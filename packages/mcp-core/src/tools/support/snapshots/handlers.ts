@@ -89,6 +89,7 @@ function fullResolutionHint({
     directToolNames,
     fallbackInstruction:
       "Full-resolution snapshot image bytes are not available in this session",
+    purpose: "for full-resolution image bytes",
   })}`;
 }
 
@@ -139,11 +140,9 @@ function formatSnapshotImageFullResolutionStep({
     directToolNames,
     fallbackInstruction:
       "Full-resolution snapshot image bytes are not available in this session",
+    purpose: "to fetch original full-resolution image bytes",
   });
-  const suffix = instruction.startsWith("Use ")
-    ? " to fetch original full-resolution image bytes"
-    : "";
-  return `- ${instruction}${suffix}`;
+  return `- ${instruction}`;
 }
 
 function countField(

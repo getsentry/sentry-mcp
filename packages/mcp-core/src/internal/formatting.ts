@@ -2058,11 +2058,10 @@ function formatIssueReplayOutput({
       directToolNames,
       fallbackInstruction:
         "Replay detail lookup is not available in this session",
+      purpose: "to inspect a replay in detail",
     });
     lines.push("");
-    lines.push(
-      `${replayDetailsInstruction}${replayDetailsInstruction.startsWith("Use ") ? " to inspect a replay in detail" : ""}.`,
-    );
+    lines.push(`${replayDetailsInstruction}.`);
   }
 
   return `${lines.join("\n")}\n\n`;

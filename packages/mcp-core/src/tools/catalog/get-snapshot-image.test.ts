@@ -176,7 +176,7 @@ describe("get_snapshot_image", () => {
       - **Status**: changed
       - **Diff**: 12.5%
       - **Image Resolution**: preview
-      - **Full Resolution**: Use the Sentry tool \`get_snapshot_image(organizationSlug='sentry', snapshotId='231949', imageIdentifier='login_screen.png', imageResolution='full')\`
+      - **Full Resolution**: Use the Sentry tool \`get_snapshot_image(organizationSlug='sentry', snapshotId='231949', imageIdentifier='login_screen.png', imageResolution='full')\` for full-resolution image bytes
       - **Display Name**: login_screen.png
       - **Group**: auth
       - **File**: \`login_screen.png\`

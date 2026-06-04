@@ -34,6 +34,38 @@ describe("tool call formatting", () => {
     );
   });
 
+  it("formats purpose text before catalog gateway steps", () => {
+    expect(
+      formatToolCallInstruction({
+        toolName: "find_releases",
+        arguments: {
+          organizationSlug: "my-org",
+        },
+        experimentalMode: true,
+        availableToolNames: new Set([
+          "find_releases",
+          "search_tools",
+          "execute_tool",
+        ]),
+        purpose: "to list releases and their details",
+      }),
+    ).toBe(
+      'Use the Sentry tool `find_releases` to list releases and their details: search `search_tools(query=\'find_releases\')`, then call `execute_tool` with name `find_releases` and arguments `{"organizationSlug":"my-org"}`',
+    );
+  });
+
+  it("does not append purpose text to fallback guidance", () => {
+    expect(
+      formatToolCallInstruction({
+        toolName: "find_releases",
+        experimentalMode: true,
+        availableToolNames: new Set(["search_tools", "execute_tool"]),
+        fallbackInstruction: "Release listing is not available",
+        purpose: "to list releases and their details",
+      }),
+    ).toBe("Release listing is not available");
+  });
+
   it("does not format non-top-level stable tools as direct calls", () => {
     expect(
       formatToolCallInstruction({

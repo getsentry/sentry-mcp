@@ -162,10 +162,9 @@ export function formatReplayResults(params: FormatReplayResultsParams): string {
     directToolNames: params.directToolNames,
     fallbackInstruction:
       "Replay detail lookup is not available in this session",
+    purpose: "to inspect a specific replay in more detail",
   });
-  output += replayDetailsInstruction.startsWith("Use ")
-    ? `- Inspect a specific replay in more detail: ${replayDetailsInstruction}\n`
-    : `- ${replayDetailsInstruction}\n`;
+  output += `- ${replayDetailsInstruction}\n`;
   output +=
     "- Pivot from a replay into related issues or traces: Open the replay link above, then use `get_sentry_resource` on related issue or trace URLs\n";
 

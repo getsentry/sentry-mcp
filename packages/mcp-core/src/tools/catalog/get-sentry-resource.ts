@@ -478,6 +478,7 @@ function generateUnsupportedResourceMessage(
         availableToolNames,
         directToolNames,
         fallbackInstruction: "Release listing is not available in this session",
+        purpose: "to list releases and their details",
       });
       return [
         "# Release Detected",
@@ -488,7 +489,7 @@ function generateUnsupportedResourceMessage(
         "To get release information:",
         "",
         `- **View in Sentry**: [Open Release](${releaseUrl})`,
-        `- **Find releases**: ${findReleasesInstruction}${findReleasesInstruction.startsWith("Use ") ? " to list releases and their details" : ""}`,
+        `- **Find releases**: ${findReleasesInstruction}`,
         `- **Search issues**: Use \`search_issues\` with query \`release:${resolved.releaseVersion}\` to find issues in this release`,
       ].join("\n");
     }
@@ -518,10 +519,8 @@ export default defineTool({
       directToolNames,
       fallbackInstruction:
         "Full-resolution snapshot image bytes are not available in this session",
+      purpose: "for full-resolution image bytes",
     });
-    const fullResolutionSuffix = fullResolutionInstruction.startsWith("Use ")
-      ? " for full-resolution image bytes."
-      : ".";
 
     return [
       "Fetch a Sentry resource by URL, or by resourceType plus resourceId.",
@@ -534,7 +533,7 @@ export default defineTool({
       "",
       "For preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):",
       "- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)",
-      `- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. ${fullResolutionInstruction}${fullResolutionSuffix}`,
+      `- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. ${fullResolutionInstruction}.`,
       "",
       "Resource IDs:",
       "- span: <traceId>:<spanId>",

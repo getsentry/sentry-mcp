@@ -780,10 +780,9 @@ export function formatProfileResults(params: FormatEventResultsParams): string {
       directToolNames: params.directToolNames,
       fallbackInstruction:
         "Profile detail lookup is not available in this session",
+      purpose: "for the full detail view",
     });
-    output += profileDetailsInstruction.startsWith("Use ")
-      ? `- Open a Profile URL above when available, or ${profileDetailsInstruction} for the full detail view\n`
-      : `- Open a Profile URL above when available. ${profileDetailsInstruction}\n`;
+    output += `- Open a Profile URL above when available. ${profileDetailsInstruction}\n`;
   }
   output +=
     "- Open the Trace URL for an end-to-end view of the profiled request when available\n";
