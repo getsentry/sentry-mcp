@@ -2,8 +2,8 @@ import { z } from "zod";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { ALL_SKILLS } from "../../skills";
 import type { ServerContext } from "../../types";
-import { searchToolCatalog } from "../catalog-runtime/search";
 import type { ToolRegistry } from "../catalog-runtime/availability";
+import { searchToolCatalog } from "../catalog-runtime/search";
 
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 20;
@@ -52,21 +52,25 @@ export function createSearchToolsTool(getTools: () => ToolRegistry) {
     requiredScopes: [],
     experimental: true,
     description: [
-      "Search available Sentry MCP tools by name and description.",
+      "Search the available Sentry MCP tool catalog by name and description.",
+      "",
+      "In experimental mode, many Sentry operations are intentionally not exposed as top-level tools. Use this for any Sentry-related task when you do not see an obvious direct tool, including long-tail inspection, project management, documentation lookup, preprod snapshots, attachments, DSNs, releases, teams, and issue-specific pivots.",
       "",
       "Use this tool when you need to:",
       "- Find the right Sentry operation before calling execute_tool",
-      "- Discover available tools for a task without scanning the full top-level tool list",
+      "- Discover available Sentry tools for a task without scanning the top-level tool list",
       "- Inspect the executable JSON input schema for an available tool",
       "",
       "<examples>",
       "search_tools(query='list projects')",
       "search_tools(query='update issue status')",
       "search_tools(query='find dsn', limit=5)",
+      "search_tools(query='snapshot image')",
       "</examples>",
       "",
       "<hints>",
       "- Results only include tools available in the current session.",
+      "- If a Sentry operation is not listed as a direct tool, search here before deciding it is unavailable.",
       "- Returned schemas already account for active organization, project, and region constraints.",
       "- Call execute_tool with the returned name and arguments that match the returned schema.",
       "- This tool returns structured JSON. Do not parse markdown from its text content.",
@@ -77,7 +81,9 @@ export function createSearchToolsTool(getTools: () => ToolRegistry) {
         .string()
         .trim()
         .min(1)
-        .describe("Keywords describing the Sentry operation to find."),
+        .describe(
+          "Natural language keywords describing the Sentry operation, resource, or workflow to find.",
+        ),
       limit: z
         .number()
         .int()

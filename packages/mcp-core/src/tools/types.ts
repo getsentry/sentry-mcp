@@ -1,13 +1,13 @@
-import type { z } from "zod";
-import type { ServerContext, ProjectCapabilities } from "../types";
-import type { Scope } from "../permissions";
-import type { Skill } from "../skills";
 import type {
   CallToolResult,
-  TextContent,
-  ImageContent,
   EmbeddedResource,
+  ImageContent,
+  TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
+import type { z } from "zod";
+import type { Scope } from "../permissions";
+import type { Skill } from "../skills";
+import type { ProjectCapabilities, ServerContext } from "../types";
 
 export type ToolContent = TextContent | ImageContent | EmbeddedResource;
 export type ToolOutput = string | ToolContent[] | CallToolResult;
@@ -31,6 +31,8 @@ export type ToolHandler<
  */
 export interface DescriptionContext {
   experimentalMode: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
 }
 
 /**

@@ -36,7 +36,7 @@ import tools from "./tools/index";
 import {
   executeToolHandler,
   getFilteredInputSchema,
-  getToolsForMcpRegistration,
+  getAvailableTools,
   injectConstraintParams,
   resolveToolDescription,
   type RegisteredToolHandlerExtra,
@@ -182,13 +182,25 @@ function configureServer({
   const grantedSkillIds = grantedSkills
     ? Array.from(grantedSkills).sort()
     : undefined;
-  const toolsToRegister = getToolsForMcpRegistration({
+  const availableTools = getAvailableTools({
     tools: registry,
     context,
     agentMode,
     experimentalMode,
     useDefaultSurfacePolicy: !customTools || agentMode,
   });
+  const toolsToRegister = agentMode
+    ? availableTools
+    : availableTools.filter(({ isTopLevel }) => isTopLevel);
+  const contextWithToolAvailability: ServerContext = {
+    ...context,
+    availableToolNames: new Set(
+      availableTools.flatMap(({ key, tool }) => [key, tool.name]),
+    ),
+    directToolNames: new Set(
+      toolsToRegister.flatMap(({ key, tool }) => [key, tool.name]),
+    ),
+  };
 
   server.server.onerror = (error) => {
     const transportLogOptions: LogIssueOptions = {
@@ -204,8 +216,15 @@ function configureServer({
   };
 
   for (const { tool } of toolsToRegister) {
-    const filteredInputSchema = getFilteredInputSchema(tool, context);
-    const resolvedDescription = resolveToolDescription(tool, experimentalMode);
+    const filteredInputSchema = getFilteredInputSchema(
+      tool,
+      contextWithToolAvailability,
+    );
+    const resolvedDescription = resolveToolDescription(tool, {
+      experimentalMode,
+      availableToolNames: contextWithToolAvailability.availableToolNames,
+      directToolNames: contextWithToolAvailability.directToolNames,
+    });
 
     server.registerTool(
       tool.name,
@@ -266,7 +285,7 @@ function configureServer({
           const paramsWithConstraints = injectConstraintParams(
             rawParams,
             tool,
-            context,
+            contextWithToolAvailability,
           );
 
           if (activeSpan) {
@@ -286,7 +305,7 @@ function configureServer({
           const output = await executeToolHandler({
             tool,
             params: rawParams,
-            context,
+            context: contextWithToolAvailability,
           });
 
           if (activeSpan) {

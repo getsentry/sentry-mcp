@@ -8,7 +8,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
-import { z, type ZodTypeAny } from "zod";
+import { type ZodTypeAny, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -81,13 +81,15 @@ function generateToolDefinitions({
       throw new Error(`Invalid tool: ${key}`);
     const t = tool as {
       name: string;
-      description: string;
+      description:
+        | string
+        | ((context: { experimentalMode: boolean }) => string);
       inputSchema: Record<string, ZodTypeAny>;
       requiredScopes: string[]; // must exist on all tools (can be empty)
       experimental?: boolean;
       hideInExperimentalMode?: boolean;
     };
-    if (!surfacesModule.isDefaultTopLevelToolName(t.name)) {
+    if (!surfacesModule.isTopLevelToolName(t.name, experimentalMode)) {
       return null;
     }
     if (!toolTypesModule.isToolVisibleInMode(t, experimentalMode)) {
@@ -99,7 +101,9 @@ function generateToolDefinitions({
     const jsonSchema = zodFieldMapToJsonSchema(t.inputSchema || {});
     return {
       name: t.name,
-      description: t.description,
+      description: toolTypesModule.resolveDescription(t.description, {
+        experimentalMode,
+      }),
       // Export full JSON Schema under inputSchema for external docs
       inputSchema: jsonSchema,
       // Preserve tool access requirements for UIs/docs
@@ -154,7 +158,9 @@ async function generateSkillDefinitions() {
 
       const t = tool as {
         name: string;
-        description: string;
+        description:
+          | string
+          | ((context: { experimentalMode: boolean }) => string);
         skills: string[];
         requiredScopes: string[];
       };
@@ -170,7 +176,9 @@ async function generateSkillDefinitions() {
       if (Array.isArray(t.skills) && t.skills.includes(skill.id)) {
         skillTools.push({
           name: t.name,
-          description: t.description,
+          description: toolTypesModule.resolveDescription(t.description, {
+            experimentalMode: false,
+          }),
           requiredScopes: Array.isArray(t.requiredScopes)
             ? t.requiredScopes
             : [],
@@ -243,6 +251,11 @@ function isUpToDate(outDir: string): boolean {
   const otherInputs = [
     path.join(__dirname, "../src/skills.ts"),
     path.join(__dirname, "../src/tools/surfaces.ts"),
+    path.join(__dirname, "../src/tools/types.ts"),
+    path.join(
+      __dirname,
+      "../src/internal/tool-helpers/tool-call-formatting.ts",
+    ),
     path.join(__dirname, "generate-definitions.ts"),
   ];
   for (const inputPath of otherInputs) {

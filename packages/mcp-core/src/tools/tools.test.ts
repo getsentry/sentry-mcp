@@ -5,9 +5,11 @@ import { assert, test } from "vitest";
 import catalogTools from "./catalog/index.js";
 import * as tools from "./index.js";
 import {
+  EXPERIMENTAL_TOP_LEVEL_TOOL_NAMES,
   TOP_LEVEL_TOOL_NAMES,
   WRAPPER_TOOL_NAMES,
   isDefaultTopLevelToolName,
+  isTopLevelToolName,
 } from "./surfaces.js";
 import { isToolVisibleInMode, resolveDescription } from "./types.js";
 
@@ -35,14 +37,16 @@ function getCatalogToolSourceFileName(toolName: string): string {
 }
 
 test(`all tool descriptions under maximum length`, () => {
-  for (const tool of Object.values(tools.default)) {
-    const length = resolveDescription(tool.description, {
-      experimentalMode: false,
-    }).length;
-    assert(
-      length < DESCRIPTION_MAX_LENGTH,
-      `${tool.name} description must be less than ${DESCRIPTION_MAX_LENGTH} characters (was ${length})`,
-    );
+  for (const experimentalMode of [false, true]) {
+    for (const tool of Object.values(tools.default)) {
+      const length = resolveDescription(tool.description, {
+        experimentalMode,
+      }).length;
+      assert(
+        length < DESCRIPTION_MAX_LENGTH,
+        `${tool.name} description must be less than ${DESCRIPTION_MAX_LENGTH} characters in ${experimentalMode ? "experimental" : "stable"} mode (was ${length})`,
+      );
+    }
   }
 });
 
@@ -75,7 +79,7 @@ test("public tool count stays within the hard limit in all modes", () => {
   for (const experimentalMode of [false, true]) {
     const visibleTools = Object.entries(tools.default).filter(
       ([toolName, tool]) =>
-        isDefaultTopLevelToolName(toolName) &&
+        isTopLevelToolName(toolName, experimentalMode) &&
         isToolVisibleInMode(tool, experimentalMode),
     );
 
@@ -91,6 +95,13 @@ test("central direct exposure policy references existing tools", () => {
 
   for (const toolName of TOP_LEVEL_TOOL_NAMES) {
     assert(toolNames.has(toolName), `top-level tool '${toolName}' must exist`);
+  }
+
+  for (const toolName of EXPERIMENTAL_TOP_LEVEL_TOOL_NAMES) {
+    assert(
+      toolNames.has(toolName),
+      `experimental top-level tool '${toolName}' must exist`,
+    );
   }
 
   for (const toolName of WRAPPER_TOOL_NAMES) {

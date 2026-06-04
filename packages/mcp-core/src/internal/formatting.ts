@@ -34,6 +34,7 @@ import {
   getStatusDisplayName,
   isTerminalStatus,
 } from "./tool-helpers/seer";
+import { formatToolCallInstruction } from "./tool-helpers/tool-call-formatting";
 import { formatUserGeoSummary } from "./user-formatting";
 
 /**
@@ -184,6 +185,9 @@ export function formatEventOutput(
       apiService: SentryApiService;
       organizationSlug: string;
       relatedReplayIds?: string[];
+      experimentalMode?: boolean;
+      availableToolNames?: ReadonlySet<string>;
+      directToolNames?: ReadonlySet<string>;
     };
   },
 ) {
@@ -204,6 +208,9 @@ export function formatEventOutput(
       organizationSlug: options.replaySummary.organizationSlug,
       event,
       relatedReplayIds: options.replaySummary.relatedReplayIds,
+      experimentalMode: options.replaySummary.experimentalMode ?? false,
+      availableToolNames: options.replaySummary.availableToolNames,
+      directToolNames: options.replaySummary.directToolNames,
     });
   }
 
@@ -1754,6 +1761,8 @@ export function formatIssueOutput({
   externalIssues,
   relatedReplayIds,
   experimentalMode,
+  availableToolNames,
+  directToolNames,
 }: {
   organizationSlug: string;
   issue: Issue;
@@ -1764,6 +1773,8 @@ export function formatIssueOutput({
   externalIssues?: ExternalIssueList;
   relatedReplayIds?: string[];
   experimentalMode?: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
 }) {
   let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
 
@@ -1911,6 +1922,9 @@ export function formatIssueOutput({
       apiService,
       organizationSlug,
       relatedReplayIds,
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
     },
   });
 
@@ -1938,7 +1952,19 @@ export function formatIssueOutput({
   output += `- Commit message issue reference: \`Fixes ${issue.shortId}\` automatically closes the issue when the commit is merged.\n`;
   output +=
     "- The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.\n";
-  output += `- Issue event search: \`search_issue_events(organizationSlug='${organizationSlug}', issueId='${issue.shortId}', query='your query')\`\n`;
+  const issueEventSearchInstruction = formatToolCallInstruction({
+    toolName: "search_issue_events",
+    arguments: {
+      organizationSlug,
+      issueId: issue.shortId,
+      query: "your query",
+    },
+    experimentalMode: experimentalMode ?? false,
+    availableToolNames,
+    directToolNames,
+    fallbackInstruction: "Issue event search is not available in this session",
+  });
+  output += `- Issue event search: ${issueEventSearchInstruction}\n`;
   if (traceId) {
     output += `- Full distributed trace and span tree: \`get_sentry_resource(resourceType='trace', organizationSlug='${organizationSlug}', resourceId='${traceId}')\`\n`;
     output += `- Related span search: \`search_events(organizationSlug='${organizationSlug}', dataset='spans', query='trace:${traceId}')\`\n`;
@@ -1957,11 +1983,17 @@ function formatIssueReplayOutput({
   organizationSlug,
   event,
   relatedReplayIds,
+  experimentalMode,
+  availableToolNames,
+  directToolNames,
 }: {
   apiService: SentryApiService;
   organizationSlug: string;
   event: Event;
   relatedReplayIds?: string[];
+  experimentalMode: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
 }): string {
   const attachedReplayId = getReplayIdFromEvent(event);
   const normalizedRelatedReplayIds = dedupeReplayIds(relatedReplayIds ?? []);
@@ -2015,9 +2047,21 @@ function formatIssueReplayOutput({
   const exampleReplayId =
     attachedReplayId ?? normalizedRelatedReplayIds.at(0) ?? null;
   if (exampleReplayId) {
+    const replayDetailsInstruction = formatToolCallInstruction({
+      toolName: "get_replay_details",
+      arguments: {
+        organizationSlug,
+        replayId: exampleReplayId,
+      },
+      experimentalMode,
+      availableToolNames,
+      directToolNames,
+      fallbackInstruction:
+        "Replay detail lookup is not available in this session",
+    });
     lines.push("");
     lines.push(
-      `Use \`get_replay_details(organizationSlug='${organizationSlug}', replayId='${exampleReplayId}')\` to inspect a replay in detail.`,
+      `${replayDetailsInstruction}${replayDetailsInstruction.startsWith("Use ") ? " to inspect a replay in detail" : ""}.`,
     );
   }
 

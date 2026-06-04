@@ -1,24 +1,25 @@
-import { z } from "zod";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type {
   ServerNotification,
   ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { setTag } from "@sentry/core";
-import { isEnabledBySkills, type Skill } from "../../skills";
+import { z } from "zod";
+import { UserInputError } from "../../errors";
 import {
   getConstraintKeysToFilter,
   getConstraintParametersToInject,
 } from "../../internal/constraint-helpers";
-import { UserInputError } from "../../errors";
+import { type Skill, isEnabledBySkills } from "../../skills";
 import type { ProjectCapabilities, ServerContext } from "../../types";
 import {
   isCatalogInfrastructureToolName,
-  isDefaultTopLevelToolName,
   isOutsideCatalogToolName,
+  isTopLevelToolName,
 } from "../surfaces";
 import {
   type ToolConfig,
+  type DescriptionContext,
   isToolVisibleInMode,
   resolveDescription,
 } from "../types";
@@ -40,9 +41,11 @@ export interface CatalogContext {
 
 function getToolPlacement({
   key,
+  experimentalMode,
   useDefaultSurfacePolicy,
 }: {
   key: string;
+  experimentalMode: boolean;
   useDefaultSurfacePolicy: boolean;
 }): {
   isCatalogTool: boolean;
@@ -51,7 +54,7 @@ function getToolPlacement({
   if (useDefaultSurfacePolicy) {
     return {
       isCatalogTool: !isOutsideCatalogToolName(key),
-      isTopLevel: isDefaultTopLevelToolName(key),
+      isTopLevel: isTopLevelToolName(key, experimentalMode),
     };
   }
 
@@ -162,7 +165,11 @@ export function getAvailableTools({
   const availableTools: ToolWithContext[] = [];
 
   for (const [key, tool] of Object.entries(tools)) {
-    const placement = getToolPlacement({ key, useDefaultSurfacePolicy });
+    const placement = getToolPlacement({
+      key,
+      experimentalMode,
+      useDefaultSurfacePolicy,
+    });
 
     if (agentMode) {
       if (key !== "use_sentry") {
@@ -279,9 +286,9 @@ export async function executeToolHandler({
 
 export function resolveToolDescription(
   tool: ToolConfig<any>,
-  experimentalMode: boolean,
+  context: DescriptionContext,
 ): string {
-  return resolveDescription(tool.description, { experimentalMode });
+  return resolveDescription(tool.description, context);
 }
 
 export type RegisteredToolHandlerExtra = RequestHandlerExtra<

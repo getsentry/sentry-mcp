@@ -5,17 +5,21 @@ import type {
 import type { SentryApiService } from "../../../api-client";
 import { UserInputError } from "../../../errors";
 import {
+  type ImagePreviewResult,
   blobToBase64,
   createImagePreview,
-  type ImagePreviewResult,
 } from "../../../internal/blob-utils";
 import {
+  formatToolCall,
+  formatToolCallInstruction,
+} from "../../../internal/tool-helpers/tool-call-formatting";
+import {
+  type SnapshotImageEntry,
+  type SnapshotImageTreeItem,
   formatSnapshotDiffPercent,
   getSnapshotImageDisplayName,
   renderSnapshotImageContext,
   renderSnapshotImageTreeSection,
-  type SnapshotImageEntry,
-  type SnapshotImageTreeItem,
 } from "./formatting";
 
 interface SnapshotDiffPair {
@@ -57,10 +61,89 @@ interface SnapshotImageDetailResponse {
 
 export type SnapshotImageResolution = "preview" | "full";
 
-function fullResolutionHint(
-  _nextSteps: "snapshot-tools" | "resource-url" | "resource-id" | undefined,
-): string {
-  return '- **Full Resolution**: set `imageResolution="full"` in `get_snapshot_image`';
+function fullResolutionHint({
+  organizationSlug,
+  snapshotId,
+  imageIdentifier,
+  experimentalMode,
+  availableToolNames,
+  directToolNames,
+}: {
+  organizationSlug: string;
+  snapshotId: string;
+  imageIdentifier: string;
+  experimentalMode: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
+}): string {
+  return `- **Full Resolution**: ${formatToolCallInstruction({
+    toolName: "get_snapshot_image",
+    arguments: {
+      organizationSlug,
+      snapshotId,
+      imageIdentifier,
+      imageResolution: "full",
+    },
+    experimentalMode,
+    availableToolNames,
+    directToolNames,
+    fallbackInstruction:
+      "Full-resolution snapshot image bytes are not available in this session",
+  })}`;
+}
+
+function getSnapshotImagePreviewFallback({
+  organizationSlug,
+  snapshotId,
+  imageIdentifier,
+}: {
+  organizationSlug: string;
+  snapshotId: string;
+  imageIdentifier: string;
+}): string {
+  return `Use the Sentry tool \`${formatToolCall({
+    toolName: "get_sentry_resource",
+    arguments: {
+      organizationSlug,
+      resourceType: "snapshotImage",
+      resourceId: `${snapshotId}:${imageIdentifier}`,
+    },
+  })}\``;
+}
+
+function formatSnapshotImageFullResolutionStep({
+  organizationSlug,
+  snapshotId,
+  imageIdentifier,
+  experimentalMode,
+  availableToolNames,
+  directToolNames,
+}: {
+  organizationSlug: string;
+  snapshotId: string;
+  imageIdentifier: string;
+  experimentalMode: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
+}): string {
+  const instruction = formatToolCallInstruction({
+    toolName: "get_snapshot_image",
+    arguments: {
+      organizationSlug,
+      snapshotId,
+      imageIdentifier,
+      imageResolution: "full",
+    },
+    experimentalMode,
+    availableToolNames,
+    directToolNames,
+    fallbackInstruction:
+      "Full-resolution snapshot image bytes are not available in this session",
+  });
+  const suffix = instruction.startsWith("Use ")
+    ? " to fetch original full-resolution image bytes"
+    : "";
+  return `- ${instruction}${suffix}`;
 }
 
 function countField(
@@ -149,6 +232,9 @@ export async function fetchSnapshotImage(
   imageResolution: SnapshotImageResolution,
   options: {
     nextSteps?: "snapshot-tools" | "resource-url" | "resource-id";
+    experimentalMode?: boolean;
+    availableToolNames?: ReadonlySet<string>;
+    directToolNames?: ReadonlySet<string>;
   } = {},
 ): Promise<(TextContent | ImageContent)[]> {
   const detail = (await apiService.getSnapshotImageDetail({
@@ -183,7 +269,16 @@ export async function fetchSnapshotImage(
     lines.push(`- **Previous File**: \`${detail.previous_image_file_name}\``);
   lines.push(`- **Image Resolution**: ${imageResolution}`);
   if (imageResolution === "preview") {
-    lines.push(fullResolutionHint(options.nextSteps));
+    lines.push(
+      fullResolutionHint({
+        organizationSlug,
+        snapshotId,
+        imageIdentifier,
+        experimentalMode: options.experimentalMode ?? false,
+        availableToolNames: options.availableToolNames,
+        directToolNames: options.directToolNames,
+      }),
+    );
   }
 
   const primary = headImage ?? baseImage;
@@ -262,6 +357,9 @@ export async function fetchSnapshotSummary(
     showUnmodified?: boolean;
     listImagesWhenNoDiffs?: boolean;
     nextSteps?: "snapshot-tools" | "resource-url" | "resource-id";
+    experimentalMode?: boolean;
+    availableToolNames?: ReadonlySet<string>;
+    directToolNames?: ReadonlySet<string>;
   } = {},
 ): Promise<string> {
   const data = (await apiService.getSnapshotDetails({
@@ -419,15 +517,57 @@ export async function fetchSnapshotSummary(
     const separator = resolvedSnapshotUrl.includes("?") ? "&" : "?";
     const selectedImageUrl = `${resolvedSnapshotUrl}${separator}selectedSnapshot=<image_file_name>`;
     sections.push(
-      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(url="${selectedImageUrl}")\`\n- To fetch original full-resolution image bytes, use \`get_snapshot_image\``,
+      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(url="${selectedImageUrl}")\`\n${formatSnapshotImageFullResolutionStep(
+        {
+          organizationSlug,
+          snapshotId,
+          imageIdentifier: "<image_file_name>",
+          experimentalMode: options.experimentalMode ?? false,
+          availableToolNames: options.availableToolNames,
+          directToolNames: options.directToolNames,
+        },
+      )}`,
     );
   } else if (options.nextSteps === "resource-id") {
     sections.push(
-      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(resourceType="snapshotImage", resourceId="${snapshotId}:<image_file_name>")\`\n- To fetch original full-resolution image bytes, use \`get_snapshot_image\``,
+      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(resourceType="snapshotImage", resourceId="${snapshotId}:<image_file_name>")\`\n${formatSnapshotImageFullResolutionStep(
+        {
+          organizationSlug,
+          snapshotId,
+          imageIdentifier: "<image_file_name>",
+          experimentalMode: options.experimentalMode ?? false,
+          availableToolNames: options.availableToolNames,
+          directToolNames: options.directToolNames,
+        },
+      )}`,
     );
   } else {
     sections.push(
-      `\n## Next Steps\n\n- To view a specific image preview, use \`get_snapshot_image(organizationSlug="${organizationSlug}", snapshotId="${snapshotId}", imageIdentifier="<image_file_name>")\`\n- To fetch original full-resolution image bytes, set \`imageResolution="full"\` in \`get_snapshot_image\``,
+      `\n## Next Steps\n\n- ${formatToolCallInstruction({
+        toolName: "get_snapshot_image",
+        arguments: {
+          organizationSlug,
+          snapshotId,
+          imageIdentifier: "<image_file_name>",
+        },
+        experimentalMode: options.experimentalMode ?? false,
+        availableToolNames: options.availableToolNames,
+        directToolNames: options.directToolNames,
+        fallbackInstruction: getSnapshotImagePreviewFallback({
+          organizationSlug,
+          snapshotId,
+          imageIdentifier: "<image_file_name>",
+        }),
+      })} to view a specific image preview\n${formatSnapshotImageFullResolutionStep(
+        {
+          organizationSlug,
+          snapshotId,
+          imageIdentifier: "<image_file_name>",
+          experimentalMode: options.experimentalMode ?? false,
+          availableToolNames: options.availableToolNames,
+          directToolNames: options.directToolNames,
+        },
+      )}`,
     );
   }
 

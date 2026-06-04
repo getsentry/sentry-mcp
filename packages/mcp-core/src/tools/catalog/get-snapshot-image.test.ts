@@ -1,13 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { decode as decodePng, encode as encodePng } from "fast-png";
-import { http, HttpResponse } from "msw";
-import { mswServer } from "@sentry/mcp-server-mocks";
 import type {
   ImageContent,
   TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
-import getSnapshotImage from "./get-snapshot-image.js";
+import { mswServer } from "@sentry/mcp-server-mocks";
+import { decode as decodePng, encode as encodePng } from "fast-png";
+import { http, HttpResponse } from "msw";
+import { describe, expect, it } from "vitest";
 import { getServerContext } from "../../test-setup.js";
+import getSnapshotImage from "./get-snapshot-image.js";
 
 const fakePng = encodePng({
   width: 1,
@@ -127,7 +127,11 @@ function callHandler(
       regionUrl: null,
       ...overrides,
     },
-    getServerContext(),
+    {
+      ...getServerContext(),
+      availableToolNames: new Set(["get_snapshot_image"]),
+      directToolNames: new Set(["get_snapshot_image"]),
+    },
   );
 }
 
@@ -156,7 +160,9 @@ describe("get_snapshot_image", () => {
     expect(textParts[0]!.text).toContain("**Status**: changed");
     expect(textParts[0]!.text).toContain("**Diff**: 12.5%");
     expect(textParts[0]!.text).toContain("**Image Resolution**: preview");
-    expect(textParts[0]!.text).toContain('imageResolution="full"');
+    expect(textParts[0]!.text).toContain(
+      "Use the Sentry tool `get_snapshot_image(organizationSlug='sentry', snapshotId='231949', imageIdentifier='login_screen.png', imageResolution='full')`",
+    );
     expect(textParts[0]!.text).toContain("### Context");
     expect(textParts[0]!.text).toContain("- **device_name**: iPhone 16");
     expect(textParts[1]!.text).toBe("### Head (current) — preview");
@@ -170,7 +176,7 @@ describe("get_snapshot_image", () => {
       - **Status**: changed
       - **Diff**: 12.5%
       - **Image Resolution**: preview
-      - **Full Resolution**: set \`imageResolution="full"\` in \`get_snapshot_image\`
+      - **Full Resolution**: Use the Sentry tool \`get_snapshot_image(organizationSlug='sentry', snapshotId='231949', imageIdentifier='login_screen.png', imageResolution='full')\`
       - **Display Name**: login_screen.png
       - **Group**: auth
       - **File**: \`login_screen.png\`

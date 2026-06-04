@@ -6,9 +6,9 @@ import { buildServer } from "./server";
 import tools from "./tools";
 import {
   CATALOG_INFRASTRUCTURE_TOOL_NAMES,
-  TOP_LEVEL_TOOL_NAMES,
+  getTopLevelToolNames,
 } from "./tools/surfaces";
-import { isToolVisibleInMode, type ToolConfig } from "./tools/types";
+import { type ToolConfig, isToolVisibleInMode } from "./tools/types";
 import type { ServerContext } from "./types";
 
 // Mock the Sentry core module
@@ -108,7 +108,7 @@ function getExpectedTopLevelToolNames({
   docs?: boolean;
   experimental?: boolean;
 } = {}) {
-  return [...TOP_LEVEL_TOOL_NAMES]
+  return [...getTopLevelToolNames({ experimentalMode: experimental })]
     .filter((toolName) => docs || !DOC_TOOL_NAMES.has(toolName))
     .filter((toolName) => isToolVisibleInMode(tools[toolName], experimental))
     .filter(
@@ -504,10 +504,15 @@ describe("buildServer", () => {
 
   describe("dynamic descriptions", () => {
     it("resolves function descriptions with context", () => {
-      const dynamicDescription = vi.fn((ctx: { experimentalMode: boolean }) =>
-        ctx.experimentalMode
-          ? "Experimental description"
-          : "Normal description",
+      const dynamicDescription = vi.fn(
+        (ctx: {
+          experimentalMode: boolean;
+          availableToolNames?: ReadonlySet<string>;
+          directToolNames?: ReadonlySet<string>;
+        }) =>
+          ctx.experimentalMode
+            ? "Experimental description"
+            : "Normal description",
       );
 
       buildServer({
@@ -521,9 +526,23 @@ describe("buildServer", () => {
       });
 
       // The description function should be called with the correct context
-      expect(dynamicDescription).toHaveBeenCalledWith({
-        experimentalMode: true,
-      });
+      expect(dynamicDescription).toHaveBeenCalledWith(
+        expect.objectContaining({
+          experimentalMode: true,
+          availableToolNames: expect.any(Set),
+          directToolNames: expect.any(Set),
+        }),
+      );
+      expect(
+        dynamicDescription.mock.calls[0]![0].availableToolNames?.has(
+          "dynamic_tool",
+        ),
+      ).toBe(true);
+      expect(
+        dynamicDescription.mock.calls[0]![0].directToolNames?.has(
+          "dynamic_tool",
+        ),
+      ).toBe(true);
     });
 
     it("passes static descriptions unchanged", () => {
@@ -671,6 +690,75 @@ describe("buildServer", () => {
       );
       expect(toolNames).toContain("search_tools");
       expect(toolNames).toContain("execute_tool");
+    });
+
+    it("does not advertise stable-only hidden snapshot image calls in stable descriptions", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set([...baseContext.grantedSkills!, "preprod"]),
+        },
+      });
+
+      const registeredTools = await listRegisteredTools(server);
+      const getSentryResource = registeredTools.find(
+        (tool) => tool.name === "get_sentry_resource",
+      );
+
+      expect(getSentryResource?.description).toContain(
+        "Full-resolution snapshot image bytes are not available in this session",
+      );
+      expect(getSentryResource?.description).not.toContain(
+        "get_snapshot_image(",
+      );
+    });
+
+    it("does not recommend unavailable catalog tools in generated runtime guidance", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["triage"]),
+        },
+        experimentalMode: true,
+      });
+
+      const result = await callRegisteredTool(server, "get_sentry_resource", {
+        url: "https://my-org.sentry.io/releases/v1.2.3/",
+      });
+      const text = getTextContent(result);
+
+      expect(text).toContain(
+        "- **Find releases**: Release listing is not available in this session",
+      );
+      expect(text).not.toContain("find_releases(");
+      expect(text).not.toContain(
+        "search `search_tools(query='find_releases')`",
+      );
+    });
+
+    it("keeps long-tail tools catalog-only in experimental mode", async () => {
+      const server = buildServer({
+        context: baseContext,
+        experimentalMode: true,
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+
+      expect(toolNames).not.toContain("create_project");
+      expect(toolNames).not.toContain("find_releases");
+      expect(toolNames).not.toContain("get_event_attachment");
+
+      const result = await callRegisteredTool(server, "search_tools", {
+        query: "create project",
+        limit: 5,
+      });
+      const payload = getStructuredContent<{
+        results: Array<{ name: string }>;
+      }>(result);
+
+      expect(payload.results.map((tool) => tool.name)).toContain(
+        "create_project",
+      );
     });
 
     it("discloses only use_sentry through MCP tools/list in agent mode", async () => {

@@ -1,10 +1,10 @@
-import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "../../internal/tool-helpers/define";
-import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import type { ServerContext } from "../../types";
-import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+import { z } from "zod";
 import { UserInputError } from "../../errors";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+import type { ServerContext } from "../../types";
 import { fetchSnapshotImage } from "../support/snapshots/handlers";
 
 export default defineTool({
@@ -85,7 +85,12 @@ export default defineTool({
       params.snapshotId,
       params.imageIdentifier,
       params.imageResolution,
-      { nextSteps: "snapshot-tools" },
+      {
+        nextSteps: "snapshot-tools",
+        experimentalMode: context.experimentalMode ?? false,
+        availableToolNames: context.availableToolNames,
+        directToolNames: context.directToolNames,
+      },
     );
   },
 });

@@ -1,48 +1,70 @@
-import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "../../internal/tool-helpers/define";
-import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import type { ServerContext } from "../../types";
-import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+import { z } from "zod";
 import { UserInputError } from "../../errors";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
+import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+import type { ServerContext } from "../../types";
 import { fetchSnapshotSummary } from "../support/snapshots/handlers";
 
 export default defineTool({
   name: "get_snapshot",
   skills: ["preprod"],
   requiredScopes: ["project:read"],
-  description: [
-    "Get a preprod snapshot comparison summary, including metadata, counts, and changed image sections.",
-    "",
-    "Use this tool when you need to:",
-    "- Investigate a failed snapshot test from CI",
-    "- Review what changed in a specific preprod snapshot",
-    "- Browse snapshot image file names before viewing a specific image",
-    "",
-    "Pass organizationSlug and snapshotId. Use get_sentry_resource for snapshot URLs.",
-    "Compact output is returned by default. Set showUnmodified=true to list unchanged and skipped images separately.",
-    "",
-    "<examples>",
-    "### Browse a snapshot",
-    "",
-    "```",
-    'get_snapshot(organizationSlug="sentry", snapshotId="231949")',
-    "```",
-    "",
-    "### Include unchanged and skipped images",
-    "",
-    "```",
-    'get_snapshot(organizationSlug="sentry", snapshotId="231949", showUnmodified=true)',
-    "```",
-    "</examples>",
-    "",
-    "<hints>",
-    "- Use get_snapshot_image to view a specific image preview or full-resolution image bytes.",
-    "- Use get_sentry_resource when starting from a Sentry snapshot URL.",
-    "- The diff percent field shows what percentage of pixels changed (0-100).",
-    "- showUnmodified=true is useful when a diff snapshot has no changed image sections.",
-    "</hints>",
-  ].join("\n"),
+  description: ({ experimentalMode, availableToolNames, directToolNames }) => {
+    const imageInstruction = formatToolCallInstruction({
+      toolName: "get_snapshot_image",
+      arguments: {
+        organizationSlug: "<organization_slug>",
+        snapshotId: "<snapshot_id>",
+        imageIdentifier: "<image_file_name>",
+      },
+      experimentalMode,
+      availableToolNames,
+      directToolNames,
+      fallbackInstruction:
+        "Use the Sentry tool `get_sentry_resource(resourceType='snapshotImage', organizationSlug='<organization_slug>', resourceId='<snapshot_id>:<image_file_name>')`",
+    });
+    const imageInstructionSuffix = imageInstruction.includes(
+      "get_snapshot_image",
+    )
+      ? " to view a specific image preview or full-resolution image bytes."
+      : " to view a specific image preview.";
+
+    return [
+      "Get a preprod snapshot comparison summary, including metadata, counts, and changed image sections.",
+      "",
+      "Use this tool when you need to:",
+      "- Investigate a failed snapshot test from CI",
+      "- Review what changed in a specific preprod snapshot",
+      "- Browse snapshot image file names before viewing a specific image",
+      "",
+      "Pass organizationSlug and snapshotId. Use get_sentry_resource for snapshot URLs.",
+      "Compact output is returned by default. Set showUnmodified=true to list unchanged and skipped images separately.",
+      "",
+      "<examples>",
+      "### Browse a snapshot",
+      "",
+      "```",
+      'get_snapshot(organizationSlug="sentry", snapshotId="231949")',
+      "```",
+      "",
+      "### Include unchanged and skipped images",
+      "",
+      "```",
+      'get_snapshot(organizationSlug="sentry", snapshotId="231949", showUnmodified=true)',
+      "```",
+      "</examples>",
+      "",
+      "<hints>",
+      `- ${imageInstruction}${imageInstructionSuffix}`,
+      "- Use get_sentry_resource when starting from a Sentry snapshot URL.",
+      "- The diff percent field shows what percentage of pixels changed (0-100).",
+      "- showUnmodified=true is useful when a diff snapshot has no changed image sections.",
+      "</hints>",
+    ].join("\n");
+  },
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
     snapshotId: z
@@ -84,6 +106,9 @@ export default defineTool({
         showUnmodified: params.showUnmodified,
         listImagesWhenNoDiffs: true,
         nextSteps: "snapshot-tools",
+        experimentalMode: context.experimentalMode ?? false,
+        availableToolNames: context.availableToolNames,
+        directToolNames: context.directToolNames,
       },
     );
   },

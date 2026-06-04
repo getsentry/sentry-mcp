@@ -1,4 +1,5 @@
 import type { SentryApiService } from "../../../api-client";
+import { formatToolCallInstruction } from "../../../internal/tool-helpers/tool-call-formatting";
 import { formatUserGeoSummary } from "../../../internal/user-formatting";
 import { logInfo } from "../../../telem/logging";
 import { formatDuration } from "../profile/analyzer";
@@ -108,6 +109,9 @@ export interface FormatEventResultsParams {
   fields: string[];
   explanation?: string;
   executedSearch?: ExecutedSearch;
+  experimentalMode?: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
 }
 
 function formatUserFieldLines(
@@ -760,8 +764,27 @@ export function formatProfileResults(params: FormatEventResultsParams): string {
   }
 
   output += "## Next Steps\n\n";
-  output +=
-    "- Open a Profile URL above when available, or pass the profile identifiers to `get_profile_details` for the full detail view\n";
+  if (params.experimentalMode === true) {
+    output +=
+      "- Open a Profile URL above when available, or use `get_sentry_resource` with the profile URL for the full detail view\n";
+  } else {
+    const profileDetailsInstruction = formatToolCallInstruction({
+      toolName: "get_profile_details",
+      arguments: {
+        organizationSlug,
+        projectSlugOrId: "<project>",
+        profileId: "<profile_id>",
+      },
+      experimentalMode: false,
+      availableToolNames: params.availableToolNames,
+      directToolNames: params.directToolNames,
+      fallbackInstruction:
+        "Profile detail lookup is not available in this session",
+    });
+    output += profileDetailsInstruction.startsWith("Use ")
+      ? `- Open a Profile URL above when available, or ${profileDetailsInstruction} for the full detail view\n`
+      : `- Open a Profile URL above when available. ${profileDetailsInstruction}\n`;
+  }
   output +=
     "- Open the Trace URL for an end-to-end view of the profiled request when available\n";
   output +=
