@@ -6,12 +6,15 @@ Step-by-step guide for adding new tools to the Sentry MCP server.
 
 Not every tool is exposed to every consumer. We rely on several mechanisms to keep the active tool set manageable:
 
+- **Catalog by default** — Most tools are searchable/executable through `search_tools` + `execute_tool` automatically when experimental mode is enabled. Search uses the tool's existing name and description.
+- **Catalog registry** — `packages/mcp-core/src/tools/catalog/index.ts` lists ordinary Sentry operation tools. The catalog directory is intentionally flat: one tool entry per file.
+- **Special tools** — Wrapper/gateway tools (`search_tools`, `execute_tool`, `use_sentry`) live in `packages/mcp-core/src/tools/special/`. They still use the same tool types, but they are kept out of the ordinary catalog.
+- **Central direct exposure policy** — `packages/mcp-core/src/tools/surfaces.ts` lists the catalog tools that are also exposed directly through MCP `tools/list`.
 - **`requiredCapabilities`** — Tools declare which project capabilities they need (e.g. `profiles`, `replays`, `traces`). If the upstream project doesn't have a capability enabled, the tool is automatically hidden.
-- **`internalOnly`** — Composition primitives (e.g. `get_issue_details`, `get_trace_details`) that are only called by other tools like `get_sentry_resource`, never exposed directly via MCP.
 - **`experimental` / `hideInExperimentalMode`** — Feature flags for tools that are being tested or replaced.
 - **Skills & constraints** — The server filters tools based on granted skills and org/project constraints.
 
-We also expect upstream consumers (Claude Code plugins, Cursor, etc.) to use **tool selection** or **progressive disclosure** on their end. The total registered tool count can exceed what any single session needs because consumers pick a relevant subset.
+We also expect upstream consumers (Claude Code plugins, Cursor, etc.) to use **tool selection** or **progressive disclosure** on their end. The catalog can contain more tools than the direct MCP surface, but the registered top-level tool count must still stay within the limits below.
 
 ## Tool Count Limits
 
@@ -20,25 +23,40 @@ Target ~20 publicly visible tools. Never exceed 25. AI agents have limited tool 
 Before adding a new tool, consider if it could be:
 1. Combined with an existing tool
 2. Implemented as a parameter variant
-3. Gated behind `requiredCapabilities` if only relevant to some projects
+3. Added to the searchable catalog instead of the top-level MCP surface
+4. Gated behind `requiredCapabilities` if only relevant to some projects
+
+### Choosing Direct Exposure
+
+After creating a tool module, add it to `packages/mcp-core/src/tools/catalog/index.ts`. Then update `packages/mcp-core/src/tools/surfaces.ts` only when it should be directly exposed through MCP `tools/list`:
+
+- Add high-frequency, foundational tools to `TOP_LEVEL_TOOL_NAMES`.
+- Leave long-tail tools out of `TOP_LEVEL_TOOL_NAMES` to make them available only through `search_tools` and `execute_tool` after the normal skill, constraint, experimental, and capability filters pass. The catalog gateway tools themselves are experimental for now.
+- Keep private implementation helpers as plain modules/functions instead of MCP tools.
+
+Do not add search-only summaries or catalog-only schemas. `search_tools` indexes the existing tool name and description.
 
 ## Tool Structure
 
 Each tool consists of:
-1. **Tool Module** - Single file in `src/tools/your-tool-name.ts` with definition and handler
-2. **Tests** - Unit tests in `src/tools/your-tool-name.test.ts`
+1. **Tool Module** - Single file in `src/tools/catalog/your-tool-name.ts` with definition and handler
+2. **Tests** - Unit tests in `src/tools/catalog/your-tool-name.test.ts`, including a baseline happy-path inline snapshot
 3. **Mocks** - API responses in `mcp-server-mocks`
 4. **Evals** - Integration tests (use sparingly)
 
+If a tool needs substantial helper code, put that code under
+`packages/mcp-core/src/tools/support/` and import it from the flat catalog tool
+file. Do not create per-tool subdirectories under `tools/catalog/`.
+
 ## Step 1: Create the Tool Module
 
-Create `packages/mcp-server/src/tools/your-tool-name.ts`:
+Create `packages/mcp-core/src/tools/catalog/your-tool-name.ts`:
 
 ```typescript
 import { z } from "zod";
-import { defineTool } from "./utils/defineTool";
-import { apiServiceFromContext } from "./utils/api-utils";
-import type { ServerContext } from "../types";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import type { ServerContext } from "../../types";
 
 export default defineTool({
   name: "your_tool_name",
@@ -168,7 +186,7 @@ See [common-patterns.md](common-patterns.md#response-formatting) for:
 
 Follow comprehensive testing patterns from `testing.md` for unit, integration, and evaluation tests.
 
-Create `packages/mcp-server/src/tools/your-tool-name.test.ts`:
+Create `packages/mcp-core/src/tools/catalog/your-tool-name.test.ts`:
 
 ```typescript
 import { describe, it, expect } from "vitest";
@@ -265,8 +283,10 @@ pnpm eval your-tool
 
 ## Checklist
 
-- [ ] Definition in `toolDefinitions.ts`
-- [ ] Handler in `tools.ts`
+- [ ] Tool module in `packages/mcp-core/src/tools/catalog/`
+- [ ] Tool registered in `packages/mcp-core/src/tools/catalog/index.ts`
+- [ ] Co-located test includes a baseline inline snapshot for the tool output
+- [ ] Direct exposure policy updated in `packages/mcp-core/src/tools/surfaces.ts` if this should be top-level
 - [ ] Unit tests with snapshots
 - [ ] Mock responses
 - [ ] 1-2 eval tests (if critical)
@@ -399,7 +419,7 @@ try {
 3. **Use structured outputs** - Define clear schemas for agent responses
 4. **Provide tool discovery** - Let agents explore available fields dynamically
 
-See `packages/mcp-server/src/tools/search-events/` and `packages/mcp-server/src/tools/search-issues/` for examples.
+See `packages/mcp-core/src/tools/catalog/search-events.ts` and `packages/mcp-core/src/tools/catalog/search-issues.ts` for examples. Their helper code lives under `packages/mcp-core/src/tools/support/`.
 
 ## Worker-Specific Tools
 
@@ -427,7 +447,7 @@ export default new Hono().post("/", async (c) => {
   return c.json({ results });
 });
 
-// In the MCP tool (tools.ts)
+// In the MCP tool module
 search_docs: async (context, params) => {
   const response = await fetch(`${context.host}/api/search`, {
     method: "POST",
@@ -454,6 +474,6 @@ This pattern works with both Cloudflare-hosted and stdio transports.
 
 ## References
 
-- Tool examples: `packages/mcp-server/src/tools.ts`
-- Schema patterns: `packages/mcp-server/src/schema.ts`
+- Tool examples: `packages/mcp-core/src/tools/catalog/`
+- Schema patterns: `packages/mcp-core/src/schema.ts`
 - Mock examples: `packages/mcp-server-mocks/src/handlers/`

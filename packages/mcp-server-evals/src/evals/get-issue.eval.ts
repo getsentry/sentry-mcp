@@ -1,5 +1,5 @@
-import { describeEval } from "vitest-evals";
-import { FIXTURES, NoOpTaskRunner, ToolPredictionScorer } from "./utils";
+import { describeEval, ToolCallScorer } from "vitest-evals";
+import { FIXTURES, McpToolCallTaskRunner } from "./utils";
 
 describeEval("get-issue", {
   data: async () => {
@@ -8,15 +8,19 @@ describeEval("get-issue", {
         input: `Explain CLOUDFLARE-MCP-41 from Sentry in ${FIXTURES.organizationSlug}.`,
         expectedTools: [
           {
-            name: "find_organizations",
-            arguments: {},
+            name: "search_tools",
+            arguments: {
+              query: "issue",
+            },
           },
           {
-            name: "get_issue_details",
+            name: "execute_tool",
             arguments: {
-              organizationSlug: FIXTURES.organizationSlug,
-              issueId: "CLOUDFLARE-MCP-41",
-              regionUrl: "https://us.sentry.io",
+              name: "get_issue_details",
+              arguments: {
+                organizationSlug: FIXTURES.organizationSlug,
+                issueId: "CLOUDFLARE-MCP-41",
+              },
             },
           },
         ],
@@ -25,23 +29,27 @@ describeEval("get-issue", {
         input: `Explain the event with ID 7ca573c0f4814912aaa9bdc77d1a7d51 from Sentry in ${FIXTURES.organizationSlug}.`,
         expectedTools: [
           {
-            name: "find_organizations",
-            arguments: {},
+            name: "search_tools",
+            arguments: {
+              query: "issue",
+            },
           },
           {
-            name: "get_issue_details",
+            name: "execute_tool",
             arguments: {
-              organizationSlug: FIXTURES.organizationSlug,
-              eventId: "7ca573c0f4814912aaa9bdc77d1a7d51",
-              regionUrl: "https://us.sentry.io",
+              name: "get_issue_details",
+              arguments: {
+                organizationSlug: FIXTURES.organizationSlug,
+                eventId: "7ca573c0f4814912aaa9bdc77d1a7d51",
+              },
             },
           },
         ],
       },
     ];
   },
-  task: NoOpTaskRunner(),
-  scorers: [ToolPredictionScorer()],
+  task: McpToolCallTaskRunner(),
+  scorers: [ToolCallScorer({ ordered: true, params: "fuzzy" })],
   threshold: 0.6,
-  timeout: 30000,
+  timeout: 90000,
 });

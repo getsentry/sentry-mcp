@@ -15,7 +15,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { searchIssuesAgent } from "../../tools/search-issues/agent";
+import { searchIssuesAgent } from "../../tools/support/search-issues/agent";
 import { SentryApiService } from "../../api-client";
 import { setAgentProvider } from "./provider-factory";
 

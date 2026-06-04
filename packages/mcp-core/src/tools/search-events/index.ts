@@ -1,5 +1,2 @@
-// Export the search-events handler
-export { default } from "./handler";
-
-// Export the agent for testing
-export { searchEventsAgent } from "./agent";
+export { default } from "../catalog/search-events";
+export { searchEventsAgent } from "../support/search-events/agent";

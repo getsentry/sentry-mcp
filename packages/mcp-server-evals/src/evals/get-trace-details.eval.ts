@@ -1,5 +1,5 @@
-import { describeEval } from "vitest-evals";
-import { FIXTURES, NoOpTaskRunner, ToolPredictionScorer } from "./utils";
+import { describeEval, ToolCallScorer } from "vitest-evals";
+import { FIXTURES, McpToolCallTaskRunner } from "./utils";
 
 describeEval("get-trace-details", {
   data: async () => {
@@ -8,15 +8,19 @@ describeEval("get-trace-details", {
         input: `Show me trace ${FIXTURES.traceId} from Sentry in ${FIXTURES.organizationSlug}.`,
         expectedTools: [
           {
-            name: "find_organizations",
-            arguments: {},
+            name: "search_tools",
+            arguments: {
+              query: "trace",
+            },
           },
           {
-            name: "get_trace_details",
+            name: "execute_tool",
             arguments: {
-              organizationSlug: FIXTURES.organizationSlug,
-              traceId: FIXTURES.traceId,
-              regionUrl: "https://us.sentry.io",
+              name: "get_trace_details",
+              arguments: {
+                organizationSlug: FIXTURES.organizationSlug,
+                traceId: FIXTURES.traceId,
+              },
             },
           },
         ],
@@ -25,23 +29,27 @@ describeEval("get-trace-details", {
         input: `Explain trace ${FIXTURES.traceId} in ${FIXTURES.organizationSlug}.`,
         expectedTools: [
           {
-            name: "find_organizations",
-            arguments: {},
+            name: "search_tools",
+            arguments: {
+              query: "trace",
+            },
           },
           {
-            name: "get_trace_details",
+            name: "execute_tool",
             arguments: {
-              organizationSlug: FIXTURES.organizationSlug,
-              traceId: FIXTURES.traceId,
-              regionUrl: "https://us.sentry.io",
+              name: "get_trace_details",
+              arguments: {
+                organizationSlug: FIXTURES.organizationSlug,
+                traceId: FIXTURES.traceId,
+              },
             },
           },
         ],
       },
     ];
   },
-  task: NoOpTaskRunner(),
-  scorers: [ToolPredictionScorer()],
+  task: McpToolCallTaskRunner(),
+  scorers: [ToolCallScorer({ ordered: true, params: "fuzzy" })],
   threshold: 0.6,
-  timeout: 30000,
+  timeout: 90000,
 });

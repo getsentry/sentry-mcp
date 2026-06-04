@@ -24,9 +24,9 @@ pnpm run measure-tokens
 ```
 📊 MCP Server Token Cost Report
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Total Tokens:     9,069
-Tool Count:       19
-Average/Tool:     477
+Total Tokens:     14,068
+Tool Count:       24
+Average/Tool:     586
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Per-Tool Breakdown:
@@ -34,8 +34,9 @@ Per-Tool Breakdown:
 ┌─────────────────────────────┬────────┬─────────┐
 │ Tool                        │ Tokens │ % Total │
 ├─────────────────────────────┼────────┼─────────┤
-│ search_docs                 │   1036 │   11.4% │
-│ update_issue                │    757 │    8.3% │
+│ search_events               │   1192 │    8.5% │
+│ update_issue                │   1166 │    8.3% │
+│ search_docs                 │    975 │    6.9% │
 ...
 ```
 
@@ -44,19 +45,19 @@ Per-Tool Breakdown:
 # From repository root
 pnpm run measure-tokens -- -o token-stats.json
 
-# Or from mcp-server package
-cd packages/mcp-server
+# Or from mcp-core package
+cd packages/mcp-core
 pnpm run measure-tokens -- -o token-stats.json
 ```
 
 JSON format:
 ```json
 {
-  "total_tokens": 9069,
-  "tool_count": 19,
-  "avg_tokens_per_tool": 477,
+  "total_tokens": 14068,
+  "tool_count": 24,
+  "avg_tokens_per_tool": 586,
   "tools": [
-    {"name": "search_docs", "tokens": 1036, "percentage": 11.4},
+    {"name": "search_events", "tokens": 1192, "percentage": 8.5},
     ...
   ]
 }
@@ -79,9 +80,9 @@ GitHub Actions workflow runs on every PR and push to main:
 
 ## Understanding the Results
 
-**Current baseline (19 tools, excluding use_sentry):**
-- ~9,069 tokens total
-- ~477 tokens/tool average
+**Current baseline (24 tools, excluding use_sentry):**
+- ~14,068 tokens total
+- ~586 tokens/tool average
 
 **Tool count limits:**
 - **Target:** ≤20 tools (current best practice)
@@ -96,7 +97,7 @@ GitHub Actions workflow runs on every PR and push to main:
 
 **Tokenizer:** Uses `tiktoken` with GPT-4's `cl100k_base` encoding (good approximation for Claude).
 
-**Script location:** `packages/mcp-server/scripts/measure-token-cost.ts`
+**Script location:** `packages/mcp-core/scripts/measure-token-cost.ts`
 
 **CLI options:**
 ```bash
@@ -123,6 +124,6 @@ tsx measure-token-cost.ts --help       # Show help
 
 ## References
 
-- Script: `packages/mcp-server/scripts/measure-token-cost.ts`
+- Script: `packages/mcp-core/scripts/measure-token-cost.ts`
 - Workflow: `.github/workflows/token-cost.yml`
 - Tool limits: See "Tool Count Limits" in `docs/adding-tools.md`
