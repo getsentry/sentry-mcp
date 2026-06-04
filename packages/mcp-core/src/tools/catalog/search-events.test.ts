@@ -4,6 +4,7 @@ import { mswServer } from "@sentry/mcp-server-mocks";
 import searchEvents from "./search-events";
 import { generateText } from "ai";
 import { UserInputError } from "../../errors";
+import { isStructuredToolResult } from "../../internal/tool-result";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -234,6 +235,113 @@ describe("search_events", () => {
     expect(result).toContain(
       "- Fields: `tags[type]`, `tags[sequence]`, `span.status`, `tags[reason]`, `count()`",
     );
+  });
+
+  it("returns structured content for event searches in experimental mode", async () => {
+    const query =
+      'transaction:"VPN connections" tags[type]:Unified tags[country]:CN';
+    const fields = ["tags[type]", "tags[sequence]", "count()"];
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("spans");
+          expect(url.searchParams.get("query")).toBe(query);
+          expect(url.searchParams.getAll("field")).toEqual(fields);
+
+          return HttpResponse.json({
+            data: [
+              {
+                "tags[type]": "Unified",
+                "tags[sequence]": "42",
+                "count()": 3,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query,
+        dataset: "spans",
+        fields,
+        sort: "-count()",
+        statsPeriod: "7d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+        experimentalMode: true,
+      },
+    );
+
+    expect(isStructuredToolResult(result)).toBe(true);
+    if (!isStructuredToolResult(result)) {
+      throw new Error("Expected structured tool result");
+    }
+
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: JSON.stringify(result.structuredContent),
+      },
+    ]);
+    expect(result.structuredContent).toMatchObject({
+      schemaVersion: "sentry.mcp.search_events.v1",
+      security: {
+        note: expect.stringContaining("user-controlled telemetry"),
+        untrustedFields: expect.arrayContaining([
+          "search.query",
+          "search.requestFields",
+          "results.data",
+        ]),
+      },
+      meta: {
+        organizationSlug: "test-org",
+        projectSlug: null,
+        projectId: null,
+      },
+      search: {
+        inputQuery: query,
+        dataset: "spans",
+        query,
+        fields,
+        requestFields: fields,
+        sort: "-count()",
+        timeRange: {
+          statsPeriod: "7d",
+        },
+        limit: 10,
+      },
+      results: {
+        kind: "events",
+        count: 1,
+        data: [
+          {
+            "tags[type]": "Unified",
+            "tags[sequence]": "42",
+            "count()": 3,
+          },
+        ],
+      },
+    });
+    expect(result.structuredContent.links).toMatchObject({
+      explorer: expect.stringContaining("https://test-org.sentry.io"),
+    });
   });
 
   it("should append environment filters for structured trace searches", async () => {
@@ -1021,6 +1129,93 @@ describe("search_events", () => {
     expect(metricQuery.aggregateFields).toEqual([{ yAxes: ["sum(value)"] }]);
   });
 
+  it("returns display fields and executed request fields in experimental metrics sample searches", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+
+          expect(url.searchParams.get("dataset")).toBe("tracemetrics");
+          expect(url.searchParams.getAll("field")).toEqual([
+            "timestamp",
+            "value",
+            "metric.name",
+            "metric.type",
+            "metric.unit",
+          ]);
+
+          return HttpResponse.json({
+            data: [
+              {
+                timestamp: "2026-04-13T14:19:18+00:00",
+                value: 12.4,
+                "metric.name": "http.request.duration",
+                "metric.type": "distribution",
+                "metric.unit": "millisecond",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "metrics",
+        query: "metric.name:http.request.duration",
+        fields: ["timestamp", "value"],
+        sort: "-timestamp",
+        statsPeriod: "14d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+        experimentalMode: true,
+      },
+    );
+
+    expect(isStructuredToolResult(result)).toBe(true);
+    if (!isStructuredToolResult(result)) {
+      throw new Error("Expected structured tool result");
+    }
+
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: JSON.stringify(result.structuredContent),
+      },
+    ]);
+    expect(result.structuredContent).toMatchObject({
+      search: {
+        dataset: "metrics",
+        query: "metric.name:http.request.duration",
+        fields: ["timestamp", "value"],
+        requestFields: [
+          "timestamp",
+          "value",
+          "metric.name",
+          "metric.type",
+          "metric.unit",
+        ],
+        limit: 10,
+      },
+      results: {
+        count: 1,
+      },
+    });
+  });
+
   it("should handle profiles dataset queries", async () => {
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse(
@@ -1435,6 +1630,100 @@ describe("search_events", () => {
     expect(result).toContain("Environment: production, staging");
     expect(result).toContain("Jane Doe");
     expect(result).toContain("2 errors");
+  });
+
+  it("returns structured content for replay searches in experimental mode", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "replays",
+        "url:*checkout* count_errors:>0",
+        [],
+        undefined,
+        "-count_errors",
+        { statsPeriod: "24h" },
+        "production",
+      ),
+    );
+
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/test-org/replays/", () =>
+        HttpResponse.json({
+          data: [
+            {
+              id: "7e07485f12f9416b8b1426260799b51f",
+              duration: 576,
+              environment: "production",
+              count_errors: 2,
+              count_rage_clicks: 1,
+              count_dead_clicks: 3,
+              started_at: "2025-01-15T10:00:00Z",
+              browser: { name: "Chrome", version: "131.0.0" },
+              user: { display_name: "Jane Doe" },
+              urls: ["/checkout"],
+              releases: ["frontend@1.2.3"],
+              trace_ids: ["a4d1aae7216b47ff8117cf4e09ce9d0a"],
+            },
+          ],
+        }),
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query: "production checkout replays with errors in the last day",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+        experimentalMode: true,
+      },
+    );
+
+    expect(isStructuredToolResult(result)).toBe(true);
+    if (!isStructuredToolResult(result)) {
+      throw new Error("Expected structured tool result");
+    }
+
+    expect(result.structuredContent).toMatchObject({
+      schemaVersion: "sentry.mcp.search_events.v1",
+      meta: {
+        organizationSlug: "test-org",
+        projectSlug: null,
+        projectId: null,
+      },
+      search: {
+        inputQuery: "production checkout replays with errors in the last day",
+        dataset: "replays",
+        query: "url:*checkout* count_errors:>0",
+        fields: [],
+        sort: "-count_errors",
+        environment: "production",
+        timeRange: {
+          statsPeriod: "24h",
+        },
+        limit: 10,
+      },
+      results: {
+        kind: "replays",
+        count: 1,
+        data: [
+          {
+            id: "7e07485f12f9416b8b1426260799b51f",
+            count_errors: 2,
+          },
+        ],
+      },
+    });
   });
 
   it("should not add default statsPeriod to replay absolute time ranges", async () => {

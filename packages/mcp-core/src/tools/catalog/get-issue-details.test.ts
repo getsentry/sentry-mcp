@@ -13,6 +13,7 @@ import {
 } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
+import { isStructuredToolResult } from "../../internal/tool-result";
 import getIssueDetails from "./get-issue-details.js";
 
 const baseContext = {
@@ -263,6 +264,76 @@ describe("get_issue_details", () => {
       - Related log search: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
       "
     `);
+  });
+
+  it("returns structured content in experimental mode", async () => {
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      {
+        ...baseContext,
+        experimentalMode: true,
+      },
+    );
+
+    expect(isStructuredToolResult(result)).toBe(true);
+    if (!isStructuredToolResult(result)) {
+      throw new Error("Expected structured tool result");
+    }
+
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: JSON.stringify(result.structuredContent),
+      },
+    ]);
+    expect(result.structuredContent).toMatchObject({
+      schemaVersion: "sentry.mcp.issue_details.v1",
+      security: {
+        note: expect.stringContaining("user-controlled telemetry"),
+        untrustedFields: expect.arrayContaining([
+          "issue.title",
+          "event.entries",
+          "event.contexts",
+          "related.autofixState",
+        ]),
+      },
+      meta: {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "CLOUDFLARE-MCP",
+      },
+      issue: {
+        shortId: "CLOUDFLARE-MCP-41",
+        title: "Error: Tool list_organizations is already registered",
+        counts: {
+          occurrences: "25",
+          users: 1,
+        },
+      },
+      event: {
+        id: "7ca573c0f4814912aaa9bdc77d1a7d51",
+        type: "error",
+        entries: expect.arrayContaining([
+          expect.objectContaining({
+            type: "exception",
+          }),
+        ]),
+        tags: expect.arrayContaining([
+          {
+            key: "environment",
+            value: "development",
+          },
+        ]),
+      },
+      links: {
+        issue: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41",
+      },
+    });
   });
 
   it("omits null culprit values from issue output", async () => {

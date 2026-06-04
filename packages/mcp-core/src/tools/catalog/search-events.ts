@@ -4,6 +4,11 @@ import { UserInputError } from "../../errors";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
+import { createStructuredOutputSecurity } from "../../internal/structured-output";
+import {
+  createStructuredToolResult,
+  type StructuredToolResult,
+} from "../../internal/tool-result";
 import {
   ParamOrganizationSlug,
   ParamProjectSlug,
@@ -27,11 +32,13 @@ import {
   formatProfileResults,
   formatSpanResults,
   formatTraceMetricsResults,
+  type FormatEventResultsParams,
 } from "../support/search-events/formatters";
 import {
   DEFAULT_REPLAY_SORT,
   DEFAULT_REPLAY_STATS_PERIOD,
   formatReplayResults,
+  type FormatReplayResultsParams,
   isValidReplaySort,
 } from "../support/search-events/replays";
 import {
@@ -41,6 +48,7 @@ import {
 
 const SEARCH_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
 const DEFAULT_EVENTS_SORT = "-timestamp";
+const SEARCH_EVENTS_STRUCTURED_CONTENT_VERSION = "sentry.mcp.search_events.v1";
 
 function defaultSortForDataset(dataset: PublicEventsDataset | "replays") {
   return dataset === "replays" ? DEFAULT_REPLAY_SORT : DEFAULT_EVENTS_SORT;
@@ -246,6 +254,124 @@ function buildSearchRepairPrompt(params: {
       2,
     ),
   ].join("\n");
+}
+
+type SearchEventsFormatParams = FormatEventResultsParams & {
+  dataset: PublicEventsDataset;
+  requestFields: string[];
+  limit: number;
+  projectSlug?: string | null;
+  projectId?: string | null;
+};
+
+type SearchEventsReplayFormatParams = FormatReplayResultsParams & {
+  limit: number;
+  projectSlug?: string | null;
+  projectId?: string | null;
+};
+
+function formatSearchEventsResult(
+  params: SearchEventsFormatParams,
+  context: ServerContext,
+): string | StructuredToolResult {
+  if (!context.experimentalMode) {
+    switch (params.dataset) {
+      case "errors":
+        return formatErrorResults(params);
+      case "logs":
+        return formatLogResults(params);
+      case "spans":
+        return formatSpanResults(params);
+      case "profiles":
+        return formatProfileResults(params);
+      case "metrics":
+        return formatTraceMetricsResults(params);
+    }
+  }
+
+  return createStructuredToolResult({
+    schemaVersion: SEARCH_EVENTS_STRUCTURED_CONTENT_VERSION,
+    security: createStructuredOutputSecurity([
+      "search.inputQuery",
+      "search.query",
+      "search.fields",
+      "search.requestFields",
+      "search.sort",
+      "search.timeRange",
+      "search.explanation",
+      "results.data",
+    ]),
+    meta: {
+      organizationSlug: params.organizationSlug,
+      projectSlug: params.projectSlug ?? null,
+      projectId: params.projectId ?? null,
+    },
+    links: {
+      explorer: params.explorerUrl,
+    },
+    search: {
+      inputQuery: params.inputQuery,
+      dataset: params.dataset,
+      query: params.sentryQuery,
+      fields: params.fields,
+      requestFields: params.requestFields,
+      sort: params.executedSearch?.sort ?? null,
+      timeRange: params.executedSearch?.timeRange ?? null,
+      limit: params.limit,
+      explanation: params.explanation ?? null,
+    },
+    results: {
+      kind: "events",
+      count: params.eventData.length,
+      data: params.eventData,
+    },
+  });
+}
+
+function formatSearchEventsReplayResult(
+  params: SearchEventsReplayFormatParams,
+  context: ServerContext,
+): string | StructuredToolResult {
+  if (!context.experimentalMode) {
+    return formatReplayResults(params);
+  }
+
+  return createStructuredToolResult({
+    schemaVersion: SEARCH_EVENTS_STRUCTURED_CONTENT_VERSION,
+    security: createStructuredOutputSecurity([
+      "search.inputQuery",
+      "search.query",
+      "search.sort",
+      "search.environment",
+      "search.timeRange",
+      "search.explanation",
+      "results.data",
+    ]),
+    meta: {
+      organizationSlug: params.organizationSlug,
+      projectSlug: params.projectSlug ?? null,
+      projectId: params.projectId ?? null,
+    },
+    links: {
+      explorer: params.searchUrl,
+    },
+    search: {
+      inputQuery: params.inputQuery,
+      dataset: "replays",
+      query: params.replayQuery,
+      fields: [],
+      sort: params.sort,
+      environment: params.environment ?? null,
+      timeRange: params.timeRange ?? null,
+      limit: params.limit,
+      explanation: params.explanation ?? null,
+    },
+    results: {
+      kind: "replays",
+      count: params.replays.length,
+      data: params.replays,
+    },
+  });
 }
 
 export default defineTool({
@@ -528,29 +654,35 @@ export default defineTool({
         replays.length,
       );
 
-      return formatReplayResults({
-        replays,
-        inputQuery: params.query || sentryQuery || "recent replays",
-        includeExplanation: params.includeExplanation,
-        organizationSlug,
-        apiService,
-        searchUrl: replaySearchUrl,
-        replayQuery: sentryQuery,
-        sort: replaySort,
-        environment,
-        explanation,
-        timeRange: replayTimeParams,
-        executedSearch: {
-          dataset,
-          query: sentryQuery,
-          fields: [],
+      return formatSearchEventsReplayResult(
+        {
+          replays,
+          inputQuery: params.query || sentryQuery || "recent replays",
+          includeExplanation: params.includeExplanation,
+          organizationSlug,
+          apiService,
+          searchUrl: replaySearchUrl,
+          replayQuery: sentryQuery,
           sort: replaySort,
+          environment,
+          explanation,
           timeRange: replayTimeParams,
+          limit: params.limit,
+          projectSlug: params.projectSlug,
+          projectId: projectId ?? null,
+          executedSearch: {
+            dataset,
+            query: sentryQuery,
+            fields: [],
+            sort: replaySort,
+            timeRange: replayTimeParams,
+          },
+          experimentalMode: context.experimentalMode ?? false,
+          availableToolNames: context.availableToolNames,
+          directToolNames: context.directToolNames,
         },
-        experimentalMode: context.experimentalMode ?? false,
-        availableToolNames: context.availableToolNames,
-        directToolNames: context.directToolNames,
-      });
+        context,
+      );
     }
 
     // Sentry rejects the request if the sort column isn't in the selected
@@ -657,7 +789,11 @@ export default defineTool({
       explorerUrl,
       sentryQuery,
       fields,
+      requestFields,
       explanation,
+      limit: params.limit,
+      projectSlug: params.projectSlug,
+      projectId: projectId ?? null,
       executedSearch: {
         dataset,
         query: sentryQuery,
@@ -670,17 +806,6 @@ export default defineTool({
       directToolNames: context.directToolNames,
     };
 
-    switch (dataset) {
-      case "errors":
-        return formatErrorResults(formatParams);
-      case "logs":
-        return formatLogResults(formatParams);
-      case "spans":
-        return formatSpanResults(formatParams);
-      case "profiles":
-        return formatProfileResults(formatParams);
-      default:
-        return formatTraceMetricsResults(formatParams);
-    }
+    return formatSearchEventsResult({ ...formatParams, dataset }, context);
   },
 });

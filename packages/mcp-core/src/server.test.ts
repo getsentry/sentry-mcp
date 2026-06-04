@@ -1,7 +1,12 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { setUser } from "@sentry/core";
+import { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createStructuredToolResult,
+  normalizeToolHandlerResult,
+} from "./internal/tool-result";
 import { buildServer } from "./server";
 import tools from "./tools";
 import {
@@ -180,6 +185,79 @@ describe("buildServer", () => {
         id: "user-123",
         ip_address: "192.0.2.1",
       });
+    });
+  });
+
+  describe("structured tool results", () => {
+    it("passes structuredContent through to MCP results", async () => {
+      const result = normalizeToolHandlerResult({
+        content: [{ type: "text", text: "Structured summary" }],
+        structuredContent: {
+          schemaVersion: "test.structured.v1",
+          data: {
+            message: "hello",
+          },
+        },
+      });
+
+      expect(result).toEqual({
+        content: [{ type: "text", text: "Structured summary" }],
+        structuredContent: {
+          schemaVersion: "test.structured.v1",
+          data: {
+            message: "hello",
+          },
+        },
+      });
+    });
+
+    it("returns serialized structuredContent over the MCP client surface", async () => {
+      const structuredContent = {
+        schemaVersion: "test.structured.v1",
+        data: {
+          message: "hello",
+        },
+      };
+      const server = buildServer({
+        context: baseContext,
+        tools: {
+          structured_tool: createMockTool("structured_tool", {
+            inputSchema: {
+              noop: z.string().optional(),
+            },
+            handler: async () => createStructuredToolResult(structuredContent),
+          }),
+        },
+      });
+      const [clientTransport, serverTransport] =
+        InMemoryTransport.createLinkedPair();
+      const client = new Client({
+        name: "structured-result-test-client",
+        version: "1.0.0",
+      });
+
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+
+      try {
+        const result = await client.callTool({
+          name: "structured_tool",
+          arguments: { noop: "ok" },
+        });
+
+        expect(result).toMatchObject({
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(structuredContent),
+            },
+          ],
+          structuredContent,
+        });
+      } finally {
+        await client.close();
+        await server.close();
+      }
     });
   });
 

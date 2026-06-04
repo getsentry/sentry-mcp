@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
+import { createStructuredOutputSecurity } from "../../internal/structured-output";
+import {
+  createStructuredToolResult,
+  type StructuredToolResult,
+} from "../../internal/tool-result";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import {
   parseIssueParams,
@@ -158,19 +163,22 @@ export default defineTool({
         }),
       ]);
 
-      return formatIssueOutput({
-        organizationSlug: orgSlug,
-        issue,
-        event,
-        apiService,
-        autofixState,
-        performanceTrace,
-        externalIssues,
-        relatedReplayIds,
-        experimentalMode: context.experimentalMode,
-        availableToolNames: context.availableToolNames,
-        directToolNames: context.directToolNames,
-      });
+      return formatIssueDetailsResult(
+        {
+          organizationSlug: orgSlug,
+          issue,
+          event,
+          apiService,
+          autofixState,
+          performanceTrace,
+          externalIssues,
+          relatedReplayIds,
+          experimentalMode: context.experimentalMode,
+          availableToolNames: context.availableToolNames,
+          directToolNames: context.directToolNames,
+        },
+        context,
+      );
     }
 
     // Validate that we have the minimum required parameters
@@ -240,21 +248,143 @@ export default defineTool({
       }),
     ]);
 
-    return formatIssueOutput({
-      organizationSlug: orgSlug,
-      issue,
-      event,
-      apiService,
-      autofixState,
-      performanceTrace,
-      externalIssues,
-      relatedReplayIds,
-      experimentalMode: context.experimentalMode,
-      availableToolNames: context.availableToolNames,
-      directToolNames: context.directToolNames,
-    });
+    return formatIssueDetailsResult(
+      {
+        organizationSlug: orgSlug,
+        issue,
+        event,
+        apiService,
+        autofixState,
+        performanceTrace,
+        externalIssues,
+        relatedReplayIds,
+        experimentalMode: context.experimentalMode,
+        availableToolNames: context.availableToolNames,
+        directToolNames: context.directToolNames,
+      },
+      context,
+    );
   },
 });
+
+const ISSUE_DETAILS_STRUCTURED_CONTENT_VERSION = "sentry.mcp.issue_details.v1";
+
+type FormatIssueOutputArgs = Parameters<typeof formatIssueOutput>[0];
+
+function formatIssueDetailsResult(
+  args: FormatIssueOutputArgs,
+  context: ServerContext,
+): string | StructuredToolResult {
+  if (!context.experimentalMode) {
+    return formatIssueOutput(args);
+  }
+
+  return createStructuredToolResult(formatIssueDetailsStructuredContent(args));
+}
+
+function formatIssueDetailsStructuredContent({
+  organizationSlug,
+  issue,
+  event,
+  apiService,
+  autofixState,
+  performanceTrace,
+  externalIssues,
+  relatedReplayIds,
+}: FormatIssueOutputArgs) {
+  const traceId = getTraceId(event);
+
+  return {
+    schemaVersion: ISSUE_DETAILS_STRUCTURED_CONTENT_VERSION,
+    security: createStructuredOutputSecurity([
+      "issue.title",
+      "issue.culprit",
+      "issue.metadata",
+      "event.title",
+      "event.message",
+      "event.entries",
+      "event.context",
+      "event.contexts",
+      "event.tags",
+      "event.user",
+      "event.occurrence",
+      "related.autofixState",
+      "related.externalIssues",
+      "related.replayIds",
+      "related.performanceTrace",
+    ]),
+    meta: {
+      organizationSlug,
+      projectSlug: issue.project.slug,
+    },
+    links: {
+      issue: apiService.getIssueUrl(organizationSlug, issue.shortId),
+      trace: traceId ? apiService.getTraceUrl(organizationSlug, traceId) : null,
+      replays: (relatedReplayIds ?? []).map((replayId) =>
+        apiService.getReplayUrl(organizationSlug, replayId),
+      ),
+    },
+    issue: {
+      id: issue.id,
+      shortId: issue.shortId,
+      title: issue.title,
+      culprit: issue.culprit,
+      permalink: issue.permalink,
+      project: issue.project,
+      platform: issue.platform ?? null,
+      status: issue.status,
+      substatus: issue.substatus ?? null,
+      type: issue.type,
+      issueType: issue.issueType ?? null,
+      issueCategory: issue.issueCategory ?? null,
+      metadata: issue.metadata ?? null,
+      assignedTo: issue.assignedTo ?? null,
+      seerFixabilityScore: issue.seerFixabilityScore ?? null,
+      counts: {
+        occurrences: issue.count,
+        users: issue.userCount,
+      },
+      timestamps: {
+        firstSeen: issue.firstSeen,
+        lastSeen: issue.lastSeen,
+      },
+    },
+    event: {
+      id: event.id,
+      type: event.type,
+      title: event.title,
+      message: event.message,
+      platform: event.platform ?? null,
+      dateCreated: getEventDateCreated(event),
+      dateReceived: event.dateReceived ?? null,
+      entries: event.entries,
+      contexts: event.contexts ?? {},
+      context: event.context ?? {},
+      tags: event.tags ?? [],
+      user: event.user ?? null,
+      occurrence: getEventOccurrence(event),
+    },
+    related: {
+      autofixState: autofixState ?? null,
+      externalIssues: externalIssues ?? [],
+      replayIds: relatedReplayIds ?? [],
+      performanceTrace: performanceTrace ?? null,
+    },
+  };
+}
+
+function getEventDateCreated(event: Event): string | null {
+  return "dateCreated" in event ? (event.dateCreated ?? null) : null;
+}
+
+function getEventOccurrence(event: Event): unknown {
+  return "occurrence" in event ? event.occurrence : null;
+}
+
+function getTraceId(event: Event): string | null {
+  const traceId = event.contexts?.trace?.trace_id;
+  return typeof traceId === "string" && traceId.length > 0 ? traceId : null;
+}
 
 /**
  * Fetches supplementary data for an issue in parallel: Seer analysis and external links.

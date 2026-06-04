@@ -5,6 +5,7 @@ import searchIssueEvents from "./search-issue-events";
 import { generateText } from "ai";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
+import { isStructuredToolResult } from "../../internal/tool-result";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -146,6 +147,107 @@ describe("search_issue_events", () => {
       - Set up alerts: Configure alert rules for these error patterns
       "
     `);
+  });
+
+  it("returns structured content in experimental mode", async () => {
+    mockGenerateText.mockResolvedValue(
+      mockAIResponse(
+        "environment:production",
+        ["id", "timestamp", "title", "environment"],
+        "-timestamp",
+        { statsPeriod: "7d" },
+      ),
+    );
+
+    mswServer.use(
+      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("query")).toBe("environment:production");
+        expect(url.searchParams.get("statsPeriod")).toBe("7d");
+
+        return HttpResponse.json([
+          {
+            id: "event1",
+            timestamp: "2025-01-15T10:00:00Z",
+            title: "Test Error",
+            environment: "production",
+          },
+        ]);
+      }),
+    );
+
+    const result = await searchIssueEvents.handler(
+      {
+        organizationSlug: "test-org",
+        issueId: "MCP-41",
+        query: "production events",
+        sort: "-timestamp",
+        statsPeriod: "14d",
+        projectSlug: null,
+        regionUrl: null,
+        limit: 50,
+        includeExplanation: false,
+      },
+      {
+        ...mockContext,
+        experimentalMode: true,
+      },
+    );
+
+    expect(isStructuredToolResult(result)).toBe(true);
+    if (!isStructuredToolResult(result)) {
+      throw new Error("Expected structured tool result");
+    }
+
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: JSON.stringify(result.structuredContent),
+      },
+    ]);
+    expect(result.structuredContent).toMatchObject({
+      schemaVersion: "sentry.mcp.search_issue_events.v1",
+      security: {
+        note: expect.stringContaining("user-controlled telemetry"),
+        untrustedFields: expect.arrayContaining([
+          "issue.identifier",
+          "search.query",
+          "results.data",
+        ]),
+      },
+      meta: {
+        organizationSlug: "test-org",
+        issueIdentifier: "MCP-41",
+        projectSlug: null,
+        projectId: null,
+      },
+      issue: {
+        identifier: "MCP-41",
+      },
+      search: {
+        inputQuery: "Events in issue MCP-41: production events",
+        dataset: "errors",
+        query: "environment:production",
+        explorerQuery: "issue:MCP-41 environment:production",
+        fields: ["id", "timestamp", "title", "environment"],
+        sort: "-timestamp",
+        timeRange: {
+          statsPeriod: "7d",
+        },
+        limit: 50,
+      },
+      results: {
+        kind: "issue_events",
+        count: 1,
+        data: [
+          {
+            id: "event1",
+            title: "Test Error",
+            environment: "production",
+          },
+        ],
+      },
+    });
   });
 
   it("should include user geo details in formatted event output", async () => {

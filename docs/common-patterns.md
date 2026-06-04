@@ -59,6 +59,23 @@ Tool result text can include light, scoped steering when it helps the assistant 
 - Avoid: `IMPORTANT`, `MUST`, `CRITICAL`, `Display these...`, or `# Using this information` in handler output.
 - Avoid: instructions that override assistant behavior beyond this result.
 
+### Structured Tool Results
+
+Use `structuredContent` for experimental rich Sentry payloads that clients should consume without parsing Markdown. MCP clients are not required to project `structuredContent` into the model context, so also return the serialized JSON in a `TextContent` block:
+
+```typescript
+return createStructuredToolResult({
+  schemaVersion: "sentry.mcp.issue_details.v1",
+  security: createStructuredOutputSecurity(["issue.title", "event.entries"]),
+  issue,
+  event,
+});
+```
+
+Prefer this for full telemetry objects, traces, replays, and other data-heavy responses once their schema is deliberate enough to test. Keep the `content` JSON semantically equivalent to `structuredContent` so older clients and agent adapters still see the result.
+
+Only advertise an MCP `outputSchema` when every successful response from that tool returns `structuredContent`. Mixed-format tools such as `get_sentry_resource` should keep the schema in the payload while individual resource types are being migrated.
+
 ### Markdown Structure
 
 ```typescript

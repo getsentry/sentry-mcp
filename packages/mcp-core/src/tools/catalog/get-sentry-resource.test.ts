@@ -11,6 +11,7 @@ import {
 import { encode as encodePng } from "fast-png";
 import { http, HttpResponse } from "msw";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { isStructuredToolResult } from "../../internal/tool-result";
 import getSentryResource from "./get-sentry-resource.js";
 
 const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
@@ -95,6 +96,40 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(
         "Error: Tool list_organizations is already registered",
       );
+    });
+
+    it("returns issue structuredContent in experimental mode", async () => {
+      const result = await getSentryResource.handler(
+        {
+          url: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41",
+        },
+        {
+          ...baseContext,
+          experimentalMode: true,
+        },
+      );
+
+      expect(isStructuredToolResult(result)).toBe(true);
+      if (!isStructuredToolResult(result)) {
+        throw new Error("Expected structured tool result");
+      }
+
+      expect(result.content).toEqual([
+        {
+          type: "text",
+          text: JSON.stringify(result.structuredContent),
+        },
+      ]);
+      expect(result.structuredContent).toMatchObject({
+        schemaVersion: "sentry.mcp.issue_details.v1",
+        issue: {
+          shortId: "CLOUDFLARE-MCP-41",
+          title: "Error: Tool list_organizations is already registered",
+        },
+        event: {
+          id: "7ca573c0f4814912aaa9bdc77d1a7d51",
+        },
+      });
     });
 
     it("resolves issue from path-based org URL (/{org}/issues/)", async () => {
