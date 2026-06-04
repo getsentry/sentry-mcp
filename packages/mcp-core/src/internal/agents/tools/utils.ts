@@ -1,7 +1,8 @@
-import { tool, APICallError } from "ai";
+import { getActiveSpan } from "@sentry/core";
+import { APICallError, tool } from "ai";
 import { z } from "zod";
-import { UserInputError, LLMProviderError } from "../../../errors";
 import { ApiClientError, ApiServerError } from "../../../api-client";
+import { LLMProviderError, UserInputError } from "../../../errors";
 import { logIssue, logWarn } from "../../../telem/logging";
 
 /**
@@ -20,6 +21,29 @@ export type AgentToolResponse<T = unknown> = {
   error?: string;
   result?: T;
 };
+
+export function recordAgentToolResultCount(count: number | undefined) {
+  if (typeof count !== "number" || !Number.isFinite(count)) {
+    return;
+  }
+
+  try {
+    getActiveSpan()?.setAttribute("gen_ai.tool.call.result.count", count);
+  } catch {}
+}
+
+function recordExtractedAgentToolResultCount<TResult>(
+  result: TResult,
+  getResultCount?: (result: TResult) => number | undefined,
+) {
+  if (!getResultCount) {
+    return;
+  }
+
+  try {
+    recordAgentToolResultCount(getResultCount(result));
+  } catch {}
+}
 
 /**
  * Handles errors from agent tool execution and returns appropriate error messages.
@@ -149,6 +173,7 @@ export function agentTool<TParameters, TResult>(config: {
   description: string;
   parameters: z.ZodSchema<TParameters>;
   execute: (params: TParameters) => Promise<TResult>;
+  getResultCount?: (result: TResult) => number | undefined;
 }) {
   // Infer the result type from the execute function's return type
   type InferredResult = Awaited<ReturnType<typeof config.execute>>;
@@ -161,6 +186,7 @@ export function agentTool<TParameters, TResult>(config: {
     ): Promise<AgentToolResponse<InferredResult>> => {
       try {
         const result = await config.execute(input);
+        recordExtractedAgentToolResultCount(result, config.getResultCount);
         return { result };
       } catch (error) {
         return handleAgentToolError<InferredResult>(error);

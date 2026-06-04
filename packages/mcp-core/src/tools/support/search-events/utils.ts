@@ -5,15 +5,18 @@ import type {
   TraceItemAttributeValidationResult,
   TraceItemType,
 } from "../../../api-client";
-import { agentTool } from "../../../internal/agents/tools/utils";
+import {
+  agentTool,
+  recordAgentToolResultCount,
+} from "../../../internal/agents/tools/utils";
 import {
   formatUserGeoSummary,
   isPlainObject,
 } from "../../../internal/user-formatting";
 import {
-  normalizeEventsDataset,
-  PUBLIC_EVENTS_DATASETS,
   type EventsDataset,
+  PUBLIC_EVENTS_DATASETS,
+  normalizeEventsDataset,
 } from "../../../utils/events-datasets";
 
 // Type for flexible event data that can contain any fields
@@ -540,6 +543,7 @@ export function createDatasetAttributesTool(options: {
         ...DATASET_FIELDS[normalizedDataset],
         ...customAttributes,
       };
+      const fieldCount = Object.keys(allFields).length;
 
       const recommendedFields = RECOMMENDED_FIELDS[normalizedDataset];
 
@@ -553,15 +557,17 @@ export function createDatasetAttributesTool(options: {
         allFieldTypes[field] = "number";
       }
 
+      recordAgentToolResultCount(fieldCount);
+
       return `Dataset: ${dataset}
 ${formatValidationResults(validationResults)}
 
-Available Fields (${Object.keys(allFields).length} total):
+Available Fields (${fieldCount} total):
 ${Object.entries(allFields)
   .slice(0, 50) // Limit to first 50 to avoid overwhelming the agent
   .map(([key, desc]) => `- ${key}: ${desc}`)
   .join("\n")}
-${Object.keys(allFields).length > 50 ? `\n... and ${Object.keys(allFields).length - 50} more fields` : ""}
+${fieldCount > 50 ? `\n... and ${fieldCount - 50} more fields` : ""}
 
 Recommended Fields for ${dataset}:
 ${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}
