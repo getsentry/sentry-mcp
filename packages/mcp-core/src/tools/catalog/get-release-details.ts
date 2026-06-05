@@ -99,13 +99,32 @@ export default defineTool({
     projectId: z
       .string()
       .trim()
-      .describe("Optional numeric project ID for release health metadata.")
+      .describe(
+        "Optional numeric project ID for project-specific release health metadata.",
+      )
       .nullable()
       .default(null),
-    includeHealth: z.boolean().default(false),
-    includeDeploys: z.boolean().default(true),
-    includeCommits: z.boolean().default(true),
-    limit: z.number().int().positive().max(50).default(10),
+    includeHealth: z
+      .boolean()
+      .describe(
+        "Include release health metadata. For organization-level calls, also provide projectId; project-constrained sessions use the active project.",
+      )
+      .default(false),
+    includeDeploys: z
+      .boolean()
+      .describe("Include recent deploys for this release.")
+      .default(true),
+    includeCommits: z
+      .boolean()
+      .describe("Include recent commits attached to this release.")
+      .default(true),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(50)
+      .describe("Maximum number of deploys and commits to return, up to 50.")
+      .default(10),
   },
   annotations: {
     readOnlyHint: true,
