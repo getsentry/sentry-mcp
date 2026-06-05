@@ -228,7 +228,9 @@ CORRECT QUERY PATTERNS (FOLLOW THESE):
 - For field existence: Use has:field_name (NOT field_name IS NOT NULL)
 - For field absence: Use !has:field_name (NOT field_name IS NULL)
 - For time periods: Use timeRange parameter (NOT SQL date functions)
+- For numeric thresholds: Use comparison operators like field:>value, field:<value, field:>=value, or field:<=value (NOT wildcard/string prefixes)
 - Example: "items processed yesterday" → query: "has:item.processed", timeRange: {"statsPeriod": "24h"}
+- Example: "temperature above 0.7" → query: "gen_ai.request.temperature:>0.7"
 
 PROCESS:
 1. Analyze the user's query
@@ -241,6 +243,7 @@ COMMON ERRORS TO AVOID:
 - Using SQL syntax (IS NOT NULL, IS NULL, yesterday(), today(), etc.) - Use has: operator and timeRange instead
 - Using numeric functions (sum, avg, min, max, percentiles) on non-numeric fields
 - Using incorrect field names (use the otelSemantics tool to look up correct names)
+- Approximating numeric thresholds with wildcard strings (use field:>value or field:<value comparisons)
 - Missing required fields in the fields array for aggregate queries
 - Invalid sort parameter not included in fields array
 - Putting replay environment filters inside the replay query instead of the separate environment field
@@ -271,6 +274,7 @@ export const NUMERIC_FIELDS: Record<string, Set<string>> = {
     "gen_ai.usage.input_tokens",
     "gen_ai.usage.output_tokens",
     "gen_ai.request.max_tokens",
+    "gen_ai.request.temperature",
     // Web Vitals measurements
     "measurements.lcp",
     "measurements.cls",
@@ -329,6 +333,7 @@ export const DATASET_FIELDS = {
     "gen_ai.provider.name": "AI provider name (e.g., anthropic, openai)",
     "gen_ai.request.model": "Model name (e.g., claude-3-5-sonnet-20241022)",
     "gen_ai.operation.name": "Operation type (e.g., chat, completion)",
+    "gen_ai.request.temperature": "LLM sampling temperature (numeric)",
     "gen_ai.usage.input_tokens": "Number of input tokens (numeric)",
     "gen_ai.usage.output_tokens": "Number of output tokens (numeric)",
     "gen_ai.tool.name": "Tool name (e.g., search_issues, search_events)",
@@ -582,6 +587,21 @@ export const DATASET_EXAMPLES: Record<
           "count()",
         ],
         sort: "-sum(gen_ai.usage.input_tokens)",
+      },
+    },
+    {
+      description: "LLM calls where temperature is above 0.7",
+      output: {
+        query: "gen_ai.request.temperature:>0.7",
+        fields: [
+          "gen_ai.request.model",
+          "gen_ai.request.temperature",
+          "gen_ai.operation.name",
+          "span.duration",
+          "timestamp",
+          "trace",
+        ],
+        sort: "-span.duration",
       },
     },
     {
