@@ -965,7 +965,6 @@ export default defineTool({
         output += "\n## Response Notes\n\n";
         output += `- Full issue details: \`get_sentry_resource(resourceType="issue", organizationSlug="${orgSlug}", resourceId="${updatedIssue.shortId}")\`\n`;
         return {
-          isError: true,
           content: [
             {
               type: "text",
