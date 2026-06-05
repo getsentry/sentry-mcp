@@ -11,6 +11,7 @@ import {
   getTraceUrl,
   getEventsExplorerUrl,
   getTraceMetricsExploreUrl,
+  getMonitorUrl,
 } from "./url-utils";
 
 describe("url-utils", () => {
@@ -259,6 +260,30 @@ describe("url-utils", () => {
       const result = getTraceUrl("sentry.example.com", "myorg", "abc123");
       expect(result).toBe(
         "https://sentry.example.com/organizations/myorg/explore/traces/trace/abc123",
+      );
+    });
+  });
+
+  describe("getMonitorUrl", () => {
+    it("should encode monitor slugs as a single path segment", () => {
+      const result = getMonitorUrl("sentry.io", "myorg", "nightly/import 1");
+
+      expect(result).toBe(
+        "https://myorg.sentry.io/crons/nightly%2Fimport%201/",
+      );
+    });
+
+    it("should encode project and monitor slugs as separate path segments", () => {
+      const result = getMonitorUrl(
+        "sentry.io",
+        "myorg",
+        "nightly/import 1",
+        "https",
+        "backend",
+      );
+
+      expect(result).toBe(
+        "https://myorg.sentry.io/crons/backend/nightly%2Fimport%201/",
       );
     });
   });

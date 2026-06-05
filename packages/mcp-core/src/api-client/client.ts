@@ -853,12 +853,17 @@ export class SentryApiService {
     );
   }
 
-  getMonitorUrl(organizationSlug: string, monitorSlug: string): string {
+  getMonitorUrl(
+    organizationSlug: string,
+    monitorSlug: string,
+    projectSlug?: string,
+  ): string {
     return getMonitorUrlUtil(
       this.host,
       organizationSlug,
       monitorSlug,
       this.protocol,
+      projectSlug,
     );
   }
 

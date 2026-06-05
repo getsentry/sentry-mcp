@@ -153,12 +153,13 @@ export default defineTool({
       .slice(0, params.limit)
       .map((monitor) => {
         const project = formatProject(monitor);
-        const monitorPath = project
-          ? `${project}/${monitor.slug}`
-          : monitor.slug;
         return formatMonitor(
           monitor,
-          apiService.getMonitorUrl(organizationSlug, monitorPath),
+          apiService.getMonitorUrl(
+            organizationSlug,
+            monitor.slug,
+            project ?? undefined,
+          ),
         );
       })
       .join("\n\n");

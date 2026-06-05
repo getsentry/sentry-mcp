@@ -164,8 +164,11 @@ export default defineTool({
     });
 
     const project = formatProject(monitor);
-    const monitorPath = project ? `${project}/${monitor.slug}` : monitor.slug;
-    const monitorUrl = apiService.getMonitorUrl(organizationSlug, monitorPath);
+    const monitorUrl = apiService.getMonitorUrl(
+      organizationSlug,
+      monitor.slug,
+      project ?? undefined,
+    );
 
     const [checkIns, stats] = await Promise.all([
       apiService.listMonitorCheckIns({

@@ -90,4 +90,48 @@ describe("find_monitors", () => {
     expect(params.get("projectSlug")).toBe("backend");
     expect(params.get("project")).toBeNull();
   });
+
+  it("encodes monitor slugs in web links", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/",
+        () =>
+          HttpResponse.json([
+            {
+              id: "4509100000000002",
+              slug: "nightly/import 1",
+              name: "Nightly Import 1",
+              status: "ok",
+              project: {
+                id: "4509109104082945",
+                slug: "cloudflare-mcp",
+                name: "cloudflare-mcp",
+              },
+              config: {
+                schedule_type: "crontab",
+                schedule: ["crontab", "0 2 * * *"],
+              },
+              environments: [],
+            },
+          ]),
+      ),
+    );
+
+    const result = await findMonitors.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        projectSlug: null,
+        environment: null,
+        owner: null,
+        query: null,
+        limit: 10,
+      },
+      context,
+    );
+
+    expect(result).toContain(
+      "[Open Monitor](https://sentry-mcp-evals.sentry.io/crons/cloudflare-mcp/nightly%2Fimport%201/)",
+    );
+  });
 });

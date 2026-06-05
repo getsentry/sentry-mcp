@@ -368,7 +368,8 @@ export function getPreprodSnapshotUrl(
  * Generates a Sentry cron monitor URL.
  * @param host The Sentry host (may include regional subdomain for API access)
  * @param organizationSlug Organization identifier
- * @param monitorSlug Monitor slug, optionally prefixed with project slug (e.g. "my-project/my-monitor")
+ * @param monitorSlug Monitor slug
+ * @param projectSlug Optional project slug to disambiguate monitors with the same slug
  * @returns The complete monitor URL
  */
 export function getMonitorUrl(
@@ -376,11 +377,15 @@ export function getMonitorUrl(
   organizationSlug: string,
   monitorSlug: string,
   protocol: SentryProtocol = "https",
+  projectSlug?: string,
 ): string {
+  const monitorPath = (projectSlug ? [projectSlug, monitorSlug] : [monitorSlug])
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
   return getSentryWebBaseUrl(
     host,
     organizationSlug,
-    `/crons/${monitorSlug}/`,
+    `/crons/${monitorPath}/`,
     protocol,
   );
 }

@@ -256,4 +256,55 @@ describe("get_monitor_details", () => {
     expect(params.get("resolution")).toBe("3600s");
     expect(params.get("statsPeriod")).toBeNull();
   });
+
+  it("encodes monitor slugs in web links", async () => {
+    const monitorResponse = {
+      id: "4509100000000002",
+      slug: "nightly/import 1",
+      name: "Nightly Import 1",
+      status: "ok",
+      owner: null,
+      project: {
+        id: "4509109104082945",
+        slug: "cloudflare-mcp",
+        name: "cloudflare-mcp",
+      },
+      config: {
+        schedule_type: "crontab",
+        schedule: ["crontab", "0 2 * * *"],
+      },
+      environments: [],
+    };
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/",
+        () => HttpResponse.json(monitorResponse),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/checkins/",
+        () => HttpResponse.json([]),
+      ),
+    );
+
+    const result = await getMonitorDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        projectSlug: null,
+        monitorSlug: "nightly-import",
+        environment: null,
+        statsPeriod: "24h",
+        start: null,
+        end: null,
+        checkInLimit: 10,
+        includeStats: false,
+        rollupSeconds: null,
+      },
+      context,
+    );
+
+    expect(result).toContain(
+      "[Open Monitor](https://sentry-mcp-evals.sentry.io/crons/cloudflare-mcp/nightly%2Fimport%201/)",
+    );
+  });
 });
