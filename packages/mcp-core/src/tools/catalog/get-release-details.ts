@@ -118,38 +118,37 @@ export default defineTool({
     const organizationSlug = params.organizationSlug;
     setTag("organization.slug", organizationSlug);
     setTag("release.version", params.releaseVersion);
+    const scopedProjectSlug = context.constraints.projectSlug ?? undefined;
     let projectId = params.projectId ?? undefined;
 
-    if (
-      context.constraints.projectSlug &&
-      (params.projectId || params.includeHealth)
-    ) {
+    if (scopedProjectSlug && params.projectId) {
       const scopedProject = await apiService.getProject({
         organizationSlug,
-        projectSlugOrId: context.constraints.projectSlug,
+        projectSlugOrId: scopedProjectSlug,
       });
       const scopedProjectId = String(scopedProject.id);
-      if (params.projectId && params.projectId !== scopedProjectId) {
+      if (params.projectId !== scopedProjectId) {
         throw new UserInputError(
-          `Release health project is outside the active project constraint. Expected project "${context.constraints.projectSlug}".`,
+          `Release health project is outside the active project constraint. Expected project "${scopedProjectSlug}".`,
         );
       }
-      if (params.includeHealth) {
-        projectId = scopedProjectId;
-      }
+      projectId = scopedProjectId;
     }
 
     const release = await apiService.getReleaseDetails({
       organizationSlug,
       releaseVersion: params.releaseVersion,
-      projectId,
+      projectSlug: scopedProjectSlug,
+      projectId: scopedProjectSlug ? undefined : projectId,
       includeHealth: params.includeHealth,
     });
-    assertProjectListContainsConstraint({
-      resourceLabel: "Release",
-      scopedProjectSlug: context.constraints.projectSlug,
-      projects: release.projects,
-    });
+    if (release.projects && release.projects.length > 0) {
+      assertProjectListContainsConstraint({
+        resourceLabel: "Release",
+        scopedProjectSlug,
+        projects: release.projects,
+      });
+    }
 
     const [deploys, commits] = await Promise.all([
       params.includeDeploys

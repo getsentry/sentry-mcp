@@ -1,4 +1,4 @@
-import { mswServer } from "@sentry/mcp-server-mocks";
+import { mswServer, releaseFixture } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import getReleaseDetails from "./get-release-details.js";
@@ -64,12 +64,20 @@ describe("get_release_details", () => {
   });
 
   it("rejects releases outside the active project constraint", async () => {
+    const releaseVersion = "8ce89484-0fec-4913-a2cd-e8e2d41dee36";
+    mswServer.use(
+      http.get(
+        `https://sentry.io/api/0/projects/sentry-mcp-evals/frontend/releases/${releaseVersion}/`,
+        () => HttpResponse.json(releaseFixture),
+      ),
+    );
+
     await expect(
       getReleaseDetails.handler(
         {
           organizationSlug: "sentry-mcp-evals",
           regionUrl: null,
-          releaseVersion: "8ce89484-0fec-4913-a2cd-e8e2d41dee36",
+          releaseVersion,
           projectId: null,
           includeHealth: false,
           includeDeploys: true,
@@ -86,6 +94,40 @@ describe("get_release_details", () => {
       ),
     ).rejects.toThrow(
       'Release is outside the active project constraint. Expected project "frontend".',
+    );
+  });
+
+  it("allows scoped release details when project refs are omitted", async () => {
+    const releaseVersion = "8ce89484-0fec-4913-a2cd-e8e2d41dee36";
+    mswServer.use(
+      http.get(
+        `https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/${releaseVersion}/`,
+        () => HttpResponse.json({ ...releaseFixture, projects: undefined }),
+      ),
+    );
+
+    const result = await getReleaseDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        releaseVersion,
+        projectId: null,
+        includeHealth: false,
+        includeDeploys: false,
+        includeCommits: false,
+        limit: 10,
+      },
+      {
+        ...context,
+        constraints: {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+        },
+      },
+    );
+
+    expect(result).toContain(
+      `# Release ${releaseVersion} in **sentry-mcp-evals**`,
     );
   });
 

@@ -1763,11 +1763,13 @@ export class SentryApiService {
     {
       organizationSlug,
       releaseVersion,
+      projectSlug,
       projectId,
       includeHealth,
     }: {
       organizationSlug: string;
       releaseVersion: string;
+      projectSlug?: string;
       projectId?: string;
       includeHealth?: boolean;
     },
@@ -1782,7 +1784,9 @@ export class SentryApiService {
     }
 
     const encodedVersion = encodeURIComponent(releaseVersion);
-    const path = `/organizations/${organizationSlug}/releases/${encodedVersion}/`;
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/releases/${encodedVersion}/`
+      : `/organizations/${organizationSlug}/releases/${encodedVersion}/`;
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,
