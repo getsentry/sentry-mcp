@@ -397,13 +397,13 @@ describe("parseSentryUrl", () => {
     it("decodes encoded project crons monitor slug", () => {
       expect(
         parseSentryUrl(
-          "https://my-org.sentry.io/crons/my-project/nightly%20import/",
+          "https://my-org.sentry.io/crons/my%20project/nightly%20import/",
         ),
       ).toMatchInlineSnapshot(`
         {
           "monitorSlug": "nightly import",
           "organizationSlug": "my-org",
-          "projectSlugOrId": "my-project",
+          "projectSlugOrId": "my project",
           "type": "monitor",
         }
       `);

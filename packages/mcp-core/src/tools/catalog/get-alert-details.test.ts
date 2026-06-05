@@ -104,4 +104,43 @@ describe("get_alert_details", () => {
       'Alert is outside the active project constraint. Expected project "frontend".',
     );
   });
+
+  it("rejects project-scoped alerts when detector evidence lacks a project", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/detectors/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("projectSlug")).toBe("frontend");
+          return HttpResponse.json([
+            {
+              id: "2001",
+              projectId: "4509062593708032",
+              name: "Unhandled Errors",
+            },
+          ]);
+        },
+      ),
+    );
+
+    await expect(
+      getAlertDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          regionUrl: null,
+          alertId: "1001",
+          includeDetectors: false,
+        },
+        {
+          ...context,
+          constraints: {
+            organizationSlug: "sentry-mcp-evals",
+            projectSlug: "frontend",
+          },
+        },
+      ),
+    ).rejects.toThrow(
+      'Alert is outside the active project constraint. Expected project "frontend".',
+    );
+  });
 });

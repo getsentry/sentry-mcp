@@ -314,7 +314,7 @@ function identifyResource(
         return {
           type: "monitor",
           organizationSlug,
-          projectSlugOrId: nextPart,
+          projectSlugOrId: decodePathSegment(nextPart),
           monitorSlug: decodePathSegment(afterNext),
         };
       }

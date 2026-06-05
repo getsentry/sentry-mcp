@@ -146,13 +146,11 @@ export default defineTool({
         hasEvidence: detectors.length > 0,
       });
       for (const detector of detectors) {
-        if (detector.project) {
-          assertProjectRefWithinConstraint({
-            resourceLabel: "Alert",
-            scopedProjectSlug: context.constraints.projectSlug,
-            project: detector.project,
-          });
-        }
+        assertProjectRefWithinConstraint({
+          resourceLabel: "Alert",
+          scopedProjectSlug: context.constraints.projectSlug,
+          project: detector.project,
+        });
       }
     }
 
