@@ -79,11 +79,19 @@ type DefinitionTool = {
   hideInExperimentalMode?: boolean;
 };
 
+type ToolSurface = "direct" | "catalog";
+
 function isSkillDefinitionTool(tool: DefinitionTool): boolean {
   return (
     !surfacesModule.isWrapperToolName(tool.name) &&
     !surfacesModule.isCatalogInfrastructureToolName(tool.name)
   );
+}
+
+function toolNamesFromEntries(
+  entries: Array<[string, DefinitionTool]>,
+): ReadonlySet<string> {
+  return new Set(entries.flatMap(([toolKey, tool]) => [toolKey, tool.name]));
 }
 
 // Tools
@@ -99,29 +107,55 @@ function generateToolDefinitions({
     throw new Error("Failed to import tools from src/tools/index.ts");
   }
 
-  const defs = Object.entries(toolsDefault).map(([key, tool]) => {
-    if (!tool || typeof tool !== "object")
-      throw new Error(`Invalid tool: ${key}`);
-    const t = tool as DefinitionTool;
-    if (!surfacesModule.isTopLevelToolName(t.name, experimentalMode)) {
-      return null;
-    }
-    if (!toolTypesModule.isToolVisibleInMode(t, experimentalMode)) {
+  const visibleEntries = Object.entries(toolsDefault).flatMap(
+    ([key, tool]): Array<[string, DefinitionTool]> => {
+      if (!tool || typeof tool !== "object") {
+        throw new Error(`Invalid tool: ${key}`);
+      }
+      const t = tool as DefinitionTool;
+      if (
+        surfacesModule.isWrapperToolName(t.name) ||
+        !toolTypesModule.isToolVisibleInMode(t, experimentalMode)
+      ) {
+        return [];
+      }
+      return [[key, t]];
+    },
+  );
+  const directEntries = visibleEntries.filter(([, tool]) =>
+    surfacesModule.isTopLevelToolName(tool.name, experimentalMode),
+  );
+  const availableToolNames = toolNamesFromEntries(visibleEntries);
+  const directToolNames = toolNamesFromEntries(directEntries);
+
+  const defs = visibleEntries.map(([, t]) => {
+    const isDirect = directToolNames.has(t.name);
+    const isCatalog =
+      isSkillDefinitionTool(t) &&
+      Array.isArray(t.skills) &&
+      t.skills.length > 0;
+    if (!isDirect && !isCatalog) {
       return null;
     }
     if (!Array.isArray(t.requiredScopes)) {
       throw new Error(`Tool '${t.name}' is missing requiredScopes array`);
     }
     const jsonSchema = zodFieldMapToJsonSchema(t.inputSchema || {});
+    const surface: ToolSurface = isDirect ? "direct" : "catalog";
     return {
       name: t.name,
       description: toolTypesModule.resolveDescription(t.description, {
         experimentalMode,
+        availableToolNames,
+        directToolNames,
       }),
       // Export full JSON Schema under inputSchema for external docs
       inputSchema: jsonSchema,
       // Preserve tool access requirements for UIs/docs
       requiredScopes: t.requiredScopes,
+      // Preserve skill catalog membership and call surface for UIs/docs.
+      skills: t.skills,
+      surface,
     };
   });
   return defs.filter(isNonNull).sort(byName);
@@ -323,8 +357,12 @@ async function main() {
 
     // Sync allowedTools in agent frontmatter with the direct MCP surface for
     // each plugin's MCP mode.
-    const toolNames = tools.map((t) => t.name);
-    const experimentalToolNames = experimentalTools.map((t) => t.name);
+    const directTools = tools.filter((tool) => tool.surface === "direct");
+    const experimentalDirectTools = experimentalTools.filter(
+      (tool) => tool.surface === "direct",
+    );
+    const toolNames = directTools.map((t) => t.name);
+    const experimentalToolNames = experimentalDirectTools.map((t) => t.name);
 
     let agentsSynced = 0;
     for (const agentConfig of agentConfigs()) {
@@ -338,7 +376,7 @@ async function main() {
     }
 
     console.log(
-      `✅ Generated: tools(${tools.length}), experimentalTools(${experimentalTools.length}), skills(${skills.length}), agents(${agentsSynced})`,
+      `✅ Generated: tools(${tools.length}), directTools(${directTools.length}), experimentalTools(${experimentalTools.length}), experimentalDirectTools(${experimentalDirectTools.length}), skills(${skills.length}), agents(${agentsSynced})`,
     );
   } catch (error) {
     const err = error as Error;
