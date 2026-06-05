@@ -315,14 +315,14 @@ function identifyResource(
           type: "monitor",
           organizationSlug,
           projectSlugOrId: nextPart,
-          monitorSlug: afterNext,
+          monitorSlug: decodePathSegment(afterNext),
         };
       }
       // Pattern: /crons/{monitorSlug}/
       return {
         type: "monitor",
         organizationSlug,
-        monitorSlug: nextPart,
+        monitorSlug: decodePathSegment(nextPart),
       };
     }
   }

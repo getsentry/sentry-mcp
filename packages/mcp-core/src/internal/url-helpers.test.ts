@@ -369,12 +369,39 @@ describe("parseSentryUrl", () => {
       `);
     });
 
+    it("decodes encoded crons monitor slug", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/crons/nightly%2Fimport/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "monitorSlug": "nightly/import",
+          "organizationSlug": "my-org",
+          "type": "monitor",
+        }
+      `);
+    });
+
     it("parses crons URL with project and monitor slug", () => {
       expect(
         parseSentryUrl("https://my-org.sentry.io/crons/my-project/my-monitor/"),
       ).toMatchInlineSnapshot(`
         {
           "monitorSlug": "my-monitor",
+          "organizationSlug": "my-org",
+          "projectSlugOrId": "my-project",
+          "type": "monitor",
+        }
+      `);
+    });
+
+    it("decodes encoded project crons monitor slug", () => {
+      expect(
+        parseSentryUrl(
+          "https://my-org.sentry.io/crons/my-project/nightly%20import/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "monitorSlug": "nightly import",
           "organizationSlug": "my-org",
           "projectSlugOrId": "my-project",
           "type": "monitor",
