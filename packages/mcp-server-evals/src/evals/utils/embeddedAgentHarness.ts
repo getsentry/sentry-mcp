@@ -64,18 +64,46 @@ function createFallbackSession(
   };
 }
 
+function hasHarnessStepModel(step: unknown) {
+  if (!step || typeof step !== "object" || !("model" in step)) {
+    return false;
+  }
+
+  const { model } = step;
+  if (!model || typeof model !== "object") {
+    return false;
+  }
+
+  return (
+    "provider" in model &&
+    typeof model.provider === "string" &&
+    "modelId" in model &&
+    typeof model.modelId === "string"
+  );
+}
+
 function withFallbackSession(input: string, result: EmbeddedSearchAgentResult) {
-  if (Array.isArray(result.steps) && result.steps.length > 0) {
-    return result;
+  const session = createFallbackSession(input, result);
+
+  if (
+    Array.isArray(result.steps) &&
+    result.steps.length > 0 &&
+    result.steps.every(hasHarnessStepModel)
+  ) {
+    return {
+      ...result,
+      session,
+    };
   }
 
   return {
     ...result,
-    session: createFallbackSession(input, result),
+    steps: undefined,
+    session,
   };
 }
 
-function createEmbeddedSearchAgentHarness(
+export function createEmbeddedSearchAgentHarness(
   name: string,
   agent: EmbeddedSearchAgent,
 ) {

@@ -5,6 +5,7 @@ import {
   createJudge,
   ToolCallJudge,
   type JudgeContext,
+  type JsonValue,
   type ToolCallRecord,
 } from "vitest-evals";
 import { z } from "zod";
@@ -19,6 +20,23 @@ import type {
 
 const defaultModel = openai("gpt-4o");
 
+const jsonPrimitiveSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
+const shallowJsonValueSchema = z.union([
+  jsonPrimitiveSchema,
+  z.array(jsonPrimitiveSchema),
+  z.record(jsonPrimitiveSchema),
+]);
+const jsonValueSchema: z.ZodType<JsonValue> = z.union([
+  shallowJsonValueSchema,
+  z.array(shallowJsonValueSchema),
+  z.record(shallowJsonValueSchema),
+]);
+
 const predictionSchema = z.object({
   rationale: z
     .string()
@@ -27,7 +45,7 @@ const predictionSchema = z.object({
     .array(
       z.object({
         name: z.string().describe("Sentry MCP tool name"),
-        arguments: z.record(z.unknown()).optional().default({}),
+        arguments: z.record(jsonValueSchema).optional().default({}),
       }),
     )
     .describe("Ordered Sentry MCP tool calls the assistant would likely make"),
