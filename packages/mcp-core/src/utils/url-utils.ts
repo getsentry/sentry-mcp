@@ -398,10 +398,11 @@ export function getReleaseUrl(
   releaseVersion: string,
   protocol: SentryProtocol = "https",
 ): string {
+  const encodedReleaseVersion = encodeURIComponent(releaseVersion);
   return getSentryWebBaseUrl(
     host,
     organizationSlug,
-    `/releases/${releaseVersion}/`,
+    `/releases/${encodedReleaseVersion}/`,
     protocol,
   );
 }

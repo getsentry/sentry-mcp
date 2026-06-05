@@ -506,7 +506,7 @@ describe("get_sentry_resource", () => {
 
         To get release information:
 
-        - **View in Sentry**: [Open Release](https://my-org.sentry.io/releases/backend@2024.01.15-abc123/)
+        - **View in Sentry**: [Open Release](https://my-org.sentry.io/releases/backend%402024.01.15-abc123/)
         - **Find releases**: Use the Sentry tool \`find_releases(organizationSlug='my-org')\` to list releases and their details
         - **Search issues**: Use \`search_issues\` with query \`release:backend@2024.01.15-abc123\` to find issues in this release"
       `);

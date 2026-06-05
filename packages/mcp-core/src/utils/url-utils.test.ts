@@ -8,6 +8,7 @@ import {
   getPreprodSnapshotUrl,
   getReplaysSearchUrl,
   getReplayUrl,
+  getReleaseUrl,
   getTraceUrl,
   getEventsExplorerUrl,
   getTraceMetricsExploreUrl,
@@ -159,6 +160,19 @@ describe("url-utils", () => {
       );
       expect(result).toBe(
         "http://sentry.internal:9000/organizations/myorg/issues/PROJ-123",
+      );
+    });
+  });
+
+  describe("getReleaseUrl", () => {
+    it("should encode release versions in the path segment", () => {
+      const result = getReleaseUrl(
+        "sentry.io",
+        "myorg",
+        "backend/web 2025.04.13",
+      );
+      expect(result).toBe(
+        "https://myorg.sentry.io/releases/backend%2Fweb%202025.04.13/",
       );
     });
   });

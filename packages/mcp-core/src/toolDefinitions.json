@@ -888,6 +888,74 @@
     "surface": "direct"
   },
   {
+    "name": "get_release_details",
+    "description": "Get details for a Sentry release.\n\nUse this tool when you need to:\n- Inspect an exact release version\n- See deploys and environments for a release\n- See recent commits attached to a release\n- Gather release health metadata when a project ID is known\n\n<examples>\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3')\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3', includeHealth=true, projectId='450123')\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "releaseVersion": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact release version."
+        },
+        "projectId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Optional numeric project ID for release health metadata."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional numeric project ID for release health metadata.",
+          "default": null
+        },
+        "includeHealth": {
+          "type": "boolean",
+          "default": false
+        },
+        "includeDeploys": {
+          "type": "boolean",
+          "default": true
+        },
+        "includeCommits": {
+          "type": "boolean",
+          "default": true
+        },
+        "limit": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 50,
+          "default": 10
+        }
+      },
+      "required": ["organizationSlug", "releaseVersion"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["project:releases"],
+    "skills": ["inspect"],
+    "surface": "catalog"
+  },
+  {
     "name": "get_replay_details",
     "description": "Get high-level information about a specific Sentry replay by URL or replay ID.\n\nUSE THIS TOOL WHEN USERS:\n- Share a replay URL\n- Ask what happened in a specific replay\n- Want a concise replay summary plus the next issue or trace lookups to run\n\n<examples>\n### With replay URL\n```\nget_replay_details(replayUrl='https://my-organization.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/')\n```\n\n### With organization and replay ID\n```\nget_replay_details(organizationSlug='my-organization', replayId='7e07485f-12f9-416b-8b14-26260799b51f')\n```\n</examples>",
     "inputSchema": {

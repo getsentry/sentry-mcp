@@ -31,7 +31,10 @@ import {
   ProjectListSchema,
   ProjectRepoLinkSchema,
   ProjectSchema,
+  CommitListSchema,
+  DeployListSchema,
   RepositoryListSchema,
+  ReleaseDetailsSchema,
   ReleaseListSchema,
   IssueActivityListResponseSchema,
   IssueCommentListSchema,
@@ -81,9 +84,12 @@ import type {
   IssueList,
   IssueTagValues,
   ExternalIssueList,
+  CommitList,
+  DeployList,
   OrganizationList,
   Project,
   ProjectList,
+  ReleaseDetails,
   ReleaseList,
   TagList,
   Team,
@@ -1655,6 +1661,106 @@ export class SentryApiService {
       opts,
     );
     return ReleaseListSchema.parse(body);
+  }
+
+  async getReleaseDetails(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlug,
+      projectId,
+      includeHealth,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlug?: string;
+      projectId?: string;
+      includeHealth?: boolean;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReleaseDetails> {
+    const searchQuery = new URLSearchParams();
+    if (projectId) {
+      searchQuery.set("project", projectId);
+    }
+    if (includeHealth) {
+      searchQuery.set("health", "1");
+    }
+
+    const encodedVersion = encodeURIComponent(releaseVersion);
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/releases/${encodedVersion}/`
+      : `/organizations/${organizationSlug}/releases/${encodedVersion}/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return ReleaseDetailsSchema.parse(body);
+  }
+
+  async listReleaseDeploys(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlug,
+      limit,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlug?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<DeployList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlug) {
+      searchQuery.set("projectSlug", projectSlug);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const encodedVersion = encodeURIComponent(releaseVersion);
+    const path = `/organizations/${organizationSlug}/releases/${encodedVersion}/deploys/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return DeployListSchema.parse(body);
+  }
+
+  async listReleaseCommits(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlug,
+      limit,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlug?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<CommitList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlug) {
+      searchQuery.set("projectSlug", projectSlug);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const encodedVersion = encodeURIComponent(releaseVersion);
+    const path = `/organizations/${organizationSlug}/releases/${encodedVersion}/commits/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return CommitListSchema.parse(body);
   }
 
   /**
