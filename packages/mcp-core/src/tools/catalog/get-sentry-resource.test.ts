@@ -11,6 +11,8 @@ import {
 import { encode as encodePng } from "fast-png";
 import { http, HttpResponse } from "msw";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import getMonitorDetails from "./get-monitor-details.js";
+import getReleaseDetails from "./get-release-details.js";
 import getSentryResource from "./get-sentry-resource.js";
 
 const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
@@ -128,8 +130,13 @@ function mockReleaseResource({
 }
 
 describe("get_sentry_resource", () => {
-  it("advertises the release scope used by release URL dispatch", () => {
-    expect(getSentryResource.requiredScopes).toContain("project:releases");
+  it("keeps release and organization scopes on dedicated detail tools", () => {
+    expect(getSentryResource.requiredScopes).toEqual([
+      "event:read",
+      "project:read",
+    ]);
+    expect(getMonitorDetails.requiredScopes).toContain("org:read");
+    expect(getReleaseDetails.requiredScopes).toContain("project:releases");
   });
 
   beforeEach(() => {

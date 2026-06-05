@@ -26,8 +26,8 @@ import getAIConversationDetails from "./get-ai-conversation-details";
 import getIssueDetails from "./get-issue-details";
 import getMonitorDetails from "./get-monitor-details";
 import getProfileDetails from "./get-profile-details";
-import getReplayDetails from "./get-replay-details";
 import getReleaseDetails from "./get-release-details";
+import getReplayDetails from "./get-replay-details";
 import getTraceDetails from "./get-trace-details";
 
 /** Types with full API integration. */
@@ -441,10 +441,22 @@ function parseSpanResourceId(resourceId: string): {
   };
 }
 
+function assertCatalogToolAvailable(
+  context: ServerContext,
+  toolName: string,
+  resourceLabel: string,
+) {
+  if (context.availableToolNames && !context.availableToolNames.has(toolName)) {
+    throw new UserInputError(
+      `${resourceLabel} resources require the inspect skill. Enable inspect tools or call ${toolName} in a session where it is available.`,
+    );
+  }
+}
+
 export default defineTool({
   name: "get_sentry_resource",
   skills: ["inspect", "triage", "seer", "preprod"],
-  requiredScopes: ["event:read", "project:read", "project:releases"],
+  requiredScopes: ["event:read", "project:read"],
 
   description: ({ experimentalMode, availableToolNames, directToolNames }) => {
     const fullResolutionInstruction = formatToolCallInstruction({
@@ -646,6 +658,7 @@ export default defineTool({
         );
 
       case "monitor":
+        assertCatalogToolAvailable(context, "get_monitor_details", "Monitor");
         return getMonitorDetails.handler(
           {
             organizationSlug: resolved.organizationSlug,
@@ -664,6 +677,7 @@ export default defineTool({
         );
 
       case "release":
+        assertCatalogToolAvailable(context, "get_release_details", "Release");
         return getReleaseDetails.handler(
           {
             organizationSlug: resolved.organizationSlug,

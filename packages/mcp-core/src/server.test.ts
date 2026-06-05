@@ -729,12 +729,26 @@ describe("buildServer", () => {
       );
     });
 
-    it("dispatches supported release URLs through get_sentry_resource", async () => {
+    it("rejects release URL dispatch without inspect tools", async () => {
       const server = buildServer({
         context: {
           ...baseContext,
           grantedSkills: new Set(["triage"]),
         },
+        experimentalMode: true,
+      });
+
+      const result = await callRegisteredTool(server, "get_sentry_resource", {
+        url: "https://sentry-mcp-evals.sentry.io/releases/8ce89484-0fec-4913-a2cd-e8e2d41dee36/",
+      });
+      const text = getTextContent(result);
+
+      expect(text).toContain("Release resources require the inspect skill");
+    });
+
+    it("dispatches supported release URLs through get_sentry_resource when inspect is available", async () => {
+      const server = buildServer({
+        context: baseContext,
         experimentalMode: true,
       });
 
