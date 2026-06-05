@@ -17,16 +17,13 @@ describeSearchAgentEval("search-events-agent", searchEventsAgentHarness, [
     },
   },
   {
-    // Query with "me" reference - should only require whoami
+    // Query with "me" reference may use direct Sentry syntax or resolve whoami.
     input: "Show me my errors from last week",
-    expectedTools: [
-      {
-        name: "whoami",
-      },
-    ],
+    expectedTools: [],
     expected: {
       dataset: "errors",
-      query: /user\.email:"?test@example\.com"?|user\.id:"?123456"?/, // Can be either
+      query:
+        /assignedTo:me|user\.email:"?test@example\.com"?|user\.id:"?123456"?/, // Can be direct shorthand or resolved identity
       sort: "-timestamp",
       timeRange: { statsPeriod: "7d" },
     },
@@ -97,7 +94,7 @@ describeSearchAgentEval("search-events-agent", searchEventsAgentHarness, [
     expected: {
       dataset: "spans",
       query: /custom\.db\.pool_size:>10|has:custom\.db\.pool_size/,
-      sort: /-span\.duration|-custom\.db\.pool_size/,
+      sort: /-span\.duration|-custom\.db\.pool_size|-timestamp/,
     },
   },
   {

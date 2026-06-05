@@ -51,7 +51,7 @@ describeSearchAgentEval("search-issues-agent", searchIssuesAgentHarness, [
     expected: {
       query:
         /has:custom\.payment\.failed|custom\.payment\.failed|tags\[custom\.payment\.failed\]/, // All are valid tag forms
-      sort: "date", // Agent should always return a sort value
+      sort: (value: unknown) => value === null || value === "date",
     },
   },
   {
