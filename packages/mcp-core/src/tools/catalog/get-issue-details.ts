@@ -103,6 +103,18 @@ const structuredExternalIssueSchema = z.object({
   url: z.string(),
 });
 
+const structuredProjectSchema = z.object({
+  slug: z.string(),
+  name: z.string(),
+  platform: z.string().nullable(),
+});
+
+const structuredIssueMetadataSchema = z.object({
+  title: z.string().nullable(),
+  location: z.string().nullable(),
+  value: z.string().nullable(),
+});
+
 const issueDetailsSuccessStructuredOutputSchema = z.object({
   schemaVersion: z.literal(ISSUE_DETAILS_STRUCTURED_CONTENT_VERSION),
   security: StructuredOutputSecuritySchema,
@@ -121,14 +133,14 @@ const issueDetailsSuccessStructuredOutputSchema = z.object({
     title: z.string(),
     culprit: z.unknown(),
     permalink: z.unknown(),
-    project: z.object({ slug: z.string() }).passthrough(),
+    project: structuredProjectSchema,
     platform: z.string().nullable(),
     status: z.unknown(),
     substatus: z.unknown().nullable(),
     type: z.unknown(),
     issueType: z.unknown().nullable(),
     issueCategory: z.unknown().nullable(),
-    metadata: z.unknown().nullable(),
+    metadata: structuredIssueMetadataSchema,
     assignedTo: z.unknown().nullable(),
     seerFixabilityScore: z.unknown().nullable(),
     counts: z.object({
@@ -524,14 +536,14 @@ function formatIssueDetailsStructuredContent({
       title: issue.title,
       culprit: issue.culprit,
       permalink: issue.permalink,
-      project: issue.project,
+      project: formatStructuredProject(issue.project),
       platform: issue.platform ?? null,
       status: issue.status,
       substatus: issue.substatus ?? null,
       type: issue.type,
       issueType: issue.issueType ?? null,
       issueCategory: issue.issueCategory ?? null,
-      metadata: issue.metadata ?? null,
+      metadata: formatStructuredIssueMetadata(issue.metadata),
       assignedTo: issue.assignedTo ?? null,
       seerFixabilityScore: issue.seerFixabilityScore ?? null,
       counts: {
@@ -569,6 +581,36 @@ function formatIssueDetailsStructuredContent({
       performanceTrace: summarizePerformanceTrace(performanceTrace),
     },
   };
+}
+
+function formatStructuredProject(
+  project: Issue["project"],
+): z.infer<typeof structuredProjectSchema> {
+  return {
+    slug: project.slug,
+    name: project.name,
+    platform: project.platform ?? null,
+  };
+}
+
+function formatStructuredIssueMetadata(
+  metadata: Issue["metadata"] | undefined,
+): z.infer<typeof structuredIssueMetadataSchema> {
+  return {
+    title: formatNullableStructuredValue(metadata?.title),
+    location: formatNullableStructuredValue(metadata?.location),
+    value: formatNullableStructuredValue(metadata?.value),
+  };
+}
+
+function formatNullableStructuredValue(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return formatEventValue(value, {
+    maxLength: STRUCTURED_EVENT_FIELD_VALUE_LIMIT,
+  });
 }
 
 function createStructuredFieldRows(value: unknown): {

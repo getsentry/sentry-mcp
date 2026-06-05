@@ -460,6 +460,20 @@ describe("get_issue_details", () => {
     expect(result.structuredContent.security).not.toHaveProperty(
       "untrustedFields",
     );
+    const structuredIssue = result.structuredContent.issue as {
+      project: Record<string, unknown>;
+      metadata: Record<string, unknown>;
+    };
+    expect(structuredIssue.project).toEqual({
+      slug: "CLOUDFLARE-MCP",
+      name: "CLOUDFLARE-MCP",
+      platform: "bun",
+    });
+    expect(structuredIssue.metadata).toEqual({
+      title: "Error: Tool list_organizations is already registered",
+      location: null,
+      value: "Tool list_organizations is already registered",
+    });
   });
 
   it("bounds autofix state in structured content", async () => {
