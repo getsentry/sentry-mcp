@@ -1,5 +1,6 @@
 import { experimental_createMCPClient } from "@ai-sdk/mcp";
 import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
+import toolDefinitions from "@sentry/mcp-core/toolDefinitions";
 
 type MockMcpClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
 
@@ -17,17 +18,8 @@ function createMockTransport() {
   });
 }
 
-function getShortDescription(tool: unknown): string {
-  if (
-    tool &&
-    typeof tool === "object" &&
-    "description" in tool &&
-    typeof tool.description === "string"
-  ) {
-    return tool.description.split("\n")[0] ?? "";
-  }
-
-  return "";
+function getShortDescription(description: string): string {
+  return description.split("\n")[0] ?? "";
 }
 
 export async function withMockMcpClient<T>(
@@ -45,12 +37,9 @@ export async function withMockMcpClient<T>(
 }
 
 async function loadAvailableToolDescriptions() {
-  return await withMockMcpClient(async (client) => {
-    const tools = await client.tools();
-    return Object.entries(tools).map(
-      ([name, tool]) => `${name} - ${getShortDescription(tool)}`,
-    );
-  });
+  return toolDefinitions.map(
+    (tool) => `${tool.name} - ${getShortDescription(tool.description)}`,
+  );
 }
 
 export async function getAvailableToolDescriptions(): Promise<string[]> {
