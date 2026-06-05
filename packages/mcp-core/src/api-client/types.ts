@@ -60,6 +60,10 @@ import type {
   FlamegraphProfileSchema,
   FlamegraphSchema,
   GenericEventSchema,
+  IssueActivityListResponseSchema,
+  IssueActivitySchema,
+  IssueCommentListSchema,
+  IssueCommentSchema,
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
@@ -98,6 +102,8 @@ export type Project = z.infer<typeof ProjectSchema>;
 export type ClientKey = z.infer<typeof ClientKeySchema>;
 export type Release = z.infer<typeof ReleaseSchema>;
 export type Issue = z.infer<typeof IssueSchema>;
+export type IssueActivity = z.infer<typeof IssueActivitySchema>;
+export type IssueComment = z.infer<typeof IssueCommentSchema>;
 
 // Individual event types
 export type ErrorEvent = z.infer<typeof ErrorEventSchema>;
@@ -131,6 +137,10 @@ export type TeamList = z.infer<typeof TeamListSchema>;
 export type ProjectList = z.infer<typeof ProjectListSchema>;
 export type ReleaseList = z.infer<typeof ReleaseListSchema>;
 export type IssueList = z.infer<typeof IssueListSchema>;
+export type IssueActivityList = z.infer<
+  typeof IssueActivityListResponseSchema
+>["activity"];
+export type IssueCommentList = z.infer<typeof IssueCommentListSchema>;
 export type EventAttachmentList = z.infer<typeof EventAttachmentListSchema>;
 export type TagList = z.infer<typeof TagListSchema>;
 export type ClientKeyList = z.infer<typeof ClientKeyListSchema>;

@@ -325,6 +325,39 @@ export const ReleaseSchema = z.object({
 
 export const ReleaseListSchema = z.array(ReleaseSchema);
 
+const ApiResourceIdSchema = z.union([z.string(), z.number()]);
+
+const ApiActorSchema = z
+  .object({
+    id: ApiResourceIdSchema.optional(),
+    name: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    username: z.string().nullable().optional(),
+    type: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const IssueActivitySchema = z
+  .object({
+    id: ApiResourceIdSchema,
+    type: z.string().nullable().optional(),
+    dateCreated: z.string().datetime().nullable().optional(),
+    user: ApiActorSchema.nullable().optional(),
+    sentry_app: z.record(z.string(), z.unknown()).nullable().optional(),
+    data: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
+export const IssueActivityListResponseSchema = z.object({
+  activity: z.array(IssueActivitySchema),
+});
+
+export const IssueCommentSchema = IssueActivitySchema.extend({
+  type: z.string().nullable().optional(),
+});
+
+export const IssueCommentListSchema = z.array(IssueCommentSchema);
+
 /**
  * Organization tag lists are backed by `TagKeySerializerResponse`, which only
  * guarantees `key` and `name`. Count fields are backend-dependent and may come
