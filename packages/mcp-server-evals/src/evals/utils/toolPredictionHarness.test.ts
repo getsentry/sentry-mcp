@@ -93,7 +93,7 @@ describe("ToolPredictionJudge", () => {
     expect(result.metadata?.deterministicScore).toBe(1);
   });
 
-  it("scores wrong predicted tools as failures", async () => {
+  it("ignores inflated model scores for wrong predicted tools", async () => {
     const result = await ToolPredictionJudge.assess(
       createJudgeContext(
         {
@@ -119,7 +119,7 @@ describe("ToolPredictionJudge", () => {
       ),
     );
 
-    expect(result.score).toBe(0.8);
+    expect(result.score).toBe(0);
     expect(result.metadata?.rationale).toContain("wrong lookup path");
     expect(result.metadata?.deterministicRationale).toContain(
       "Partial match: 0/1",
@@ -127,7 +127,7 @@ describe("ToolPredictionJudge", () => {
     expect(result.metadata?.deterministicScore).toBe(0);
   });
 
-  it("preserves model scores for incomplete multi-step predictions", async () => {
+  it("uses deterministic partial scores for incomplete multi-step predictions", async () => {
     const result = await ToolPredictionJudge.assess(
       createJudgeContext(
         {
@@ -161,7 +161,7 @@ describe("ToolPredictionJudge", () => {
       ),
     );
 
-    expect(result.score).toBe(0.6);
+    expect(result.score).toBe(0.5);
     expect(result.metadata?.rationale).toContain("missed the update");
     expect(result.metadata?.deterministicRationale).toContain("Partial match");
     expect(result.metadata?.deterministicScore).toBe(0.5);

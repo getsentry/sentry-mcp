@@ -187,7 +187,7 @@ export const ToolPredictionJudge = createJudge<
   const deterministicScore = toolCallJudgeResult.score ?? 0;
 
   return {
-    score: Math.max(context.output.score, deterministicScore),
+    score: deterministicScore,
     metadata: {
       ...toolCallJudgeResult.metadata,
       rationale: context.output.rationale,
