@@ -99,9 +99,11 @@ export default defineTool({
     statsPeriod: z
       .string()
       .trim()
-      .describe("Relative time range, such as `24h`, `7d`, or `14d`.")
+      .describe(
+        "Relative time range, such as `24h`, `7d`, or `14d`. Defaults to `24h` when `start` and `end` are omitted.",
+      )
       .nullable()
-      .default("24h"),
+      .default(null),
     start: z
       .string()
       .datetime()
@@ -142,6 +144,12 @@ export default defineTool({
         project: { slug: params.projectSlug },
       });
     }
+    const start = params.start ?? undefined;
+    const end = params.end ?? undefined;
+    const hasAbsoluteTimeRange = start !== undefined || end !== undefined;
+    const statsPeriod = hasAbsoluteTimeRange
+      ? undefined
+      : (params.statsPeriod ?? "24h");
 
     const monitor = await apiService.getMonitorDetails({
       organizationSlug,
@@ -165,9 +173,9 @@ export default defineTool({
         projectSlug: projectSlug ?? undefined,
         monitorSlug: params.monitorSlug,
         environment: params.environment ?? undefined,
-        statsPeriod: params.statsPeriod ?? undefined,
-        start: params.start ?? undefined,
-        end: params.end ?? undefined,
+        statsPeriod,
+        start,
+        end,
         limit: params.checkInLimit,
       }),
       params.includeStats
@@ -176,9 +184,9 @@ export default defineTool({
             projectSlug: projectSlug ?? undefined,
             monitorSlug: params.monitorSlug,
             environment: params.environment ?? undefined,
-            statsPeriod: params.statsPeriod ?? undefined,
-            start: params.start ?? undefined,
-            end: params.end ?? undefined,
+            statsPeriod,
+            start,
+            end,
             rollup: params.rollupSeconds ?? undefined,
           })
         : Promise.resolve([]),

@@ -184,6 +184,7 @@ describe("get_monitor_details", () => {
   });
 
   it("uses StatsMixin time parameters for monitor stats", async () => {
+    let checkInsRequestUrl: string | null = null;
     let statsRequestUrl: string | null = null;
     const monitorResponse = {
       id: "4509100000000001",
@@ -209,7 +210,10 @@ describe("get_monitor_details", () => {
       ),
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/checkins/",
-        () => HttpResponse.json([]),
+        ({ request }) => {
+          checkInsRequestUrl = request.url;
+          return HttpResponse.json([]);
+        },
       ),
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/stats/",
@@ -227,7 +231,7 @@ describe("get_monitor_details", () => {
         projectSlug: null,
         monitorSlug: "nightly-import",
         environment: "production",
-        statsPeriod: "24h",
+        statsPeriod: null,
         start: "2025-04-14T02:00:00.000Z",
         end: "2025-04-14T03:00:00.000Z",
         checkInLimit: 10,
@@ -236,6 +240,13 @@ describe("get_monitor_details", () => {
       },
       context,
     );
+
+    expect(checkInsRequestUrl).not.toBeNull();
+    const checkInsParams = new URL(checkInsRequestUrl ?? "").searchParams;
+    expect(checkInsParams.get("environment")).toBe("production");
+    expect(checkInsParams.get("start")).toBe("2025-04-14T02:00:00.000Z");
+    expect(checkInsParams.get("end")).toBe("2025-04-14T03:00:00.000Z");
+    expect(checkInsParams.get("statsPeriod")).toBeNull();
 
     expect(statsRequestUrl).not.toBeNull();
     const params = new URL(statsRequestUrl ?? "").searchParams;
