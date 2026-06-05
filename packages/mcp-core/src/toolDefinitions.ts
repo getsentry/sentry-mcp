@@ -1,7 +1,10 @@
 import toolDefinitionsData from "./toolDefinitions.json";
 import type { Scope } from "./permissions";
+import type { Skill } from "./skills";
 
 // Tool definition for UI/external consumption
+export type ToolDefinitionSurface = "direct" | "catalog";
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -9,8 +12,20 @@ export interface ToolDefinition {
   inputSchema: unknown;
   // Sentry API scopes required to use the tool
   requiredScopes: Scope[];
+  // User-facing skill catalog memberships
+  skills: Skill[];
+  // Whether this tool is exposed directly or through the catalog.
+  surface: ToolDefinitionSurface;
 }
 
 const toolDefinitions = toolDefinitionsData as ToolDefinition[];
+
+export const directToolDefinitions = toolDefinitions.filter(
+  (tool) => tool.surface === "direct",
+);
+
+export const catalogToolDefinitions = toolDefinitions.filter(
+  (tool) => tool.surface === "catalog",
+);
 
 export default toolDefinitions;
