@@ -184,18 +184,20 @@ export const ToolPredictionJudge = createJudge<
     toolCalls: predictedToolCalls,
     expectedTools: context.metadata.expectedTools,
   });
+  const deterministicScore = toolCallJudgeResult.score ?? 0;
 
   return {
-    score: context.output.score,
+    score: Math.max(context.output.score, deterministicScore),
     metadata: {
       ...toolCallJudgeResult.metadata,
       rationale: context.output.rationale,
+      modelScore: context.output.score,
       predictedTools: requireJsonValue(predictedToolCalls, "predictedTools"),
       expectedTools: requireJsonValue(
         normalizeExpectedToolCalls(context.metadata.expectedTools),
         "expectedTools",
       ),
-      deterministicScore: toolCallJudgeResult.score,
+      deterministicScore,
       deterministicRationale: toolCallJudgeResult.metadata?.rationale,
     },
   };

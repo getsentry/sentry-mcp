@@ -5,13 +5,15 @@ on:
   push:
     branches: [main]
     paths:
-      - "packages/mcp-core/src/tools*"
+      - "packages/mcp-core/src/tools/**"
+      - "packages/mcp-core/src/internal/agents/**"
       - "packages/mcp-server-evals/**"
       - "packages/mcp-server-mocks/**"
       - ".github/workflows/eval.yml"
   pull_request:
     paths:
-      - "packages/mcp-core/src/tools*"
+      - "packages/mcp-core/src/tools/**"
+      - "packages/mcp-core/src/internal/agents/**"
       - "packages/mcp-server-evals/**"
       - "packages/mcp-server-mocks/**"
       - ".github/workflows/eval.yml"

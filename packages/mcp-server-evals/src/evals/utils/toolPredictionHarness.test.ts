@@ -64,6 +64,35 @@ describe("ToolPredictionJudge", () => {
     ]);
   });
 
+  it("uses deterministic score when the model underrates matching tools", async () => {
+    const result = await ToolPredictionJudge.assess(
+      createJudgeContext(
+        {
+          score: 0,
+          rationale: "The expected discovery call is not necessary.",
+          predictedTools: [
+            {
+              name: "find_organizations",
+              arguments: {},
+            },
+          ],
+        },
+        {
+          expectedTools: [
+            {
+              name: "find_organizations",
+              arguments: {},
+            },
+          ],
+        },
+      ),
+    );
+
+    expect(result.score).toBe(1);
+    expect(result.metadata?.modelScore).toBe(0);
+    expect(result.metadata?.deterministicScore).toBe(1);
+  });
+
   it("scores wrong predicted tools as failures", async () => {
     const result = await ToolPredictionJudge.assess(
       createJudgeContext(

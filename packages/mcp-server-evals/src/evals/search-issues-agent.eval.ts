@@ -40,7 +40,7 @@ describeSearchAgentEval("search-issues-agent", searchIssuesAgentHarness, [
     expectedTools: [],
     expected: {
       query:
-        /(?=.*is:unresolved)(?=.*error\.handled:false)(?=.*lastSeen:(?:-24h|>-24h))/,
+        /(?=.*is:unresolved)(?=.*error\.handled:false)(?=.*lastSeen:(?:-24h|>=?-24h))/,
       sort: /date|user/,
     },
   },

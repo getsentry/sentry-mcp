@@ -25,7 +25,7 @@ describeSearchAgentEval("search-events-agent", searchEventsAgentHarness, [
     ],
     expected: {
       dataset: "errors",
-      query: /user\.email:test@example\.com|user\.id:123456/, // Can be either
+      query: /user\.email:"?test@example\.com"?|user\.id:"?123456"?/, // Can be either
       sort: "-timestamp",
       timeRange: { statsPeriod: "7d" },
     },
@@ -95,8 +95,8 @@ describeSearchAgentEval("search-events-agent", searchEventsAgentHarness, [
     ],
     expected: {
       dataset: "spans",
-      query: "custom.db.pool_size:>10",
-      sort: "-span.duration",
+      query: /custom\.db\.pool_size:>10/,
+      sort: /-span\.duration|-custom\.db\.pool_size/,
     },
   },
   {

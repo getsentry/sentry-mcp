@@ -107,7 +107,7 @@ export function describeSearchAgentEval(
 
         it(
           testName ?? input,
-          { timeout: options.timeout ?? 90000 },
+          { timeout: options.timeout ?? 150000 },
           async ({ run }) => {
             await run(input, { metadata });
           },

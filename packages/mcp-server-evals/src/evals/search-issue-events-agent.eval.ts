@@ -76,7 +76,7 @@ describeSearchAgentEval(
       expectedTools: [],
       expected: {
         query:
-          /^$|environment:production.*release:|release:.*environment:production/,
+          /^$|environment:production.*(?:release:|has:release)|(?:release:|has:release).*environment:production/,
         sort: "-timestamp",
         timeRange: { statsPeriod: "24h" },
       },

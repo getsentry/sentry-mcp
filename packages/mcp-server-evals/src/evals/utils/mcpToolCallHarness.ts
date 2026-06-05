@@ -16,7 +16,7 @@ type AiSdkToolCall = {
   input?: unknown;
 };
 
-type McpToolCallResult = {
+export type McpToolCallResult = {
   text?: unknown;
   toolCalls?: unknown;
   steps?: unknown[];
@@ -82,11 +82,11 @@ function getStepToolCalls(result: McpToolCallResult): ToolCallRecord[] {
   });
 }
 
-function getToolCalls(result: McpToolCallResult): ToolCallRecord[] {
-  const topLevelToolCalls = normalizeToolCalls(result.toolCalls);
-  return topLevelToolCalls.length > 0
-    ? topLevelToolCalls
-    : getStepToolCalls(result);
+export function getToolCalls(result: McpToolCallResult): ToolCallRecord[] {
+  const stepToolCalls = getStepToolCalls(result);
+  return stepToolCalls.length > 0
+    ? stepToolCalls
+    : normalizeToolCalls(result.toolCalls);
 }
 
 export function createMcpToolCallHarness(maxSteps = 6) {
