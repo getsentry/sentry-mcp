@@ -15,6 +15,7 @@ import {
   isSentryHost,
   type TraceMetricIdentifier,
 } from "../utils/url-utils";
+import { isNumericId } from "../utils/slug-validation";
 import {
   isMetricsDataset,
   isProfilesDataset,
@@ -31,7 +32,10 @@ import {
   ProjectListSchema,
   ProjectRepoLinkSchema,
   ProjectSchema,
+  CommitListSchema,
+  DeployListSchema,
   RepositoryListSchema,
+  ReleaseDetailsSchema,
   ReleaseListSchema,
   IssueActivityListResponseSchema,
   IssueCommentListSchema,
@@ -81,9 +85,12 @@ import type {
   IssueList,
   IssueTagValues,
   ExternalIssueList,
+  CommitList,
+  DeployList,
   OrganizationList,
   Project,
   ProjectList,
+  ReleaseDetails,
   ReleaseList,
   TagList,
   Team,
@@ -1655,6 +1662,103 @@ export class SentryApiService {
       opts,
     );
     return ReleaseListSchema.parse(body);
+  }
+
+  async getReleaseDetails(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlugOrId,
+      includeHealth,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlugOrId?: string;
+      includeHealth?: boolean;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReleaseDetails> {
+    const searchQuery = new URLSearchParams();
+    if (includeHealth) {
+      searchQuery.set("health", "1");
+    }
+
+    const encodedVersion = encodeURIComponent(releaseVersion);
+    const path = projectSlugOrId
+      ? `/projects/${organizationSlug}/${projectSlugOrId}/releases/${encodedVersion}/`
+      : `/organizations/${organizationSlug}/releases/${encodedVersion}/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return ReleaseDetailsSchema.parse(body);
+  }
+
+  async listReleaseDeploys(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlugOrId,
+      limit,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlugOrId?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<DeployList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlugOrId) {
+      searchQuery.set(
+        isNumericId(projectSlugOrId) ? "project" : "projectSlug",
+        projectSlugOrId,
+      );
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const encodedVersion = encodeURIComponent(releaseVersion);
+    const path = `/organizations/${organizationSlug}/releases/${encodedVersion}/deploys/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return DeployListSchema.parse(body);
+  }
+
+  async listReleaseCommits(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlugOrId,
+      limit,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlugOrId?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<CommitList> {
+    const searchQuery = new URLSearchParams();
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const encodedVersion = encodeURIComponent(releaseVersion);
+    const path = projectSlugOrId
+      ? `/projects/${organizationSlug}/${projectSlugOrId}/releases/${encodedVersion}/commits/`
+      : `/organizations/${organizationSlug}/releases/${encodedVersion}/commits/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return CommitListSchema.parse(body);
   }
 
   /**

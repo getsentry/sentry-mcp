@@ -337,6 +337,58 @@ const ApiActorSchema = z
   })
   .passthrough();
 
+export const ReleaseDetailsSchema = ReleaseSchema.extend({
+  adoptionStages: z.unknown().optional(),
+  authors: z.array(ApiActorSchema).optional(),
+  commitCount: z.number().optional(),
+  currentProjectMeta: z.record(z.string(), z.unknown()).optional(),
+  deployCount: z.number().optional(),
+  lastDeploy: ReleaseSchema.shape.lastDeploy.optional(),
+  newGroups: z.number().optional(),
+  owner: ApiActorSchema.nullable().optional(),
+  projects: z.array(ReleaseProjectSchema).optional(),
+  refs: z.array(z.record(z.string(), z.unknown())).optional(),
+})
+  .partial()
+  .extend({
+    id: ApiResourceIdSchema,
+    version: z.string(),
+  })
+  .passthrough();
+
+export const DeploySchema = z
+  .object({
+    id: ApiResourceIdSchema,
+    environment: z.string().nullable().optional(),
+    name: z.string().nullable().optional(),
+    url: z.string().nullable().optional(),
+    dateStarted: z.string().datetime().nullable().optional(),
+    dateFinished: z.string().datetime().nullable().optional(),
+  })
+  .passthrough();
+
+export const DeployListSchema = z.array(DeploySchema);
+
+export const CommitSchema = z
+  .object({
+    id: ApiResourceIdSchema,
+    message: z.string().nullable().optional(),
+    dateCreated: z.string().datetime().nullable().optional(),
+    pullRequest: z.record(z.string(), z.unknown()).nullable().optional(),
+    suspectCommitType: z.string().optional(),
+    author: ApiActorSchema.nullable().optional(),
+    repository: z
+      .object({
+        name: z.string().nullable().optional(),
+      })
+      .passthrough()
+      .nullable()
+      .optional(),
+  })
+  .passthrough();
+
+export const CommitListSchema = z.array(CommitSchema);
+
 export const IssueActivitySchema = z
   .object({
     id: ApiResourceIdSchema,
