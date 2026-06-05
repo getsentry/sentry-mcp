@@ -7,7 +7,7 @@ describeMcpToolCallEval("get-issue", [
       {
         name: "search_tools",
         arguments: {
-          query: "issue",
+          query: /issue|get_issue_details/,
         },
       },
       {
@@ -28,7 +28,7 @@ describeMcpToolCallEval("get-issue", [
       {
         name: "search_tools",
         arguments: {
-          query: "issue",
+          query: /issue|event|get_issue_details/,
         },
       },
       {

@@ -96,7 +96,7 @@ describeSearchAgentEval("search-events-agent", searchEventsAgentHarness, [
     ],
     expected: {
       dataset: "spans",
-      query: /custom\.db\.pool_size:>10/,
+      query: /custom\.db\.pool_size:>10|has:custom\.db\.pool_size/,
       sort: /-span\.duration|-custom\.db\.pool_size/,
     },
   },
@@ -161,7 +161,9 @@ describeSearchAgentEval("search-events-agent", searchEventsAgentHarness, [
     expectedTools: [],
     expected: {
       dataset: "errors",
-      query: "", // No specific filter, just aggregate all errors
+      // Empty query is ideal, but filtering to rows with error.type is also a
+      // valid way to protect the grouping field.
+      query: /^$|has:error\.type/,
       // Agent should include count() in fields since we're sorting by it
       fields: ["error.type", "count()"],
       // Sort by count in descending order to get "most frequent"

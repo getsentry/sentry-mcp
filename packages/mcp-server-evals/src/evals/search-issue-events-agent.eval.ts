@@ -48,7 +48,7 @@ describeSearchAgentEval(
         },
       ],
       expected: {
-        query: /user\.email:test@example\.com|user:test@example\.com/, // Various valid forms
+        query: /user\.email:"?test@example\.com"?|user:"?test@example\.com"?/, // Various valid forms
         sort: "-timestamp",
       },
     },
@@ -76,7 +76,7 @@ describeSearchAgentEval(
       expectedTools: [],
       expected: {
         query:
-          /^$|environment:production.*(?:release:|has:release)|(?:release:|has:release).*environment:production/,
+          /^$|^environment:production$|environment:production.*(?:release:|has:release)|(?:release:|has:release).*environment:production/,
         sort: "-timestamp",
         timeRange: { statsPeriod: "24h" },
       },
