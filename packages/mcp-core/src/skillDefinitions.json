@@ -65,7 +65,7 @@
       {
         "name": "get_release_details",
         "description": "Get details for a Sentry release.\n\nUse this tool when you need to:\n- Inspect an exact release version\n- See deploys and environments for a release\n- See recent commits attached to a release\n- Gather release health metadata when a project ID is known\n\n<examples>\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3')\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3', includeHealth=true, projectId='450123')\n</examples>",
-        "requiredScopes": ["project:releases"]
+        "requiredScopes": ["project:read"]
       },
       {
         "name": "get_replay_details",

@@ -1746,15 +1746,14 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<CommitList> {
     const searchQuery = new URLSearchParams();
-    if (projectSlug) {
-      searchQuery.set("projectSlug", projectSlug);
-    }
     if (limit !== undefined) {
       searchQuery.set("per_page", String(limit));
     }
 
     const encodedVersion = encodeURIComponent(releaseVersion);
-    const path = `/organizations/${organizationSlug}/releases/${encodedVersion}/commits/`;
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/releases/${encodedVersion}/commits/`
+      : `/organizations/${organizationSlug}/releases/${encodedVersion}/commits/`;
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,

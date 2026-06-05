@@ -77,7 +77,7 @@ function formatHealthOrMeta(release: ReleaseDetails): string[] {
 export default defineTool({
   name: "get_release_details",
   skills: ["inspect"],
-  requiredScopes: ["project:releases"],
+  requiredScopes: ["project:read"],
   description: [
     "Get details for a Sentry release.",
     "",
@@ -155,7 +155,7 @@ export default defineTool({
         ? apiService.listReleaseDeploys({
             organizationSlug,
             releaseVersion: params.releaseVersion,
-            projectSlug: context.constraints.projectSlug ?? undefined,
+            projectSlug: scopedProjectSlug,
             limit: params.limit,
           })
         : Promise.resolve([]),
@@ -163,7 +163,7 @@ export default defineTool({
         ? apiService.listReleaseCommits({
             organizationSlug,
             releaseVersion: params.releaseVersion,
-            projectSlug: context.constraints.projectSlug ?? undefined,
+            projectSlug: scopedProjectSlug,
             limit: params.limit,
           })
         : Promise.resolve([]),

@@ -853,6 +853,11 @@ export const restHandlers = buildHandlers([
   },
   {
     method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/8ce89484-0fec-4913-a2cd-e8e2d41dee36/commits/",
+    fetch: () => HttpResponse.json(releaseCommitsFixture),
+  },
+  {
+    method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/tags/",
     fetch: () => HttpResponse.json(tagsFixture),
   },

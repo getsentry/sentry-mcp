@@ -951,7 +951,7 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["project:releases"],
+    "requiredScopes": ["project:read"],
     "skills": ["inspect"],
     "surface": "catalog"
   },

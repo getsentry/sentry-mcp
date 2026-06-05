@@ -157,21 +157,21 @@ describe("get_release_details", () => {
     );
   });
 
-  it("filters deploys and commits by projectSlug under an active project constraint", async () => {
-    const requestUrls: string[] = [];
+  it("uses scoped release endpoints under an active project constraint", async () => {
+    const requests: Array<{ kind: "deploys" | "commits"; url: string }> = [];
     const releaseVersion = "8ce89484-0fec-4913-a2cd-e8e2d41dee36";
     mswServer.use(
       http.get(
         `https://sentry.io/api/0/organizations/sentry-mcp-evals/releases/${releaseVersion}/deploys/`,
         ({ request }) => {
-          requestUrls.push(request.url);
+          requests.push({ kind: "deploys", url: request.url });
           return HttpResponse.json([]);
         },
       ),
       http.get(
-        `https://sentry.io/api/0/organizations/sentry-mcp-evals/releases/${releaseVersion}/commits/`,
+        `https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/${releaseVersion}/commits/`,
         ({ request }) => {
-          requestUrls.push(request.url);
+          requests.push({ kind: "commits", url: request.url });
           return HttpResponse.json([]);
         },
       ),
@@ -197,11 +197,23 @@ describe("get_release_details", () => {
       },
     );
 
-    expect(requestUrls).toHaveLength(2);
-    for (const requestUrl of requestUrls) {
-      const params = new URL(requestUrl).searchParams;
-      expect(params.get("projectSlug")).toBe("cloudflare-mcp");
-      expect(params.get("project")).toBeNull();
-    }
+    expect(requests).toHaveLength(2);
+    const deploysRequest = requests.find(
+      (request) => request.kind === "deploys",
+    );
+    const commitsRequest = requests.find(
+      (request) => request.kind === "commits",
+    );
+    expect(deploysRequest).toBeDefined();
+    expect(commitsRequest).toBeDefined();
+    expect(new URL(deploysRequest!.url).searchParams.get("projectSlug")).toBe(
+      "cloudflare-mcp",
+    );
+    expect(new URL(commitsRequest!.url).pathname).toBe(
+      `/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/${releaseVersion}/commits/`,
+    );
+    expect(
+      new URL(commitsRequest!.url).searchParams.get("projectSlug"),
+    ).toBeNull();
   });
 });
