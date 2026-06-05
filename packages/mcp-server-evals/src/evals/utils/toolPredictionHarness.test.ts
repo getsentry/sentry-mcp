@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Harness, HarnessRun } from "vitest-evals";
-import { ToolPredictionJudge } from "./toolPredictionHarness";
+import {
+  ToolPredictionJudge,
+  generatePredictionPrompt,
+} from "./toolPredictionHarness";
 import type { ToolPredictionMetadata, ToolPredictionOutput } from "./types";
 
 function createJudgeContext(
@@ -31,6 +34,19 @@ function createJudgeContext(
 }
 
 describe("ToolPredictionJudge", () => {
+  it("does not leak expected tool calls into the prediction prompt", () => {
+    const prompt = generatePredictionPrompt(
+      ["- search_issues: Search Sentry issues"],
+      "Find recent crashes in production",
+    );
+
+    expect(prompt).toContain("- search_issues: Search Sentry issues");
+    expect(prompt).toContain("Find recent crashes in production");
+    expect(prompt).not.toContain("EXPECTED TOOL CALLS");
+    expect(prompt).not.toContain("follow them exactly");
+    expect(prompt).not.toContain("expected tools");
+  });
+
   it("scores matching predicted tools", async () => {
     const result = await ToolPredictionJudge.assess(
       createJudgeContext(

@@ -38,7 +38,11 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.union([
 ]);
 
 const predictionSchema = z.object({
-  score: z.number().min(0).max(1).describe("Score from 0 to 1"),
+  score: z
+    .number()
+    .min(0)
+    .max(1)
+    .describe("Confidence score for the predicted tool calls from 0 to 1"),
   rationale: z
     .string()
     .describe("Brief explanation of the score and predicted tool calls"),
@@ -55,23 +59,9 @@ const predictionSchema = z.object({
 type RawToolPredictionOutput = z.infer<typeof predictionSchema>;
 type ToolPredictionResult = GenerateObjectResult<RawToolPredictionOutput>;
 
-function describeExpectedToolCalls(expectedTools: ExpectedToolCall[] = []) {
-  if (expectedTools.length === 0) {
-    return "No tool calls are expected.";
-  }
-
-  return expectedTools
-    .map(
-      (tool) =>
-        `- ${tool.name} with arguments: ${JSON.stringify(tool.arguments ?? {})}`,
-    )
-    .join("\n");
-}
-
-function generatePredictionPrompt(
+export function generatePredictionPrompt(
   availableTools: string[],
   task: string,
-  expectedTools: ExpectedToolCall[] = [],
 ) {
   return `You are predicting which Sentry MCP tools an AI assistant would call for a user task.
 
@@ -81,25 +71,22 @@ ${availableTools.join("\n")}
 [USER TASK]
 ${task}
 
-[EXPECTED TOOL CALLS]
-${describeExpectedToolCalls(expectedTools)}
-
-Return the ordered tool calls the assistant would likely make and a score for how well they match the expected calls. Do not answer the user task directly.
+Return the ordered tool calls the assistant would likely make and a confidence score for your prediction. Do not answer the user task directly.
 
 Guidance:
-- The expected tool calls show what is actually expected for this specific legacy prediction case; follow them exactly when provided.
-- If expected tools include discovery calls, predict discovery calls.
-- If expected tools do not include discovery calls, do not predict them.
+- Use only the available tool descriptions and the user task to decide.
+- Predict discovery calls only when an assistant would need them before the final action.
+- If the task does not require Sentry MCP tools, return an empty predictedTools array.
 - Include arguments only when they are available or strongly implied by the task.
 - Extra parameters like regionUrl are acceptable only when the assistant would have learned them from an earlier discovery call.
 - For natural-language search queries, preserve the user's meaning rather than inventing exact syntax.
 
-Score as follows:
-- 1.0: All expected tools would be called with correct arguments in the right order.
-- 0.8: All expected tools would be called, with minor differences like extra params.
-- 0.6: Most expected tools would be called but some are missing or in the wrong order.
-- 0.3: Some expected tools would be called but there are significant issues.
-- 0.0: Wrong tools or critical tools missing.`;
+Score confidence as follows:
+- 1.0: The tool sequence is obvious from the task and catalog.
+- 0.8: The likely tools are clear, with minor uncertainty in arguments.
+- 0.6: The broad tool choice is plausible, but ordering or arguments are uncertain.
+- 0.3: A tool may be needed, but the task is ambiguous.
+- 0.0: No reliable tool prediction can be made.`;
 }
 
 function normalizePredictedToolCall(
@@ -151,11 +138,7 @@ export function createToolPredictionHarness() {
 
       return await generateObject({
         model: defaultModel,
-        prompt: generatePredictionPrompt(
-          availableTools,
-          input,
-          context.metadata.expectedTools,
-        ),
+        prompt: generatePredictionPrompt(availableTools, input),
         schema: predictionSchema,
         abortSignal: context.signal,
         experimental_telemetry: {
