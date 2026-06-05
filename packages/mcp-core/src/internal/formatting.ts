@@ -1751,9 +1751,7 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
  * @param params - Object containing organization slug, issue, event, and API service
  * @returns Formatted markdown string with complete issue information
  */
-// ---------------------------------------------------------------------------
 // Prompt-injection boundary helpers
-// ---------------------------------------------------------------------------
 
 const UNTRUSTED_BOUNDARY_TAG = "untrusted_sentry_data";
 

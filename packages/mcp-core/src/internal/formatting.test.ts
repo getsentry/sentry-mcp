@@ -2171,11 +2171,7 @@ describe("markAsUntrustedSentryData", () => {
     expect(result).toContain("&lt;/untrusted_sentry_data>");
     // The original text still appears (just with tags escaped)
     expect(result).toContain("fake opening tag");
-    // The structural closing tag must still appear exactly once at the end
-    const lastClose = result.lastIndexOf("</untrusted_sentry_data>");
-    expect(lastClose).toBeGreaterThan(
-      result.indexOf("</untrusted_sentry_data>") - 1,
-    );
+    // The structural closing tag must still appear at the very end
     expect(result.endsWith("</untrusted_sentry_data>")).toBe(true);
   });
 });
