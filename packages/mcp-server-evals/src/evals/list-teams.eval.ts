@@ -1,61 +1,52 @@
-import { describeEval } from "vitest-evals";
-import { FIXTURES, NoOpTaskRunner, ToolPredictionScorer } from "./utils";
+import { describeToolPredictionEval, FIXTURES } from "./utils";
 
-describeEval("list-teams", {
-  data: async () => {
-    return [
+describeToolPredictionEval("list-teams", [
+  {
+    input: `What teams do I have access to in Sentry for '${FIXTURES.organizationSlug}'`,
+    expectedTools: [
       {
-        input: `What teams do I have access to in Sentry for '${FIXTURES.organizationSlug}'`,
-        expectedTools: [
-          {
-            name: "find_organizations",
-            arguments: {},
-          },
-          {
-            name: "find_teams",
-            arguments: {
-              organizationSlug: FIXTURES.organizationSlug,
-              regionUrl: "https://us.sentry.io",
-            },
-          },
-        ],
+        name: "find_organizations",
+        arguments: {},
       },
       {
-        input: `Do I have access to the team '${FIXTURES.teamSlug}' for '${FIXTURES.organizationSlug}'`,
-        expectedTools: [
-          {
-            name: "find_organizations",
-            arguments: {},
-          },
-          {
-            name: "find_teams",
-            arguments: {
-              organizationSlug: FIXTURES.organizationSlug,
-              regionUrl: "https://us.sentry.io",
-            },
-          },
-        ],
+        name: "find_teams",
+        arguments: {
+          organizationSlug: FIXTURES.organizationSlug,
+          regionUrl: "https://us.sentry.io",
+        },
       },
-      {
-        input: `Do I have access to the team 'an-imaginary-team' for '${FIXTURES.organizationSlug}'`,
-        expectedTools: [
-          {
-            name: "find_organizations",
-            arguments: {},
-          },
-          {
-            name: "find_teams",
-            arguments: {
-              organizationSlug: FIXTURES.organizationSlug,
-              regionUrl: "https://us.sentry.io",
-            },
-          },
-        ],
-      },
-    ];
+    ],
   },
-  task: NoOpTaskRunner(),
-  scorers: [ToolPredictionScorer()],
-  threshold: 0.6,
-  timeout: 30000,
-});
+  {
+    input: `Do I have access to the team '${FIXTURES.teamSlug}' for '${FIXTURES.organizationSlug}'`,
+    expectedTools: [
+      {
+        name: "find_organizations",
+        arguments: {},
+      },
+      {
+        name: "find_teams",
+        arguments: {
+          organizationSlug: FIXTURES.organizationSlug,
+          regionUrl: "https://us.sentry.io",
+        },
+      },
+    ],
+  },
+  {
+    input: `Do I have access to the team 'an-imaginary-team' for '${FIXTURES.organizationSlug}'`,
+    expectedTools: [
+      {
+        name: "find_organizations",
+        arguments: {},
+      },
+      {
+        name: "find_teams",
+        arguments: {
+          organizationSlug: FIXTURES.organizationSlug,
+          regionUrl: "https://us.sentry.io",
+        },
+      },
+    ],
+  },
+]);

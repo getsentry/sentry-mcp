@@ -11,8 +11,15 @@
     "build": "tsc -b",
     "dev": "tsc -w",
     "start": "tsx src/bin/start-mock-stdio.ts",
-    "eval": "vitest --config=vitest.config.ts",
-    "eval:ci": "vitest run --reporter=vitest-evals/reporter --reporter=junit --reporter=json --outputFile.json=eval-results.json --outputFile.junit=eval.junit.xml"
+    "test": "vitest run --config=vitest.unit.config.ts",
+    "test:ci": "vitest run --config=vitest.unit.config.ts --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test:watch": "vitest --config=vitest.unit.config.ts",
+    "eval": "vitest run --config=vitest.config.ts --reporter=vitest-evals/reporter --reporter=json --outputFile.json=eval-results.json",
+    "eval:ci": "vitest run --config=vitest.config.ts --reporter=vitest-evals/reporter --reporter=junit --reporter=json --outputFile.json=eval-results.json --outputFile.junit=eval.junit.xml",
+    "eval:info": "VITEST_EVALS_REPORT_LEVEL=info vitest run --config=vitest.config.ts --reporter=vitest-evals/reporter --reporter=json --outputFile.json=eval-results.json",
+    "eval:report": "vitest-evals serve eval-results.json",
+    "eval:ui": "vitest-evals serve eval-results.json",
+    "eval:watch": "vitest --config=vitest.config.ts"
   },
   "dependencies": {
     "@ai-sdk/mcp": "catalog:",
@@ -22,6 +29,7 @@
     "@sentry/mcp-server": "workspace:*",
     "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
+    "@vitest-evals/harness-ai-sdk": "catalog:",
     "ai": "catalog:",
     "dotenv": "catalog:",
     "msw": "catalog:",

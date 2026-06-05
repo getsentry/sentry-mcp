@@ -529,7 +529,7 @@ export default defineTool({
       "Supports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.",
       "Trace lookups return a condensed overview by default.",
       "",
-      "AI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID to fetch all spans for that conversation. To discover or list conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'. Conversations are NOT issues — do not use search_issues for conversation queries.",
+      "AI Conversations: spans sharing gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID. To discover IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'. Conversations are NOT issues.",
       "",
       "For preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):",
       "- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)",
@@ -537,12 +537,14 @@ export default defineTool({
       "",
       "Resource IDs:",
       "- span: <traceId>:<spanId>",
+      "- breadcrumbs: issue shortId or event ID",
       "- snapshot: <snapshotId>",
       "- snapshotImage: <snapshotId>:<image_file_name>",
       "",
       "<examples>",
       "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')",
       "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
+      "get_sentry_resource(resourceType='breadcrumbs', organizationSlug='my-org', resourceId='PROJECT-123')",
       "get_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')",
       "get_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')",
       "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')",
@@ -582,7 +584,7 @@ export default defineTool({
       .trim()
       .optional()
       .describe(
-        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, snapshot artifact ID, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL.",
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, snapshot artifact ID, issue shortId or event ID for breadcrumbs, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL.",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),

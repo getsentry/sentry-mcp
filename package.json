@@ -27,6 +27,8 @@
     "deploy": "turbo deploy",
     "eval": "dotenv -e .env -e .env.local -- turbo eval",
     "eval:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run eval:ci",
+    "eval:report": "pnpm --filter @sentry/mcp-server-evals eval:report",
+    "eval:ui": "pnpm --filter @sentry/mcp-server-evals eval:ui",
     "flue:issue-triage": "flue run issue-triage --target node",
     "format": "biome format --write",
     "lint": "biome lint",

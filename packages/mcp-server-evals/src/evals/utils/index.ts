@@ -1,7 +1,17 @@
 export { FIXTURES } from "./fixtures";
-export { McpToolCallTaskRunner } from "./mcpToolCallRunner";
-export { NoOpTaskRunner } from "./runner";
 export {
-  ToolPredictionScorer,
-  type ExpectedToolCall,
-} from "./toolPredictionScorer";
+  describeMcpToolCallEval,
+  describeSearchAgentEval,
+  describeToolPredictionEval,
+} from "./describe";
+export {
+  searchEventsAgentHarness,
+  searchIssueEventsAgentHarness,
+  searchIssuesAgentHarness,
+} from "./embeddedAgentHarness";
+export {
+  ToolPredictionJudge,
+  toolPredictionHarness,
+} from "./toolPredictionHarness";
+export { mcpToolCallHarness } from "./mcpToolCallHarness";
+export type { ExpectedToolCall } from "./types";

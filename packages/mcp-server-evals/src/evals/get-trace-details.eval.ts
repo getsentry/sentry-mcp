@@ -1,55 +1,46 @@
-import { describeEval, ToolCallScorer } from "vitest-evals";
-import { FIXTURES, McpToolCallTaskRunner } from "./utils";
+import { describeMcpToolCallEval, FIXTURES } from "./utils";
 
-describeEval("get-trace-details", {
-  data: async () => {
-    return [
+describeMcpToolCallEval("get-trace-details", [
+  {
+    input: `Show me trace ${FIXTURES.traceId} from Sentry in ${FIXTURES.organizationSlug}.`,
+    expectedTools: [
       {
-        input: `Show me trace ${FIXTURES.traceId} from Sentry in ${FIXTURES.organizationSlug}.`,
-        expectedTools: [
-          {
-            name: "search_tools",
-            arguments: {
-              query: "trace",
-            },
-          },
-          {
-            name: "execute_tool",
-            arguments: {
-              name: "get_trace_details",
-              arguments: {
-                organizationSlug: FIXTURES.organizationSlug,
-                traceId: FIXTURES.traceId,
-              },
-            },
-          },
-        ],
+        name: "search_tools",
+        arguments: {
+          query: "trace",
+        },
       },
       {
-        input: `Explain trace ${FIXTURES.traceId} in ${FIXTURES.organizationSlug}.`,
-        expectedTools: [
-          {
-            name: "search_tools",
-            arguments: {
-              query: "trace",
-            },
+        name: "execute_tool",
+        arguments: {
+          name: "get_trace_details",
+          arguments: {
+            organizationSlug: FIXTURES.organizationSlug,
+            traceId: FIXTURES.traceId,
           },
-          {
-            name: "execute_tool",
-            arguments: {
-              name: "get_trace_details",
-              arguments: {
-                organizationSlug: FIXTURES.organizationSlug,
-                traceId: FIXTURES.traceId,
-              },
-            },
-          },
-        ],
+        },
       },
-    ];
+    ],
   },
-  task: McpToolCallTaskRunner(),
-  scorers: [ToolCallScorer({ ordered: true, params: "fuzzy" })],
-  threshold: 0.6,
-  timeout: 90000,
-});
+  {
+    input: `Explain trace ${FIXTURES.traceId} in ${FIXTURES.organizationSlug}.`,
+    expectedTools: [
+      {
+        name: "search_tools",
+        arguments: {
+          query: "trace",
+        },
+      },
+      {
+        name: "execute_tool",
+        arguments: {
+          name: "get_trace_details",
+          arguments: {
+            organizationSlug: FIXTURES.organizationSlug,
+            traceId: FIXTURES.traceId,
+          },
+        },
+      },
+    ],
+  },
+]);

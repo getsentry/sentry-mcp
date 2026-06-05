@@ -1,29 +1,22 @@
-import { describeEval } from "vitest-evals";
-import { FIXTURES, NoOpTaskRunner, ToolPredictionScorer } from "./utils";
+import { describeToolPredictionEval, FIXTURES } from "./utils";
 
-describeEval("list-tags", {
-  data: async () => {
-    return [
+describeToolPredictionEval("get-issue-tag-values", [
+  {
+    input: `What are common values for the url tag on issue CLOUDFLARE-MCP-41 in ${FIXTURES.organizationSlug}?`,
+    expectedTools: [
       {
-        input: `What are common tags in ${FIXTURES.organizationSlug}`,
-        expectedTools: [
-          {
-            name: "find_organizations",
-            arguments: {},
-          },
-          {
-            name: "find_tags",
-            arguments: {
-              organizationSlug: FIXTURES.organizationSlug,
-              regionUrl: "https://us.sentry.io",
-            },
-          },
-        ],
+        name: "find_organizations",
+        arguments: {},
       },
-    ];
+      {
+        name: "get_issue_tag_values",
+        arguments: {
+          organizationSlug: FIXTURES.organizationSlug,
+          regionUrl: "https://us.sentry.io",
+          issueId: "CLOUDFLARE-MCP-41",
+          tagKey: "url",
+        },
+      },
+    ],
   },
-  task: NoOpTaskRunner(),
-  scorers: [ToolPredictionScorer()],
-  threshold: 0.6,
-  timeout: 30000,
-});
+]);

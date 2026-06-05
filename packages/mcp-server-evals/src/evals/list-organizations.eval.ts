@@ -1,22 +1,13 @@
-import { describeEval } from "vitest-evals";
-import { NoOpTaskRunner, ToolPredictionScorer } from "./utils";
+import { describeToolPredictionEval } from "./utils";
 
-describeEval("list-organizations", {
-  data: async () => {
-    return [
+describeToolPredictionEval("list-organizations", [
+  {
+    input: `What organizations do I have access to in Sentry`,
+    expectedTools: [
       {
-        input: `What organizations do I have access to in Sentry`,
-        expectedTools: [
-          {
-            name: "find_organizations",
-            arguments: {},
-          },
-        ],
+        name: "find_organizations",
+        arguments: {},
       },
-    ];
+    ],
   },
-  task: NoOpTaskRunner(),
-  scorers: [ToolPredictionScorer()],
-  threshold: 0.6,
-  timeout: 30000,
-});
+]);

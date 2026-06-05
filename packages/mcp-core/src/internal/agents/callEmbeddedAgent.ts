@@ -2,6 +2,7 @@ import {
   generateText,
   Output,
   type Tool,
+  type GenerateTextResult,
   APICallError,
   NoObjectGeneratedError,
   stepCountIs,
@@ -16,9 +17,17 @@ export type ToolCall = {
   args: unknown;
 };
 
+type EmbeddedAgentGenerateResult = GenerateTextResult<
+  Record<string, Tool>,
+  ReturnType<typeof Output.object>
+>;
+
 interface EmbeddedAgentResult<T> {
   result: T;
   toolCalls: ToolCall[];
+  steps?: EmbeddedAgentGenerateResult["steps"];
+  usage?: EmbeddedAgentGenerateResult["usage"];
+  totalUsage?: EmbeddedAgentGenerateResult["totalUsage"];
 }
 
 /**
@@ -54,7 +63,7 @@ export async function callEmbeddedAgent<
       system,
       prompt,
       tools,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(7),
       experimental_output: Output.object({ schema }),
       experimental_telemetry: {
         isEnabled: true,
@@ -101,6 +110,9 @@ export async function callEmbeddedAgent<
     return {
       result: parsedResult.data,
       toolCalls: capturedToolCalls,
+      steps: result.steps,
+      usage: result.usage,
+      totalUsage: result.totalUsage,
     };
   } catch (error: unknown) {
     // Rescue NoObjectGeneratedError: try to parse the raw LLM text through the schema
