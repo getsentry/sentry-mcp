@@ -17,9 +17,19 @@ function toToolCall(call: { toolName: string; input: unknown }) {
   };
 }
 
+const DEFAULT_SYSTEM = [
+  "You are a Sentry assistant with access to Sentry MCP tools.",
+  "Use search_tools before execute_tool when the needed Sentry operation is not directly listed as a tool.",
+  "When search_tools returns a tool, call execute_tool with that returned tool name and arguments matching the returned schema.",
+].join("\n");
+
 export function McpToolCallTaskRunner(
   model: LanguageModel = defaultModel,
   maxSteps = 6,
+  {
+    extraEnv = {},
+    systemPrompt = DEFAULT_SYSTEM,
+  }: { extraEnv?: Record<string, string>; systemPrompt?: string } = {},
 ) {
   return async function McpToolCallTaskRunner(input: string) {
     const transport = new Experimental_StdioMCPTransport({
@@ -29,6 +39,7 @@ export function McpToolCallTaskRunner(
         ...process.env,
         SENTRY_ACCESS_TOKEN: "mocked-access-token",
         SENTRY_HOST: "sentry.io",
+        ...extraEnv,
       },
     });
     const client = await experimental_createMCPClient({ transport });
@@ -38,11 +49,7 @@ export function McpToolCallTaskRunner(
       const result = await generateText({
         model,
         tools,
-        system: [
-          "You are a Sentry assistant with access to Sentry MCP tools.",
-          "Use search_tools before execute_tool when the needed Sentry operation is not directly listed as a tool.",
-          "When search_tools returns a tool, call execute_tool with that returned tool name and arguments matching the returned schema.",
-        ].join("\n"),
+        system: systemPrompt,
         prompt: input,
         stopWhen: stepCountIs(maxSteps),
         experimental_telemetry: {
