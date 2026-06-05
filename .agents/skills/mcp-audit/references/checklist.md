@@ -49,10 +49,11 @@ Use this checklist for repeatable MCP protocol and compatibility audits in any r
 6. Verify tool execution failures are distinguished from protocol-level JSON-RPC failures.
 7. For tools that return service data, telemetry, user content, issue/event details, logs, traces, or other external payload values, classify the output as potentially untrusted unless the repo proves otherwise.
 8. For `structuredContent`, verify that payloads are schema-shaped result views rather than raw API responses. Existing Markdown migrations should preserve the rendered-result contract: roughly the same fields, ordering, value formatting, and summarization decisions in JSON form.
-9. Verify untrusted output cannot masquerade as trusted instructions:
-   - broad security note or equivalent trust-boundary metadata is present when the repo uses that pattern
+9. Assess untrusted output handling without treating formatting as a security boundary:
+   - broad security notes or trust-boundary metadata are advisory, not sufficient mitigation
    - raw full event, trace, log, context, tag, user, or attachment objects are not dumped without an explicit bounded-design rationale
-   - tests or snapshots cover representative malicious or instruction-like payload values for newly structured endpoints
+   - tests, snapshots, or evals cover representative malicious or instruction-like payload values for newly structured endpoints
+   - any claim that structured output reduces prompt-injection risk is backed by an eval or by an enforced client/tool-action boundary
 10. Build an explicit list of tools that mutate upstream state.
 11. Classify each mutation:
    - additive write

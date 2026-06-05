@@ -25,7 +25,7 @@ Read `references/spec-baseline.md` and `references/checklist.md` before making c
    - Verify `tools/list` pagination, `notifications/tools/list_changed` if claimed, and client-visible metadata from the exported server surface.
    - Check tool definitions: `name`, `title`, `description`, `icons`, `inputSchema`, `outputSchema`, `annotations`, and `execution.taskSupport`.
    - Check tool result semantics: `content`, `structuredContent`, `isError`, embedded resources, resource links, and the split between protocol errors and tool execution errors.
-   - For `structuredContent`, look for untrusted telemetry or user-controlled external data. Structured output should be a deliberate JSON form of the rendered result contract, not a raw API dump that gives clients a larger prompt-injection surface.
+   - For `structuredContent`, look for untrusted telemetry or user-controlled external data. Structured output should be a deliberate JSON form of the rendered result contract, not a raw API dump that gives clients a larger prompt-injection surface. Treat structured output as typed data plumbing, not a prompt-injection mitigation unless an eval or enforced client/tool-action boundary proves it.
    - Review safety hints conservatively: `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint`.
    - Build the explicit upstream-mutation inventory for write-capable tools.
 

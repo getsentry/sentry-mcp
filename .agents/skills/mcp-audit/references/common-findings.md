@@ -19,10 +19,11 @@ Use this reference to avoid overly narrow audits and to separate common MCP fail
 6. `outputSchema` is declared but `structuredContent` is absent or does not match it.
 7. `structuredContent` dumps raw API responses, full telemetry objects, or user-controlled external payloads instead of a deliberate JSON view of the rendered result contract.
 8. A Markdown-to-structured migration changes output semantics by exposing fields, nesting, or volume that the Markdown renderer previously summarized or formatted.
-9. Structured telemetry output lacks tests or snapshots with instruction-like untrusted payload values, so prompt-injection regressions can ship unnoticed.
-10. Business-logic failures are surfaced as protocol errors instead of tool-call failures.
-11. Tool names or titles drift from the targeted spec revision.
-12. The server claims task support in tool metadata without the broader task flow it depends on.
+9. Structured telemetry output is presented as a prompt-injection mitigation without an eval or enforced client/tool-action boundary proving that claim.
+10. Structured telemetry output lacks tests or snapshots with instruction-like untrusted payload values, so prompt-injection regressions can ship unnoticed.
+11. Business-logic failures are surfaced as protocol errors instead of tool-call failures.
+12. Tool names or titles drift from the targeted spec revision.
+13. The server claims task support in tool metadata without the broader task flow it depends on.
 
 ## Prompt and resource problems
 
