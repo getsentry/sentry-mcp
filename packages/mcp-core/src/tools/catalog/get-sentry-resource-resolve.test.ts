@@ -377,6 +377,20 @@ describe("resolveResourceParams", () => {
       });
     });
 
+    it("allows numeric project IDs in monitor URLs under a project constraint", () => {
+      expect(
+        resolveResourceParams({
+          url: "https://my-org.sentry.io/crons/4509109104082945/my-monitor/",
+          projectSlug: "backend",
+        }),
+      ).toEqual<ResolvedResourceParams>({
+        type: "monitor",
+        organizationSlug: "my-org",
+        projectSlugOrId: "4509109104082945",
+        monitorSlug: "my-monitor",
+      });
+    });
+
     it("parses release URL", () => {
       expect(
         resolveResourceParams({
@@ -705,14 +719,34 @@ describe("resolveResourceParams", () => {
       });
     });
 
-    it("throws for unsupported explicit resourceType (monitor)", () => {
-      expect(() =>
+    it("accepts monitor as an explicit resourceType", () => {
+      expect(
         resolveResourceParams({
           resourceType: "monitor",
           organizationSlug: "my-org",
-          resourceId: "something",
+          resourceId: "daily-backup",
         }),
-      ).toThrow("Invalid resourceType: monitor");
+      ).toEqual<ResolvedResourceParams>({
+        type: "monitor",
+        organizationSlug: "my-org",
+        monitorSlug: "daily-backup",
+      });
+    });
+
+    it("preserves scoped project for explicit monitor resourceType", () => {
+      expect(
+        resolveResourceParams({
+          resourceType: "monitor",
+          organizationSlug: "my-org",
+          projectSlug: "backend",
+          resourceId: "daily-backup",
+        }),
+      ).toEqual<ResolvedResourceParams>({
+        type: "monitor",
+        organizationSlug: "my-org",
+        monitorSlug: "daily-backup",
+        projectSlugOrId: "backend",
+      });
     });
 
     it("throws when span resourceId is malformed", () => {

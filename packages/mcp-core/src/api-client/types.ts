@@ -71,6 +71,12 @@ import type {
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
+  MonitorCheckInListSchema,
+  MonitorCheckInSchema,
+  MonitorListSchema,
+  MonitorSchema,
+  MonitorStatsSchema,
+  MonitorStatSchema,
   OrganizationListSchema,
   OrganizationSchema,
   ProfileChunkResponseSchema,
@@ -112,6 +118,9 @@ export type Commit = z.infer<typeof CommitSchema>;
 export type Issue = z.infer<typeof IssueSchema>;
 export type IssueActivity = z.infer<typeof IssueActivitySchema>;
 export type IssueComment = z.infer<typeof IssueCommentSchema>;
+export type Monitor = z.infer<typeof MonitorSchema>;
+export type MonitorCheckIn = z.infer<typeof MonitorCheckInSchema>;
+export type MonitorStat = z.infer<typeof MonitorStatSchema>;
 
 // Individual event types
 export type ErrorEvent = z.infer<typeof ErrorEventSchema>;
@@ -151,6 +160,9 @@ export type IssueActivityList = z.infer<
   typeof IssueActivityListResponseSchema
 >["activity"];
 export type IssueCommentList = z.infer<typeof IssueCommentListSchema>;
+export type MonitorList = z.infer<typeof MonitorListSchema>;
+export type MonitorCheckInList = z.infer<typeof MonitorCheckInListSchema>;
+export type MonitorStats = z.infer<typeof MonitorStatsSchema>;
 export type EventAttachmentList = z.infer<typeof EventAttachmentListSchema>;
 export type TagList = z.infer<typeof TagListSchema>;
 export type ClientKeyList = z.infer<typeof ClientKeyListSchema>;

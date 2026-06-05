@@ -4,6 +4,8 @@ import findTeams from "./find-teams";
 import findProjects from "./find-projects";
 import findReleases from "./find-releases";
 import getReleaseDetails from "./get-release-details";
+import findMonitors from "./find-monitors";
+import getMonitorDetails from "./get-monitor-details";
 import getIssueDetails from "./get-issue-details";
 import getIssueActivity from "./get-issue-activity";
 import getIssueTagValues from "./get-issue-tag-values";
@@ -48,6 +50,8 @@ const catalogTools = {
   find_projects: findProjects,
   find_releases: findReleases,
   get_release_details: getReleaseDetails,
+  find_monitors: findMonitors,
+  get_monitor_details: getMonitorDetails,
   get_issue_details: getIssueDetails,
   get_issue_activity: getIssueActivity,
   get_issue_tag_values: getIssueTagValues,

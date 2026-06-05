@@ -9,6 +9,7 @@ import {
   getReplaysSearchUrl,
   getReplayUrl,
   getReleaseUrl,
+  getMonitorUrl,
   getTraceUrl,
   getEventsExplorerUrl,
   getTraceMetricsExploreUrl,
@@ -173,6 +174,34 @@ describe("url-utils", () => {
       );
       expect(result).toBe(
         "https://myorg.sentry.io/releases/backend%2Fweb%202025.04.13/",
+      );
+    });
+  });
+
+  describe("getMonitorUrl", () => {
+    it("should encode project and monitor path segments independently", () => {
+      const result = getMonitorUrl(
+        "sentry.io",
+        "myorg",
+        "daily/import 1",
+        "https",
+        "backend",
+      );
+      expect(result).toBe(
+        "https://myorg.sentry.io/crons/backend/daily%2Fimport%201/",
+      );
+    });
+
+    it("should use self-hosted organization paths", () => {
+      const result = getMonitorUrl(
+        "sentry.internal:9000",
+        "myorg",
+        "daily-backup",
+        "http",
+        "backend",
+      );
+      expect(result).toBe(
+        "http://sentry.internal:9000/organizations/myorg/crons/backend/daily-backup/",
       );
     });
   });

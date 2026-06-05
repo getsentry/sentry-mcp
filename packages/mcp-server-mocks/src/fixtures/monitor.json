@@ -1,0 +1,52 @@
+{
+  "id": "4509100000000001",
+  "slug": "nightly-import",
+  "name": "Nightly Import",
+  "status": "ok",
+  "isMuted": false,
+  "isUpserting": false,
+  "project": {
+    "id": "4509062593708032",
+    "slug": "cloudflare-mcp",
+    "name": "cloudflare-mcp"
+  },
+  "owner": {
+    "type": "team",
+    "id": "4509109078196224",
+    "name": "the-goats"
+  },
+  "dateCreated": "2025-04-10T12:00:00.000Z",
+  "lastCheckIn": "2025-04-14T02:00:13.000Z",
+  "nextCheckIn": "2025-04-15T02:00:00.000Z",
+  "config": {
+    "schedule": ["crontab", "0 2 * * *"],
+    "schedule_type": "crontab",
+    "timezone": "UTC",
+    "checkin_margin": 5,
+    "max_runtime": 30
+  },
+  "environments": [
+    {
+      "id": "1",
+      "name": "production",
+      "status": "ok",
+      "isMuted": false,
+      "dateCreated": "2025-04-10T12:00:00.000Z",
+      "lastCheckIn": "2025-04-14T02:00:13.000Z",
+      "nextCheckIn": "2025-04-15T02:00:00.000Z",
+      "nextCheckInLatest": "2025-04-15T02:05:00.000Z",
+      "activeIncident": null
+    },
+    {
+      "id": "2",
+      "name": "staging",
+      "status": "missed_checkin",
+      "isMuted": false,
+      "dateCreated": "2025-04-10T12:00:00.000Z",
+      "lastCheckIn": "2025-04-13T02:00:18.000Z",
+      "nextCheckIn": "2025-04-14T02:00:00.000Z",
+      "nextCheckInLatest": "2025-04-14T02:05:00.000Z",
+      "activeIncident": null
+    }
+  ]
+}

@@ -18,12 +18,14 @@ import {
 } from "../../internal/url-scope";
 import { ParamOrganizationSlug } from "../../schema";
 import type { ServerContext } from "../../types";
+import { isNumericId } from "../../utils/slug-validation";
 import {
   fetchSnapshotImage,
   fetchSnapshotSummary,
 } from "../support/snapshots/handlers";
 import getAIConversationDetails from "./get-ai-conversation-details";
 import getIssueDetails from "./get-issue-details";
+import getMonitorDetails from "./get-monitor-details";
 import getProfileDetails from "./get-profile-details";
 import getReplayDetails from "./get-replay-details";
 import getTraceDetails from "./get-trace-details";
@@ -37,13 +39,14 @@ export const FULLY_SUPPORTED_TYPES = [
   "ai_conversation",
   "breadcrumbs",
   "replay",
+  "monitor",
   "snapshot",
   "snapshotImage",
 ] as const;
 export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
 
 /** Recognized from URLs but not yet fully supported -- return guidance messages. */
-export type RecognizedType = "monitor" | "release";
+export type RecognizedType = "release";
 
 /** All resource types. */
 export type ResolvedResourceType =
@@ -173,6 +176,14 @@ export function resolveResourceParams(params: {
         type: "replay",
         organizationSlug,
         replayId: resourceId,
+      };
+
+    case "monitor":
+      return {
+        type: "monitor",
+        organizationSlug,
+        monitorSlug: resourceId,
+        projectSlugOrId: params.projectSlug ?? undefined,
       };
 
     case "snapshot":
@@ -362,11 +373,13 @@ function resolveFromParsedUrl(
         organizationSlug,
         monitorSlug: parsed.monitorSlug,
         projectSlugOrId: parsed.projectSlugOrId
-          ? resolveScopedProjectSlug({
-              resourceLabel: "Monitor",
-              scopedProjectSlug: params.projectSlug,
-              urlProjectSlug: parsed.projectSlugOrId,
-            })
+          ? isNumericId(parsed.projectSlugOrId)
+            ? parsed.projectSlugOrId
+            : resolveScopedProjectSlug({
+                resourceLabel: "Monitor",
+                scopedProjectSlug: params.projectSlug,
+                urlProjectSlug: parsed.projectSlugOrId,
+              })
           : undefined,
       };
 
@@ -429,6 +442,18 @@ function parseSpanResourceId(resourceId: string): {
   };
 }
 
+function assertCatalogToolAvailable(
+  context: ServerContext,
+  toolName: string,
+  resourceLabel: string,
+) {
+  if (context.availableToolNames && !context.availableToolNames.has(toolName)) {
+    throw new UserInputError(
+      `${resourceLabel} resources require the inspect skill. Enable inspect tools or call ${toolName} in a session where it is available.`,
+    );
+  }
+}
+
 function generateUnsupportedResourceMessage(
   resolved: ResolvedResourceParams,
   apiService: SentryApiService,
@@ -439,33 +464,6 @@ function generateUnsupportedResourceMessage(
   const { type, organizationSlug } = resolved;
 
   switch (type) {
-    case "monitor": {
-      // Include projectSlugOrId in URL when present
-      const monitorPath = resolved.projectSlugOrId
-        ? `${resolved.projectSlugOrId}/${resolved.monitorSlug}`
-        : (resolved.monitorSlug ?? "");
-      const monitorUrl = apiService.getMonitorUrl(
-        organizationSlug,
-        monitorPath,
-      );
-      return [
-        "# Cron Monitor Detected",
-        "",
-        `**Organization**: ${organizationSlug}`,
-        `**Monitor**: ${resolved.monitorSlug}`,
-        resolved.projectSlugOrId
-          ? `**Project**: ${resolved.projectSlugOrId}`
-          : "",
-        "",
-        "Cron monitor support is coming soon. In the meantime:",
-        "",
-        `- **View in Sentry**: [Open Monitor](${monitorUrl})`,
-        `- **Search issues**: Use \`search_issues\` with query \`monitor.slug:${resolved.monitorSlug}\` to find issues from this monitor`,
-      ]
-        .filter(Boolean)
-        .join("\n");
-    }
-
     case "release": {
       const releaseUrl = apiService.getReleaseUrl(
         organizationSlug,
@@ -526,7 +524,7 @@ export default defineTool({
       "Fetch a Sentry resource by URL, or by resourceType plus resourceId.",
       "Pass a Sentry URL directly when possible; the resource type is auto-detected.",
       "",
-      "Supports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.",
+      "Supports issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, preprod snapshots, and snapshot images.",
       "Trace lookups return a condensed overview by default.",
       "",
       "AI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID to fetch all spans for that conversation. To discover or list conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'. Conversations are NOT issues — do not use search_issues for conversation queries.",
@@ -537,6 +535,7 @@ export default defineTool({
       "",
       "Resource IDs:",
       "- span: <traceId>:<spanId>",
+      "- monitor: <monitorSlug>",
       "- snapshot: <snapshotId>",
       "- snapshotImage: <snapshotId>:<image_file_name>",
       "",
@@ -569,12 +568,13 @@ export default defineTool({
         "ai_conversation",
         "breadcrumbs",
         "replay",
+        "monitor",
         "snapshot",
         "snapshotImage",
       ])
       .optional()
       .describe(
-        "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL. Use `snapshot` with a snapshot artifact ID, or `snapshotImage` with `<snapshotId>:<image_file_name>`.",
+        "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL. Use `monitor` with a monitor slug, `snapshot` with a snapshot artifact ID, or `snapshotImage` with `<snapshotId>:<image_file_name>`.",
       ),
 
     resourceId: z
@@ -582,7 +582,7 @@ export default defineTool({
       .trim()
       .optional()
       .describe(
-        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, snapshot artifact ID, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL.",
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug, snapshot artifact ID, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL.",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),
@@ -609,7 +609,7 @@ export default defineTool({
     getActiveSpan()?.setAttribute("app.resource.type", resolved.type);
 
     // Recognized but not yet fully supported types return guidance messages
-    if (resolved.type === "monitor" || resolved.type === "release") {
+    if (resolved.type === "release") {
       const apiService = apiServiceFromContext(context, {
         regionUrl: context.constraints.regionUrl ?? undefined,
       });
@@ -710,6 +710,25 @@ export default defineTool({
             organizationSlug: resolved.organizationSlug,
             replayId: resolved.replayId,
             regionUrl: context.constraints.regionUrl ?? undefined,
+          },
+          context,
+        );
+
+      case "monitor":
+        assertCatalogToolAvailable(context, "get_monitor_details", "Monitor");
+        return getMonitorDetails.handler(
+          {
+            organizationSlug: resolved.organizationSlug,
+            projectSlugOrId: resolved.projectSlugOrId ?? null,
+            monitorSlug: resolved.monitorSlug!,
+            regionUrl: context.constraints.regionUrl ?? null,
+            environment: null,
+            statsPeriod: "24h",
+            start: null,
+            end: null,
+            checkInLimit: 10,
+            includeStats: true,
+            rollupSeconds: null,
           },
           context,
         );
