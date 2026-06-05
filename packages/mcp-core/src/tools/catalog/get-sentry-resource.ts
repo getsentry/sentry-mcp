@@ -447,11 +447,18 @@ function assertCatalogToolAvailable(
   toolName: string,
   resourceLabel: string,
 ) {
-  if (context.availableToolNames && !context.availableToolNames.has(toolName)) {
+  if (!isToolAvailable(toolName, context.availableToolNames)) {
     throw new UserInputError(
       `${resourceLabel} resources require the inspect skill. Enable inspect tools or call ${toolName} in a session where it is available.`,
     );
   }
+}
+
+function isToolAvailable(
+  toolName: string,
+  availableToolNames?: ReadonlySet<string>,
+): boolean {
+  return !availableToolNames || availableToolNames.has(toolName);
 }
 
 function generateUnsupportedResourceMessage(
@@ -504,6 +511,10 @@ export default defineTool({
   requiredScopes: ["event:read", "project:read"],
 
   description: ({ experimentalMode, availableToolNames, directToolNames }) => {
+    const monitorResourcesAvailable = isToolAvailable(
+      "get_monitor_details",
+      availableToolNames,
+    );
     const fullResolutionInstruction = formatToolCallInstruction({
       toolName: "get_snapshot_image",
       arguments: {
@@ -519,12 +530,21 @@ export default defineTool({
         "Full-resolution snapshot image bytes are not available in this session",
       purpose: "for full-resolution image bytes",
     });
+    const supportedResources = monitorResourcesAvailable
+      ? "issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, preprod snapshots, and snapshot images."
+      : "issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.";
+    const resourceIds = [
+      "- span: <traceId>:<spanId>",
+      ...(monitorResourcesAvailable ? ["- monitor: <monitorSlug>"] : []),
+      "- snapshot: <snapshotId>",
+      "- snapshotImage: <snapshotId>:<image_file_name>",
+    ];
 
     return [
       "Fetch a Sentry resource by URL, or by resourceType plus resourceId.",
       "Pass a Sentry URL directly when possible; the resource type is auto-detected.",
       "",
-      "Supports issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, preprod snapshots, and snapshot images.",
+      `Supports ${supportedResources}`,
       "Trace lookups return a condensed overview by default.",
       "",
       "AI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID to fetch all spans for that conversation. To discover or list conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'. Conversations are NOT issues — do not use search_issues for conversation queries.",
@@ -534,10 +554,7 @@ export default defineTool({
       `- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. ${fullResolutionInstruction}.`,
       "",
       "Resource IDs:",
-      "- span: <traceId>:<spanId>",
-      "- monitor: <monitorSlug>",
-      "- snapshot: <snapshotId>",
-      "- snapshotImage: <snapshotId>:<image_file_name>",
+      ...resourceIds,
       "",
       "<examples>",
       "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')",
@@ -574,7 +591,7 @@ export default defineTool({
       ])
       .optional()
       .describe(
-        "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL. Use `monitor` with a monitor slug, `snapshot` with a snapshot artifact ID, or `snapshotImage` with `<snapshotId>:<image_file_name>`.",
+        "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL. Use `monitor` with a monitor slug only when inspect monitor tools are available, `snapshot` with a snapshot artifact ID, or `snapshotImage` with `<snapshotId>:<image_file_name>`.",
       ),
 
     resourceId: z
@@ -582,7 +599,7 @@ export default defineTool({
       .trim()
       .optional()
       .describe(
-        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug, snapshot artifact ID, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL.",
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug when inspect monitor tools are available, snapshot artifact ID, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL.",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),

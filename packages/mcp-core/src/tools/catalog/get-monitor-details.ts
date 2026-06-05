@@ -70,7 +70,7 @@ function formatStat(stat: MonitorStat): string {
 export default defineTool({
   name: "get_monitor_details",
   skills: ["inspect"],
-  requiredScopes: ["org:read"],
+  requiredScopes: ["project:read"],
   description: [
     "Get details for a Sentry cron monitor.",
     "",

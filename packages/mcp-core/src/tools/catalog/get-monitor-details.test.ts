@@ -376,4 +376,10 @@ describe("get_monitor_details", () => {
       "[Open Monitor](https://sentry-mcp-evals.sentry.io/crons/cloudflare-mcp/nightly%2Fimport%201/)",
     );
   });
+
+  describe("tool definition", () => {
+    it("requires the project read scope used by the backend monitor endpoints", () => {
+      expect(getMonitorDetails.requiredScopes).toEqual(["project:read"]);
+    });
+  });
 });

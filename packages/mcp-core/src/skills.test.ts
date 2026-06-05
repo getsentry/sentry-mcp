@@ -174,5 +174,22 @@ describe("skills module", () => {
       expect(inspectToolNames).toContain("get_snapshot_image");
       expect(triageToolNames).not.toContain("get_snapshot_image");
     });
+
+    it("omits monitor resource guidance when the inspect skill is not enabled", () => {
+      const inspectDescription = getGeneratedSkillToolDescription(
+        "inspect",
+        "get_sentry_resource",
+      );
+      const triageDescription = getGeneratedSkillToolDescription(
+        "triage",
+        "get_sentry_resource",
+      );
+
+      expect(inspectDescription).toContain("monitors");
+      expect(inspectDescription).toContain("- monitor: <monitorSlug>");
+
+      expect(triageDescription).not.toContain("monitors");
+      expect(triageDescription).not.toContain("- monitor: <monitorSlug>");
+    });
   });
 });
