@@ -18,6 +18,7 @@ import {
 } from "../../internal/url-scope";
 import { ParamOrganizationSlug } from "../../schema";
 import type { ServerContext } from "../../types";
+import { isNumericId } from "../../utils/slug-validation";
 import {
   fetchSnapshotImage,
   fetchSnapshotSummary,
@@ -374,11 +375,13 @@ function resolveFromParsedUrl(
         organizationSlug,
         monitorSlug: parsed.monitorSlug,
         projectSlugOrId: parsed.projectSlugOrId
-          ? resolveScopedProjectSlug({
-              resourceLabel: "Monitor",
-              scopedProjectSlug: params.projectSlug,
-              urlProjectSlug: parsed.projectSlugOrId,
-            })
+          ? isNumericId(parsed.projectSlugOrId)
+            ? parsed.projectSlugOrId
+            : resolveScopedProjectSlug({
+                resourceLabel: "Monitor",
+                scopedProjectSlug: params.projectSlug,
+                urlProjectSlug: parsed.projectSlugOrId,
+              })
           : undefined,
       };
 

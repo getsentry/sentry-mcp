@@ -13,6 +13,7 @@ import {
   ParamProjectSlug,
   ParamRegionUrl,
 } from "../../schema";
+import { isNumericId } from "../../utils/slug-validation";
 import {
   compactLines,
   formatActor,
@@ -137,7 +138,7 @@ export default defineTool({
     setTag("monitor.slug", params.monitorSlug);
     const projectSlug =
       params.projectSlug ?? context.constraints.projectSlug ?? null;
-    if (params.projectSlug) {
+    if (params.projectSlug && !isNumericId(params.projectSlug)) {
       assertProjectRefWithinConstraint({
         resourceLabel: "Monitor",
         scopedProjectSlug: context.constraints.projectSlug,

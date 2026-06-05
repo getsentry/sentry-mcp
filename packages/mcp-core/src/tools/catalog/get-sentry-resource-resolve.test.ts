@@ -377,6 +377,20 @@ describe("resolveResourceParams", () => {
       });
     });
 
+    it("allows numeric project IDs in monitor URLs under a project constraint", () => {
+      expect(
+        resolveResourceParams({
+          url: "https://my-org.sentry.io/crons/4509109104082945/my-monitor/",
+          projectSlug: "backend",
+        }),
+      ).toEqual<ResolvedResourceParams>({
+        type: "monitor",
+        organizationSlug: "my-org",
+        projectSlugOrId: "4509109104082945",
+        monitorSlug: "my-monitor",
+      });
+    });
+
     it("parses release URL", () => {
       expect(
         resolveResourceParams({

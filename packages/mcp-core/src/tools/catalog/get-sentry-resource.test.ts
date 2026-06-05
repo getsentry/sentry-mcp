@@ -64,15 +64,17 @@ function mockMonitorResource({
   apiBaseUrl = "https://sentry.io",
   organizationSlug,
   monitorSlug,
+  projectPath,
   projectSlug = "backend",
 }: {
   apiBaseUrl?: string;
   organizationSlug: string;
   monitorSlug: string;
+  projectPath?: string;
   projectSlug?: string;
 }) {
   const organizationMonitorPath = `${apiBaseUrl}/api/0/organizations/${organizationSlug}/monitors/${monitorSlug}/`;
-  const projectMonitorPath = `${apiBaseUrl}/api/0/projects/${organizationSlug}/${projectSlug}/monitors/${monitorSlug}/`;
+  const projectMonitorPath = `${apiBaseUrl}/api/0/projects/${organizationSlug}/${projectPath ?? projectSlug}/monitors/${monitorSlug}/`;
   const buildMonitor = (slug: string) => ({
     id: "123",
     slug: monitorSlug,
@@ -561,6 +563,35 @@ describe("get_sentry_resource", () => {
       expect(result).toContain("# Monitor my-monitor in **my-org**");
       expect(result).toContain(
         "[Open Monitor](https://my-org.sentry.io/crons/my-project/my-monitor/)",
+      );
+    });
+
+    it("dispatches monitor URL with numeric project ID under an active project constraint", async () => {
+      mswServer.use(
+        ...mockMonitorResource({
+          organizationSlug: "my-org",
+          monitorSlug: "my-monitor",
+          projectPath: "4509109104082945",
+          projectSlug: "backend",
+        }),
+      );
+
+      const result = await getSentryResource.handler(
+        {
+          url: "https://my-org.sentry.io/crons/4509109104082945/my-monitor/",
+        },
+        {
+          ...baseContext,
+          constraints: {
+            ...baseContext.constraints,
+            projectSlug: "backend",
+          },
+        },
+      );
+
+      expect(result).toContain("# Monitor my-monitor in **my-org**");
+      expect(result).toContain(
+        "[Open Monitor](https://my-org.sentry.io/crons/backend/my-monitor/)",
       );
     });
 
