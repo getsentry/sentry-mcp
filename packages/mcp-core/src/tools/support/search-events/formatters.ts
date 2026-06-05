@@ -114,26 +114,130 @@ export interface FormatEventResultsParams {
   directToolNames?: ReadonlySet<string>;
 }
 
+export interface RenderedEventField {
+  name: string;
+  label: string;
+  value: string;
+}
+
+export interface RenderedErrorEventRow {
+  id: string | null;
+  title: string;
+  fields: RenderedEventField[];
+}
+
+const ERROR_EVENT_PRIORITY_FIELDS = [
+  "title",
+  "issue",
+  "project",
+  "level",
+  "error.type",
+  "message",
+  "culprit",
+  "timestamp",
+  "last_seen()",
+  "count()",
+] as const;
+
+function formatUserFieldEntries(
+  value: Record<string, unknown>,
+): RenderedEventField[] {
+  const geoSummary = formatUserGeoSummary(value.geo);
+  const userSummary = formatKnownUserValue(value, { includeGeo: false });
+  const fields: RenderedEventField[] = [];
+
+  if (userSummary) {
+    fields.push({ name: "user", label: "user", value: userSummary });
+  } else if (!geoSummary) {
+    fields.push({
+      name: "user",
+      label: "user",
+      value: formatEventValue(value),
+    });
+  }
+
+  if (geoSummary) {
+    fields.push({ name: "user.geo", label: "user.geo", value: geoSummary });
+  }
+
+  return fields;
+}
+
 function formatUserFieldLines(
   value: Record<string, unknown>,
   options: { prefix?: string } = {},
 ): string[] {
   const prefix = options.prefix ?? "";
-  const geoSummary = formatUserGeoSummary(value.geo);
-  const userSummary = formatKnownUserValue(value, { includeGeo: false });
-  const lines: string[] = [];
+  return formatUserFieldEntries(value).map(
+    (field) => `${prefix}**${field.label}**: ${field.value}`,
+  );
+}
 
-  if (userSummary) {
-    lines.push(`${prefix}**user**: ${userSummary}`);
-  } else if (!geoSummary) {
-    lines.push(`${prefix}**user**: ${formatEventValue(value)}`);
-  }
+export function createRenderedErrorEventRows({
+  eventData,
+  apiService,
+  organizationSlug,
+}: Pick<
+  FormatEventResultsParams,
+  "eventData" | "apiService" | "organizationSlug"
+>): RenderedErrorEventRow[] {
+  return eventData.map((event) => {
+    const fields: RenderedEventField[] = [];
+    const addField = (name: string, label: string, value: string) => {
+      fields.push({ name, label, value });
+    };
 
-  if (geoSummary) {
-    lines.push(`${prefix}**user.geo**: ${geoSummary}`);
-  }
+    for (const field of ERROR_EVENT_PRIORITY_FIELDS) {
+      const value = event[field];
+      if (value === null || value === undefined) {
+        continue;
+      }
 
-  return lines;
+      if (field === "issue" && typeof value === "string") {
+        addField(field, "Issue ID", value);
+        addField(
+          "issue.url",
+          "Issue URL",
+          apiService.getIssueUrl(organizationSlug, value),
+        );
+      } else if (field === "issue") {
+        addField(field, "Issue ID", formatEventValue(value));
+      } else {
+        addField(field, field, formatEventValue(value));
+      }
+    }
+
+    const displayedFields = new Set<string>([
+      ...ERROR_EVENT_PRIORITY_FIELDS,
+      "id",
+    ]);
+    for (const [key, value] of Object.entries(event)) {
+      if (displayedFields.has(key) || value === null || value === undefined) {
+        continue;
+      }
+
+      if (key === "user" && typeof value === "object" && value !== null) {
+        for (const field of formatUserFieldEntries(
+          value as Record<string, unknown>,
+        )) {
+          fields.push(field);
+        }
+        continue;
+      }
+
+      addField(key, key, formatEventValue(value));
+    }
+
+    return {
+      id: getStringValue(event, "id") || null,
+      title:
+        getStringValue(event, "title") ||
+        getStringValue(event, "message") ||
+        getStringValue(event, "error.value") ||
+        "Error Event",
+      fields,
+    };
+  });
 }
 
 /**
@@ -196,70 +300,15 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
     output += JSON.stringify(eventData, null, 2);
     output += "\n```\n\n";
   } else {
-    // For individual errors, format with details
-    // Define priority fields that should appear first if present
-    const priorityFields = [
-      "title",
-      "issue",
-      "project",
-      "level",
-      "error.type",
-      "message",
-      "culprit",
-      "timestamp",
-      "last_seen()", // Aggregate field - when the issue was last seen
-      "count()", // Aggregate field - total occurrences of this issue
-    ];
+    for (const event of createRenderedErrorEventRows({
+      eventData,
+      apiService,
+      organizationSlug,
+    })) {
+      output += `## ${event.title}\n\n`;
 
-    for (const event of eventData) {
-      // Try to get a title from various possible fields
-      const title =
-        getStringValue(event, "title") ||
-        getStringValue(event, "message") ||
-        getStringValue(event, "error.value") ||
-        "Error Event";
-
-      output += `## ${title}\n\n`;
-
-      // Display priority fields first if they exist
-      for (const field of priorityFields) {
-        if (
-          field in event &&
-          event[field] !== null &&
-          event[field] !== undefined
-        ) {
-          const value = event[field];
-
-          if (field === "issue" && typeof value === "string") {
-            output += `**Issue ID**: ${value}\n`;
-            output += `**Issue URL**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
-          } else if (field === "issue") {
-            output += `**Issue ID**: ${formatEventValue(value)}\n`;
-          } else {
-            output += `**${field}**: ${formatEventValue(value)}\n`;
-          }
-        }
-      }
-
-      // Display any additional fields that weren't in the priority list
-      const displayedFields = new Set([...priorityFields, "id"]);
-      for (const [key, value] of Object.entries(event)) {
-        if (
-          !displayedFields.has(key) &&
-          value !== null &&
-          value !== undefined
-        ) {
-          if (key === "user" && typeof value === "object" && value !== null) {
-            for (const line of formatUserFieldLines(
-              value as Record<string, unknown>,
-            )) {
-              output += `${line}\n`;
-            }
-            continue;
-          }
-
-          output += `**${key}**: ${formatEventValue(value)}\n`;
-        }
+      for (const field of event.fields) {
+        output += `**${field.label}**: ${field.value}\n`;
       }
 
       output += "\n";

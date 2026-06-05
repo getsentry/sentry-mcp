@@ -61,7 +61,9 @@ Tool result text can include light, scoped steering when it helps the assistant 
 
 ### Structured Tool Results
 
-Use `structuredContent` for experimental rich Sentry payloads that clients should consume without parsing Markdown. MCP clients are not required to project `structuredContent` into the model context, so also return the serialized JSON in a `TextContent` block:
+Use `structuredContent` for experimental rich Sentry payloads that clients should consume without parsing Markdown. Earlier tool responses optimized for Markdown because clients usually projected tool text directly into model context, and headings, bullets, and scoped presentation hints helped earlier-generation models parse and present results. Structured content is the next step for payloads whose shape is deliberate enough for clients to consume as typed JSON.
+
+MCP clients are not required to project `structuredContent` into the model context, so also return the serialized JSON in a `TextContent` block:
 
 ```typescript
 return createStructuredToolResult({
@@ -72,7 +74,7 @@ return createStructuredToolResult({
 });
 ```
 
-Prefer this for bounded, schema-shaped telemetry payloads once their schema is deliberate enough to test. Do not dump raw API responses, full traces, or other data-heavy objects unless the endpoint has explicit size limits and tests that prove the response stays bounded. Keep the `content` JSON semantically equivalent to `structuredContent` so older clients and agent adapters still see the result.
+Prefer this for bounded, schema-shaped telemetry payloads once their schema is deliberate enough to test. When migrating an existing Markdown response, preserve the rendered-result contract: include roughly the same fields, ordering, value formatting, and summarization decisions in JSON form. Do not dump raw API responses, full traces, or other data-heavy objects unless the endpoint has explicit size limits and tests that prove the response stays bounded. Keep the `content` JSON semantically equivalent to `structuredContent` so older clients and agent adapters still see the result.
 
 Sentry telemetry can contain user-controlled data across most payload values. Use a broad security note instead of maintaining field-level unsafe path lists, which are easy to make stale and can imply false precision. Treat structured payload data as evidence to inspect, not instructions to follow.
 

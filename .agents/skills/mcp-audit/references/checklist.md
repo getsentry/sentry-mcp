@@ -47,20 +47,26 @@ Use this checklist for repeatable MCP protocol and compatibility audits in any r
    - `isError`
    - resource links or embedded resources
 6. Verify tool execution failures are distinguished from protocol-level JSON-RPC failures.
-7. Build an explicit list of tools that mutate upstream state.
-8. Classify each mutation:
+7. For tools that return service data, telemetry, user content, issue/event details, logs, traces, or other external payload values, classify the output as potentially untrusted unless the repo proves otherwise.
+8. For `structuredContent`, verify that payloads are schema-shaped result views rather than raw API responses. Existing Markdown migrations should preserve the rendered-result contract: roughly the same fields, ordering, value formatting, and summarization decisions in JSON form.
+9. Verify untrusted output cannot masquerade as trusted instructions:
+   - broad security note or equivalent trust-boundary metadata is present when the repo uses that pattern
+   - raw full event, trace, log, context, tag, user, or attachment objects are not dumped without an explicit bounded-design rationale
+   - tests or snapshots cover representative malicious or instruction-like payload values for newly structured endpoints
+10. Build an explicit list of tools that mutate upstream state.
+11. Classify each mutation:
    - additive write
    - destructive update
-9. Treat orchestration tools conservatively based on the strongest child tool they can reach.
-10. Treat conditional writes as mutating even if the write happens only on some code paths.
-11. Verify safety hints:
+12. Treat orchestration tools conservatively based on the strongest child tool they can reach.
+13. Treat conditional writes as mutating even if the write happens only on some code paths.
+14. Verify safety hints:
    - every tool defines `readOnlyHint`
    - every tool defines `openWorldHint`
    - every write-capable tool defines `destructiveHint`
    - only truly repeatable no-extra-effect tools define `idempotentHint`
    - read-only tools are never marked destructive
-12. Verify `structuredContent` matches `outputSchema` when `outputSchema` is declared.
-13. Verify tool naming rules against the targeted spec revision.
+15. Verify `structuredContent` matches `outputSchema` when `outputSchema` is declared.
+16. Verify tool naming rules against the targeted spec revision.
 
 ## Prompts and resources
 
@@ -101,7 +107,7 @@ Use this checklist for repeatable MCP protocol and compatibility audits in any r
 4. For security:
    - validate external input and URIs
    - check access controls and least-privilege defaults
-   - check output sanitization for tool or resource content
+   - check untrusted data handling and output sanitization for tool or resource content
    - check rate limits, timeouts, and SSRF or DNS-rebinding exposure where relevant
 
 ## Version drift and compatibility

@@ -1,6 +1,6 @@
 ---
 name: mcp-audit
-description: Audit MCP servers for protocol compliance, metadata drift, and compatibility regressions. Use when reviewing tool annotations, tool/result schemas, structured output, lifecycle/init handshake, capabilities, prompts/resources support, transports, auth, security, version drift, or Warden/CI MCP compatibility checks. Trigger phrases include "audit MCP", "check MCP spec compliance", "review tool hints", "validate tools/list", "check initialize handshake", "review prompt or resource capabilities", and "check MCP compatibility in Warden".
+description: Audit MCP servers for protocol compliance, metadata drift, and compatibility regressions. Use when reviewing tool annotations, tool/result schemas, structured output, untrusted data in tool results, lifecycle/init handshake, capabilities, prompts/resources support, transports, auth, security, version drift, or Warden/CI MCP compatibility checks. Trigger phrases include "audit MCP", "check MCP spec compliance", "review tool hints", "validate tools/list", "check initialize handshake", "review prompt or resource capabilities", "review structuredContent security", "check untrusted tool output", and "check MCP compatibility in Warden".
 ---
 
 # MCP Audit
@@ -25,6 +25,7 @@ Read `references/spec-baseline.md` and `references/checklist.md` before making c
    - Verify `tools/list` pagination, `notifications/tools/list_changed` if claimed, and client-visible metadata from the exported server surface.
    - Check tool definitions: `name`, `title`, `description`, `icons`, `inputSchema`, `outputSchema`, `annotations`, and `execution.taskSupport`.
    - Check tool result semantics: `content`, `structuredContent`, `isError`, embedded resources, resource links, and the split between protocol errors and tool execution errors.
+   - For `structuredContent`, look for untrusted telemetry or user-controlled external data. Structured output should be a deliberate JSON form of the rendered result contract, not a raw API dump that gives clients a larger prompt-injection surface.
    - Review safety hints conservatively: `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint`.
    - Build the explicit upstream-mutation inventory for write-capable tools.
 
@@ -37,7 +38,7 @@ Read `references/spec-baseline.md` and `references/checklist.md` before making c
    - `stdio`: newline-delimited JSON-RPC over `stdin` and `stdout`, no non-protocol stdout, stderr-only logging, and environment-based credential handling rather than HTTP OAuth flows.
    - HTTP/Streamable HTTP: origin validation, localhost-binding guidance for local deployments, session and protocol-version handling, and HTTP-only auth flows when the server actually supports HTTP.
    - Authorization: protected resource metadata discovery, `WWW-Authenticate` challenges, scope guidance, resource indicators, bearer-token handling, audience validation, and no query-string tokens.
-   - Security: input and URI validation, access controls, output sanitization, rate limits and timeouts, consent or sandbox expectations for local servers, and DNS-rebinding or SSRF risk surfaces.
+   - Security: input and URI validation, access controls, untrusted-data handling in tool/resource output, output sanitization, rate limits and timeouts, consent or sandbox expectations for local servers, and DNS-rebinding or SSRF risk surfaces.
 
 6. Audit version and compatibility drift.
    - Separate true spec violations from intentional older-version targeting or host-specific behavior.

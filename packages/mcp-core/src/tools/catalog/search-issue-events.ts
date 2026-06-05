@@ -21,6 +21,7 @@ import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { UserInputError } from "../../errors";
 import { searchIssueEventsAgent } from "../support/search-issue-events/agent";
 import {
+  createRenderedErrorEventRows,
   formatErrorResults,
   type FormatEventResultsParams,
 } from "../support/search-events/formatters";
@@ -63,7 +64,19 @@ const searchIssueEventsStructuredOutputSchema = z.object({
   results: z.object({
     kind: z.literal("issue_events"),
     count: z.number(),
-    data: z.array(z.unknown()),
+    data: z.array(
+      z.object({
+        id: z.string().nullable(),
+        title: z.string(),
+        fields: z.array(
+          z.object({
+            name: z.string(),
+            label: z.string(),
+            value: z.string(),
+          }),
+        ),
+      }),
+    ),
   }),
 });
 
@@ -120,7 +133,11 @@ function formatSearchIssueEventsResult(
     results: {
       kind: "issue_events",
       count: params.eventData.length,
-      data: params.eventData,
+      data: createRenderedErrorEventRows({
+        eventData: params.eventData,
+        apiService: params.apiService,
+        organizationSlug: params.organizationSlug,
+      }),
     },
   });
 }
