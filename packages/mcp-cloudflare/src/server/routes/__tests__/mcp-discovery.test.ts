@@ -19,11 +19,11 @@ describe("/.mcp discovery routes", () => {
 
     const json = await res.json();
     expect(json).toEqual({
-      endpoints: ["/.mcp/tools.json"],
+      endpoints: ["/.mcp/tools.json", "/.mcp/skills.json"],
     });
   });
 
-  it("GET /.mcp/tools.json should return tool definitions", async () => {
+  it("GET /.mcp/tools.json should return direct tool definitions", async () => {
     const res = await app.request(
       "/.mcp/tools.json",
       {
@@ -46,7 +46,44 @@ describe("/.mcp discovery routes", () => {
     expect(toolNames).toContain("find_organizations");
     expect(toolNames).toContain("get_sentry_resource");
     expect(toolNames).not.toContain("get_issue_details");
+    expect(toolNames).not.toContain("get_issue_activity");
     expect(toolNames).not.toContain("get_trace_details");
     expect(toolNames).toContain("search_events");
+  });
+
+  it("GET /.mcp/skills.json should return skill catalog definitions", async () => {
+    const res = await app.request(
+      "/.mcp/skills.json",
+      {
+        headers: {
+          "CF-Connecting-IP": "192.0.2.1",
+        },
+      },
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("application/json");
+
+    const json = (await res.json()) as Array<{
+      id: string;
+      tools: Array<{ name: string }>;
+    }>;
+    const inspectSkill = json.find((skill) => skill.id === "inspect");
+    expect(inspectSkill?.tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining([
+        "find_alerts",
+        "find_monitors",
+        "get_alert_details",
+        "get_issue_activity",
+        "get_monitor_details",
+        "get_release_details",
+      ]),
+    );
+
+    const triageSkill = json.find((skill) => skill.id === "triage");
+    expect(triageSkill?.tools.map((tool) => tool.name)).toContain(
+      "add_issue_note",
+    );
   });
 });

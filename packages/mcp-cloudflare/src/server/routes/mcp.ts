@@ -6,6 +6,7 @@
  * so routes here only need to set content-specific headers like Cache-Control.
  */
 import { Hono } from "hono";
+import SKILL_DEFINITIONS from "@sentry/mcp-core/skillDefinitions";
 import TOOL_DEFINITIONS from "@sentry/mcp-core/toolDefinitions";
 
 function jsonResponse(json: unknown, status = 200) {
@@ -23,8 +24,10 @@ export default new Hono()
   // Index: advertise available endpoints
   .get("/", (c) =>
     jsonResponse({
-      endpoints: ["/.mcp/tools.json"],
+      endpoints: ["/.mcp/tools.json", "/.mcp/skills.json"],
     }),
   )
   // Tools
-  .get("/tools.json", (c) => jsonResponse(TOOL_DEFINITIONS));
+  .get("/tools.json", (c) => jsonResponse(TOOL_DEFINITIONS))
+  // Skills
+  .get("/skills.json", (c) => jsonResponse(SKILL_DEFINITIONS));
