@@ -245,6 +245,43 @@ describe("get_release_details", () => {
     );
   });
 
+  it("hides health metadata when includeHealth is false", async () => {
+    const releaseVersion = "8ce89484-0fec-4913-a2cd-e8e2d41dee36";
+    mswServer.use(
+      http.get(
+        `https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/${releaseVersion}/`,
+        () =>
+          HttpResponse.json({
+            ...releaseFixture,
+            currentProjectMeta: {
+              sessionsAdoption: "enabled",
+            },
+            adoptionStages: {
+              sessions: "adopted",
+            },
+          }),
+      ),
+    );
+
+    const result = await getReleaseDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        releaseVersion,
+        projectSlugOrId: "cloudflare-mcp",
+        includeHealth: false,
+        includeDeploys: false,
+        includeCommits: false,
+        limit: 10,
+      },
+      context,
+    );
+
+    expect(result).not.toContain("Health And Project Metadata");
+    expect(result).not.toContain("sessionsAdoption");
+    expect(result).not.toContain("adoptionStages");
+  });
+
   it("uses scoped release endpoints under an active project constraint", async () => {
     const requests: Array<{ kind: "deploys" | "commits"; url: string }> = [];
     const releaseVersion = "8ce89484-0fec-4913-a2cd-e8e2d41dee36";

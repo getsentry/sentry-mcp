@@ -261,7 +261,7 @@ export default defineTool({
       );
     }
 
-    const healthLines = formatHealthOrMeta(release);
+    const healthLines = params.includeHealth ? formatHealthOrMeta(release) : [];
     if (healthLines.length > 0) {
       output.push("", "## Health And Project Metadata", "", ...healthLines);
     }
