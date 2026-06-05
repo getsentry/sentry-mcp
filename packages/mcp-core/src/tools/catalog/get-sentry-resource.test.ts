@@ -75,13 +75,15 @@ function mockMonitorResource({
 }) {
   const organizationMonitorPath = `${apiBaseUrl}/api/0/organizations/${organizationSlug}/monitors/${monitorSlug}/`;
   const projectMonitorPath = `${apiBaseUrl}/api/0/projects/${organizationSlug}/${projectPath ?? projectSlug}/monitors/${monitorSlug}/`;
+  const projectId =
+    projectPath && /^\d+$/.test(projectPath) ? projectPath : "456";
   const buildMonitor = (slug: string) => ({
     id: "123",
     slug: monitorSlug,
     name: monitorSlug,
     status: "ok",
     project: {
-      id: "456",
+      id: projectId,
       slug,
       name: slug,
     },
@@ -92,6 +94,15 @@ function mockMonitorResource({
   return [
     http.get(organizationMonitorPath, () =>
       HttpResponse.json(buildMonitor("backend")),
+    ),
+    http.get(
+      `${apiBaseUrl}/api/0/projects/${organizationSlug}/${projectSlug}/`,
+      () =>
+        HttpResponse.json({
+          id: projectId,
+          slug: projectSlug,
+          name: projectSlug,
+        }),
     ),
     http.get(`${organizationMonitorPath}checkins/`, () =>
       HttpResponse.json([]),
@@ -593,6 +604,56 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(
         "[Open Monitor](https://my-org.sentry.io/crons/backend/my-monitor/)",
       );
+    });
+
+    it("rejects numeric monitor project IDs outside the active project constraint before monitor reads", async () => {
+      const paths: string[] = [];
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/projects/my-org/frontend/",
+          ({ request }) => {
+            paths.push(new URL(request.url).pathname);
+            return HttpResponse.json({
+              id: "999",
+              slug: "frontend",
+              name: "frontend",
+            });
+          },
+        ),
+        http.get(
+          "https://sentry.io/api/0/projects/my-org/4509109104082945/monitors/my-monitor/",
+          ({ request }) => {
+            paths.push(new URL(request.url).pathname);
+            return HttpResponse.json({
+              id: "123",
+              slug: "my-monitor",
+              project: {
+                id: "4509109104082945",
+                slug: "backend",
+                name: "backend",
+              },
+            });
+          },
+        ),
+      );
+
+      await expect(
+        getSentryResource.handler(
+          {
+            url: "https://my-org.sentry.io/crons/4509109104082945/my-monitor/",
+          },
+          {
+            ...baseContext,
+            constraints: {
+              ...baseContext.constraints,
+              projectSlug: "frontend",
+            },
+          },
+        ),
+      ).rejects.toThrow(
+        'Monitor is outside the active project constraint. Expected project "frontend".',
+      );
+      expect(paths).toEqual(["/api/0/projects/my-org/frontend/"]);
     });
 
     it("dispatches explicit monitor resourceType under an active project constraint", async () => {

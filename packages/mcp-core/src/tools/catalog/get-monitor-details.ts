@@ -2,6 +2,7 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { UserInputError } from "../../errors";
 import type {
   Monitor,
   MonitorCheckIn,
@@ -144,6 +145,21 @@ export default defineTool({
         scopedProjectSlug: context.constraints.projectSlug,
         project: { slug: params.projectSlug },
       });
+    }
+    if (
+      params.projectSlug &&
+      isNumericId(params.projectSlug) &&
+      context.constraints.projectSlug
+    ) {
+      const scopedProject = await apiService.getProject({
+        organizationSlug,
+        projectSlugOrId: context.constraints.projectSlug,
+      });
+      if (String(scopedProject.id) !== params.projectSlug) {
+        throw new UserInputError(
+          `Monitor is outside the active project constraint. Expected project "${context.constraints.projectSlug}".`,
+        );
+      }
     }
     const start = params.start ?? undefined;
     const end = params.end ?? undefined;
