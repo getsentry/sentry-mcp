@@ -98,7 +98,6 @@ describeSearchAgentEval(
     },
   ],
   {
-    threshold: 0.6,
     timeout: 30000,
   },
 );

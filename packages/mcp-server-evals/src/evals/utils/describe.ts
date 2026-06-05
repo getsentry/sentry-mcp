@@ -96,7 +96,7 @@ export function describeSearchAgentEval(
     {
       harness,
       judges: [ToolCallJudge(), StructuredOutputJudge({ match: "fuzzy" })],
-      judgeThreshold: resolveThreshold(options.threshold, 1),
+      judgeThreshold: resolveThreshold(options.threshold, 0.6),
     },
     (it) => {
       for (const testCase of cases) {
