@@ -59,7 +59,7 @@ const searchIssueEventsStructuredOutputSchema = z.object({
       end: z.string().optional(),
     }),
     limit: z.number(),
-    explanation: z.string().nullable(),
+    explanation: z.string().nullable().optional(),
   }),
   results: z.object({
     kind: z.literal("issue_events"),
@@ -128,7 +128,9 @@ function formatSearchIssueEventsResult(
       sort: params.sort,
       timeRange: params.timeRange,
       limit: params.limit,
-      explanation: params.explanation ?? null,
+      ...(params.includeExplanation === true
+        ? { explanation: params.explanation ?? null }
+        : {}),
     },
     results: {
       kind: "issue_events",

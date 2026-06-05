@@ -249,7 +249,6 @@ describe("search_issue_events", () => {
         "schemaVersion": "sentry.mcp.search_issue_events.v1",
         "search": {
           "dataset": "errors",
-          "explanation": "Test query translation",
           "explorerQuery": "issue:MCP-41 environment:production",
           "fields": [
             "id",

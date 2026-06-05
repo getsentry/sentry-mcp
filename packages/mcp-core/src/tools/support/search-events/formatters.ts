@@ -120,11 +120,23 @@ export interface RenderedEventField {
   value: string;
 }
 
-export interface RenderedErrorEventRow {
+export interface RenderedEventRow {
   id: string | null;
   title: string;
   fields: RenderedEventField[];
 }
+
+const RENDERED_EVENT_FIELD_LIMIT = 40;
+
+const DEFAULT_TITLE_FIELDS = [
+  "title",
+  "message",
+  "transaction",
+  "span.description",
+  "metric.name",
+  "profile.id",
+  "id",
+] as const;
 
 const ERROR_EVENT_PRIORITY_FIELDS = [
   "title",
@@ -138,6 +150,24 @@ const ERROR_EVENT_PRIORITY_FIELDS = [
   "last_seen()",
   "count()",
 ] as const;
+
+function pushRenderedField(
+  fields: RenderedEventField[],
+  field: RenderedEventField,
+) {
+  if (fields.length < RENDERED_EVENT_FIELD_LIMIT) {
+    fields.push(field);
+  }
+}
+
+function pushRenderedFields(
+  fields: RenderedEventField[],
+  newFields: RenderedEventField[],
+) {
+  for (const field of newFields) {
+    pushRenderedField(fields, field);
+  }
+}
 
 function formatUserFieldEntries(
   value: Record<string, unknown>,
@@ -180,14 +210,18 @@ export function createRenderedErrorEventRows({
 }: Pick<
   FormatEventResultsParams,
   "eventData" | "apiService" | "organizationSlug"
->): RenderedErrorEventRow[] {
+>): RenderedEventRow[] {
   return eventData.map((event) => {
     const fields: RenderedEventField[] = [];
     const addField = (name: string, label: string, value: string) => {
-      fields.push({ name, label, value });
+      pushRenderedField(fields, { name, label, value });
     };
 
     for (const field of ERROR_EVENT_PRIORITY_FIELDS) {
+      if (fields.length >= RENDERED_EVENT_FIELD_LIMIT) {
+        break;
+      }
+
       const value = event[field];
       if (value === null || value === undefined) {
         continue;
@@ -212,16 +246,19 @@ export function createRenderedErrorEventRows({
       "id",
     ]);
     for (const [key, value] of Object.entries(event)) {
+      if (fields.length >= RENDERED_EVENT_FIELD_LIMIT) {
+        break;
+      }
+
       if (displayedFields.has(key) || value === null || value === undefined) {
         continue;
       }
 
       if (key === "user" && typeof value === "object" && value !== null) {
-        for (const field of formatUserFieldEntries(
-          value as Record<string, unknown>,
-        )) {
-          fields.push(field);
-        }
+        pushRenderedFields(
+          fields,
+          formatUserFieldEntries(value as Record<string, unknown>),
+        );
         continue;
       }
 
@@ -235,6 +272,60 @@ export function createRenderedErrorEventRows({
         getStringValue(event, "message") ||
         getStringValue(event, "error.value") ||
         "Error Event",
+      fields,
+    };
+  });
+}
+
+export function createRenderedEventRows({
+  eventData,
+  priorityFields = [],
+  titleFallback = "Event Result",
+}: {
+  eventData: FlexibleEventData[];
+  priorityFields?: string[];
+  titleFallback?: string;
+}): RenderedEventRow[] {
+  return eventData.map((event) => {
+    const fields: RenderedEventField[] = [];
+    const fieldOrder = Array.from(
+      new Set([...priorityFields, ...Object.keys(event)]),
+    );
+
+    for (const field of fieldOrder) {
+      if (fields.length >= RENDERED_EVENT_FIELD_LIMIT) {
+        break;
+      }
+
+      const value = event[field];
+      if (field === "id" || value === null || value === undefined) {
+        continue;
+      }
+
+      if (field === "user" && typeof value === "object" && value !== null) {
+        pushRenderedFields(
+          fields,
+          formatUserFieldEntries(value as Record<string, unknown>),
+        );
+        continue;
+      }
+
+      pushRenderedField(fields, {
+        name: field,
+        label: field,
+        value: formatEventValue(value),
+      });
+    }
+
+    return {
+      id:
+        getStringValue(event, "id") ||
+        getStringValue(event, "sentry.item_id") ||
+        null,
+      title:
+        DEFAULT_TITLE_FIELDS.map((field) => getStringValue(event, field)).find(
+          Boolean,
+        ) ?? titleFallback,
       fields,
     };
   });

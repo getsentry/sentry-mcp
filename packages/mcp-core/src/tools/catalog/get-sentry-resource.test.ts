@@ -142,7 +142,7 @@ describe("get_sentry_resource", () => {
             "dateCreated": "2025-04-08T21:15:04Z",
             "dateReceived": "2025-04-08T21:15:04.700878Z",
             "entries": {
-              "truncated": true,
+              "truncated": false,
               "types": [
                 "exception",
                 "request",
@@ -171,13 +171,12 @@ describe("get_sentry_resource", () => {
             "type": "error",
             "user": {
               "keys": [
-                "email",
                 "id",
-                "ip_address",
-                "name",
+                "email",
                 "username",
+                "ipAddress",
+                "displayName",
                 "geo",
-                "data",
               ],
               "truncated": false,
             },

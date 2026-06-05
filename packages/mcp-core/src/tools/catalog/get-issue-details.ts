@@ -40,6 +40,7 @@ import {
   ParamIssueShortId,
   ParamIssueUrl,
 } from "../../schema";
+import { formatEventValue } from "../support/search-events/utils";
 
 const ISSUE_DETAILS_STRUCTURED_CONTENT_VERSION = "sentry.mcp.issue_details.v1";
 const STRUCTURED_EVENT_ENTRIES_LIMIT = 12;
@@ -49,6 +50,43 @@ const STRUCTURED_TRACE_DEPTH_LIMIT = 2;
 const STRUCTURED_AUTOFIX_ARRAY_LIMIT = 10;
 const STRUCTURED_AUTOFIX_OBJECT_KEY_LIMIT = 20;
 const STRUCTURED_AUTOFIX_DEPTH_LIMIT = 3;
+const STRUCTURED_EVENT_FIELD_LIMIT = 40;
+const STRUCTURED_EVENT_FIELD_VALUE_LIMIT = 500;
+
+const structuredRenderedFieldSchema = z.object({
+  name: z.string(),
+  value: z.string(),
+});
+
+const structuredNamedFieldGroupSchema = z.object({
+  name: z.string(),
+  fields: z.array(structuredRenderedFieldSchema),
+});
+
+const structuredTagSchema = z.object({
+  key: z.string(),
+  value: z.string(),
+});
+
+const structuredEntrySchema = z.object({
+  type: z.string(),
+  value: z.string(),
+});
+
+const structuredUserSchema = z.object({
+  id: z.string().nullable(),
+  email: z.string().nullable(),
+  username: z.string().nullable(),
+  ipAddress: z.string().nullable(),
+  displayName: z.string().nullable(),
+  geo: z.string().nullable(),
+});
+
+const structuredExternalIssueSchema = z.object({
+  displayName: z.string(),
+  serviceType: z.string(),
+  url: z.string(),
+});
 
 const issueDetailsSuccessStructuredOutputSchema = z.object({
   schemaVersion: z.literal(ISSUE_DETAILS_STRUCTURED_CONTENT_VERSION),
@@ -95,16 +133,34 @@ const issueDetailsSuccessStructuredOutputSchema = z.object({
     platform: z.string().nullable(),
     dateCreated: z.string().nullable(),
     dateReceived: z.string().nullable(),
-    entries: StructuredDataPreviewSchema,
-    contexts: StructuredDataPreviewSchema,
-    context: StructuredDataPreviewSchema,
-    tags: StructuredDataPreviewSchema,
-    user: StructuredDataPreviewSchema,
-    occurrence: StructuredDataPreviewSchema,
+    entries: z.object({
+      data: z.array(structuredEntrySchema),
+      truncated: z.boolean(),
+    }),
+    contexts: z.object({
+      data: z.array(structuredNamedFieldGroupSchema),
+      truncated: z.boolean(),
+    }),
+    context: z.object({
+      data: z.array(structuredRenderedFieldSchema),
+      truncated: z.boolean(),
+    }),
+    tags: z.object({
+      data: z.array(structuredTagSchema),
+      truncated: z.boolean(),
+    }),
+    user: z.object({
+      data: structuredUserSchema.nullable(),
+      truncated: z.boolean(),
+    }),
+    occurrence: z.object({
+      data: z.array(structuredRenderedFieldSchema),
+      truncated: z.boolean(),
+    }),
   }),
   related: z.object({
     autofixState: StructuredDataPreviewSchema,
-    externalIssues: z.array(z.unknown()),
+    externalIssues: z.array(structuredExternalIssueSchema),
     replayIds: z.array(z.string()),
     performanceTrace: z.unknown().nullable(),
   }),
@@ -480,14 +536,12 @@ function formatIssueDetailsStructuredContent({
       platform: event.platform ?? null,
       dateCreated: getEventDateCreated(event),
       dateReceived: event.dateReceived ?? null,
-      entries: createStructuredDataPreview(event.entries ?? [], {
-        arrayLimit: STRUCTURED_EVENT_ENTRIES_LIMIT,
-      }),
-      contexts: createStructuredDataPreview(event.contexts ?? {}),
-      context: createStructuredDataPreview(event.context ?? {}),
-      tags: createStructuredDataPreview(event.tags ?? []),
-      user: createStructuredDataPreview(event.user ?? null),
-      occurrence: createStructuredDataPreview(getEventOccurrence(event)),
+      entries: createStructuredEntryRows(event.entries ?? []),
+      contexts: createStructuredNamedObjectRows(event.contexts ?? {}),
+      context: createStructuredFieldRows(event.context ?? {}),
+      tags: createStructuredTagRows(event.tags ?? []),
+      user: createStructuredUser(event.user ?? null),
+      occurrence: createStructuredFieldRows(getEventOccurrence(event)),
     },
     related: {
       autofixState: createStructuredDataPreview(autofixState ?? null, {
@@ -495,11 +549,135 @@ function formatIssueDetailsStructuredContent({
         objectKeyLimit: STRUCTURED_AUTOFIX_OBJECT_KEY_LIMIT,
         depthLimit: STRUCTURED_AUTOFIX_DEPTH_LIMIT,
       }),
-      externalIssues: externalIssues ?? [],
+      externalIssues: formatStructuredExternalIssues(externalIssues),
       replayIds: relatedReplayIds ?? [],
       performanceTrace: summarizePerformanceTrace(performanceTrace),
     },
   };
+}
+
+function createStructuredFieldRows(value: unknown): {
+  data: Array<{ name: string; value: string }>;
+  truncated: boolean;
+} {
+  if (!isRecord(value)) {
+    return { data: [], truncated: value != null };
+  }
+
+  const entries = Object.entries(value).filter(
+    ([, entryValue]) => entryValue !== null && entryValue !== undefined,
+  );
+  return {
+    data: entries
+      .slice(0, STRUCTURED_EVENT_FIELD_LIMIT)
+      .map(([name, data]) => ({
+        name,
+        value: formatEventValue(data, {
+          maxLength: STRUCTURED_EVENT_FIELD_VALUE_LIMIT,
+        }),
+      })),
+    truncated: entries.length > STRUCTURED_EVENT_FIELD_LIMIT,
+  };
+}
+
+function createStructuredEntryRows(entries: Event["entries"]): {
+  data: Array<{ type: string; value: string }>;
+  truncated: boolean;
+} {
+  const entryRows = (entries ?? []).map((entry) => ({
+    type: entry.type,
+    value: formatEventValue(entry.data, {
+      maxLength: STRUCTURED_EVENT_FIELD_VALUE_LIMIT,
+    }),
+  }));
+
+  return {
+    data: entryRows.slice(0, STRUCTURED_EVENT_ENTRIES_LIMIT),
+    truncated: entryRows.length > STRUCTURED_EVENT_ENTRIES_LIMIT,
+  };
+}
+
+function createStructuredNamedObjectRows(value: unknown): {
+  data: Array<{
+    name: string;
+    fields: Array<{ name: string; value: string }>;
+  }>;
+  truncated: boolean;
+} {
+  if (!isRecord(value)) {
+    return { data: [], truncated: value != null };
+  }
+
+  const entries = Object.entries(value);
+  let childTruncated = false;
+  const rows = entries
+    .slice(0, STRUCTURED_EVENT_FIELD_LIMIT)
+    .map(([name, data]) => {
+      const fields = createStructuredFieldRows(data);
+      childTruncated = childTruncated || fields.truncated;
+
+      return {
+        name,
+        fields: fields.data.filter((field) => field.name !== "type"),
+      };
+    });
+
+  return {
+    data: rows,
+    truncated: entries.length > STRUCTURED_EVENT_FIELD_LIMIT || childTruncated,
+  };
+}
+
+function createStructuredTagRows(tags: Event["tags"]): {
+  data: Array<{ key: string; value: string }>;
+  truncated: boolean;
+} {
+  const tagRows = (tags ?? []).map((tag) => ({
+    key: tag.key,
+    value: formatEventValue(tag.value, {
+      maxLength: STRUCTURED_EVENT_FIELD_VALUE_LIMIT,
+    }),
+  }));
+
+  return {
+    data: tagRows.slice(0, STRUCTURED_EVENT_FIELD_LIMIT),
+    truncated: tagRows.length > STRUCTURED_EVENT_FIELD_LIMIT,
+  };
+}
+
+function createStructuredUser(user: Event["user"] | null): {
+  data: z.infer<typeof structuredUserSchema> | null;
+  truncated: boolean;
+} {
+  if (!user || Object.keys(user).length === 0) {
+    return { data: null, truncated: false };
+  }
+
+  return {
+    data: {
+      id: user.id ?? null,
+      email: user.email ?? null,
+      username: user.username ?? null,
+      ipAddress: user.ip_address ?? user.ip ?? null,
+      displayName: user.display_name ?? user.name ?? null,
+      geo: user.geo
+        ? formatEventValue(user.geo, {
+            maxLength: STRUCTURED_EVENT_FIELD_VALUE_LIMIT,
+          })
+        : null,
+    },
+    truncated: false,
+  };
+}
+
+function formatStructuredExternalIssues(
+  externalIssues: ExternalIssueList | undefined,
+): Array<z.infer<typeof structuredExternalIssueSchema>> {
+  return (externalIssues ?? []).map((externalIssue) => ({
+    displayName: externalIssue.displayName,
+    serviceType: externalIssue.serviceType,
+    url: externalIssue.webUrl,
+  }));
 }
 
 function getEventDateCreated(event: Event): string | null {

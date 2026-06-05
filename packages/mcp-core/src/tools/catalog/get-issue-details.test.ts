@@ -30,10 +30,10 @@ type IssueDetailsStructuredContent = {
   event: {
     message: string | null;
     contexts: {
-      data: Record<string, unknown>;
+      data: Array<{ name: string }>;
     };
     tags: {
-      data: Array<{ key: string; value: string | null }>;
+      data: Array<{ key: string; value: string }>;
     };
   };
 };
@@ -327,7 +327,7 @@ describe("get_issue_details", () => {
           "dateCreated": "2025-04-08T21:15:04Z",
           "dateReceived": "2025-04-08T21:15:04.700878Z",
           "entries": {
-            "truncated": true,
+            "truncated": false,
             "types": [
               "exception",
               "request",
@@ -356,13 +356,12 @@ describe("get_issue_details", () => {
           "type": "error",
           "user": {
             "keys": [
-              "email",
               "id",
-              "ip_address",
-              "name",
+              "email",
               "username",
+              "ipAddress",
+              "displayName",
               "geo",
-              "data",
             ],
             "truncated": false,
           },
@@ -586,7 +585,7 @@ describe("get_issue_details", () => {
           "dateCreated": null,
           "dateReceived": null,
           "entries": {
-            "truncated": true,
+            "truncated": false,
             "types": [
               "spans",
               "request",
@@ -602,7 +601,6 @@ describe("get_issue_details", () => {
               "fingerprint",
               "issueTitle",
               "subtitle",
-              "resourceId",
               "evidenceData",
               "evidenceDisplay",
               "type",
@@ -610,7 +608,6 @@ describe("get_issue_details", () => {
               "level",
               "culprit",
               "priority",
-              "assignee",
             ],
             "truncated": false,
           },
@@ -741,9 +738,12 @@ describe("get_issue_details", () => {
           truncated: expect.any(Boolean),
         },
         occurrence: {
-          data: expect.objectContaining({
-            evidenceData: expect.any(Object),
-          }),
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              name: "evidenceData",
+              value: expect.any(String),
+            }),
+          ]),
           truncated: expect.any(Boolean),
         },
       },
@@ -1371,7 +1371,9 @@ describe("get_issue_details", () => {
         },
       ]),
     );
-    expect(Object.keys(structuredContent.event.contexts.data)).toEqual(
+    expect(
+      structuredContent.event.contexts.data.map((context) => context.name),
+    ).toEqual(
       expect.arrayContaining([
         "trace",
         expect.stringContaining("Issue Classification"),

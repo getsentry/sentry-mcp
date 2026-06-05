@@ -38,11 +38,11 @@ interface StructuredIssueContent {
     dateCreated: string | null;
     dateReceived: string | null;
     entries: StructuredPreview<unknown[]>;
-    contexts: StructuredPreview<Record<string, unknown>>;
-    context: StructuredPreview<Record<string, unknown>>;
+    contexts: StructuredPreview<Array<{ name: string; fields: unknown[] }>>;
+    context: StructuredPreview<Array<{ name: string; value: string }>>;
     tags: StructuredPreview<Array<{ key: string; value: string | null }>>;
     user: StructuredPreview<Record<string, unknown> | null>;
-    occurrence: StructuredPreview<Record<string, unknown> | null>;
+    occurrence: StructuredPreview<Array<{ name: string; value: string }>>;
   };
   related: {
     autofixState: StructuredPreview<unknown>;
@@ -91,11 +91,11 @@ export function toIssueDetailsStructuredContentSnapshot(content: unknown) {
       },
       contexts: {
         truncated: structuredContent.event.contexts.truncated,
-        keys: Object.keys(structuredContent.event.contexts.data),
+        keys: getNamedRowKeys(structuredContent.event.contexts.data),
       },
       context: {
         truncated: structuredContent.event.context.truncated,
-        keys: Object.keys(structuredContent.event.context.data),
+        keys: getNamedRowKeys(structuredContent.event.context.data),
       },
       tags: {
         truncated: structuredContent.event.tags.truncated,
@@ -107,7 +107,7 @@ export function toIssueDetailsStructuredContentSnapshot(content: unknown) {
       },
       occurrence: {
         truncated: structuredContent.event.occurrence.truncated,
-        keys: getObjectKeys(structuredContent.event.occurrence.data),
+        keys: getNamedRowKeys(structuredContent.event.occurrence.data),
       },
     },
     related: {
@@ -134,6 +134,16 @@ function getEntryType(entry: unknown): unknown {
 
 function getObjectKeys(value: unknown): string[] {
   return isRecord(value) ? Object.keys(value) : [];
+}
+
+function getNamedRowKeys(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return getObjectKeys(value);
+  }
+
+  return value.flatMap((row) =>
+    isRecord(row) && typeof row.name === "string" ? [row.name] : [],
+  );
 }
 
 function toPerformanceTraceSnapshot(trace: unknown): unknown {

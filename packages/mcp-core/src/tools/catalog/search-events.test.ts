@@ -314,9 +314,25 @@ describe("search_events", () => {
           "count": 1,
           "data": [
             {
-              "count()": 3,
-              "tags[sequence]": "42",
-              "tags[type]": "Unified",
+              "fields": [
+                {
+                  "label": "tags[type]",
+                  "name": "tags[type]",
+                  "value": "Unified",
+                },
+                {
+                  "label": "tags[sequence]",
+                  "name": "tags[sequence]",
+                  "value": "42",
+                },
+                {
+                  "label": "count()",
+                  "name": "count()",
+                  "value": "3",
+                },
+              ],
+              "id": null,
+              "title": "spans result",
             },
           ],
           "kind": "events",
@@ -324,7 +340,6 @@ describe("search_events", () => {
         "schemaVersion": "sentry.mcp.search_events.v1",
         "search": {
           "dataset": "spans",
-          "explanation": null,
           "fields": [
             "tags[type]",
             "tags[sequence]",
@@ -375,9 +390,25 @@ describe("search_events", () => {
         count: 1,
         data: [
           {
-            "tags[type]": "Unified",
-            "tags[sequence]": "42",
-            "count()": 3,
+            id: null,
+            title: "spans result",
+            fields: [
+              {
+                name: "tags[type]",
+                label: "tags[type]",
+                value: "Unified",
+              },
+              {
+                name: "tags[sequence]",
+                label: "tags[sequence]",
+                value: "42",
+              },
+              {
+                name: "count()",
+                label: "count()",
+                value: "3",
+              },
+            ],
           },
         ],
       },
@@ -1256,11 +1287,35 @@ describe("search_events", () => {
           "count": 1,
           "data": [
             {
-              "metric.name": "http.request.duration",
-              "metric.type": "distribution",
-              "metric.unit": "millisecond",
-              "timestamp": "2026-04-13T14:19:18+00:00",
-              "value": 12.4,
+              "fields": [
+                {
+                  "label": "timestamp",
+                  "name": "timestamp",
+                  "value": "2026-04-13T14:19:18+00:00",
+                },
+                {
+                  "label": "value",
+                  "name": "value",
+                  "value": "12.4",
+                },
+                {
+                  "label": "metric.name",
+                  "name": "metric.name",
+                  "value": "http.request.duration",
+                },
+                {
+                  "label": "metric.type",
+                  "name": "metric.type",
+                  "value": "distribution",
+                },
+                {
+                  "label": "metric.unit",
+                  "name": "metric.unit",
+                  "value": "millisecond",
+                },
+              ],
+              "id": null,
+              "title": "http.request.duration",
             },
           ],
           "kind": "events",
@@ -1268,7 +1323,6 @@ describe("search_events", () => {
         "schemaVersion": "sentry.mcp.search_events.v1",
         "search": {
           "dataset": "metrics",
-          "explanation": null,
           "fields": [
             "timestamp",
             "value",
@@ -1811,36 +1865,60 @@ describe("search_events", () => {
           "count": 1,
           "data": [
             {
-              "browser": {
-                "name": "Chrome",
-                "version": "131.0.0",
-              },
-              "count_dead_clicks": 3,
-              "count_errors": 2,
-              "count_rage_clicks": 1,
-              "device": {},
-              "duration": 576,
-              "environment": "production",
-              "error_ids": [],
+              "fields": [
+                {
+                  "label": "Replay URL",
+                  "name": "url",
+                  "value": "https://test-org.sentry.io/explore/replays/7e07485f12f9416b8b1426260799b51f/",
+                },
+                {
+                  "label": "Started",
+                  "name": "started_at",
+                  "value": "2025-01-15 10:00:00 UTC",
+                },
+                {
+                  "label": "Duration",
+                  "name": "duration",
+                  "value": "9m 36s",
+                },
+                {
+                  "label": "User",
+                  "name": "user",
+                  "value": "Jane Doe",
+                },
+                {
+                  "label": "Summary",
+                  "name": "summary",
+                  "value": "2 errors · 1 rage click · 3 dead clicks",
+                },
+                {
+                  "label": "Environment",
+                  "name": "environment",
+                  "value": "production",
+                },
+                {
+                  "label": "Browser",
+                  "name": "browser",
+                  "value": "Chrome 131.0.0",
+                },
+                {
+                  "label": "Pages",
+                  "name": "pages",
+                  "value": "/checkout",
+                },
+                {
+                  "label": "Release",
+                  "name": "release",
+                  "value": "frontend@1.2.3",
+                },
+                {
+                  "label": "Trace",
+                  "name": "trace",
+                  "value": "a4d1aae7216b47ff8117cf4e09ce9d0a",
+                },
+              ],
               "id": "7e07485f12f9416b8b1426260799b51f",
-              "info_ids": [],
-              "os": {},
-              "releases": [
-                "frontend@1.2.3",
-              ],
-              "sdk": {},
-              "started_at": "2025-01-15T10:00:00Z",
-              "tags": {},
-              "trace_ids": [
-                "a4d1aae7216b47ff8117cf4e09ce9d0a",
-              ],
-              "urls": [
-                "/checkout",
-              ],
-              "user": {
-                "display_name": "Jane Doe",
-              },
-              "warning_ids": [],
+              "title": "7e07485f12f9416b8b1426260799b51f",
             },
           ],
           "kind": "replays",
@@ -1849,7 +1927,6 @@ describe("search_events", () => {
         "search": {
           "dataset": "replays",
           "environment": "production",
-          "explanation": "Test query translation",
           "fields": [],
           "inputQuery": "production checkout replays with errors in the last day",
           "limit": 10,
@@ -1892,7 +1969,19 @@ describe("search_events", () => {
         data: [
           {
             id: "7e07485f12f9416b8b1426260799b51f",
-            count_errors: 2,
+            title: "7e07485f12f9416b8b1426260799b51f",
+            fields: expect.arrayContaining([
+              {
+                name: "summary",
+                label: "Summary",
+                value: "2 errors · 1 rage click · 3 dead clicks",
+              },
+              {
+                name: "user",
+                label: "User",
+                value: "Jane Doe",
+              },
+            ]),
           },
         ],
       },

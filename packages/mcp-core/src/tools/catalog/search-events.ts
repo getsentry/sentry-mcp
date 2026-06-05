@@ -30,6 +30,8 @@ import {
   TRACE_METRICS_SAMPLE_IDENTITY_FIELDS,
 } from "../support/search-events/config";
 import {
+  createRenderedErrorEventRows,
+  createRenderedEventRows,
   formatErrorResults,
   formatLogResults,
   formatProfileResults,
@@ -40,6 +42,7 @@ import {
 import {
   DEFAULT_REPLAY_SORT,
   DEFAULT_REPLAY_STATS_PERIOD,
+  createRenderedReplayRows,
   formatReplayResults,
   type FormatReplayResultsParams,
   isValidReplaySort,
@@ -52,6 +55,18 @@ import {
 const SEARCH_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
 const DEFAULT_EVENTS_SORT = "-timestamp";
 const SEARCH_EVENTS_STRUCTURED_CONTENT_VERSION = "sentry.mcp.search_events.v1";
+
+const renderedResultFieldSchema = z.object({
+  name: z.string(),
+  label: z.string(),
+  value: z.string(),
+});
+
+const renderedResultRowSchema = z.object({
+  id: z.string().nullable(),
+  title: z.string(),
+  fields: z.array(renderedResultFieldSchema),
+});
 
 const searchEventsStructuredOutputSchema = z.object({
   schemaVersion: z.literal(SEARCH_EVENTS_STRUCTURED_CONTENT_VERSION),
@@ -74,12 +89,12 @@ const searchEventsStructuredOutputSchema = z.object({
     environment: z.unknown().optional(),
     timeRange: z.unknown().nullable(),
     limit: z.number(),
-    explanation: z.string().nullable(),
+    explanation: z.string().nullable().optional(),
   }),
   results: z.object({
     kind: z.enum(["events", "replays"]),
     count: z.number(),
-    data: z.array(z.unknown()),
+    data: z.array(renderedResultRowSchema),
   }),
 });
 
@@ -342,12 +357,25 @@ function formatSearchEventsResult(
       sort: params.executedSearch?.sort ?? null,
       timeRange: params.executedSearch?.timeRange ?? null,
       limit: params.limit,
-      explanation: params.explanation ?? null,
+      ...(params.includeExplanation === true
+        ? { explanation: params.explanation ?? null }
+        : {}),
     },
     results: {
       kind: "events",
       count: params.eventData.length,
-      data: params.eventData,
+      data:
+        params.dataset === "errors"
+          ? createRenderedErrorEventRows({
+              eventData: params.eventData,
+              apiService: params.apiService,
+              organizationSlug: params.organizationSlug,
+            })
+          : createRenderedEventRows({
+              eventData: params.eventData,
+              priorityFields: params.fields,
+              titleFallback: `${params.dataset} result`,
+            }),
     },
   });
 }
@@ -380,12 +408,18 @@ function formatSearchEventsReplayResult(
       environment: params.environment ?? null,
       timeRange: params.timeRange ?? null,
       limit: params.limit,
-      explanation: params.explanation ?? null,
+      ...(params.includeExplanation === true
+        ? { explanation: params.explanation ?? null }
+        : {}),
     },
     results: {
       kind: "replays",
       count: params.replays.length,
-      data: params.replays,
+      data: createRenderedReplayRows({
+        replays: params.replays,
+        organizationSlug: params.organizationSlug,
+        apiService: params.apiService,
+      }),
     },
   });
 }
