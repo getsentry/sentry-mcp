@@ -255,19 +255,24 @@ See [api-patterns.md](api-patterns.md#mock-patterns) for validation examples.
 **⚠️ Each eval costs time and API credits. Only test core functionality!**
 
 ```typescript
-describeEval("your-tool", {
-  data: async () => [
-    {
-      input: `Primary use case in ${FIXTURES.organizationSlug}`,
-      expected: "Expected response"
-    },
-    // Maximum 2-3 scenarios!
-  ],
-  task: TaskRunner(),
-  scorers: [Factuality()],
-  threshold: 0.6,
-});
+import { describeToolPredictionEval, FIXTURES } from "./utils";
+
+describeToolPredictionEval("your-tool", [
+  {
+    input: `Primary use case in ${FIXTURES.organizationSlug}`,
+    expectedTools: [
+      {
+        name: "your_tool",
+        arguments: { organizationSlug: FIXTURES.organizationSlug },
+      },
+    ],
+  },
+  // Maximum 2-3 scenarios!
+]);
 ```
+
+Use `describeMcpToolCallEval` instead when the eval needs to execute the full
+MCP harness and validate actual tool calls, usage data, and traces.
 
 ## Testing Workflow
 
@@ -279,7 +284,7 @@ pnpm test tools.test
 pnpm inspector
 
 # 3. Run minimal evals
-pnpm eval your-tool
+pnpm --filter @sentry/mcp-server-evals eval your-tool
 ```
 
 ## Checklist

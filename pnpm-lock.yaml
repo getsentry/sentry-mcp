@@ -75,6 +75,9 @@ catalogs:
     '@vitejs/plugin-react':
       specifier: ^4.6.0
       version: 4.6.0
+    '@vitest-evals/harness-ai-sdk':
+      specifier: ^0.12.0
+      version: 0.12.0
     agents:
       specifier: ^0.3.10
       version: 0.3.10
@@ -166,8 +169,8 @@ catalogs:
       specifier: ^4.1.2
       version: 4.1.2
     vitest-evals:
-      specifier: ^0.4.0
-      version: 0.4.0
+      specifier: ^0.12.0
+      version: 0.12.0
     workers-mcp:
       specifier: 0.1.0-3
       version: 0.1.0-3
@@ -228,7 +231,7 @@ importers:
         version: 4.1.2(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@6.3.5(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3))
       vitest-evals:
         specifier: 'catalog:'
-        version: 0.4.0(tinyrainbow@3.1.0)(vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@6.3.5(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3)))
+        version: 0.12.0(ai@6.0.64(zod@3.25.76))(tinyrainbow@3.1.0)(vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@6.3.5(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3)))(zod@3.25.76)
     devDependencies:
       '@flue/cli':
         specifier: 'catalog:'
@@ -531,6 +534,9 @@ importers:
       '@sentry/mcp-server-tsconfig':
         specifier: workspace:*
         version: link:../mcp-server-tsconfig
+      '@vitest-evals/harness-ai-sdk':
+        specifier: 'catalog:'
+        version: 0.12.0(ai@6.0.64(zod@3.25.76))(vitest-evals@0.12.0(ai@6.0.64(zod@3.25.76))(tinyrainbow@3.1.0)(vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@24.0.10)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3)))(zod@3.25.76))
       ai:
         specifier: 'catalog:'
         version: 6.0.64(zod@3.25.76)
@@ -548,7 +554,7 @@ importers:
         version: 4.1.2(@opentelemetry/api@1.9.1)(@types/node@24.0.10)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3))
       vitest-evals:
         specifier: 'catalog:'
-        version: 0.4.0(tinyrainbow@3.1.0)(vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@24.0.10)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3)))
+        version: 0.12.0(ai@6.0.64(zod@3.25.76))(tinyrainbow@3.1.0)(vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@24.0.10)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3)))(zod@3.25.76)
       zod:
         specifier: 'catalog:'
         version: 3.25.76
@@ -2890,6 +2896,18 @@ packages:
     engines: {node: ^14.18.0 || >=16.0.0}
     peerDependencies:
       vite: ^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0-beta.0
+
+  '@vitest-evals/core@0.12.0':
+    resolution: {integrity: sha512-JOatlrVw4jcP9VCBAFcM07pGxUA2iLt4Ks5jaRYqyATjkNwPYnyNDL+YHgvelANfPA0BBX8MzRfs6vEkzJgC+A==}
+
+  '@vitest-evals/harness-ai-sdk@0.12.0':
+    resolution: {integrity: sha512-0yvM80vMqhCl+bc9j3tlDQfOc5H3rL3VNO2RUX8fRgDuWJ3iORW+WDENP+L4PO85GHvLgvUVGDhx+IJBfb26DA==}
+    peerDependencies:
+      ai: '>=4 <7'
+      vitest-evals: '*'
+
+  '@vitest-evals/report-ui@0.12.0':
+    resolution: {integrity: sha512-rjWKnB+WL1ekiIvHdcnEX0tfaCwfeG3BNU6jvGKuJsHqkf8JRtuTyy/xgUKKsb56CokcZ3K3hmeo6RKik/KBrQ==}
 
   '@vitest/expect@4.1.2':
     resolution: {integrity: sha512-gbu+7B0YgUJ2nkdsRJrFFW6X7NTP44WlhiclHniUhxADQJH5Szt9mZ9hWnJPJ8YwOK5zUOSSlSvyzRf0u1DSBQ==}
@@ -5657,11 +5675,19 @@ packages:
       yaml:
         optional: true
 
-  vitest-evals@0.4.0:
-    resolution: {integrity: sha512-tvKIc8sCtK7LZnSTFLh5C7BlDzSZhefKzCR68QNShVa7gkiepg7CZH8j3T6ZBWwIa5VgfmFkZ1Iv5NKzUpSfGQ==}
+  vitest-evals@0.12.0:
+    resolution: {integrity: sha512-pyVA4N8gM+T2JB+SGFNSuXcgf/CHbBygAXkXR1fEPEfleKyMacJXPF9gLWIyyC1x5BCrt0r4zkwzkdjZrdpwZQ==}
+    hasBin: true
     peerDependencies:
-      tinyrainbow: '*'
-      vitest: '*'
+      ai: '>=4 <7'
+      tinyrainbow: '>=2 <4'
+      vitest: '>=4 <5'
+      zod: '>=3 <5'
+    peerDependenciesMeta:
+      ai:
+        optional: true
+      zod:
+        optional: true
 
   vitest@4.1.2:
     resolution: {integrity: sha512-xjR1dMTVHlFLh98JE3i/f/WePqJsah4A0FK9cc8Ehp9Udk0AZk6ccpIZhh1qJ/yxVWRZ+Q54ocnD8TXmkhspGg==}
@@ -8324,6 +8350,19 @@ snapshots:
       vite: 6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3)
     transitivePeerDependencies:
       - supports-color
+
+  '@vitest-evals/core@0.12.0':
+    dependencies:
+      zod: 3.25.76
+
+  '@vitest-evals/harness-ai-sdk@0.12.0(ai@6.0.64(zod@3.25.76))(vitest-evals@0.12.0(ai@6.0.64(zod@3.25.76))(tinyrainbow@3.1.0)(vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@24.0.10)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3)))(zod@3.25.76))':
+    dependencies:
+      ai: 6.0.64(zod@3.25.76)
+      vitest-evals: 0.12.0(ai@6.0.64(zod@3.25.76))(tinyrainbow@3.1.0)(vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@24.0.10)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3)))(zod@3.25.76)
+
+  '@vitest-evals/report-ui@0.12.0':
+    dependencies:
+      '@vitest-evals/core': 0.12.0
 
   '@vitest/expect@4.1.2':
     dependencies:
@@ -11572,15 +11611,25 @@ snapshots:
       tsx: 4.20.3
       yaml: 2.8.3
 
-  vitest-evals@0.4.0(tinyrainbow@3.1.0)(vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@6.3.5(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3))):
+  vitest-evals@0.12.0(ai@6.0.64(zod@3.25.76))(tinyrainbow@3.1.0)(vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@6.3.5(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3)))(zod@3.25.76):
     dependencies:
+      '@vitest-evals/core': 0.12.0
+      '@vitest-evals/report-ui': 0.12.0
       tinyrainbow: 3.1.0
       vitest: 4.1.2(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@6.3.5(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3))
+    optionalDependencies:
+      ai: 6.0.64(zod@3.25.76)
+      zod: 3.25.76
 
-  vitest-evals@0.4.0(tinyrainbow@3.1.0)(vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@24.0.10)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3))):
+  vitest-evals@0.12.0(ai@6.0.64(zod@3.25.76))(tinyrainbow@3.1.0)(vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@24.0.10)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3)))(zod@3.25.76):
     dependencies:
+      '@vitest-evals/core': 0.12.0
+      '@vitest-evals/report-ui': 0.12.0
       tinyrainbow: 3.1.0
       vitest: 4.1.2(@opentelemetry/api@1.9.1)(@types/node@24.0.10)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3))
+    optionalDependencies:
+      ai: 6.0.64(zod@3.25.76)
+      zod: 3.25.76
 
   vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@6.3.5(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.3)):
     dependencies:

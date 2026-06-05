@@ -47,6 +47,7 @@
         "**/*.test.ts",
         "**/*.spec.ts",
         "vitest.config.ts",
+        "vitest.unit.config.ts",
         "package.json"
       ],
       "outputs": ["coverage/**", "*.junit.xml"],
@@ -61,7 +62,7 @@
     "eval": {
       "dependsOn": ["^build"],
       "outputs": [],
-      "cache": true
+      "cache": false
     },
     "build": {
       "dependsOn": ["^build"],
@@ -87,6 +88,7 @@
     "NODE_ENV",
     "CI",
     "OPENAI_API_KEY",
+    "VITEST_EVALS_REPORT_LEVEL",
     "COOKIE_SECRET",
     "SENTRY_CLIENT_ID",
     "SENTRY_CLIENT_SECRET",

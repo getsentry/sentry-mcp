@@ -7,6 +7,7 @@ import { createWhoamiTool } from "../../../internal/agents/tools/whoami";
 import { createDatasetAttributesTool } from "./utils";
 import { systemPrompt } from "./config";
 import { PUBLIC_EVENTS_DATASETS } from "../../../utils/events-datasets";
+import type { ToolCall } from "../../../internal/agents/callEmbeddedAgent";
 
 const SEARCH_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
 
@@ -91,7 +92,7 @@ export async function searchEventsAgent(
   options: SearchEventsAgentOptions,
 ): Promise<{
   result: z.output<typeof searchEventsAgentOutputSchema>;
-  toolCalls: any[];
+  toolCalls: ToolCall[];
 }> {
   // Provider check happens in callEmbeddedAgent via getAgentProvider()
   // Create tools pre-bound with the provided API service and organization

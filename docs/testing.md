@@ -253,22 +253,25 @@ expect(result.timestamp).toMatchInlineSnapshot(); // ❌
 ### Eval Test Structure
 
 ```typescript
-import { describeEval } from "vitest-evals";
-import { TaskRunner, Factuality } from "./utils";
+import { describeToolPredictionEval, FIXTURES } from "./utils";
 
-describeEval("tool-name", {
-  data: async () => [
-    {
-      input: "Natural language request",
-      expected: "Expected response content"
-    }
-  ],
-  task: TaskRunner(),      // Uses AI to call tools
-  scorers: [Factuality()], // Validates output
-  threshold: 0.6,
-  timeout: 30000
-});
+describeToolPredictionEval("tool-name", [
+  {
+    input: `Natural language request in ${FIXTURES.organizationSlug}`,
+    expectedTools: [
+      {
+        name: "your_tool",
+        arguments: { organizationSlug: FIXTURES.organizationSlug },
+      },
+    ],
+  },
+]);
 ```
+
+Use `describeToolPredictionEval` for fast tool-selection coverage. Use
+`describeMcpToolCallEval` when the eval must run the full MCP harness and
+capture actual tool calls, usage, and traces. Use `describeSearchAgentEval` for
+embedded search agents that return structured query output.
 
 ### Running Evals
 
@@ -277,8 +280,14 @@ describeEval("tool-name", {
 pnpm eval
 
 # Run specific eval
-pnpm eval tool-name
+pnpm --filter @sentry/mcp-server-evals eval tool-name
+
+# Serve the last JSON report locally
+pnpm eval:report
 ```
+
+Eval runs write `packages/mcp-server-evals/eval-results.json`; CI and the local
+report UI both read that JSON artifact.
 
 ## Test Data Management
 
