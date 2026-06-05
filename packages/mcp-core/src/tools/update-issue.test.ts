@@ -1137,20 +1137,20 @@ describe("update_issue", () => {
       ),
     );
 
-    const result = getErrorToolResult(
-      await updateIssue.handler(
-        {
-          organizationSlug: "sentry-mcp-evals",
-          issueId: "CLOUDFLARE-MCP-41",
-          status: "resolved",
-          externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
-          assignedTo: undefined,
-          issueUrl: undefined,
-          regionUrl: null,
-        },
-        serverContext,
-      ),
+    const raw = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "resolved",
+        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
     );
+    expect(raw).not.toHaveProperty("isError");
+    const result = getTextToolResult(raw);
 
     expect(result).toContain("Partially Updated");
     expect(result).toContain("The Sentry issue update succeeded.");
@@ -1170,21 +1170,21 @@ describe("update_issue", () => {
       ),
     );
 
-    const result = getErrorToolResult(
-      await updateIssue.handler(
-        {
-          organizationSlug: "sentry-mcp-evals",
-          issueId: "CLOUDFLARE-MCP-41",
-          status: "resolved",
-          externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
-          reason: "Fixing in linked ticket",
-          assignedTo: undefined,
-          issueUrl: undefined,
-          regionUrl: null,
-        },
-        serverContext,
-      ),
+    const raw = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "resolved",
+        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+        reason: "Fixing in linked ticket",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
     );
+    expect(raw).not.toHaveProperty("isError");
+    const result = getTextToolResult(raw);
 
     expect(result).toContain("Partially Updated");
     expect(result).toContain("The Sentry issue update succeeded.");
