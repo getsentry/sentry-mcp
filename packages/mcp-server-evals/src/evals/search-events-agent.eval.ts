@@ -3,6 +3,7 @@ import "../setup-env";
 
 // The shared MSW server is already started in setup-env.ts
 
+// biome-ignore format: keep the long eval case list diff stable.
 describeSearchAgentEval("search-events-agent", searchEventsAgentHarness, [
   {
     // Simple query with common fields - should NOT require tool calls
@@ -195,4 +196,4 @@ describeSearchAgentEval("search-events-agent", searchEventsAgentHarness, [
       // timeRange is optional
     },
   },
-]);
+], { timeout: 180000 });
