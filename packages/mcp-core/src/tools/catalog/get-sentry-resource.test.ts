@@ -595,6 +595,36 @@ describe("get_sentry_resource", () => {
       );
     });
 
+    it("dispatches explicit monitor resourceType under an active project constraint", async () => {
+      mswServer.use(
+        ...mockMonitorResource({
+          organizationSlug: "my-org",
+          monitorSlug: "my-monitor",
+          projectSlug: "backend",
+        }),
+      );
+
+      const result = await getSentryResource.handler(
+        {
+          resourceType: "monitor",
+          resourceId: "my-monitor",
+          organizationSlug: "my-org",
+        },
+        {
+          ...baseContext,
+          constraints: {
+            ...baseContext.constraints,
+            projectSlug: "backend",
+          },
+        },
+      );
+
+      expect(result).toContain("# Monitor my-monitor in **my-org**");
+      expect(result).toContain(
+        "[Open Monitor](https://my-org.sentry.io/crons/backend/my-monitor/)",
+      );
+    });
+
     it("dispatches release URL to get_release_details", async () => {
       mswServer.use(
         ...mockReleaseResource({

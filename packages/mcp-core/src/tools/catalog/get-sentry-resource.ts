@@ -179,6 +179,7 @@ export function resolveResourceParams(params: {
         type: "monitor",
         organizationSlug,
         monitorSlug: resourceId,
+        projectSlugOrId: params.projectSlug ?? undefined,
       };
 
     case "release":

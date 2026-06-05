@@ -733,6 +733,22 @@ describe("resolveResourceParams", () => {
       });
     });
 
+    it("preserves scoped project for explicit monitor resourceType", () => {
+      expect(
+        resolveResourceParams({
+          resourceType: "monitor",
+          organizationSlug: "my-org",
+          projectSlug: "backend",
+          resourceId: "daily-backup",
+        }),
+      ).toEqual<ResolvedResourceParams>({
+        type: "monitor",
+        organizationSlug: "my-org",
+        monitorSlug: "daily-backup",
+        projectSlugOrId: "backend",
+      });
+    });
+
     it("accepts release as an explicit resourceType", () => {
       expect(
         resolveResourceParams({
