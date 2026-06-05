@@ -13,6 +13,7 @@ import { z } from "zod";
 import {
   captureMcpToolCalls,
   createMcpToolCallRun,
+  prepareMcpToolCallStep,
 } from "./mcpToolCallHarness";
 
 function createToolOptions(toolCallId: string): ToolExecutionOptions {
@@ -124,6 +125,26 @@ describe("captureMcpToolCalls", () => {
         },
       },
     ]);
+  });
+});
+
+describe("prepareMcpToolCallStep", () => {
+  it("forces discovery before catalog execution", () => {
+    expect(prepareMcpToolCallStep(0)).toEqual({
+      toolChoice: {
+        type: "tool",
+        toolName: "search_tools",
+      },
+      activeTools: ["search_tools"],
+    });
+    expect(prepareMcpToolCallStep(1)).toEqual({
+      toolChoice: {
+        type: "tool",
+        toolName: "execute_tool",
+      },
+      activeTools: ["execute_tool"],
+    });
+    expect(prepareMcpToolCallStep(2)).toBeUndefined();
   });
 });
 

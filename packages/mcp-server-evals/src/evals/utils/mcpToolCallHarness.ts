@@ -4,6 +4,7 @@ import {
   generateText,
   stepCountIs,
   type LanguageModelUsage,
+  type PrepareStepResult,
   type ToolExecutionOptions,
   type ToolSet,
 } from "ai";
@@ -171,6 +172,28 @@ export function createMcpToolCallRun(
   };
 }
 
+function forcedToolStep(toolName: "search_tools" | "execute_tool") {
+  return {
+    toolChoice: {
+      type: "tool",
+      toolName,
+    },
+    activeTools: [toolName],
+  } satisfies PrepareStepResult<ToolSet>;
+}
+
+export function prepareMcpToolCallStep(
+  stepNumber: number,
+): PrepareStepResult<ToolSet> | undefined {
+  if (stepNumber === 0) {
+    return forcedToolStep("search_tools");
+  }
+
+  if (stepNumber === 1) {
+    return forcedToolStep("execute_tool");
+  }
+}
+
 export function createMcpToolCallHarness(
   maxSteps = 6,
 ): Harness<string, string, ToolCallEvalMetadata> {
@@ -200,6 +223,7 @@ export function createMcpToolCallHarness(
           prompt: input,
           stopWhen: stepCountIs(maxSteps),
           abortSignal: context.signal,
+          prepareStep: ({ stepNumber }) => prepareMcpToolCallStep(stepNumber),
           experimental_telemetry: {
             isEnabled: true,
             functionId: "catalog_tool_behavior_eval",
