@@ -574,7 +574,7 @@ async function tryPostReasonComment(
       organizationSlug: string;
       issueId: string;
       text: string;
-    }) => Promise<void>;
+    }) => Promise<unknown>;
   },
   organizationSlug: string,
   issueId: string,

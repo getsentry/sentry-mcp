@@ -71,6 +71,12 @@ import profileChunkFixture from "./fixtures/profile-chunk.json" with {
 import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
   type: "json",
 };
+import issueActivityFixture from "./fixtures/issue-activity.json" with {
+  type: "json",
+};
+import issueCommentsFixture from "./fixtures/issue-comments.json" with {
+  type: "json",
+};
 import issueFixture from "./fixtures/issue.json" with { type: "json" };
 import issueNullCulpritFixture from "./fixtures/issue-null-culprit.json" with {
   type: "json",
@@ -1031,6 +1037,16 @@ export const restHandlers = buildHandlers([
     },
   },
   {
+    method: "get",
+    path: "/api/0/organizations/:org/issues/:issueId/activities/",
+    fetch: () => HttpResponse.json(issueActivityFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/:org/issues/:issueId/notes/",
+    fetch: () => HttpResponse.json(issueCommentsFixture),
+  },
+  {
     method: "post",
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/:teamSlug/",
     fetch: async ({ request, params }) => {
@@ -1052,9 +1068,13 @@ export const restHandlers = buildHandlers([
       const body = (await request.json()) as { text: string };
       return HttpResponse.json({
         id: "12345",
-        text: body.text,
+        user: userFixture,
+        sentry_app: null,
         type: "note",
-        dateCreated: new Date().toISOString(),
+        data: {
+          text: body.text,
+        },
+        dateCreated: "2025-04-14T12:34:56.000Z",
       });
     },
   },

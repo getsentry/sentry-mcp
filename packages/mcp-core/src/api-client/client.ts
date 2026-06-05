@@ -33,6 +33,9 @@ import {
   ProjectSchema,
   RepositoryListSchema,
   ReleaseListSchema,
+  IssueActivityListResponseSchema,
+  IssueCommentListSchema,
+  IssueCommentSchema,
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
@@ -72,6 +75,9 @@ import type {
   EventAttachment,
   EventAttachmentList,
   Issue,
+  IssueActivityList,
+  IssueComment,
+  IssueCommentList,
   IssueList,
   IssueTagValues,
   ExternalIssueList,
@@ -2484,8 +2490,8 @@ export class SentryApiService {
       text: string;
     },
     opts?: RequestOptions,
-  ): Promise<void> {
-    await this.requestJSON(
+  ): Promise<IssueComment> {
+    const body = await this.requestJSON(
       `/organizations/${organizationSlug}/issues/${issueId}/notes/`,
       {
         method: "POST",
@@ -2493,6 +2499,51 @@ export class SentryApiService {
       },
       opts,
     );
+    return IssueCommentSchema.parse(body);
+  }
+
+  async getIssueActivity(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueActivityList> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/activities/`,
+      undefined,
+      opts,
+    );
+    return IssueActivityListResponseSchema.parse(body).activity;
+  }
+
+  async listIssueComments(
+    {
+      organizationSlug,
+      issueId,
+      limit,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueCommentList> {
+    const searchQuery = new URLSearchParams();
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const path = `/organizations/${organizationSlug}/issues/${issueId}/notes/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return IssueCommentListSchema.parse(body);
   }
 
   // TODO: Sentry is not yet exposing a reasonable API to fetch trace data

@@ -5,7 +5,7 @@
     "description": "Search for errors, analyze traces, and explore event details",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 17,
+    "toolCount": 18,
     "tools": [
       {
         "name": "find_organizations",
@@ -35,6 +35,11 @@
       {
         "name": "get_event_attachment",
         "description": "Download attachments from a Sentry event.\n\nUse this tool when you need to:\n- Download files attached to a specific event\n- Access screenshots, log files, or other attachments uploaded with an error report\n- Retrieve attachment metadata and download URLs\n\n<examples>\n### Download a specific attachment by ID\n\n```\nget_event_attachment(organizationSlug='my-organization', projectSlug='my-project', eventId='c49541c747cb4d8aa3efb70ca5aba243', attachmentId='12345')\n```\n\n### List all attachments for an event\n\n```\nget_event_attachment(organizationSlug='my-organization', projectSlug='my-project', eventId='c49541c747cb4d8aa3efb70ca5aba243')\n```\n\n</examples>\n\n<hints>\n- If `attachmentId` is provided, the specific attachment will be downloaded as an embedded resource\n- If `attachmentId` is omitted, all attachments for the event will be listed with download information\n- The `projectSlug` is required to identify which project the event belongs to\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "get_issue_activity",
+        "description": "Get the activity feed and comments for a Sentry issue.\n\nUse this tool when you need to:\n- Review prior comments before triaging an issue\n- Understand who resolved, ignored, assigned, or commented on an issue\n- See recent issue activity that is not included in `get_issue_details`\n\n<examples>\nget_issue_activity(organizationSlug='my-organization', issueId='PROJECT-123')\nget_issue_activity(issueUrl='https://my-organization.sentry.io/issues/PROJECT-123/')\n</examples>",
         "requiredScopes": ["event:read"]
       },
       {
@@ -190,8 +195,13 @@
     "description": "Resolve, assign, and update issues",
     "defaultEnabled": false,
     "order": 4,
-    "toolCount": 11,
+    "toolCount": 13,
     "tools": [
+      {
+        "name": "add_issue_note",
+        "description": "Add a human-visible comment to a Sentry issue's activity feed.\n\nUse this tool when the user explicitly asks to leave a note/comment, or when a triage workflow needs to record a user-approved explanation.\n\n<examples>\nadd_issue_note(organizationSlug='my-organization', issueId='PROJECT-123', text='Investigating with the payments team.')\nadd_issue_note(issueUrl='https://my-organization.sentry.io/issues/PROJECT-123/', text='Resolved by deploy 1.2.3.')\n</examples>\n\n<hints>\n- This mutates visible Sentry issue state by posting a comment.\n- Do not use this for private scratch notes, secrets, credentials, or unapproved content.\n</hints>",
+        "requiredScopes": ["event:write"]
+      },
       {
         "name": "find_organizations",
         "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
@@ -211,6 +221,11 @@
         "name": "get_ai_conversation_details",
         "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'.",
         "requiredScopes": ["event:read", "project:read"]
+      },
+      {
+        "name": "get_issue_activity",
+        "description": "Get the activity feed and comments for a Sentry issue.\n\nUse this tool when you need to:\n- Review prior comments before triaging an issue\n- Understand who resolved, ignored, assigned, or commented on an issue\n- See recent issue activity that is not included in `get_issue_details`\n\n<examples>\nget_issue_activity(organizationSlug='my-organization', issueId='PROJECT-123')\nget_issue_activity(issueUrl='https://my-organization.sentry.io/issues/PROJECT-123/')\n</examples>",
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "get_issue_details",
