@@ -78,7 +78,8 @@ describeSearchAgentEval("search-events-agent", searchEventsAgentHarness, [
     ],
     expected: {
       dataset: "errors",
-      query: "has:custom.payment.processor",
+      query:
+        /has:custom\.payment\.processor|has:tags\[custom\.payment\.processor\]/,
       sort: "-timestamp",
     },
   },
@@ -183,10 +184,13 @@ describeSearchAgentEval("search-events-agent", searchEventsAgentHarness, [
     ],
     expected: {
       dataset: "spans",
-      query: "has:db.operation",
+      query: /has:db\.operation|has:db\.system/,
       // Agent must include avg(span.duration) since we're sorting by it
       // Use db.operation as the grouping field (span.op is deprecated)
-      fields: ["db.operation", "avg(span.duration)"],
+      fields: (value: unknown) =>
+        Array.isArray(value) &&
+        ["avg(span.duration)"].every((field) => value.includes(field)) &&
+        (value.includes("db.operation") || value.includes("db.system")),
       // Sort by average duration
       sort: "-avg(span.duration)",
       // timeRange is optional

@@ -3,11 +3,8 @@ import { searchEventsAgent } from "@sentry/mcp-core/tools/search-events/agent";
 import { searchIssueEventsAgent } from "@sentry/mcp-core/tools/search-issue-events/agent";
 import { searchIssuesAgent } from "@sentry/mcp-core/tools/search-issues/agent";
 import { aiSdkHarness } from "@vitest-evals/harness-ai-sdk";
-import type {
-  JsonValue,
-  NormalizedSession,
-  ToolCallRecord,
-} from "vitest-evals";
+import type { JsonValue, ToolCallRecord } from "vitest-evals";
+import { withFallbackSession } from "./fallbackSession";
 import { FIXTURES } from "./fixtures";
 import { requireJsonValue, toJsonRecord } from "./json";
 import type { StructuredEvalMetadata } from "./types";
@@ -43,66 +40,6 @@ function toToolCallRecord(call: CapturedToolCall): ToolCallRecord {
   };
 }
 
-function createFallbackSession(
-  input: string,
-  result: EmbeddedSearchAgentResult,
-): NormalizedSession {
-  const toolCalls = result.toolCalls.map(toToolCallRecord);
-
-  return {
-    messages: [
-      {
-        role: "user",
-        content: input,
-      },
-      {
-        role: "assistant",
-        content: requireJsonValue(result.result, "agent output"),
-        ...(toolCalls.length > 0 ? { toolCalls } : {}),
-      },
-    ],
-  };
-}
-
-function hasHarnessStepModel(step: unknown) {
-  if (!step || typeof step !== "object" || !("model" in step)) {
-    return false;
-  }
-
-  const { model } = step;
-  if (!model || typeof model !== "object") {
-    return false;
-  }
-
-  return (
-    "provider" in model &&
-    typeof model.provider === "string" &&
-    "modelId" in model &&
-    typeof model.modelId === "string"
-  );
-}
-
-function withFallbackSession(input: string, result: EmbeddedSearchAgentResult) {
-  const session = createFallbackSession(input, result);
-
-  if (
-    Array.isArray(result.steps) &&
-    result.steps.length > 0 &&
-    result.steps.every(hasHarnessStepModel)
-  ) {
-    return {
-      ...result,
-      session,
-    };
-  }
-
-  return {
-    ...result,
-    steps: undefined,
-    session,
-  };
-}
-
 export function createEmbeddedSearchAgentHarness(
   name: string,
   agent: EmbeddedSearchAgent,
@@ -127,7 +64,12 @@ export function createEmbeddedSearchAgentHarness(
         apiService,
       });
 
-      return withFallbackSession(input, result);
+      return withFallbackSession(
+        input,
+        result,
+        requireJsonValue(result.result, "agent output"),
+        result.toolCalls.map(toToolCallRecord),
+      );
     },
     output: ({ result }) => requireJsonValue(result.result, "agent output"),
   });

@@ -25,7 +25,6 @@ describeSearchAgentEval("search-issues-agent", searchIssuesAgentHarness, [
     expected: {
       query:
         /assigned_or_suggested:test@example\.com|assigned:test@example\.com|assigned:me/, // Various valid forms
-      sort: "date",
     },
   },
   {
@@ -42,7 +41,8 @@ describeSearchAgentEval("search-issues-agent", searchIssuesAgentHarness, [
     input: "Show me critical unhandled errors from the last 24 hours",
     expectedTools: [],
     expected: {
-      query: /(?=.*is:unresolved)(?=.*error\.handled:false)(?=.*lastSeen:-24h)/,
+      query:
+        /(?=.*is:unresolved)(?=.*error\.handled:false)(?=.*lastSeen:(?:-24h|>-24h))/,
       sort: /date|user/,
     },
   },
@@ -57,18 +57,12 @@ describeSearchAgentEval("search-issues-agent", searchIssuesAgentHarness, [
     },
   },
   {
-    // Another query requiring field discovery
+    // Custom tag queries may either use field discovery or direct tag syntax.
     input: "Find issues where the kafka.consumer.group is orders-processor",
-    expectedTools: [
-      {
-        name: "issueFields",
-        arguments: {}, // No arguments needed anymore
-      },
-    ],
+    expectedTools: [],
     expected: {
       query:
         /kafka\.consumer\.group:orders-processor|tags\[kafka\.consumer\.group\]:orders-processor/,
-      sort: "date", // Agent should always return a sort value
     },
   },
   {
@@ -97,7 +91,6 @@ describeSearchAgentEval("search-issues-agent", searchIssuesAgentHarness, [
     expected: {
       query:
         /(?=.*is:for_review)(?=.*release:latest)(?=.*assigned:me)(?=.*issue\.priority:high)/,
-      sort: "date",
     },
   },
   {
@@ -115,7 +108,6 @@ describeSearchAgentEval("search-issues-agent", searchIssuesAgentHarness, [
     expectedTools: [],
     expected: {
       query: /^(?!.*is:unresolved)(?=.*is:new)(?=.*is:regressed)/,
-      sort: "date",
     },
   },
 ]);

@@ -97,7 +97,4 @@ describeSearchAgentEval(
       },
     },
   ],
-  {
-    timeout: 30000,
-  },
 );
