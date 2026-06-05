@@ -6,6 +6,7 @@ import { UserInputError } from "../../errors";
 import type { Commit, Deploy, ReleaseDetails } from "../../api-client/types";
 import type { ServerContext } from "../../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+import { validateSlugOrId, isNumericId } from "../../utils/slug-validation";
 import {
   compactLines,
   formatActor,
@@ -83,31 +84,35 @@ export default defineTool({
     "",
     "Use this tool when you need to:",
     "- Inspect an exact release version",
+    "- Scope a release lookup to a specific project",
     "- See deploys and environments for a release",
     "- See recent commits attached to a release",
-    "- Gather release health metadata when a project ID is known",
+    "- Gather release health metadata when a project is known",
     "",
     "<examples>",
     "get_release_details(organizationSlug='my-organization', releaseVersion='1.2.3')",
-    "get_release_details(organizationSlug='my-organization', releaseVersion='1.2.3', includeHealth=true, projectId='450123')",
+    "get_release_details(organizationSlug='my-organization', releaseVersion='1.2.3', projectSlugOrId='backend')",
+    "get_release_details(organizationSlug='my-organization', releaseVersion='1.2.3', includeHealth=true, projectSlugOrId='backend')",
     "</examples>",
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
     regionUrl: ParamRegionUrl.nullable().default(null),
     releaseVersion: z.string().trim().min(1).describe("Exact release version."),
-    projectId: z
+    projectSlugOrId: z
       .string()
+      .toLowerCase()
       .trim()
+      .superRefine(validateSlugOrId)
       .describe(
-        "Optional numeric project ID for project-specific release health metadata.",
+        "Optional project slug or numeric ID. Use this to scope release details, deploys, and commits to one project; required for health metadata unless the session is already project-constrained.",
       )
       .nullable()
       .default(null),
     includeHealth: z
       .boolean()
       .describe(
-        "Include release health metadata. For organization-level calls, also provide projectId; project-constrained sessions use the active project.",
+        "Include project-specific release health metadata. Requires projectSlugOrId unless the session is already project-constrained.",
       )
       .default(false),
     includeDeploys: z
@@ -138,27 +143,44 @@ export default defineTool({
     setTag("organization.slug", organizationSlug);
     setTag("release.version", params.releaseVersion);
     const scopedProjectSlug = context.constraints.projectSlug ?? undefined;
-    let projectId = params.projectId ?? undefined;
+    const requestedProjectSlugOrId = params.projectSlugOrId ?? undefined;
+    const projectSlugOrId = scopedProjectSlug ?? requestedProjectSlugOrId;
 
-    if (scopedProjectSlug && params.projectId) {
+    if (projectSlugOrId) {
+      if (isNumericId(projectSlugOrId)) {
+        setTag("project.id", projectSlugOrId);
+      } else {
+        setTag("project.slug", projectSlugOrId);
+      }
+    }
+
+    if (
+      scopedProjectSlug &&
+      requestedProjectSlugOrId &&
+      requestedProjectSlugOrId !== scopedProjectSlug
+    ) {
       const scopedProject = await apiService.getProject({
         organizationSlug,
         projectSlugOrId: scopedProjectSlug,
       });
       const scopedProjectId = String(scopedProject.id);
-      if (params.projectId !== scopedProjectId) {
+      if (requestedProjectSlugOrId !== scopedProjectId) {
         throw new UserInputError(
-          `Release health project is outside the active project constraint. Expected project "${scopedProjectSlug}".`,
+          `Release project is outside the active project constraint. Expected project "${scopedProjectSlug}".`,
         );
       }
-      projectId = scopedProjectId;
+    }
+
+    if (params.includeHealth && !projectSlugOrId) {
+      throw new UserInputError(
+        "Release health metadata requires a project. Provide `projectSlugOrId` or use a project-constrained session.",
+      );
     }
 
     const release = await apiService.getReleaseDetails({
       organizationSlug,
       releaseVersion: params.releaseVersion,
-      projectSlug: scopedProjectSlug,
-      projectId: scopedProjectSlug ? undefined : projectId,
+      projectSlugOrId,
       includeHealth: params.includeHealth,
     });
     if (release.projects && release.projects.length > 0) {
@@ -174,7 +196,7 @@ export default defineTool({
         ? apiService.listReleaseDeploys({
             organizationSlug,
             releaseVersion: params.releaseVersion,
-            projectSlug: scopedProjectSlug,
+            projectSlugOrId,
             limit: params.limit,
           })
         : Promise.resolve([]),
@@ -182,7 +204,7 @@ export default defineTool({
         ? apiService.listReleaseCommits({
             organizationSlug,
             releaseVersion: params.releaseVersion,
-            projectSlug: scopedProjectSlug,
+            projectSlugOrId,
             limit: params.limit,
           })
         : Promise.resolve([]),

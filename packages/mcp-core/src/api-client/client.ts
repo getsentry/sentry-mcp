@@ -15,6 +15,7 @@ import {
   isSentryHost,
   type TraceMetricIdentifier,
 } from "../utils/url-utils";
+import { isNumericId } from "../utils/slug-validation";
 import {
   isMetricsDataset,
   isProfilesDataset,
@@ -1667,29 +1668,24 @@ export class SentryApiService {
     {
       organizationSlug,
       releaseVersion,
-      projectSlug,
-      projectId,
+      projectSlugOrId,
       includeHealth,
     }: {
       organizationSlug: string;
       releaseVersion: string;
-      projectSlug?: string;
-      projectId?: string;
+      projectSlugOrId?: string;
       includeHealth?: boolean;
     },
     opts?: RequestOptions,
   ): Promise<ReleaseDetails> {
     const searchQuery = new URLSearchParams();
-    if (projectId) {
-      searchQuery.set("project", projectId);
-    }
     if (includeHealth) {
       searchQuery.set("health", "1");
     }
 
     const encodedVersion = encodeURIComponent(releaseVersion);
-    const path = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/releases/${encodedVersion}/`
+    const path = projectSlugOrId
+      ? `/projects/${organizationSlug}/${projectSlugOrId}/releases/${encodedVersion}/`
       : `/organizations/${organizationSlug}/releases/${encodedVersion}/`;
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
@@ -1703,19 +1699,22 @@ export class SentryApiService {
     {
       organizationSlug,
       releaseVersion,
-      projectSlug,
+      projectSlugOrId,
       limit,
     }: {
       organizationSlug: string;
       releaseVersion: string;
-      projectSlug?: string;
+      projectSlugOrId?: string;
       limit?: number;
     },
     opts?: RequestOptions,
   ): Promise<DeployList> {
     const searchQuery = new URLSearchParams();
-    if (projectSlug) {
-      searchQuery.set("projectSlug", projectSlug);
+    if (projectSlugOrId) {
+      searchQuery.set(
+        isNumericId(projectSlugOrId) ? "project" : "projectSlug",
+        projectSlugOrId,
+      );
     }
     if (limit !== undefined) {
       searchQuery.set("per_page", String(limit));
@@ -1735,12 +1734,12 @@ export class SentryApiService {
     {
       organizationSlug,
       releaseVersion,
-      projectSlug,
+      projectSlugOrId,
       limit,
     }: {
       organizationSlug: string;
       releaseVersion: string;
-      projectSlug?: string;
+      projectSlugOrId?: string;
       limit?: number;
     },
     opts?: RequestOptions,
@@ -1751,8 +1750,8 @@ export class SentryApiService {
     }
 
     const encodedVersion = encodeURIComponent(releaseVersion);
-    const path = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/releases/${encodedVersion}/commits/`
+    const path = projectSlugOrId
+      ? `/projects/${organizationSlug}/${projectSlugOrId}/releases/${encodedVersion}/commits/`
       : `/organizations/${organizationSlug}/releases/${encodedVersion}/commits/`;
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,

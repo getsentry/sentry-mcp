@@ -18,7 +18,7 @@ describe("get_release_details", () => {
         organizationSlug: "sentry-mcp-evals",
         regionUrl: null,
         releaseVersion: "8ce89484-0fec-4913-a2cd-e8e2d41dee36",
-        projectId: null,
+        projectSlugOrId: null,
         includeHealth: false,
         includeDeploys: true,
         includeCommits: true,
@@ -78,7 +78,7 @@ describe("get_release_details", () => {
           organizationSlug: "sentry-mcp-evals",
           regionUrl: null,
           releaseVersion,
-          projectId: null,
+          projectSlugOrId: null,
           includeHealth: false,
           includeDeploys: true,
           includeCommits: true,
@@ -111,7 +111,7 @@ describe("get_release_details", () => {
         organizationSlug: "sentry-mcp-evals",
         regionUrl: null,
         releaseVersion,
-        projectId: null,
+        projectSlugOrId: null,
         includeHealth: false,
         includeDeploys: false,
         includeCommits: false,
@@ -138,7 +138,7 @@ describe("get_release_details", () => {
           organizationSlug: "sentry-mcp-evals",
           regionUrl: null,
           releaseVersion: "8ce89484-0fec-4913-a2cd-e8e2d41dee36",
-          projectId: "123",
+          projectSlugOrId: "123",
           includeHealth: true,
           includeDeploys: false,
           includeCommits: false,
@@ -153,7 +153,95 @@ describe("get_release_details", () => {
         },
       ),
     ).rejects.toThrow(
-      'Release health project is outside the active project constraint. Expected project "cloudflare-mcp".',
+      'Release project is outside the active project constraint. Expected project "cloudflare-mcp".',
+    );
+  });
+
+  it("requires a project when release health is requested", async () => {
+    await expect(
+      getReleaseDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          regionUrl: null,
+          releaseVersion: "8ce89484-0fec-4913-a2cd-e8e2d41dee36",
+          projectSlugOrId: null,
+          includeHealth: true,
+          includeDeploys: false,
+          includeCommits: false,
+          limit: 10,
+        },
+        context,
+      ),
+    ).rejects.toThrow(
+      "Release health metadata requires a project. Provide `projectSlugOrId` or use a project-constrained session.",
+    );
+  });
+
+  it("uses projectSlugOrId as the project scope", async () => {
+    const requests: Array<{
+      kind: "details" | "deploys" | "commits";
+      url: string;
+    }> = [];
+    const releaseVersion = "8ce89484-0fec-4913-a2cd-e8e2d41dee36";
+    mswServer.use(
+      http.get(
+        `https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/${releaseVersion}/`,
+        ({ request }) => {
+          requests.push({ kind: "details", url: request.url });
+          return HttpResponse.json(releaseFixture);
+        },
+      ),
+      http.get(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/releases/${releaseVersion}/deploys/`,
+        ({ request }) => {
+          requests.push({ kind: "deploys", url: request.url });
+          return HttpResponse.json([]);
+        },
+      ),
+      http.get(
+        `https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/${releaseVersion}/commits/`,
+        ({ request }) => {
+          requests.push({ kind: "commits", url: request.url });
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    await getReleaseDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        releaseVersion,
+        projectSlugOrId: "cloudflare-mcp",
+        includeHealth: false,
+        includeDeploys: true,
+        includeCommits: true,
+        limit: 10,
+      },
+      context,
+    );
+
+    expect(requests).toHaveLength(3);
+    const detailsRequest = requests.find(
+      (request) => request.kind === "details",
+    );
+    const deploysRequest = requests.find(
+      (request) => request.kind === "deploys",
+    );
+    const commitsRequest = requests.find(
+      (request) => request.kind === "commits",
+    );
+    expect(detailsRequest).toBeDefined();
+    expect(deploysRequest).toBeDefined();
+    expect(commitsRequest).toBeDefined();
+    expect(new URL(detailsRequest!.url).pathname).toBe(
+      `/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/${releaseVersion}/`,
+    );
+    expect(new URL(deploysRequest!.url).searchParams.get("projectSlug")).toBe(
+      "cloudflare-mcp",
+    );
+    expect(new URL(commitsRequest!.url).pathname).toBe(
+      `/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/${releaseVersion}/commits/`,
     );
   });
 
@@ -182,7 +270,7 @@ describe("get_release_details", () => {
         organizationSlug: "sentry-mcp-evals",
         regionUrl: null,
         releaseVersion,
-        projectId: null,
+        projectSlugOrId: null,
         includeHealth: false,
         includeDeploys: true,
         includeCommits: true,

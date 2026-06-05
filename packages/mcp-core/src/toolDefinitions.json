@@ -889,7 +889,7 @@
   },
   {
     "name": "get_release_details",
-    "description": "Get details for a Sentry release.\n\nUse this tool when you need to:\n- Inspect an exact release version\n- See deploys and environments for a release\n- See recent commits attached to a release\n- Gather release health metadata when a project ID is known\n\n<examples>\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3')\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3', includeHealth=true, projectId='450123')\n</examples>",
+    "description": "Get details for a Sentry release.\n\nUse this tool when you need to:\n- Inspect an exact release version\n- Scope a release lookup to a specific project\n- See deploys and environments for a release\n- See recent commits attached to a release\n- Gather release health metadata when a project is known\n\n<examples>\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3')\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3', projectSlugOrId='backend')\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3', includeHealth=true, projectSlugOrId='backend')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -915,22 +915,22 @@
           "minLength": 1,
           "description": "Exact release version."
         },
-        "projectId": {
+        "projectSlugOrId": {
           "anyOf": [
             {
               "type": "string",
-              "description": "Optional numeric project ID for project-specific release health metadata."
+              "description": "Optional project slug or numeric ID. Use this to scope release details, deploys, and commits to one project; required for health metadata unless the session is already project-constrained."
             },
             {
               "type": "null"
             }
           ],
-          "description": "Optional numeric project ID for project-specific release health metadata.",
+          "description": "Optional project slug or numeric ID. Use this to scope release details, deploys, and commits to one project; required for health metadata unless the session is already project-constrained.",
           "default": null
         },
         "includeHealth": {
           "type": "boolean",
-          "description": "Include release health metadata. For organization-level calls, also provide projectId; project-constrained sessions use the active project.",
+          "description": "Include project-specific release health metadata. Requires projectSlugOrId unless the session is already project-constrained.",
           "default": false
         },
         "includeDeploys": {
