@@ -1,3 +1,5 @@
+import { mswServer } from "@sentry/mcp-server-mocks";
+import { http, HttpResponse } from "msw";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { SentryApiService } from "./client";
 import { ConfigurationError } from "../errors";
@@ -563,27 +565,24 @@ describe("request headers", () => {
 });
 
 describe("monitor time parameters", () => {
-  let originalFetch: typeof globalThis.fetch;
-
-  beforeEach(() => {
-    originalFetch = globalThis.fetch;
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-  });
-
   it("defaults blank monitor statsPeriod values to 24h", async () => {
-    const requestUrls: string[] = [];
-    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
-      requestUrls.push(url);
-      return Promise.resolve(
-        new Response(JSON.stringify([]), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-    });
+    const requestUrls: URL[] = [];
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/monitors/nightly-import/checkins/",
+        ({ request }) => {
+          requestUrls.push(new URL(request.url));
+          return HttpResponse.json([]);
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/monitors/nightly-import/stats/",
+        ({ request }) => {
+          requestUrls.push(new URL(request.url));
+          return HttpResponse.json([]);
+        },
+      ),
+    );
 
     const apiService = new SentryApiService({
       host: "sentry.io",
@@ -602,13 +601,13 @@ describe("monitor time parameters", () => {
       statsPeriod: "   ",
     });
 
-    const checkInsUrl = new URL(requestUrls[0]);
+    expect(requestUrls).toHaveLength(2);
+    const [checkInsUrl, statsUrl] = requestUrls as [URL, URL];
     expect(checkInsUrl.pathname).toBe(
       "/api/0/organizations/my-org/monitors/nightly-import/checkins/",
     );
     expect(checkInsUrl.searchParams.get("statsPeriod")).toBe("24h");
 
-    const statsUrl = new URL(requestUrls[1]);
     expect(statsUrl.pathname).toBe(
       "/api/0/organizations/my-org/monitors/nightly-import/stats/",
     );
