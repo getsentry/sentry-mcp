@@ -196,6 +196,9 @@ export default defineTool({
     }
     const start = params.start ?? undefined;
     const end = params.end ?? undefined;
+    if ((start && !end) || (!start && end)) {
+      throw new UserInputError("`start` and `end` must be provided together.");
+    }
     const hasAbsoluteTimeRange = start !== undefined || end !== undefined;
     const requestedStatsPeriod = params.statsPeriod?.trim() || undefined;
     const statsPeriod = hasAbsoluteTimeRange

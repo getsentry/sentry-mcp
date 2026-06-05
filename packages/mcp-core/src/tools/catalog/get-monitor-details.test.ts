@@ -257,6 +257,27 @@ describe("get_monitor_details", () => {
     expect(params.get("statsPeriod")).toBeNull();
   });
 
+  it("rejects absolute monitor time ranges missing an end", async () => {
+    await expect(
+      getMonitorDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          regionUrl: null,
+          projectSlugOrId: null,
+          monitorSlug: "nightly-import",
+          environment: null,
+          statsPeriod: null,
+          start: "2025-04-14T02:00:00.000Z",
+          end: null,
+          checkInLimit: 10,
+          includeStats: true,
+          rollupSeconds: null,
+        },
+        context,
+      ),
+    ).rejects.toThrow("`start` and `end` must be provided together.");
+  });
+
   it("defaults blank statsPeriod to a 24h monitor window", async () => {
     let checkInsRequestUrl: string | null = null;
     let statsRequestUrl: string | null = null;
