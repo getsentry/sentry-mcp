@@ -1,14 +1,14 @@
-import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "../../internal/tool-helpers/define";
-import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { z } from "zod";
 import type { Detector, Workflow } from "../../api-client/types";
-import type { ServerContext } from "../../types";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { defineTool } from "../../internal/tool-helpers/define";
 import {
   ParamOrganizationSlug,
   ParamProjectSlugOrAll,
   ParamRegionUrl,
 } from "../../schema";
+import type { ServerContext } from "../../types";
 import {
   compactLines,
   formatActor,
@@ -73,7 +73,7 @@ export default defineTool({
     "- List alert workflows in an organization",
     "- Search alerts by name or action",
     "- Find alert IDs before calling `get_alert_details`",
-    "- Inspect connected monitors/detectors at a high level",
+    "- Inspect matching detectors at a high level",
     "",
     "<examples>",
     "find_alerts(organizationSlug='my-organization')",
@@ -147,7 +147,7 @@ export default defineTool({
     }
 
     if (params.includeDetectors) {
-      output.push("", "## Connected Monitors And Detectors", "");
+      output.push("", "## Matching Detectors", "");
       output.push(
         detectors.length === 0
           ? "No detectors found."
@@ -160,7 +160,10 @@ export default defineTool({
       "- Use `get_alert_details` with an alert ID for full workflow details.",
     );
     output.push(
-      "- Detector IDs can be used to find workflows connected to a monitor.",
+      "- Matching detectors are listed from a separate detector search using the same filters; use `get_alert_details` to confirm exact workflow connections.",
+    );
+    output.push(
+      "- A detector ID can filter alert workflows connected to that detector.",
     );
 
     return `${output.join("\n")}\n`;

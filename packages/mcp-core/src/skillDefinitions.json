@@ -9,7 +9,7 @@
     "tools": [
       {
         "name": "find_alerts",
-        "description": "Find Sentry alerts.\n\nUse this tool when you need to:\n- List alert workflows in an organization\n- Search alerts by name or action\n- Find alert IDs before calling `get_alert_details`\n- Inspect connected monitors/detectors at a high level\n\n<examples>\nfind_alerts(organizationSlug='my-organization')\nfind_alerts(organizationSlug='my-organization', query='slack')\nfind_alerts(organizationSlug='my-organization', projectSlug='backend', includeDetectors=true)\n</examples>",
+        "description": "Find Sentry alerts.\n\nUse this tool when you need to:\n- List alert workflows in an organization\n- Search alerts by name or action\n- Find alert IDs before calling `get_alert_details`\n- Inspect matching detectors at a high level\n\n<examples>\nfind_alerts(organizationSlug='my-organization')\nfind_alerts(organizationSlug='my-organization', query='slack')\nfind_alerts(organizationSlug='my-organization', projectSlug='backend', includeDetectors=true)\n</examples>",
         "requiredScopes": ["org:read"]
       },
       {

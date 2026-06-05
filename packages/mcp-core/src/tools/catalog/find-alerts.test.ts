@@ -40,7 +40,7 @@ describe("find_alerts", () => {
       **Created**: 2025-04-10T10:00:00.000Z
       **Updated**: 2025-04-14T10:00:00.000Z
 
-      ## Connected Monitors And Detectors
+      ## Matching Detectors
 
       - Unhandled Errors (2001)
         - Type: error
@@ -51,7 +51,8 @@ describe("find_alerts", () => {
       ## Response Notes
 
       - Use \`get_alert_details\` with an alert ID for full workflow details.
-      - Detector IDs can be used to find workflows connected to a monitor.
+      - Matching detectors are listed from a separate detector search using the same filters; use \`get_alert_details\` to confirm exact workflow connections.
+      - A detector ID can filter alert workflows connected to that detector.
       "
     `);
   });
