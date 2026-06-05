@@ -13,9 +13,25 @@ import type { ServerContext } from "./types";
 
 // Mock the Sentry core module
 vi.mock("@sentry/core", () => ({
+  captureException: vi.fn(() => "event-id"),
+  captureMessage: vi.fn(() => "message-id"),
+  logger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn(),
+  },
   setTag: vi.fn(),
   setUser: vi.fn(),
   getActiveSpan: vi.fn(),
+  withScope: vi.fn((callback) =>
+    callback({
+      addAttachment: vi.fn(),
+      setContext: vi.fn(),
+    }),
+  ),
   wrapMcpServerWithSentry: vi.fn((server) => server),
 }));
 
@@ -713,7 +729,7 @@ describe("buildServer", () => {
       );
     });
 
-    it("does not recommend unavailable catalog tools in generated runtime guidance", async () => {
+    it("dispatches supported release URLs through get_sentry_resource", async () => {
       const server = buildServer({
         context: {
           ...baseContext,
@@ -723,17 +739,15 @@ describe("buildServer", () => {
       });
 
       const result = await callRegisteredTool(server, "get_sentry_resource", {
-        url: "https://my-org.sentry.io/releases/v1.2.3/",
+        url: "https://sentry-mcp-evals.sentry.io/releases/8ce89484-0fec-4913-a2cd-e8e2d41dee36/",
       });
       const text = getTextContent(result);
 
       expect(text).toContain(
-        "- **Find releases**: Release listing is not available in this session",
+        "# Release 8ce89484-0fec-4913-a2cd-e8e2d41dee36 in **sentry-mcp-evals**",
       );
-      expect(text).not.toContain("find_releases(");
-      expect(text).not.toContain(
-        "search `search_tools(query='find_releases')`",
-      );
+      expect(text).toContain("## Deploys");
+      expect(text).toContain("## Commits");
     });
 
     it("keeps long-tail tools catalog-only in experimental mode", async () => {

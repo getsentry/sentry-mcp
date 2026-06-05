@@ -1,6 +1,6 @@
 import { getActiveSpan, setTag } from "@sentry/core";
 import { z } from "zod";
-import { ApiNotFoundError, type SentryApiService } from "../../api-client";
+import { ApiNotFoundError } from "../../api-client";
 import { UserInputError } from "../../errors";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { fetchAndFormatBreadcrumbs } from "../../internal/tool-helpers/breadcrumbs";
@@ -24,8 +24,10 @@ import {
 } from "../support/snapshots/handlers";
 import getAIConversationDetails from "./get-ai-conversation-details";
 import getIssueDetails from "./get-issue-details";
+import getMonitorDetails from "./get-monitor-details";
 import getProfileDetails from "./get-profile-details";
 import getReplayDetails from "./get-replay-details";
+import getReleaseDetails from "./get-release-details";
 import getTraceDetails from "./get-trace-details";
 
 /** Types with full API integration. */
@@ -37,19 +39,15 @@ export const FULLY_SUPPORTED_TYPES = [
   "ai_conversation",
   "breadcrumbs",
   "replay",
+  "monitor",
+  "release",
   "snapshot",
   "snapshotImage",
 ] as const;
 export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
 
-/** Recognized from URLs but not yet fully supported -- return guidance messages. */
-export type RecognizedType = "monitor" | "release";
-
 /** All resource types. */
-export type ResolvedResourceType =
-  | FullySupportedType
-  | RecognizedType
-  | "profile";
+export type ResolvedResourceType = FullySupportedType | "profile";
 
 export interface ResolvedResourceParams {
   type: ResolvedResourceType;
@@ -173,6 +171,20 @@ export function resolveResourceParams(params: {
         type: "replay",
         organizationSlug,
         replayId: resourceId,
+      };
+
+    case "monitor":
+      return {
+        type: "monitor",
+        organizationSlug,
+        monitorSlug: resourceId,
+      };
+
+    case "release":
+      return {
+        type: "release",
+        organizationSlug,
+        releaseVersion: resourceId,
       };
 
     case "snapshot":
@@ -429,81 +441,10 @@ function parseSpanResourceId(resourceId: string): {
   };
 }
 
-function generateUnsupportedResourceMessage(
-  resolved: ResolvedResourceParams,
-  apiService: SentryApiService,
-  experimentalMode: boolean,
-  availableToolNames?: ReadonlySet<string>,
-  directToolNames?: ReadonlySet<string>,
-): string {
-  const { type, organizationSlug } = resolved;
-
-  switch (type) {
-    case "monitor": {
-      // Include projectSlugOrId in URL when present
-      const monitorPath = resolved.projectSlugOrId
-        ? `${resolved.projectSlugOrId}/${resolved.monitorSlug}`
-        : (resolved.monitorSlug ?? "");
-      const monitorUrl = apiService.getMonitorUrl(
-        organizationSlug,
-        monitorPath,
-      );
-      return [
-        "# Cron Monitor Detected",
-        "",
-        `**Organization**: ${organizationSlug}`,
-        `**Monitor**: ${resolved.monitorSlug}`,
-        resolved.projectSlugOrId
-          ? `**Project**: ${resolved.projectSlugOrId}`
-          : "",
-        "",
-        "Cron monitor support is coming soon. In the meantime:",
-        "",
-        `- **View in Sentry**: [Open Monitor](${monitorUrl})`,
-        `- **Search issues**: Use \`search_issues\` with query \`monitor.slug:${resolved.monitorSlug}\` to find issues from this monitor`,
-      ]
-        .filter(Boolean)
-        .join("\n");
-    }
-
-    case "release": {
-      const releaseUrl = apiService.getReleaseUrl(
-        organizationSlug,
-        resolved.releaseVersion ?? "",
-      );
-      const findReleasesInstruction = formatToolCallInstruction({
-        toolName: "find_releases",
-        arguments: { organizationSlug },
-        experimentalMode,
-        availableToolNames,
-        directToolNames,
-        fallbackInstruction: "Release listing is not available in this session",
-        purpose: "to list releases and their details",
-      });
-      return [
-        "# Release Detected",
-        "",
-        `**Organization**: ${organizationSlug}`,
-        `**Release**: ${resolved.releaseVersion}`,
-        "",
-        "To get release information:",
-        "",
-        `- **View in Sentry**: [Open Release](${releaseUrl})`,
-        `- **Find releases**: ${findReleasesInstruction}`,
-        `- **Search issues**: Use \`search_issues\` with query \`release:${resolved.releaseVersion}\` to find issues in this release`,
-      ].join("\n");
-    }
-
-    default:
-      // This should never happen due to TypeScript exhaustiveness
-      return `Unsupported resource type: ${type}`;
-  }
-}
-
 export default defineTool({
   name: "get_sentry_resource",
   skills: ["inspect", "triage", "seer", "preprod"],
-  requiredScopes: ["event:read", "project:read"],
+  requiredScopes: ["event:read", "project:read", "project:releases"],
 
   description: ({ experimentalMode, availableToolNames, directToolNames }) => {
     const fullResolutionInstruction = formatToolCallInstruction({
@@ -523,10 +464,10 @@ export default defineTool({
     });
 
     return [
-      "Fetch a Sentry resource by URL, or by resourceType plus resourceId.",
-      "Pass a Sentry URL directly when possible; the resource type is auto-detected.",
+      "Fetch a Sentry resource by URL or by resourceType plus resourceId.",
+      "Pass a Sentry URL directly when possible; type is auto-detected.",
       "",
-      "Supports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.",
+      "Supports issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, releases, snapshots, and snapshot images.",
       "Trace lookups return a condensed overview by default.",
       "",
       "AI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID to fetch all spans for that conversation. To discover or list conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'. Conversations are NOT issues — do not use search_issues for conversation queries.",
@@ -537,6 +478,8 @@ export default defineTool({
       "",
       "Resource IDs:",
       "- span: <traceId>:<spanId>",
+      "- monitor: <monitorSlug>",
+      "- release: <releaseVersion>",
       "- snapshot: <snapshotId>",
       "- snapshotImage: <snapshotId>:<image_file_name>",
       "",
@@ -569,6 +512,8 @@ export default defineTool({
         "ai_conversation",
         "breadcrumbs",
         "replay",
+        "monitor",
+        "release",
         "snapshot",
         "snapshotImage",
       ])
@@ -607,20 +552,6 @@ export default defineTool({
     }
 
     getActiveSpan()?.setAttribute("app.resource.type", resolved.type);
-
-    // Recognized but not yet fully supported types return guidance messages
-    if (resolved.type === "monitor" || resolved.type === "release") {
-      const apiService = apiServiceFromContext(context, {
-        regionUrl: context.constraints.regionUrl ?? undefined,
-      });
-      return generateUnsupportedResourceMessage(
-        resolved,
-        apiService,
-        context.experimentalMode ?? false,
-        context.availableToolNames,
-        context.directToolNames,
-      );
-    }
 
     switch (resolved.type) {
       case "issue":
@@ -710,6 +641,39 @@ export default defineTool({
             organizationSlug: resolved.organizationSlug,
             replayId: resolved.replayId,
             regionUrl: context.constraints.regionUrl ?? undefined,
+          },
+          context,
+        );
+
+      case "monitor":
+        return getMonitorDetails.handler(
+          {
+            organizationSlug: resolved.organizationSlug,
+            projectSlug: resolved.projectSlugOrId ?? null,
+            monitorSlug: resolved.monitorSlug!,
+            regionUrl: context.constraints.regionUrl ?? null,
+            environment: null,
+            statsPeriod: "24h",
+            start: null,
+            end: null,
+            checkInLimit: 10,
+            includeStats: true,
+            rollupSeconds: null,
+          },
+          context,
+        );
+
+      case "release":
+        return getReleaseDetails.handler(
+          {
+            organizationSlug: resolved.organizationSlug,
+            releaseVersion: resolved.releaseVersion!,
+            regionUrl: context.constraints.regionUrl ?? null,
+            projectId: null,
+            includeHealth: false,
+            includeDeploys: true,
+            includeCommits: true,
+            limit: 10,
           },
           context,
         );

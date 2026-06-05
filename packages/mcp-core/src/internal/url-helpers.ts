@@ -197,6 +197,14 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function decodePathSegment(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function extractPathGroup(
   pathParts: string[],
   patterns: RegExp[],
@@ -331,7 +339,7 @@ function identifyResource(
       return {
         type: "release",
         organizationSlug,
-        releaseVersion,
+        releaseVersion: decodePathSegment(releaseVersion),
       };
     }
   }

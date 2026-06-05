@@ -705,14 +705,32 @@ describe("resolveResourceParams", () => {
       });
     });
 
-    it("throws for unsupported explicit resourceType (monitor)", () => {
-      expect(() =>
+    it("accepts monitor as an explicit resourceType", () => {
+      expect(
         resolveResourceParams({
           resourceType: "monitor",
           organizationSlug: "my-org",
-          resourceId: "something",
+          resourceId: "daily-backup",
         }),
-      ).toThrow("Invalid resourceType: monitor");
+      ).toEqual<ResolvedResourceParams>({
+        type: "monitor",
+        organizationSlug: "my-org",
+        monitorSlug: "daily-backup",
+      });
+    });
+
+    it("accepts release as an explicit resourceType", () => {
+      expect(
+        resolveResourceParams({
+          resourceType: "release",
+          organizationSlug: "my-org",
+          resourceId: "backend@2024.01.15-abc123",
+        }),
+      ).toEqual<ResolvedResourceParams>({
+        type: "release",
+        organizationSlug: "my-org",
+        releaseVersion: "backend@2024.01.15-abc123",
+      });
     });
 
     it("throws when span resourceId is malformed", () => {

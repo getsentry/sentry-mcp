@@ -31,8 +31,22 @@ import {
   ProjectListSchema,
   ProjectRepoLinkSchema,
   ProjectSchema,
+  CommitListSchema,
+  DeployListSchema,
+  DetectorListSchema,
+  DetectorSchema,
   RepositoryListSchema,
+  IssueActivityListResponseSchema,
+  IssueCommentListSchema,
+  IssueCommentSchema,
+  MonitorCheckInListSchema,
+  MonitorListSchema,
+  MonitorSchema,
+  MonitorStatsSchema,
+  ReleaseDetailsSchema,
   ReleaseListSchema,
+  WorkflowListSchema,
+  WorkflowSchema,
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
@@ -75,9 +89,21 @@ import type {
   IssueList,
   IssueTagValues,
   ExternalIssueList,
+  CommitList,
+  DeployList,
+  Detector,
+  DetectorList,
+  IssueActivityList,
+  IssueComment,
+  IssueCommentList,
+  Monitor,
+  MonitorCheckInList,
+  MonitorList,
+  MonitorStats,
   OrganizationList,
   Project,
   ProjectList,
+  ReleaseDetails,
   ReleaseList,
   TagList,
   Team,
@@ -85,6 +111,8 @@ import type {
   Trace,
   TraceMeta,
   User,
+  Workflow,
+  WorkflowList,
   Flamegraph,
   ProfileChunk,
   TransactionProfile,
@@ -389,6 +417,81 @@ export class SentryApiService {
     } else if (start && end) {
       queryParams.set("start", start);
       queryParams.set("end", end);
+    }
+  }
+
+  private applyStatsMixinTimeParams(
+    queryParams: URLSearchParams,
+    statsPeriod?: string,
+    start?: string,
+    end?: string,
+    resolutionSeconds?: number,
+  ): void {
+    if (statsPeriod && (start || end)) {
+      throw new ApiValidationError(
+        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
+      );
+    }
+    if ((start && !end) || (!start && end)) {
+      throw new ApiValidationError(
+        "Both start and end parameters must be provided together for absolute time ranges.",
+      );
+    }
+
+    let since: number;
+    let until: number;
+
+    if (start && end) {
+      const startMs = Date.parse(start);
+      const endMs = Date.parse(end);
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+        throw new ApiValidationError(
+          "start and end parameters must be valid ISO 8601 date strings.",
+        );
+      }
+      since = Math.floor(startMs / 1000);
+      until = Math.floor(endMs / 1000);
+    } else {
+      const period = statsPeriod ?? "24h";
+      const match = /^(\d+)([smhdw])$/.exec(period);
+      if (!match) {
+        throw new ApiValidationError(
+          "statsPeriod must use a supported relative time format, such as `24h`, `7d`, or `2w`.",
+        );
+      }
+      const amount = Number(match[1]);
+      const unit = match[2];
+      let unitSeconds: number;
+      switch (unit) {
+        case "s":
+          unitSeconds = 1;
+          break;
+        case "m":
+          unitSeconds = 60;
+          break;
+        case "h":
+          unitSeconds = 60 * 60;
+          break;
+        case "d":
+          unitSeconds = 24 * 60 * 60;
+          break;
+        default:
+          unitSeconds = 7 * 24 * 60 * 60;
+      }
+      until = Math.floor(Date.now() / 1000);
+      since = until - amount * unitSeconds;
+    }
+
+    if (since > until) {
+      throw new ApiValidationError(
+        "start must be before or equal to end for absolute time ranges.",
+      );
+    }
+
+    queryParams.set("since", String(since));
+    queryParams.set("until", String(until));
+    if (resolutionSeconds !== undefined) {
+      queryParams.set("resolution", `${resolutionSeconds}s`);
     }
   }
 
@@ -1651,6 +1754,391 @@ export class SentryApiService {
     return ReleaseListSchema.parse(body);
   }
 
+  async getReleaseDetails(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectId,
+      includeHealth,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectId?: string;
+      includeHealth?: boolean;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReleaseDetails> {
+    const searchQuery = new URLSearchParams();
+    if (projectId) {
+      searchQuery.set("project", projectId);
+    }
+    if (includeHealth) {
+      searchQuery.set("health", "1");
+    }
+
+    const encodedVersion = encodeURIComponent(releaseVersion);
+    const path = `/organizations/${organizationSlug}/releases/${encodedVersion}/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return ReleaseDetailsSchema.parse(body);
+  }
+
+  async listReleaseDeploys(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlug,
+      limit,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlug?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<DeployList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlug) {
+      searchQuery.set("projectSlug", projectSlug);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const encodedVersion = encodeURIComponent(releaseVersion);
+    const path = `/organizations/${organizationSlug}/releases/${encodedVersion}/deploys/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return DeployListSchema.parse(body);
+  }
+
+  async listReleaseCommits(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlug,
+      limit,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlug?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<CommitList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlug) {
+      searchQuery.set("projectSlug", projectSlug);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const encodedVersion = encodeURIComponent(releaseVersion);
+    const path = `/organizations/${organizationSlug}/releases/${encodedVersion}/commits/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return CommitListSchema.parse(body);
+  }
+
+  async listMonitors(
+    {
+      organizationSlug,
+      projectSlug,
+      environment,
+      owner,
+      query,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      environment?: string;
+      owner?: string;
+      query?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MonitorList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlug) {
+      searchQuery.append("projectSlug", projectSlug);
+    }
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    if (owner) {
+      searchQuery.append("owner", owner);
+    }
+    if (query) {
+      searchQuery.set("query", query);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const body = await this.requestJSON(
+      searchQuery.toString()
+        ? `/organizations/${organizationSlug}/monitors/?${searchQuery.toString()}`
+        : `/organizations/${organizationSlug}/monitors/`,
+      undefined,
+      opts,
+    );
+    return MonitorListSchema.parse(body);
+  }
+
+  async getMonitorDetails(
+    {
+      organizationSlug,
+      projectSlug,
+      monitorSlug,
+      environment,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      monitorSlug: string;
+      environment?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Monitor> {
+    const searchQuery = new URLSearchParams();
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+
+    const encodedMonitor = encodeURIComponent(monitorSlug);
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/monitors/${encodedMonitor}/`
+      : `/organizations/${organizationSlug}/monitors/${encodedMonitor}/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return MonitorSchema.parse(body);
+  }
+
+  async listMonitorCheckIns(
+    {
+      organizationSlug,
+      projectSlug,
+      monitorSlug,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      monitorSlug: string;
+      environment?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MonitorCheckInList> {
+    const searchQuery = new URLSearchParams();
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+    const effectiveStatsPeriod =
+      start || end ? undefined : (statsPeriod ?? "24h");
+    this.applyTimeParams(searchQuery, effectiveStatsPeriod, start, end);
+
+    const encodedMonitor = encodeURIComponent(monitorSlug);
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/monitors/${encodedMonitor}/checkins/`
+      : `/organizations/${organizationSlug}/monitors/${encodedMonitor}/checkins/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return MonitorCheckInListSchema.parse(body);
+  }
+
+  async getMonitorStats(
+    {
+      organizationSlug,
+      projectSlug,
+      monitorSlug,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      rollup,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      monitorSlug: string;
+      environment?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      rollup?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MonitorStats> {
+    const searchQuery = new URLSearchParams();
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    const effectiveStatsPeriod =
+      start || end ? undefined : (statsPeriod ?? "24h");
+    this.applyStatsMixinTimeParams(
+      searchQuery,
+      effectiveStatsPeriod,
+      start,
+      end,
+      rollup,
+    );
+
+    const encodedMonitor = encodeURIComponent(monitorSlug);
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/monitors/${encodedMonitor}/stats/`
+      : `/organizations/${organizationSlug}/monitors/${encodedMonitor}/stats/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return MonitorStatsSchema.parse(body);
+  }
+
+  async listWorkflows(
+    {
+      organizationSlug,
+      projectSlug,
+      query,
+      detectorId,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string;
+      detectorId?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<WorkflowList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlug) {
+      searchQuery.append("projectSlug", projectSlug);
+    }
+    if (query) {
+      searchQuery.set("query", query);
+    }
+    if (detectorId) {
+      searchQuery.append("detector", detectorId);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const body = await this.requestJSON(
+      searchQuery.toString()
+        ? `/organizations/${organizationSlug}/workflows/?${searchQuery.toString()}`
+        : `/organizations/${organizationSlug}/workflows/`,
+      undefined,
+      opts,
+    );
+    return WorkflowListSchema.parse(body);
+  }
+
+  async getWorkflow(
+    {
+      organizationSlug,
+      workflowId,
+    }: {
+      organizationSlug: string;
+      workflowId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Workflow> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/workflows/${encodeURIComponent(workflowId)}/`,
+      undefined,
+      opts,
+    );
+    return WorkflowSchema.parse(body);
+  }
+
+  async listDetectors(
+    {
+      organizationSlug,
+      projectSlug,
+      query,
+      workflowId,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string;
+      workflowId?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<DetectorList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlug) {
+      searchQuery.append("projectSlug", projectSlug);
+    }
+    const queryParts: string[] = [];
+    if (query) {
+      queryParts.push(query);
+    }
+    if (workflowId) {
+      queryParts.push(`workflow:${workflowId}`);
+    }
+    if (queryParts.length > 0) {
+      searchQuery.set("query", queryParts.join(" "));
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const body = await this.requestJSON(
+      searchQuery.toString()
+        ? `/organizations/${organizationSlug}/detectors/?${searchQuery.toString()}`
+        : `/organizations/${organizationSlug}/detectors/`,
+      undefined,
+      opts,
+    );
+    return DetectorListSchema.parse(body);
+  }
+
+  async getDetector(
+    {
+      organizationSlug,
+      detectorId,
+    }: {
+      organizationSlug: string;
+      detectorId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Detector> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/detectors/${encodeURIComponent(detectorId)}/`,
+      undefined,
+      opts,
+    );
+    return DetectorSchema.parse(body);
+  }
+
   /**
    * Lists available tags for search queries.
    *
@@ -2484,8 +2972,8 @@ export class SentryApiService {
       text: string;
     },
     opts?: RequestOptions,
-  ): Promise<void> {
-    await this.requestJSON(
+  ): Promise<IssueComment> {
+    const body = await this.requestJSON(
       `/organizations/${organizationSlug}/issues/${issueId}/notes/`,
       {
         method: "POST",
@@ -2493,6 +2981,51 @@ export class SentryApiService {
       },
       opts,
     );
+    return IssueCommentSchema.parse(body);
+  }
+
+  async getIssueActivity(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueActivityList> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/activities/`,
+      undefined,
+      opts,
+    );
+    return IssueActivityListResponseSchema.parse(body).activity;
+  }
+
+  async listIssueComments(
+    {
+      organizationSlug,
+      issueId,
+      limit,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueCommentList> {
+    const searchQuery = new URLSearchParams();
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const path = `/organizations/${organizationSlug}/issues/${issueId}/notes/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return IssueCommentListSchema.parse(body);
   }
 
   // TODO: Sentry is not yet exposing a reasonable API to fetch trace data

@@ -1,0 +1,28 @@
+{
+  "activity": [
+    {
+      "id": "4633815464",
+      "user": null,
+      "sentry_app": null,
+      "type": "auto_set_ongoing",
+      "data": {
+        "after_days": 7
+      },
+      "dateCreated": "2025-04-10T22:55:22.411Z"
+    },
+    {
+      "id": "4633816000",
+      "user": {
+        "id": "12345",
+        "name": "Jane Developer",
+        "email": "jane@example.com"
+      },
+      "sentry_app": null,
+      "type": "note",
+      "data": {
+        "text": "Investigating after the latest deploy."
+      },
+      "dateCreated": "2025-04-14T12:00:00.000Z"
+    }
+  ]
+}

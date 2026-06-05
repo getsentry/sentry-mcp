@@ -3,8 +3,8 @@ import {
   issueNullCulpritFixture,
   profileChunkFixture,
   tagsFixture,
-  transactionProfileV1MissingFunctionFixture,
   transactionProfileV1Fixture,
+  transactionProfileV1MissingFunctionFixture,
 } from "@sentry/mcp-server-mocks";
 import { describe, expect, it } from "vitest";
 import {
@@ -23,6 +23,7 @@ import {
   TagSchema,
   TransactionProfileSampleSchema,
   TransactionProfileSchema,
+  WorkflowSchema,
 } from "./schema";
 
 describe("IssueSchema", () => {
@@ -591,6 +592,31 @@ describe("ReleaseSchema", () => {
     expect(release.lastCommit?.author).toEqual({});
     expect(release.lastDeploy?.environment).toBeNull();
     expect(release.projects[0]?.slug).toBeNull();
+  });
+});
+
+describe("WorkflowSchema", () => {
+  it("should parse upstream workflow serializer fields", () => {
+    const workflow = WorkflowSchema.parse({
+      id: "42",
+      name: "High priority errors",
+      organizationId: "1",
+      createdBy: "123",
+      dateCreated: "2026-05-20T12:00:00.000Z",
+      dateUpdated: "2026-05-21T12:00:00.000Z",
+      triggers: null,
+      actionFilters: [],
+      environment: null,
+      config: {},
+      detectorIds: ["77"],
+      enabled: true,
+      lastTriggered: null,
+      owner: "team:ops",
+    });
+
+    expect(workflow.createdBy).toBe("123");
+    expect(workflow.triggers).toBeNull();
+    expect(workflow.owner).toBe("team:ops");
   });
 });
 

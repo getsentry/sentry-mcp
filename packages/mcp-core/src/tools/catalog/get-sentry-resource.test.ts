@@ -48,6 +48,8 @@ function callHandler(params: {
     | "span"
     | "breadcrumbs"
     | "replay"
+    | "monitor"
+    | "release"
     | "snapshot"
     | "snapshotImage";
   resourceId?: string;
@@ -56,7 +58,80 @@ function callHandler(params: {
   return getSentryResource.handler(params, baseContext);
 }
 
+function mockMonitorResource({
+  apiBaseUrl = "https://sentry.io",
+  organizationSlug,
+  monitorSlug,
+  projectSlug = "backend",
+}: {
+  apiBaseUrl?: string;
+  organizationSlug: string;
+  monitorSlug: string;
+  projectSlug?: string;
+}) {
+  const organizationMonitorPath = `${apiBaseUrl}/api/0/organizations/${organizationSlug}/monitors/${monitorSlug}/`;
+  const projectMonitorPath = `${apiBaseUrl}/api/0/projects/${organizationSlug}/${projectSlug}/monitors/${monitorSlug}/`;
+  const buildMonitor = (slug: string) => ({
+    id: "123",
+    slug: monitorSlug,
+    name: monitorSlug,
+    status: "ok",
+    project: {
+      id: "456",
+      slug,
+      name: slug,
+    },
+    config: {
+      schedule: ["crontab", "0 0 * * *"],
+    },
+  });
+  return [
+    http.get(organizationMonitorPath, () =>
+      HttpResponse.json(buildMonitor("backend")),
+    ),
+    http.get(`${organizationMonitorPath}checkins/`, () =>
+      HttpResponse.json([]),
+    ),
+    http.get(`${organizationMonitorPath}stats/`, () => HttpResponse.json([])),
+    http.get(projectMonitorPath, () =>
+      HttpResponse.json(buildMonitor(projectSlug)),
+    ),
+    http.get(`${projectMonitorPath}checkins/`, () => HttpResponse.json([])),
+    http.get(`${projectMonitorPath}stats/`, () => HttpResponse.json([])),
+  ];
+}
+
+function mockReleaseResource({
+  apiBaseUrl = "https://sentry.io",
+  organizationSlug,
+  releaseVersion,
+}: {
+  apiBaseUrl?: string;
+  organizationSlug: string;
+  releaseVersion: string;
+}) {
+  const encodedVersion = encodeURIComponent(releaseVersion);
+  const releasePath = `${apiBaseUrl}/api/0/organizations/${organizationSlug}/releases/${encodedVersion}/`;
+  return [
+    http.get(releasePath, () =>
+      HttpResponse.json({
+        id: "789",
+        version: releaseVersion,
+        shortVersion: releaseVersion,
+        dateCreated: "2025-04-13T19:54:21.764000Z",
+        projects: [],
+      }),
+    ),
+    http.get(`${releasePath}deploys/`, () => HttpResponse.json([])),
+    http.get(`${releasePath}commits/`, () => HttpResponse.json([])),
+  ];
+}
+
 describe("get_sentry_resource", () => {
+  it("advertises the release scope used by release URL dispatch", () => {
+    expect(getSentryResource.requiredScopes).toContain("project:releases");
+  });
+
   beforeEach(() => {
     Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
     Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
@@ -435,8 +510,8 @@ describe("get_sentry_resource", () => {
     });
   });
 
-  // ─── URL mode: recognized-only types (guidance messages) ──────────────────
-  describe("URL mode — recognized types (guidance messages)", () => {
+  // ─── URL mode: resource URLs with dedicated tool dispatch ─────────────────
+  describe("URL mode — monitor, release, and replay resources", () => {
     it("delegates replay URL to get_replay_details", async () => {
       const result = await callHandler({
         url: `https://sentry-mcp-evals.sentry.io/replays/${replayDetailsFixture.id}/`,
@@ -447,72 +522,103 @@ describe("get_sentry_resource", () => {
       expect(result).toContain("Clicked submit order");
     });
 
-    it("returns guidance for monitor URL (simple slug)", async () => {
+    it("dispatches monitor URL with a simple slug to get_monitor_details", async () => {
+      mswServer.use(
+        ...mockMonitorResource({
+          organizationSlug: "my-org",
+          monitorSlug: "daily-backup",
+        }),
+      );
+
       const result = await callHandler({
         url: "https://my-org.sentry.io/crons/daily-backup/",
       });
-      expect(result).toMatchInlineSnapshot(`
-        "# Cron Monitor Detected
-        **Organization**: my-org
-        **Monitor**: daily-backup
-        Cron monitor support is coming soon. In the meantime:
-        - **View in Sentry**: [Open Monitor](https://my-org.sentry.io/crons/daily-backup/)
-        - **Search issues**: Use \`search_issues\` with query \`monitor.slug:daily-backup\` to find issues from this monitor"
-      `);
+      expect(result).toContain("# Monitor daily-backup in **my-org**");
+      expect(result).toContain(
+        "[Open Monitor](https://my-org.sentry.io/crons/backend/daily-backup/)",
+      );
     });
 
-    it("returns guidance for monitor URL with project/slug path", async () => {
+    it("dispatches monitor URL with project/slug path to get_monitor_details", async () => {
+      mswServer.use(
+        ...mockMonitorResource({
+          organizationSlug: "my-org",
+          monitorSlug: "my-monitor",
+          projectSlug: "my-project",
+        }),
+      );
+
       const result = await callHandler({
         url: "https://my-org.sentry.io/crons/my-project/my-monitor/",
       });
-      expect(result).toMatchInlineSnapshot(`
-        "# Cron Monitor Detected
-        **Organization**: my-org
-        **Monitor**: my-monitor
-        **Project**: my-project
-        Cron monitor support is coming soon. In the meantime:
-        - **View in Sentry**: [Open Monitor](https://my-org.sentry.io/crons/my-project/my-monitor/)
-        - **Search issues**: Use \`search_issues\` with query \`monitor.slug:my-monitor\` to find issues from this monitor"
-      `);
+      expect(result).toContain("# Monitor my-monitor in **my-org**");
+      expect(result).toContain(
+        "[Open Monitor](https://my-org.sentry.io/crons/my-project/my-monitor/)",
+      );
     });
 
-    it("returns guidance for release URL", async () => {
+    it("dispatches release URL to get_release_details", async () => {
+      mswServer.use(
+        ...mockReleaseResource({
+          organizationSlug: "my-org",
+          releaseVersion: "v1.2.3",
+        }),
+      );
+
       const result = await callHandler({
         url: "https://my-org.sentry.io/releases/v1.2.3/",
       });
-      expect(result).toMatchInlineSnapshot(`
-        "# Release Detected
-
-        **Organization**: my-org
-        **Release**: v1.2.3
-
-        To get release information:
-
-        - **View in Sentry**: [Open Release](https://my-org.sentry.io/releases/v1.2.3/)
-        - **Find releases**: Use the Sentry tool \`find_releases(organizationSlug='my-org')\` to list releases and their details
-        - **Search issues**: Use \`search_issues\` with query \`release:v1.2.3\` to find issues in this release"
-      `);
+      expect(result).toContain("# Release v1.2.3 in **my-org**");
+      expect(result).toContain(
+        "[Open Release](https://my-org.sentry.io/releases/v1.2.3/)",
+      );
     });
 
-    it("returns guidance for release URL with complex version", async () => {
+    it("dispatches release URL with complex version to get_release_details", async () => {
+      mswServer.use(
+        ...mockReleaseResource({
+          organizationSlug: "my-org",
+          releaseVersion: "backend@2024.01.15-abc123",
+        }),
+      );
+
       const result = await callHandler({
         url: "https://my-org.sentry.io/releases/backend@2024.01.15-abc123/",
       });
-      expect(result).toMatchInlineSnapshot(`
-        "# Release Detected
+      expect(result).toContain(
+        "# Release backend@2024.01.15-abc123 in **my-org**",
+      );
+      expect(result).toContain(
+        "[Open Release](https://my-org.sentry.io/releases/backend%402024.01.15-abc123/)",
+      );
+    });
 
-        **Organization**: my-org
-        **Release**: backend@2024.01.15-abc123
+    it("dispatches encoded release URLs without double-encoding the version", async () => {
+      mswServer.use(
+        ...mockReleaseResource({
+          organizationSlug: "my-org",
+          releaseVersion: "backend/v1.2.3",
+        }),
+      );
 
-        To get release information:
-
-        - **View in Sentry**: [Open Release](https://my-org.sentry.io/releases/backend@2024.01.15-abc123/)
-        - **Find releases**: Use the Sentry tool \`find_releases(organizationSlug='my-org')\` to list releases and their details
-        - **Search issues**: Use \`search_issues\` with query \`release:backend@2024.01.15-abc123\` to find issues in this release"
-      `);
+      const result = await callHandler({
+        url: "https://my-org.sentry.io/releases/backend%2Fv1.2.3/",
+      });
+      expect(result).toContain("# Release backend/v1.2.3 in **my-org**");
+      expect(result).toContain(
+        "[Open Release](https://my-org.sentry.io/releases/backend%2Fv1.2.3/)",
+      );
     });
 
     it("uses configured host and protocol for self-hosted monitor URL", async () => {
+      mswServer.use(
+        ...mockMonitorResource({
+          apiBaseUrl: "http://sentry.internal:9000",
+          organizationSlug: "my-org",
+          monitorSlug: "daily-backup",
+        }),
+      );
+
       const result = await getSentryResource.handler(
         {
           resourceType: undefined,
@@ -527,11 +633,19 @@ describe("get_sentry_resource", () => {
         },
       );
       expect(result).toContain(
-        "[Open Monitor](http://sentry.internal:9000/organizations/my-org/crons/daily-backup/)",
+        "[Open Monitor](http://sentry.internal:9000/organizations/my-org/crons/backend/daily-backup/)",
       );
     });
 
     it("uses configured host and protocol for self-hosted release URL", async () => {
+      mswServer.use(
+        ...mockReleaseResource({
+          apiBaseUrl: "http://sentry.internal:9000",
+          organizationSlug: "my-org",
+          releaseVersion: "v1.2.3",
+        }),
+      );
+
       const result = await getSentryResource.handler(
         {
           resourceType: undefined,
@@ -638,7 +752,7 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
-    });
+    }, 10000);
 
     it("rejects unsupported override (issue on trace URL)", async () => {
       await expect(

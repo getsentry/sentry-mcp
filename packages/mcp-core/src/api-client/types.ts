@@ -47,7 +47,13 @@ import type {
   AutofixRunStateSchema,
   ClientKeyListSchema,
   ClientKeySchema,
+  CommitListSchema,
+  CommitSchema,
   DefaultEventSchema,
+  DeployListSchema,
+  DeploySchema,
+  DetectorListSchema,
+  DetectorSchema,
   ErrorEventSchema,
   EventAttachmentListSchema,
   EventAttachmentSchema,
@@ -61,8 +67,18 @@ import type {
   FlamegraphSchema,
   GenericEventSchema,
   IssueListSchema,
+  IssueActivityListResponseSchema,
+  IssueActivitySchema,
+  IssueCommentListSchema,
+  IssueCommentSchema,
   IssueSchema,
   IssueTagValuesSchema,
+  MonitorCheckInListSchema,
+  MonitorCheckInSchema,
+  MonitorListSchema,
+  MonitorSchema,
+  MonitorStatsSchema,
+  MonitorStatSchema,
   OrganizationListSchema,
   OrganizationSchema,
   ProfileChunkResponseSchema,
@@ -71,6 +87,7 @@ import type {
   ProfileFrameSchema,
   ProjectListSchema,
   ProjectSchema,
+  ReleaseDetailsSchema,
   ReleaseListSchema,
   ReleaseSchema,
   ReplayDetailsSchema,
@@ -89,6 +106,8 @@ import type {
   TransactionProfileSchema,
   UnknownEventSchema,
   UserSchema,
+  WorkflowListSchema,
+  WorkflowSchema,
 } from "./schema";
 
 export type User = z.infer<typeof UserSchema>;
@@ -97,6 +116,16 @@ export type Team = z.infer<typeof TeamSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
 export type ClientKey = z.infer<typeof ClientKeySchema>;
 export type Release = z.infer<typeof ReleaseSchema>;
+export type ReleaseDetails = z.infer<typeof ReleaseDetailsSchema>;
+export type Deploy = z.infer<typeof DeploySchema>;
+export type Commit = z.infer<typeof CommitSchema>;
+export type Monitor = z.infer<typeof MonitorSchema>;
+export type MonitorCheckIn = z.infer<typeof MonitorCheckInSchema>;
+export type MonitorStat = z.infer<typeof MonitorStatSchema>;
+export type Workflow = z.infer<typeof WorkflowSchema>;
+export type Detector = z.infer<typeof DetectorSchema>;
+export type IssueActivity = z.infer<typeof IssueActivitySchema>;
+export type IssueComment = z.infer<typeof IssueCommentSchema>;
 export type Issue = z.infer<typeof IssueSchema>;
 
 // Individual event types
@@ -130,6 +159,17 @@ export type OrganizationList = z.infer<typeof OrganizationListSchema>;
 export type TeamList = z.infer<typeof TeamListSchema>;
 export type ProjectList = z.infer<typeof ProjectListSchema>;
 export type ReleaseList = z.infer<typeof ReleaseListSchema>;
+export type DeployList = z.infer<typeof DeployListSchema>;
+export type CommitList = z.infer<typeof CommitListSchema>;
+export type MonitorList = z.infer<typeof MonitorListSchema>;
+export type MonitorCheckInList = z.infer<typeof MonitorCheckInListSchema>;
+export type MonitorStats = z.infer<typeof MonitorStatsSchema>;
+export type WorkflowList = z.infer<typeof WorkflowListSchema>;
+export type DetectorList = z.infer<typeof DetectorListSchema>;
+export type IssueActivityList = z.infer<
+  typeof IssueActivityListResponseSchema
+>["activity"];
+export type IssueCommentList = z.infer<typeof IssueCommentListSchema>;
 export type IssueList = z.infer<typeof IssueListSchema>;
 export type EventAttachmentList = z.infer<typeof EventAttachmentListSchema>;
 export type TagList = z.infer<typeof TagListSchema>;

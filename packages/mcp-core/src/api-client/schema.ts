@@ -325,6 +325,222 @@ export const ReleaseSchema = z.object({
 
 export const ReleaseListSchema = z.array(ReleaseSchema);
 
+const ApiResourceIdSchema = z.union([z.string(), z.number()]);
+
+const ApiActorSchema = z
+  .object({
+    id: ApiResourceIdSchema.optional(),
+    name: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    username: z.string().nullable().optional(),
+    type: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+const ApiActorRefSchema = z.union([ApiResourceIdSchema, ApiActorSchema]);
+
+const ApiProjectRefSchema = z
+  .object({
+    id: ApiResourceIdSchema.optional(),
+    slug: z.string().nullable().optional(),
+    name: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const MonitorEnvironmentSchema = z
+  .object({
+    id: ApiResourceIdSchema.optional(),
+    name: z.string().nullable().optional(),
+    status: z.string().nullable().optional(),
+    dateCreated: z.string().datetime().nullable().optional(),
+    lastCheckIn: z.string().datetime().nullable().optional(),
+    nextCheckIn: z.string().datetime().nullable().optional(),
+    nextCheckInLatest: z.string().datetime().nullable().optional(),
+    isMuted: z.boolean().nullable().optional(),
+    activeIncident: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
+export const MonitorSchema = z
+  .object({
+    id: ApiResourceIdSchema.optional(),
+    slug: z.string(),
+    name: z.string().nullable().optional(),
+    status: z.string().nullable().optional(),
+    type: z.string().nullable().optional(),
+    isMuted: z.boolean().nullable().optional(),
+    isUpserting: z.boolean().nullable().optional(),
+    project: ApiProjectRefSchema.nullable().optional(),
+    owner: z.union([z.string(), ApiActorSchema]).nullable().optional(),
+    dateCreated: z.string().datetime().nullable().optional(),
+    nextCheckIn: z.string().datetime().nullable().optional(),
+    lastCheckIn: z.string().datetime().nullable().optional(),
+    config: z.record(z.string(), z.unknown()).nullable().optional(),
+    environments: z.array(MonitorEnvironmentSchema).optional(),
+    alertRule: z.record(z.string(), z.unknown()).optional(),
+  })
+  .passthrough();
+
+export const MonitorListSchema = z.array(MonitorSchema);
+
+export const MonitorCheckInSchema = z
+  .object({
+    id: ApiResourceIdSchema.optional(),
+    checkInId: z.string().nullable().optional(),
+    status: z.string().nullable().optional(),
+    duration: z.number().nullable().optional(),
+    dateCreated: z.string().datetime().nullable().optional(),
+    dateAdded: z.string().datetime().nullable().optional(),
+    dateUpdated: z.string().datetime().nullable().optional(),
+    dateInProgress: z.string().datetime().nullable().optional(),
+    dateClock: z.string().datetime().nullable().optional(),
+    expectedTime: z.string().datetime().nullable().optional(),
+    environment: z.string().nullable().optional(),
+    monitorConfig: z.record(z.string(), z.unknown()).optional(),
+    groups: z
+      .array(z.union([z.string(), z.record(z.string(), z.unknown())]))
+      .optional(),
+  })
+  .passthrough();
+
+export const MonitorCheckInListSchema = z.array(MonitorCheckInSchema);
+
+export const MonitorStatSchema = z
+  .object({
+    ts: z.number(),
+  })
+  .passthrough();
+
+export const MonitorStatsSchema = z.array(MonitorStatSchema);
+
+export const ReleaseDetailsSchema = ReleaseSchema.extend({
+  adoptionStages: z.unknown().optional(),
+  authors: z.array(ApiActorSchema).optional(),
+  commitCount: z.number().optional(),
+  currentProjectMeta: z.record(z.string(), z.unknown()).optional(),
+  deployCount: z.number().optional(),
+  lastDeploy: ReleaseSchema.shape.lastDeploy.optional(),
+  newGroups: z.number().optional(),
+  owner: ApiActorSchema.nullable().optional(),
+  projects: z.array(ReleaseProjectSchema).optional(),
+  refs: z.array(z.record(z.string(), z.unknown())).optional(),
+})
+  .partial()
+  .extend({
+    id: ApiResourceIdSchema,
+    version: z.string(),
+  })
+  .passthrough();
+
+export const DeploySchema = z
+  .object({
+    id: ApiResourceIdSchema,
+    environment: z.string().nullable().optional(),
+    name: z.string().nullable().optional(),
+    url: z.string().nullable().optional(),
+    dateStarted: z.string().datetime().nullable().optional(),
+    dateFinished: z.string().datetime().nullable().optional(),
+  })
+  .passthrough();
+
+export const DeployListSchema = z.array(DeploySchema);
+
+export const CommitSchema = z
+  .object({
+    id: ApiResourceIdSchema,
+    message: z.string().nullable().optional(),
+    dateCreated: z.string().datetime().nullable().optional(),
+    pullRequest: z.record(z.string(), z.unknown()).nullable().optional(),
+    suspectCommitType: z.string().optional(),
+    author: ApiActorSchema.nullable().optional(),
+    repository: z
+      .object({
+        name: z.string().nullable().optional(),
+      })
+      .passthrough()
+      .nullable()
+      .optional(),
+  })
+  .passthrough();
+
+export const CommitListSchema = z.array(CommitSchema);
+
+export const WorkflowSchema = z
+  .object({
+    id: ApiResourceIdSchema,
+    name: z.string(),
+    organizationId: ApiResourceIdSchema.optional(),
+    enabled: z.boolean().nullable().optional(),
+    dateCreated: z.string().datetime().nullable().optional(),
+    dateUpdated: z.string().datetime().nullable().optional(),
+    createdBy: ApiActorRefSchema.nullable().optional(),
+    environment: z.string().nullable().optional(),
+    triggers: z.record(z.string(), z.unknown()).nullable().optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
+    detectorIds: z.array(ApiResourceIdSchema).nullable().optional(),
+    lastTriggered: z.string().datetime().nullable().optional(),
+    owner: z.union([z.string(), ApiActorSchema]).nullable().optional(),
+    detectors: z.array(z.record(z.string(), z.unknown())).optional(),
+    actionFilters: z
+      .array(z.record(z.string(), z.unknown()))
+      .nullable()
+      .optional(),
+    whenConditionGroup: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
+export const WorkflowListSchema = z.array(WorkflowSchema);
+
+export const DetectorSchema = z
+  .object({
+    id: ApiResourceIdSchema,
+    name: z.string(),
+    enabled: z.boolean().nullable().optional(),
+    type: z.string().nullable().optional(),
+    projectId: ApiResourceIdSchema.optional(),
+    project: ApiProjectRefSchema.nullable().optional(),
+    owner: ApiActorSchema.nullable().optional(),
+    createdBy: ApiActorRefSchema.nullable().optional(),
+    dateCreated: z.string().datetime().nullable().optional(),
+    dateUpdated: z.string().datetime().nullable().optional(),
+    workflowIds: z.array(ApiResourceIdSchema).optional(),
+    description: z.string().nullable().optional(),
+    dataSources: z
+      .array(z.record(z.string(), z.unknown()))
+      .nullable()
+      .optional(),
+    conditionGroup: z.record(z.string(), z.unknown()).nullable().optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
+    openIssues: z.number().optional(),
+    alertRuleId: ApiResourceIdSchema.nullable().optional(),
+    ruleId: ApiResourceIdSchema.nullable().optional(),
+    latestGroup: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
+export const DetectorListSchema = z.array(DetectorSchema);
+
+export const IssueActivitySchema = z
+  .object({
+    id: ApiResourceIdSchema,
+    type: z.string().nullable().optional(),
+    dateCreated: z.string().datetime().nullable().optional(),
+    user: ApiActorSchema.nullable().optional(),
+    sentry_app: z.record(z.string(), z.unknown()).nullable().optional(),
+    data: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
+export const IssueActivityListResponseSchema = z.object({
+  activity: z.array(IssueActivitySchema),
+});
+
+export const IssueCommentSchema = IssueActivitySchema.extend({
+  type: z.string().nullable().optional(),
+});
+
+export const IssueCommentListSchema = z.array(IssueCommentSchema);
+
 /**
  * Organization tag lists are backed by `TagKeySerializerResponse`, which only
  * guarantees `key` and `name`. Count fields are backend-dependent and may come

@@ -1,0 +1,40 @@
+{
+  "id": "2001",
+  "projectId": "4509062593708032",
+  "name": "Unhandled Errors",
+  "type": "error",
+  "workflowIds": ["1001"],
+  "owner": {
+    "type": "team",
+    "id": "4509109078196224",
+    "name": "the-goats"
+  },
+  "createdBy": "12345",
+  "dateCreated": "2025-04-10T09:00:00.000Z",
+  "dateUpdated": "2025-04-14T09:30:00.000Z",
+  "dataSources": [
+    {
+      "id": "6001",
+      "organizationId": "1",
+      "type": "snuba_query_subscription",
+      "sourceId": "7001",
+      "queryObj": {}
+    }
+  ],
+  "conditionGroup": {
+    "id": "3003",
+    "organizationId": "1",
+    "logicType": "all",
+    "conditions": [],
+    "actions": []
+  },
+  "config": {},
+  "enabled": true,
+  "alertRuleId": null,
+  "ruleId": null,
+  "latestGroup": {
+    "id": "6507376925",
+    "shortId": "CLOUDFLARE-MCP-41"
+  },
+  "openIssues": 1
+}

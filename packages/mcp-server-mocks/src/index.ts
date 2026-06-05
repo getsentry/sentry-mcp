@@ -71,6 +71,12 @@ import profileChunkFixture from "./fixtures/profile-chunk.json" with {
 import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
   type: "json",
 };
+import issueActivityFixture from "./fixtures/issue-activity.json" with {
+  type: "json",
+};
+import issueCommentsFixture from "./fixtures/issue-comments.json" with {
+  type: "json",
+};
 import issueFixture from "./fixtures/issue.json" with { type: "json" };
 import issueNullCulpritFixture from "./fixtures/issue-null-culprit.json" with {
   type: "json",
@@ -83,6 +89,21 @@ import performanceEventFixture from "./fixtures/performance-event.json" with {
 };
 import projectFixture from "./fixtures/project.json" with { type: "json" };
 import releaseFixture from "./fixtures/release.json" with { type: "json" };
+import releaseCommitsFixture from "./fixtures/release-commits.json" with {
+  type: "json",
+};
+import releaseDeploysFixture from "./fixtures/release-deploys.json" with {
+  type: "json",
+};
+import monitorFixture from "./fixtures/monitor.json" with { type: "json" };
+import monitorCheckInsFixture from "./fixtures/monitor-checkins.json" with {
+  type: "json",
+};
+import monitorStatsFixture from "./fixtures/monitor-stats.json" with {
+  type: "json",
+};
+import workflowFixture from "./fixtures/workflow.json" with { type: "json" };
+import detectorFixture from "./fixtures/detector.json" with { type: "json" };
 import tagsFixture from "./fixtures/tags.json" with { type: "json" };
 import teamFixture from "./fixtures/team.json" with { type: "json" };
 import traceEventFixture from "./fixtures/trace-event.json" with {
@@ -816,8 +837,63 @@ export const restHandlers = buildHandlers([
   },
   {
     method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/releases/8ce89484-0fec-4913-a2cd-e8e2d41dee36/",
+    fetch: () => HttpResponse.json(releaseFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/releases/8ce89484-0fec-4913-a2cd-e8e2d41dee36/deploys/",
+    fetch: () => HttpResponse.json(releaseDeploysFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/releases/8ce89484-0fec-4913-a2cd-e8e2d41dee36/commits/",
+    fetch: () => HttpResponse.json(releaseCommitsFixture),
+  },
+  {
+    method: "get",
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/",
     fetch: () => HttpResponse.json([releaseFixture]),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/monitors/",
+    fetch: () => HttpResponse.json([monitorFixture]),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/",
+    fetch: () => HttpResponse.json(monitorFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/checkins/",
+    fetch: () => HttpResponse.json(monitorCheckInsFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/stats/",
+    fetch: () => HttpResponse.json(monitorStatsFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/workflows/",
+    fetch: () => HttpResponse.json([workflowFixture]),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/workflows/1001/",
+    fetch: () => HttpResponse.json(workflowFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/detectors/",
+    fetch: () => HttpResponse.json([detectorFixture]),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/detectors/2001/",
+    fetch: () => HttpResponse.json(detectorFixture),
   },
   {
     method: "get",
@@ -1046,15 +1122,29 @@ export const restHandlers = buildHandlers([
     },
   },
   {
+    method: "get",
+    path: "/api/0/organizations/:org/issues/:issueId/activities/",
+    fetch: () => HttpResponse.json(issueActivityFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/:org/issues/:issueId/notes/",
+    fetch: () => HttpResponse.json(issueCommentsFixture),
+  },
+  {
     method: "post",
     path: "/api/0/organizations/:org/issues/:issueId/notes/",
     fetch: async ({ request }) => {
       const body = (await request.json()) as { text: string };
       return HttpResponse.json({
         id: "12345",
-        text: body.text,
+        user: userFixture,
+        sentry_app: null,
         type: "note",
-        dateCreated: new Date().toISOString(),
+        data: {
+          text: body.text,
+        },
+        dateCreated: "2025-04-14T12:34:56.000Z",
       });
     },
   },

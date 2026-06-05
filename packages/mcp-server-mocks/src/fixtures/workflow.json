@@ -1,0 +1,56 @@
+{
+  "id": "1001",
+  "name": "Critical Errors to Slack",
+  "organizationId": "1",
+  "createdBy": "12345",
+  "dateCreated": "2025-04-10T10:00:00.000Z",
+  "dateUpdated": "2025-04-14T10:00:00.000Z",
+  "triggers": {
+    "id": "3001",
+    "organizationId": "1",
+    "logicType": "all",
+    "conditions": [
+      {
+        "id": "4001",
+        "type": "event_frequency_count",
+        "comparison": { "value": 1, "interval": "1h" },
+        "conditionResult": true
+      }
+    ],
+    "actions": []
+  },
+  "actionFilters": [
+    {
+      "id": "3002",
+      "organizationId": "1",
+      "logicType": "all",
+      "conditions": [
+        {
+          "id": "4002",
+          "type": "tagged_event",
+          "comparison": { "key": "level", "match": "eq", "value": "error" },
+          "conditionResult": true
+        }
+      ],
+      "actions": [
+        {
+          "id": "5001",
+          "type": "slack",
+          "integrationId": null,
+          "data": {
+            "targetType": "specific",
+            "targetIdentifier": "#alerts-critical"
+          },
+          "config": {},
+          "status": "active"
+        }
+      ]
+    }
+  ],
+  "environment": "production",
+  "config": {},
+  "detectorIds": ["2001"],
+  "enabled": true,
+  "lastTriggered": null,
+  "owner": "team:the-goats"
+}
