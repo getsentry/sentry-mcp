@@ -30,7 +30,10 @@ type IssueDetailsStructuredContent = {
   event: {
     message: string | null;
     contexts: {
-      data: Array<{ name: string }>;
+      data: Array<{
+        name: string;
+        fields: Array<{ name: string; value: string }>;
+      }>;
     };
     tags: {
       data: Array<{ key: string; value: string }>;
@@ -1373,10 +1376,18 @@ describe("get_issue_details", () => {
     );
     expect(
       structuredContent.event.contexts.data.map((context) => context.name),
-    ).toEqual(
+    ).toEqual(expect.arrayContaining(["trace", "custom_context"]));
+    expect(structuredContent.event.contexts.data).toEqual(
       expect.arrayContaining([
-        "trace",
-        expect.stringContaining("Issue Classification"),
+        expect.objectContaining({
+          name: "custom_context",
+          fields: expect.arrayContaining([
+            {
+              name: "context.name",
+              value: expect.stringContaining("Issue Classification"),
+            },
+          ]),
+        }),
       ]),
     );
   });

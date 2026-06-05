@@ -52,6 +52,21 @@ const STRUCTURED_AUTOFIX_OBJECT_KEY_LIMIT = 20;
 const STRUCTURED_AUTOFIX_DEPTH_LIMIT = 3;
 const STRUCTURED_EVENT_FIELD_LIMIT = 40;
 const STRUCTURED_EVENT_FIELD_VALUE_LIMIT = 500;
+const STRUCTURED_KNOWN_CONTEXT_NAMES = new Set([
+  "app",
+  "browser",
+  "client_os",
+  "cloud_resource",
+  "culture",
+  "device",
+  "gpu",
+  "os",
+  "profile",
+  "replay",
+  "response",
+  "runtime",
+  "trace",
+]);
 
 const structuredRenderedFieldSchema = z.object({
   name: z.string(),
@@ -613,6 +628,10 @@ function createStructuredNamedObjectRows(value: unknown): {
   const rows = entries
     .slice(0, STRUCTURED_EVENT_FIELD_LIMIT)
     .map(([name, data]) => {
+      if (!STRUCTURED_KNOWN_CONTEXT_NAMES.has(name)) {
+        return createStructuredCustomContextRow(name, data);
+      }
+
       const fields = createStructuredFieldRows(data);
       childTruncated = childTruncated || fields.truncated;
 
@@ -625,6 +644,32 @@ function createStructuredNamedObjectRows(value: unknown): {
   return {
     data: rows,
     truncated: entries.length > STRUCTURED_EVENT_FIELD_LIMIT || childTruncated,
+  };
+}
+
+function createStructuredCustomContextRow(
+  name: string,
+  data: unknown,
+): {
+  name: string;
+  fields: Array<{ name: string; value: string }>;
+} {
+  return {
+    name: "custom_context",
+    fields: [
+      {
+        name: "context.name",
+        value: formatEventValue(name, {
+          maxLength: STRUCTURED_EVENT_FIELD_VALUE_LIMIT,
+        }),
+      },
+      {
+        name: "context.value",
+        value: formatEventValue(data, {
+          maxLength: STRUCTURED_EVENT_FIELD_VALUE_LIMIT,
+        }),
+      },
+    ],
   };
 }
 
