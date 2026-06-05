@@ -19,7 +19,6 @@ describeSearchAgentEval("search-issues-agent", searchIssuesAgentHarness, [
     expectedTools: [
       {
         name: "whoami",
-        arguments: {},
       },
     ],
     expected: {

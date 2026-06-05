@@ -45,7 +45,6 @@ describeSearchAgentEval(
       expectedTools: [
         {
           name: "whoami",
-          arguments: {},
         },
       ],
       expected: {
@@ -88,7 +87,6 @@ describeSearchAgentEval(
       expectedTools: [
         {
           name: "issueEventFields",
-          arguments: {},
         },
       ],
       expected: {

@@ -22,10 +22,6 @@ type EvalOptions = {
   timeout?: number;
 };
 
-function ignoreToolArguments() {
-  return true;
-}
-
 function resolveThreshold(
   threshold: number | null | undefined,
   defaultThreshold: number,
@@ -100,7 +96,7 @@ export function describeSearchAgentEval(
     {
       harness,
       judges: [
-        ToolCallJudge({ params: ignoreToolArguments }),
+        ToolCallJudge({ params: "fuzzy" }),
         StructuredOutputJudge({ match: "fuzzy" }),
       ],
       judgeThreshold: resolveThreshold(options.threshold, 0.6),

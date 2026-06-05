@@ -21,7 +21,6 @@ describeSearchAgentEval("search-events-agent", searchEventsAgentHarness, [
     expectedTools: [
       {
         name: "whoami",
-        arguments: {},
       },
     ],
     expected: {
