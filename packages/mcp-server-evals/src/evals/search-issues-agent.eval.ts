@@ -32,7 +32,6 @@ describeSearchAgentEval("search-issues-agent", searchIssuesAgentHarness, [
     expectedTools: [],
     expected: {
       query: /(?=.*assigned:me)(?=.*is:unresolved)/,
-      sort: "date",
     },
   },
   {

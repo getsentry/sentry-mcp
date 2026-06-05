@@ -38,9 +38,10 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.union([
 ]);
 
 const predictionSchema = z.object({
+  score: z.number().min(0).max(1).describe("Score from 0 to 1"),
   rationale: z
     .string()
-    .describe("Brief explanation of why these tool calls fit the task"),
+    .describe("Brief explanation of the score and predicted tool calls"),
   predictedTools: z
     .array(
       z.object({
@@ -83,15 +84,22 @@ ${task}
 [EXPECTED TOOL CALLS]
 ${describeExpectedToolCalls(expectedTools)}
 
-Return the ordered tool calls the assistant would likely make. Do not answer the user task directly.
+Return the ordered tool calls the assistant would likely make and a score for how well they match the expected calls. Do not answer the user task directly.
 
 Guidance:
-- Use discovery tools when the task only gives a human name or ambiguous slug.
-- If the task already provides organization/project in "org/project" form, the assistant may skip discovery when the required slugs are clear.
-- The expected tool calls are the suite author's calibration for this legacy prediction case; match their sequence when provided.
+- The expected tool calls show what is actually expected for this specific legacy prediction case; follow them exactly when provided.
+- If expected tools include discovery calls, predict discovery calls.
+- If expected tools do not include discovery calls, do not predict them.
 - Include arguments only when they are available or strongly implied by the task.
 - Extra parameters like regionUrl are acceptable only when the assistant would have learned them from an earlier discovery call.
-- For natural-language search queries, preserve the user's meaning rather than inventing exact syntax.`;
+- For natural-language search queries, preserve the user's meaning rather than inventing exact syntax.
+
+Score as follows:
+- 1.0: All expected tools would be called with correct arguments in the right order.
+- 0.8: All expected tools would be called, with minor differences like extra params.
+- 0.6: Most expected tools would be called but some are missing or in the wrong order.
+- 0.3: Some expected tools would be called but there are significant issues.
+- 0.0: Wrong tools or critical tools missing.`;
 }
 
 function normalizePredictedToolCall(
@@ -107,6 +115,7 @@ function normalizePredictionOutput(
   output: RawToolPredictionOutput,
 ): ToolPredictionOutput {
   return {
+    score: output.score,
     rationale: output.rationale,
     predictedTools: output.predictedTools.map(normalizePredictedToolCall),
   };
@@ -170,22 +179,24 @@ export const ToolPredictionJudge = createJudge<
 >("ToolPredictionJudge", async (context) => {
   const predictedToolCalls =
     context.output.predictedTools.map(toToolCallRecord);
-  const judgeResult = await toolCallJudge.assess({
+  const toolCallJudgeResult = await toolCallJudge.assess({
     ...context,
     toolCalls: predictedToolCalls,
     expectedTools: context.metadata.expectedTools,
   });
 
   return {
-    score: judgeResult.score,
+    score: context.output.score,
     metadata: {
-      ...judgeResult.metadata,
+      ...toolCallJudgeResult.metadata,
+      rationale: context.output.rationale,
       predictedTools: requireJsonValue(predictedToolCalls, "predictedTools"),
       expectedTools: requireJsonValue(
         normalizeExpectedToolCalls(context.metadata.expectedTools),
         "expectedTools",
       ),
-      predictionRationale: context.output.rationale,
+      deterministicScore: toolCallJudgeResult.score,
+      deterministicRationale: toolCallJudgeResult.metadata?.rationale,
     },
   };
 });

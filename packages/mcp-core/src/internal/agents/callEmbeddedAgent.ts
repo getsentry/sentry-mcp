@@ -63,7 +63,7 @@ export async function callEmbeddedAgent<
       system,
       prompt,
       tools,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(7),
       experimental_output: Output.object({ schema }),
       experimental_telemetry: {
         isEnabled: true,

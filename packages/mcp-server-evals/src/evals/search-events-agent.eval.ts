@@ -60,7 +60,7 @@ describeSearchAgentEval("search-events-agent", searchEventsAgentHarness, [
     ],
     expected: {
       dataset: "spans",
-      query: "gen_ai.request.temperature:>0.7",
+      query: /gen_ai\.request\.temperature:>0\.7/,
       sort: "-span.duration",
     },
   },

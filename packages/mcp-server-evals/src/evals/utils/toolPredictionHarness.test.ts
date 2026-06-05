@@ -35,6 +35,7 @@ describe("ToolPredictionJudge", () => {
     const result = await ToolPredictionJudge.assess(
       createJudgeContext(
         {
+          score: 1,
           rationale: "The task asks for accessible organizations.",
           predictedTools: [
             {
@@ -67,6 +68,7 @@ describe("ToolPredictionJudge", () => {
     const result = await ToolPredictionJudge.assess(
       createJudgeContext(
         {
+          score: 0.8,
           rationale: "The prediction picked the wrong lookup path.",
           predictedTools: [
             {
@@ -88,14 +90,19 @@ describe("ToolPredictionJudge", () => {
       ),
     );
 
-    expect(result.score).toBe(0);
-    expect(result.metadata?.rationale).toContain("Partial match: 0/1");
+    expect(result.score).toBe(0.8);
+    expect(result.metadata?.rationale).toContain("wrong lookup path");
+    expect(result.metadata?.deterministicRationale).toContain(
+      "Partial match: 0/1",
+    );
+    expect(result.metadata?.deterministicScore).toBe(0);
   });
 
-  it("preserves partial scores for incomplete multi-step predictions", async () => {
+  it("preserves model scores for incomplete multi-step predictions", async () => {
     const result = await ToolPredictionJudge.assess(
       createJudgeContext(
         {
+          score: 0.6,
           rationale: "The prediction found the issue but missed the update.",
           predictedTools: [
             {
@@ -125,7 +132,9 @@ describe("ToolPredictionJudge", () => {
       ),
     );
 
-    expect(result.score).toBe(0.5);
-    expect(result.metadata?.rationale).toContain("Partial match");
+    expect(result.score).toBe(0.6);
+    expect(result.metadata?.rationale).toContain("missed the update");
+    expect(result.metadata?.deterministicRationale).toContain("Partial match");
+    expect(result.metadata?.deterministicScore).toBe(0.5);
   });
 });

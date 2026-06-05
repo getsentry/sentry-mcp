@@ -13,6 +13,7 @@ export type PredictedToolCall = {
 };
 
 export type ToolPredictionOutput = {
+  score: number;
   rationale: string;
   predictedTools: PredictedToolCall[];
 };

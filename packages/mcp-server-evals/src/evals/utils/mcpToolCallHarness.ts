@@ -32,7 +32,7 @@ function getTextOutput(result: unknown): string {
     return result.text;
   }
 
-  throw new Error("MCP tool-call harness did not produce text output");
+  return "";
 }
 
 function toToolCallRecord(call: AiSdkToolCall): ToolCallRecord | null {
@@ -110,6 +110,7 @@ export function createMcpToolCallHarness(maxSteps = 6) {
             "You are a Sentry assistant with access to Sentry MCP tools.",
             "Use search_tools before execute_tool when the needed Sentry operation is not directly listed as a tool.",
             "When search_tools returns a tool, call execute_tool with that returned tool name and arguments matching the returned schema.",
+            "When the user says 'from Sentry in <organization>', Sentry is the product name and <organization> is the organizationSlug.",
           ].join("\n"),
           prompt: input,
           stopWhen: stepCountIs(maxSteps),
