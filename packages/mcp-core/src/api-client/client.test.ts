@@ -562,6 +562,62 @@ describe("request headers", () => {
   });
 });
 
+describe("monitor time parameters", () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("defaults blank monitor statsPeriod values to 24h", async () => {
+    const requestUrls: string[] = [];
+    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+      requestUrls.push(url);
+      return Promise.resolve(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await apiService.listMonitorCheckIns({
+      organizationSlug: "my-org",
+      monitorSlug: "nightly-import",
+      statsPeriod: "   ",
+      limit: 10,
+    });
+    await apiService.getMonitorStats({
+      organizationSlug: "my-org",
+      monitorSlug: "nightly-import",
+      statsPeriod: "   ",
+    });
+
+    const checkInsUrl = new URL(requestUrls[0]);
+    expect(checkInsUrl.pathname).toBe(
+      "/api/0/organizations/my-org/monitors/nightly-import/checkins/",
+    );
+    expect(checkInsUrl.searchParams.get("statsPeriod")).toBe("24h");
+
+    const statsUrl = new URL(requestUrls[1]);
+    expect(statsUrl.pathname).toBe(
+      "/api/0/organizations/my-org/monitors/nightly-import/stats/",
+    );
+    expect(statsUrl.searchParams.get("statsPeriod")).toBeNull();
+    expect(statsUrl.searchParams.get("since")).not.toBeNull();
+    expect(statsUrl.searchParams.get("until")).not.toBeNull();
+  });
+});
+
 describe("listOrganizations", () => {
   let originalFetch: typeof globalThis.fetch;
 

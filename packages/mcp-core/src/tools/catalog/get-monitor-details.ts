@@ -148,9 +148,10 @@ export default defineTool({
     const start = params.start ?? undefined;
     const end = params.end ?? undefined;
     const hasAbsoluteTimeRange = start !== undefined || end !== undefined;
+    const requestedStatsPeriod = params.statsPeriod?.trim() || undefined;
     const statsPeriod = hasAbsoluteTimeRange
       ? undefined
-      : (params.statsPeriod ?? "24h");
+      : (requestedStatsPeriod ?? "24h");
 
     const monitor = await apiService.getMonitorDetails({
       organizationSlug,

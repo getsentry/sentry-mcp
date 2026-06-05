@@ -137,6 +137,11 @@ const NETWORK_ERROR_MESSAGES: Record<string, string> = {
   ECONNRESET: "Connection reset. Try again in a moment.",
 };
 
+function normalizeStatsPeriod(statsPeriod?: string): string | undefined {
+  const normalized = statsPeriod?.trim();
+  return normalized || undefined;
+}
+
 function getNextCursor(linkHeader: string | null): string | null {
   if (!linkHeader) {
     return null;
@@ -1965,7 +1970,7 @@ export class SentryApiService {
       searchQuery.set("per_page", String(limit));
     }
     const effectiveStatsPeriod =
-      start || end ? undefined : (statsPeriod ?? "24h");
+      start || end ? undefined : (normalizeStatsPeriod(statsPeriod) ?? "24h");
     this.applyTimeParams(searchQuery, effectiveStatsPeriod, start, end);
 
     const encodedMonitor = encodeURIComponent(monitorSlug);
@@ -2007,7 +2012,7 @@ export class SentryApiService {
       searchQuery.append("environment", environment);
     }
     const effectiveStatsPeriod =
-      start || end ? undefined : (statsPeriod ?? "24h");
+      start || end ? undefined : (normalizeStatsPeriod(statsPeriod) ?? "24h");
     this.applyStatsMixinTimeParams(
       searchQuery,
       effectiveStatsPeriod,

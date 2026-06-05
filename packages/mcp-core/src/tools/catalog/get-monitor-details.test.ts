@@ -257,6 +257,75 @@ describe("get_monitor_details", () => {
     expect(params.get("statsPeriod")).toBeNull();
   });
 
+  it("defaults blank statsPeriod to a 24h monitor window", async () => {
+    let checkInsRequestUrl: string | null = null;
+    let statsRequestUrl: string | null = null;
+    const monitorResponse = {
+      id: "4509100000000001",
+      slug: "nightly-import",
+      name: "Nightly Import",
+      status: "ok",
+      owner: null,
+      project: {
+        id: "4509109104082945",
+        slug: "cloudflare-mcp",
+        name: "cloudflare-mcp",
+      },
+      config: {
+        schedule_type: "crontab",
+        schedule: ["crontab", "0 2 * * *"],
+      },
+      environments: [],
+    };
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/",
+        () => HttpResponse.json(monitorResponse),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/checkins/",
+        ({ request }) => {
+          checkInsRequestUrl = request.url;
+          return HttpResponse.json([]);
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/stats/",
+        ({ request }) => {
+          statsRequestUrl = request.url;
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    await getMonitorDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        projectSlug: null,
+        monitorSlug: "nightly-import",
+        environment: null,
+        statsPeriod: "   ",
+        start: null,
+        end: null,
+        checkInLimit: 10,
+        includeStats: true,
+        rollupSeconds: null,
+      },
+      context,
+    );
+
+    expect(checkInsRequestUrl).not.toBeNull();
+    const checkInsParams = new URL(checkInsRequestUrl ?? "").searchParams;
+    expect(checkInsParams.get("statsPeriod")).toBe("24h");
+
+    expect(statsRequestUrl).not.toBeNull();
+    const statsParams = new URL(statsRequestUrl ?? "").searchParams;
+    expect(statsParams.get("statsPeriod")).toBeNull();
+    expect(statsParams.get("since")).not.toBeNull();
+    expect(statsParams.get("until")).not.toBeNull();
+  });
+
   it("encodes monitor slugs in web links", async () => {
     const monitorResponse = {
       id: "4509100000000002",
