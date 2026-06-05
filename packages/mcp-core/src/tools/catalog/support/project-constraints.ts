@@ -2,7 +2,6 @@ import { UserInputError } from "../../../errors";
 
 type ProjectRef = {
   slug?: string | null;
-  name?: string | null;
 };
 
 function projectConstraintError(resourceLabel: string, projectSlug: string) {
@@ -11,8 +10,8 @@ function projectConstraintError(resourceLabel: string, projectSlug: string) {
   );
 }
 
-function projectLabel(project: ProjectRef | null | undefined): string | null {
-  return project?.slug ?? project?.name ?? null;
+function projectSlug(project: ProjectRef | null | undefined): string | null {
+  return project?.slug ?? null;
 }
 
 export function assertProjectRefWithinConstraint({
@@ -28,7 +27,7 @@ export function assertProjectRefWithinConstraint({
     return;
   }
 
-  if (projectLabel(project) !== scopedProjectSlug) {
+  if (projectSlug(project) !== scopedProjectSlug) {
     throw projectConstraintError(resourceLabel, scopedProjectSlug);
   }
 }
@@ -47,7 +46,7 @@ export function assertProjectListContainsConstraint({
   }
 
   const hasMatchingProject =
-    projects?.some((project) => projectLabel(project) === scopedProjectSlug) ??
+    projects?.some((project) => projectSlug(project) === scopedProjectSlug) ??
     false;
 
   if (!hasMatchingProject) {
