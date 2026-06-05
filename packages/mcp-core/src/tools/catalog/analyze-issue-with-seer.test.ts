@@ -392,7 +392,6 @@ describe("analyze_issue_with_seer", () => {
           expect(body).toEqual({
             event_id: undefined,
             instruction: "Focus on memory leaks",
-            referrer: "api.mcp",
           });
           return HttpResponse.json({
             run_id: 123,

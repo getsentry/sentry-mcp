@@ -2853,7 +2853,6 @@ export class SentryApiService {
         body: JSON.stringify({
           event_id: eventId,
           instruction,
-          referrer: "api.mcp",
         }),
       },
       opts,
