@@ -29,19 +29,19 @@ You can limit which skills are granted using the `--skills` flag:
 
 ```shell
 # Default: ALL skills (inspect, docs, seer, triage, project-management)
-npx @sentry/mcp-server@latest --access-token=sentry-user-token
+SENTRY_ACCESS_TOKEN=sentry-user-token npx @sentry/mcp-server@latest
 
 # Limit to specific skills only
-npx @sentry/mcp-server@latest --access-token=TOKEN --skills=inspect,docs
+SENTRY_ACCESS_TOKEN=TOKEN npx @sentry/mcp-server@latest --skills=inspect,docs
 
 # Self-hosted Sentry
-npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.example.com
+SENTRY_ACCESS_TOKEN=TOKEN npx @sentry/mcp-server@latest --host=sentry.example.com
 
 # Override OpenAI endpoint for AI-powered tools (stdio only)
-npx @sentry/mcp-server@latest --access-token=TOKEN --openai-base-url=https://proxy.example.com/v1
+SENTRY_ACCESS_TOKEN=TOKEN npx @sentry/mcp-server@latest --openai-base-url=https://proxy.example.com/v1
 
 # Azure OpenAI / Azure-compatible deployment routing (stdio only)
-npx @sentry/mcp-server@latest --access-token=TOKEN --agent-provider=azure-openai --openai-base-url=https://example.openai.azure.com/openai/v1/
+SENTRY_ACCESS_TOKEN=TOKEN npx @sentry/mcp-server@latest --agent-provider=azure-openai --openai-base-url=https://example.openai.azure.com/openai/v1/
 ```
 
 For Azure OpenAI or Azure-compatible deployment proxies, use the dedicated
@@ -109,10 +109,10 @@ If you're currently using scopes:
 
 ```shell
 # OLD (deprecated)
-npx @sentry/mcp-server --access-token=TOKEN --scopes=org:read,event:write
+SENTRY_ACCESS_TOKEN=TOKEN npx @sentry/mcp-server --scopes=org:read,event:write
 
 # NEW (recommended)
-npx @sentry/mcp-server --access-token=TOKEN --skills=inspect,triage
+SENTRY_ACCESS_TOKEN=TOKEN npx @sentry/mcp-server --skills=inspect,triage
 ```
 
 The host configuration accepts two distinct formats:
