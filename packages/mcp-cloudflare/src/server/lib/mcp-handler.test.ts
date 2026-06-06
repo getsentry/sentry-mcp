@@ -75,6 +75,16 @@ async function parseSSEResponse<T>(response: Response): Promise<T> {
   return JSON.parse(dataLine.slice(6)) as T;
 }
 
+function createMockKV(): KVNamespace {
+  return {
+    get: vi.fn().mockResolvedValue(null),
+    put: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn(),
+    list: vi.fn(),
+    getWithMetadata: vi.fn(),
+  } as unknown as KVNamespace;
+}
+
 function createTestEnv(): Env {
   return {
     COOKIE_SECRET: "test-cookie-secret-32-characters",
@@ -83,6 +93,7 @@ function createTestEnv(): Env {
     SENTRY_HOST: "sentry.io",
     OPENAI_API_KEY: "test-openai-key",
     OAUTH_KV: {} as KVNamespace,
+    MCP_CACHE: createMockKV(),
     OAUTH_PROVIDER: {
       listUserGrants: vi.fn().mockResolvedValue({ items: [] }),
       revokeGrant: vi.fn().mockResolvedValue(undefined),
@@ -280,6 +291,26 @@ describe("MCP Handler", () => {
       expect(response.status).toBe(404);
     });
 
+    it("should reject invalid organization and project slugs", async () => {
+      const testCases = [
+        { path: "/mcp/%20", message: "Invalid organization slug" },
+        {
+          path: "/mcp/sentry-mcp-evals/%20",
+          message: "Invalid project slug",
+        },
+      ];
+
+      for (const { path, message } of testCases) {
+        const request = createMcpRequest("initialize", {}, { path });
+        const ctx = createMcpContext();
+
+        const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+        expect(response.status).toBe(400);
+        expect(await response.text()).toBe(message);
+      }
+    });
+
     it("should handle /mcp/:org with valid organization", async () => {
       const request = createMcpRequest(
         "initialize",
@@ -299,6 +330,45 @@ describe("MCP Handler", () => {
         result?: { protocolVersion: string };
       }>(response);
       expect(body.result?.protocolVersion).toBeDefined();
+    });
+
+    it("should handle /mcp/:org/:project with valid project", async () => {
+      const request = createMcpRequest(
+        "initialize",
+        {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "1.0.0" },
+        },
+        { path: "/mcp/sentry-mcp-evals/cloudflare-mcp" },
+      );
+      const ctx = createMcpContext();
+
+      const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+      expect(response.status).toBe(200);
+      const body = await parseSSEResponse<{
+        result?: { protocolVersion: string };
+      }>(response);
+      expect(body.result?.protocolVersion).toBeDefined();
+    });
+
+    it("should return 404 for non-existent project", async () => {
+      const request = createMcpRequest(
+        "initialize",
+        {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "1.0.0" },
+        },
+        { path: "/mcp/sentry-mcp-evals/nonexistent-project" },
+      );
+      const ctx = createMcpContext();
+
+      const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+      expect(response.status).toBe(404);
+      expect(await response.text()).toContain("Project");
     });
 
     it("should return 404 for non-existent organization", async () => {

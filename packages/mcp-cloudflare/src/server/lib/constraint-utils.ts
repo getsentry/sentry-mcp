@@ -1,23 +1,57 @@
 import type { Constraints, ProjectCapabilities } from "@sentry/mcp-core/types";
 import { SentryApiService, ApiError } from "@sentry/mcp-core/api-client";
 import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
+import { z } from "zod";
 
 // Timeout for fetching project capabilities (5 seconds)
 const CAPABILITIES_TIMEOUT_MS = 5000;
 
 // Cache configuration
 const CACHE_TTL_SECONDS = 900; // 15 minutes
-const CACHE_KEY_VERSION = "v1";
+const PROJECT_TIMEOUT_CACHE_TTL_SECONDS = 60; // Avoid repeated startup stalls.
+const CACHE_KEY_VERSION = "v2";
+
+const ProjectCapabilitiesSchema = z.object({
+  profiles: z.boolean().optional(),
+  replays: z.boolean().optional(),
+  logs: z.boolean().optional(),
+  traces: z.boolean().optional(),
+});
+
+const CachedOrgConstraintsSchema = z.object({
+  scope: z.literal("org"),
+  regionUrl: z.string().nullable(),
+  cachedAt: z.number(),
+});
+
+const CachedProjectConstraintsSchema = z.discriminatedUnion("status", [
+  z.object({
+    scope: z.literal("project"),
+    status: z.literal("verified"),
+    regionUrl: z.string().nullable(),
+    projectCapabilities: ProjectCapabilitiesSchema,
+    cachedAt: z.number(),
+  }),
+  z.object({
+    scope: z.literal("project"),
+    status: z.literal("timeout"),
+    regionUrl: z.string().nullable(),
+    cachedAt: z.number(),
+  }),
+]);
+
+const CachedConstraintsSchema = z.union([
+  CachedOrgConstraintsSchema,
+  CachedProjectConstraintsSchema,
+]);
+
+type CachedOrgConstraints = z.infer<typeof CachedOrgConstraintsSchema>;
+type CachedProjectConstraints = z.infer<typeof CachedProjectConstraintsSchema>;
 
 /**
  * Cached constraints data stored in KV.
  */
-export type CachedConstraints = {
-  regionUrl: string | null;
-  /** Populated when a project constraint was verified; null for org-only cache entries. */
-  projectCapabilities: ProjectCapabilities | null;
-  cachedAt: number;
-};
+export type CachedConstraints = CachedOrgConstraints | CachedProjectConstraints;
 
 /**
  * Options for caching constraints verification results.
@@ -25,11 +59,12 @@ export type CachedConstraints = {
 export type CacheOptions = {
   kv: KVNamespace;
   userId: string;
+  waitUntil: (promise: Promise<void>) => void;
 };
 
 /**
  * Build a cache key for constraints verification.
- * Format: caps:v1:{userId}:{sentryHost}:{organizationSlug}:{scopeKey}
+ * Format: caps:v2:{userId}:{sentryHost}:{organizationSlug}:{scopeKey}
  * scopeKey is "org" for org-only entries or "project:{slug}" for project-scoped entries.
  */
 function buildCacheKey(
@@ -38,10 +73,7 @@ function buildCacheKey(
   organizationSlug: string,
   projectSlug: string | null | undefined,
 ): string {
-  const normalizedProjectSlug = projectSlug?.trim();
-  const scopeKey = normalizedProjectSlug
-    ? `project:${normalizedProjectSlug}`
-    : "org";
+  const scopeKey = projectSlug ? `project:${projectSlug}` : "org";
   return `caps:${CACHE_KEY_VERSION}:${userId}:${sentryHost}:${organizationSlug}:${scopeKey}`;
 }
 
@@ -55,7 +87,8 @@ async function getCachedConstraints(
 ): Promise<CachedConstraints | null> {
   try {
     const cached = await kv.get(key, "json");
-    return cached as CachedConstraints | null;
+    const parsed = CachedConstraintsSchema.safeParse(cached);
+    return parsed.success ? parsed.data : null;
   } catch (error) {
     logWarn("Failed to read constraints cache", {
       loggerScope: ["cloudflare", "constraint-utils"],
@@ -65,18 +98,30 @@ async function getCachedConstraints(
   }
 }
 
+type ConstraintCache = {
+  readOrg(): Promise<CachedOrgConstraints | null>;
+  readProject(): Promise<CachedProjectConstraints | null>;
+  writeOrg(regionUrl: string | null): void;
+  writeProjectVerified(
+    regionUrl: string | null,
+    projectCapabilities: ProjectCapabilities,
+  ): void;
+  writeProjectTimeout(regionUrl: string | null): void;
+};
+
 /**
  * Store constraints in KV cache.
- * Fire-and-forget - errors are logged but don't block the response.
+ * Scheduled with waitUntil so errors are logged without blocking the response.
  */
 async function setCachedConstraints(
   kv: KVNamespace,
   key: string,
   data: CachedConstraints,
+  ttlSeconds = CACHE_TTL_SECONDS,
 ): Promise<void> {
   try {
     await kv.put(key, JSON.stringify(data), {
-      expirationTtl: CACHE_TTL_SECONDS,
+      expirationTtl: ttlSeconds,
     });
   } catch (error) {
     logWarn("Failed to write constraints cache", {
@@ -84,6 +129,82 @@ async function setCachedConstraints(
       extra: { key, error: String(error) },
     });
   }
+}
+
+function writeCachedConstraints(
+  cache: CacheOptions,
+  key: string,
+  data: CachedConstraints,
+  ttlSeconds = CACHE_TTL_SECONDS,
+): void {
+  const writePromise = setCachedConstraints(cache.kv, key, data, ttlSeconds);
+  cache.waitUntil(writePromise);
+}
+
+function createConstraintCache(
+  cache: CacheOptions,
+  sentryHost: string,
+  organizationSlug: string,
+  projectSlug: string | null | undefined,
+): ConstraintCache {
+  const orgKey = buildCacheKey(
+    cache.userId,
+    sentryHost,
+    organizationSlug,
+    null,
+  );
+  const projectKey = projectSlug
+    ? buildCacheKey(cache.userId, sentryHost, organizationSlug, projectSlug)
+    : null;
+
+  return {
+    async readOrg() {
+      const cached = await getCachedConstraints(cache.kv, orgKey);
+      return cached?.scope === "org" ? cached : null;
+    },
+    async readProject() {
+      if (!projectKey) {
+        return null;
+      }
+      const cached = await getCachedConstraints(cache.kv, projectKey);
+      return cached?.scope === "project" ? cached : null;
+    },
+    writeOrg(regionUrl) {
+      writeCachedConstraints(cache, orgKey, {
+        scope: "org",
+        regionUrl,
+        cachedAt: Date.now(),
+      });
+    },
+    writeProjectVerified(regionUrl, projectCapabilities) {
+      if (!projectKey) {
+        return;
+      }
+      writeCachedConstraints(cache, projectKey, {
+        scope: "project",
+        status: "verified",
+        regionUrl,
+        projectCapabilities,
+        cachedAt: Date.now(),
+      });
+    },
+    writeProjectTimeout(regionUrl) {
+      if (!projectKey) {
+        return;
+      }
+      writeCachedConstraints(
+        cache,
+        projectKey,
+        {
+          scope: "project",
+          status: "timeout",
+          regionUrl,
+          cachedAt: Date.now(),
+        },
+        PROJECT_TIMEOUT_CACHE_TTL_SECONDS,
+      );
+    },
+  };
 }
 
 /**
@@ -114,8 +235,8 @@ async function withTimeout<T>(
  * Verify that provided org/project constraints exist and the user has access
  * by querying Sentry's API using the provided OAuth access token.
  *
- * If cache options are provided with a projectSlug, results will be cached
- * in KV to avoid repeated API calls during MCP sessions.
+ * If cache options are provided, results will be cached in KV to avoid
+ * repeated API calls during MCP sessions.
  */
 export async function verifyConstraintsAccess(
   { organizationSlug, projectSlug }: Constraints,
@@ -157,51 +278,73 @@ export async function verifyConstraintsAccess(
 
   // Check KV cache when available (org-only and org+project keys).
   // Cache key includes userId to ensure per-user isolation.
-  let cacheKey: string | null = null;
-  if (cache) {
-    cacheKey = buildCacheKey(
-      cache.userId,
-      sentryHost,
-      organizationSlug,
-      projectSlug,
-    );
-    const cached = await getCachedConstraints(cache.kv, cacheKey);
-    if (cached) {
-      return {
-        ok: true,
-        constraints: {
-          organizationSlug,
-          projectSlug: projectSlug || null,
-          regionUrl: cached.regionUrl,
-          projectCapabilities: cached.projectCapabilities,
-        },
-      };
+  const constraintCache = cache
+    ? createConstraintCache(cache, sentryHost, organizationSlug, projectSlug)
+    : null;
+  if (constraintCache) {
+    if (projectSlug) {
+      const cachedProject = await constraintCache.readProject();
+      if (cachedProject) {
+        return {
+          ok: true,
+          constraints: {
+            organizationSlug,
+            projectSlug,
+            regionUrl: cachedProject.regionUrl,
+            projectCapabilities:
+              cachedProject.status === "verified"
+                ? cachedProject.projectCapabilities
+                : null,
+          },
+        };
+      }
+    } else {
+      const cachedOrg = await constraintCache.readOrg();
+      if (cachedOrg) {
+        return {
+          ok: true,
+          constraints: {
+            organizationSlug,
+            projectSlug: null,
+            regionUrl: cachedOrg.regionUrl,
+            projectCapabilities: null,
+          },
+        };
+      }
     }
   }
+
+  const cachedOrgConstraints =
+    constraintCache && projectSlug ? await constraintCache.readOrg() : null;
 
   // Use shared API client for consistent behavior and error handling
   const api = new SentryApiService({ accessToken, host: sentryHost });
 
   // Verify organization using API client
-  let regionUrl: string | null | undefined = null;
-  try {
-    const org = await api.getOrganization(organizationSlug);
-    regionUrl = org.links?.regionUrl || null;
-  } catch (error) {
-    if (error instanceof ApiError) {
-      const message =
-        error.status === 404
-          ? `Organization '${organizationSlug}' not found`
-          : error.message;
-      return { ok: false, status: error.status, message };
+  let regionUrl: string | null = null;
+  if (cachedOrgConstraints) {
+    regionUrl = cachedOrgConstraints.regionUrl;
+  } else {
+    try {
+      const org = await api.getOrganization(organizationSlug);
+      regionUrl = org.links?.regionUrl || null;
+      constraintCache?.writeOrg(regionUrl);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const message =
+          error.status === 404
+            ? `Organization '${organizationSlug}' not found`
+            : error.message;
+        return { ok: false, status: error.status, message };
+      }
+      const eventId = logIssue(error);
+      return {
+        ok: false,
+        status: 502,
+        message: "Failed to verify organization",
+        eventId,
+      };
     }
-    const eventId = logIssue(error);
-    return {
-      ok: false,
-      status: 502,
-      message: "Failed to verify organization",
-      eventId,
-    };
   }
 
   // Verify project access if specified
@@ -228,6 +371,7 @@ export async function verifyConstraintsAccess(
         logs: project.hasLogs === true,
         traces: project.firstTransactionEvent === true,
       };
+      constraintCache?.writeProjectVerified(regionUrl, projectCapabilities);
     } catch (error) {
       // Check if this was a timeout
       if (error instanceof Error && error.message === "CAPABILITY_TIMEOUT") {
@@ -240,6 +384,7 @@ export async function verifyConstraintsAccess(
             `Project verification timed out after ${CAPABILITIES_TIMEOUT_MS}ms for ${projectSlug}`,
           ),
         );
+        constraintCache?.writeProjectTimeout(regionUrl);
       } else if (error instanceof ApiError) {
         // API errors (404, 401, 403, etc.) should fail verification
         const message =
@@ -259,22 +404,12 @@ export async function verifyConstraintsAccess(
     }
   }
 
-  // Cache: org-only after org fetch; org+project only when project verification
-  // succeeded (skip caching on project timeout so the next request can retry).
-  if (cacheKey && (!projectSlug || projectCapabilities !== null)) {
-    void setCachedConstraints(cache!.kv, cacheKey, {
-      regionUrl: regionUrl || null,
-      projectCapabilities: projectSlug ? projectCapabilities : null,
-      cachedAt: Date.now(),
-    });
-  }
-
   return {
     ok: true,
     constraints: {
       organizationSlug,
       projectSlug: projectSlug || null,
-      regionUrl: regionUrl || null,
+      regionUrl,
       projectCapabilities,
     },
   };
