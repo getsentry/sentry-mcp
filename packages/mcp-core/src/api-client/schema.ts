@@ -1069,19 +1069,40 @@ export const ExternalIssueListSchema = z.array(ExternalIssueSchema);
  * Upstream source of truth in getsentry/sentry:
  * - `src/sentry/api/endpoints/organization_trace_meta.py`
  */
-export const TraceMetaSchema = z.object({
-  logs: z.number(),
-  errors: z.number(),
-  performance_issues: z.number(),
-  span_count: z.number(),
-  transaction_child_count_map: z.array(
-    z.object({
-      "transaction.event_id": z.string().nullable(),
-      "count()": z.number(),
-    }),
-  ),
-  span_count_map: z.record(z.string(), z.number()),
+const TraceMetaTransactionChildCountSchema = z.object({
+  "transaction.event_id": z.string().nullable(),
+  "count()": z.number(),
 });
+
+export const TraceMetaSchema = z
+  .object({
+    logs: z.number().optional(),
+    errors: z.number().optional(),
+    performance_issues: z.number().optional(),
+    span_count: z.number().optional(),
+    transaction_child_count_map: z
+      .array(TraceMetaTransactionChildCountSchema)
+      .optional(),
+    span_count_map: z.record(z.string(), z.number()).optional(),
+    logsCount: z.number().optional(),
+    errorsCount: z.number().optional(),
+    performanceIssuesCount: z.number().optional(),
+    spansCount: z.number().optional(),
+    transactionChildCountMap: z
+      .array(TraceMetaTransactionChildCountSchema)
+      .optional(),
+    spansCountMap: z.record(z.string(), z.number()).optional(),
+  })
+  .transform((meta) => ({
+    logs: meta.logs ?? meta.logsCount ?? 0,
+    errors: meta.errors ?? meta.errorsCount ?? 0,
+    performance_issues:
+      meta.performance_issues ?? meta.performanceIssuesCount ?? 0,
+    span_count: meta.span_count ?? meta.spansCount ?? 0,
+    transaction_child_count_map:
+      meta.transaction_child_count_map ?? meta.transactionChildCountMap ?? [],
+    span_count_map: meta.span_count_map ?? meta.spansCountMap ?? {},
+  }));
 
 /**
  * Schema for individual spans within a trace.

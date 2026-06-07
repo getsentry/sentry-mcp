@@ -417,6 +417,45 @@ describe("get_trace_details", () => {
     expect(result).not.toContain("## Overview");
   });
 
+  it("handles trace meta responses with missing count fields", async () => {
+    const traceId = "c4d1aae7216b47ff8117cf4e09ce9d0c";
+
+    mswServer.use(
+      ...httpGetRegional(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace-meta/${traceId}/`,
+        () => {
+          return HttpResponse.json({});
+        },
+      ),
+      ...httpGetRegional(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/${traceId}/`,
+        () => {
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const result = await getTraceDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        traceId,
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain("**Total Spans**: 0");
+    expect(result).toContain("**Errors**: 0");
+    expect(result).toContain("**Performance Issues**: 0");
+    expect(result).toContain("**Logs**: 0");
+  });
+
   it("handles API error gracefully", async () => {
     mswServer.use(
       ...httpGetRegional(

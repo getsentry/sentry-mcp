@@ -21,6 +21,7 @@ import {
   ReleaseSchema,
   ReplayDetailsSchema,
   TagSchema,
+  TraceMetaSchema,
   TransactionProfileSampleSchema,
   TransactionProfileSchema,
 } from "./schema";
@@ -602,6 +603,53 @@ describe("TagSchema", () => {
       key: "transaction",
       name: "Transaction",
       totalValues: 1080,
+    });
+  });
+});
+
+describe("TraceMetaSchema", () => {
+  it("defaults missing trace metadata counts and maps", () => {
+    expect(TraceMetaSchema.parse({})).toEqual({
+      logs: 0,
+      errors: 0,
+      performance_issues: 0,
+      span_count: 0,
+      transaction_child_count_map: [],
+      span_count_map: {},
+    });
+  });
+
+  it("normalizes current trace-meta response keys", () => {
+    expect(
+      TraceMetaSchema.parse({
+        logsCount: 3,
+        errorsCount: 2,
+        performanceIssuesCount: 1,
+        spansCount: 4,
+        transactionChildCountMap: [
+          {
+            "transaction.event_id": "0daf40dc453a429c8c57e4c215c4e82c",
+            "count()": 4,
+          },
+        ],
+        spansCountMap: {
+          "http.client": 4,
+        },
+      }),
+    ).toEqual({
+      logs: 3,
+      errors: 2,
+      performance_issues: 1,
+      span_count: 4,
+      transaction_child_count_map: [
+        {
+          "transaction.event_id": "0daf40dc453a429c8c57e4c215c4e82c",
+          "count()": 4,
+        },
+      ],
+      span_count_map: {
+        "http.client": 4,
+      },
     });
   });
 });
