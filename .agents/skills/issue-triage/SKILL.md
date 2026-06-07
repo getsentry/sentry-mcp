@@ -90,6 +90,7 @@ If `repositoryContext.checkoutAvailable` is true, inspect code under `repository
    - `needs_more_info`: likely valid, but missing concrete repro, motivation, or acceptance criteria.
    - `low_actionability`: the request has a recognizable shape but little useful signal.
    - `impractical_scope`: the request is broad enough that it needs a proposal, owner, migration plan, or product decision before normal issue triage makes sense.
+   - `spam`: promotional, automated, or SEO/link-drop content that is not a repo bug, docs issue, support request, feature request, security report, or maintainer decision.
    - `unclear`: the concern cannot be identified.
 6. Choose the rewrite mode before drafting anything:
    - `none`: leave the issue body alone. Use this for weak or low-signal reports when rewriting would launder them into a better-looking ticket than they are.
@@ -107,6 +108,11 @@ If `repositoryContext.checkoutAvailable` is true, inspect code under `repository
    - Set `should_comment` to true when the best next step is a short ask for missing context, a scope note for maintainer review, or a concise explanation that the request is not actionable as written.
    - Provide `triage_comment` when `should_comment` is true.
    - Keep broad/impractical feature requests open for human review unless duplicate status is confirmed by the duplicate stage.
+9. Decide whether to close spam:
+   - Set `should_close` to true only for clear spam, automated external promotion, registry listing notifications, package-claim solicitations, SEO/link drops, or marketing outreach that has no repository maintenance action.
+   - Use `disposition: "spam"`, `labels_to_apply: ["invalid"]` when that label exists, `close_reason: "not planned"`, and a concise `close_comment`.
+   - Do not close security reports, legal/ownership disputes, maintainer-authored issues, ambiguous partner/integration requests, or anything needing human judgment.
+   - Be decisive when the evidence is direct. Do not say a maintainer can decide whether to close a clear spam issue.
 
 ### Low-Signal and Impractical Requests
 
@@ -178,7 +184,7 @@ Return:
 
 - `severity`: `low`, `medium`, `high`, or `critical`
 - `category`: `bug`, `documentation`, `feature_request`, `support`, `security`, `maintenance`, or `unknown`
-- `disposition`: `actionable`, `needs_more_info`, `low_actionability`, `impractical_scope`, or `unclear`
+- `disposition`: `actionable`, `needs_more_info`, `low_actionability`, `impractical_scope`, `spam`, or `unclear`
 - `rewrite_mode`: `none`, `light_cleanup`, `technical_diagnosis`, or `scope_clarification`
 - `validity`: `confirmed`, `likely`, `not_reproducible`, or `unclear`
 - `summary`: concise diagnosis
@@ -190,4 +196,7 @@ Return:
 - `proposed_body` when `should_update_issue` is true
 - `triage_comment` when `should_comment` is true
 - `update_comment` when `should_update_issue` is true
+- `should_close`: true only for clear spam that should be closed automatically
+- `close_reason`: `not planned` when `should_close` is true
+- `close_comment` when `should_close` is true
 - `needs_human_review`: true for security-sensitive, high-risk, ambiguous, or destructive cases

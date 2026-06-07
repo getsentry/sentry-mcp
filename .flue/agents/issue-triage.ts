@@ -32,6 +32,7 @@ const dispositionSchema = v.picklist([
   "needs_more_info",
   "low_actionability",
   "impractical_scope",
+  "spam",
   "unclear",
 ]);
 const rewriteModeSchema = v.picklist([
@@ -40,6 +41,7 @@ const rewriteModeSchema = v.picklist([
   "technical_diagnosis",
   "scope_clarification",
 ]);
+const closeReasonSchema = v.picklist(["not planned"]);
 
 const duplicateCandidateSchema = v.object({
   number: v.pipe(v.number(), v.integer(), v.minValue(1)),
@@ -73,6 +75,9 @@ const diagnosisSchema = v.object({
   proposed_body: v.optional(v.string()),
   triage_comment: v.optional(v.string()),
   update_comment: v.optional(v.string()),
+  should_close: v.optional(v.boolean()),
+  close_reason: v.optional(closeReasonSchema),
+  close_comment: v.optional(v.string()),
   needs_human_review: v.boolean(),
 });
 type Diagnosis = v.InferOutput<typeof diagnosisSchema>;
@@ -82,6 +87,8 @@ const updateSchema = v.object({
   body_updated: v.boolean(),
   labels_applied: v.array(v.string()),
   comment_posted: v.boolean(),
+  issue_closed: v.boolean(),
+  close_reason: v.optional(closeReasonSchema),
   needs_human_review: v.boolean(),
   summary: v.string(),
 });
@@ -407,6 +414,59 @@ async function closeDuplicate(
   return labelsApplied;
 }
 
+function shouldCloseAsSpam(diagnosis: Diagnosis) {
+  return (
+    diagnosis.should_close === true &&
+    diagnosis.close_reason === "not planned" &&
+    diagnosis.disposition === "spam" &&
+    diagnosis.severity === "low" &&
+    diagnosis.category !== "security" &&
+    diagnosis.needs_human_review === false
+  );
+}
+
+function hasPuntingCloseLanguage(comment: string) {
+  return /maintainer can decide whether to .*close/i.test(comment);
+}
+
+function buildSpamCloseComment() {
+  return [
+    "Triage bot here.",
+    "",
+    "This is an automated external promotion rather than a repo bug, docs issue, support request, or feature request, so I'm closing it as invalid for normal repo triage.",
+  ].join("\n");
+}
+
+function selectCloseComment(diagnosis: Diagnosis) {
+  const comment =
+    diagnosis.close_comment?.trim() || diagnosis.triage_comment?.trim();
+
+  if (comment && /\bclos/i.test(comment) && !hasPuntingCloseLanguage(comment)) {
+    return comment;
+  }
+
+  return buildSpamCloseComment();
+}
+
+async function closeSpamIssue(
+  session: FlueSession,
+  context: IssueContext,
+  diagnosis: Diagnosis,
+) {
+  const commentPosted = await postComment(
+    session,
+    context,
+    selectCloseComment(diagnosis),
+  );
+  await runGhCommand(
+    session,
+    `gh issue close ${context.issueNumber}${repoArg(context.repository)} --reason ${shellQuote("not planned")}`,
+    "Closing spam issue",
+  );
+
+  return commentPosted;
+}
+
 function buildIssueUpdateComment(
   diagnosis: v.InferOutput<typeof diagnosisSchema>,
 ) {
@@ -483,6 +543,7 @@ async function applyTriageUpdate(
       body_updated: false,
       labels_applied: [],
       comment_posted: false,
+      issue_closed: false,
       needs_human_review: true,
       summary: "Skipped triage update because the issue is already closed.",
     };
@@ -496,6 +557,23 @@ async function applyTriageUpdate(
   let titleUpdated = false;
   let bodyUpdated = false;
   let commentPosted = false;
+
+  if (shouldCloseAsSpam(diagnosis)) {
+    commentPosted = await closeSpamIssue(session, context, diagnosis);
+
+    return {
+      title_updated: false,
+      body_updated: false,
+      labels_applied: labelsApplied,
+      comment_posted: commentPosted,
+      issue_closed: true,
+      close_reason: "not planned",
+      needs_human_review: false,
+      summary: "Closed issue as spam.",
+    };
+  }
+
+  const unsafeCloseRequest = diagnosis.should_close === true;
 
   if (diagnosis.should_update_issue) {
     titleUpdated = await editIssueTitle(
@@ -532,9 +610,11 @@ async function applyTriageUpdate(
     body_updated: bodyUpdated,
     labels_applied: labelsApplied,
     comment_posted: commentPosted,
-    needs_human_review: diagnosis.needs_human_review,
-    summary:
-      changed.length > 0
+    issue_closed: false,
+    needs_human_review: diagnosis.needs_human_review || unsafeCloseRequest,
+    summary: unsafeCloseRequest
+      ? "Skipped unsafe spam close request and left the issue open for maintainer review."
+      : changed.length > 0
         ? `Updated issue ${changed.join(", ")}.`
         : "No issue update was needed.",
   };
@@ -755,7 +835,11 @@ export default async function ({ init, payload }: FlueContext) {
   const update = await applyTriageUpdate(session, updateContext, diagnosis);
 
   return {
-    outcome: update.needs_human_review ? "needs_human_review" : "triaged",
+    outcome: update.issue_closed
+      ? "closed_spam"
+      : update.needs_human_review
+        ? "needs_human_review"
+        : "triaged",
     steps: [
       { name: "search-duplicates", result: duplicateSearch.status },
       {
@@ -774,6 +858,8 @@ export default async function ({ init, payload }: FlueContext) {
     comment_posted: update.comment_posted,
     title_updated: update.title_updated,
     body_updated: update.body_updated,
+    issue_closed: update.issue_closed,
+    close_reason: update.close_reason,
     needs_human_review: update.needs_human_review,
     summary: update.summary,
   };
