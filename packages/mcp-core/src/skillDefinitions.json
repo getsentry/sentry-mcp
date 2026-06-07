@@ -330,6 +330,7 @@
     "description": "Inspect visual regression snapshot tests from CI — view changed images and diff masks",
     "defaultEnabled": false,
     "order": 6,
+    "mergedIntoSkillInExperimentalMode": "inspect",
     "toolCount": 7,
     "tools": [
       {

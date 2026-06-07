@@ -104,6 +104,41 @@ describe("approval-dialog", () => {
       expect(html).toContain(">javascript</strong> project");
       expect(html).toContain(">sentry</strong> organization");
     });
+
+    it("should render merged skills separately outside experimental mode", async () => {
+      const response = await renderApprovalDialog(
+        new Request("https://example.com/oauth/authorize"),
+        {
+          client: mockClient,
+          server: { name: "Sentry MCP" },
+          state: { oauthReqInfo: { clientId: "test-client" } },
+          cookieSecret: TEST_SECRET,
+        },
+      );
+
+      const html = await response.text();
+
+      expect(html).toContain("Inspect Issues &amp; Events");
+      expect(html).toContain("Preprod Snapshots");
+    });
+
+    it("should hide merged skills in experimental mode", async () => {
+      const response = await renderApprovalDialog(
+        new Request("https://example.com/oauth/authorize"),
+        {
+          client: mockClient,
+          server: { name: "Sentry MCP" },
+          experimentalMode: true,
+          state: { oauthReqInfo: { clientId: "test-client" } },
+          cookieSecret: TEST_SECRET,
+        },
+      );
+
+      const html = await response.text();
+
+      expect(html).toContain("Inspect Issues &amp; Events");
+      expect(html).not.toContain("Preprod Snapshots");
+    });
   });
 
   describe("CSRF protection with HMAC-signed state", () => {

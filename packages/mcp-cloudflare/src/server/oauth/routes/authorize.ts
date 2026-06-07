@@ -16,7 +16,10 @@ import {
 import { SCOPES } from "../../../constants";
 import { signState, type OAuthState } from "../state";
 import { logWarn } from "@sentry/mcp-core/telem/logging";
-import { parseResourceMcpConstraints } from "../resource-scope";
+import {
+  parseResourceExperimentalMode,
+  parseResourceMcpConstraints,
+} from "../resource-scope";
 
 /**
  * Extended AuthRequest that includes skills and resource parameter
@@ -143,6 +146,7 @@ export default new Hono<{ Bindings: Env }>()
       ...(resourceParam ? { resource: resourceParam } : {}),
     };
     const approvalScope = parseResourceMcpConstraints(resourceParam);
+    const experimentalMode = parseResourceExperimentalMode(resourceParam);
 
     // XXX(dcramer): we want to confirm permissions on each time
     // so you can always choose new ones
@@ -168,6 +172,7 @@ export default new Hono<{ Bindings: Env }>()
         name: "Sentry MCP",
       },
       scope: approvalScope,
+      experimentalMode,
       redirectUri: oauthReqInfoWithResource.redirectUri,
       state: { oauthReqInfo: oauthReqInfoWithResource },
       cookieSecret: c.env.COOKIE_SECRET,

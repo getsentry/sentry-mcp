@@ -3,6 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { setUser } from "@sentry/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildServer } from "./server";
+import type { Skill } from "./skills";
 import tools from "./tools";
 import {
   CATALOG_INFRASTRUCTURE_TOOL_NAMES,
@@ -440,6 +441,59 @@ describe("buildServer", () => {
     });
   });
 
+  describe("experimental skill collapsing", () => {
+    it("does not expose preprod tools through inspect in stable mode", () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set<Skill>(["inspect"]),
+        },
+        experimentalMode: false,
+        tools: {
+          preprod_tool: createMockTool("preprod_tool", {
+            skills: ["preprod"],
+          }),
+        },
+      });
+
+      expect(getRegisteredToolNames(server)).not.toContain("preprod_tool");
+    });
+
+    it("exposes preprod tools through inspect in experimental mode", () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set<Skill>(["inspect"]),
+        },
+        experimentalMode: true,
+        tools: {
+          preprod_tool: createMockTool("preprod_tool", {
+            skills: ["preprod"],
+          }),
+        },
+      });
+
+      expect(getRegisteredToolNames(server)).toContain("preprod_tool");
+    });
+
+    it("continues to expose preprod tools to explicit preprod grants", () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set<Skill>(["preprod"]),
+        },
+        experimentalMode: false,
+        tools: {
+          preprod_tool: createMockTool("preprod_tool", {
+            skills: ["preprod"],
+          }),
+        },
+      });
+
+      expect(getRegisteredToolNames(server)).toContain("preprod_tool");
+    });
+  });
+
   describe("hideInExperimentalMode filtering", () => {
     it("hides tools with hideInExperimentalMode when experimentalMode is true", () => {
       const server = buildServer({
@@ -772,57 +826,20 @@ describe("buildServer", () => {
       expect(registeredTools.map((tool) => tool.name)).toEqual(["use_sentry"]);
     });
 
-    it("keeps preprod tools catalog-only while enforcing their skill gate", async () => {
-      const withoutPreprod = buildServer({
+    it("keeps preprod tools catalog-only while exposing them through inspect in experimental mode", async () => {
+      const server = buildServer({
         context: baseContext,
         experimentalMode: true,
       });
-      const withoutPreprodToolNames = getRegisteredToolNames(withoutPreprod);
-      expect(withoutPreprodToolNames).not.toContain("get_snapshot");
-      expect(withoutPreprodToolNames).not.toContain("get_snapshot_image");
-      expect(withoutPreprodToolNames).not.toContain("get_latest_base_snapshot");
+      const topLevelToolNames = getRegisteredToolNames(server);
+      expect(topLevelToolNames).not.toContain("get_snapshot");
+      expect(topLevelToolNames).not.toContain("get_snapshot_image");
+      expect(topLevelToolNames).not.toContain("get_latest_base_snapshot");
 
-      const hiddenResult = await callRegisteredTool(
-        withoutPreprod,
-        "search_tools",
-        {
-          query: "snapshot",
-          limit: 10,
-        },
-      );
-      const hiddenPayload = getStructuredContent<{
-        results: Array<{ name: string }>;
-      }>(hiddenResult);
-      expect(hiddenPayload.results.map((tool) => tool.name)).not.toContain(
-        "get_snapshot",
-      );
-
-      const withPreprod = buildServer({
-        context: {
-          ...baseContext,
-          grantedSkills: new Set([
-            "inspect",
-            "triage",
-            "project-management",
-            "seer",
-            "preprod",
-          ]),
-        },
-        experimentalMode: true,
+      const visibleResult = await callRegisteredTool(server, "search_tools", {
+        query: "snapshot",
+        limit: 10,
       });
-      const withPreprodToolNames = getRegisteredToolNames(withPreprod);
-      expect(withPreprodToolNames).not.toContain("get_snapshot");
-      expect(withPreprodToolNames).not.toContain("get_snapshot_image");
-      expect(withPreprodToolNames).not.toContain("get_latest_base_snapshot");
-
-      const visibleResult = await callRegisteredTool(
-        withPreprod,
-        "search_tools",
-        {
-          query: "snapshot",
-          limit: 10,
-        },
-      );
       const visiblePayload = getStructuredContent<{
         results: Array<{ name: string }>;
       }>(visibleResult);

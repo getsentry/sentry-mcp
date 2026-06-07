@@ -22,6 +22,12 @@ export interface SkillDefinition {
   defaultEnabled: boolean;
   order: number;
   toolCount?: number; // Number of tools enabled by this skill (calculated dynamically)
+  /**
+   * Experimental-mode consolidation target. When set, tools assigned to this
+   * skill are also exposed to sessions granted the target skill, and OAuth
+   * consent can hide the source skill to keep the visible permission set small.
+   */
+  mergedIntoSkillInExperimentalMode?: Skill;
 }
 
 export const SKILLS: Record<Skill, SkillDefinition> = {
@@ -68,6 +74,7 @@ export const SKILLS: Record<Skill, SkillDefinition> = {
       "Inspect visual regression snapshot tests from CI — view changed images and diff masks",
     defaultEnabled: false,
     order: 6,
+    mergedIntoSkillInExperimentalMode: "inspect",
   },
 };
 
@@ -124,13 +131,40 @@ export function isValidSkill(skill: string): skill is Skill {
   return skill in SKILLS;
 }
 
+export interface SkillModeOptions {
+  experimentalMode?: boolean;
+}
+
+// Expand tool skills based on active server mode.
+export function getEffectiveToolSkills(
+  toolSkills: Skill[],
+  options: SkillModeOptions = {},
+): Skill[] {
+  if (!options.experimentalMode) {
+    return toolSkills;
+  }
+
+  const effectiveSkills = new Set<Skill>(toolSkills);
+  for (const skill of toolSkills) {
+    const mergedSkill = SKILLS[skill]?.mergedIntoSkillInExperimentalMode;
+    if (mergedSkill) {
+      effectiveSkills.add(mergedSkill);
+    }
+  }
+
+  return Array.from(effectiveSkills);
+}
+
 // Check if tool is enabled by granted skills (ANY match = enabled)
 export function isEnabledBySkills(
   grantedSkills: Set<Skill> | undefined,
   toolSkills: Skill[],
+  options: SkillModeOptions = {},
 ): boolean {
   if (!grantedSkills || toolSkills.length === 0) return false;
-  return toolSkills.some((skill) => grantedSkills.has(skill));
+  return getEffectiveToolSkills(toolSkills, options).some((skill) =>
+    grantedSkills.has(skill),
+  );
 }
 
 // Parse and validate skills from input
@@ -166,6 +200,7 @@ export function parseSkills(input: unknown): {
 // Calculate required scopes from granted skills
 export async function getScopesForSkills(
   grantedSkills: Set<Skill>,
+  options: SkillModeOptions = {},
 ): Promise<Set<string>> {
   // Import here to avoid circular dependency at module load time
   const { DEFAULT_SCOPES } = await import("./constants.js");
@@ -184,7 +219,9 @@ export async function getScopesForSkills(
       continue;
     }
     // Check if any of the tool's skills are granted
-    const toolEnabled = tool.skills.some((skill) => grantedSkills.has(skill));
+    const toolEnabled = getEffectiveToolSkills(tool.skills, options).some(
+      (skill) => grantedSkills.has(skill),
+    );
 
     // If tool is enabled by granted skills, add its required scopes
     if (toolEnabled) {

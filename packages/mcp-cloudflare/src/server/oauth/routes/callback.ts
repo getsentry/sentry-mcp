@@ -14,7 +14,10 @@ import {
   getOAuthCallbackFailureDetails,
   validateResourceParameter,
 } from "../helpers";
-import { parseResourceMcpConstraints } from "../resource-scope";
+import {
+  parseResourceExperimentalMode,
+  parseResourceMcpConstraints,
+} from "../resource-scope";
 import { type OAuthState, verifyAndParseState } from "../state";
 
 /**
@@ -264,13 +267,19 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     );
   }
 
+  const resource = (oauthReqInfo as AuthRequestWithSkills).resource;
+  const experimentalMode = parseResourceExperimentalMode(
+    typeof resource === "string" ? resource : undefined,
+  );
+
   // Calculate Sentry API scopes from validated skills
-  const grantedScopes = await getScopesForSkills(validSkills);
+  const grantedScopes = await getScopesForSkills(validSkills, {
+    experimentalMode,
+  });
 
   // Convert valid skills Set to array for OAuth props
   const grantedSkills = Array.from(validSkills);
 
-  const resource = (oauthReqInfo as AuthRequestWithSkills).resource;
   const resourceScope = parseResourceMcpConstraints(
     typeof resource === "string" ? resource : undefined,
   );

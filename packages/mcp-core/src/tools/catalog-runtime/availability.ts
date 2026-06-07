@@ -91,10 +91,12 @@ function isAllowedBySkills({
   tool,
   context,
   agentMode,
+  experimentalMode,
 }: {
   tool: ToolConfig<any>;
   context: ServerContext;
   agentMode: boolean;
+  experimentalMode: boolean;
 }): boolean {
   if (agentMode) {
     return true;
@@ -109,7 +111,8 @@ function isAllowedBySkills({
   }
 
   return (
-    tool.skills.length > 0 && isEnabledBySkills(grantedSkills, tool.skills)
+    tool.skills.length > 0 &&
+    isEnabledBySkills(grantedSkills, tool.skills, { experimentalMode })
   );
 }
 
@@ -183,7 +186,7 @@ export function getAvailableTools({
       continue;
     }
 
-    if (!isAllowedBySkills({ tool, context, agentMode })) {
+    if (!isAllowedBySkills({ tool, context, agentMode, experimentalMode })) {
       continue;
     }
 

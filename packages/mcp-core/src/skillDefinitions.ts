@@ -8,6 +8,7 @@ export interface SkillDefinition {
   defaultEnabled: boolean;
   order: number;
   toolCount?: number;
+  mergedIntoSkillInExperimentalMode?: string;
   tools?: Array<{
     name: string;
     description: string;

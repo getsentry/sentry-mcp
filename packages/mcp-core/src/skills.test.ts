@@ -5,6 +5,7 @@ import {
   isValidSkill,
   parseSkills,
   isEnabledBySkills,
+  getEffectiveToolSkills,
   type Skill,
 } from "./skills";
 import skillDefinitions from "./skillDefinitions";
@@ -29,6 +30,7 @@ describe("skills module", () => {
       expect(SKILLS["project-management"]).toBeDefined();
       expect(SKILLS.seer).toBeDefined();
       expect(SKILLS.docs).toBeDefined();
+      expect(SKILLS.preprod).toBeDefined();
     });
 
     it("includes metadata for each skill", () => {
@@ -49,6 +51,7 @@ describe("skills module", () => {
       expect(DEFAULT_SKILLS).not.toContain("docs");
       expect(DEFAULT_SKILLS).not.toContain("triage");
       expect(DEFAULT_SKILLS).not.toContain("project-management");
+      expect(DEFAULT_SKILLS).not.toContain("preprod");
     });
 
     it("has exactly 2 default skills", () => {
@@ -63,6 +66,7 @@ describe("skills module", () => {
       expect(isValidSkill("project-management")).toBe(true);
       expect(isValidSkill("seer")).toBe(true);
       expect(isValidSkill("docs")).toBe(true);
+      expect(isValidSkill("preprod")).toBe(true);
     });
 
     it("returns false for invalid skills", () => {
@@ -151,6 +155,32 @@ describe("skills module", () => {
     it("returns false when toolSkills is empty", () => {
       const grantedSkills = new Set<Skill>(["inspect"]);
       expect(isEnabledBySkills(grantedSkills, [])).toBe(false);
+    });
+
+    it("does not collapse preprod into inspect outside experimental mode", () => {
+      const grantedSkills = new Set<Skill>(["inspect"]);
+      expect(isEnabledBySkills(grantedSkills, ["preprod"])).toBe(false);
+    });
+
+    it("collapses preprod into inspect in experimental mode", () => {
+      const grantedSkills = new Set<Skill>(["inspect"]);
+      expect(
+        isEnabledBySkills(grantedSkills, ["preprod"], {
+          experimentalMode: true,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("getEffectiveToolSkills", () => {
+    it("preserves tool skills outside experimental mode", () => {
+      expect(getEffectiveToolSkills(["preprod"])).toEqual(["preprod"]);
+    });
+
+    it("adds merged target skills in experimental mode", () => {
+      expect(
+        getEffectiveToolSkills(["preprod"], { experimentalMode: true }),
+      ).toEqual(["preprod", "inspect"]);
     });
   });
 

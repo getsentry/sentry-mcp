@@ -200,6 +200,10 @@ export interface ApprovalDialogOptions {
     projectSlug: string | null;
   } | null;
   /**
+   * Whether the OAuth grant is for an experimental MCP endpoint.
+   */
+  experimentalMode?: boolean;
+  /**
    * The specific redirect URI selected for this authorization request.
    */
   redirectUri?: string | null;
@@ -212,6 +216,56 @@ export interface ApprovalDialogOptions {
    * HMAC secret key for signing state parameters
    */
   cookieSecret: string;
+}
+
+function getSkillsForApproval(
+  skills: SkillDefinition[],
+  experimentalMode: boolean,
+): SkillDefinition[] {
+  if (!experimentalMode) {
+    return skills;
+  }
+
+  const visibleSkills = skills
+    .filter((skill) => !skill.mergedIntoSkillInExperimentalMode)
+    .map((skill) => ({ ...skill }));
+
+  for (const mergedSkill of skills) {
+    const targetSkillId = mergedSkill.mergedIntoSkillInExperimentalMode;
+    if (!targetSkillId) {
+      continue;
+    }
+
+    const targetSkill = visibleSkills.find(
+      (skill) => skill.id === targetSkillId,
+    );
+    if (!targetSkill) {
+      continue;
+    }
+
+    if (targetSkill.tools || mergedSkill.tools) {
+      const toolsByName = new Map(
+        (targetSkill.tools ?? []).map((tool) => [tool.name, tool]),
+      );
+      for (const tool of mergedSkill.tools ?? []) {
+        toolsByName.set(tool.name, tool);
+      }
+      targetSkill.tools = Array.from(toolsByName.values()).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
+      targetSkill.toolCount = targetSkill.tools.length;
+      continue;
+    }
+
+    if (mergedSkill.toolCount === undefined) {
+      continue;
+    }
+
+    targetSkill.toolCount =
+      (targetSkill.toolCount ?? 0) + mergedSkill.toolCount;
+  }
+
+  return visibleSkills;
 }
 
 /**
@@ -279,10 +333,21 @@ export async function renderApprovalDialog(
   request: Request,
   options: ApprovalDialogOptions,
 ): Promise<Response> {
-  const { client, server, scope, redirectUri, state, cookieSecret } = options;
+  const {
+    client,
+    server,
+    scope,
+    experimentalMode = false,
+    redirectUri,
+    state,
+    cookieSecret,
+  } = options;
 
   // Use static skill definitions bundled at build time
-  const skills: SkillDefinition[] = skillDefinitions as SkillDefinition[];
+  const skills = getSkillsForApproval(
+    skillDefinitions as SkillDefinition[],
+    experimentalMode,
+  );
 
   // Generate HTML for all skills (checked if defaultEnabled)
   const skillsHtml = skills
