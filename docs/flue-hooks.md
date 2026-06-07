@@ -34,7 +34,7 @@ The stages are:
 3. Prepare a repository checkout for diagnosis. GitHub Actions clones the default branch with `actions/checkout`; the handler can fall back to `gh repo clone` if no checkout exists.
 4. Diagnose and validate the report using repository context and targeted commands.
 5. Apply existing labels and issue title/body cleanup from the structured diagnosis. The diagnosis includes a disposition and rewrite mode so broad or low-signal requests can stay visibly low-signal instead of being over-polished. The handler can also post a short triage-bot comment without editing the body when the best next step is asking for scope, motivation, or maintainer review.
-6. Close clear spam or automated external promotion when the structured diagnosis explicitly requests `should_close: true`, `disposition: "spam"`, `close_reason: "not planned"`, and does not require human review. Unsafe close requests are ignored and the issue is left open for maintainer review.
+6. Close clear spam or automated external promotion when the structured diagnosis explicitly requests `should_close: true`, `severity: "low"`, `disposition: "spam"`, `close_reason: "not planned"`, and does not require human review. Unsafe close requests are ignored and the issue is left open for maintainer review.
 
 If a model stage fails before returning structured output, the handler leaves the issue unchanged and reports `needs_human_review` instead of failing the workflow.
 

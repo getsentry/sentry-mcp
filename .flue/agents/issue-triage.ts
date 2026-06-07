@@ -437,6 +437,20 @@ function buildSpamCloseComment() {
   ].join("\n");
 }
 
+function buildUnsafeCloseComment(diagnosis: Diagnosis) {
+  const lines = [
+    "Triage bot here.",
+    "",
+    "The agent flagged this for spam closure, but the request did not pass the auto-close guardrails, so I left it open for maintainer review.",
+  ];
+
+  if (diagnosis.summary.trim()) {
+    lines.push("", `Current read: ${diagnosis.summary.trim()}`);
+  }
+
+  return lines.join("\n");
+}
+
 function selectCloseComment(diagnosis: Diagnosis) {
   const comment =
     diagnosis.close_comment?.trim() || diagnosis.triage_comment?.trim();
@@ -446,6 +460,21 @@ function selectCloseComment(diagnosis: Diagnosis) {
   }
 
   return buildSpamCloseComment();
+}
+
+function selectUnsafeCloseComment(diagnosis: Diagnosis) {
+  const comment =
+    diagnosis.triage_comment?.trim() || diagnosis.close_comment?.trim();
+
+  if (
+    comment &&
+    !/\bclos/i.test(comment) &&
+    !hasPuntingCloseLanguage(comment)
+  ) {
+    return comment;
+  }
+
+  return buildUnsafeCloseComment(diagnosis);
 }
 
 async function closeSpamIssue(
@@ -587,12 +616,16 @@ async function applyTriageUpdate(
       diagnosis.proposed_body,
     );
 
-    const comment = selectTriageComment(diagnosis, bodyUpdated);
+    const comment = unsafeCloseRequest
+      ? selectUnsafeCloseComment(diagnosis)
+      : selectTriageComment(diagnosis, bodyUpdated);
     if (comment) {
       commentPosted = await postComment(session, context, comment);
     }
   } else {
-    const comment = selectTriageComment(diagnosis, false);
+    const comment = unsafeCloseRequest
+      ? selectUnsafeCloseComment(diagnosis)
+      : selectTriageComment(diagnosis, false);
     if (comment) {
       commentPosted = await postComment(session, context, comment);
     }

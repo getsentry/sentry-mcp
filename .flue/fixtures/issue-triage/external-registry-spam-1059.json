@@ -46,6 +46,7 @@
     "problem": "The agent had enough evidence to classify the issue as non-repo promotional automation, but its available schema only let it label/comment. The comment also lacked conviction by deferring closure to a maintainer."
   },
   "expectedTriage": {
+    "severity": "low",
     "category": "unknown",
     "disposition": "spam",
     "labels_to_apply": ["invalid"],

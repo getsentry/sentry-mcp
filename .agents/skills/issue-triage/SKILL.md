@@ -110,7 +110,7 @@ If `repositoryContext.checkoutAvailable` is true, inspect code under `repository
    - Keep broad/impractical feature requests open for human review unless duplicate status is confirmed by the duplicate stage.
 9. Decide whether to close spam:
    - Set `should_close` to true only for clear spam, automated external promotion, registry listing notifications, package-claim solicitations, SEO/link drops, or marketing outreach that has no repository maintenance action.
-   - Use `disposition: "spam"`, `labels_to_apply: ["invalid"]` when that label exists, `close_reason: "not planned"`, and a concise `close_comment`.
+   - Use `severity: "low"`, `disposition: "spam"`, `labels_to_apply: ["invalid"]` when that label exists, `close_reason: "not planned"`, and a concise `close_comment`.
    - Do not close security reports, legal/ownership disputes, maintainer-authored issues, ambiguous partner/integration requests, or anything needing human judgment.
    - Be decisive when the evidence is direct. Do not say a maintainer can decide whether to close a clear spam issue.
 
