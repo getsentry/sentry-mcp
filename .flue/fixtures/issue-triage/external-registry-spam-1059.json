@@ -1,0 +1,60 @@
+{
+  "name": "external-registry-spam-1059",
+  "description": "Real GitHub issue fixture for an automated external registry notification that the triage agent should close as invalid/spam instead of punting to a maintainer.",
+  "source": {
+    "repository": "getsentry/sentry-mcp",
+    "issueNumber": 1059,
+    "issueUrl": "https://github.com/getsentry/sentry-mcp/issues/1059",
+    "workflowRunUrl": "https://github.com/getsentry/sentry-mcp/actions/runs/27094165697",
+    "capturedAt": "2026-06-07T13:39:51Z"
+  },
+  "issue": {
+    "number": 1059,
+    "title": "Your project is now listed on CodeGuilds",
+    "author": {
+      "login": "xdevsapps",
+      "association": "NONE",
+      "type": "User"
+    },
+    "stateAtCapture": "open",
+    "createdAt": "2026-06-07T13:38:41Z",
+    "updatedAt": "2026-06-07T13:39:51Z",
+    "labelsAtCapture": ["invalid"],
+    "body": "Hi @getsentry \ud83d\udc4b\n\nWe added your project **Sentry MCP Server** to **CodeGuilds** \u2014 a community registry for the Claude Code ecosystem (like npmjs but for Claude skills, agents, MCP servers, and tools).\n\nYour package is live at: **https://codeguilds.dev/packages/sentry-mcp**\n\nIf you'd like to claim ownership of the listing and manage it yourself, you can sign in with GitHub at https://codeguilds.dev and claim the package from your dashboard.\n\nThanks for building this \u2014 the community appreciates it!\n\n*This issue was opened automatically by the CodeGuilds team. Feel free to close it.*"
+  },
+  "observedTriage": {
+    "diagnosis": {
+      "severity": "low",
+      "category": "maintenance",
+      "disposition": "low_actionability",
+      "rewrite_mode": "none",
+      "validity": "likely",
+      "summary": "This is an external registry notification saying Sentry MCP has been listed on CodeGuilds and can be claimed by maintainers. It does not report a repo bug, docs issue, setup problem, or concrete feature request.",
+      "evidence": [
+        "Read the current issue body and comments from the provided context.",
+        "Read AGENTS.md and the README in the available checkout. The repository is Sentry MCP, matching the project named in the notification.",
+        "Duplicate search found no other CodeGuilds/listing issue in this repository.",
+        "No code, documentation, or test validation is relevant because the issue is an external listing notification rather than repository behavior."
+      ],
+      "labels_to_apply": ["invalid"],
+      "should_comment": true,
+      "should_update_issue": false,
+      "triage_comment": "Triage bot here.\n\nThis looks like an external registry notification rather than a repo bug, docs issue, or feature request. I\u2019m marking it as not actionable for normal repo triage; a maintainer can decide whether to claim the listing or close it.",
+      "needs_human_review": false
+    },
+    "comment": "Triage bot here.\n\nThis looks like an external registry notification rather than a repo bug, docs issue, or feature request. I\u2019m marking it as not actionable for normal repo triage; a maintainer can decide whether to claim the listing or close it.",
+    "problem": "The agent had enough evidence to classify the issue as non-repo promotional automation, but its available schema only let it label/comment. The comment also lacked conviction by deferring closure to a maintainer."
+  },
+  "expectedTriage": {
+    "severity": "low",
+    "category": "unknown",
+    "disposition": "spam",
+    "labels_to_apply": ["invalid"],
+    "should_update_issue": false,
+    "should_comment": true,
+    "should_close": true,
+    "close_reason": "not planned",
+    "needs_human_review": false,
+    "commentExpectation": "The comment should state that this is automated external registry promotion, not a repo issue, and that it is being closed. It should not ask a maintainer to decide whether to close."
+  }
+}
