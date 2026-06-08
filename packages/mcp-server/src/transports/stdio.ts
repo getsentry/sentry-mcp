@@ -23,42 +23,11 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { LIB_VERSION } from "@sentry/mcp-core/version";
 import * as Sentry from "@sentry/node";
 
-type SentryProtocol = "http" | "https";
-type TransportType = "stdio" | "http";
-
-type ProjectCapabilities = {
-  profiles?: boolean;
-  replays?: boolean;
-  logs?: boolean;
-  traces?: boolean;
-};
-
-type Constraints = {
-  organizationSlug?: string | null;
-  projectSlug?: string | null;
-  regionUrl?: string | null;
-  projectCapabilities?: ProjectCapabilities | null;
-};
-
 export type StdioServerContext = {
   sentryHost?: string;
-  sentryProtocol?: SentryProtocol;
   mcpUrl?: string;
-  accessToken?: string;
-  clientName?: string | null;
-  clientFamily?: string | null;
-  openaiBaseUrl?: string;
-  userId?: string | null;
-  userIpAddress?: string | null;
-  clientId?: string;
-  grantedSkills?: ReadonlySet<string>;
-  constraints?: Constraints;
   agentMode?: boolean;
   experimentalMode?: boolean;
-  availableToolNames?: ReadonlySet<string>;
-  directToolNames?: ReadonlySet<string>;
-  transport?: TransportType;
-  onUpstreamUnauthorized?: () => void | Promise<void>;
 };
 
 function getStdioSpanAttributes(
@@ -91,7 +60,7 @@ function getStdioSpanAttributes(
  * All operations are wrapped in Sentry tracing for observability.
  *
  * @param server - Configured and instrumented MCP server instance (with context in closures)
- * @param context - Server context with authentication and configuration (for telemetry attributes)
+ * @param context - Context values used for telemetry attributes
  *
  * @example CLI Integration
  * ```typescript
@@ -110,9 +79,9 @@ function getStdioSpanAttributes(
  * await startStdio(server, context);
  * ```
  */
-export async function startStdio(
+export async function startStdio<Context extends StdioServerContext>(
   server: McpServer,
-  context: StdioServerContext,
+  context: Context,
 ) {
   await Sentry.startNewTrace(async () => {
     return await Sentry.startSpan(
