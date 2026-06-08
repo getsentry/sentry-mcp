@@ -19,12 +19,7 @@ async function getAvailableTools(): Promise<string[]> {
   // Use pnpm exec to run the binary from the workspace
   const transport = new Experimental_StdioMCPTransport({
     command: "pnpm",
-    args: [
-      "exec",
-      "sentry-mcp",
-      "--access-token=mocked-access-token",
-      "--all-scopes",
-    ],
+    args: ["exec", "sentry-mcp", "--access-token=mocked-access-token"],
     env: {
       ...process.env,
       SENTRY_ACCESS_TOKEN: "mocked-access-token",
@@ -73,7 +68,12 @@ const predictionSchema = z.object({
     .array(
       z.object({
         name: z.string(),
-        arguments: z.record(z.any()).optional().default({}),
+        // Serialize arguments as a JSON string so the schema stays compatible
+        // with OpenAI's strict response_format (z.record(z.any()) emits
+        // `additionalProperties` without a `type`, which the API rejects).
+        argumentsJson: z
+          .string()
+          .describe("JSON-encoded tool arguments, e.g. '{}' for none."),
       }),
     )
     .describe("What tools the AI would likely call"),
