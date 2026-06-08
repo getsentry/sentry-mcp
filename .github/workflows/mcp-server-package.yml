@@ -52,6 +52,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build package dependencies
+        run: pnpm --filter @sentry/mcp-core build
+
       - name: Build stdio package
         run: pnpm --filter @sentry/mcp-server build
 
