@@ -20,12 +20,18 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
  * ```
  */
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type { ServerContext } from "@sentry/mcp-core/types";
 import { LIB_VERSION } from "@sentry/mcp-core/version";
 import * as Sentry from "@sentry/node";
 
+export type StdioServerContext = {
+  sentryHost?: string;
+  mcpUrl?: string;
+  agentMode?: boolean;
+  experimentalMode?: boolean;
+};
+
 function getStdioSpanAttributes(
-  context: ServerContext,
+  context: StdioServerContext,
 ): Record<string, string | boolean> {
   const attributes: Record<string, string | boolean> = {
     "app.transport": "stdio",
@@ -54,7 +60,7 @@ function getStdioSpanAttributes(
  * All operations are wrapped in Sentry tracing for observability.
  *
  * @param server - Configured and instrumented MCP server instance (with context in closures)
- * @param context - Server context with authentication and configuration (for telemetry attributes)
+ * @param context - Context values used for telemetry attributes
  *
  * @example CLI Integration
  * ```typescript
@@ -73,7 +79,10 @@ function getStdioSpanAttributes(
  * await startStdio(server, context);
  * ```
  */
-export async function startStdio(server: McpServer, context: ServerContext) {
+export async function startStdio<Context extends StdioServerContext>(
+  server: McpServer,
+  context: Context,
+) {
   await Sentry.startNewTrace(async () => {
     return await Sentry.startSpan(
       {
