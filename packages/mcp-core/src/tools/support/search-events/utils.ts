@@ -423,26 +423,6 @@ function getTraceItemType(dataset: EventsDataset): TraceItemType | null {
   return null;
 }
 
-function formatValidationResults(
-  validationResults: Record<string, TraceItemAttributeValidationResult>,
-): string {
-  const entries = Object.entries(validationResults);
-  if (entries.length === 0) {
-    return "";
-  }
-
-  return `Validated Attributes:
-${entries
-  .map(([attribute, result]) => {
-    if (result.valid) {
-      return `- ${attribute}: valid${result.type ? ` (${result.type})` : ""}`;
-    }
-    return `- ${attribute}: invalid${result.error ? ` (${result.error})` : ""}`;
-  })
-  .join("\n")}
-`;
-}
-
 /**
  * Create a tool for the agent to query available attributes by dataset
  * The tool is pre-bound with the API service and organization configured for the appropriate region
@@ -513,16 +493,6 @@ export function createDatasetAttributesTool(options: {
       const normalizedDataset = normalizeEventsDataset(dataset);
       const traceItemType = getTraceItemType(normalizedDataset);
       const attributeTimeParams = { statsPeriod: "14d" };
-      const validationResults =
-        traceItemType && attributes?.length
-          ? await apiService.validateTraceItemAttributes({
-              organizationSlug,
-              itemType: traceItemType,
-              attributes,
-              project: projectId,
-              ...attributeTimeParams,
-            })
-          : {};
       const { attributes: customAttributes, fieldTypes } =
         await fetchCustomAttributes(
           apiService,
@@ -560,7 +530,6 @@ export function createDatasetAttributesTool(options: {
       recordAgentToolResultCount(fieldCount);
 
       return `Dataset: ${dataset}
-${formatValidationResults(validationResults)}
 
 Available Fields (${fieldCount} total):
 ${Object.entries(allFields)

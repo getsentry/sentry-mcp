@@ -1286,62 +1286,6 @@ describe("API query builders", () => {
         urls.map((url) => new URL(url).searchParams.get("attributeType")),
       ).toEqual(["string", "boolean"]);
     });
-
-    it("should validate exact trace item attributes", async () => {
-      const apiService = new SentryApiService({
-        host: "sentry.io",
-        accessToken: "test-token",
-      });
-      let requestUrl: string | undefined;
-      let requestOptions: RequestInit | undefined;
-
-      globalThis.fetch = vi
-        .fn()
-        .mockImplementation((url: string, options: RequestInit) => {
-          requestUrl = url;
-          requestOptions = options;
-          return Promise.resolve({
-            ok: true,
-            headers: {
-              get: (key: string) =>
-                key === "content-type" ? "application/json" : null,
-            },
-            json: () =>
-              Promise.resolve({
-                attributes: {
-                  "tags[type]": { valid: true, type: "string" },
-                  "tags[missing]": {
-                    valid: false,
-                    error: "Unknown attribute: tags[missing]",
-                  },
-                },
-              }),
-          });
-        });
-
-      const result = await apiService.validateTraceItemAttributes({
-        organizationSlug: "test-org",
-        itemType: "spans",
-        attributes: ["tags[type]", "tags[missing]"],
-        project: "123",
-        statsPeriod: "7d",
-      });
-
-      expect(result).toEqual({
-        "tags[type]": { valid: true, type: "string" },
-        "tags[missing]": {
-          valid: false,
-          error: "Unknown attribute: tags[missing]",
-        },
-      });
-      expect(requestUrl).toContain(
-        "/api/0/organizations/test-org/trace-items/attributes/validate/?itemType=spans&project=123&statsPeriod=7d",
-      );
-      expect(requestOptions?.method).toBe("POST");
-      expect(JSON.parse(String(requestOptions?.body))).toEqual({
-        attributes: ["tags[type]", "tags[missing]"],
-      });
-    });
   });
 
   describe("Web URL builders", () => {

@@ -1960,65 +1960,6 @@ export class SentryApiService {
     return attributeResponses.flat();
   }
 
-  async validateTraceItemAttributes(
-    {
-      organizationSlug,
-      itemType = "spans",
-      attributes,
-      project,
-      statsPeriod,
-      start,
-      end,
-    }: {
-      organizationSlug: string;
-      itemType?: TraceItemType;
-      attributes: string[];
-      project?: string;
-      statsPeriod?: string;
-      start?: string;
-      end?: string;
-    },
-    opts?: RequestOptions,
-  ): Promise<Record<string, TraceItemAttributeValidationResult>> {
-    const queryParams = new URLSearchParams();
-    queryParams.set("itemType", itemType);
-    if (project) {
-      queryParams.set("project", project);
-    }
-    this.applyTimeParams(queryParams, statsPeriod, start, end);
-
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/trace-items/attributes/validate/?${queryParams.toString()}`,
-      {
-        method: "POST",
-        body: JSON.stringify({ attributes }),
-      },
-      opts,
-    );
-
-    if (!isRecord(body) || !isRecord(body.attributes)) {
-      return {};
-    }
-
-    const results: Record<string, TraceItemAttributeValidationResult> = {};
-    for (const [attribute, value] of Object.entries(body.attributes)) {
-      if (!isRecord(value) || typeof value.valid !== "boolean") {
-        continue;
-      }
-      const validationResult: TraceItemAttributeValidationResult = {
-        valid: value.valid,
-      };
-      if (isTraceItemAttributeType(value.type)) {
-        validationResult.type = value.type;
-      }
-      if (typeof value.error === "string") {
-        validationResult.error = value.error;
-      }
-      results[attribute] = validationResult;
-    }
-    return results;
-  }
-
   private async fetchTraceItemAttributesByType(
     organizationSlug: string,
     itemType: TraceItemType,
