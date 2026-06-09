@@ -1,3 +1,4 @@
+import { getActiveSpan } from "@sentry/core";
 import { z } from "zod";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { ALL_SKILLS } from "../../skills";
@@ -34,6 +35,16 @@ export const searchToolsOutputSchema = z.object({
 type SearchToolsOutput = z.infer<typeof searchToolsOutputSchema>;
 
 function createSearchToolsResult(payload: SearchToolsOutput) {
+  const activeSpan = getActiveSpan();
+
+  if (activeSpan) {
+    activeSpan.setAttribute("gen_ai.tool.call.result", JSON.stringify(payload));
+    activeSpan.setAttribute(
+      "gen_ai.tool.call.result.count",
+      payload.results.length,
+    );
+  }
+
   return {
     content: [
       {

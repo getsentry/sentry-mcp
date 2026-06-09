@@ -148,6 +148,8 @@ Current MCP spans also use related OpenTelemetry attributes outside the `mcp.*` 
 - `rpc.response.status_code` - The JSON-RPC response status or error code
 - `network.transport` - Transport protocol (`pipe` for stdio, `tcp` or `quic` for HTTP)
 - `gen_ai.tool.call.arguments.<key>` - Per-key effective tool arguments after constraints
+- `gen_ai.tool.call.result` - Tool result payload when explicitly recorded for low-risk structured outputs
+- `gen_ai.tool.call.result.count` - Sentry MCP extension for result counts, including zero-result tool calls
 
 ### Application-Owned Attributes
 These are Sentry MCP application attributes that are not part of the MCP semantic convention:
