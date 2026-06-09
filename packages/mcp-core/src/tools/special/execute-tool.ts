@@ -14,7 +14,6 @@ export function createExecuteTool(getTools: () => ToolRegistry) {
     name: "execute_tool",
     skills: ALL_SKILLS,
     requiredScopes: [],
-    experimental: true,
     description: [
       "Execute an available Sentry MCP tool discovered through search_tools.",
       "",

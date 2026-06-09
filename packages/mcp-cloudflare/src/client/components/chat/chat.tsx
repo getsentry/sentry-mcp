@@ -398,7 +398,7 @@ Try asking me things like:
             title={
               endpointMode === "agent"
                 ? "Agent mode: Only use_sentry tool (click to switch to standard)"
-                : "Standard mode: All 19 tools available (click to switch to agent)"
+                : "Standard mode: Direct tools plus searchable catalog (click to switch to agent)"
             }
             className={`shadow-lg max-xl:order-2 rounded-xl backdrop-blur ${
               endpointMode === "agent" ? "ring-4 ring-violet-300/50" : "ring-0"

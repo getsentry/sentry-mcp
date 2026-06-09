@@ -206,15 +206,14 @@ Each tool follows a consistent structure:
 - Sentry MCP must stay under 25 tools (target: ~20)
 - Consolidate functionality where possible
 - Consider parameter variants over new tools
-- Long-tail operations can live in the tool catalog and, in experimental mode,
-  be reached through `search_tools` and `execute_tool` instead of being exposed
-  directly in `tools/list`
+- Long-tail operations can live in the tool catalog and be reached through
+  `search_tools` and `execute_tool` instead of being exposed directly in
+  `tools/list`
 
 **Tool Catalog and Direct Exposure:**
 
 Tool modules define the operation itself. Ordinary tools are catalog-eligible by
-default and can be reached through `search_tools` and `execute_tool` when the
-catalog gateway is enabled in experimental mode.
+default and can be reached through `search_tools` and `execute_tool`.
 Ordinary operation modules live as flat files under
 `packages/mcp-core/src/tools/catalog/` and are registered in
 `packages/mcp-core/src/tools/catalog/index.ts`.
@@ -227,8 +226,7 @@ search, schema, and execution helpers. Wrapper/gateway tools such as
 
 `packages/mcp-core/src/tools/surfaces.ts` only centralizes the subsets of
 catalog tools that should also be exposed directly through MCP `tools/list`.
-Stable mode keeps a broader direct surface for compatibility. Experimental mode
-keeps a smaller direct surface because long-tail operations can be discovered
+The direct surface stays small because long-tail operations can be discovered
 with `search_tools` and invoked with `execute_tool`.
 The same availability filters (skills, constraints, experimental mode, and
 required capabilities) apply before either direct registration or catalog

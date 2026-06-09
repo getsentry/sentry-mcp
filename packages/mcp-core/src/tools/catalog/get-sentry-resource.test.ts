@@ -489,7 +489,7 @@ describe("get_sentry_resource", () => {
         To get release information:
 
         - **View in Sentry**: [Open Release](https://my-org.sentry.io/releases/v1.2.3/)
-        - **Find releases**: Use the Sentry tool \`find_releases(organizationSlug='my-org')\` to list releases and their details
+        - **Find releases**: Use the Sentry tool \`find_releases\` to list releases and their details: search \`search_tools(query='find_releases')\`, then call \`execute_tool\` with name \`find_releases\` and arguments \`{"organizationSlug":"my-org"}\`
         - **Search issues**: Use \`search_issues\` with query \`release:v1.2.3\` to find issues in this release"
       `);
     });
@@ -507,7 +507,7 @@ describe("get_sentry_resource", () => {
         To get release information:
 
         - **View in Sentry**: [Open Release](https://my-org.sentry.io/releases/backend%402024.01.15-abc123/)
-        - **Find releases**: Use the Sentry tool \`find_releases(organizationSlug='my-org')\` to list releases and their details
+        - **Find releases**: Use the Sentry tool \`find_releases\` to list releases and their details: search \`search_tools(query='find_releases')\`, then call \`execute_tool\` with name \`find_releases\` and arguments \`{"organizationSlug":"my-org"}\`
         - **Search issues**: Use \`search_issues\` with query \`release:backend@2024.01.15-abc123\` to find issues in this release"
       `);
     });
@@ -844,7 +844,7 @@ describe("get_sentry_resource", () => {
         'get_sentry_resource(resourceType="snapshotImage", resourceId="55:<image_file_name>")',
       );
       expect(result).toContain(
-        "- Full-resolution snapshot image bytes are not available in this session",
+        "- Use the Sentry tool `get_snapshot_image` to fetch original full-resolution image bytes: search `search_tools(query='get_snapshot_image')`, then call `execute_tool` with name `get_snapshot_image`",
       );
       expect(result).not.toContain("?selectedSnapshot=");
     });
@@ -940,7 +940,7 @@ describe("get_sentry_resource", () => {
       expect(result[0]).toMatchObject({
         type: "text",
         text: expect.stringContaining(
-          "Full-resolution snapshot image bytes are not available in this session",
+          "Use the Sentry tool `get_snapshot_image` for full-resolution image bytes: search `search_tools(query='get_snapshot_image')`, then call `execute_tool` with name `get_snapshot_image`",
         ),
       });
     });
@@ -1014,7 +1014,7 @@ describe("get_sentry_resource", () => {
       expect(result[0]).toMatchObject({
         type: "text",
         text: expect.stringContaining(
-          "- **Full Resolution**: Full-resolution snapshot image bytes are not available in this session",
+          "- **Full Resolution**: Use the Sentry tool `get_snapshot_image` for full-resolution image bytes: search `search_tools(query='get_snapshot_image')`, then call `execute_tool` with name `get_snapshot_image`",
         ),
       });
       expect(result).toContainEqual(

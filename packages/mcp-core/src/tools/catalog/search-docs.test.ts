@@ -28,7 +28,7 @@ describe("search_docs", () => {
 
       Found 2 matches
 
-      These are just snippets. Use the Sentry tool \`get_doc(path='...')\` to fetch the full content.
+      These are just snippets. Use the Sentry tool \`get_doc\`: search \`search_tools(query='get_doc')\`, then call \`execute_tool\` with name \`get_doc\` and arguments \`{"path":"..."}\` to fetch the full content.
 
       ## 1. https://docs.sentry.io/product/rate-limiting
 

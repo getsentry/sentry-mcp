@@ -9,16 +9,13 @@ import {
 } from "./skills";
 import skillDefinitions from "./skillDefinitions";
 
-function getGeneratedSkillToolDescription(skillId: string, toolName: string) {
+function getGeneratedSkillToolNames(skillId: string) {
   const skill = skillDefinitions.find(
     (definition) => definition.id === skillId,
   );
   expect(skill).toBeDefined();
 
-  const tool = skill?.tools?.find((definition) => definition.name === toolName);
-  expect(tool).toBeDefined();
-
-  return tool?.description ?? "";
+  return new Set(skill?.tools?.map((definition) => definition.name) ?? []);
 }
 
 describe("skills module", () => {
@@ -155,30 +152,12 @@ describe("skills module", () => {
   });
 
   describe("generated skill definitions", () => {
-    it("resolves dynamic descriptions with each skill's tool availability", () => {
-      const preprodDescription = getGeneratedSkillToolDescription(
-        "preprod",
-        "get_sentry_resource",
-      );
-      const triageDescription = getGeneratedSkillToolDescription(
-        "triage",
-        "get_sentry_resource",
-      );
+    it("lists tools for each skill", () => {
+      const preprodToolNames = getGeneratedSkillToolNames("preprod");
+      const triageToolNames = getGeneratedSkillToolNames("triage");
 
-      expect(preprodDescription).toContain(
-        "Use the Sentry tool `get_snapshot_image(",
-      );
-      expect(preprodDescription).toContain("imageResolution='full'");
-      expect(preprodDescription).not.toContain(
-        "Full-resolution snapshot image bytes are not available in this session",
-      );
-
-      expect(triageDescription).toContain(
-        "Full-resolution snapshot image bytes are not available in this session",
-      );
-      expect(triageDescription).not.toContain(
-        "Use the Sentry tool `get_snapshot_image(",
-      );
+      expect(preprodToolNames).toContain("get_snapshot_image");
+      expect(triageToolNames).not.toContain("get_snapshot_image");
     });
   });
 });

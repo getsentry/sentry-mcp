@@ -50,11 +50,10 @@ export function createSearchToolsTool(getTools: () => ToolRegistry) {
     name: "search_tools",
     skills: ALL_SKILLS,
     requiredScopes: [],
-    experimental: true,
     description: [
       "Search the available Sentry MCP tool catalog by name and description.",
       "",
-      "In experimental mode, many Sentry operations are intentionally not exposed as top-level tools. Use this for any Sentry-related task when you do not see an obvious direct tool, including long-tail inspection, project management, documentation lookup, preprod snapshots, attachments, DSNs, releases, teams, and issue-specific pivots.",
+      "Many Sentry operations are intentionally not exposed as top-level tools. Use this for any Sentry-related task when you do not see an obvious direct tool, including long-tail inspection, project management, documentation lookup, preprod snapshots, attachments, DSNs, releases, teams, and issue-specific pivots.",
       "",
       "Use this tool when you need to:",
       "- Find the right Sentry operation before calling execute_tool",

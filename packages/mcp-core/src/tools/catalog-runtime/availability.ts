@@ -66,14 +66,11 @@ function getToolPlacement({
 function hasRequiredCapabilities({
   tool,
   context,
-  experimentalMode,
 }: {
   tool: ToolConfig<any>;
   context: ServerContext;
-  experimentalMode: boolean;
 }): boolean {
   if (
-    !experimentalMode ||
     !context.constraints.projectSlug ||
     !context.constraints.projectCapabilities ||
     !tool.requiredCapabilities?.length
@@ -191,7 +188,7 @@ export function getAvailableTools({
       continue;
     }
 
-    if (!hasRequiredCapabilities({ tool, context, experimentalMode })) {
+    if (!hasRequiredCapabilities({ tool, context })) {
       continue;
     }
 

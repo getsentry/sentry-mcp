@@ -66,7 +66,7 @@ describe("tool call formatting", () => {
     ).toBe("Release listing is not available");
   });
 
-  it("does not format non-top-level stable tools as direct calls", () => {
+  it("formats catalog guidance for non-top-level tools in default mode", () => {
     expect(
       formatToolCallInstruction({
         toolName: "get_snapshot_image",
@@ -78,7 +78,7 @@ describe("tool call formatting", () => {
         experimentalMode: false,
       }),
     ).toBe(
-      "The Sentry tool `get_snapshot_image` is not available in this session",
+      'Use the Sentry tool `get_snapshot_image`: search `search_tools(query=\'get_snapshot_image\')`, then call `execute_tool` with name `get_snapshot_image` and arguments `{"organizationSlug":"my-org","snapshotId":"123","imageIdentifier":"login.png"}`',
     );
   });
 

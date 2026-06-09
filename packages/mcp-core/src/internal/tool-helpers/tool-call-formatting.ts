@@ -62,6 +62,10 @@ export function formatToolCall({
   return `${toolName}(${formattedArgs})`;
 }
 
+/**
+ * Formats user-facing tool guidance as a direct call, catalog gateway call, or
+ * fallback message based on the current session's available/direct tools.
+ */
 export function formatToolCallInstruction({
   toolName,
   arguments: args = {},
@@ -94,7 +98,6 @@ export function formatToolCallInstruction({
   }
 
   const catalogGatewayAvailable =
-    experimentalMode &&
     isToolAvailable("search_tools", availableToolNames) &&
     isToolAvailable("execute_tool", availableToolNames) &&
     isDirectTool("search_tools", experimentalMode, directToolNames) &&
