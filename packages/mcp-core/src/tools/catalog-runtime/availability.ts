@@ -3,7 +3,6 @@ import type {
   ServerNotification,
   ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
-import { setTag } from "@sentry/core";
 import { z } from "zod";
 import { UserInputError } from "../../errors";
 import {
@@ -260,6 +259,20 @@ export async function executeToolHandler({
   params: Record<string, unknown>;
   context: ServerContext;
 }) {
+  const paramsWithConstraints = prepareToolParams({ tool, params, context });
+
+  return tool.handler(paramsWithConstraints as never, context);
+}
+
+export function prepareToolParams({
+  tool,
+  params,
+  context,
+}: {
+  tool: ToolConfig<any>;
+  params: Record<string, unknown>;
+  context: ServerContext;
+}): Record<string, unknown> {
   const filteredInputSchema = getFilteredInputSchema(tool, context);
   const schema = z.object(filteredInputSchema);
   const parsed = schema.safeParse(params);
@@ -270,15 +283,7 @@ export async function executeToolHandler({
     );
   }
 
-  const paramsWithConstraints = injectConstraintParams(
-    parsed.data,
-    tool,
-    context,
-  );
-
-  setTag("catalog.tool", tool.name);
-
-  return tool.handler(paramsWithConstraints as never, context);
+  return injectConstraintParams(parsed.data, tool, context);
 }
 
 export function resolveToolDescription(

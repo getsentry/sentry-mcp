@@ -1,13 +1,72 @@
+import { type Span, type SpanAttributeValue, startSpan } from "@sentry/core";
 import { z } from "zod";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { UserInputError } from "../../errors";
 import { ALL_SKILLS } from "../../skills";
 import type { ServerContext } from "../../types";
 import {
-  executeToolHandler,
   getSearchableTools,
+  prepareToolParams,
   type ToolRegistry,
 } from "../catalog-runtime/availability";
+import type { ToolConfig } from "../types";
+
+function setToolArgumentAttributes(
+  span: Span,
+  params: Record<string, unknown>,
+) {
+  for (const [key, value] of Object.entries(params)) {
+    const attributeValue =
+      value == null || typeof value === "object"
+        ? JSON.stringify(value)
+        : value;
+    span.setAttribute(
+      `gen_ai.tool.call.arguments.${key}`,
+      attributeValue as SpanAttributeValue | undefined,
+    );
+  }
+}
+
+async function executeCatalogToolWithSpan({
+  tool,
+  params,
+  context,
+}: {
+  tool: ToolConfig<any>;
+  params: Record<string, unknown>;
+  context: ServerContext;
+}) {
+  return startSpan(
+    {
+      name: `execute_tool ${tool.name}`,
+      op: "gen_ai.execute_tool",
+      attributes: {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": tool.name,
+      },
+    },
+    async (span) => {
+      try {
+        const paramsWithConstraints = prepareToolParams({
+          tool,
+          params,
+          context,
+        });
+        setToolArgumentAttributes(span, paramsWithConstraints);
+        const output = await tool.handler(
+          paramsWithConstraints as never,
+          context,
+        );
+        span.setStatus({ code: 1 });
+        return output;
+      } catch (error) {
+        span.setStatus({ code: 2 });
+        span.recordException(error);
+        throw error;
+      }
+    },
+  );
+}
 
 export function createExecuteTool(getTools: () => ToolRegistry) {
   return defineTool({
@@ -67,7 +126,7 @@ export function createExecuteTool(getTools: () => ToolRegistry) {
         );
       }
 
-      return executeToolHandler({
+      return executeCatalogToolWithSpan({
         tool: match.tool,
         params: params.arguments,
         context,
