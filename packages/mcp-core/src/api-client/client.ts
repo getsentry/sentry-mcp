@@ -1967,8 +1967,9 @@ export class SentryApiService {
     if (limit !== undefined) {
       searchQuery.set("per_page", String(limit));
     }
+    const normalizedStatsPeriod = normalizeStatsPeriod(statsPeriod);
     const effectiveStatsPeriod =
-      start || end ? undefined : (normalizeStatsPeriod(statsPeriod) ?? "24h");
+      start || end ? normalizedStatsPeriod : (normalizedStatsPeriod ?? "24h");
     if (effectiveStatsPeriod) {
       parseStatsPeriod(effectiveStatsPeriod);
     }
@@ -2012,8 +2013,9 @@ export class SentryApiService {
     if (environment) {
       searchQuery.append("environment", environment);
     }
+    const normalizedStatsPeriod = normalizeStatsPeriod(statsPeriod);
     const effectiveStatsPeriod =
-      start || end ? undefined : (normalizeStatsPeriod(statsPeriod) ?? "24h");
+      start || end ? normalizedStatsPeriod : (normalizedStatsPeriod ?? "24h");
     this.applyStatsMixinTimeParams(
       searchQuery,
       effectiveStatsPeriod,

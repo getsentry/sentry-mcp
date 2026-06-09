@@ -407,6 +407,46 @@ describe("monitor time parameters", () => {
     ).rejects.toThrow("statsPeriod must use a supported relative time format");
     expect(requestReceived).toBe(false);
   });
+
+  it("rejects conflicting monitor statsPeriod and absolute time ranges before sending requests", async () => {
+    let requestReceived = false;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/monitors/nightly-import/checkins/",
+        () => {
+          requestReceived = true;
+          return HttpResponse.json([]);
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/monitors/nightly-import/stats/",
+        () => {
+          requestReceived = true;
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+    const params = {
+      organizationSlug: "my-org",
+      monitorSlug: "nightly-import",
+      statsPeriod: "24h",
+      start: "2024-01-01T00:00:00Z",
+      end: "2024-01-02T00:00:00Z",
+    };
+
+    await expect(apiService.listMonitorCheckIns(params)).rejects.toThrow(
+      "Cannot use both statsPeriod and start/end parameters",
+    );
+    await expect(apiService.getMonitorStats(params)).rejects.toThrow(
+      "Cannot use both statsPeriod and start/end parameters",
+    );
+    expect(requestReceived).toBe(false);
+  });
 });
 
 describe("network error handling", () => {
