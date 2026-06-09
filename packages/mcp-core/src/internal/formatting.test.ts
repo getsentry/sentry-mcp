@@ -122,7 +122,6 @@ describe("formatIssueOutput", () => {
           run_id: 42,
           status: "completed",
           updated_at: "2025-04-09T22:39:50.778146",
-          steps: [],
           blocks: [
             {
               artifacts: [

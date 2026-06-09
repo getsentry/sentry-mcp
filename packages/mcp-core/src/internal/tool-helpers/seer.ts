@@ -1,11 +1,5 @@
 import { z } from "zod";
-import type {
-  AutofixRunState,
-  AutofixRunStepSchema,
-  AutofixRunStepRootCauseAnalysisSchema,
-  AutofixRunStepSolutionSchema,
-  AutofixRunStepDefaultSchema,
-} from "../../api-client/index";
+import type { AutofixRunState } from "../../api-client/index";
 
 type AutofixRun = NonNullable<AutofixRunState["autofix"]>;
 
@@ -82,99 +76,6 @@ function wrapSeerAnalysisOutput({
   ].filter(Boolean);
 
   return `<seer_analysis ${attrs.join(" ")}>\n${output.trimEnd()}\n</seer_analysis>\n`;
-}
-
-export function getOutputForAutofixStep(
-  step: z.infer<typeof AutofixRunStepSchema>,
-  options: { runId?: number; includeProvenanceTags?: boolean } = {},
-) {
-  const includeProvenanceTags = options.includeProvenanceTags ?? true;
-  const heading = `## ${step.title}\n\n`;
-
-  if (step.status === "error") {
-    return `${heading}**Sentry hit an error completing this step.\n\n`;
-  }
-
-  if (step.status !== "completed") {
-    return `${heading}**Sentry is still working on this step. Please check back in a minute.**\n\n`;
-  }
-
-  if (step.type === "root_cause_analysis") {
-    const typedStep = step as z.infer<
-      typeof AutofixRunStepRootCauseAnalysisSchema
-    >;
-    let body = "";
-
-    for (const cause of typedStep.causes) {
-      if (cause.description) {
-        body += `${cause.description}\n\n`;
-      }
-      for (const entry of cause.root_cause_reproduction) {
-        body += `**${entry.title}**\n\n`;
-        body += `${entry.code_snippet_and_analysis}\n\n`;
-      }
-    }
-    if (!body.trim()) {
-      return heading;
-    }
-
-    return wrapSeerAnalysisOutput({
-      output: body,
-      runId: options.runId,
-      step: step.key,
-      includeProvenanceTags,
-    });
-  }
-
-  if (step.type === "solution") {
-    const typedStep = step as z.infer<typeof AutofixRunStepSolutionSchema>;
-    let body =
-      typeof typedStep.description === "string"
-        ? `${typedStep.description}\n\n`
-        : "";
-    for (const entry of typedStep.solution) {
-      body += `**${entry.title}**\n`;
-      if (entry.code_snippet_and_analysis) {
-        body += `${entry.code_snippet_and_analysis}\n\n`;
-      }
-    }
-
-    if (!body.trim()) {
-      return heading;
-    }
-
-    return wrapSeerAnalysisOutput({
-      output: body,
-      runId: options.runId,
-      step: step.key,
-      includeProvenanceTags,
-    });
-  }
-
-  const typedStep = step as z.infer<typeof AutofixRunStepDefaultSchema>;
-  let body = "";
-  let hasGeneratedOutput = false;
-  if (typedStep.insights && typedStep.insights.length > 0) {
-    hasGeneratedOutput = true;
-    for (const entry of typedStep.insights) {
-      body += `**${entry.insight}**\n`;
-      body += `${entry.justification}\n\n`;
-    }
-  } else if (step.output_stream) {
-    hasGeneratedOutput = true;
-    body += `${step.output_stream}\n`;
-  }
-
-  if (hasGeneratedOutput) {
-    return wrapSeerAnalysisOutput({
-      output: body,
-      runId: options.runId,
-      step: step.key,
-      includeProvenanceTags,
-    });
-  }
-
-  return heading;
 }
 
 // Artifact data shapes from getsentry/sentry's

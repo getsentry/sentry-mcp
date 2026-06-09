@@ -667,7 +667,6 @@ describe("AutofixRunStateSchema", () => {
     const state = AutofixRunStateSchema.parse(autofixStateExplorerFixture);
 
     expect(state.autofix?.status).toBe("processing");
-    expect(state.autofix?.steps).toEqual([]);
     expect(state.autofix?.blocks).toHaveLength(1);
     expect(state.autofix?.blocks[0].todos).toEqual([
       { content: "Investigate failing request", status: "completed" },

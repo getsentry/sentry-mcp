@@ -943,87 +943,6 @@ const AutofixStatusSchema = z.enum([
   "awaiting_user_input",
 ]);
 
-const AutofixRunStepBaseSchema = z.object({
-  type: z.string(),
-  key: z.string(),
-  index: z.number(),
-  status: AutofixStatusSchema,
-  title: z.string(),
-  output_stream: z.string().nullable(),
-  progress: z.array(
-    z.object({
-      data: z.unknown().nullable(),
-      message: z.string(),
-      timestamp: z.string(),
-      type: z.enum(["INFO", "WARNING", "ERROR"]),
-    }),
-  ),
-});
-
-export const AutofixRunStepDefaultSchema = AutofixRunStepBaseSchema.extend({
-  type: z.literal("default"),
-  insights: z
-    .array(
-      z.object({
-        change_diff: z.unknown().nullable(),
-        generated_at_memory_index: z.number(),
-        insight: z.string(),
-        justification: z.string(),
-        type: z.literal("insight"),
-      }),
-    )
-    .nullable(),
-}).passthrough();
-
-export const AutofixRunStepRootCauseAnalysisSchema =
-  AutofixRunStepBaseSchema.extend({
-    type: z.literal("root_cause_analysis"),
-    causes: z.array(
-      z.object({
-        description: z.string(),
-        id: z.number(),
-        root_cause_reproduction: z.array(
-          z.object({
-            code_snippet_and_analysis: z.string(),
-            is_most_important_event: z.boolean(),
-            relevant_code_file: z
-              .object({
-                file_path: z.string(),
-                repo_name: z.string(),
-              })
-              .nullable(),
-            timeline_item_type: z.string(),
-            title: z.string(),
-          }),
-        ),
-      }),
-    ),
-  }).passthrough();
-
-export const AutofixRunStepSolutionSchema = AutofixRunStepBaseSchema.extend({
-  type: z.literal("solution"),
-  solution: z.array(
-    z.object({
-      code_snippet_and_analysis: z.string().nullable(),
-      is_active: z.boolean(),
-      is_most_important_event: z.boolean(),
-      relevant_code_file: z.null(),
-      timeline_item_type: z.union([
-        z.literal("internal_code"),
-        z.literal("repro_test"),
-      ]),
-      title: z.string(),
-    }),
-  ),
-}).passthrough();
-
-export const AutofixRunStepSchema = z.union([
-  AutofixRunStepDefaultSchema,
-  AutofixRunStepRootCauseAnalysisSchema,
-  AutofixRunStepSolutionSchema,
-  AutofixRunStepBaseSchema.passthrough(),
-]);
-
 const AutofixArtifactSchema = z
   .object({
     key: z.string(),
@@ -1050,8 +969,7 @@ const AutofixBlockSchema = z
 /**
  * The Seer autofix GET endpoint is explicitly experimental. It returns the
  * agent-based run state (`blocks`, `pending_user_input`, coding-agent
- * metadata) and no longer includes `steps`; we normalize missing `steps` to
- * `[]` so the legacy step formatting code keeps working.
+ * metadata).
  *
  * Upstream source of truth in getsentry/sentry:
  * - `src/sentry/seer/endpoints/group_ai_autofix.py`
@@ -1061,13 +979,8 @@ export const AutofixRunStateSchema = z.object({
   autofix: z
     .object({
       run_id: z.number(),
-      request: z.unknown().optional(),
       updated_at: z.string().nullable().optional(),
       status: AutofixStatusSchema,
-      steps: z.preprocess(
-        (value) => value ?? [],
-        z.array(AutofixRunStepSchema),
-      ),
       blocks: z.array(AutofixBlockSchema).default([]),
       pending_user_input: z.unknown().nullable().optional(),
       repo_pr_states: z
