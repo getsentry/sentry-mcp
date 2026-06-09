@@ -52,7 +52,7 @@ catalog:
   tailwindcss: ^4.1.11
   tsdown: ^0.12.9
   tsx: ^4.20.3
-  turbo: ^2.5.4
+  turbo: ^2.9.14
   tw-animate-css: ^1.3.4
   typescript: ^5.8.3
   valibot: ^1.4.0
