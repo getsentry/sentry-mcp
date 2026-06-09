@@ -26,115 +26,115 @@
   ],
   "exports": {
     "./api-client": {
-      "types": "./dist/api-client/index.ts",
+      "types": "./dist/api-client/index.d.ts",
       "default": "./dist/api-client/index.js"
     },
     "./constants": {
-      "types": "./dist/constants.ts",
+      "types": "./dist/constants.d.ts",
       "default": "./dist/constants.js"
     },
     "./telem": {
-      "types": "./dist/telem/index.ts",
+      "types": "./dist/telem/index.d.ts",
       "default": "./dist/telem/index.js"
     },
     "./telem/logging": {
-      "types": "./dist/telem/logging.ts",
+      "types": "./dist/telem/logging.d.ts",
       "default": "./dist/telem/logging.js"
     },
     "./telem/sentry": {
-      "types": "./dist/telem/sentry.ts",
+      "types": "./dist/telem/sentry.d.ts",
       "default": "./dist/telem/sentry.js"
     },
     "./permissions": {
-      "types": "./dist/permissions.ts",
+      "types": "./dist/permissions.d.ts",
       "default": "./dist/permissions.js"
     },
     "./skills": {
-      "types": "./dist/skills.ts",
+      "types": "./dist/skills.d.ts",
       "default": "./dist/skills.js"
     },
     "./tools": {
-      "types": "./dist/tools/index.ts",
+      "types": "./dist/tools/index.d.ts",
       "default": "./dist/tools/index.js"
     },
     "./server": {
-      "types": "./dist/server.ts",
+      "types": "./dist/server.d.ts",
       "default": "./dist/server.js"
     },
     "./toolDefinitions": {
-      "types": "./dist/toolDefinitions.ts",
+      "types": "./dist/toolDefinitions.d.ts",
       "default": "./dist/toolDefinitions.js"
     },
     "./skillDefinitions": {
-      "types": "./dist/skillDefinitions.ts",
+      "types": "./dist/skillDefinitions.d.ts",
       "default": "./dist/skillDefinitions.js"
     },
     "./types": {
-      "types": "./dist/types.ts",
+      "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
     },
     "./version": {
-      "types": "./dist/version.ts",
+      "types": "./dist/version.d.ts",
       "default": "./dist/version.js"
     },
     "./tools/search-events": {
-      "types": "./dist/tools/search-events/index.ts",
+      "types": "./dist/tools/search-events/index.d.ts",
       "default": "./dist/tools/search-events/index.js"
     },
     "./tools/search-issues": {
-      "types": "./dist/tools/search-issues/index.ts",
+      "types": "./dist/tools/search-issues/index.d.ts",
       "default": "./dist/tools/search-issues/index.js"
     },
     "./tools/search-issue-events": {
-      "types": "./dist/tools/search-issue-events/index.ts",
+      "types": "./dist/tools/search-issue-events/index.d.ts",
       "default": "./dist/tools/search-issue-events/index.js"
     },
     "./tools/search-events/agent": {
-      "types": "./dist/tools/search-events/agent.ts",
+      "types": "./dist/tools/search-events/agent.d.ts",
       "default": "./dist/tools/search-events/agent.js"
     },
     "./tools/search-issues/agent": {
-      "types": "./dist/tools/search-issues/agent.ts",
+      "types": "./dist/tools/search-issues/agent.d.ts",
       "default": "./dist/tools/search-issues/agent.js"
     },
     "./tools/search-issue-events/agent": {
-      "types": "./dist/tools/search-issue-events/agent.ts",
+      "types": "./dist/tools/search-issue-events/agent.d.ts",
       "default": "./dist/tools/search-issue-events/agent.js"
     },
     "./tools/agent-tools": {
-      "types": "./dist/tools/agent-tools.ts",
+      "types": "./dist/tools/agent-tools.d.ts",
       "default": "./dist/tools/agent-tools.js"
     },
     "./internal/agents/callEmbeddedAgent": {
-      "types": "./dist/internal/agents/callEmbeddedAgent.ts",
+      "types": "./dist/internal/agents/callEmbeddedAgent.d.ts",
       "default": "./dist/internal/agents/callEmbeddedAgent.js"
     },
     "./internal/agents/openai-provider": {
-      "types": "./dist/internal/agents/openai-provider.ts",
+      "types": "./dist/internal/agents/openai-provider.d.ts",
       "default": "./dist/internal/agents/openai-provider.js"
     },
     "./internal/agents/azure-openai-provider": {
-      "types": "./dist/internal/agents/azure-openai-provider.ts",
+      "types": "./dist/internal/agents/azure-openai-provider.d.ts",
       "default": "./dist/internal/agents/azure-openai-provider.js"
     },
     "./internal/agents/anthropic-provider": {
-      "types": "./dist/internal/agents/anthropic-provider.ts",
+      "types": "./dist/internal/agents/anthropic-provider.d.ts",
       "default": "./dist/internal/agents/anthropic-provider.js"
     },
     "./internal/agents/provider-factory": {
-      "types": "./dist/internal/agents/provider-factory.ts",
+      "types": "./dist/internal/agents/provider-factory.d.ts",
       "default": "./dist/internal/agents/provider-factory.js"
     },
     "./internal/agents/types": {
-      "types": "./dist/internal/agents/types.ts",
+      "types": "./dist/internal/agents/types.d.ts",
       "default": "./dist/internal/agents/types.js"
     },
     "./utils/url-utils": {
-      "types": "./dist/utils/url-utils.ts",
+      "types": "./dist/utils/url-utils.d.ts",
       "default": "./dist/utils/url-utils.js"
     },
     "./scopes": {
-      "types": "./dist/scopes.ts",
+      "types": "./dist/scopes.d.ts",
       "default": "./dist/scopes.js"
     }
   },

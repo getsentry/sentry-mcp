@@ -33,11 +33,11 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
     "./transports/stdio": {
-      "types": "./dist/transports/stdio.ts",
+      "types": "./dist/transports/stdio.d.ts",
       "default": "./dist/transports/stdio.js"
     }
   },
