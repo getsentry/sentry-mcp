@@ -118,7 +118,7 @@ The remote deployment intentionally separates trust boundaries:
 2. **Authorization is layered**: Sentry scopes, MCP skills, and MCP resource constraints each narrow access differently.
 3. **Each session can be path-scoped**: `/mcp/:org` and `/mcp/:org/:project` produce tokens that only work for that scoped MCP URL.
 4. **Refresh does not widen access**: MCP refresh reuses the same stored grant props and does not ask Sentry for broader permissions.
-5. **Stale or invalid grants fail closed**: legacy grants, missing props, or rejected upstream tokens are revoked or require re-authentication.
+5. **Stale or invalid grants fail closed**: missing props, invalid skills, or rejected upstream tokens are revoked or require re-authentication. Already-issued Cloudflare grants with the old `preprod` skill are treated as `inspect`.
 
 ## OAuth Architecture
 

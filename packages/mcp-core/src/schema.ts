@@ -24,7 +24,7 @@ export const ParamTeamSlug = z
   .trim()
   .superRefine(validateSlug)
   .describe(
-    "The team's slug. You can find a list of existing teams in an organization using the `find_teams()` tool.",
+    "The team's slug. You can find a list of existing teams in an organization with the Sentry tool `find_teams`.",
   );
 
 export const ParamProjectSlug = z

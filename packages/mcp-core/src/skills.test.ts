@@ -9,16 +9,13 @@ import {
 } from "./skills";
 import skillDefinitions from "./skillDefinitions";
 
-function getGeneratedSkillToolDescription(skillId: string, toolName: string) {
+function getGeneratedSkillToolNames(skillId: string) {
   const skill = skillDefinitions.find(
     (definition) => definition.id === skillId,
   );
   expect(skill).toBeDefined();
 
-  const tool = skill?.tools?.find((definition) => definition.name === toolName);
-  expect(tool).toBeDefined();
-
-  return tool?.description ?? "";
+  return new Set(skill?.tools?.map((definition) => definition.name) ?? []);
 }
 
 describe("skills module", () => {
@@ -29,6 +26,7 @@ describe("skills module", () => {
       expect(SKILLS["project-management"]).toBeDefined();
       expect(SKILLS.seer).toBeDefined();
       expect(SKILLS.docs).toBeDefined();
+      expect("preprod" in SKILLS).toBe(false);
     });
 
     it("includes metadata for each skill", () => {
@@ -69,6 +67,8 @@ describe("skills module", () => {
       expect(isValidSkill("invalid")).toBe(false);
       expect(isValidSkill("")).toBe(false);
       expect(isValidSkill("INSPECT")).toBe(false);
+      expect(isValidSkill("preprod")).toBe(false);
+      expect(isValidSkill("toString")).toBe(false);
     });
   });
 
@@ -124,6 +124,18 @@ describe("skills module", () => {
       expect(valid.size).toBe(2);
       expect(invalid.length).toBe(0);
     });
+
+    it("treats legacy preprod skill as invalid by default", () => {
+      const { valid, invalid } = parseSkills(["preprod"]);
+      expect(valid).toEqual(new Set());
+      expect(invalid).toEqual(["preprod"]);
+    });
+
+    it("does not treat object prototype properties as skills", () => {
+      const { valid, invalid } = parseSkills(["toString"]);
+      expect(valid).toEqual(new Set());
+      expect(invalid).toEqual(["toString"]);
+    });
   });
 
   describe("isEnabledBySkills", () => {
@@ -155,30 +167,12 @@ describe("skills module", () => {
   });
 
   describe("generated skill definitions", () => {
-    it("resolves dynamic descriptions with each skill's tool availability", () => {
-      const preprodDescription = getGeneratedSkillToolDescription(
-        "preprod",
-        "get_sentry_resource",
-      );
-      const triageDescription = getGeneratedSkillToolDescription(
-        "triage",
-        "get_sentry_resource",
-      );
+    it("lists tools for each skill", () => {
+      const inspectToolNames = getGeneratedSkillToolNames("inspect");
+      const triageToolNames = getGeneratedSkillToolNames("triage");
 
-      expect(preprodDescription).toContain(
-        "Use the Sentry tool `get_snapshot_image(",
-      );
-      expect(preprodDescription).toContain("imageResolution='full'");
-      expect(preprodDescription).not.toContain(
-        "Full-resolution snapshot image bytes are not available in this session",
-      );
-
-      expect(triageDescription).toContain(
-        "Full-resolution snapshot image bytes are not available in this session",
-      );
-      expect(triageDescription).not.toContain(
-        "Use the Sentry tool `get_snapshot_image(",
-      );
+      expect(inspectToolNames).toContain("get_snapshot_image");
+      expect(triageToolNames).not.toContain("get_snapshot_image");
     });
   });
 });

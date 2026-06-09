@@ -87,6 +87,7 @@ async function createClient(testEnv: Env, name = "Test Client") {
 async function createSignedCallbackState(
   clientId: string,
   resource?: string,
+  skills: string[] = ["inspect"],
 ): Promise<string> {
   const now = Date.now();
   const payload: OAuthState = {
@@ -94,7 +95,7 @@ async function createSignedCallbackState(
       clientId,
       redirectUri: REDIRECT_URI,
       scope: ["org:read"],
-      skills: ["inspect"],
+      skills,
       ...(resource ? { resource } : {}),
     },
     iat: now,
@@ -424,6 +425,29 @@ describe("oauth callback routes", () => {
       expect(response.status).toBe(403);
       expect(await response.text()).toBe(
         "Authorization failed: Client not approved",
+      );
+    });
+
+    it("rejects callback with legacy preprod skill selection", async () => {
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const cookie = await approveClient(oauthApp, testEnv, client.clientId);
+      const state = await createSignedCallbackState(
+        client.clientId,
+        undefined,
+        ["preprod"],
+      );
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        code: "test-code",
+        cookie,
+      });
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toContain(
+        "You must select at least one valid permission",
       );
     });
 

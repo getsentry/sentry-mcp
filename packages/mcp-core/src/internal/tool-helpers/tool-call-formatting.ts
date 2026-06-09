@@ -26,10 +26,6 @@ function formatArguments(args: Record<string, JsonValue>): string {
     .join(", ");
 }
 
-function formatArgumentsJson(args: Record<string, JsonValue>): string {
-  return JSON.stringify(args);
-}
-
 function formatPurpose(purpose: string | undefined): string {
   return purpose ? ` ${purpose}` : "";
 }
@@ -62,11 +58,14 @@ export function formatToolCall({
   return `${toolName}(${formattedArgs})`;
 }
 
+/**
+ * Formats user-facing tool guidance as a direct call, catalog gateway call, or
+ * fallback message based on the current session's available/direct tools.
+ */
 export function formatToolCallInstruction({
   toolName,
-  arguments: args = {},
+  arguments: _args = {},
   experimentalMode,
-  searchQuery = toolName,
   purpose,
   availableToolNames,
   directToolNames,
@@ -75,7 +74,6 @@ export function formatToolCallInstruction({
   toolName: string;
   arguments?: Record<string, JsonValue>;
   experimentalMode: boolean;
-  searchQuery?: string;
   purpose?: string;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
@@ -87,28 +85,17 @@ export function formatToolCallInstruction({
     targetAvailable &&
     isDirectTool(toolName, experimentalMode, directToolNames)
   ) {
-    return `Use the Sentry tool \`${formatToolCall({
-      toolName,
-      arguments: args,
-    })}\`${formatPurpose(purpose)}`;
+    return `Use the Sentry tool \`${toolName}\`${formatPurpose(purpose)}`;
   }
 
   const catalogGatewayAvailable =
-    experimentalMode &&
     isToolAvailable("search_tools", availableToolNames) &&
     isToolAvailable("execute_tool", availableToolNames) &&
     isDirectTool("search_tools", experimentalMode, directToolNames) &&
     isDirectTool("execute_tool", experimentalMode, directToolNames);
 
   if (targetAvailable && catalogGatewayAvailable) {
-    return [
-      `Use the Sentry tool \`${toolName}\`${formatPurpose(purpose)}:`,
-      `search \`${formatToolCall({
-        toolName: "search_tools",
-        arguments: { query: searchQuery },
-      })}\`,`,
-      `then call \`execute_tool\` with name \`${toolName}\` and arguments \`${formatArgumentsJson(args)}\``,
-    ].join(" ");
+    return `Use the Sentry tool \`${toolName}\`${formatPurpose(purpose)}`;
   }
 
   return (

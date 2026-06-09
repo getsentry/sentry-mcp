@@ -10,8 +10,8 @@ Two variants are published:
 
 | Plugin | MCP URL | Purpose |
 |--------|---------|---------|
-| `sentry-mcp` | `https://mcp.sentry.dev/mcp` | Stable tool defaults |
-| `sentry-mcp-experimental` | `https://mcp.sentry.dev/mcp?experimental=1` | Forward-looking tool variants and experimental features |
+| `sentry-mcp` | `https://mcp.sentry.dev/mcp` | Default catalog gateway surface |
+| `sentry-mcp-experimental` | `https://mcp.sentry.dev/mcp?experimental=1` | Forward-looking feature flags |
 
 ## Directory Layout
 
@@ -73,7 +73,7 @@ This script:
 1. Imports all tools from `packages/mcp-core/src/tools/index.ts`
 2. Imports all skills from `packages/mcp-core/src/skills.ts`
 3. Writes `toolDefinitions.json` and `skillDefinitions.json` to `packages/mcp-core/src/`
-4. Updates `allowedTools` in both `plugins/sentry-mcp/agents/sentry-mcp.md` and `plugins/sentry-mcp-experimental/agents/sentry-mcp.md`, using the stable direct surface for the stable plugin and the experimental direct surface for the experimental plugin
+4. Updates `allowedTools` in both `plugins/sentry-mcp/agents/sentry-mcp.md` and `plugins/sentry-mcp-experimental/agents/sentry-mcp.md`, using the direct surface for each plugin mode
 
 The script runs automatically as a `prebuild` and `pretest` hook in `packages/mcp-core/package.json`. Run it explicitly after:
 - Adding, removing, or renaming tools

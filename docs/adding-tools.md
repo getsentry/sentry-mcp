@@ -6,10 +6,10 @@ Step-by-step guide for adding new tools to the Sentry MCP server.
 
 Not every tool is exposed to every consumer. We rely on several mechanisms to keep the active tool set manageable:
 
-- **Catalog by default** — Most tools are searchable/executable through `search_tools` + `execute_tool` automatically when experimental mode is enabled. Search uses the tool's existing name and description.
+- **Catalog by default** — Most tools are searchable/executable through `search_tools` + `execute_tool` automatically. Search uses the tool's existing name and description.
 - **Catalog registry** — `packages/mcp-core/src/tools/catalog/index.ts` lists ordinary Sentry operation tools. The catalog directory is intentionally flat: one tool entry per file.
 - **Special tools** — Wrapper/gateway tools (`search_tools`, `execute_tool`, `use_sentry`) live in `packages/mcp-core/src/tools/special/`. They still use the same tool types, but they are kept out of the ordinary catalog.
-- **Central direct exposure policy** — `packages/mcp-core/src/tools/surfaces.ts` lists the catalog tools that are also exposed directly through MCP `tools/list`. Stable and experimental modes have separate direct surfaces; experimental mode intentionally keeps more long-tail tools catalog-only because `search_tools` + `execute_tool` are available there.
+- **Central direct exposure policy** — `packages/mcp-core/src/tools/surfaces.ts` lists the catalog tools that are also exposed directly through MCP `tools/list`. The direct surface intentionally keeps long-tail tools catalog-only because `search_tools` + `execute_tool` are available as primary primitives.
 - **`requiredCapabilities`** — Tools declare which project capabilities they need (e.g. `profiles`, `replays`, `traces`). If the upstream project doesn't have a capability enabled, the tool is automatically hidden.
 - **`experimental` / `hideInExperimentalMode`** — Feature flags for tools that are being tested or replaced.
 - **Skills & constraints** — The server filters tools based on granted skills and org/project constraints.
@@ -30,9 +30,9 @@ Before adding a new tool, consider if it could be:
 
 After creating a tool module, add it to `packages/mcp-core/src/tools/catalog/index.ts`. Then update `packages/mcp-core/src/tools/surfaces.ts` only when it should be directly exposed through MCP `tools/list`:
 
-- Add high-frequency, foundational stable tools to `TOP_LEVEL_TOOL_NAMES`.
-- Add only the most essential experimental direct tools to `EXPERIMENTAL_TOP_LEVEL_TOOL_NAMES`. Tools omitted from this list remain available through `search_tools` and `execute_tool` after the normal skill, constraint, experimental, and capability filters pass.
-- Leave long-tail tools out of the experimental direct surface unless there is a clear reason they need to be visible without discovery. The catalog gateway tools themselves are experimental for now.
+- Add only high-frequency, foundational tools to `TOP_LEVEL_TOOL_NAMES`.
+- Leave long-tail tools out of the direct surface unless there is a clear reason they need to be visible without discovery. Tools omitted from this list remain available through `search_tools` and `execute_tool` after the normal skill, constraint, experimental, and capability filters pass.
+- Keep `EXPERIMENTAL_TOP_LEVEL_TOOL_NAMES` aligned with `TOP_LEVEL_TOOL_NAMES` unless a future experimental mode intentionally needs a different direct surface.
 - Keep private implementation helpers as plain modules/functions instead of MCP tools.
 
 Do not add search-only summaries or catalog-only schemas. `search_tools` indexes the existing tool name and description.

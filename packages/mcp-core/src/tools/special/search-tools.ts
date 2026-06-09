@@ -24,7 +24,7 @@ export const searchToolsOutputSchema = z.object({
       inputSchema: z
         .record(z.unknown())
         .describe(
-          "JSON Schema for the arguments to pass to execute_tool. Session-constrained parameters are omitted.",
+          "JSON Schema for the matching tool's arguments. Session-constrained parameters are omitted.",
         ),
       annotations: toolAnnotationsOutputSchema,
     }),
@@ -50,15 +50,14 @@ export function createSearchToolsTool(getTools: () => ToolRegistry) {
     name: "search_tools",
     skills: ALL_SKILLS,
     requiredScopes: [],
-    experimental: true,
     description: [
       "Search the available Sentry MCP tool catalog by name and description.",
       "",
-      "In experimental mode, many Sentry operations are intentionally not exposed as top-level tools. Use this for any Sentry-related task when you do not see an obvious direct tool, including long-tail inspection, project management, documentation lookup, preprod snapshots, attachments, DSNs, releases, teams, and issue-specific pivots.",
+      "Many Sentry operations are intentionally not exposed as top-level tools. Use this for any Sentry-related task when you do not see an obvious direct tool, including long-tail inspection, project management, documentation lookup, preprod snapshots, attachments, DSNs, releases, teams, and issue-specific pivots.",
       "",
       "Use this tool when you need to:",
-      "- Find the right Sentry operation before calling execute_tool",
-      "- Discover available Sentry tools for a task without scanning the top-level tool list",
+      "- Find the right Sentry operation for a task",
+      "- Discover catalog tools and their schemas for a task",
       "- Inspect the executable JSON input schema for an available tool",
       "",
       "<examples>",
@@ -72,7 +71,7 @@ export function createSearchToolsTool(getTools: () => ToolRegistry) {
       "- Results only include tools available in the current session.",
       "- If a Sentry operation is not listed as a direct tool, search here before deciding it is unavailable.",
       "- Returned schemas already account for active organization, project, and region constraints.",
-      "- Call execute_tool with the returned name and arguments that match the returned schema.",
+      "- Use the returned name and schema when executing a catalog result.",
       "- This tool returns structured JSON. Do not parse markdown from its text content.",
       "</hints>",
     ].join("\n"),

@@ -39,7 +39,7 @@ describe("get_event_attachment", () => {
       **SHA1:** abc123def456
 
       To download this attachment with the attachmentId provided:
-      Use the Sentry tool \`get_event_attachment(organizationSlug='sentry-mcp-evals', projectSlug='cloudflare-mcp', eventId='7ca573c0f4814912aaa9bdc77d1a7d51', attachmentId='123')\`
+      Use the Sentry tool \`get_event_attachment\`
 
       "
     `);

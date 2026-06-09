@@ -159,6 +159,16 @@ describe("cli/finalize", () => {
     expect(cfg.finalSkills.has("docs")).toBe(false);
   });
 
+  it("throws on legacy preprod skill in stdio", () => {
+    expect(() =>
+      finalize({
+        accessToken: "tok",
+        skills: "preprod",
+        unknownArgs: [],
+      }),
+    ).toThrow(/Invalid skills provided: preprod/);
+  });
+
   it("throws on empty skills after validation", () => {
     expect(() =>
       finalize({
@@ -174,13 +184,13 @@ describe("cli/finalize", () => {
       accessToken: "tok",
       unknownArgs: [],
     });
-    expect(cfg.finalSkills.size).toBe(6);
+    expect(cfg.finalSkills.size).toBe(5);
     expect(cfg.finalSkills.has("inspect")).toBe(true);
     expect(cfg.finalSkills.has("triage")).toBe(true);
     expect(cfg.finalSkills.has("project-management")).toBe(true);
     expect(cfg.finalSkills.has("seer")).toBe(true);
     expect(cfg.finalSkills.has("docs")).toBe(true);
-    expect(cfg.finalSkills.has("preprod")).toBe(true);
+    expect(cfg.finalSkills.has("preprod")).toBe(false);
   });
 
   // --disable-skills tests
@@ -191,12 +201,12 @@ describe("cli/finalize", () => {
       unknownArgs: [],
     });
     expect(cfg.finalSkills.has("seer")).toBe(false);
-    expect(cfg.finalSkills.size).toBe(5);
+    expect(cfg.finalSkills.size).toBe(4);
     expect(cfg.finalSkills.has("inspect")).toBe(true);
     expect(cfg.finalSkills.has("triage")).toBe(true);
     expect(cfg.finalSkills.has("project-management")).toBe(true);
     expect(cfg.finalSkills.has("docs")).toBe(true);
-    expect(cfg.finalSkills.has("preprod")).toBe(true);
+    expect(cfg.finalSkills.has("preprod")).toBe(false);
   });
 
   it("removes disabled skills when combined with --skills", () => {
@@ -241,7 +251,7 @@ describe("cli/finalize", () => {
     });
     expect(cfg.finalSkills.has("seer")).toBe(false);
     expect(cfg.finalSkills.has("docs")).toBe(false);
-    expect(cfg.finalSkills.size).toBe(4);
+    expect(cfg.finalSkills.size).toBe(3);
   });
 
   it("silently ignores disabling a skill not in the active set", () => {

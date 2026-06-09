@@ -9,7 +9,7 @@ import { renderSnapshotImageTreeSection } from "../support/snapshots/formatting"
 
 export default defineTool({
   name: "get_latest_base_snapshot",
-  skills: ["preprod"],
+  skills: ["inspect"],
   requiredScopes: ["project:read"],
   description: [
     "Get the latest UI screenshots/images for an app from the preprod snapshot system.",

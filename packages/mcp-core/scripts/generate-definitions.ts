@@ -191,6 +191,29 @@ async function generateSkillDefinitions() {
     throw new Error("Failed to import tools from src/tools/index.ts");
   }
 
+  const defaultVisibleEntries = Object.entries(toolsDefault).flatMap(
+    ([key, tool]): Array<[string, DefinitionTool]> => {
+      if (!tool || typeof tool !== "object") {
+        throw new Error(`Invalid tool: ${key}`);
+      }
+
+      const t = tool as DefinitionTool;
+      if (
+        surfacesModule.isWrapperToolName(t.name) ||
+        !toolTypesModule.isToolVisibleInMode(t, false)
+      ) {
+        return [];
+      }
+
+      return [[key, t]];
+    },
+  );
+  const defaultDirectToolNames = toolNamesFromEntries(
+    defaultVisibleEntries.filter(([, tool]) =>
+      surfacesModule.isTopLevelToolName(tool.name, false),
+    ),
+  );
+
   // Build tools array for each skill
   const skillsWithTools = skills.map((skill) => {
     const skillTools: Array<{
@@ -217,6 +240,10 @@ async function generateSkillDefinitions() {
         return [toolKey, t.name];
       }),
     );
+    const availableToolNames = new Set([
+      ...skillToolNames,
+      ...defaultDirectToolNames,
+    ]);
 
     for (const [, tool] of skillToolEntries) {
       const t = tool as DefinitionTool;
@@ -224,8 +251,8 @@ async function generateSkillDefinitions() {
         name: t.name,
         description: toolTypesModule.resolveDescription(t.description, {
           experimentalMode: false,
-          availableToolNames: skillToolNames,
-          directToolNames: skillToolNames,
+          availableToolNames,
+          directToolNames: defaultDirectToolNames,
         }),
         requiredScopes: Array.isArray(t.requiredScopes) ? t.requiredScopes : [],
       });

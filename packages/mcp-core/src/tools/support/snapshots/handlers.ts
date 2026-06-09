@@ -9,10 +9,7 @@ import {
   blobToBase64,
   createImagePreview,
 } from "../../../internal/blob-utils";
-import {
-  formatToolCall,
-  formatToolCallInstruction,
-} from "../../../internal/tool-helpers/tool-call-formatting";
+import { formatToolCallInstruction } from "../../../internal/tool-helpers/tool-call-formatting";
 import {
   type SnapshotImageEntry,
   type SnapshotImageTreeItem,
@@ -93,23 +90,8 @@ function fullResolutionHint({
   })}`;
 }
 
-function getSnapshotImagePreviewFallback({
-  organizationSlug,
-  snapshotId,
-  imageIdentifier,
-}: {
-  organizationSlug: string;
-  snapshotId: string;
-  imageIdentifier: string;
-}): string {
-  return `Use the Sentry tool \`${formatToolCall({
-    toolName: "get_sentry_resource",
-    arguments: {
-      organizationSlug,
-      resourceType: "snapshotImage",
-      resourceId: `${snapshotId}:${imageIdentifier}`,
-    },
-  })}\``;
+function getSnapshotImagePreviewFallback(): string {
+  return "Use the Sentry tool `get_sentry_resource`";
 }
 
 function formatSnapshotImageFullResolutionStep({
@@ -552,11 +534,7 @@ export async function fetchSnapshotSummary(
         experimentalMode: options.experimentalMode ?? false,
         availableToolNames: options.availableToolNames,
         directToolNames: options.directToolNames,
-        fallbackInstruction: getSnapshotImagePreviewFallback({
-          organizationSlug,
-          snapshotId,
-          imageIdentifier: "<image_file_name>",
-        }),
+        fallbackInstruction: getSnapshotImagePreviewFallback(),
       })} to view a specific image preview\n${formatSnapshotImageFullResolutionStep(
         {
           organizationSlug,

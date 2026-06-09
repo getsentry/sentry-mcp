@@ -40,8 +40,8 @@ export function McpToolCallTaskRunner(
         tools,
         system: [
           "You are a Sentry assistant with access to Sentry MCP tools.",
-          "Use search_tools before execute_tool when the needed Sentry operation is not directly listed as a tool.",
-          "When search_tools returns a tool, call execute_tool with that returned tool name and arguments matching the returned schema.",
+          "Use search_tools only when you need to discover the right Sentry operation or inspect its schema.",
+          "When you already know the right Sentry tool name, use that tool directly through the available MCP tools.",
         ].join("\n"),
         prompt: input,
         stopWhen: stepCountIs(maxSteps),

@@ -15,12 +15,10 @@ describe("tool call formatting", () => {
         },
         experimentalMode: true,
       }),
-    ).toBe(
-      "Use the Sentry tool `search_events(organizationSlug='my-org', query='level:error')`",
-    );
+    ).toBe("Use the Sentry tool `search_events`");
   });
 
-  it("formats catalog guidance when a tool is not top-level in the current mode", () => {
+  it("formats tool-name guidance when a tool is not top-level in the current mode", () => {
     expect(
       formatToolCallInstruction({
         toolName: "get_doc",
@@ -29,12 +27,10 @@ describe("tool call formatting", () => {
         },
         experimentalMode: true,
       }),
-    ).toBe(
-      'Use the Sentry tool `get_doc`: search `search_tools(query=\'get_doc\')`, then call `execute_tool` with name `get_doc` and arguments `{"path":"/platforms/javascript/guides/nextjs.md"}`',
-    );
+    ).toBe("Use the Sentry tool `get_doc`");
   });
 
-  it("formats purpose text before catalog gateway steps", () => {
+  it("formats purpose text in tool-name guidance", () => {
     expect(
       formatToolCallInstruction({
         toolName: "find_releases",
@@ -50,7 +46,7 @@ describe("tool call formatting", () => {
         purpose: "to list releases and their details",
       }),
     ).toBe(
-      'Use the Sentry tool `find_releases` to list releases and their details: search `search_tools(query=\'find_releases\')`, then call `execute_tool` with name `find_releases` and arguments `{"organizationSlug":"my-org"}`',
+      "Use the Sentry tool `find_releases` to list releases and their details",
     );
   });
 
@@ -66,7 +62,7 @@ describe("tool call formatting", () => {
     ).toBe("Release listing is not available");
   });
 
-  it("does not format non-top-level stable tools as direct calls", () => {
+  it("formats tool-name guidance for non-top-level tools in default mode", () => {
     expect(
       formatToolCallInstruction({
         toolName: "get_snapshot_image",
@@ -77,9 +73,7 @@ describe("tool call formatting", () => {
         },
         experimentalMode: false,
       }),
-    ).toBe(
-      "The Sentry tool `get_snapshot_image` is not available in this session",
-    );
+    ).toBe("Use the Sentry tool `get_snapshot_image`");
   });
 
   it("uses fallback guidance for unavailable tools", () => {
@@ -100,7 +94,7 @@ describe("tool call formatting", () => {
     ).toBe("Release listing is not available");
   });
 
-  it("uses catalog guidance only when the target tool is available", () => {
+  it("uses tool-name guidance only when the target tool is available", () => {
     expect(
       formatToolCallInstruction({
         toolName: "find_releases",
@@ -114,9 +108,7 @@ describe("tool call formatting", () => {
           "execute_tool",
         ]),
       }),
-    ).toBe(
-      'Use the Sentry tool `find_releases`: search `search_tools(query=\'find_releases\')`, then call `execute_tool` with name `find_releases` and arguments `{"organizationSlug":"my-org"}`',
-    );
+    ).toBe("Use the Sentry tool `find_releases`");
   });
 
   it("escapes arguments in direct call examples", () => {
