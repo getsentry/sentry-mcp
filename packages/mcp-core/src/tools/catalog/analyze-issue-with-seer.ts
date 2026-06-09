@@ -10,7 +10,8 @@ import {
   getStatusDisplayName,
   isTerminalStatus,
   getHumanInterventionGuidance,
-  getOutputForAutofixStep,
+  getOutputForAutofixRun,
+  getActiveAutofixTodo,
   SEER_POLLING_INTERVAL,
   SEER_TIMEOUT,
   SEER_MAX_RETRIES,
@@ -166,13 +167,7 @@ export default defineTool({
       if (isTerminalStatus(existingStatus)) {
         // Return results immediately, no polling needed
         output += `## Analysis ${getStatusDisplayName(existingStatus)}\n\n`;
-
-        for (const step of autofixState.autofix.steps) {
-          output += getOutputForAutofixStep(step, {
-            runId: autofixState.autofix.run_id,
-          });
-          output += "\n";
-        }
+        output += getOutputForAutofixRun(autofixState.autofix);
 
         if (existingStatus !== "completed") {
           output += `\n**Status**: ${existingStatus}\n`;
@@ -205,14 +200,7 @@ export default defineTool({
       // Check if completed (terminal state)
       if (isTerminalStatus(status)) {
         output += `## Analysis ${getStatusDisplayName(status)}\n\n`;
-
-        // Add all step outputs
-        for (const step of autofixState.autofix.steps) {
-          output += getOutputForAutofixStep(step, {
-            runId: autofixState.autofix.run_id,
-          });
-          output += "\n";
-        }
+        output += getOutputForAutofixRun(autofixState.autofix);
 
         if (status !== "completed") {
           output += `\n**Status**: ${status}\n`;
@@ -224,11 +212,9 @@ export default defineTool({
 
       // Update status if changed
       if (status !== lastStatus) {
-        const activeStep = autofixState.autofix.steps.find(
-          (step) => step.status === "processing",
-        );
-        if (activeStep) {
-          output += `Processing: ${activeStep.title}...\n`;
+        const activeTodo = getActiveAutofixTodo(autofixState.autofix);
+        if (activeTodo) {
+          output += `Processing: ${activeTodo}...\n`;
         }
         lastStatus = status;
       }
@@ -283,12 +269,7 @@ export default defineTool({
     // Show current progress
     if (autofixState.autofix) {
       output += `**Current Status**: ${getStatusDisplayName(autofixState.autofix.status)}\n\n`;
-      for (const step of autofixState.autofix.steps) {
-        output += getOutputForAutofixStep(step, {
-          runId: autofixState.autofix.run_id,
-        });
-        output += "\n";
-      }
+      output += getOutputForAutofixRun(autofixState.autofix);
     }
 
     // Timeout reached

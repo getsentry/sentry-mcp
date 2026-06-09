@@ -915,36 +915,22 @@ describe("get_issue_details", () => {
         run_id: 12345,
         status: "processing",
         updated_at: "2025-04-09T22:39:50.778146",
-        request: {},
-        steps: [
+        blocks: [
           {
-            id: "step-1",
-            type: "root_cause_analysis",
-            status: "completed",
-            title: "Root Cause Analysis",
-            index: 0,
-            causes: [
+            id: "block-1",
+            artifacts: [
               {
-                id: 0,
-                description:
-                  "The bottleById query fails because the input ID doesn't exist in the database.",
-                root_cause_reproduction: [],
+                key: "root_cause",
+                reason: "Root cause analysis completed",
+                data: {
+                  one_line_description:
+                    "The bottleById query fails because the input ID doesn't exist in the database.",
+                  five_whys: [],
+                  reproduction_steps: [],
+                },
               },
             ],
-            progress: [],
-            queued_user_messages: [],
-            selection: null,
-          },
-          {
-            id: "step-2",
-            type: "solution",
-            status: "processing",
-            title: "Generating Solution",
-            index: 1,
-            description: null,
-            solution: [],
-            progress: [],
-            queued_user_messages: [],
+            todos: [{ content: "Generating solution", status: "in_progress" }],
           },
         ],
       },
@@ -990,8 +976,7 @@ describe("get_issue_details", () => {
         run_id: 12346,
         status: "error",
         updated_at: "2025-04-09T22:39:50.778146",
-        request: {},
-        steps: [],
+        blocks: [],
       },
     };
 
@@ -1030,25 +1015,21 @@ describe("get_issue_details", () => {
         run_id: 12347,
         status: "awaiting_user_input",
         updated_at: "2025-04-09T22:39:50.778146",
-        request: {},
-        steps: [
+        blocks: [
           {
-            id: "step-1",
-            type: "root_cause_analysis",
-            status: "completed",
-            title: "Root Cause Analysis",
-            index: 0,
-            causes: [
+            id: "block-1",
+            artifacts: [
               {
-                id: 0,
-                description:
-                  "Partial analysis completed but more context needed.",
-                root_cause_reproduction: [],
+                key: "root_cause",
+                reason: "Partial root cause analysis",
+                data: {
+                  one_line_description:
+                    "Partial analysis completed but more context needed.",
+                  five_whys: [],
+                  reproduction_steps: [],
+                },
               },
             ],
-            progress: [],
-            queued_user_messages: [],
-            selection: null,
           },
         ],
       },

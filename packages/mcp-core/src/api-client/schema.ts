@@ -1024,6 +1024,29 @@ export const AutofixRunStepSchema = z.union([
   AutofixRunStepBaseSchema.passthrough(),
 ]);
 
+const AutofixArtifactSchema = z
+  .object({
+    key: z.string(),
+    data: z.record(z.string(), z.unknown()).nullable().default(null),
+  })
+  .passthrough();
+
+const AutofixTodoSchema = z
+  .object({
+    content: z.string(),
+    status: z.string(),
+  })
+  .passthrough();
+
+// Agent memory blocks (Sentry's `MemoryBlock`). Analysis content arrives as
+// artifacts keyed "root_cause" and "solution"; only what we render is modeled.
+const AutofixBlockSchema = z
+  .object({
+    artifacts: z.array(AutofixArtifactSchema).default([]),
+    todos: z.array(AutofixTodoSchema).nullable().optional(),
+  })
+  .passthrough();
+
 /**
  * The Seer autofix GET endpoint is explicitly experimental. It returns the
  * agent-based run state (`blocks`, `pending_user_input`, coding-agent
@@ -1045,9 +1068,14 @@ export const AutofixRunStateSchema = z.object({
         (value) => value ?? [],
         z.array(AutofixRunStepSchema),
       ),
-      blocks: z.array(z.unknown()).optional(),
+      blocks: z.array(AutofixBlockSchema).default([]),
       pending_user_input: z.unknown().nullable().optional(),
-      repo_pr_states: z.record(z.string(), z.unknown()).optional(),
+      repo_pr_states: z
+        .record(
+          z.string(),
+          z.object({ pr_url: z.string().nullable().optional() }).passthrough(),
+        )
+        .optional(),
       coding_agents: z.record(z.string(), z.unknown()).optional(),
     })
     .passthrough()

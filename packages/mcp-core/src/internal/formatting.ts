@@ -7,7 +7,6 @@
  */
 import type { z } from "zod";
 import type {
-  AutofixRunStepRootCauseAnalysisSchema,
   DefaultEventSchema,
   ErrorEntrySchema,
   ErrorEventSchema,
@@ -30,7 +29,7 @@ import type {
 } from "../api-client/types";
 import { logIssue } from "../telem/logging";
 import {
-  getOutputForAutofixStep,
+  getAutofixArtifactSummaries,
   getStatusDisplayName,
   isTerminalStatus,
 } from "./tool-helpers/seer";
@@ -1633,101 +1632,30 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
   parts.push("");
 
   // Show status first
-  const statusDisplay = getStatusDisplayName(autofix.status);
   if (!isTerminalStatus(autofix.status)) {
-    parts.push(`**Status:** ${statusDisplay}`);
+    parts.push(`**Status:** ${getStatusDisplayName(autofix.status)}`);
     parts.push("");
   }
 
-  // Show summary of what we have so far
-  if (autofix.steps.length > 0) {
-    const completedSteps = autofix.steps.filter(
-      (step) => step.status === "completed",
-    );
-
-    // Find the solution step if available
-    const solutionStep = completedSteps.find(
-      (step) => step.type === "solution",
-    );
-
-    if (solutionStep) {
-      // For solution steps, use the description directly
-      const solutionDescription = solutionStep.description;
-      if (
-        solutionDescription &&
-        typeof solutionDescription === "string" &&
-        solutionDescription.trim()
-      ) {
-        parts.push("**Summary:**");
-        parts.push(solutionDescription.trim());
-      } else {
-        // Fallback to extracting from output if no description
-        const solutionOutput = getOutputForAutofixStep(solutionStep, {
-          includeProvenanceTags: false,
-        });
-        const lines = solutionOutput.split("\n");
-        const firstParagraph = lines.find(
-          (line) =>
-            line.trim().length > 50 &&
-            !line.startsWith("#") &&
-            !line.startsWith("*"),
-        );
-        if (firstParagraph) {
-          parts.push("**Summary:**");
-          parts.push(firstParagraph.trim());
-        }
-      }
-    } else if (completedSteps.length > 0) {
-      // Show what steps have been completed so far
-      const rootCauseStep = completedSteps.find(
-        (step) => step.type === "root_cause_analysis",
-      );
-
-      if (rootCauseStep) {
-        const typedStep = rootCauseStep as z.infer<
-          typeof AutofixRunStepRootCauseAnalysisSchema
-        >;
-        if (
-          typedStep.causes &&
-          typedStep.causes.length > 0 &&
-          typedStep.causes[0].description
-        ) {
-          parts.push("**Root Cause Identified:**");
-          parts.push(typedStep.causes[0].description.trim());
-        }
-      } else {
-        // Show generic progress
-        parts.push(
-          `**Progress:** ${completedSteps.length} of ${autofix.steps.length} steps completed`,
-        );
-      }
-    }
-  } else {
-    // No steps yet - check for terminal states first
-    if (isTerminalStatus(autofix.status)) {
-      if (autofix.status === "error") {
-        parts.push("**Status:** Analysis failed.");
-      } else if (autofix.status === "awaiting_user_input") {
-        parts.push(
-          "**Status:** Analysis paused - additional information needed.",
-        );
-      }
-    } else {
-      parts.push("Analysis has started but no results yet.");
-    }
+  // Summarize from the run's artifacts: the solution if available, otherwise
+  // the root cause if it has been identified.
+  const { rootCause, solution } = getAutofixArtifactSummaries(autofix);
+  if (solution) {
+    parts.push("**Summary:**");
+    parts.push(solution);
+  } else if (rootCause) {
+    parts.push("**Root Cause Identified:**");
+    parts.push(rootCause);
+  } else if (!isTerminalStatus(autofix.status)) {
+    parts.push("Analysis has started but no results yet.");
   }
 
-  // Add specific messages for terminal states when steps exist
-  if (autofix.steps.length > 0 && isTerminalStatus(autofix.status)) {
-    if (autofix.status === "error") {
-      parts.push("");
-      parts.push("**Status:** Analysis failed.");
-    } else if (autofix.status === "awaiting_user_input") {
-      parts.push("");
-      parts.push(
-        "**Status:** Analysis paused - additional information needed.",
-      );
-    }
+  if (autofix.status === "error") {
+    parts.push("");
+    parts.push("**Status:** Analysis failed.");
+  } else if (autofix.status === "awaiting_user_input") {
+    parts.push("");
+    parts.push("**Status:** Analysis paused - additional information needed.");
   }
 
   return `${parts.join("\n")}\n\n`;
