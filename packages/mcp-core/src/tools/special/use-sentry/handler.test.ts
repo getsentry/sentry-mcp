@@ -22,7 +22,6 @@ const ALL_SKILLS: Skill[] = [
   "seer",
   "triage",
   "project-management",
-  "preprod",
 ];
 
 const mockContext: ServerContext = {

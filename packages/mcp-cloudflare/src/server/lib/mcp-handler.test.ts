@@ -213,6 +213,22 @@ describe("MCP Handler", () => {
       expect(await response.text()).toContain("No valid skills");
     });
 
+    it("accepts legacy preprod grants as inspect", async () => {
+      const request = createMcpRequest("tools/list");
+      const ctx = createMcpContext({ grantedSkills: ["preprod"] });
+
+      const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+      expect(response.status).toBe(200);
+      const body = await parseSSEResponse<{
+        result?: { tools: Array<{ name: string }> };
+      }>(response);
+      const toolNames = body.result?.tools.map((tool) => tool.name) ?? [];
+
+      expect(toolNames).toContain("search_events");
+      expect(toolNames).not.toContain("search_docs");
+    });
+
     it("applies the authenticated MCP rate limit per user", async () => {
       const mockUserRateLimiter = {
         limit: vi.fn().mockResolvedValue({ success: true }),

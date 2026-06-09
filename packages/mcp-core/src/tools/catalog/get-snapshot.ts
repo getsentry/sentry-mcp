@@ -10,7 +10,7 @@ import { fetchSnapshotSummary } from "../support/snapshots/handlers";
 
 export default defineTool({
   name: "get_snapshot",
-  skills: ["preprod"],
+  skills: ["inspect"],
   requiredScopes: ["project:read"],
   description: ({ experimentalMode, availableToolNames, directToolNames }) => {
     const imageInstruction = formatToolCallInstruction({
@@ -23,8 +23,7 @@ export default defineTool({
       experimentalMode,
       availableToolNames,
       directToolNames,
-      fallbackInstruction:
-        "Use the Sentry tool `get_sentry_resource(resourceType='snapshotImage', organizationSlug='<organization_slug>', resourceId='<snapshot_id>:<image_file_name>')`",
+      fallbackInstruction: "Use the Sentry tool `get_sentry_resource`",
     });
     const imageInstructionSuffix = imageInstruction.includes(
       "get_snapshot_image",

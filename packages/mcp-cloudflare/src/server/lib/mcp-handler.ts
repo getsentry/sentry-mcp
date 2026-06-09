@@ -233,9 +233,11 @@ const mcpHandler: ExportedHandler<Env> = {
       );
     }
 
-    const { valid: validSkills, invalid: invalidSkills } = parseSkills(
-      rawProps.grantedSkills as string[],
+    const grantedSkills = (rawProps.grantedSkills as string[]).map((skill) =>
+      skill === "preprod" ? "inspect" : skill,
     );
+    const { valid: validSkills, invalid: invalidSkills } =
+      parseSkills(grantedSkills);
 
     if (invalidSkills.length > 0) {
       logWarn("Ignoring invalid skills from OAuth provider", {

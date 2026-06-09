@@ -9,7 +9,7 @@ import { fetchSnapshotImage } from "../support/snapshots/handlers";
 
 export default defineTool({
   name: "get_snapshot_image",
-  skills: ["preprod"],
+  skills: ["inspect"],
   requiredScopes: ["project:read"],
   description: [
     "Get metadata and image content for one image in a preprod snapshot.",

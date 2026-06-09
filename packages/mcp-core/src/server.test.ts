@@ -689,10 +689,7 @@ describe("buildServer", () => {
 
     it("advertises Sentry tool guidance for snapshot image tools", async () => {
       const server = buildServer({
-        context: {
-          ...baseContext,
-          grantedSkills: new Set([...baseContext.grantedSkills!, "preprod"]),
-        },
+        context: baseContext,
       });
 
       const registeredTools = await listRegisteredTools(server);
@@ -760,17 +757,20 @@ describe("buildServer", () => {
       expect(registeredTools.map((tool) => tool.name)).toEqual(["use_sentry"]);
     });
 
-    it("keeps preprod tools catalog-only while enforcing their skill gate", async () => {
-      const withoutPreprod = buildServer({
-        context: baseContext,
+    it("keeps snapshot tools catalog-only while enforcing the inspect skill gate", async () => {
+      const withoutInspect = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["triage"]),
+        },
       });
-      const withoutPreprodToolNames = getRegisteredToolNames(withoutPreprod);
-      expect(withoutPreprodToolNames).not.toContain("get_snapshot");
-      expect(withoutPreprodToolNames).not.toContain("get_snapshot_image");
-      expect(withoutPreprodToolNames).not.toContain("get_latest_base_snapshot");
+      const withoutInspectToolNames = getRegisteredToolNames(withoutInspect);
+      expect(withoutInspectToolNames).not.toContain("get_snapshot");
+      expect(withoutInspectToolNames).not.toContain("get_snapshot_image");
+      expect(withoutInspectToolNames).not.toContain("get_latest_base_snapshot");
 
       const hiddenResult = await callRegisteredTool(
-        withoutPreprod,
+        withoutInspect,
         "search_tools",
         {
           query: "snapshot",
@@ -784,25 +784,16 @@ describe("buildServer", () => {
         "get_snapshot",
       );
 
-      const withPreprod = buildServer({
-        context: {
-          ...baseContext,
-          grantedSkills: new Set([
-            "inspect",
-            "triage",
-            "project-management",
-            "seer",
-            "preprod",
-          ]),
-        },
+      const withInspect = buildServer({
+        context: baseContext,
       });
-      const withPreprodToolNames = getRegisteredToolNames(withPreprod);
-      expect(withPreprodToolNames).not.toContain("get_snapshot");
-      expect(withPreprodToolNames).not.toContain("get_snapshot_image");
-      expect(withPreprodToolNames).not.toContain("get_latest_base_snapshot");
+      const withInspectToolNames = getRegisteredToolNames(withInspect);
+      expect(withInspectToolNames).not.toContain("get_snapshot");
+      expect(withInspectToolNames).not.toContain("get_snapshot_image");
+      expect(withInspectToolNames).not.toContain("get_latest_base_snapshot");
 
       const visibleResult = await callRegisteredTool(
-        withPreprod,
+        withInspect,
         "search_tools",
         {
           query: "snapshot",

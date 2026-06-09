@@ -191,7 +191,7 @@ describe("formatIssueOutput", () => {
     });
 
     expect(output).toContain(
-      "- Full distributed trace and span tree: Use the Sentry tool `get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')`",
+      "- Full distributed trace and span tree: Use the Sentry tool `get_sentry_resource`",
     );
     expect(output).toContain(
       "- Related span search: Related span search is not available in this session",
