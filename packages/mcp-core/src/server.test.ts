@@ -687,7 +687,7 @@ describe("buildServer", () => {
       expect(experimentalToolNames).toEqual(DEFAULT_DIRECT_TOOL_NAMES);
     });
 
-    it("advertises catalog gateway calls for snapshot image tools", async () => {
+    it("advertises Sentry tool guidance for snapshot image tools", async () => {
       const server = buildServer({
         context: {
           ...baseContext,
@@ -701,10 +701,7 @@ describe("buildServer", () => {
       );
 
       expect(getSentryResource?.description).toContain(
-        "search `search_tools(query='get_snapshot_image')`",
-      );
-      expect(getSentryResource?.description).toContain(
-        "then call `execute_tool` with name `get_snapshot_image`",
+        "Use the Sentry tool `get_snapshot_image` for full-resolution image bytes",
       );
     });
 
@@ -726,9 +723,6 @@ describe("buildServer", () => {
         "- **Find releases**: Release listing is not available in this session",
       );
       expect(text).not.toContain("find_releases(");
-      expect(text).not.toContain(
-        "search `search_tools(query='find_releases')`",
-      );
     });
 
     it("keeps long-tail tools catalog-only by default", async () => {

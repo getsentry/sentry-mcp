@@ -26,10 +26,6 @@ function formatArguments(args: Record<string, JsonValue>): string {
     .join(", ");
 }
 
-function formatArgumentsJson(args: Record<string, JsonValue>): string {
-  return JSON.stringify(args);
-}
-
 function formatPurpose(purpose: string | undefined): string {
   return purpose ? ` ${purpose}` : "";
 }
@@ -68,9 +64,8 @@ export function formatToolCall({
  */
 export function formatToolCallInstruction({
   toolName,
-  arguments: args = {},
+  arguments: _args = {},
   experimentalMode,
-  searchQuery = toolName,
   purpose,
   availableToolNames,
   directToolNames,
@@ -79,7 +74,6 @@ export function formatToolCallInstruction({
   toolName: string;
   arguments?: Record<string, JsonValue>;
   experimentalMode: boolean;
-  searchQuery?: string;
   purpose?: string;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
@@ -91,10 +85,7 @@ export function formatToolCallInstruction({
     targetAvailable &&
     isDirectTool(toolName, experimentalMode, directToolNames)
   ) {
-    return `Use the Sentry tool \`${formatToolCall({
-      toolName,
-      arguments: args,
-    })}\`${formatPurpose(purpose)}`;
+    return `Use the Sentry tool \`${toolName}\`${formatPurpose(purpose)}`;
   }
 
   const catalogGatewayAvailable =
@@ -104,14 +95,7 @@ export function formatToolCallInstruction({
     isDirectTool("execute_tool", experimentalMode, directToolNames);
 
   if (targetAvailable && catalogGatewayAvailable) {
-    return [
-      `Use the Sentry tool \`${toolName}\`${formatPurpose(purpose)}:`,
-      `search \`${formatToolCall({
-        toolName: "search_tools",
-        arguments: { query: searchQuery },
-      })}\`,`,
-      `then call \`execute_tool\` with name \`${toolName}\` and arguments \`${formatArgumentsJson(args)}\``,
-    ].join(" ");
+    return `Use the Sentry tool \`${toolName}\`${formatPurpose(purpose)}`;
   }
 
   return (

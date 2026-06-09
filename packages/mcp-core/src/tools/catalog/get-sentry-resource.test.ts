@@ -338,9 +338,9 @@ describe("get_sentry_resource", () => {
 
         ## Next Steps
 
-        - **Search spans**: Use the Sentry tool \`search_events(organizationSlug='test-org', dataset='spans', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`
-        - **Search errors**: Use the Sentry tool \`search_events(organizationSlug='test-org', dataset='errors', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`
-        - **Search logs**: Use the Sentry tool \`search_events(organizationSlug='test-org', dataset='logs', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`"
+        - **Search spans**: Use the Sentry tool \`search_events\`
+        - **Search errors**: Use the Sentry tool \`search_events\`
+        - **Search logs**: Use the Sentry tool \`search_events\`"
       `);
     });
 
@@ -489,7 +489,7 @@ describe("get_sentry_resource", () => {
         To get release information:
 
         - **View in Sentry**: [Open Release](https://my-org.sentry.io/releases/v1.2.3/)
-        - **Find releases**: Use the Sentry tool \`find_releases\` to list releases and their details: search \`search_tools(query='find_releases')\`, then call \`execute_tool\` with name \`find_releases\` and arguments \`{"organizationSlug":"my-org"}\`
+        - **Find releases**: Use the Sentry tool \`find_releases\` to list releases and their details
         - **Search issues**: Use \`search_issues\` with query \`release:v1.2.3\` to find issues in this release"
       `);
     });
@@ -507,7 +507,7 @@ describe("get_sentry_resource", () => {
         To get release information:
 
         - **View in Sentry**: [Open Release](https://my-org.sentry.io/releases/backend%402024.01.15-abc123/)
-        - **Find releases**: Use the Sentry tool \`find_releases\` to list releases and their details: search \`search_tools(query='find_releases')\`, then call \`execute_tool\` with name \`find_releases\` and arguments \`{"organizationSlug":"my-org"}\`
+        - **Find releases**: Use the Sentry tool \`find_releases\` to list releases and their details
         - **Search issues**: Use \`search_issues\` with query \`release:backend@2024.01.15-abc123\` to find issues in this release"
       `);
     });
@@ -844,7 +844,7 @@ describe("get_sentry_resource", () => {
         'get_sentry_resource(resourceType="snapshotImage", resourceId="55:<image_file_name>")',
       );
       expect(result).toContain(
-        "- Use the Sentry tool `get_snapshot_image` to fetch original full-resolution image bytes: search `search_tools(query='get_snapshot_image')`, then call `execute_tool` with name `get_snapshot_image`",
+        "- Use the Sentry tool `get_snapshot_image` to fetch original full-resolution image bytes",
       );
       expect(result).not.toContain("?selectedSnapshot=");
     });
@@ -940,7 +940,7 @@ describe("get_sentry_resource", () => {
       expect(result[0]).toMatchObject({
         type: "text",
         text: expect.stringContaining(
-          "Use the Sentry tool `get_snapshot_image` for full-resolution image bytes: search `search_tools(query='get_snapshot_image')`, then call `execute_tool` with name `get_snapshot_image`",
+          "Use the Sentry tool `get_snapshot_image` for full-resolution image bytes",
         ),
       });
     });
@@ -1014,7 +1014,7 @@ describe("get_sentry_resource", () => {
       expect(result[0]).toMatchObject({
         type: "text",
         text: expect.stringContaining(
-          "- **Full Resolution**: Use the Sentry tool `get_snapshot_image` for full-resolution image bytes: search `search_tools(query='get_snapshot_image')`, then call `execute_tool` with name `get_snapshot_image`",
+          "- **Full Resolution**: Use the Sentry tool `get_snapshot_image` for full-resolution image bytes",
         ),
       });
       expect(result).toContainEqual(
