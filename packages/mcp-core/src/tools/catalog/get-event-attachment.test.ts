@@ -66,6 +66,9 @@ describe("get_event_attachment", () => {
 
     // Should return an array with both text description and image content
     expect(Array.isArray(result)).toBe(true);
+    if (!Array.isArray(result)) {
+      throw new Error("Expected content array result");
+    }
     expect(result).toHaveLength(2);
 
     // First item should be the image content
@@ -125,6 +128,9 @@ describe("get_event_attachment", () => {
     );
 
     expect(Array.isArray(result)).toBe(true);
+    if (!Array.isArray(result)) {
+      throw new Error("Expected content array result");
+    }
     // First item must be an image, not an EmbeddedResource — proving the MCP
     // used image/png from the download Content-Type, not application/octet-stream
     // from the metadata.

@@ -1,14 +1,23 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { setUser } from "@sentry/core";
+import { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createStructuredToolResult,
+  normalizeToolHandlerResult,
+} from "./internal/tool-result";
 import { buildServer } from "./server";
 import tools from "./tools";
 import {
   CATALOG_INFRASTRUCTURE_TOOL_NAMES,
   getTopLevelToolNames,
 } from "./tools/surfaces";
-import { type ToolConfig, isToolVisibleInMode } from "./tools/types";
+import {
+  isToolVisibleInMode,
+  resolveOutputSchema,
+  type ToolConfig,
+} from "./tools/types";
 import type { ServerContext } from "./types";
 
 // Mock the Sentry core module
@@ -180,6 +189,79 @@ describe("buildServer", () => {
         id: "user-123",
         ip_address: "192.0.2.1",
       });
+    });
+  });
+
+  describe("structured tool results", () => {
+    it("passes structuredContent through to MCP results", async () => {
+      const result = normalizeToolHandlerResult({
+        content: [{ type: "text", text: "Structured summary" }],
+        structuredContent: {
+          schemaVersion: "test.structured.v1",
+          data: {
+            message: "hello",
+          },
+        },
+      });
+
+      expect(result).toEqual({
+        content: [{ type: "text", text: "Structured summary" }],
+        structuredContent: {
+          schemaVersion: "test.structured.v1",
+          data: {
+            message: "hello",
+          },
+        },
+      });
+    });
+
+    it("returns serialized structuredContent over the MCP client surface", async () => {
+      const structuredContent = {
+        schemaVersion: "test.structured.v1",
+        data: {
+          message: "hello",
+        },
+      };
+      const server = buildServer({
+        context: baseContext,
+        tools: {
+          structured_tool: createMockTool("structured_tool", {
+            inputSchema: {
+              noop: z.string().optional(),
+            },
+            handler: async () => createStructuredToolResult(structuredContent),
+          }),
+        },
+      });
+      const [clientTransport, serverTransport] =
+        InMemoryTransport.createLinkedPair();
+      const client = new Client({
+        name: "structured-result-test-client",
+        version: "1.0.0",
+      });
+
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+
+      try {
+        const result = await client.callTool({
+          name: "structured_tool",
+          arguments: { noop: "ok" },
+        });
+
+        expect(result).toMatchObject({
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(structuredContent),
+            },
+          ],
+          structuredContent,
+        });
+      } finally {
+        await client.close();
+        await server.close();
+      }
     });
   });
 
@@ -892,6 +974,69 @@ describe("buildServer", () => {
       });
     });
 
+    it("exposes structured output schemas only in experimental mode", async () => {
+      const stableServer = buildServer({
+        context: baseContext,
+      });
+      const stableTools = await listRegisteredTools(stableServer);
+      const stableSearchEvents = stableTools.find(
+        (tool) => tool.name === "search_events",
+      );
+      const stableSearchIssueEvents = stableTools.find(
+        (tool) => tool.name === "search_issue_events",
+      );
+
+      expect(stableSearchEvents).not.toHaveProperty("outputSchema");
+      expect(stableSearchIssueEvents).not.toHaveProperty("outputSchema");
+
+      const experimentalServer = buildServer({
+        context: baseContext,
+        experimentalMode: true,
+      });
+      const experimentalTools = await listRegisteredTools(experimentalServer);
+      const searchEvents = experimentalTools.find(
+        (tool) => tool.name === "search_events",
+      );
+      const searchIssueEvents = experimentalTools.find(
+        (tool) => tool.name === "search_issue_events",
+      );
+
+      expect(JSON.stringify(searchEvents?.outputSchema)).toContain(
+        "sentry.mcp.search_events.v1",
+      );
+      expect(searchIssueEvents).toBeUndefined();
+      expect(
+        resolveOutputSchema(tools.search_issue_events.outputSchema, {
+          experimentalMode: true,
+        }),
+      ).toBeDefined();
+      expect(
+        resolveOutputSchema(tools.search_issue_events.outputSchema, {
+          experimentalMode: false,
+        }),
+      ).toBeUndefined();
+      expect(
+        resolveOutputSchema(tools.get_issue_details.outputSchema, {
+          experimentalMode: true,
+        }),
+      ).toBeDefined();
+      expect(
+        resolveOutputSchema(tools.get_issue_details.outputSchema, {
+          experimentalMode: false,
+        }),
+      ).toBeUndefined();
+      expect(
+        resolveOutputSchema(tools.search_events.outputSchema, {
+          experimentalMode: false,
+        }),
+      ).toBeUndefined();
+      expect(
+        resolveOutputSchema(tools.search_events.outputSchema, {
+          experimentalMode: true,
+        }),
+      ).toBeDefined();
+    });
+
     it("search_tools returns available tools with constrained schemas", async () => {
       const server = buildServer({
         context: {
@@ -995,11 +1140,20 @@ describe("buildServer", () => {
         limit: 5,
       });
       const payload = getStructuredContent<{
-        results: Array<{ name: string }>;
+        results: Array<{
+          name: string;
+          outputSchema?: Record<string, unknown>;
+        }>;
       }>(result);
+      const issueDetailsTool = payload.results.find(
+        (tool) => tool.name === "get_issue_details",
+      );
 
       expect(payload.results.map((tool) => tool.name)).toContain(
         "get_issue_details",
+      );
+      expect(JSON.stringify(issueDetailsTool?.outputSchema)).toContain(
+        "sentry.mcp.issue_details.v1",
       );
     });
 
@@ -1034,9 +1188,23 @@ describe("buildServer", () => {
         },
       });
 
-      expect(getTextContent(result)).toContain(
-        "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
-      );
+      const payload = getStructuredContent<{
+        schemaVersion: string;
+        meta: { organizationSlug: string };
+        issue: { shortId: string; title: string };
+      }>(result);
+
+      expect(payload).toMatchObject({
+        schemaVersion: "sentry.mcp.issue_details.v1",
+        meta: {
+          organizationSlug: "sentry-mcp-evals",
+        },
+        issue: {
+          shortId: "CLOUDFLARE-MCP-41",
+          title: "Error: Tool list_organizations is already registered",
+        },
+      });
+      expect(getTextContent(result)).toBe(JSON.stringify(payload));
     });
 
     it("execute_tool injects constrained arguments for catalog-only tools", async () => {
@@ -1059,9 +1227,22 @@ describe("buildServer", () => {
         },
       });
 
-      expect(getTextContent(result)).toContain(
-        "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
-      );
+      const payload = getStructuredContent<{
+        schemaVersion: string;
+        meta: { organizationSlug: string };
+        issue: { shortId: string };
+      }>(result);
+
+      expect(payload).toMatchObject({
+        schemaVersion: "sentry.mcp.issue_details.v1",
+        meta: {
+          organizationSlug: "sentry-mcp-evals",
+        },
+        issue: {
+          shortId: "CLOUDFLARE-MCP-41",
+        },
+      });
+      expect(getTextContent(result)).toBe(JSON.stringify(payload));
     });
 
     it("exposes get_profile_details safety annotations through tool metadata", async () => {

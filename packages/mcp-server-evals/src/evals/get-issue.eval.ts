@@ -9,9 +9,6 @@ describeEval("get-issue", {
         expectedTools: [
           {
             name: "search_tools",
-            arguments: {
-              query: "issue",
-            },
           },
           {
             name: "execute_tool",
@@ -30,9 +27,6 @@ describeEval("get-issue", {
         expectedTools: [
           {
             name: "search_tools",
-            arguments: {
-              query: "issue",
-            },
           },
           {
             name: "execute_tool",

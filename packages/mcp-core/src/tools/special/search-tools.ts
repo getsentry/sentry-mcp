@@ -26,6 +26,12 @@ export const searchToolsOutputSchema = z.object({
         .describe(
           "JSON Schema for the arguments to pass to execute_tool. Session-constrained parameters are omitted.",
         ),
+      outputSchema: z
+        .record(z.unknown())
+        .optional()
+        .describe(
+          "JSON Schema for structuredContent returned by execute_tool when the target tool declares structured output.",
+        ),
       annotations: toolAnnotationsOutputSchema,
     }),
   ),

@@ -1,16 +1,14 @@
-import type {
-  CallToolResult,
-  EmbeddedResource,
-  ImageContent,
-  TextContent,
-} from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
 import type { Scope } from "../permissions";
 import type { Skill } from "../skills";
 import type { ProjectCapabilities, ServerContext } from "../types";
+import type {
+  ToolContent,
+  ToolHandlerResult,
+} from "../internal/tool-result";
 
-export type ToolContent = TextContent | ImageContent | EmbeddedResource;
-export type ToolOutput = string | ToolContent[] | CallToolResult;
+export type { ToolContent };
+export type ToolOutput = ToolHandlerResult;
 /**
  * Keeps schema-inferred handler params at tool definition sites while allowing
  * heterogeneous tool registries to store many concrete handler signatures.
@@ -43,6 +41,10 @@ export type ToolDescription =
   | string
   | ((context: DescriptionContext) => string);
 
+export type ToolOutputSchema =
+  | z.ZodType
+  | ((context: DescriptionContext) => z.ZodType | undefined);
+
 /**
  * Resolves a tool description to a string.
  * Handles both static strings and dynamic description functions.
@@ -52,6 +54,15 @@ export function resolveDescription(
   context: DescriptionContext,
 ): string {
   return typeof description === "function" ? description(context) : description;
+}
+
+export function resolveOutputSchema(
+  outputSchema: ToolOutputSchema | undefined,
+  context: DescriptionContext,
+): z.ZodType | undefined {
+  return typeof outputSchema === "function"
+    ? outputSchema(context)
+    : outputSchema;
 }
 
 /**
@@ -80,7 +91,7 @@ export interface ToolConfig<
   experimental?: boolean; // Mark tool as experimental (only shown in experimental mode)
   hideInExperimentalMode?: boolean; // Hide tool when experimental mode is active (for tools replaced by unified tools)
   requiredCapabilities?: (keyof ProjectCapabilities)[]; // Project capabilities required for this tool
-  outputSchema?: z.ZodType;
+  outputSchema?: ToolOutputSchema;
   annotations: {
     readOnlyHint?: boolean;
     destructiveHint?: boolean;

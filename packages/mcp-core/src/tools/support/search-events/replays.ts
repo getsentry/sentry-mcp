@@ -2,6 +2,7 @@ import type { ReplayDetails, SentryApiService } from "../../../api-client";
 import { formatToolCallInstruction } from "../../../internal/tool-helpers/tool-call-formatting";
 import {
   type ExecutedSearch,
+  type RenderedEventRow,
   formatExecutedSearch,
   formatSearchPresentationHint,
   formatSentryDashboardLink,
@@ -71,6 +72,83 @@ export interface FormatReplayResultsParams {
 
 export function isValidReplaySort(sort: string): boolean {
   return REPLAY_SORT_VALUES.has(sort);
+}
+
+export function createRenderedReplayRows({
+  replays,
+  organizationSlug,
+  apiService,
+}: Pick<
+  FormatReplayResultsParams,
+  "replays" | "organizationSlug" | "apiService"
+>): RenderedEventRow[] {
+  return replays.map((replay) => {
+    const replayUrl = apiService.getReplayUrl(organizationSlug, replay.id);
+    const fields = [
+      { name: "url", label: "Replay URL", value: replayUrl },
+      {
+        name: "started_at",
+        label: "Started",
+        value: formatTimestamp(replay.started_at),
+      },
+      {
+        name: "duration",
+        label: "Duration",
+        value: formatDurationSeconds(replay.duration),
+      },
+      { name: "user", label: "User", value: formatReplayUser(replay) },
+      {
+        name: "summary",
+        label: "Summary",
+        value: [
+          `${replay.count_errors ?? 0} error${replay.count_errors === 1 ? "" : "s"}`,
+          `${replay.count_rage_clicks ?? 0} rage click${replay.count_rage_clicks === 1 ? "" : "s"}`,
+          `${replay.count_dead_clicks ?? 0} dead click${replay.count_dead_clicks === 1 ? "" : "s"}`,
+        ].join(" · "),
+      },
+      {
+        name: "environment",
+        label: "Environment",
+        value: replay.environment ?? "Unknown",
+      },
+      {
+        name: "browser",
+        label: "Browser",
+        value: formatNameVersion(replay.browser?.name, replay.browser?.version),
+      },
+    ];
+
+    if (replay.urls.length > 0) {
+      fields.push({
+        name: "pages",
+        label: "Pages",
+        value: formatReplayUrls(replay.urls),
+      });
+    }
+    if (replay.releases && replay.releases.length > 0) {
+      fields.push({
+        name: "release",
+        label: "Release",
+        value: replay.releases[0] ?? "Unknown",
+      });
+    }
+    if (replay.trace_ids.length > 0) {
+      fields.push({
+        name: "trace",
+        label: "Trace",
+        value: replay.trace_ids[0] ?? "Unknown",
+      });
+    }
+    if (replay.is_archived) {
+      fields.push({ name: "status", label: "Status", value: "Archived" });
+    }
+
+    return {
+      id: replay.id,
+      title: replay.id,
+      fields,
+    };
+  });
 }
 
 export function formatReplayResults(params: FormatReplayResultsParams): string {

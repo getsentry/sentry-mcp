@@ -21,6 +21,7 @@ import {
   type ToolConfig,
   type DescriptionContext,
   isToolVisibleInMode,
+  resolveOutputSchema,
   resolveDescription,
 } from "../types";
 
@@ -289,6 +290,13 @@ export function resolveToolDescription(
   context: DescriptionContext,
 ): string {
   return resolveDescription(tool.description, context);
+}
+
+export function resolveToolOutputSchema(
+  tool: ToolConfig<any>,
+  context: DescriptionContext,
+) {
+  return resolveOutputSchema(tool.outputSchema, context);
 }
 
 export type RegisteredToolHandlerExtra = RequestHandlerExtra<

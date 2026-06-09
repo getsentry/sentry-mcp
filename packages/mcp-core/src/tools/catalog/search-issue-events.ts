@@ -3,6 +3,14 @@ import { getActiveSpan, setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { ensureIssueWithinProjectConstraint } from "../../internal/tool-helpers/issue";
+import {
+  createStructuredOutputSecurity,
+  StructuredOutputSecuritySchema,
+} from "../../internal/structured-output";
+import {
+  createStructuredToolResult,
+  type StructuredToolResult,
+} from "../../internal/tool-result";
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,
@@ -12,9 +20,129 @@ import {
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { UserInputError } from "../../errors";
 import { searchIssueEventsAgent } from "../support/search-issue-events/agent";
-import { formatErrorResults } from "../support/search-events/formatters";
+import {
+  createRenderedErrorEventRows,
+  formatErrorResults,
+  type FormatEventResultsParams,
+} from "../support/search-events/formatters";
 import { RECOMMENDED_FIELDS } from "../support/search-issue-events/config";
 import { parseIssueParams } from "../support/search-issue-events/utils";
+
+const SEARCH_ISSUE_EVENTS_STRUCTURED_CONTENT_VERSION =
+  "sentry.mcp.search_issue_events.v1";
+
+const searchIssueEventsStructuredOutputSchema = z.object({
+  schemaVersion: z.literal(SEARCH_ISSUE_EVENTS_STRUCTURED_CONTENT_VERSION),
+  security: StructuredOutputSecuritySchema,
+  meta: z.object({
+    organizationSlug: z.string(),
+    issueIdentifier: z.string(),
+    projectSlug: z.string().nullable(),
+    projectId: z.string().nullable(),
+  }),
+  links: z.object({
+    explorer: z.string(),
+  }),
+  issue: z.object({
+    identifier: z.string(),
+  }),
+  search: z.object({
+    inputQuery: z.string(),
+    dataset: z.literal("errors"),
+    query: z.string(),
+    explorerQuery: z.string(),
+    fields: z.array(z.string()),
+    sort: z.string(),
+    timeRange: z.object({
+      statsPeriod: z.string().optional(),
+      start: z.string().optional(),
+      end: z.string().optional(),
+    }),
+    limit: z.number(),
+    explanation: z.string().nullable().optional(),
+  }),
+  results: z.object({
+    kind: z.literal("issue_events"),
+    count: z.number(),
+    data: z.array(
+      z.object({
+        id: z.string().nullable(),
+        title: z.string(),
+        fields: z.array(
+          z.object({
+            name: z.string(),
+            label: z.string(),
+            value: z.string(),
+          }),
+        ),
+      }),
+    ),
+  }),
+});
+
+interface SearchTimeRange {
+  statsPeriod?: string;
+  start?: string;
+  end?: string;
+}
+
+type SearchIssueEventsFormatParams = FormatEventResultsParams & {
+  issueIdentifier: string;
+  query: string;
+  sort: string;
+  timeRange: SearchTimeRange;
+  limit: number;
+  projectSlug?: string | null;
+  projectId?: string | null;
+};
+
+function formatSearchIssueEventsResult(
+  params: SearchIssueEventsFormatParams,
+  context: ServerContext,
+): string | StructuredToolResult {
+  if (!context.experimentalMode) {
+    return formatErrorResults(params);
+  }
+
+  return createStructuredToolResult({
+    schemaVersion: SEARCH_ISSUE_EVENTS_STRUCTURED_CONTENT_VERSION,
+    security: createStructuredOutputSecurity(),
+    meta: {
+      organizationSlug: params.organizationSlug,
+      issueIdentifier: params.issueIdentifier,
+      projectSlug: params.projectSlug ?? null,
+      projectId: params.projectId ?? null,
+    },
+    links: {
+      explorer: params.explorerUrl,
+    },
+    issue: {
+      identifier: params.issueIdentifier,
+    },
+    search: {
+      inputQuery: params.inputQuery,
+      dataset: "errors",
+      query: params.query,
+      explorerQuery: params.sentryQuery,
+      fields: params.fields,
+      sort: params.sort,
+      timeRange: params.timeRange,
+      limit: params.limit,
+      ...(params.includeExplanation === true
+        ? { explanation: params.explanation ?? null }
+        : {}),
+    },
+    results: {
+      kind: "issue_events",
+      count: params.eventData.length,
+      data: createRenderedErrorEventRows({
+        eventData: params.eventData,
+        apiService: params.apiService,
+        organizationSlug: params.organizationSlug,
+      }),
+    },
+  });
+}
 
 function buildIssueEventSearchRepairPrompt(params: {
   query?: string;
@@ -127,6 +255,8 @@ export default defineTool({
         "Include explanation of how the query was translated or repaired",
       ),
   },
+  outputSchema: ({ experimentalMode }) =>
+    experimentalMode ? searchIssueEventsStructuredOutputSchema : undefined,
   annotations: {
     readOnlyHint: true,
     openWorldHint: true,
@@ -144,8 +274,10 @@ export default defineTool({
 
     setTag("organization.slug", organizationSlug);
     setTag("issue.id", issueId);
-    if (params.projectSlug) {
-      setTag("project.slug", params.projectSlug);
+    const effectiveProjectSlug =
+      params.projectSlug ?? context.constraints.projectSlug ?? null;
+    if (effectiveProjectSlug) {
+      setTag("project.slug", effectiveProjectSlug);
     }
 
     await ensureIssueWithinProjectConstraint({
@@ -157,16 +289,19 @@ export default defineTool({
 
     // Resolve project ID if project slug provided (for better tag discovery in NL mode)
     let projectId: string | undefined;
-    if (params.projectSlug) {
+    if (effectiveProjectSlug) {
       try {
         const project = await apiService.getProject({
           organizationSlug,
-          projectSlugOrId: params.projectSlug,
+          projectSlugOrId: effectiveProjectSlug,
         });
         projectId = String(project.id);
       } catch (error) {
         // Non-fatal - continue without project ID
-        console.warn(`Could not resolve project ${params.projectSlug}:`, error);
+        console.warn(
+          `Could not resolve project ${effectiveProjectSlug}:`,
+          error,
+        );
       }
     }
 
@@ -260,22 +395,35 @@ export default defineTool({
       );
     }
 
-    getActiveSpan()?.setAttribute("gen_ai.tool.call.result.count", eventsResponse.length);
+    getActiveSpan()?.setAttribute(
+      "gen_ai.tool.call.result.count",
+      eventsResponse.length,
+    );
 
     const naturalLanguageContext = params.query
       ? `Events in issue ${issueId}: ${params.query}`
       : `Events in issue ${issueId}`;
 
-    return formatErrorResults({
-      eventData: eventsResponse,
-      inputQuery: naturalLanguageContext,
-      includeExplanation: params.includeExplanation,
-      apiService,
-      organizationSlug,
-      explorerUrl,
-      sentryQuery: explorerQuery,
-      fields,
-      explanation,
-    });
+    return formatSearchIssueEventsResult(
+      {
+        eventData: eventsResponse,
+        inputQuery: naturalLanguageContext,
+        includeExplanation: params.includeExplanation,
+        apiService,
+        organizationSlug,
+        explorerUrl,
+        sentryQuery: explorerQuery,
+        fields,
+        explanation,
+        issueIdentifier: issueId,
+        query,
+        sort: sortParam,
+        timeRange: timeParams,
+        limit: params.limit,
+        projectSlug: effectiveProjectSlug,
+        projectId: projectId ?? null,
+      },
+      context,
+    );
   },
 });

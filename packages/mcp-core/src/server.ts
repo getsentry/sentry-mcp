@@ -20,7 +20,6 @@ import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
  * ```
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import {
   type SpanAttributeValue,
   getActiveSpan,
@@ -31,6 +30,7 @@ import {
 import { isApiAuthenticationErrorDeep } from "./api-client";
 import { MCP_SERVER_NAME } from "./constants";
 import { formatErrorForUser } from "./internal/error-handling";
+import { normalizeToolHandlerResult } from "./internal/tool-result";
 import type { Skill } from "./skills";
 import { type LogIssueOptions, logIssue } from "./telem/logging";
 import {
@@ -41,6 +41,7 @@ import {
   getAvailableTools,
   injectConstraintParams,
   resolveToolDescription,
+  resolveToolOutputSchema,
 } from "./tools/catalog-runtime/availability";
 import tools from "./tools/index";
 import type { ServerContext } from "./types";
@@ -48,15 +49,6 @@ import { LIB_VERSION } from "./version";
 
 function getSkillGrantedAttributeName(skill: Skill): string {
   return `app.consent.skill.${skill.replaceAll("-", "_")}.granted`;
-}
-
-function isCallToolResult(output: unknown): output is CallToolResult {
-  return (
-    !!output &&
-    typeof output === "object" &&
-    !Array.isArray(output) &&
-    Array.isArray((output as { content?: unknown }).content)
-  );
 }
 
 /**
@@ -220,18 +212,26 @@ function configureServer({
       tool,
       contextWithToolAvailability,
     );
-    const resolvedDescription = resolveToolDescription(tool, {
+    const descriptionContext = {
       experimentalMode,
       availableToolNames: contextWithToolAvailability.availableToolNames,
       directToolNames: contextWithToolAvailability.directToolNames,
-    });
+    };
+    const resolvedDescription = resolveToolDescription(
+      tool,
+      descriptionContext,
+    );
+    const resolvedOutputSchema = resolveToolOutputSchema(
+      tool,
+      descriptionContext,
+    );
 
     server.registerTool(
       tool.name,
       {
         description: resolvedDescription,
         inputSchema: filteredInputSchema,
-        outputSchema: tool.outputSchema,
+        outputSchema: resolvedOutputSchema,
         annotations: tool.annotations,
       },
       async (params: unknown, extra: RegisteredToolHandlerExtra) => {
@@ -331,29 +331,7 @@ function configureServer({
             });
           }
 
-          // if the tool returns a string, assume it's a message
-          if (typeof output === "string") {
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: output,
-                },
-              ],
-            };
-          }
-          // if the tool returns a list, assume it's a content list
-          if (Array.isArray(output)) {
-            return {
-              content: output,
-            };
-          }
-          // Some tools return a full MCP CallToolResult so they can expose
-          // structuredContent alongside a text fallback.
-          if (isCallToolResult(output)) {
-            return output;
-          }
-          throw new Error(`Invalid tool output: ${output}`);
+          return normalizeToolHandlerResult(output);
         } catch (error) {
           if (activeSpan) {
             activeSpan.setStatus({

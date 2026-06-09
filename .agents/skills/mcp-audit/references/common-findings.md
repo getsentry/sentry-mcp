@@ -17,9 +17,13 @@ Use this reference to avoid overly narrow audits and to separate common MCP fail
 4. `idempotentHint` is applied to tools whose repeated calls have additional effect.
 5. The exported `tools/list` metadata differs from the local source declaration.
 6. `outputSchema` is declared but `structuredContent` is absent or does not match it.
-7. Business-logic failures are surfaced as protocol errors instead of tool-call failures.
-8. Tool names or titles drift from the targeted spec revision.
-9. The server claims task support in tool metadata without the broader task flow it depends on.
+7. `structuredContent` dumps raw API responses, full telemetry objects, or user-controlled external payloads instead of a deliberate JSON view of the rendered result contract.
+8. A Markdown-to-structured migration changes output semantics by exposing fields, nesting, or volume that the Markdown renderer previously summarized or formatted.
+9. Structured telemetry output is presented as a prompt-injection mitigation without an eval or enforced client/tool-action boundary proving that claim.
+10. Structured telemetry output lacks tests or snapshots with instruction-like untrusted payload values, so prompt-injection regressions can ship unnoticed.
+11. Business-logic failures are surfaced as protocol errors instead of tool-call failures.
+12. Tool names or titles drift from the targeted spec revision.
+13. The server claims task support in tool metadata without the broader task flow it depends on.
 
 ## Prompt and resource problems
 
@@ -38,6 +42,7 @@ Use this reference to avoid overly narrow audits and to separate common MCP fail
 5. Protected-resource metadata or `WWW-Authenticate` guidance is incomplete for HTTP servers.
 6. Local servers assume trusted clients without documenting consent or sandbox expectations.
 7. Input, URI, or resource fetch paths create avoidable SSRF or DNS-rebinding exposure.
+8. Tool or resource output treats public DSN-derived telemetry, issue fields, logs, event contexts, tags, users, stack data, attachments, or similar payload values as trusted instruction text.
 
 ## Compatibility and drift problems
 
