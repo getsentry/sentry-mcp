@@ -337,6 +337,80 @@ const ApiActorSchema = z
   })
   .passthrough();
 
+const ApiProjectRefSchema = z
+  .object({
+    id: ApiResourceIdSchema.optional(),
+    slug: z.string().nullable().optional(),
+    name: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const MonitorEnvironmentSchema = z
+  .object({
+    id: ApiResourceIdSchema.optional(),
+    name: z.string().nullable().optional(),
+    status: z.string().nullable().optional(),
+    dateCreated: z.string().datetime().nullable().optional(),
+    lastCheckIn: z.string().datetime().nullable().optional(),
+    nextCheckIn: z.string().datetime().nullable().optional(),
+    nextCheckInLatest: z.string().datetime().nullable().optional(),
+    isMuted: z.boolean().nullable().optional(),
+    activeIncident: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
+export const MonitorSchema = z
+  .object({
+    id: ApiResourceIdSchema.optional(),
+    slug: z.string(),
+    name: z.string().nullable().optional(),
+    status: z.string().nullable().optional(),
+    type: z.string().nullable().optional(),
+    isMuted: z.boolean().nullable().optional(),
+    isUpserting: z.boolean().nullable().optional(),
+    project: ApiProjectRefSchema.nullable().optional(),
+    owner: z.union([z.string(), ApiActorSchema]).nullable().optional(),
+    dateCreated: z.string().datetime().nullable().optional(),
+    nextCheckIn: z.string().datetime().nullable().optional(),
+    lastCheckIn: z.string().datetime().nullable().optional(),
+    config: z.record(z.string(), z.unknown()).nullable().optional(),
+    environments: z.array(MonitorEnvironmentSchema).optional(),
+    alertRule: z.record(z.string(), z.unknown()).optional(),
+  })
+  .passthrough();
+
+export const MonitorListSchema = z.array(MonitorSchema);
+
+export const MonitorCheckInSchema = z
+  .object({
+    id: ApiResourceIdSchema.optional(),
+    checkInId: z.string().nullable().optional(),
+    status: z.string().nullable().optional(),
+    duration: z.number().nullable().optional(),
+    dateCreated: z.string().datetime().nullable().optional(),
+    dateAdded: z.string().datetime().nullable().optional(),
+    dateUpdated: z.string().datetime().nullable().optional(),
+    dateInProgress: z.string().datetime().nullable().optional(),
+    dateClock: z.string().datetime().nullable().optional(),
+    expectedTime: z.string().datetime().nullable().optional(),
+    environment: z.string().nullable().optional(),
+    monitorConfig: z.record(z.string(), z.unknown()).optional(),
+    groups: z
+      .array(z.union([z.string(), z.record(z.string(), z.unknown())]))
+      .optional(),
+  })
+  .passthrough();
+
+export const MonitorCheckInListSchema = z.array(MonitorCheckInSchema);
+
+export const MonitorStatSchema = z
+  .object({
+    ts: z.number(),
+  })
+  .passthrough();
+
+export const MonitorStatsSchema = z.array(MonitorStatSchema);
+
 export const ReleaseDetailsSchema = ReleaseSchema.extend({
   adoptionStages: z.unknown().optional(),
   authors: z.array(ApiActorSchema).optional(),

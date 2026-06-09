@@ -1,0 +1,20 @@
+[
+  {
+    "ts": 1744596000,
+    "ok": 1,
+    "error": 0,
+    "missed": 0,
+    "timeout": 0,
+    "unknown": 0,
+    "duration": 13.2
+  },
+  {
+    "ts": 1744682400,
+    "ok": 0,
+    "error": 0,
+    "missed": 1,
+    "timeout": 0,
+    "unknown": 0,
+    "duration": 0
+  }
+]

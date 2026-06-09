@@ -48,12 +48,69 @@ function callHandler(params: {
     | "span"
     | "breadcrumbs"
     | "replay"
+    | "monitor"
     | "snapshot"
     | "snapshotImage";
   resourceId?: string;
   organizationSlug?: string;
 }) {
   return getSentryResource.handler(params, baseContext);
+}
+
+function mockMonitorResource({
+  apiBaseUrl = "https://sentry.io",
+  organizationSlug,
+  monitorSlug,
+  projectPath,
+  projectSlug = "backend",
+}: {
+  apiBaseUrl?: string;
+  organizationSlug: string;
+  monitorSlug: string;
+  projectPath?: string;
+  projectSlug?: string;
+}) {
+  const organizationMonitorPath = `${apiBaseUrl}/api/0/organizations/${organizationSlug}/monitors/${monitorSlug}/`;
+  const projectMonitorPath = `${apiBaseUrl}/api/0/projects/${organizationSlug}/${projectPath ?? projectSlug}/monitors/${monitorSlug}/`;
+  const projectId =
+    projectPath && /^\d+$/.test(projectPath) ? projectPath : "456";
+  const buildMonitor = (slug: string) => ({
+    id: "123",
+    slug: monitorSlug,
+    name: monitorSlug,
+    status: "ok",
+    project: {
+      id: projectId,
+      slug,
+      name: slug,
+    },
+    config: {
+      schedule: ["crontab", "0 0 * * *"],
+    },
+  });
+  return [
+    http.get(organizationMonitorPath, () =>
+      HttpResponse.json(buildMonitor("backend")),
+    ),
+    http.get(
+      `${apiBaseUrl}/api/0/projects/${organizationSlug}/${projectSlug}/`,
+      () =>
+        HttpResponse.json({
+          id: projectId,
+          slug: projectSlug,
+          name: projectSlug,
+        }),
+    ),
+    http.get(`${organizationMonitorPath}checkins/`, () =>
+      HttpResponse.json([]),
+    ),
+    http.get(`${organizationMonitorPath}stats/`, () => HttpResponse.json([])),
+    http.get(projectMonitorPath, () =>
+      HttpResponse.json(buildMonitor(projectSlug)),
+    ),
+    http.get(`${projectMonitorPath}checkins/`, () => HttpResponse.json([])),
+    http.get(`${projectMonitorPath}stats/`, () => HttpResponse.json([])),
+  ];
 }
 
 describe("get_sentry_resource", () => {
@@ -447,33 +504,148 @@ describe("get_sentry_resource", () => {
       expect(result).toContain("Clicked submit order");
     });
 
-    it("returns guidance for monitor URL (simple slug)", async () => {
+    it("dispatches monitor URL with a simple slug to get_monitor_details", async () => {
+      mswServer.use(
+        ...mockMonitorResource({
+          organizationSlug: "my-org",
+          monitorSlug: "daily-backup",
+        }),
+      );
+
       const result = await callHandler({
         url: "https://my-org.sentry.io/crons/daily-backup/",
       });
-      expect(result).toMatchInlineSnapshot(`
-        "# Cron Monitor Detected
-        **Organization**: my-org
-        **Monitor**: daily-backup
-        Cron monitor support is coming soon. In the meantime:
-        - **View in Sentry**: [Open Monitor](https://my-org.sentry.io/crons/daily-backup/)
-        - **Search issues**: Use \`search_issues\` with query \`monitor.slug:daily-backup\` to find issues from this monitor"
-      `);
+      expect(result).toContain("# Monitor daily-backup in **my-org**");
+      expect(result).toContain(
+        "[Open Monitor](https://my-org.sentry.io/crons/backend/daily-backup/)",
+      );
     });
 
-    it("returns guidance for monitor URL with project/slug path", async () => {
+    it("dispatches monitor URL with project/slug path to get_monitor_details", async () => {
+      mswServer.use(
+        ...mockMonitorResource({
+          organizationSlug: "my-org",
+          monitorSlug: "my-monitor",
+          projectSlug: "my-project",
+        }),
+      );
+
       const result = await callHandler({
         url: "https://my-org.sentry.io/crons/my-project/my-monitor/",
       });
-      expect(result).toMatchInlineSnapshot(`
-        "# Cron Monitor Detected
-        **Organization**: my-org
-        **Monitor**: my-monitor
-        **Project**: my-project
-        Cron monitor support is coming soon. In the meantime:
-        - **View in Sentry**: [Open Monitor](https://my-org.sentry.io/crons/my-project/my-monitor/)
-        - **Search issues**: Use \`search_issues\` with query \`monitor.slug:my-monitor\` to find issues from this monitor"
-      `);
+      expect(result).toContain("# Monitor my-monitor in **my-org**");
+      expect(result).toContain(
+        "[Open Monitor](https://my-org.sentry.io/crons/my-project/my-monitor/)",
+      );
+    });
+
+    it("dispatches monitor URL with numeric project ID under an active project constraint", async () => {
+      mswServer.use(
+        ...mockMonitorResource({
+          organizationSlug: "my-org",
+          monitorSlug: "my-monitor",
+          projectPath: "4509109104082945",
+          projectSlug: "backend",
+        }),
+      );
+
+      const result = await getSentryResource.handler(
+        {
+          url: "https://my-org.sentry.io/crons/4509109104082945/my-monitor/",
+        },
+        {
+          ...baseContext,
+          constraints: {
+            ...baseContext.constraints,
+            projectSlug: "backend",
+          },
+        },
+      );
+
+      expect(result).toContain("# Monitor my-monitor in **my-org**");
+      expect(result).toContain(
+        "[Open Monitor](https://my-org.sentry.io/crons/backend/my-monitor/)",
+      );
+    });
+
+    it("rejects numeric monitor project IDs outside the active project constraint before monitor reads", async () => {
+      const paths: string[] = [];
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/projects/my-org/frontend/",
+          ({ request }) => {
+            paths.push(new URL(request.url).pathname);
+            return HttpResponse.json({
+              id: "999",
+              slug: "frontend",
+              name: "frontend",
+            });
+          },
+        ),
+        http.get(
+          "https://sentry.io/api/0/projects/my-org/4509109104082945/monitors/my-monitor/",
+          ({ request }) => {
+            paths.push(new URL(request.url).pathname);
+            return HttpResponse.json({
+              id: "123",
+              slug: "my-monitor",
+              project: {
+                id: "4509109104082945",
+                slug: "backend",
+                name: "backend",
+              },
+            });
+          },
+        ),
+      );
+
+      await expect(
+        getSentryResource.handler(
+          {
+            url: "https://my-org.sentry.io/crons/4509109104082945/my-monitor/",
+          },
+          {
+            ...baseContext,
+            constraints: {
+              ...baseContext.constraints,
+              projectSlug: "frontend",
+            },
+          },
+        ),
+      ).rejects.toThrow(
+        'Monitor is outside the active project constraint. Expected project "frontend".',
+      );
+      expect(paths).toEqual(["/api/0/projects/my-org/frontend/"]);
+    });
+
+    it("dispatches explicit monitor resourceType under an active project constraint", async () => {
+      mswServer.use(
+        ...mockMonitorResource({
+          organizationSlug: "my-org",
+          monitorSlug: "my-monitor",
+          projectSlug: "backend",
+        }),
+      );
+
+      const result = await getSentryResource.handler(
+        {
+          resourceType: "monitor",
+          resourceId: "my-monitor",
+          organizationSlug: "my-org",
+        },
+        {
+          ...baseContext,
+          constraints: {
+            ...baseContext.constraints,
+            projectSlug: "backend",
+          },
+        },
+      );
+
+      expect(result).toContain("# Monitor my-monitor in **my-org**");
+      expect(result).toContain(
+        "[Open Monitor](https://my-org.sentry.io/crons/backend/my-monitor/)",
+      );
     });
 
     it("returns guidance for release URL", async () => {
@@ -513,6 +685,14 @@ describe("get_sentry_resource", () => {
     });
 
     it("uses configured host and protocol for self-hosted monitor URL", async () => {
+      mswServer.use(
+        ...mockMonitorResource({
+          apiBaseUrl: "http://sentry.internal:9000",
+          organizationSlug: "my-org",
+          monitorSlug: "daily-backup",
+        }),
+      );
+
       const result = await getSentryResource.handler(
         {
           resourceType: undefined,
@@ -527,7 +707,7 @@ describe("get_sentry_resource", () => {
         },
       );
       expect(result).toContain(
-        "[Open Monitor](http://sentry.internal:9000/organizations/my-org/crons/daily-backup/)",
+        "[Open Monitor](http://sentry.internal:9000/organizations/my-org/crons/backend/daily-backup/)",
       );
     });
 

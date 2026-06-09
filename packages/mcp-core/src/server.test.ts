@@ -702,6 +702,26 @@ describe("buildServer", () => {
       );
     });
 
+    it("does not advertise monitor resources when inspect tools are unavailable", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["triage"]),
+        },
+      });
+
+      const registeredTools = await listRegisteredTools(server);
+      const getSentryResource = registeredTools.find(
+        (tool) => tool.name === "get_sentry_resource",
+      );
+
+      expect(getSentryResource?.description).toContain("replays");
+      expect(getSentryResource?.description).not.toContain("monitors");
+      expect(getSentryResource?.description).not.toContain(
+        "- monitor: <monitorSlug>",
+      );
+    });
+
     it("does not recommend unavailable catalog tools in generated runtime guidance", async () => {
       const server = buildServer({
         context: {

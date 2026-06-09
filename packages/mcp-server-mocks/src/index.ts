@@ -95,6 +95,13 @@ import releaseCommitsFixture from "./fixtures/release-commits.json" with {
 import releaseDeploysFixture from "./fixtures/release-deploys.json" with {
   type: "json",
 };
+import monitorFixture from "./fixtures/monitor.json" with { type: "json" };
+import monitorCheckInsFixture from "./fixtures/monitor-checkins.json" with {
+  type: "json",
+};
+import monitorStatsFixture from "./fixtures/monitor-stats.json" with {
+  type: "json",
+};
 import tagsFixture from "./fixtures/tags.json" with { type: "json" };
 import teamFixture from "./fixtures/team.json" with { type: "json" };
 import traceEventFixture from "./fixtures/trace-event.json" with {
@@ -855,6 +862,41 @@ export const restHandlers = buildHandlers([
     method: "get",
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/8ce89484-0fec-4913-a2cd-e8e2d41dee36/commits/",
     fetch: () => HttpResponse.json(releaseCommitsFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/monitors/",
+    fetch: () => HttpResponse.json([monitorFixture]),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/",
+    fetch: () => HttpResponse.json(monitorFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/checkins/",
+    fetch: () => HttpResponse.json(monitorCheckInsFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/stats/",
+    fetch: () => HttpResponse.json(monitorStatsFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/monitors/nightly-import/",
+    fetch: () => HttpResponse.json(monitorFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/monitors/nightly-import/checkins/",
+    fetch: () => HttpResponse.json(monitorCheckInsFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/monitors/nightly-import/stats/",
+    fetch: () => HttpResponse.json(monitorStatsFixture),
   },
   {
     method: "get",

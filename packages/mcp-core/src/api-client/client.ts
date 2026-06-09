@@ -34,6 +34,10 @@ import {
   ProjectSchema,
   CommitListSchema,
   DeployListSchema,
+  MonitorCheckInListSchema,
+  MonitorListSchema,
+  MonitorSchema,
+  MonitorStatsSchema,
   RepositoryListSchema,
   ReleaseDetailsSchema,
   ReleaseListSchema,
@@ -87,6 +91,10 @@ import type {
   ExternalIssueList,
   CommitList,
   DeployList,
+  Monitor,
+  MonitorCheckInList,
+  MonitorList,
+  MonitorStats,
   OrganizationList,
   Project,
   ProjectList,
@@ -121,6 +129,27 @@ const NETWORK_ERROR_MESSAGES: Record<string, string> = {
   ETIMEDOUT: "Connection timed out. Check network connectivity.",
   ECONNRESET: "Connection reset. Try again in a moment.",
 };
+
+function normalizeStatsPeriod(statsPeriod?: string): string | undefined {
+  const normalized = statsPeriod?.trim();
+  return normalized || undefined;
+}
+
+function parseStatsPeriod(statsPeriod: string): {
+  amount: number;
+  unit: string;
+} {
+  const match = /^(\d+)([smhdw])$/.exec(statsPeriod);
+  if (!match) {
+    throw new ApiValidationError(
+      "statsPeriod must use a supported relative time format, such as `24h`, `7d`, or `2w`.",
+    );
+  }
+  return {
+    amount: Number(match[1]),
+    unit: match[2],
+  };
+}
 
 function getNextCursor(linkHeader: string | null): string | null {
   if (!linkHeader) {
@@ -402,6 +431,73 @@ export class SentryApiService {
     } else if (start && end) {
       queryParams.set("start", start);
       queryParams.set("end", end);
+    }
+  }
+
+  private applyStatsMixinTimeParams(
+    queryParams: URLSearchParams,
+    statsPeriod?: string,
+    start?: string,
+    end?: string,
+    resolutionSeconds?: number,
+  ): void {
+    if (statsPeriod && (start || end)) {
+      throw new ApiValidationError(
+        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
+      );
+    }
+    if ((start && !end) || (!start && end)) {
+      throw new ApiValidationError(
+        "Both start and end parameters must be provided together for absolute time ranges.",
+      );
+    }
+
+    let since: number;
+    let until: number;
+
+    if (start && end) {
+      const startMs = Date.parse(start);
+      const endMs = Date.parse(end);
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+        throw new ApiValidationError(
+          "start and end parameters must be valid ISO 8601 date strings.",
+        );
+      }
+      since = Math.floor(startMs / 1000);
+      until = Math.floor(endMs / 1000);
+    } else {
+      const period = statsPeriod ?? "24h";
+      const { amount, unit } = parseStatsPeriod(period);
+      let unitSeconds: number;
+      switch (unit) {
+        case "s":
+          unitSeconds = 1;
+          break;
+        case "m":
+          unitSeconds = 60;
+          break;
+        case "h":
+          unitSeconds = 60 * 60;
+          break;
+        case "d":
+          unitSeconds = 60 * 60 * 24;
+          break;
+        case "w":
+          unitSeconds = 60 * 60 * 24 * 7;
+          break;
+        default:
+          throw new ApiValidationError(
+            "statsPeriod must use a supported relative time format, such as `24h`, `7d`, or `2w`.",
+          );
+      }
+      until = Math.floor(Date.now() / 1000);
+      since = until - amount * unitSeconds;
+    }
+
+    queryParams.set("since", String(since));
+    queryParams.set("until", String(until));
+    if (resolutionSeconds !== undefined) {
+      queryParams.set("resolution", `${resolutionSeconds}s`);
     }
   }
 
@@ -763,12 +859,17 @@ export class SentryApiService {
     );
   }
 
-  getMonitorUrl(organizationSlug: string, monitorSlug: string): string {
+  getMonitorUrl(
+    organizationSlug: string,
+    monitorSlug: string,
+    projectSlug?: string,
+  ): string {
     return getMonitorUrlUtil(
       this.host,
       organizationSlug,
       monitorSlug,
       this.protocol,
+      projectSlug,
     );
   }
 
@@ -1759,6 +1860,180 @@ export class SentryApiService {
       opts,
     );
     return CommitListSchema.parse(body);
+  }
+
+  async listMonitors(
+    {
+      organizationSlug,
+      projectSlug,
+      environment,
+      owner,
+      query,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      environment?: string;
+      owner?: string;
+      query?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MonitorList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlug) {
+      searchQuery.append("projectSlug", projectSlug);
+    }
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    if (owner) {
+      searchQuery.append("owner", owner);
+    }
+    if (query) {
+      searchQuery.set("query", query);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const body = await this.requestJSON(
+      searchQuery.toString()
+        ? `/organizations/${organizationSlug}/monitors/?${searchQuery.toString()}`
+        : `/organizations/${organizationSlug}/monitors/`,
+      undefined,
+      opts,
+    );
+    return MonitorListSchema.parse(body);
+  }
+
+  async getMonitorDetails(
+    {
+      organizationSlug,
+      projectSlug,
+      monitorSlug,
+      environment,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      monitorSlug: string;
+      environment?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Monitor> {
+    const searchQuery = new URLSearchParams();
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+
+    const encodedMonitor = encodeURIComponent(monitorSlug);
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/monitors/${encodedMonitor}/`
+      : `/organizations/${organizationSlug}/monitors/${encodedMonitor}/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return MonitorSchema.parse(body);
+  }
+
+  async listMonitorCheckIns(
+    {
+      organizationSlug,
+      projectSlug,
+      monitorSlug,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      monitorSlug: string;
+      environment?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MonitorCheckInList> {
+    const searchQuery = new URLSearchParams();
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+    const normalizedStatsPeriod = normalizeStatsPeriod(statsPeriod);
+    const effectiveStatsPeriod =
+      start || end ? normalizedStatsPeriod : (normalizedStatsPeriod ?? "24h");
+    if (effectiveStatsPeriod) {
+      parseStatsPeriod(effectiveStatsPeriod);
+    }
+    this.applyTimeParams(searchQuery, effectiveStatsPeriod, start, end);
+
+    const encodedMonitor = encodeURIComponent(monitorSlug);
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/monitors/${encodedMonitor}/checkins/`
+      : `/organizations/${organizationSlug}/monitors/${encodedMonitor}/checkins/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return MonitorCheckInListSchema.parse(body);
+  }
+
+  async getMonitorStats(
+    {
+      organizationSlug,
+      projectSlug,
+      monitorSlug,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      rollup,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      monitorSlug: string;
+      environment?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      rollup?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MonitorStats> {
+    const searchQuery = new URLSearchParams();
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    const normalizedStatsPeriod = normalizeStatsPeriod(statsPeriod);
+    const effectiveStatsPeriod =
+      start || end ? normalizedStatsPeriod : (normalizedStatsPeriod ?? "24h");
+    this.applyStatsMixinTimeParams(
+      searchQuery,
+      effectiveStatsPeriod,
+      start,
+      end,
+      rollup,
+    );
+
+    const encodedMonitor = encodeURIComponent(monitorSlug);
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/monitors/${encodedMonitor}/stats/`
+      : `/organizations/${organizationSlug}/monitors/${encodedMonitor}/stats/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return MonitorStatsSchema.parse(body);
   }
 
   /**

@@ -1,4 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { mswServer } from "@sentry/mcp-server-mocks";
 import { SentryApiService } from "./client";
 import { ConfigurationError } from "../errors";
 
@@ -324,6 +326,126 @@ describe("getEventsExplorerUrl", () => {
       expect(result).toContain("project=4509062593708032");
       expect(result).toContain("mode=aggregate");
     });
+  });
+});
+
+describe("monitor time parameters", () => {
+  it("defaults blank monitor statsPeriod values to a 24h window", async () => {
+    const requestUrls: URL[] = [];
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/monitors/nightly-import/checkins/",
+        ({ request }) => {
+          requestUrls.push(new URL(request.url));
+          return HttpResponse.json([]);
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/monitors/nightly-import/stats/",
+        ({ request }) => {
+          requestUrls.push(new URL(request.url));
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await apiService.listMonitorCheckIns({
+      organizationSlug: "my-org",
+      monitorSlug: "nightly-import",
+      statsPeriod: "   ",
+      limit: 10,
+    });
+    await apiService.getMonitorStats({
+      organizationSlug: "my-org",
+      monitorSlug: "nightly-import",
+      statsPeriod: "   ",
+    });
+
+    expect(requestUrls).toHaveLength(2);
+    const [checkInsUrl, statsUrl] = requestUrls as [URL, URL];
+    expect(checkInsUrl.pathname).toBe(
+      "/api/0/organizations/my-org/monitors/nightly-import/checkins/",
+    );
+    expect(checkInsUrl.searchParams.get("statsPeriod")).toBe("24h");
+    expect(statsUrl.pathname).toBe(
+      "/api/0/organizations/my-org/monitors/nightly-import/stats/",
+    );
+    expect(statsUrl.searchParams.get("statsPeriod")).toBeNull();
+    expect(statsUrl.searchParams.get("since")).not.toBeNull();
+    expect(statsUrl.searchParams.get("until")).not.toBeNull();
+  });
+
+  it("rejects invalid monitor check-in statsPeriod values before sending a request", async () => {
+    let requestReceived = false;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/monitors/nightly-import/checkins/",
+        () => {
+          requestReceived = true;
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await expect(
+      apiService.listMonitorCheckIns({
+        organizationSlug: "my-org",
+        monitorSlug: "nightly-import",
+        statsPeriod: "bogus",
+        limit: 10,
+      }),
+    ).rejects.toThrow("statsPeriod must use a supported relative time format");
+    expect(requestReceived).toBe(false);
+  });
+
+  it("rejects conflicting monitor statsPeriod and absolute time ranges before sending requests", async () => {
+    let requestReceived = false;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/monitors/nightly-import/checkins/",
+        () => {
+          requestReceived = true;
+          return HttpResponse.json([]);
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/monitors/nightly-import/stats/",
+        () => {
+          requestReceived = true;
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+    const params = {
+      organizationSlug: "my-org",
+      monitorSlug: "nightly-import",
+      statsPeriod: "24h",
+      start: "2024-01-01T00:00:00Z",
+      end: "2024-01-02T00:00:00Z",
+    };
+
+    await expect(apiService.listMonitorCheckIns(params)).rejects.toThrow(
+      "Cannot use both statsPeriod and start/end parameters",
+    );
+    await expect(apiService.getMonitorStats(params)).rejects.toThrow(
+      "Cannot use both statsPeriod and start/end parameters",
+    );
+    expect(requestReceived).toBe(false);
   });
 });
 
