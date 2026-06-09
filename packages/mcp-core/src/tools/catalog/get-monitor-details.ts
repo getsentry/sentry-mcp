@@ -201,6 +201,11 @@ export default defineTool({
     }
     const hasAbsoluteTimeRange = start !== undefined || end !== undefined;
     const requestedStatsPeriod = params.statsPeriod?.trim() || undefined;
+    if (hasAbsoluteTimeRange && requestedStatsPeriod) {
+      throw new UserInputError(
+        "`statsPeriod` cannot be combined with `start` and `end`.",
+      );
+    }
     const statsPeriod = hasAbsoluteTimeRange
       ? undefined
       : (requestedStatsPeriod ?? "24h");

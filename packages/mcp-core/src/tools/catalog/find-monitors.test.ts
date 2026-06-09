@@ -91,6 +91,101 @@ describe("find_monitors", () => {
     expect(params.get("project")).toBeNull();
   });
 
+  it("sends monitor list filters to Sentry", async () => {
+    let requestUrl: string | null = null;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/",
+        ({ request }) => {
+          requestUrl = request.url;
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    await findMonitors.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        projectSlug: "backend",
+        environment: "production",
+        owner: "team:123",
+        query: "billing",
+        limit: 25,
+      },
+      context,
+    );
+
+    expect(requestUrl).not.toBeNull();
+    const params = new URL(requestUrl ?? "").searchParams;
+    expect(params.get("projectSlug")).toBe("backend");
+    expect(params.get("environment")).toBe("production");
+    expect(params.get("owner")).toBe("team:123");
+    expect(params.get("query")).toBe("billing");
+    expect(params.get("per_page")).toBe("25");
+  });
+
+  it("uses the active project constraint as the monitor list project", async () => {
+    let requestUrl: string | null = null;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/",
+        ({ request }) => {
+          requestUrl = request.url;
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    await findMonitors.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        projectSlug: "all",
+        environment: null,
+        owner: null,
+        query: null,
+        limit: 10,
+      },
+      {
+        ...context,
+        constraints: {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "backend",
+        },
+      },
+    );
+
+    expect(requestUrl).not.toBeNull();
+    const params = new URL(requestUrl ?? "").searchParams;
+    expect(params.get("projectSlug")).toBe("backend");
+  });
+
+  it("rejects monitor list projects outside the active project constraint", async () => {
+    await expect(
+      findMonitors.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          regionUrl: null,
+          projectSlug: "backend",
+          environment: null,
+          owner: null,
+          query: null,
+          limit: 10,
+        },
+        {
+          ...context,
+          constraints: {
+            organizationSlug: "sentry-mcp-evals",
+            projectSlug: "frontend",
+          },
+        },
+      ),
+    ).rejects.toThrow(
+      'Monitor list is outside the active project constraint. Expected project "frontend".',
+    );
+  });
+
   it("encodes monitor slugs in web links", async () => {
     mswServer.use(
       http.get(

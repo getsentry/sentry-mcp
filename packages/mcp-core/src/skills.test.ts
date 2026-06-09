@@ -18,6 +18,18 @@ function getGeneratedSkillToolNames(skillId: string) {
   return new Set(skill?.tools?.map((definition) => definition.name) ?? []);
 }
 
+function getGeneratedSkillToolDescription(skillId: string, toolName: string) {
+  const skill = skillDefinitions.find(
+    (definition) => definition.id === skillId,
+  );
+  expect(skill).toBeDefined();
+
+  const tool = skill?.tools?.find((definition) => definition.name === toolName);
+  expect(tool).toBeDefined();
+
+  return tool?.description ?? "";
+}
+
 describe("skills module", () => {
   describe("SKILLS registry", () => {
     it("has all expected skills", () => {

@@ -16,6 +16,7 @@ import {
   formatId,
   formatUnknown,
 } from "./support/api-formatting";
+import { assertProjectRefWithinConstraint } from "./support/project-constraints";
 
 function formatProject(monitor: Monitor): string | null {
   if (!monitor.project) {
@@ -141,13 +142,25 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
     setTag("organization.slug", organizationSlug);
+    const requestedProjectSlug =
+      params.projectSlug && params.projectSlug !== "all"
+        ? params.projectSlug
+        : undefined;
+    if (requestedProjectSlug) {
+      assertProjectRefWithinConstraint({
+        resourceLabel: "Monitor list",
+        scopedProjectSlug: context.constraints.projectSlug,
+        project: { slug: requestedProjectSlug },
+      });
+    }
+    const projectSlug = context.constraints.projectSlug ?? requestedProjectSlug;
+    if (projectSlug) {
+      setTag("project.slug", projectSlug);
+    }
 
     const monitors = await apiService.listMonitors({
       organizationSlug,
-      projectSlug:
-        params.projectSlug && params.projectSlug !== "all"
-          ? params.projectSlug
-          : undefined,
+      projectSlug,
       environment: params.environment ?? undefined,
       owner: params.owner ?? undefined,
       query: params.query ?? undefined,

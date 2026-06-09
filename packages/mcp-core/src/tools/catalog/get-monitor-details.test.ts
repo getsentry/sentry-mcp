@@ -278,6 +278,29 @@ describe("get_monitor_details", () => {
     ).rejects.toThrow("`start` and `end` must be provided together.");
   });
 
+  it("rejects combining statsPeriod with an absolute monitor time range", async () => {
+    await expect(
+      getMonitorDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          regionUrl: null,
+          projectSlugOrId: null,
+          monitorSlug: "nightly-import",
+          environment: null,
+          statsPeriod: "24h",
+          start: "2025-04-14T02:00:00.000Z",
+          end: "2025-04-14T03:00:00.000Z",
+          checkInLimit: 10,
+          includeStats: true,
+          rollupSeconds: null,
+        },
+        context,
+      ),
+    ).rejects.toThrow(
+      "`statsPeriod` cannot be combined with `start` and `end`.",
+    );
+  });
+
   it("defaults blank statsPeriod to a 24h monitor window", async () => {
     let checkInsRequestUrl: string | null = null;
     let statsRequestUrl: string | null = null;
@@ -374,6 +397,14 @@ describe("get_monitor_details", () => {
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/checkins/",
         () => HttpResponse.json([]),
       ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/nightly-import/stats/",
+        () =>
+          HttpResponse.json(
+            { detail: "stats should not be requested" },
+            { status: 500 },
+          ),
+      ),
     );
 
     const result = await getMonitorDetails.handler(
@@ -396,6 +427,7 @@ describe("get_monitor_details", () => {
     expect(result).toContain(
       "[Open Monitor](https://sentry-mcp-evals.sentry.io/crons/cloudflare-mcp/nightly%2Fimport%201/)",
     );
+    expect(result).not.toContain("## Stats");
   });
 
   describe("tool definition", () => {
