@@ -1,7 +1,7 @@
 {
   "autofix": {
     "run_id": 21831,
-    "status": "IN_PROGRESS",
+    "status": "processing",
     "blocks": [
       {
         "type": "root_cause",

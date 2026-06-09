@@ -666,6 +666,7 @@ describe("AutofixRunStateSchema", () => {
   it("accepts explorer-style autofix state without legacy steps", () => {
     const state = AutofixRunStateSchema.parse(autofixStateExplorerFixture);
 
+    expect(state.autofix?.status).toBe("processing");
     expect(state.autofix?.steps).toEqual([]);
     expect(state.autofix?.blocks).toEqual([
       {

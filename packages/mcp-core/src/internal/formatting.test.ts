@@ -121,14 +121,14 @@ describe("formatIssueOutput", () => {
         autofix: {
           run_id: 42,
           request: {},
-          status: "COMPLETED",
+          status: "completed",
           updated_at: "2025-04-09T22:39:50.778146",
           steps: [
             {
               type: "solution",
               key: "solution_step_with_a_name_long_enough_to_match_summary_filter",
               index: 0,
-              status: "COMPLETED",
+              status: "completed",
               title: "Proposed Solution",
               output_stream: null,
               progress: [],

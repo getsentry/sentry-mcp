@@ -174,7 +174,7 @@ export default defineTool({
           output += "\n";
         }
 
-        if (existingStatus !== "COMPLETED") {
+        if (existingStatus !== "completed") {
           output += `\n**Status**: ${existingStatus}\n`;
           output += getHumanInterventionGuidance(existingStatus);
           output += "\n";
@@ -214,7 +214,7 @@ export default defineTool({
           output += "\n";
         }
 
-        if (status !== "COMPLETED") {
+        if (status !== "completed") {
           output += `\n**Status**: ${status}\n`;
           output += getHumanInterventionGuidance(status);
         }
@@ -225,8 +225,7 @@ export default defineTool({
       // Update status if changed
       if (status !== lastStatus) {
         const activeStep = autofixState.autofix.steps.find(
-          (step) =>
-            step.status === "PROCESSING" || step.status === "IN_PROGRESS",
+          (step) => step.status === "processing",
         );
         if (activeStep) {
           output += `Processing: ${activeStep.title}...\n`;

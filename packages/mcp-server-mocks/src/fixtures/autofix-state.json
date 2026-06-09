@@ -4,7 +4,7 @@
     "request": {
       "project_id": 4505138086019073
     },
-    "status": "COMPLETED",
+    "status": "completed",
     "updated_at": "2025-04-09T22:39:50.778146",
     "steps": [
       {
@@ -122,7 +122,7 @@
           }
         ],
         "queued_user_messages": [],
-        "status": "COMPLETED",
+        "status": "completed",
         "title": "Analyzing the Issue",
         "type": "default"
       },
@@ -211,7 +211,7 @@
         ],
         "queued_user_messages": [],
         "selection": { "cause_id": 0, "instruction": null },
-        "status": "COMPLETED",
+        "status": "completed",
         "termination_reason": null,
         "title": "Root Cause Analysis",
         "type": "root_cause_analysis"
@@ -385,7 +385,7 @@
           }
         ],
         "queued_user_messages": [],
-        "status": "COMPLETED",
+        "status": "completed",
         "title": "Planning Solution",
         "type": "default"
       },
@@ -438,7 +438,7 @@
           }
         ],
         "solution_selected": false,
-        "status": "COMPLETED",
+        "status": "completed",
         "title": "Solution",
         "type": "solution"
       }

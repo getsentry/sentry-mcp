@@ -1642,7 +1642,7 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
   // Show summary of what we have so far
   if (autofix.steps.length > 0) {
     const completedSteps = autofix.steps.filter(
-      (step) => step.status === "COMPLETED",
+      (step) => step.status === "completed",
     );
 
     // Find the solution step if available
@@ -1705,14 +1705,9 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
   } else {
     // No steps yet - check for terminal states first
     if (isTerminalStatus(autofix.status)) {
-      if (autofix.status === "FAILED" || autofix.status === "ERROR") {
+      if (autofix.status === "error") {
         parts.push("**Status:** Analysis failed.");
-      } else if (autofix.status === "CANCELLED") {
-        parts.push("**Status:** Analysis was cancelled.");
-      } else if (
-        autofix.status === "NEED_MORE_INFORMATION" ||
-        autofix.status === "WAITING_FOR_USER_RESPONSE"
-      ) {
+      } else if (autofix.status === "awaiting_user_input") {
         parts.push(
           "**Status:** Analysis paused - additional information needed.",
         );
@@ -1724,16 +1719,10 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
 
   // Add specific messages for terminal states when steps exist
   if (autofix.steps.length > 0 && isTerminalStatus(autofix.status)) {
-    if (autofix.status === "FAILED" || autofix.status === "ERROR") {
+    if (autofix.status === "error") {
       parts.push("");
       parts.push("**Status:** Analysis failed.");
-    } else if (autofix.status === "CANCELLED") {
-      parts.push("");
-      parts.push("**Status:** Analysis was cancelled.");
-    } else if (
-      autofix.status === "NEED_MORE_INFORMATION" ||
-      autofix.status === "WAITING_FOR_USER_RESPONSE"
-    ) {
+    } else if (autofix.status === "awaiting_user_input") {
       parts.push("");
       parts.push(
         "**Status:** Analysis paused - additional information needed.",

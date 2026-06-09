@@ -52,14 +52,14 @@ describe("analyze_issue_with_seer", () => {
             autofix: {
               run_id: 4242,
               request: {},
-              status: "COMPLETED",
+              status: "completed",
               updated_at: "2025-04-09T22:39:50.778146",
               steps: [
                 {
                   type: "root_cause_analysis",
                   key: "root_cause_analysis",
                   index: 0,
-                  status: "COMPLETED",
+                  status: "completed",
                   title: "Root Cause Analysis",
                   output_stream: null,
                   progress: [],
@@ -84,7 +84,7 @@ describe("analyze_issue_with_seer", () => {
                   type: "solution",
                   key: "solution",
                   index: 1,
-                  status: "COMPLETED",
+                  status: "completed",
                   title: "Proposed Solution",
                   output_stream: null,
                   progress: [],
@@ -263,11 +263,11 @@ describe("analyze_issue_with_seer", () => {
       ...autofixStateFixture,
       autofix: {
         ...autofixStateFixture.autofix,
-        status: "PROCESSING",
+        status: "processing",
         steps: [
           {
             ...autofixStateFixture.autofix.steps[0],
-            status: "PROCESSING",
+            status: "processing",
             title: "Analyzing the issue",
           },
         ],
@@ -318,7 +318,7 @@ describe("analyze_issue_with_seer", () => {
       ...autofixStateFixture,
       autofix: {
         ...autofixStateFixture.autofix,
-        status: "PROCESSING",
+        status: "processing",
       },
     };
 

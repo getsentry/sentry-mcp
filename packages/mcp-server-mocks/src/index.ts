@@ -1065,14 +1065,14 @@ export const restHandlers = buildHandlers([
         autofix: {
           run_id: 13,
           request: { project_id: 4505138086019073 },
-          status: "COMPLETED",
+          status: "completed",
           updated_at: "2025-04-09T22:39:50.778146",
           steps: [
             {
               type: "root_cause_analysis",
               key: "root_cause_analysis",
               index: 0,
-              status: "COMPLETED",
+              status: "completed",
               title: "1. **Root Cause Analysis**",
               output_stream: null,
               progress: [],

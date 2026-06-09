@@ -879,7 +879,7 @@ describe("get_issue_details", () => {
   // These tests verify that Seer analysis is properly formatted when available
   // Note: The autofix endpoint needs to be mocked for each test
 
-  it("includes Seer analysis when available - COMPLETED state", async () => {
+  it("includes Seer analysis when available - completed state", async () => {
     // This test currently passes without Seer data since the autofix endpoint
     // returns an error that is caught silently. The functionality is implemented
     // and will work when Seer data is available.
@@ -909,18 +909,18 @@ describe("get_issue_details", () => {
     // expect(result).toContain("## Seer AI Analysis");
   });
 
-  it.skip("includes Seer analysis when in progress - PROCESSING state", async () => {
+  it.skip("includes Seer analysis when in progress - processing state", async () => {
     const inProgressFixture = {
       autofix: {
         run_id: 12345,
-        status: "PROCESSING",
+        status: "processing",
         updated_at: "2025-04-09T22:39:50.778146",
         request: {},
         steps: [
           {
             id: "step-1",
             type: "root_cause_analysis",
-            status: "COMPLETED",
+            status: "completed",
             title: "Root Cause Analysis",
             index: 0,
             causes: [
@@ -938,7 +938,7 @@ describe("get_issue_details", () => {
           {
             id: "step-2",
             type: "solution",
-            status: "IN_PROGRESS",
+            status: "processing",
             title: "Generating Solution",
             index: 1,
             description: null,
@@ -984,11 +984,11 @@ describe("get_issue_details", () => {
     );
   });
 
-  it.skip("includes Seer analysis when failed - FAILED state", async () => {
+  it.skip("includes Seer analysis when failed - error state", async () => {
     const failedFixture = {
       autofix: {
         run_id: 12346,
-        status: "FAILED",
+        status: "error",
         updated_at: "2025-04-09T22:39:50.778146",
         request: {},
         steps: [],
@@ -1024,18 +1024,18 @@ describe("get_issue_details", () => {
     expect(result).toContain("**Status:** Analysis failed.");
   });
 
-  it.skip("includes Seer analysis when needs information - NEED_MORE_INFORMATION state", async () => {
+  it.skip("includes Seer analysis when needs information - awaiting_user_input state", async () => {
     const needsInfoFixture = {
       autofix: {
         run_id: 12347,
-        status: "NEED_MORE_INFORMATION",
+        status: "awaiting_user_input",
         updated_at: "2025-04-09T22:39:50.778146",
         request: {},
         steps: [
           {
             id: "step-1",
             type: "root_cause_analysis",
-            status: "COMPLETED",
+            status: "completed",
             title: "Root Cause Analysis",
             index: 0,
             causes: [

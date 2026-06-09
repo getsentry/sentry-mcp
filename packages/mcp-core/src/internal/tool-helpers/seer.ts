@@ -13,21 +13,14 @@ export const SEER_INITIAL_RETRY_DELAY = 1000; // 1 second initial retry delay
 
 export function getStatusDisplayName(status: string): string {
   switch (status) {
-    case "COMPLETED":
+    case "completed":
       return "Complete";
-    case "FAILED":
-    case "ERROR":
+    case "error":
       return "Failed";
-    case "CANCELLED":
-      return "Cancelled";
-    case "NEED_MORE_INFORMATION":
-      return "Needs More Information";
-    case "WAITING_FOR_USER_RESPONSE":
+    case "awaiting_user_input":
       return "Waiting for Response";
-    case "PROCESSING":
+    case "processing":
       return "Processing";
-    case "IN_PROGRESS":
-      return "In Progress";
     default:
       return status;
   }
@@ -37,33 +30,21 @@ export function getStatusDisplayName(status: string): string {
  * Check if an autofix status is terminal (no more updates expected)
  */
 export function isTerminalStatus(status: string): boolean {
-  return [
-    "COMPLETED",
-    "FAILED",
-    "ERROR",
-    "CANCELLED",
-    "NEED_MORE_INFORMATION",
-    "WAITING_FOR_USER_RESPONSE",
-  ].includes(status);
+  return ["completed", "error", "awaiting_user_input"].includes(status);
 }
 
 /**
  * Check if an autofix status requires human intervention
  */
 export function isHumanInterventionStatus(status: string): boolean {
-  return (
-    status === "NEED_MORE_INFORMATION" || status === "WAITING_FOR_USER_RESPONSE"
-  );
+  return status === "awaiting_user_input";
 }
 
 /**
  * Get guidance message for human intervention states
  */
 export function getHumanInterventionGuidance(status: string): string {
-  if (status === "NEED_MORE_INFORMATION") {
-    return "\nSeer needs additional information to continue the analysis. Please review the insights above and consider providing more context.\n";
-  }
-  if (status === "WAITING_FOR_USER_RESPONSE") {
+  if (status === "awaiting_user_input") {
     return "\nSeer is waiting for your response to proceed. Please review the analysis and provide feedback.\n";
   }
   return "";
@@ -107,11 +88,11 @@ export function getOutputForAutofixStep(
   const includeProvenanceTags = options.includeProvenanceTags ?? true;
   const heading = `## ${step.title}\n\n`;
 
-  if (step.status === "FAILED") {
+  if (step.status === "error") {
     return `${heading}**Sentry hit an error completing this step.\n\n`;
   }
 
-  if (step.status !== "COMPLETED") {
+  if (step.status !== "completed") {
     return `${heading}**Sentry is still working on this step. Please check back in a minute.**\n\n`;
   }
 

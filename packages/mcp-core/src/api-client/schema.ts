@@ -935,16 +935,12 @@ export const AutofixRunSchema = z
   })
   .passthrough();
 
+// Run statuses from Sentry's `SeerRunState` (`seer/agent/client_models.py`).
 const AutofixStatusSchema = z.enum([
-  "PENDING",
-  "PROCESSING",
-  "IN_PROGRESS",
-  "NEED_MORE_INFORMATION",
-  "COMPLETED",
-  "FAILED",
-  "ERROR",
-  "CANCELLED",
-  "WAITING_FOR_USER_RESPONSE",
+  "processing",
+  "completed",
+  "error",
+  "awaiting_user_input",
 ]);
 
 const AutofixRunStepBaseSchema = z.object({
@@ -1029,18 +1025,14 @@ export const AutofixRunStepSchema = z.union([
 ]);
 
 /**
- * The Seer autofix GET endpoint is explicitly experimental and currently has
- * two materially different payload shapes:
- * - legacy `get_autofix_state(...).dict()` responses with `request` and `steps`
- * - explorer responses with `blocks`, `pending_user_input`, and coding-agent
- *   metadata but no `steps`
- *
- * We normalize missing `steps` to `[]` so existing formatting code keeps
- * working even if the server returns the explorer shape.
+ * The Seer autofix GET endpoint is explicitly experimental. It returns the
+ * agent-based run state (`blocks`, `pending_user_input`, coding-agent
+ * metadata) and no longer includes `steps`; we normalize missing `steps` to
+ * `[]` so the legacy step formatting code keeps working.
  *
  * Upstream source of truth in getsentry/sentry:
  * - `src/sentry/seer/endpoints/group_ai_autofix.py`
- * - `src/sentry/seer/autofix/types.py` (`AutofixStateResponse`)
+ * - `src/sentry/seer/agent/client_models.py` (`SeerRunState`)
  */
 export const AutofixRunStateSchema = z.object({
   autofix: z
