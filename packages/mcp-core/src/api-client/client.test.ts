@@ -379,6 +379,34 @@ describe("monitor time parameters", () => {
     expect(statsUrl.searchParams.get("since")).not.toBeNull();
     expect(statsUrl.searchParams.get("until")).not.toBeNull();
   });
+
+  it("rejects invalid monitor check-in statsPeriod values before sending a request", async () => {
+    let requestReceived = false;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/monitors/nightly-import/checkins/",
+        () => {
+          requestReceived = true;
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await expect(
+      apiService.listMonitorCheckIns({
+        organizationSlug: "my-org",
+        monitorSlug: "nightly-import",
+        statsPeriod: "bogus",
+        limit: 10,
+      }),
+    ).rejects.toThrow("statsPeriod must use a supported relative time format");
+    expect(requestReceived).toBe(false);
+  });
 });
 
 describe("network error handling", () => {

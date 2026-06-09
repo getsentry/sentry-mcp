@@ -135,6 +135,22 @@ function normalizeStatsPeriod(statsPeriod?: string): string | undefined {
   return normalized || undefined;
 }
 
+function parseStatsPeriod(statsPeriod: string): {
+  amount: number;
+  unit: string;
+} {
+  const match = /^(\d+)([smhdw])$/.exec(statsPeriod);
+  if (!match) {
+    throw new ApiValidationError(
+      "statsPeriod must use a supported relative time format, such as `24h`, `7d`, or `2w`.",
+    );
+  }
+  return {
+    amount: Number(match[1]),
+    unit: match[2],
+  };
+}
+
 function getNextCursor(linkHeader: string | null): string | null {
   if (!linkHeader) {
     return null;
@@ -451,14 +467,7 @@ export class SentryApiService {
       until = Math.floor(endMs / 1000);
     } else {
       const period = statsPeriod ?? "24h";
-      const match = /^(\d+)([smhdw])$/.exec(period);
-      if (!match) {
-        throw new ApiValidationError(
-          "statsPeriod must use a supported relative time format, such as `24h`, `7d`, or `2w`.",
-        );
-      }
-      const amount = Number(match[1]);
-      const unit = match[2];
+      const { amount, unit } = parseStatsPeriod(period);
       let unitSeconds: number;
       switch (unit) {
         case "s":
@@ -1960,6 +1969,9 @@ export class SentryApiService {
     }
     const effectiveStatsPeriod =
       start || end ? undefined : (normalizeStatsPeriod(statsPeriod) ?? "24h");
+    if (effectiveStatsPeriod) {
+      parseStatsPeriod(effectiveStatsPeriod);
+    }
     this.applyTimeParams(searchQuery, effectiveStatsPeriod, start, end);
 
     const encodedMonitor = encodeURIComponent(monitorSlug);
