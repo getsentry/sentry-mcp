@@ -1,8 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { setUser } from "@sentry/core";
+import { type Span, setTag, setUser, startSpan } from "@sentry/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { buildServer } from "./server";
+import { createExecuteTool } from "./tools/special/execute-tool";
 import type { ToolConfig } from "./tools/types";
 import type { ServerContext } from "./types";
 
@@ -11,8 +13,21 @@ vi.mock("@sentry/core", () => ({
   setTag: vi.fn(),
   setUser: vi.fn(),
   getActiveSpan: vi.fn(),
+  startSpan: vi.fn(),
   wrapMcpServerWithSentry: vi.fn((server) => server),
 }));
+
+function createMockSpan() {
+  return {
+    setAttribute: vi.fn(),
+    setStatus: vi.fn(),
+    recordException: vi.fn(),
+  };
+}
+
+type MockSpan = ReturnType<typeof createMockSpan>;
+
+let startedSpans: MockSpan[] = [];
 
 /**
  * Helper to get registered tool names from an McpServer.
@@ -111,6 +126,15 @@ const DEFAULT_DIRECT_TOOL_NAMES_WITH_DOCS = [
 describe("buildServer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    startedSpans = [];
+    vi.mocked(startSpan).mockImplementation((<T>(
+      _options: Parameters<typeof startSpan>[0],
+      callback: (span: Span) => T,
+    ) => {
+      const span = createMockSpan();
+      startedSpans.push(span);
+      return callback(span as unknown as Span);
+    }) as typeof startSpan);
   });
 
   const baseContext: ServerContext = {
@@ -1069,6 +1093,135 @@ describe("buildServer", () => {
       expect(getTextContent(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
+    });
+
+    it("execute_tool creates a catalog tool span with effective arguments", async () => {
+      const handler = vi.fn(async (params: unknown) => {
+        const parsed = params as {
+          organizationSlug: string;
+          filter: string;
+          nested: { limit: number };
+        };
+        return `${parsed.organizationSlug}:${parsed.filter}:${parsed.nested.limit}`;
+      });
+      const registry: Record<string, ToolConfig> = {};
+      registry.fake_catalog_tool = createMockTool("fake_catalog_tool", {
+        inputSchema: {
+          organizationSlug: z.string(),
+          filter: z.string(),
+          nested: z.object({ limit: z.number() }),
+        },
+        handler,
+      });
+      registry.execute_tool = createExecuteTool(() => registry);
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "bound-org",
+            projectSlug: null,
+          },
+        },
+        tools: registry,
+      });
+
+      const result = await callRegisteredTool(server, "execute_tool", {
+        name: "fake_catalog_tool",
+        arguments: {
+          filter: "handled",
+          nested: { limit: 3 },
+        },
+      });
+
+      expect(getTextContent(result)).toBe("bound-org:handled:3");
+      expect(startSpan).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "execute_tool fake_catalog_tool",
+          op: "gen_ai.execute_tool",
+          attributes: {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "fake_catalog_tool",
+          },
+        }),
+        expect.any(Function),
+      );
+      expect(handler).toHaveBeenCalledWith(
+        {
+          organizationSlug: "bound-org",
+          filter: "handled",
+          nested: { limit: 3 },
+        },
+        expect.any(Object),
+      );
+      const span = startedSpans[0];
+      expect(span?.setAttribute).toHaveBeenCalledWith(
+        "gen_ai.tool.call.arguments.organizationSlug",
+        "bound-org",
+      );
+      expect(span?.setAttribute).toHaveBeenCalledWith(
+        "gen_ai.tool.call.arguments.filter",
+        "handled",
+      );
+      expect(span?.setAttribute).toHaveBeenCalledWith(
+        "gen_ai.tool.call.arguments.nested",
+        JSON.stringify({ limit: 3 }),
+      );
+      expect(span?.setStatus).toHaveBeenCalledWith({ code: 1 });
+      expect(setTag).not.toHaveBeenCalledWith(
+        "catalog.tool",
+        "fake_catalog_tool",
+      );
+    });
+
+    it("does not create a catalog child span for direct tool calls", async () => {
+      const server = buildServer({
+        context: baseContext,
+        tools: {
+          fake_catalog_tool: createMockTool("fake_catalog_tool", {
+            handler: async () => "direct-result",
+          }),
+        },
+      });
+
+      const result = await callRegisteredTool(server, "fake_catalog_tool", {});
+
+      expect(getTextContent(result)).toBe("direct-result");
+      expect(startSpan).not.toHaveBeenCalled();
+    });
+
+    it("marks the catalog tool span as errored when execute_tool validation fails", async () => {
+      const registry: Record<string, ToolConfig> = {};
+      registry.fake_catalog_tool = createMockTool("fake_catalog_tool", {
+        inputSchema: {
+          requiredValue: z.string(),
+        },
+      });
+      registry.execute_tool = createExecuteTool(() => registry);
+      const server = buildServer({
+        context: baseContext,
+        tools: registry,
+      });
+
+      const result = await callRegisteredTool(server, "execute_tool", {
+        name: "fake_catalog_tool",
+        arguments: {},
+      });
+
+      expect(result).toMatchObject({ isError: true });
+      expect(getTextContent(result)).toContain(
+        "Invalid arguments for fake_catalog_tool",
+      );
+      expect(startSpan).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attributes: expect.objectContaining({
+            "gen_ai.tool.name": "fake_catalog_tool",
+          }),
+        }),
+        expect.any(Function),
+      );
+      const span = startedSpans[0];
+      expect(span?.setStatus).toHaveBeenCalledWith({ code: 2 });
+      expect(span?.recordException).toHaveBeenCalledWith(expect.any(Error));
     });
 
     it("execute_tool injects constrained arguments for catalog-only tools", async () => {
