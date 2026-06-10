@@ -7,6 +7,7 @@ import {
   parseIssueParams,
 } from "../../internal/tool-helpers/issue";
 import type { IssueActivity, IssueComment } from "../../api-client/types";
+import { formatAvailableToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
 import type { ServerContext } from "../../types";
 import {
   ParamIssueShortId,
@@ -133,10 +134,17 @@ export default defineTool({
       );
     }
 
-    output.push("", "## Response Notes", "");
-    output.push(
-      "- Use `add_issue_note` to add a new human-visible issue comment.",
-    );
+    const addNoteInstruction = formatAvailableToolCallInstruction({
+      toolName: "add_issue_note",
+      experimentalMode: context.experimentalMode ?? false,
+      availableToolNames: context.availableToolNames,
+      directToolNames: context.directToolNames,
+      purpose: "to add a new human-visible issue comment",
+    });
+    if (addNoteInstruction) {
+      output.push("", "## Response Notes", "");
+      output.push(`- ${addNoteInstruction}.`);
+    }
 
     return `${output.join("\n")}\n`;
   },

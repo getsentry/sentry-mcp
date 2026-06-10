@@ -30,7 +30,11 @@ function formatPurpose(purpose: string | undefined): string {
   return purpose ? ` ${purpose}` : "";
 }
 
-function isToolAvailable(
+/**
+ * Checks the actual session tool set; missing availability preserves legacy
+ * behavior for callers that cannot provide session-scoped tool metadata.
+ */
+export function isToolAvailableInSession(
   toolName: string,
   availableToolNames: ReadonlySet<string> | undefined,
 ): boolean {
@@ -79,7 +83,10 @@ export function formatToolCallInstruction({
   directToolNames?: ReadonlySet<string>;
   fallbackInstruction?: string;
 }): string {
-  const targetAvailable = isToolAvailable(toolName, availableToolNames);
+  const targetAvailable = isToolAvailableInSession(
+    toolName,
+    availableToolNames,
+  );
 
   if (
     targetAvailable &&
@@ -89,8 +96,8 @@ export function formatToolCallInstruction({
   }
 
   const catalogGatewayAvailable =
-    isToolAvailable("search_tools", availableToolNames) &&
-    isToolAvailable("execute_tool", availableToolNames) &&
+    isToolAvailableInSession("search_tools", availableToolNames) &&
+    isToolAvailableInSession("execute_tool", availableToolNames) &&
     isDirectTool("search_tools", experimentalMode, directToolNames) &&
     isDirectTool("execute_tool", experimentalMode, directToolNames);
 
@@ -102,4 +109,34 @@ export function formatToolCallInstruction({
     fallbackInstruction ??
     `The Sentry tool \`${toolName}\` is not available in this session`
   );
+}
+
+/**
+ * Formats user-facing guidance only when the target tool is available in the
+ * current session; otherwise returns null so callers can omit the guidance.
+ */
+export function formatAvailableToolCallInstruction({
+  toolName,
+  experimentalMode,
+  purpose,
+  availableToolNames,
+  directToolNames,
+}: {
+  toolName: string;
+  experimentalMode: boolean;
+  purpose?: string;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
+}): string | null {
+  if (!isToolAvailableInSession(toolName, availableToolNames)) {
+    return null;
+  }
+
+  return formatToolCallInstruction({
+    toolName,
+    experimentalMode,
+    purpose,
+    availableToolNames,
+    directToolNames,
+  });
 }

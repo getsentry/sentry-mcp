@@ -15,7 +15,6 @@ export const CATALOG_INFRASTRUCTURE_TOOL_NAMES = [
 export const WRAPPER_TOOL_NAMES = ["use_sentry"] as const;
 
 export const TOP_LEVEL_TOOL_NAMES = [
-  "whoami",
   "find_organizations",
   "find_projects",
   "update_issue",

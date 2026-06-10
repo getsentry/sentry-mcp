@@ -138,7 +138,7 @@ describe("search_issues", () => {
       ## Next Steps
 
       - Get more details about a specific issue: Use get_sentry_resource with the issue ID or issue URL
-      - Update issue status: Use update_issue to resolve or assign issues
+      - Update issue status: Use the Sentry tool \`update_issue\` to resolve or assign issues
       - View event counts: Use search_events for aggregated statistics
       "
     `);
@@ -194,6 +194,74 @@ describe("search_issues", () => {
     expect(mockGenerateText).not.toHaveBeenCalled();
     expect(result).toContain("PROJ-123");
     expect(result).toContain("Test Error");
+  });
+
+  it("omits update_issue guidance when update_issue is unavailable in the session", async () => {
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
+
+    mswServer.use(
+      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("query")).toBe("is:unresolved");
+        return HttpResponse.json([
+          {
+            id: "123",
+            shortId: "PROJ-123",
+            title: "Test Error",
+            status: "unresolved",
+            count: "100",
+            userCount: 50,
+            firstSeen: "2025-01-15T10:00:00Z",
+            lastSeen: "2025-01-15T12:00:00Z",
+            permalink: "https://sentry.io/issues/123/",
+            project: {
+              id: "456",
+              slug: "test-project",
+              name: "Test Project",
+            },
+            culprit: "test.function",
+          },
+        ]);
+      }),
+    );
+
+    const result = await searchIssues.handler(
+      {
+        organizationSlug: "test-org",
+        query: "is:unresolved",
+        sort: "date",
+        projectSlugOrId: null,
+        regionUrl: null,
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        ...mockContext,
+        availableToolNames: new Set([
+          "execute_tool",
+          "find_organizations",
+          "find_projects",
+          "get_sentry_resource",
+          "search_events",
+          "search_issues",
+          "search_tools",
+        ]),
+        directToolNames: new Set([
+          "execute_tool",
+          "find_organizations",
+          "find_projects",
+          "get_sentry_resource",
+          "search_events",
+          "search_issues",
+          "search_tools",
+        ]),
+      },
+    );
+
+    expect(result).toContain("PROJ-123");
+    expect(result).not.toContain("Update issue status");
+    expect(result).not.toContain("update_issue");
   });
 
   it("should preserve explicit query syntax through agent repair", async () => {

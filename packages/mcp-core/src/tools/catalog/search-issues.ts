@@ -169,7 +169,10 @@ export default defineTool({
       limit: params.limit,
     });
 
-    getActiveSpan()?.setAttribute("gen_ai.tool.call.result.count", issues.length);
+    getActiveSpan()?.setAttribute(
+      "gen_ai.tool.call.result.count",
+      issues.length,
+    );
 
     // Build output with explanation first (if requested and NL was used), then results
     let output = "";
@@ -199,6 +202,9 @@ export default defineTool({
         protocol: context.sentryProtocol,
         inputQuery: params.query,
         skipHeader: true,
+        experimentalMode: context.experimentalMode ?? false,
+        availableToolNames: context.availableToolNames,
+        directToolNames: context.directToolNames,
       });
     } else {
       output = formatIssueResults({
@@ -211,6 +217,9 @@ export default defineTool({
         protocol: context.sentryProtocol,
         inputQuery: params.query,
         skipHeader: false,
+        experimentalMode: context.experimentalMode ?? false,
+        availableToolNames: context.availableToolNames,
+        directToolNames: context.directToolNames,
       });
     }
 

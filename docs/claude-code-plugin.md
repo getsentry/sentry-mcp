@@ -50,7 +50,7 @@ mcpServers:
 allowedTools:
   - analyze_issue_with_seer
   - search_issues
-  - ...              # Full list of MCP tool names
+  - ...              # Default-grant direct MCP tool names
 ---
 ```
 
@@ -63,7 +63,7 @@ The body below the frontmatter is the agent's system prompt.
 
 ## Keeping `allowedTools` in Sync
 
-The `allowedTools` list in the agent frontmatter must match the tools registered in the MCP server. The `generate-definitions` script handles this automatically:
+The `allowedTools` list in the agent frontmatter must match the generated default-grant direct MCP surface. The `generate-definitions` script handles this automatically:
 
 ```bash
 pnpm run --filter @sentry/mcp-core generate-definitions
@@ -73,7 +73,7 @@ This script:
 1. Imports all tools from `packages/mcp-core/src/tools/index.ts`
 2. Imports all skills from `packages/mcp-core/src/skills.ts`
 3. Writes `toolDefinitions.json` and `skillDefinitions.json` to `packages/mcp-core/src/`
-4. Updates `allowedTools` in both `plugins/sentry-mcp/agents/sentry-mcp.md` and `plugins/sentry-mcp-experimental/agents/sentry-mcp.md`, using the direct surface for each plugin mode
+4. Updates `allowedTools` in both `plugins/sentry-mcp/agents/sentry-mcp.md` and `plugins/sentry-mcp-experimental/agents/sentry-mcp.md`, using the default-grant direct surface for each plugin mode. Optional-skill tools remain reachable through `search_tools` and `execute_tool` when available.
 
 The script runs automatically as a `prebuild` and `pretest` hook in `packages/mcp-core/package.json`. Run it explicitly after:
 - Adding, removing, or renaming tools

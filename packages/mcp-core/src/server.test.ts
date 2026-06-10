@@ -116,7 +116,6 @@ const DEFAULT_DIRECT_TOOL_NAMES = [
   "search_issues",
   "search_tools",
   "update_issue",
-  "whoami",
 ].sort();
 const DEFAULT_DIRECT_TOOL_NAMES_WITH_DOCS = [
   ...DEFAULT_DIRECT_TOOL_NAMES,
@@ -586,8 +585,8 @@ describe("buildServer", () => {
       });
 
       const toolNames = getRegisteredToolNames(server);
-      // Should have standard tools like whoami
-      expect(toolNames).toContain("whoami");
+      // whoami is available through the catalog, not as a direct tool.
+      expect(toolNames).not.toContain("whoami");
       expect(toolNames).toContain("get_sentry_resource");
       expect(toolNames).not.toContain("get_issue_details");
       expect(toolNames).not.toContain("get_trace_details");
@@ -607,7 +606,7 @@ describe("buildServer", () => {
 
       const toolNames = getRegisteredToolNames(server);
       // Should still have tools, including get_sentry_resource in stable mode
-      expect(toolNames).toContain("whoami");
+      expect(toolNames).not.toContain("whoami");
       expect(toolNames).toContain("get_sentry_resource");
       expect(toolNames).not.toContain("get_issue_details");
       expect(toolNames).not.toContain("get_trace_details");
@@ -622,8 +621,8 @@ describe("buildServer", () => {
       });
 
       const toolNames = getRegisteredToolNames(server);
-      // Should have the standard tools
-      expect(toolNames).toContain("whoami");
+      // whoami is available through the catalog, not as a direct tool.
+      expect(toolNames).not.toContain("whoami");
       expect(toolNames).toContain("get_sentry_resource");
       expect(toolNames).not.toContain("get_issue_details");
       expect(toolNames).not.toContain("get_trace_details");
@@ -657,6 +656,7 @@ describe("buildServer", () => {
       expect(toolNames).toEqual(DEFAULT_DIRECT_TOOL_NAMES);
       expect(toolNames).toContain("search_tools");
       expect(toolNames).toContain("execute_tool");
+      expect(toolNames).not.toContain("whoami");
       expect(toolNames).not.toContain("use_sentry");
       expect(toolNames).not.toContain("search_docs");
       expect(toolNames).not.toContain("get_doc");
@@ -1020,6 +1020,107 @@ describe("buildServer", () => {
       );
     });
 
+    it("search_tools includes whoami as a catalog-only foundational tool", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["inspect"]),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      expect(toolNames).not.toContain("whoami");
+
+      const result = await callRegisteredTool(server, "search_tools", {
+        query: "authenticated user",
+        limit: 10,
+      });
+      const payload = getStructuredContent<{
+        results: Array<{ name: string }>;
+      }>(result);
+
+      expect(payload.results.map((tool) => tool.name)).toContain("whoami");
+    });
+
+    it("search_tools omits unavailable non-inspect tools", async () => {
+      const inspectSeerServer = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["inspect", "seer"]),
+        },
+      });
+      for (const [toolName, grantedSkills] of [
+        ["add_issue_note", ["triage"]],
+        ["update_issue", ["triage"]],
+        ["create_project", ["project-management"]],
+        ["create_team", ["project-management"]],
+        ["update_project", ["project-management"]],
+        ["create_dsn", ["project-management"]],
+        ["find_dsns", ["project-management"]],
+        ["search_docs", ["docs"]],
+        ["get_doc", ["docs"]],
+      ] as const) {
+        const grantedServer = buildServer({
+          context: {
+            ...baseContext,
+            grantedSkills: new Set(grantedSkills),
+          },
+        });
+        const grantedResult = await callRegisteredTool(
+          grantedServer,
+          "search_tools",
+          {
+            query: toolName,
+            limit: 10,
+          },
+        );
+        const grantedPayload = getStructuredContent<{
+          results: Array<{ name: string }>;
+        }>(grantedResult);
+        expect(grantedPayload.results.map((tool) => tool.name)).toContain(
+          toolName,
+        );
+
+        const inspectSeerResult = await callRegisteredTool(
+          inspectSeerServer,
+          "search_tools",
+          {
+            query: toolName,
+            limit: 10,
+          },
+        );
+        const inspectSeerPayload = getStructuredContent<{
+          results: Array<{ name: string }>;
+        }>(inspectSeerResult);
+        expect(
+          inspectSeerPayload.results.map((tool) => tool.name),
+        ).not.toContain(toolName);
+      }
+    });
+
+    it("execute_tool rejects unavailable non-inspect tools", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["inspect", "seer"]),
+        },
+      });
+
+      const result = await callRegisteredTool(server, "execute_tool", {
+        name: "update_issue",
+        arguments: {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          status: "resolved",
+        },
+      });
+
+      expect(result).toMatchObject({ isError: true });
+      expect(getTextContent(result)).toContain(
+        'Tool "update_issue" is not available in this session',
+      );
+    });
+
     it("search_tools and execute_tool enforce project capabilities by default", async () => {
       const server = buildServer({
         context: {
@@ -1093,6 +1194,25 @@ describe("buildServer", () => {
       expect(getTextContent(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
+    });
+
+    it("execute_tool dispatches to catalog-only whoami", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["inspect"]),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      expect(toolNames).not.toContain("whoami");
+
+      const result = await callRegisteredTool(server, "execute_tool", {
+        name: "whoami",
+        arguments: {},
+      });
+
+      expect(getTextContent(result)).toContain("You are authenticated as");
     });
 
     it("execute_tool passes effective arguments to a catalog tool", async () => {

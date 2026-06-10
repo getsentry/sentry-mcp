@@ -15,12 +15,9 @@ allowedTools:
   - find_organizations
   - find_projects
   - get_sentry_resource
-  - search_docs
   - search_events
   - search_issues
   - search_tools
-  - update_issue
-  - whoami
 ---
 
 You are a Sentry expert. Investigate errors, analyze performance, and manage projects using the available MCP tools.

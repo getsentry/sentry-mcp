@@ -11,7 +11,7 @@ const EMAIL_REGEX = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 export const WHOAMI_SCENARIO: ScenarioDefinition = {
   name: "whoami",
   buildPrompt(serverName) {
-    return `Use the "whoami" tool from the MCP server named "${serverName}". Call it exactly once. Reply with only the authenticated email address.`;
+    return `Use the Sentry MCP server named "${serverName}" to identify the authenticated user. Reply with only the authenticated email address.`;
   },
   validate(finalOutput) {
     const match = finalOutput.match(EMAIL_REGEX);
