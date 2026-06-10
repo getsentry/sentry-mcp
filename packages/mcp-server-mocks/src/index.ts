@@ -1064,26 +1064,42 @@ export const restHandlers = buildHandlers([
       HttpResponse.json({
         autofix: {
           run_id: 13,
-          request: { project_id: 4505138086019073 },
-          status: "COMPLETED",
+          status: "completed",
           updated_at: "2025-04-09T22:39:50.778146",
-          steps: [
+          owner_user_id: null,
+          pending_user_input: null,
+          repo_pr_states: {},
+          blocks: [
             {
-              type: "root_cause_analysis",
-              key: "root_cause_analysis",
-              index: 0,
-              status: "COMPLETED",
-              title: "1. **Root Cause Analysis**",
-              output_stream: null,
-              progress: [],
-              description: "The analysis has completed successfully.",
-              causes: [
+              id: "block-1",
+              message: {
+                role: "assistant",
+                content: "The analysis has completed successfully.",
+                thinking_content: null,
+                tool_calls: null,
+                metadata: null,
+              },
+              timestamp: "2025-04-09T22:39:50.000000",
+              loading: false,
+              artifacts: [
                 {
-                  description: "The analysis has completed successfully.",
-                  id: 1,
-                  root_cause_reproduction: [],
+                  key: "root_cause",
+                  reason: "Root cause analysis completed",
+                  data: {
+                    one_line_description:
+                      "The analysis has completed successfully.",
+                    five_whys: [],
+                    reproduction_steps: [],
+                    relevant_repo: null,
+                  },
                 },
               ],
+              file_patches: null,
+              merged_file_patches: null,
+              pr_commit_shas: null,
+              todos: null,
+              tool_links: null,
+              tool_results: null,
             },
           ],
         },

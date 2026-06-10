@@ -37,9 +37,7 @@ describe("analyze_issue_with_seer", () => {
     expect(result).toContain("# Seer Analysis for Issue CLOUDFLARE-MCP-45");
     expect(result).toContain("Found existing analysis (Run ID: 13)");
     expect(result).toContain("## Analysis Complete");
-    expect(result).toContain(
-      '<seer_analysis run_id="13" step="root_cause_analysis">',
-    );
+    expect(result).toContain('<seer_analysis run_id="13" step="root_cause">');
     expect(result).toContain("The analysis has completed successfully.");
   });
 
@@ -51,62 +49,48 @@ describe("analyze_issue_with_seer", () => {
           HttpResponse.json({
             autofix: {
               run_id: 4242,
-              request: {},
-              status: "COMPLETED",
+              status: "completed",
               updated_at: "2025-04-09T22:39:50.778146",
-              steps: [
+              blocks: [
                 {
-                  type: "root_cause_analysis",
-                  key: "root_cause_analysis",
-                  index: 0,
-                  status: "COMPLETED",
-                  title: "Root Cause Analysis",
-                  output_stream: null,
-                  progress: [],
-                  causes: [
+                  id: "block-1",
+                  artifacts: [
                     {
-                      description: "The request used the wrong bottle ID.",
-                      id: 1,
-                      root_cause_reproduction: [
-                        {
-                          code_snippet_and_analysis:
-                            "The bottle lookup threw after receiving ID 3216.",
-                          is_most_important_event: true,
-                          relevant_code_file: null,
-                          timeline_item_type: "internal_code",
-                          title: "Lookup path",
-                        },
-                      ],
+                      key: "root_cause",
+                      reason: "Root cause analysis completed",
+                      data: {
+                        one_line_description:
+                          "The request used the wrong bottle ID.",
+                        five_whys: [
+                          "The bottle lookup threw after receiving ID 3216.",
+                        ],
+                        reproduction_steps: [],
+                      },
                     },
                   ],
                 },
                 {
-                  type: "solution",
-                  key: "solution",
-                  index: 1,
-                  status: "COMPLETED",
-                  title: "Proposed Solution",
-                  output_stream: null,
-                  progress: [],
-                  description:
-                    "Use the canonical bottle ID for both batched calls.",
-                  solution: [
+                  id: "block-2",
+                  artifacts: [
                     {
-                      code_snippet_and_analysis:
-                        "Pass the same ID to both procedures.",
-                      is_active: true,
-                      is_most_important_event: true,
-                      relevant_code_file: null,
-                      timeline_item_type: "internal_code",
-                      title: "Share canonical ID",
-                    },
-                    {
-                      code_snippet_and_analysis: null,
-                      is_active: true,
-                      is_most_important_event: false,
-                      relevant_code_file: null,
-                      timeline_item_type: "repro_test",
-                      title: "Add regression coverage",
+                      key: "solution",
+                      reason: "Solution plan completed",
+                      data: {
+                        one_line_summary:
+                          "Use the canonical bottle ID for both batched calls.",
+                        steps: [
+                          {
+                            title: "Share canonical ID",
+                            description:
+                              "Pass the same ID to both procedures.",
+                          },
+                          {
+                            title: "Add regression coverage",
+                            description:
+                              "Test the batched request with mismatched IDs.",
+                          },
+                        ],
+                      },
                     },
                   ],
                 },
@@ -145,21 +129,21 @@ describe("analyze_issue_with_seer", () => {
 
       ## Analysis Complete
 
-      <seer_analysis run_id="4242" step="root_cause_analysis">
+      <seer_analysis run_id="4242" step="root_cause">
+      ## Root Cause Analysis
+
       The request used the wrong bottle ID.
 
-      **Lookup path**
-
-      The bottle lookup threw after receiving ID 3216.
+      1. The bottle lookup threw after receiving ID 3216.
       </seer_analysis>
 
       <seer_analysis run_id="4242" step="solution">
+      ## Proposed Solution
+
       Use the canonical bottle ID for both batched calls.
 
-      **Share canonical ID**
-      Pass the same ID to both procedures.
-
-      **Add regression coverage**
+      - **Share canonical ID**: Pass the same ID to both procedures.
+      - **Add regression coverage**: Test the batched request with mismatched IDs.
       </seer_analysis>"
     `);
     expect(result).not.toContain("null");
@@ -263,12 +247,12 @@ describe("analyze_issue_with_seer", () => {
       ...autofixStateFixture,
       autofix: {
         ...autofixStateFixture.autofix,
-        status: "PROCESSING",
-        steps: [
+        status: "processing",
+        blocks: [
           {
-            ...autofixStateFixture.autofix.steps[0],
-            status: "PROCESSING",
-            title: "Analyzing the issue",
+            id: "block-1",
+            artifacts: [],
+            todos: [{ content: "Analyzing the issue", status: "in_progress" }],
           },
         ],
       },
@@ -318,7 +302,7 @@ describe("analyze_issue_with_seer", () => {
       ...autofixStateFixture,
       autofix: {
         ...autofixStateFixture.autofix,
-        status: "PROCESSING",
+        status: "processing",
       },
     };
 
