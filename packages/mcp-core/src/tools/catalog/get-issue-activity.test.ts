@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { mswServer } from "@sentry/mcp-server-mocks";
+import { afterEach, describe, expect, it } from "vitest";
 import getIssueActivity from "./get-issue-activity.js";
 
 const context = {
@@ -8,6 +9,10 @@ const context = {
   accessToken: "access-token",
   userId: "1",
 };
+
+afterEach(() => {
+  mswServer.resetHandlers();
+});
 
 describe("get_issue_activity", () => {
   it("serializes issue activity and comments", async () => {
@@ -39,8 +44,28 @@ describe("get_issue_activity", () => {
 
       ## Response Notes
 
-      - Use \`add_issue_note\` to add a new human-visible issue comment.
+      - Use the Sentry tool \`add_issue_note\` to add a new human-visible issue comment.
       "
     `);
+  });
+
+  it("omits add_issue_note guidance when the tool is unavailable", async () => {
+    const result = await getIssueActivity.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        issueId: "CLOUDFLARE-MCP-41",
+        includeComments: true,
+        limit: 25,
+      },
+      {
+        ...context,
+        availableToolNames: new Set(["get_issue_activity", "execute_tool"]),
+        directToolNames: new Set(["execute_tool"]),
+      },
+    );
+
+    expect(result).not.toContain("Response Notes");
+    expect(result).not.toContain("add_issue_note");
   });
 });

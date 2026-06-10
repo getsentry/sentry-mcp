@@ -82,7 +82,7 @@ export function createExecuteTool(getTools: () => ToolRegistry) {
       "",
       "<examples>",
       "execute_tool(name='find_projects', arguments={ organizationSlug: 'my-org' })",
-      "execute_tool(name='update_issue', arguments={ organizationSlug: 'my-org', issueId: 'PROJ-1', status: 'resolved' })",
+      "execute_tool(name='whoami', arguments={})",
       "</examples>",
       "",
       "<hints>",

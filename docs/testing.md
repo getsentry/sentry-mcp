@@ -133,7 +133,7 @@ pnpm -w run agent-cli-test --provider codex --setup stdio
 This harness:
 - Uses the real local CLI session for the selected provider
 - Checks the configured MCP server entry before running the prompt
-- Runs a real `whoami` smoke prompt and verifies the final response contains an authenticated email
+- Runs a real authenticated-user smoke prompt and verifies the final response contains an authenticated email
 
 Use `--setup repo --server sentry` to target the hosted server instead of the local `sentry-dev` entry.
 
@@ -148,13 +148,13 @@ When the harness fails, rerun the provider directly with debug enabled so you ca
 
 ```bash
 # Claude Code: capture a full debug log for the prompt run
-claude --mcp-config /tmp/claude-sentry-dev-config.json --strict-mcp-config --permission-mode bypassPermissions --no-session-persistence --debug-file /tmp/claude-sentry-dev.log -p 'Use the "whoami" tool from the MCP server named "sentry-dev". Call it exactly once. Reply with only the authenticated email address.'
+claude --mcp-config /tmp/claude-sentry-dev-config.json --strict-mcp-config --permission-mode bypassPermissions --no-session-persistence --debug-file /tmp/claude-sentry-dev.log -p 'Use the Sentry MCP server named "sentry-dev" to identify the authenticated user. Reply with only the authenticated email address.'
 
 # Codex: capture MCP transport and client debug output
-RUST_LOG=codex_core=debug,rmcp=debug RUST_BACKTRACE=1 codex exec --skip-git-repo-check --sandbox read-only --output-last-message /tmp/codex-sentry-dev-last.txt 'Use only the MCP server named "sentry-dev". Call the "whoami" tool exactly once. Reply with only the authenticated email address.'
+RUST_LOG=codex_core=debug,rmcp=debug RUST_BACKTRACE=1 codex exec --skip-git-repo-check --sandbox read-only --output-last-message /tmp/codex-sentry-dev-last.txt 'Use only the Sentry MCP server named "sentry-dev" to identify the authenticated user. Reply with only the authenticated email address.'
 ```
 
-For Claude, inspect the debug file for `ToolSearchTool`, `mcp__<server>__whoami`, MCP connection lines, and any `tool permission denied` entries.
+For Claude, inspect the debug file for `ToolSearchTool`, `mcp__<server>__search_tools`, `mcp__<server>__execute_tool`, MCP connection lines, and any `tool permission denied` entries.
 For Codex, inspect the debug output for `UnexpectedContentType`, `AuthRequired`, or `resources/list failed`.
 
 ## Functional Testing Patterns

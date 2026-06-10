@@ -81,6 +81,14 @@ type DefinitionTool = {
 
 type ToolSurface = "direct" | "catalog";
 
+function isEnabledByDefaultSkills(tool: DefinitionTool): boolean {
+  const defaultSkills = skillsModule.DEFAULT_SKILLS as readonly string[];
+  return (
+    Array.isArray(tool.skills) &&
+    tool.skills.some((skill) => defaultSkills.includes(skill))
+  );
+}
+
 function isSkillDefinitionTool(tool: DefinitionTool): boolean {
   return (
     !surfacesModule.isWrapperToolName(tool.name) &&
@@ -382,14 +390,20 @@ async function main() {
     writeJson(path.join(outDir, "toolDefinitions.json"), tools);
     writeJson(path.join(outDir, "skillDefinitions.json"), skills);
 
-    // Sync allowedTools in agent frontmatter with the direct MCP surface for
-    // each plugin's MCP mode.
+    // Sync allowedTools in agent frontmatter with the direct MCP surface that
+    // is available under the default OAuth grant. Optional-skill tools remain
+    // available through search_tools/execute_tool when the user grants them,
+    // without advertising direct calls that many sessions cannot execute.
     const directTools = tools.filter((tool) => tool.surface === "direct");
     const experimentalDirectTools = experimentalTools.filter(
       (tool) => tool.surface === "direct",
     );
-    const toolNames = directTools.map((t) => t.name);
-    const experimentalToolNames = experimentalDirectTools.map((t) => t.name);
+    const toolNames = directTools
+      .filter(isEnabledByDefaultSkills)
+      .map((t) => t.name);
+    const experimentalToolNames = experimentalDirectTools
+      .filter(isEnabledByDefaultSkills)
+      .map((t) => t.name);
 
     let agentsSynced = 0;
     for (const agentConfig of agentConfigs()) {

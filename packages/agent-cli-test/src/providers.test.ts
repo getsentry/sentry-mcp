@@ -55,10 +55,14 @@ sentry-stdio  node     ../../../mcp-server/dist/index.js  SENTRY_MCP_AUTH_CACHE=
 });
 
 describe("WHOAMI_SCENARIO", () => {
-  it("builds a prompt that targets whoami on a named MCP server", () => {
-    expect(WHOAMI_SCENARIO.buildPrompt("sentry-dev")).toContain(
-      '"whoami" tool from the MCP server named "sentry-dev"',
-    );
+  it("builds a prompt that targets authentication on a named MCP server", () => {
+    const prompt = WHOAMI_SCENARIO.buildPrompt("sentry-dev");
+
+    expect(prompt).toContain('Sentry MCP server named "sentry-dev"');
+    expect(prompt).toContain("authenticated email address");
+    expect(prompt).not.toContain('"whoami" tool');
+    expect(prompt).not.toContain("execute_tool");
+    expect(prompt).not.toContain("exactly once");
   });
 
   it("extracts an email from the final output", () => {

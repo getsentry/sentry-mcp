@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatAvailableToolCallInstruction,
   formatToolCall,
   formatToolCallInstruction,
+  isToolAvailableInSession,
 } from "./tool-call-formatting";
 
 describe("tool call formatting", () => {
@@ -92,6 +94,43 @@ describe("tool call formatting", () => {
         fallbackInstruction: "Release listing is not available",
       }),
     ).toBe("Release listing is not available");
+  });
+
+  it("reports availability from the provided session tool set", () => {
+    expect(
+      isToolAvailableInSession(
+        "update_issue",
+        new Set(["search_tools", "execute_tool"]),
+      ),
+    ).toBe(false);
+    expect(
+      isToolAvailableInSession(
+        "update_issue",
+        new Set(["update_issue", "search_tools", "execute_tool"]),
+      ),
+    ).toBe(true);
+    expect(isToolAvailableInSession("update_issue", undefined)).toBe(true);
+  });
+
+  it("formats optional guidance only for available tools", () => {
+    expect(
+      formatAvailableToolCallInstruction({
+        toolName: "update_issue",
+        experimentalMode: false,
+        availableToolNames: new Set(["search_tools", "execute_tool"]),
+      }),
+    ).toBeNull();
+    expect(
+      formatAvailableToolCallInstruction({
+        toolName: "update_issue",
+        experimentalMode: false,
+        availableToolNames: new Set([
+          "update_issue",
+          "search_tools",
+          "execute_tool",
+        ]),
+      }),
+    ).toBe("Use the Sentry tool `update_issue`");
   });
 
   it("uses tool-name guidance only when the target tool is available", () => {

@@ -196,13 +196,13 @@ This opens the MCP Inspector at `http://localhost:6274`
 
 **Basic workflow:**
 1. **List Tools** - Verify expected tools appear
-2. **Call a tool** - Start with `whoami` (no parameters required)
+2. **Call a tool** - Start with `execute_tool` using `name="whoami"` and `arguments={}`
 3. **Test with parameters** - Try `find_organizations()`
 4. **Test complex operations** - Try `search_events(query="errors in the last hour")`
 
 **Example test sequence:**
 ```
-1. whoami()
+1. execute_tool(name="whoami", arguments={})
 2. find_organizations()
 3. find_projects(organizationSlug="your-org")
 4. search_events(
@@ -244,7 +244,7 @@ pnpm -w run cli --transport stdio --list-tools
 Look for this in the output:
 ```
 ● Connected to MCP server (stdio)
-  ⎿  20 tools available
+  ⎿  tools available
 ```
 
 ### Example Test Session
@@ -254,21 +254,21 @@ Look for this in the output:
 $ pnpm -w run cli --access-token=YOUR_TOKEN "list all available tools"
 
 ● Connected to MCP server (stdio)
-  ⎿  20 tools available
+  ⎿  Tools available
 
 ● Here are the available tools:
-  1. whoami
+  1. execute_tool
   2. find_organizations
-  3. find_teams
-  [... 17 more tools ...]
+  3. find_projects
+  [...]
 
 # Test 2: Test a specific tool
 $ pnpm -w run cli --access-token=YOUR_TOKEN "who am I?"
 
 ● Connected to MCP server (stdio)
-  ⎿  20 tools available
+  ⎿  Tools available
 
-● whoami()
+● execute_tool(name="whoami", arguments={})
   ⎿  You are authenticated as: user@example.com
 ```
 
@@ -289,9 +289,9 @@ pnpm -w run cli --transport stdio --access-token=test-fake-token-12345 "who am I
 **Expected output:**
 ```
 ● Connected to MCP server (stdio)
-  ⎿  20 tools available
+  ⎿  Tools available
 
-● whoami()
+● execute_tool(name="whoami", arguments={})
   ⎿  **Input Error**
       API error (400): Bad Request
 ```
@@ -690,7 +690,7 @@ pnpm start --access-token=TOKEN
 ```bash
 # Time tool execution
 time node dist/index.js --access-token=TOKEN <<EOF
-{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"whoami"}}
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"execute_tool","arguments":{"name":"whoami","arguments":{}}}}
 EOF
 
 # Memory usage

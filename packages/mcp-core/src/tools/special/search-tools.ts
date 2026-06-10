@@ -73,7 +73,7 @@ export function createSearchToolsTool(getTools: () => ToolRegistry) {
       "",
       "<examples>",
       "search_tools(query='list projects')",
-      "search_tools(query='update issue status')",
+      "search_tools(query='issue details')",
       "search_tools(query='find dsn', limit=5)",
       "search_tools(query='snapshot image')",
       "</examples>",

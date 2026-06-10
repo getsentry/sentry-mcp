@@ -2,6 +2,7 @@ import type { Issue } from "../../../api-client";
 import { logInfo } from "../../../telem/logging";
 import { getIssueUrl, getIssuesSearchUrl } from "../../../utils/url-utils";
 import { getSeerActionabilityLabel } from "../../../internal/formatting";
+import { formatAvailableToolCallInstruction } from "../../../internal/tool-helpers/tool-call-formatting";
 import type { SentryProtocol } from "../../../types";
 
 /**
@@ -21,6 +22,9 @@ export interface FormatIssueResultsParams {
   protocol?: SentryProtocol;
   inputQuery?: string;
   skipHeader?: boolean;
+  experimentalMode?: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
 }
 
 /**
@@ -37,6 +41,9 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
     protocol = "https",
     inputQuery,
     skipHeader = false,
+    experimentalMode = false,
+    availableToolNames,
+    directToolNames,
   } = params;
 
   const region = regionUrl ? new URL(regionUrl) : null;
@@ -147,8 +154,16 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
   output += "## Next Steps\n\n";
   output +=
     "- Get more details about a specific issue: Use get_sentry_resource with the issue ID or issue URL\n";
-  output +=
-    "- Update issue status: Use update_issue to resolve or assign issues\n";
+  const updateIssueInstruction = formatAvailableToolCallInstruction({
+    toolName: "update_issue",
+    experimentalMode,
+    availableToolNames,
+    directToolNames,
+    purpose: "to resolve or assign issues",
+  });
+  if (updateIssueInstruction) {
+    output += `- Update issue status: ${updateIssueInstruction}\n`;
+  }
   output +=
     "- View event counts: Use search_events for aggregated statistics\n";
 

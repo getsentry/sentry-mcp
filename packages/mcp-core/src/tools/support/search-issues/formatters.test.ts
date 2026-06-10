@@ -147,6 +147,65 @@ describe("formatIssueResults", () => {
     });
   });
 
+  describe("availability-aware guidance", () => {
+    it("omits update_issue guidance when the tool is unavailable", () => {
+      const issue = createPerformanceIssue({
+        shortId: "TEST-NO-TRIAGE",
+        title: "N+1 Query",
+      });
+
+      const result = formatIssueResults({
+        ...baseParams,
+        issues: [issue],
+        availableToolNames: new Set([
+          "get_sentry_resource",
+          "search_events",
+          "search_tools",
+          "execute_tool",
+        ]),
+        directToolNames: new Set([
+          "get_sentry_resource",
+          "search_events",
+          "search_tools",
+          "execute_tool",
+        ]),
+      });
+
+      expect(result).not.toContain("Update issue status");
+      expect(result).not.toContain("update_issue");
+    });
+
+    it("includes update_issue guidance when the tool is available", () => {
+      const issue = createPerformanceIssue({
+        shortId: "TEST-TRIAGE",
+        title: "N+1 Query",
+      });
+
+      const result = formatIssueResults({
+        ...baseParams,
+        issues: [issue],
+        availableToolNames: new Set([
+          "get_sentry_resource",
+          "search_events",
+          "search_tools",
+          "execute_tool",
+          "update_issue",
+        ]),
+        directToolNames: new Set([
+          "get_sentry_resource",
+          "search_events",
+          "search_tools",
+          "execute_tool",
+          "update_issue",
+        ]),
+      });
+
+      expect(result).toContain(
+        "Update issue status: Use the Sentry tool `update_issue` to resolve or assign issues",
+      );
+    });
+  });
+
   describe("empty results", () => {
     it("handles empty issue list gracefully", () => {
       const result = formatIssueResults({
@@ -267,7 +326,7 @@ describe("formatIssueResults", () => {
         ## Next Steps
 
         - Get more details about a specific issue: Use get_sentry_resource with the issue ID or issue URL
-        - Update issue status: Use update_issue to resolve or assign issues
+        - Update issue status: Use the Sentry tool \`update_issue\` to resolve or assign issues
         - View event counts: Use search_events for aggregated statistics
         - View feedback details: Use get_sentry_resource to see full feedback content and linked error events
         "

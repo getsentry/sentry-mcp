@@ -233,7 +233,7 @@
   },
   {
     "name": "execute_tool",
-    "description": "Execute an available Sentry MCP tool discovered through search_tools.\n\nUse this tool when you need to:\n- Call a Sentry operation returned by search_tools\n- Execute a tool by name using arguments that match its returned schema\n\n<examples>\nexecute_tool(name='find_projects', arguments={ organizationSlug: 'my-org' })\nexecute_tool(name='update_issue', arguments={ organizationSlug: 'my-org', issueId: 'PROJ-1', status: 'resolved' })\n</examples>\n\n<hints>\n- Use search_tools first if you are not sure which name or arguments to pass.\n- Arguments are validated against the target tool's schema before execution.\n- Active organization, project, and region constraints are injected automatically.\n</hints>",
+    "description": "Execute an available Sentry MCP tool discovered through search_tools.\n\nUse this tool when you need to:\n- Call a Sentry operation returned by search_tools\n- Execute a tool by name using arguments that match its returned schema\n\n<examples>\nexecute_tool(name='find_projects', arguments={ organizationSlug: 'my-org' })\nexecute_tool(name='whoami', arguments={})\n</examples>\n\n<hints>\n- Use search_tools first if you are not sure which name or arguments to pass.\n- Arguments are validated against the target tool's schema before execution.\n- Active organization, project, and region constraints are injected automatically.\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1848,7 +1848,7 @@
   },
   {
     "name": "search_tools",
-    "description": "Search the available Sentry MCP tool catalog by name and description.\n\nMany Sentry operations are intentionally not exposed as top-level tools. Use this for any Sentry-related task when you do not see an obvious direct tool, including long-tail inspection, project management, documentation lookup, preprod snapshots, attachments, DSNs, releases, teams, and issue-specific pivots.\n\nUse this tool when you need to:\n- Find the right Sentry operation for a task\n- Discover catalog tools and their schemas for a task\n- Inspect the executable JSON input schema for an available tool\n\n<examples>\nsearch_tools(query='list projects')\nsearch_tools(query='update issue status')\nsearch_tools(query='find dsn', limit=5)\nsearch_tools(query='snapshot image')\n</examples>\n\n<hints>\n- Results only include tools available in the current session.\n- If a Sentry operation is not listed as a direct tool, search here before deciding it is unavailable.\n- Returned schemas already account for active organization, project, and region constraints.\n- Use the returned name and schema when executing a catalog result.\n- This tool returns structured JSON. Do not parse markdown from its text content.\n</hints>",
+    "description": "Search the available Sentry MCP tool catalog by name and description.\n\nMany Sentry operations are intentionally not exposed as top-level tools. Use this for any Sentry-related task when you do not see an obvious direct tool, including long-tail inspection, project management, documentation lookup, preprod snapshots, attachments, DSNs, releases, teams, and issue-specific pivots.\n\nUse this tool when you need to:\n- Find the right Sentry operation for a task\n- Discover catalog tools and their schemas for a task\n- Inspect the executable JSON input schema for an available tool\n\n<examples>\nsearch_tools(query='list projects')\nsearch_tools(query='issue details')\nsearch_tools(query='find dsn', limit=5)\nsearch_tools(query='snapshot image')\n</examples>\n\n<hints>\n- Results only include tools available in the current session.\n- If a Sentry operation is not listed as a direct tool, search here before deciding it is unavailable.\n- Returned schemas already account for active organization, project, and region constraints.\n- Use the returned name and schema when executing a catalog result.\n- This tool returns structured JSON. Do not parse markdown from its text content.\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1924,7 +1924,7 @@
         },
         "assignedTo": {
           "type": "string",
-          "description": "The assignee in format 'user:ID' or 'team:ID_OR_SLUG' where ID is numeric. Example: 'user:123456', 'team:789', or 'team:my-team-slug'. Use the whoami tool to find your user ID."
+          "description": "The assignee in format 'user:ID' or 'team:ID_OR_SLUG' where ID is numeric. Example: 'user:123456', 'team:789', or 'team:my-team-slug'. Use the available Sentry `whoami` tool to find your user ID."
         },
         "ignoreMode": {
           "type": "string",
@@ -2071,6 +2071,6 @@
     "inputSchema": {},
     "requiredScopes": [],
     "skills": ["inspect", "seer", "docs", "triage", "project-management"],
-    "surface": "direct"
+    "surface": "catalog"
   }
 ]

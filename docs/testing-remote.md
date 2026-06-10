@@ -318,7 +318,7 @@ Opens at `http://localhost:6274`
 
 **Basic verification:**
 1. List tools → Verify expected tools available
-2. Call `whoami` → Verify authentication
+2. Call `execute_tool` with `name="whoami"` and `arguments={}` → Verify authentication
 3. Call `find_organizations` → Verify data access
 
 **Parameter testing:**
@@ -370,15 +370,15 @@ pnpm -w run cli "list organizations"
 
 **In OAuth approval screen, test:**
 - Minimal skills (inspect, docs only)
-- Default skills (inspect, seer, docs)
+- Default skills (inspect, seer)
 - All skills (inspect, seer, docs, triage, project-management)
 
-**Verify tools filtered by skills:**
+**Verify tools reflect the current session grant:**
 ```bash
-# With inspect, docs only: no write tools
+# With read-only grants: no write tools
 pnpm -w run cli "list tools" | grep "create_"
 
-# With all skills: includes write tools
+# With all grants: includes write tools
 # Should see: create_project, create_team, update_issue, etc.
 ```
 
@@ -502,7 +502,7 @@ pnpm -w run cli "who am I?"
 ### "Tool not found" errors
 
 **Causes:**
-1. Tool filtered by skills
+1. Tool is not available in the current session
 2. Build issue
 3. Server version mismatch
 
@@ -511,8 +511,8 @@ pnpm -w run cli "who am I?"
 # Check tool list
 pnpm -w run cli "list tools" | jq '.tools[] | .name'
 
-# Verify skills include required permissions
-# Example: create_project requires project-management skill
+# Verify the session grant includes the capability for the tool you need
+# Example: create_project is only available with project-management capabilities
 
 # Rebuild and restart
 pnpm -w run build && pnpm dev
