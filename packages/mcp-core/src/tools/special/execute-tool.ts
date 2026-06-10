@@ -38,8 +38,8 @@ async function executeCatalogToolWithSpan({
 }) {
   return startSpan(
     {
-      name: `execute_tool ${tool.name}`,
-      op: "gen_ai.execute_tool",
+      name: `tools/call ${tool.name}`,
+      op: "mcp.execute_tool",
       attributes: {
         "gen_ai.operation.name": "execute_tool",
         "gen_ai.tool.name": tool.name,
