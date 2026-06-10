@@ -134,6 +134,350 @@ describe("find_dashboards", () => {
     );
   });
 
+  it("fetches additional pages to fill project-constrained dashboard results", async () => {
+    const requestUrls: string[] = [];
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
+        () =>
+          HttpResponse.json({
+            id: "4509109104082945",
+            slug: "cloudflare-mcp",
+            name: "cloudflare-mcp",
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/dashboards/",
+        ({ request }) => {
+          requestUrls.push(request.url);
+          const cursor = new URL(request.url).searchParams.get("cursor");
+          if (!cursor) {
+            return HttpResponse.json(
+              [
+                {
+                  ...dashboardListFixture[0],
+                  id: "201",
+                  title: "Other Project Errors",
+                  projects: [1],
+                },
+                {
+                  ...dashboardListFixture[1],
+                  id: "202",
+                  title: "Other Project Metrics",
+                  projects: [2],
+                },
+              ],
+              {
+                headers: {
+                  Link: '<https://sentry.io/api/0/organizations/sentry-mcp-evals/dashboards/?cursor=page-2>; rel="next"; results="true"; cursor="page-2"',
+                },
+              },
+            );
+          }
+
+          return HttpResponse.json(
+            [
+              {
+                ...dashboardListFixture[0],
+                id: "203",
+                title: "Cloudflare Errors",
+                projects: [4509109104082945],
+              },
+              {
+                ...dashboardListFixture[1],
+                id: "204",
+                title: "Cloudflare Metrics",
+                projects: [4509109104082945],
+              },
+            ],
+            {
+              headers: {
+                Link: '<https://sentry.io/api/0/organizations/sentry-mcp-evals/dashboards/?cursor=page-3>; rel="next"; results="true"; cursor="page-3"',
+              },
+            },
+          );
+        },
+      ),
+    );
+
+    const result = await findDashboards.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        titleQuery: null,
+        sort: "title",
+        cursor: null,
+        limit: 2,
+      },
+      projectConstrainedContext,
+    );
+
+    expect(requestUrls).toHaveLength(2);
+    expect(new URL(requestUrls[0]!).searchParams.get("per_page")).toBe("2");
+    expect(new URL(requestUrls[1]!).searchParams.get("cursor")).toBe("page-2");
+    expect(new URL(requestUrls[1]!).searchParams.get("per_page")).toBe("2");
+    expect(result).not.toContain("Other Project Errors");
+    expect(result).not.toContain("Other Project Metrics");
+    expect(result).toContain("## Cloudflare Errors");
+    expect(result).toContain("## Cloudflare Metrics");
+    expect(result).toContain(
+      'More dashboards are available. Pass `cursor: "mcp-dashboard-project:',
+    );
+  });
+
+  it("uses a project cursor when a filtered page has more visible dashboards than requested", async () => {
+    const requestUrls: string[] = [];
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
+        () =>
+          HttpResponse.json({
+            id: "4509109104082945",
+            slug: "cloudflare-mcp",
+            name: "cloudflare-mcp",
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/dashboards/",
+        ({ request }) => {
+          requestUrls.push(request.url);
+          const cursor = new URL(request.url).searchParams.get("cursor");
+          if (!cursor) {
+            return HttpResponse.json(
+              [
+                {
+                  ...dashboardListFixture[0],
+                  id: "301",
+                  title: "Cloudflare Errors",
+                  projects: [4509109104082945],
+                },
+                {
+                  ...dashboardListFixture[1],
+                  id: "302",
+                  title: "Other Project Metrics",
+                  projects: [2],
+                },
+              ],
+              {
+                headers: {
+                  Link: '<https://sentry.io/api/0/organizations/sentry-mcp-evals/dashboards/?cursor=page-2>; rel="next"; results="true"; cursor="page-2"',
+                },
+              },
+            );
+          }
+
+          if (cursor === "page-2") {
+            return HttpResponse.json(
+              [
+                {
+                  ...dashboardListFixture[0],
+                  id: "303",
+                  title: "Cloudflare Metrics",
+                  projects: [4509109104082945],
+                },
+                {
+                  ...dashboardListFixture[1],
+                  id: "304",
+                  title: "Cloudflare Throughput",
+                  projects: [4509109104082945],
+                },
+              ],
+              {
+                headers: {
+                  Link: '<https://sentry.io/api/0/organizations/sentry-mcp-evals/dashboards/?cursor=page-3>; rel="next"; results="true"; cursor="page-3"',
+                },
+              },
+            );
+          }
+
+          return HttpResponse.json([
+            {
+              ...dashboardListFixture[0],
+              id: "305",
+              title: "Cloudflare Latency",
+              projects: [4509109104082945],
+            },
+          ]);
+        },
+      ),
+    );
+
+    const firstResult = await findDashboards.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        titleQuery: null,
+        sort: "title",
+        cursor: null,
+        limit: 2,
+      },
+      projectConstrainedContext,
+    );
+    const nextCursor = /cursor: "([^"]+)"/.exec(firstResult)?.[1];
+
+    expect(nextCursor).toEqual(
+      expect.stringContaining("mcp-dashboard-project:"),
+    );
+    expect(firstResult).toContain("## Cloudflare Errors");
+    expect(firstResult).toContain("## Cloudflare Metrics");
+    expect(firstResult).not.toContain("Cloudflare Throughput");
+
+    const secondResult = await findDashboards.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        titleQuery: null,
+        sort: "title",
+        cursor: nextCursor!,
+        limit: 1,
+      },
+      projectConstrainedContext,
+    );
+
+    expect(new URL(requestUrls[2]!).searchParams.get("cursor")).toBe("page-2");
+    expect(new URL(requestUrls[2]!).searchParams.get("per_page")).toBe("2");
+    expect(secondResult).toContain("## Cloudflare Throughput");
+    expect(secondResult).not.toContain("Cloudflare Metrics");
+    expect(secondResult).not.toContain("Cloudflare Latency");
+  });
+
+  it("resumes a project cursor within the first API page", async () => {
+    let requestUrl: string | null = null;
+    const firstPageCursor = `mcp-dashboard-project:${Buffer.from(
+      JSON.stringify({
+        v: 1,
+        apiCursor: null,
+        offset: 1,
+        pageLimit: 2,
+      }),
+    ).toString("base64url")}`;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
+        () =>
+          HttpResponse.json({
+            id: "4509109104082945",
+            slug: "cloudflare-mcp",
+            name: "cloudflare-mcp",
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/dashboards/",
+        ({ request }) => {
+          requestUrl = request.url;
+          return HttpResponse.json([
+            {
+              ...dashboardListFixture[0],
+              id: "401",
+              title: "Cloudflare Errors",
+              projects: [4509109104082945],
+            },
+            {
+              ...dashboardListFixture[1],
+              id: "402",
+              title: "Cloudflare Metrics",
+              projects: [4509109104082945],
+            },
+          ]);
+        },
+      ),
+    );
+
+    const result = await findDashboards.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        titleQuery: null,
+        sort: "title",
+        cursor: firstPageCursor,
+        limit: 1,
+      },
+      projectConstrainedContext,
+    );
+
+    if (!requestUrl) {
+      throw new Error("Expected dashboard list request to be captured.");
+    }
+    const searchParams = new URL(requestUrl).searchParams;
+    expect(searchParams.has("cursor")).toBe(false);
+    expect(searchParams.get("per_page")).toBe("2");
+    expect(result).not.toContain("Cloudflare Errors");
+    expect(result).toContain("## Cloudflare Metrics");
+  });
+
+  it("rejects project cursors in org-wide searches before calling Sentry", async () => {
+    let rejectPhase = false;
+    let orgWideDashboardRequests = 0;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
+        () =>
+          HttpResponse.json({
+            id: "4509109104082945",
+            slug: "cloudflare-mcp",
+            name: "cloudflare-mcp",
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/dashboards/",
+        () => {
+          if (rejectPhase) {
+            orgWideDashboardRequests++;
+          }
+          return HttpResponse.json([
+            {
+              ...dashboardListFixture[0],
+              id: "501",
+              title: "Cloudflare Errors",
+              projects: [4509109104082945],
+            },
+            {
+              ...dashboardListFixture[1],
+              id: "502",
+              title: "Cloudflare Metrics",
+              projects: [4509109104082945],
+            },
+          ]);
+        },
+      ),
+    );
+
+    const projectResult = await findDashboards.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        titleQuery: null,
+        sort: "title",
+        cursor: null,
+        limit: 1,
+      },
+      projectConstrainedContext,
+    );
+    const projectCursor = /cursor: "([^"]+)"/.exec(projectResult)?.[1];
+    expect(projectCursor).toEqual(
+      expect.stringContaining("mcp-dashboard-project:"),
+    );
+    if (!projectCursor) {
+      throw new Error("Expected project-scoped dashboard cursor.");
+    }
+
+    rejectPhase = true;
+    await expect(
+      findDashboards.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          regionUrl: null,
+          titleQuery: null,
+          sort: "title",
+          cursor: projectCursor,
+          limit: 1,
+        },
+        context,
+      ),
+    ).rejects.toThrow("Project-scoped dashboard cursors");
+    expect(orgWideDashboardRequests).toBe(0);
+  });
+
   it("passes search, sort, cursor, and limit query parameters", async () => {
     let requestUrl: string | null = null;
     mswServer.use(

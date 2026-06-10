@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
+import type { DashboardListItem, SentryApiService } from "../../api-client";
+import { UserInputError } from "../../errors";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import type { ServerContext } from "../../types";
@@ -9,6 +11,194 @@ import {
   formatDashboardList,
   resolveDashboardProjectConstraint,
 } from "../support/dashboards";
+
+const PROJECT_DASHBOARD_CURSOR_PREFIX = "mcp-dashboard-project:";
+
+type ProjectDashboardCursor = {
+  v: 1;
+  apiCursor: string | null;
+  offset: number;
+  pageLimit: number;
+};
+
+function isProjectDashboardCursor(
+  value: unknown,
+): value is ProjectDashboardCursor {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const cursor = value as Record<string, unknown>;
+  return (
+    cursor.v === 1 &&
+    (typeof cursor.apiCursor === "string" || cursor.apiCursor === null) &&
+    typeof cursor.offset === "number" &&
+    Number.isInteger(cursor.offset) &&
+    cursor.offset >= 0 &&
+    typeof cursor.pageLimit === "number" &&
+    Number.isInteger(cursor.pageLimit) &&
+    cursor.pageLimit > 0 &&
+    cursor.pageLimit <= 100
+  );
+}
+
+/**
+ * Encodes the project-scoped pagination state that Sentry's dashboard API
+ * cannot represent: a visible-item offset inside one upstream API page.
+ */
+function encodeProjectDashboardCursor(
+  cursor: Omit<ProjectDashboardCursor, "v">,
+): string {
+  const payload = Buffer.from(
+    JSON.stringify({
+      v: 1,
+      ...cursor,
+    } satisfies ProjectDashboardCursor),
+  ).toString("base64url");
+  return `${PROJECT_DASHBOARD_CURSOR_PREFIX}${payload}`;
+}
+
+/** Decodes MCP-owned project cursors while leaving raw Sentry API cursors intact. */
+function decodeProjectDashboardCursor(
+  cursor: string | null | undefined,
+): ProjectDashboardCursor | null {
+  if (!cursor?.startsWith(PROJECT_DASHBOARD_CURSOR_PREFIX)) {
+    return null;
+  }
+
+  try {
+    const value: unknown = JSON.parse(
+      Buffer.from(
+        cursor.slice(PROJECT_DASHBOARD_CURSOR_PREFIX.length),
+        "base64url",
+      ).toString("utf8"),
+    );
+    if (isProjectDashboardCursor(value)) {
+      return value;
+    }
+  } catch {
+    // Fall through to the user-facing validation error below.
+  }
+
+  throw new UserInputError(
+    "Invalid dashboard cursor. Pass the cursor exactly as returned by find_dashboards.",
+  );
+}
+
+/** Ensures org-wide dashboard searches only pass raw Sentry cursors upstream. */
+function assertRawDashboardCursor(cursor: string | null | undefined): void {
+  if (!cursor?.startsWith(PROJECT_DASHBOARD_CURSOR_PREFIX)) {
+    return;
+  }
+
+  throw new UserInputError(
+    "Project-scoped dashboard cursors can only be used in project-scoped dashboard searches. Start a new org-wide find_dashboards request without a cursor.",
+  );
+}
+
+/** Formats the next project cursor without exposing raw API cursors for constrained pages. */
+function formatProjectDashboardNextCursor({
+  apiCursor,
+  offset = 0,
+  pageLimit,
+}: {
+  apiCursor: string | null;
+  offset?: number;
+  pageLimit: number;
+}): string | null {
+  if (!apiCursor) {
+    return null;
+  }
+
+  return encodeProjectDashboardCursor({
+    apiCursor,
+    offset,
+    pageLimit,
+  });
+}
+
+/**
+ * Lists dashboards visible to one project, refilling across API pages while
+ * keeping Sentry's cursor page size stable for every followed API cursor.
+ */
+async function listProjectVisibleDashboards({
+  apiService,
+  organizationSlug,
+  titleQuery,
+  sort,
+  limit,
+  cursor,
+  projectId,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  titleQuery?: string | null;
+  sort: "title" | "-title" | "dateCreated" | "-dateCreated";
+  limit: number;
+  cursor?: string | null;
+  projectId: string | number;
+}): Promise<{ dashboards: DashboardListItem[]; nextCursor: string | null }> {
+  const projectCursor = decodeProjectDashboardCursor(cursor);
+  const dashboards: DashboardListItem[] = [];
+  const seenCursors = new Set<string>();
+  const pageLimit = projectCursor?.pageLimit ?? limit;
+  let pageCursor = projectCursor ? projectCursor.apiCursor : (cursor ?? null);
+  let visibleOffset = projectCursor?.offset ?? 0;
+  let nextCursor: string | null = null;
+
+  if (pageCursor) {
+    seenCursors.add(pageCursor);
+  }
+
+  do {
+    const page = await apiService.listDashboards({
+      organizationSlug,
+      query: titleQuery ?? undefined,
+      sortBy: sort,
+      limit: pageLimit,
+      cursor: pageCursor ?? undefined,
+    });
+
+    const visiblePage = filterDashboardsByProjectConstraint({
+      dashboards: page.dashboards,
+      projectId,
+    });
+    const offsetVisiblePage = visiblePage.slice(visibleOffset);
+    const remaining = limit - dashboards.length;
+
+    if (offsetVisiblePage.length > remaining) {
+      dashboards.push(...offsetVisiblePage.slice(0, remaining));
+      return {
+        dashboards,
+        nextCursor: encodeProjectDashboardCursor({
+          apiCursor: pageCursor,
+          offset: visibleOffset + remaining,
+          pageLimit,
+        }),
+      };
+    }
+
+    dashboards.push(...offsetVisiblePage);
+    visibleOffset = 0;
+
+    nextCursor = page.nextCursor;
+    if (!nextCursor || seenCursors.has(nextCursor)) {
+      nextCursor = null;
+      break;
+    }
+
+    seenCursors.add(nextCursor);
+    pageCursor = nextCursor;
+  } while (dashboards.length < limit);
+
+  return {
+    dashboards,
+    nextCursor: formatProjectDashboardNextCursor({
+      apiCursor: nextCursor,
+      pageLimit,
+    }),
+  };
+}
 
 export default defineTool({
   name: "find_dashboards",
@@ -48,7 +238,9 @@ export default defineTool({
     cursor: z
       .string()
       .trim()
-      .describe("Optional pagination cursor from a previous response.")
+      .describe(
+        "Optional pagination cursor from a previous response. Reuse cursors only with the same search scope and project constraint.",
+      )
       .nullable()
       .default(null),
     limit: z
@@ -81,21 +273,31 @@ export default defineTool({
       setTag("project.id", String(scopedProject.id));
     }
 
-    const { dashboards, nextCursor } = await apiService.listDashboards({
-      organizationSlug,
-      query: params.titleQuery ?? undefined,
-      sortBy: params.sort,
-      limit: params.limit,
-      cursor: params.cursor ?? undefined,
-    });
-
-    const visibleDashboards = filterDashboardsByProjectConstraint({
-      dashboards,
-      projectId: scopedProject?.id,
-    });
+    let dashboards: DashboardListItem[];
+    let nextCursor: string | null;
+    if (scopedProject) {
+      ({ dashboards, nextCursor } = await listProjectVisibleDashboards({
+        apiService,
+        organizationSlug,
+        titleQuery: params.titleQuery,
+        sort: params.sort,
+        limit: params.limit,
+        projectId: scopedProject.id,
+        cursor: params.cursor,
+      }));
+    } else {
+      assertRawDashboardCursor(params.cursor);
+      ({ dashboards, nextCursor } = await apiService.listDashboards({
+        organizationSlug,
+        query: params.titleQuery ?? undefined,
+        sortBy: params.sort,
+        limit: params.limit,
+        cursor: params.cursor ?? undefined,
+      }));
+    }
 
     return formatDashboardList({
-      dashboards: visibleDashboards,
+      dashboards,
       organizationSlug,
       titleQuery: params.titleQuery,
       nextCursor,

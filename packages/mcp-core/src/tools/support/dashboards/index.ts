@@ -157,6 +157,10 @@ export function formatDashboardList({
     output += titleQuery
       ? `No dashboards found matching "${titleQuery}".\n`
       : "No dashboards found.\n";
+    if (nextCursor) {
+      output += "\n## Response Notes\n\n";
+      output += `- More dashboards may be available. Pass \`cursor: "${nextCursor}"\` to fetch the next page.\n`;
+    }
     return output;
   }
 

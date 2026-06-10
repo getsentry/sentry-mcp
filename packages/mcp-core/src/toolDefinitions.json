@@ -303,13 +303,13 @@
           "anyOf": [
             {
               "type": "string",
-              "description": "Optional pagination cursor from a previous response."
+              "description": "Optional pagination cursor from a previous response. Reuse cursors only with the same search scope and project constraint."
             },
             {
               "type": "null"
             }
           ],
-          "description": "Optional pagination cursor from a previous response.",
+          "description": "Optional pagination cursor from a previous response. Reuse cursors only with the same search scope and project constraint.",
           "default": null
         },
         "limit": {
