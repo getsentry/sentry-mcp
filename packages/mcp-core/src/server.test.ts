@@ -4,6 +4,7 @@ import { type Span, setUser, startSpan } from "@sentry/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { buildServer } from "./server";
+import type { Skill } from "./skills";
 import { createExecuteTool } from "./tools/special/execute-tool";
 import type { ToolConfig } from "./tools/types";
 import type { ServerContext } from "./types";
@@ -116,10 +117,6 @@ const DEFAULT_DIRECT_TOOL_NAMES = [
   "search_issues",
   "search_tools",
   "update_issue",
-].sort();
-const DEFAULT_DIRECT_TOOL_NAMES_WITH_DOCS = [
-  ...DEFAULT_DIRECT_TOOL_NAMES,
-  "search_docs",
 ].sort();
 
 describe("buildServer", () => {
@@ -665,28 +662,90 @@ describe("buildServer", () => {
       expect(toolNames).not.toContain("get_profile");
     });
 
-    it("discloses docs tools through MCP tools/list when docs skill is granted", async () => {
-      const server = buildServer({
-        context: {
-          ...baseContext,
+    it("keeps docs tools catalog-only and executable under inspect and legacy docs grants", async () => {
+      const cases: Array<{
+        grantedSkills: ReadonlySet<Skill>;
+        expectedDirectTools: string[];
+      }> = [
+        {
           grantedSkills: new Set([
             "inspect",
             "triage",
             "project-management",
             "seer",
-            "docs",
           ]),
+          expectedDirectTools: DEFAULT_DIRECT_TOOL_NAMES,
         },
-      });
+        {
+          grantedSkills: new Set(["docs"]),
+          expectedDirectTools: [
+            "execute_tool",
+            "find_organizations",
+            "find_projects",
+            "search_tools",
+          ],
+        },
+      ] as const;
 
-      const registeredTools = await listRegisteredTools(server);
-      const toolNames = registeredTools.map((tool) => tool.name).sort();
+      for (const { grantedSkills, expectedDirectTools } of cases) {
+        const listServer = buildServer({
+          context: {
+            ...baseContext,
+            grantedSkills,
+          },
+        });
+        const registeredTools = await listRegisteredTools(listServer);
+        const toolNames = registeredTools.map((tool) => tool.name).sort();
 
-      expect(toolNames).toEqual(DEFAULT_DIRECT_TOOL_NAMES_WITH_DOCS);
-      expect(toolNames).toContain("search_docs");
-      expect(toolNames).not.toContain("get_doc");
-      expect(toolNames).toContain("search_tools");
-      expect(toolNames).toContain("execute_tool");
+        expect(toolNames).toEqual(expectedDirectTools);
+        expect(toolNames).not.toContain("search_docs");
+        expect(toolNames).not.toContain("get_doc");
+        expect(toolNames).toContain("search_tools");
+        expect(toolNames).toContain("execute_tool");
+
+        const searchServer = buildServer({
+          context: {
+            ...baseContext,
+            grantedSkills,
+          },
+        });
+        const searchResult = await callRegisteredTool(
+          searchServer,
+          "search_tools",
+          {
+            query: "documentation",
+            limit: 10,
+          },
+        );
+        const payload = getStructuredContent<{
+          results: Array<{ name: string }>;
+        }>(searchResult);
+
+        const catalogToolNames = payload.results.map((tool) => tool.name);
+        expect(catalogToolNames).toContain("search_docs");
+        expect(catalogToolNames).toContain("get_doc");
+
+        const executeServer = buildServer({
+          context: {
+            ...baseContext,
+            grantedSkills,
+          },
+        });
+        const executeResult = await callRegisteredTool(
+          executeServer,
+          "execute_tool",
+          {
+            name: "get_doc",
+            arguments: {
+              path: "/product/rate-limiting.md",
+            },
+          },
+        );
+
+        expect(getTextContent(executeResult)).toContain(
+          "# Project Rate Limits and Quotas",
+        );
+      }
     });
 
     it("keeps the same direct tool surface in experimental mode", async () => {
@@ -1057,8 +1116,6 @@ describe("buildServer", () => {
         ["update_project", ["project-management"]],
         ["create_dsn", ["project-management"]],
         ["find_dsns", ["project-management"]],
-        ["search_docs", ["docs"]],
-        ["get_doc", ["docs"]],
       ] as const) {
         const grantedServer = buildServer({
           context: {

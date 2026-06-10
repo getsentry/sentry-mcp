@@ -15,6 +15,14 @@ import {
 
 const COOKIE_NAME = "mcp-approved-clients";
 const ONE_YEAR_IN_SECONDS = 31536000;
+// Hosted OAuth approvals only mint active skills. Deprecated skills may still
+// work for existing grants or explicit stdio use, but not through this form.
+const APPROVABLE_SKILLS = (skillDefinitions as SkillDefinition[]).filter(
+  (skill) => !skill.deprecated,
+);
+const APPROVABLE_SKILL_IDS = new Set(
+  APPROVABLE_SKILLS.map((skill) => skill.id),
+);
 /**
  * Imports a secret key string for HMAC-SHA256 signing.
  * @param secret - The raw secret key string.
@@ -282,12 +290,9 @@ export async function renderApprovalDialog(
   const { client, server, scope, redirectUri, state, cookieSecret } = options;
 
   // Use static skill definitions bundled at build time
-  const skills: SkillDefinition[] = skillDefinitions as SkillDefinition[];
-
   // Generate HTML for all skills (checked if defaultEnabled)
-  const skillsHtml = skills
-    .map(
-      (skill) => `
+  const skillsHtml = APPROVABLE_SKILLS.map(
+    (skill) => `
     <label class="permission-item">
       <input type="checkbox" name="skill" value="${sanitizeHtml(skill.id)}"${skill.defaultEnabled ? " checked" : ""}>
       <span class="permission-checkbox"></span>
@@ -300,8 +305,7 @@ export async function renderApprovalDialog(
       </div>
     </label>
   `,
-    )
-    .join("");
+  ).join("");
 
   // Encode state for form submission (HMAC-signed to prevent tampering)
   const encodedState = await encodeState(state, cookieSecret);
@@ -896,7 +900,10 @@ export async function parseRedirectApproval(
     // Extract skill selections from checkboxes - collect all 'skill' field values
     skills = formData
       .getAll("skill")
-      .filter((s): s is string => typeof s === "string");
+      .filter(
+        (s): s is string =>
+          typeof s === "string" && APPROVABLE_SKILL_IDS.has(s),
+      );
   } catch (error) {
     logError(error, {
       loggerScope: ["cloudflare", "approval-dialog"],

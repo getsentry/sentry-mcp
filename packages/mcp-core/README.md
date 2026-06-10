@@ -15,20 +15,21 @@ The MCP server uses a **skills-based authorization system** that maps user-frien
 
 ### Available Skills
 
-By default (no `--skills` flag), the MCP server grants **ALL skills** for non-interactive convenience:
+By default (no `--skills` flag), the MCP server grants active, non-deprecated skills for non-interactive convenience:
 
 - **`inspect`** (default) - View organizations, projects, teams, issues, traces, and search for errors
-- **`docs`** (default) - Search and read Sentry SDK documentation
 - **`seer`** (default) - Use Seer to analyze issues and generate fix recommendations
 - **`triage`** - Resolve, assign, and update issues
 - **`project-management`** - Create and modify projects, teams, and DSNs
+
+Documentation tools are available through the `inspect` skill via the catalog: use `search_tools` to find documentation tools, then call `search_docs` or `get_doc` through `execute_tool`. The legacy `docs` skill can still be requested explicitly for docs-only catalog access, but it is not granted by default.
 
 ### Customizing Skills
 
 You can limit which skills are granted using the `--skills` flag:
 
 ```shell
-# Default: ALL skills (inspect, docs, seer, triage, project-management)
+# Default: active skills (inspect, seer, triage, project-management)
 npx @sentry/mcp-server@latest --access-token=sentry-user-token
 
 # Limit to specific skills only

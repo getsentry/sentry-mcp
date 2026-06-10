@@ -422,8 +422,38 @@ describe("MCP Handler", () => {
       }>(response);
       const toolNames = body.result?.tools.map((tool) => tool.name) ?? [];
 
-      expect(toolNames).toContain("search_docs");
+      expect(toolNames).toContain("search_tools");
+      expect(toolNames).not.toContain("search_docs");
+      expect(toolNames).not.toContain("get_doc");
       expect(toolNames).not.toContain("get_issue_details");
+
+      const searchRequest = createMcpRequest("tools/call", {
+        name: "search_tools",
+        arguments: {
+          query: "documentation",
+          limit: 10,
+        },
+      });
+
+      const searchResponse = await mcpHandler.fetch!(
+        searchRequest,
+        createTestEnv(),
+        ctx,
+      );
+
+      expect(searchResponse.status).toBe(200);
+      const searchBody = await parseSSEResponse<{
+        result?: {
+          structuredContent?: { results?: Array<{ name: string }> };
+        };
+      }>(searchResponse);
+      const catalogToolNames =
+        searchBody.result?.structuredContent?.results?.map(
+          (tool) => tool.name,
+        ) ?? [];
+
+      expect(catalogToolNames).toContain("search_docs");
+      expect(catalogToolNames).toContain("get_doc");
     });
   });
 });

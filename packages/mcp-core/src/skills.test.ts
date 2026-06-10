@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   SKILLS,
+  ACTIVE_SKILLS,
   DEFAULT_SKILLS,
   isValidSkill,
   parseSkills,
@@ -50,6 +51,10 @@ describe("skills module", () => {
         expect(typeof skill.order).toBe("number");
       }
     });
+
+    it("marks docs as a deprecated legacy skill", () => {
+      expect(SKILLS.docs.deprecated).toBe(true);
+    });
   });
 
   describe("DEFAULT_SKILLS", () => {
@@ -63,6 +68,18 @@ describe("skills module", () => {
 
     it("has exactly 2 default skills", () => {
       expect(DEFAULT_SKILLS.length).toBe(2);
+    });
+  });
+
+  describe("ACTIVE_SKILLS", () => {
+    it("excludes deprecated legacy skills", () => {
+      expect(ACTIVE_SKILLS).toEqual([
+        "inspect",
+        "seer",
+        "triage",
+        "project-management",
+      ]);
+      expect(ACTIVE_SKILLS).not.toContain("docs");
     });
   });
 
