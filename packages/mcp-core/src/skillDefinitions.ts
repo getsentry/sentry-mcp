@@ -6,6 +6,7 @@ export interface SkillDefinition {
   name: string;
   description: string;
   defaultEnabled: boolean;
+  deprecated?: boolean;
   order: number;
   toolCount?: number;
   tools?: Array<{

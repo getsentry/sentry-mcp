@@ -19,6 +19,7 @@ export interface SkillDefinition {
   name: string;
   description: string;
   defaultEnabled: boolean;
+  deprecated?: boolean;
   order: number;
   toolCount?: number; // Number of tools enabled by this skill (calculated dynamically)
 }
@@ -27,7 +28,8 @@ export const SKILLS: Record<Skill, SkillDefinition> = {
   inspect: {
     id: "inspect",
     name: "Inspect Issues & Events",
-    description: "Search for errors, analyze traces, and explore event details",
+    description:
+      "Read-only access to core Sentry data: issues, events, traces, replays, releases, monitors, profiles, documentation, and project metadata",
     defaultEnabled: true,
     order: 1,
   },
@@ -42,8 +44,10 @@ export const SKILLS: Record<Skill, SkillDefinition> = {
   docs: {
     id: "docs",
     name: "Documentation",
-    description: "Search and read Sentry SDK documentation",
+    description:
+      "Deprecated legacy docs-only grant. Documentation tools are now available through Inspect Issues & Events.",
     defaultEnabled: false,
+    deprecated: true,
     order: 3,
   },
   triage: {
@@ -104,6 +108,11 @@ export async function getSkillsArrayWithCounts(): Promise<SkillDefinition[]> {
 
 // All skills (for foundational tools that should be available to all skills)
 export const ALL_SKILLS: Skill[] = Object.keys(SKILLS) as Skill[];
+
+// Active skills (for default grants that should exclude deprecated legacy skills)
+export const ACTIVE_SKILLS: Skill[] = SKILLS_ARRAY.filter(
+  (s) => !s.deprecated,
+).map((s) => s.id);
 
 // Default skills
 export const DEFAULT_SKILLS: Skill[] = SKILLS_ARRAY.filter(

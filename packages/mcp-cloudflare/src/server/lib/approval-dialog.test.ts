@@ -35,6 +35,22 @@ describe("approval-dialog", () => {
       expect(html).toContain('value="');
     });
 
+    it("does not render deprecated skill checkboxes", async () => {
+      const response = await renderApprovalDialog(
+        new Request("https://example.com/oauth/authorize"),
+        {
+          client: mockClient,
+          server: { name: "Test Server" },
+          state: { oauthReqInfo: { clientId: "test-client" } },
+          cookieSecret: TEST_SECRET,
+        },
+      );
+      const html = await response.text();
+
+      expect(html).not.toContain('value="docs"');
+      expect(html).not.toContain("Deprecated legacy docs-only grant");
+    });
+
     it("should sanitize HTML content", async () => {
       const mockRequest = new Request("https://example.com/oauth/authorize", {
         method: "GET",
@@ -193,7 +209,7 @@ describe("approval-dialog", () => {
       );
     });
 
-    it("should accept valid signed state", async () => {
+    it("should accept valid signed state and ignore deprecated skill submissions", async () => {
       const oauthReqInfo = {
         clientId: "test-client",
         redirectUri: "https://example.com/callback",
@@ -234,7 +250,7 @@ describe("approval-dialog", () => {
 
       expect(result.state).toBeDefined();
       expect(result.state.oauthReqInfo).toEqual(oauthReqInfo);
-      expect(result.skills).toEqual(["inspect", "docs"]);
+      expect(result.skills).toEqual(["inspect"]);
     });
 
     it("should reject state with wrong secret", async () => {

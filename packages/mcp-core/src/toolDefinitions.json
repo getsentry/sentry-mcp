@@ -606,7 +606,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "requiredScopes": [],
-    "skills": ["docs"],
+    "skills": ["inspect", "docs"],
     "surface": "catalog"
   },
   {
@@ -1571,8 +1571,8 @@
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "requiredScopes": [],
-    "skills": ["docs"],
-    "surface": "direct"
+    "skills": ["inspect", "docs"],
+    "surface": "catalog"
   },
   {
     "name": "search_events",

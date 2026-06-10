@@ -9,8 +9,8 @@ import { USER_AGENT } from "../../version";
 
 export default defineTool({
   name: "get_doc",
-  skills: ["docs"], // Only available in docs skill
-  requiredScopes: [], // No Sentry API scopes required - authorization via 'docs' skill
+  skills: ["inspect", "docs"], // Docs is retained for legacy docs-only grants.
+  requiredScopes: [],
   description: [
     "Fetch the full markdown content of a Sentry documentation page.",
     "",

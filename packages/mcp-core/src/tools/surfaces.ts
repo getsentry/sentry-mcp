@@ -20,7 +20,6 @@ export const TOP_LEVEL_TOOL_NAMES = [
   "update_issue",
   "search_events",
   "analyze_issue_with_seer",
-  "search_docs",
   "search_issues",
   "get_sentry_resource",
   ...CATALOG_INFRASTRUCTURE_TOOL_NAMES,

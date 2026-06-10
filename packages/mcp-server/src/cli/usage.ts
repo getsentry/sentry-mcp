@@ -36,7 +36,7 @@ Session constraints:
   --project-slug <slug>       Optional project constraint
 
 Skill controls:
-  --skills <list>           Specify which skills to grant (default: all skills)
+  --skills <list>           Specify which skills to grant (default: active, non-deprecated skills)
   --disable-skills <list>   Remove specific skills (e.g. --disable-skills=seer)
 
 All skills: ${allSkills.join(", ")}

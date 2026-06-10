@@ -1,4 +1,9 @@
-import { ALL_SKILLS, parseSkills, type Skill } from "@sentry/mcp-core/skills";
+import {
+  ACTIVE_SKILLS,
+  ALL_SKILLS,
+  parseSkills,
+  type Skill,
+} from "@sentry/mcp-core/skills";
 import {
   isSentryHost,
   validateAndParseSentryUrlThrows,
@@ -51,10 +56,10 @@ export function finalize(input: MergedArgs): PartiallyResolvedConfig {
 
   // Skills resolution
   //
-  // IMPORTANT: stdio (CLI) intentionally defaults to ALL skills when no --skills flag is provided
+  // IMPORTANT: stdio (CLI) intentionally defaults to all active skills when no --skills flag is provided
   //
   // This differs from the OAuth flow, which requires explicit user selection:
-  // - stdio/CLI: Non-interactive, defaults to ALL skills (inspect, docs, seer, triage, project-management)
+  // - stdio/CLI: Non-interactive, defaults to all non-deprecated skills
   // - OAuth: Interactive, requires user to explicitly select skills (with sensible defaults pre-checked)
   //
   // Rationale:
@@ -78,8 +83,8 @@ export function finalize(input: MergedArgs): PartiallyResolvedConfig {
     }
     finalSkills = valid;
   } else {
-    // Default: grant ALL skills when no flag is provided (see comment block above for rationale)
-    finalSkills = new Set<Skill>(ALL_SKILLS);
+    // Default: grant all active skills when no flag is provided (see comment block above for rationale)
+    finalSkills = new Set<Skill>(ACTIVE_SKILLS);
   }
 
   // Disable-skills: remove specific skills from the active set

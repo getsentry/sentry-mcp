@@ -10,8 +10,8 @@ import type { SearchResponse } from "../types";
 
 export default defineTool({
   name: "search_docs",
-  skills: ["docs"], // Only available in docs skill
-  requiredScopes: [], // No Sentry API scopes required - authorization via 'docs' skill
+  skills: ["inspect", "docs"], // Docs is retained for legacy docs-only grants.
+  requiredScopes: [],
   description: ({ experimentalMode, availableToolNames, directToolNames }) =>
     [
       "Search Sentry documentation for SDK setup, instrumentation, and configuration guidance.",
