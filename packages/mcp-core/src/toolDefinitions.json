@@ -258,6 +258,77 @@
     "surface": "direct"
   },
   {
+    "name": "find_dashboards",
+    "description": "Find Sentry dashboards in an organization.\n\nUse this tool when you need to:\n- List dashboards in an organization\n- Find a dashboard ID before calling get_dashboard_details\n- Search dashboards by title\n\n<examples>\nfind_dashboards(organizationSlug='my-organization')\nfind_dashboards(organizationSlug='my-organization', titleQuery='errors')\n</examples>\n\n<hints>\n- Dashboard IDs are organization-scoped.\n- Use `get_dashboard_details` after finding the correct dashboard ID.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "titleQuery": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Optional title substring to search for."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional title substring to search for.",
+          "default": null
+        },
+        "sort": {
+          "type": "string",
+          "enum": ["title", "-title", "dateCreated", "-dateCreated"],
+          "description": "Sort order for dashboard results.",
+          "default": "title"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Optional pagination cursor from a previous response."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional pagination cursor from a previous response.",
+          "default": null
+        },
+        "limit": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "description": "Maximum number of dashboards to return.",
+          "default": 10
+        }
+      },
+      "required": ["organizationSlug"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["org:read"],
+    "skills": ["inspect"],
+    "surface": "catalog"
+  },
+  {
     "name": "find_dsns",
     "description": "List all Sentry DSNs for a specific project.\n\nUse this tool when you need to:\n- Retrieve a SENTRY_DSN for a specific project\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you might want to call `find_organizations()` first.\n</hints>",
     "inputSchema": {
@@ -588,6 +659,43 @@
     },
     "requiredScopes": ["event:read", "project:read"],
     "skills": ["inspect", "triage", "seer"],
+    "surface": "catalog"
+  },
+  {
+    "name": "get_dashboard_details",
+    "description": "Get detailed information about a specific Sentry dashboard.\n\nUse this tool when you need to:\n- Inspect a dashboard's widgets and saved query definitions\n- View dashboard projects, environments, filters, layout, and widget IDs\n- Resolve a dashboard by exact title or numeric ID\n\n<examples>\nget_dashboard_details(organizationSlug='my-organization', dashboardIdOrTitle='12345')\nget_dashboard_details(organizationSlug='my-organization', dashboardIdOrTitle='Errors Overview')\n</examples>\n\n<hints>\n- Numeric dashboard IDs are resolved directly.\n- Title lookups require one exact case-insensitive match. Use `find_dashboards` first if uncertain.\n- This returns saved widget query definitions, not live widget data.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "dashboardIdOrTitle": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The dashboard's numeric ID or exact title."
+        }
+      },
+      "required": ["organizationSlug", "dashboardIdOrTitle"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["org:read"],
+    "skills": ["inspect"],
     "surface": "catalog"
   },
   {

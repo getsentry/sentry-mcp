@@ -152,6 +152,112 @@ export const ProjectRepoLinkSchema = z
   })
   .passthrough();
 
+/**
+ * Dashboard schemas validated against getsentry/sentry:
+ * - `src/sentry/dashboards/endpoints/organization_dashboards.py`
+ * - `src/sentry/dashboards/endpoints/organization_dashboard_details.py`
+ * - `src/sentry/api/serializers/models/dashboard.py`
+ */
+export const DashboardPermissionsSchema = z
+  .object({
+    isEditableByEveryone: z.boolean().optional(),
+    teamsWithEditAccess: z.array(z.union([z.string(), z.number()])).optional(),
+  })
+  .passthrough();
+
+export const DashboardWidgetPreviewSchema = z
+  .object({
+    displayType: z.string(),
+    layout: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
+export const DashboardWidgetQuerySchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    name: z.string(),
+    fields: z.array(z.string()),
+    aggregates: z.array(z.string()),
+    columns: z.array(z.string()),
+    fieldAliases: z.array(z.string()),
+    conditions: z.string(),
+    orderby: z.string(),
+    widgetId: z.union([z.string(), z.number()]),
+    isHidden: z.boolean().optional(),
+    selectedAggregate: z.number().nullable().optional(),
+    linkedDashboards: z
+      .array(
+        z
+          .object({
+            field: z.string(),
+            dashboardId: z.union([z.string(), z.number()]),
+          })
+          .passthrough(),
+      )
+      .optional(),
+  })
+  .passthrough();
+
+export const DashboardWidgetSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    title: z.string(),
+    description: z.string().nullable().optional(),
+    displayType: z.string(),
+    interval: z.string().nullable().optional(),
+    dateCreated: z.string(),
+    dashboardId: z.union([z.string(), z.number()]),
+    queries: z.array(DashboardWidgetQuerySchema).default([]),
+    limit: z.number().nullable().optional(),
+    widgetType: z.string().nullable().optional(),
+    layout: z.record(z.string(), z.unknown()).nullable().optional(),
+    datasetSource: z.string().optional(),
+  })
+  .passthrough();
+
+export const DashboardFiltersSchema = z.record(z.string(), z.unknown());
+
+export const DashboardListItemSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    title: z.string(),
+    dateCreated: z.string(),
+    createdBy: z.unknown().nullable().optional(),
+    environment: z.array(z.string()).default([]),
+    filters: DashboardFiltersSchema.default({}),
+    lastVisited: z.string().nullable().optional(),
+    widgetDisplay: z.array(z.string()).default([]),
+    widgetPreview: z.array(DashboardWidgetPreviewSchema).default([]),
+    permissions: DashboardPermissionsSchema.nullable().optional(),
+    isFavorited: z.boolean().optional(),
+    projects: z.array(z.number()).default([]),
+    prebuiltId: z.union([z.string(), z.number()]).nullable().optional(),
+  })
+  .passthrough();
+
+export const DashboardListSchema = z.array(DashboardListItemSchema);
+
+export const DashboardSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    title: z.string(),
+    dateCreated: z.string(),
+    createdBy: z.unknown().nullable().optional(),
+    widgets: z.array(DashboardWidgetSchema),
+    projects: z.array(z.number()).default([]),
+    environment: z.array(z.string()).default([]),
+    filters: DashboardFiltersSchema.default({}),
+    permissions: DashboardPermissionsSchema.nullable().optional(),
+    isFavorited: z.boolean().optional(),
+    prebuiltId: z.union([z.string(), z.number()]).nullable().optional(),
+    period: z.string().nullable().optional(),
+    start: z.string().nullable().optional(),
+    end: z.string().nullable().optional(),
+    utc: z.union([z.string(), z.boolean()]).nullable().optional(),
+    expired: z.boolean().optional(),
+  })
+  .passthrough();
+
 const ReplayTagsSchema = z.preprocess(
   (value) => {
     if (value === undefined || value === null || Array.isArray(value)) {

@@ -44,6 +44,11 @@ export interface ProfilesExplorerUrlOptions {
   groupByFields?: string[];
 }
 
+export interface DashboardUrlOptions {
+  projectId?: string | number | null;
+  statsPeriod?: string | null;
+}
+
 function deriveSelectedFields(
   fields?: string[],
   aggregateFunctions?: string[],
@@ -341,6 +346,40 @@ export function getIssueUrl(
     `/issues/${issueId}`,
     protocol,
   );
+}
+
+/**
+ * Generates a Sentry dashboard URL.
+ * @param host The Sentry host (may include regional subdomain for API access)
+ * @param organizationSlug Organization identifier
+ * @param dashboardId Dashboard ID
+ * @param options Optional dashboard view query parameters
+ * @param protocol Protocol to use when building the web URL
+ * @returns The complete dashboard URL
+ */
+export function getDashboardUrl(
+  host: string,
+  organizationSlug: string,
+  dashboardId: string,
+  options: DashboardUrlOptions = {},
+  protocol: SentryProtocol = "https",
+): string {
+  const encodedDashboardId = encodeURIComponent(dashboardId);
+  const params = new URLSearchParams();
+  if (options.projectId !== null && options.projectId !== undefined) {
+    params.set("project", String(options.projectId));
+  }
+  if (options.statsPeriod) {
+    params.set("statsPeriod", options.statsPeriod);
+  }
+
+  const queryString = params.toString();
+  return `${getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    `/dashboard/${encodedDashboardId}/`,
+    protocol,
+  )}${queryString ? `?${queryString}` : ""}`;
 }
 
 /**
