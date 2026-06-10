@@ -258,6 +258,90 @@
     "surface": "direct"
   },
   {
+    "name": "find_alert_rules",
+    "description": "Find Sentry alert rules.\n\nUse this tool when you need to:\n- List issue alert rules for a project\n- List metric alert rules for an organization or project\n- Find an alert rule ID by name before inspecting it\n- Check alert conditions, queries, triggers, actions, owner, or environment\n\n<examples>\nfind_alert_rules(organizationSlug='my-org')\nfind_alert_rules(organizationSlug='my-org', projectSlug='backend')\nfind_alert_rules(organizationSlug='my-org', kind='issue', projectSlug='backend', query='critical')\n</examples>\n\n<hints>\n- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.\n- Metric alert rules can be listed organization-wide or project-scoped.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["all", "issue", "metric"],
+          "description": "Which alert rule family to search. Use `all` to include metric alerts, plus issue alerts when a project is available.",
+          "default": "all"
+        },
+        "projectSlug": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible.",
+          "default": null
+        },
+        "query": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Optional search query for alert rule name."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional search query for alert rule name.",
+          "default": null
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Optional pagination cursor from a previous Sentry API response."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional pagination cursor from a previous Sentry API response.",
+          "default": null
+        },
+        "limit": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "description": "Maximum number of alert rules to return per alert family.",
+          "default": 10
+        }
+      },
+      "required": ["organizationSlug"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["org:read", "project:read"],
+    "skills": ["inspect"],
+    "surface": "catalog"
+  },
+  {
     "name": "find_dashboards",
     "description": "Find Sentry dashboards in an organization.\n\nUse this tool when you need to:\n- List dashboards in an organization\n- Find a dashboard ID before calling get_dashboard_details\n- Search dashboards by title\n\n<examples>\nfind_dashboards(organizationSlug='my-organization')\nfind_dashboards(organizationSlug='my-organization', titleQuery='errors')\n</examples>\n\n<hints>\n- Dashboard IDs are organization-scoped.\n- Use `get_dashboard_details` after finding the correct dashboard ID.\n</hints>",
     "inputSchema": {
@@ -659,6 +743,62 @@
     },
     "requiredScopes": ["event:read", "project:read"],
     "skills": ["inspect", "triage", "seer"],
+    "surface": "catalog"
+  },
+  {
+    "name": "get_alert_rule",
+    "description": "Get details for a Sentry alert rule.\n\nUse this tool when you need to inspect an alert rule's exact conditions, query, triggers, and actions before explaining or planning changes.\n\n<examples>\nget_alert_rule(organizationSlug='my-org', kind='metric', ruleIdOrName='12345')\nget_alert_rule(organizationSlug='my-org', kind='issue', projectSlug='backend', ruleIdOrName='Notify backend team')\nget_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='P95 latency')\n</examples>\n\n<hints>\n- Use `kind='issue'` or `kind='metric'` for numeric IDs because issue and metric alerts use separate endpoints.\n- With `kind='all'`, a digit-only `ruleIdOrName` is treated as an exact alert rule name.\n- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["all", "issue", "metric"],
+          "description": "Which alert rule family to inspect. Use `issue` or `metric` for numeric IDs; `all` treats the value as an exact-name lookup.",
+          "default": "all"
+        },
+        "projectSlug": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible.",
+          "default": null
+        },
+        "ruleIdOrName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The alert rule's numeric ID, or an exact alert rule name."
+        }
+      },
+      "required": ["organizationSlug", "ruleIdOrName"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["org:read", "project:read"],
+    "skills": ["inspect"],
     "surface": "catalog"
   },
   {

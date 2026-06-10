@@ -8,6 +8,8 @@ import findDashboards from "./find-dashboards";
 import getDashboardDetails from "./get-dashboard-details";
 import findMonitors from "./find-monitors";
 import getMonitorDetails from "./get-monitor-details";
+import findAlertRules from "./find-alert-rules";
+import getAlertRule from "./get-alert-rule";
 import getIssueDetails from "./get-issue-details";
 import getIssueActivity from "./get-issue-activity";
 import getIssueTagValues from "./get-issue-tag-values";
@@ -56,6 +58,8 @@ const catalogTools = {
   get_dashboard_details: getDashboardDetails,
   find_monitors: findMonitors,
   get_monitor_details: getMonitorDetails,
+  find_alert_rules: findAlertRules,
+  get_alert_rule: getAlertRule,
   get_issue_details: getIssueDetails,
   get_issue_activity: getIssueActivity,
   get_issue_tag_values: getIssueTagValues,

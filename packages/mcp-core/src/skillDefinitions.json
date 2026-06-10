@@ -5,8 +5,13 @@
     "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, monitors, profiles, documentation, and project metadata",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 28,
+    "toolCount": 30,
     "tools": [
+      {
+        "name": "find_alert_rules",
+        "description": "Find Sentry alert rules.\n\nUse this tool when you need to:\n- List issue alert rules for a project\n- List metric alert rules for an organization or project\n- Find an alert rule ID by name before inspecting it\n- Check alert conditions, queries, triggers, actions, owner, or environment\n\n<examples>\nfind_alert_rules(organizationSlug='my-org')\nfind_alert_rules(organizationSlug='my-org', projectSlug='backend')\nfind_alert_rules(organizationSlug='my-org', kind='issue', projectSlug='backend', query='critical')\n</examples>\n\n<hints>\n- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.\n- Metric alert rules can be listed organization-wide or project-scoped.\n</hints>",
+        "requiredScopes": ["org:read", "project:read"]
+      },
       {
         "name": "find_dashboards",
         "description": "Find Sentry dashboards in an organization.\n\nUse this tool when you need to:\n- List dashboards in an organization\n- Find a dashboard ID before calling get_dashboard_details\n- Search dashboards by title\n\n<examples>\nfind_dashboards(organizationSlug='my-organization')\nfind_dashboards(organizationSlug='my-organization', titleQuery='errors')\n</examples>\n\n<hints>\n- Dashboard IDs are organization-scoped.\n- Use `get_dashboard_details` after finding the correct dashboard ID.\n</hints>",
@@ -41,6 +46,11 @@
         "name": "get_ai_conversation_details",
         "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'.",
         "requiredScopes": ["event:read", "project:read"]
+      },
+      {
+        "name": "get_alert_rule",
+        "description": "Get details for a Sentry alert rule.\n\nUse this tool when you need to inspect an alert rule's exact conditions, query, triggers, and actions before explaining or planning changes.\n\n<examples>\nget_alert_rule(organizationSlug='my-org', kind='metric', ruleIdOrName='12345')\nget_alert_rule(organizationSlug='my-org', kind='issue', projectSlug='backend', ruleIdOrName='Notify backend team')\nget_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='P95 latency')\n</examples>\n\n<hints>\n- Use `kind='issue'` or `kind='metric'` for numeric IDs because issue and metric alerts use separate endpoints.\n- With `kind='all'`, a digit-only `ruleIdOrName` is treated as an exact alert rule name.\n- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.\n</hints>",
+        "requiredScopes": ["org:read", "project:read"]
       },
       {
         "name": "get_dashboard_details",

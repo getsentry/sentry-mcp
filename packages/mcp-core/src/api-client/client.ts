@@ -65,6 +65,10 @@ import {
   TraceSchema,
   UserSchema,
   UserRegionsSchema,
+  IssueAlertRuleListSchema,
+  IssueAlertRuleSchema,
+  MetricAlertRuleListSchema,
+  MetricAlertRuleSchema,
   FlamegraphSchema,
   ProfileChunkResponseSchema,
   TransactionProfileSchema,
@@ -90,6 +94,8 @@ import type {
   EventAttachmentList,
   Issue,
   IssueActivityList,
+  IssueAlertRule,
+  IssueAlertRuleList,
   IssueComment,
   IssueCommentList,
   IssueList,
@@ -101,6 +107,8 @@ import type {
   MonitorCheckInList,
   MonitorList,
   MonitorStats,
+  MetricAlertRule,
+  MetricAlertRuleList,
   OrganizationList,
   Project,
   ProjectList,
@@ -902,6 +910,30 @@ export class SentryApiService {
     );
   }
 
+  getIssueAlertRuleUrl(
+    organizationSlug: string,
+    projectSlug: string,
+    ruleId: string | number,
+  ): string {
+    const encodedProject = encodeURIComponent(projectSlug);
+    const encodedRuleId = encodeURIComponent(String(ruleId));
+    if (this.isSaas()) {
+      return `${this.protocol}://${organizationSlug}.sentry.io/issues/alerts/rules/${encodedProject}/${encodedRuleId}/details/`;
+    }
+    return `${this.protocol}://${this.host}/organizations/${organizationSlug}/issues/alerts/rules/${encodedProject}/${encodedRuleId}/details/`;
+  }
+
+  getMetricAlertRuleUrl(
+    organizationSlug: string,
+    ruleId: string | number,
+  ): string {
+    const encodedRuleId = encodeURIComponent(String(ruleId));
+    if (this.isSaas()) {
+      return `${this.protocol}://${organizationSlug}.sentry.io/issues/alerts/rules/details/${encodedRuleId}/`;
+    }
+    return `${this.protocol}://${this.host}/organizations/${organizationSlug}/issues/alerts/rules/details/${encodedRuleId}/`;
+  }
+
   // ================================================================================
   // URL BUILDERS FOR DIFFERENT SENTRY APIS
   // ================================================================================
@@ -1684,6 +1716,248 @@ export class SentryApiService {
       opts,
     );
     return ProjectRepoLinkSchema.parse(body);
+  }
+
+  async listIssueAlertRules(
+    params: {
+      organizationSlug: string;
+      projectSlug: string;
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRuleList> {
+    const page = await this.listIssueAlertRulesPage(params, opts);
+    return page.rules;
+  }
+
+  async listIssueAlertRulesPage(
+    {
+      organizationSlug,
+      projectSlug,
+      query,
+      cursor,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ rules: IssueAlertRuleList; nextCursor: string | null }> {
+    if (query) {
+      const project = await this.getProject(
+        {
+          organizationSlug,
+          projectSlugOrId: projectSlug,
+        },
+        opts,
+      );
+      const body = await this.listCombinedAlertRules(
+        {
+          organizationSlug,
+          name: query,
+          alertType: "rule",
+          projectId: project.id,
+          cursor,
+          limit,
+        },
+        opts,
+      );
+      return {
+        rules: IssueAlertRuleListSchema.parse(body.data),
+        nextCursor: body.nextCursor,
+      };
+    }
+
+    const searchQuery = new URLSearchParams();
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const queryString = searchQuery.toString();
+    const response = await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/rules/${queryString ? `?${queryString}` : ""}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+    return {
+      rules: IssueAlertRuleListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async getIssueAlertRule(
+    {
+      organizationSlug,
+      projectSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      ruleId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/rules/${encodeURIComponent(String(ruleId))}/`,
+      undefined,
+      opts,
+    );
+    return IssueAlertRuleSchema.parse(body);
+  }
+
+  async listMetricAlertRules(
+    params: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MetricAlertRuleList> {
+    const page = await this.listMetricAlertRulesPage(params, opts);
+    return page.rules;
+  }
+
+  async listMetricAlertRulesPage(
+    {
+      organizationSlug,
+      projectSlug,
+      query,
+      cursor,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ rules: MetricAlertRuleList; nextCursor: string | null }> {
+    if (query) {
+      const project = projectSlug
+        ? await this.getProject(
+            {
+              organizationSlug,
+              projectSlugOrId: projectSlug,
+            },
+            opts,
+          )
+        : undefined;
+      const body = await this.listCombinedAlertRules(
+        {
+          organizationSlug,
+          name: query,
+          alertType: "alert_rule",
+          projectId: project?.id,
+          cursor,
+          limit,
+        },
+        opts,
+      );
+      return {
+        rules: MetricAlertRuleListSchema.parse(body.data),
+        nextCursor: body.nextCursor,
+      };
+    }
+
+    const searchQuery = new URLSearchParams();
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const queryString = searchQuery.toString();
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/alert-rules/`
+      : `/organizations/${organizationSlug}/alert-rules/`;
+    const response = await this.request(
+      `${path}${queryString ? `?${queryString}` : ""}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+    return {
+      rules: MetricAlertRuleListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async getMetricAlertRule(
+    {
+      organizationSlug,
+      projectSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      ruleId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MetricAlertRule> {
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/alert-rules/${encodeURIComponent(String(ruleId))}/`
+      : `/organizations/${organizationSlug}/alert-rules/${encodeURIComponent(String(ruleId))}/`;
+    const body = await this.requestJSON(path, undefined, opts);
+    return MetricAlertRuleSchema.parse(body);
+  }
+
+  /**
+   * Uses Sentry's combined-rules endpoint for supported name search.
+   * `rule` selects issue alerts and `alert_rule` selects metric alerts.
+   */
+  private async listCombinedAlertRules(
+    {
+      organizationSlug,
+      name,
+      alertType,
+      projectId,
+      cursor,
+      limit,
+    }: {
+      organizationSlug: string;
+      name: string;
+      alertType: "rule" | "alert_rule";
+      projectId?: string | number;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ data: unknown; nextCursor: string | null }> {
+    const searchQuery = new URLSearchParams();
+    searchQuery.set("name", name);
+    searchQuery.append("alertType", alertType);
+    if (projectId !== undefined) {
+      searchQuery.append("project", String(projectId));
+    }
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/combined-rules/?${searchQuery.toString()}`,
+      undefined,
+      opts,
+    );
+    return {
+      data: await this.parseJsonResponse(response),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   /**

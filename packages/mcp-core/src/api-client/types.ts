@@ -69,6 +69,8 @@ import type {
   GenericEventSchema,
   IssueActivityListResponseSchema,
   IssueActivitySchema,
+  IssueAlertRuleListSchema,
+  IssueAlertRuleSchema,
   IssueCommentListSchema,
   IssueCommentSchema,
   IssueListSchema,
@@ -80,6 +82,8 @@ import type {
   MonitorSchema,
   MonitorStatsSchema,
   MonitorStatSchema,
+  MetricAlertRuleListSchema,
+  MetricAlertRuleSchema,
   OrganizationListSchema,
   OrganizationSchema,
   ProfileChunkResponseSchema,
@@ -113,6 +117,8 @@ export type User = z.infer<typeof UserSchema>;
 export type Organization = z.infer<typeof OrganizationSchema>;
 export type Team = z.infer<typeof TeamSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
+export type IssueAlertRule = z.infer<typeof IssueAlertRuleSchema>;
+export type MetricAlertRule = z.infer<typeof MetricAlertRuleSchema>;
 export type ClientKey = z.infer<typeof ClientKeySchema>;
 export type Release = z.infer<typeof ReleaseSchema>;
 export type ReleaseDetails = z.infer<typeof ReleaseDetailsSchema>;
@@ -155,6 +161,8 @@ export type ReplayRecordingSegments = z.infer<
 export type OrganizationList = z.infer<typeof OrganizationListSchema>;
 export type TeamList = z.infer<typeof TeamListSchema>;
 export type ProjectList = z.infer<typeof ProjectListSchema>;
+export type IssueAlertRuleList = z.infer<typeof IssueAlertRuleListSchema>;
+export type MetricAlertRuleList = z.infer<typeof MetricAlertRuleListSchema>;
 export type ReleaseList = z.infer<typeof ReleaseListSchema>;
 export type DeployList = z.infer<typeof DeployListSchema>;
 export type CommitList = z.infer<typeof CommitListSchema>;

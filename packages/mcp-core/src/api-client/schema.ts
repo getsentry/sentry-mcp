@@ -258,6 +258,46 @@ export const DashboardSchema = z
   })
   .passthrough();
 
+export const AlertRuleComponentSchema = z.record(z.string(), z.unknown());
+
+export const IssueAlertRuleSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    name: z.string(),
+    status: z.string().optional(),
+    actionMatch: z.string().nullable().optional(),
+    filterMatch: z.string().nullable().optional(),
+    conditions: z.array(AlertRuleComponentSchema).optional().default([]),
+    filters: z.array(AlertRuleComponentSchema).optional().default([]),
+    actions: z.array(AlertRuleComponentSchema).optional().default([]),
+    frequency: z.number().nullable().optional(),
+    environment: z.string().nullable().optional(),
+    owner: z.unknown().optional(),
+    dateCreated: z.string().optional(),
+  })
+  .passthrough();
+
+export const IssueAlertRuleListSchema = z.array(IssueAlertRuleSchema);
+
+export const MetricAlertRuleSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    name: z.string(),
+    status: z.union([z.string(), z.number()]).optional(),
+    query: z.string().nullable().optional(),
+    aggregate: z.string().nullable().optional(),
+    dataset: z.string().nullable().optional(),
+    timeWindow: z.number().nullable().optional(),
+    environment: z.string().nullable().optional(),
+    owner: z.unknown().optional(),
+    projects: z.array(z.string()).optional().default([]),
+    triggers: z.array(AlertRuleComponentSchema).optional().default([]),
+    dateCreated: z.string().optional(),
+  })
+  .passthrough();
+
+export const MetricAlertRuleListSchema = z.array(MetricAlertRuleSchema);
+
 const ReplayTagsSchema = z.preprocess(
   (value) => {
     if (value === undefined || value === null || Array.isArray(value)) {
