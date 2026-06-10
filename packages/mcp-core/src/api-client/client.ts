@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   getContinuousProfileUrl as getContinuousProfileUrlUtil,
   getAIConversationUrl as getAIConversationUrlUtil,
+  getDashboardUrl as getDashboardUrlUtil,
   getIssueUrl as getIssueUrlUtil,
   getMonitorUrl as getMonitorUrlUtil,
   getPreprodSnapshotUrl as getPreprodSnapshotUrlUtil,
@@ -13,6 +14,7 @@ import {
   getTraceMetricsExploreUrl,
   getTraceUrl as getTraceUrlUtil,
   isSentryHost,
+  type DashboardUrlOptions,
   type TraceMetricIdentifier,
 } from "../utils/url-utils";
 import { isNumericId } from "../utils/slug-validation";
@@ -57,6 +59,8 @@ import {
   ClientKeyListSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
+  DashboardListSchema,
+  DashboardSchema,
   TraceMetaSchema,
   TraceSchema,
   UserSchema,
@@ -79,6 +83,8 @@ import type {
   AutofixRunState,
   ClientKey,
   ClientKeyList,
+  Dashboard,
+  DashboardListItem,
   Event,
   EventAttachment,
   EventAttachmentList,
@@ -882,6 +888,20 @@ export class SentryApiService {
     );
   }
 
+  getDashboardUrl(
+    organizationSlug: string,
+    dashboardId: string,
+    options: DashboardUrlOptions = {},
+  ): string {
+    return getDashboardUrlUtil(
+      this.host,
+      organizationSlug,
+      dashboardId,
+      options,
+      this.protocol,
+    );
+  }
+
   // ================================================================================
   // URL BUILDERS FOR DIFFERENT SENTRY APIS
   // ================================================================================
@@ -1448,6 +1468,65 @@ export class SentryApiService {
 
     const body = await this.requestJSON(path, undefined, opts);
     return ProjectListSchema.parse(body);
+  }
+
+  async listDashboards(
+    {
+      organizationSlug,
+      query,
+      sortBy,
+      limit = 10,
+      cursor,
+    }: {
+      organizationSlug: string;
+      query?: string | null;
+      sortBy?: "title" | "-title" | "dateCreated" | "-dateCreated";
+      limit?: number;
+      cursor?: string | null;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ dashboards: DashboardListItem[]; nextCursor: string | null }> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("per_page", String(limit));
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (sortBy) {
+      queryParams.set("sort", sortBy);
+    }
+    if (cursor) {
+      queryParams.set("cursor", cursor);
+    }
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/dashboards/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+
+    return {
+      dashboards: DashboardListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async getDashboard(
+    {
+      organizationSlug,
+      dashboardId,
+    }: {
+      organizationSlug: string;
+      dashboardId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Dashboard> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/dashboards/${dashboardId}/`,
+      undefined,
+      opts,
+    );
+    return DashboardSchema.parse(body);
   }
 
   /**

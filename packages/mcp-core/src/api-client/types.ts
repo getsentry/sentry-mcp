@@ -49,6 +49,9 @@ import type {
   ClientKeySchema,
   CommitListSchema,
   CommitSchema,
+  DashboardListItemSchema,
+  DashboardSchema,
+  DashboardWidgetSchema,
   DefaultEventSchema,
   DeployListSchema,
   DeploySchema,
@@ -166,6 +169,11 @@ export type MonitorStats = z.infer<typeof MonitorStatsSchema>;
 export type EventAttachmentList = z.infer<typeof EventAttachmentListSchema>;
 export type TagList = z.infer<typeof TagListSchema>;
 export type ClientKeyList = z.infer<typeof ClientKeyListSchema>;
+
+// Dashboard types
+export type Dashboard = z.infer<typeof DashboardSchema>;
+export type DashboardListItem = z.infer<typeof DashboardListItemSchema>;
+export type DashboardWidget = z.infer<typeof DashboardWidgetSchema>;
 
 // Trace types
 export type TraceMeta = z.infer<typeof TraceMetaSchema>;

@@ -31,6 +31,12 @@ import autofixStateExplorerFixture from "./fixtures/autofix-state-explorer.json"
   type: "json",
 };
 import clientKeyFixture from "./fixtures/client-key.json" with { type: "json" };
+import dashboardDetailsFixture from "./fixtures/dashboard-details.json" with {
+  type: "json",
+};
+import dashboardListFixture from "./fixtures/dashboard-list.json" with {
+  type: "json",
+};
 import eventAttachmentsFixture from "./fixtures/event-attachments.json" with {
   type: "json",
 };
@@ -363,6 +369,49 @@ export const restHandlers = buildHandlers([
         },
       ]);
     },
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/dashboards/",
+    fetch: ({ request }) => {
+      const url = new URL(request.url);
+      const query = url.searchParams.get("query")?.toLowerCase();
+      const perPage = Number(url.searchParams.get("per_page") ?? "10");
+      const cursor = url.searchParams.get("cursor");
+      const dashboards = query
+        ? dashboardListFixture.filter((dashboard) =>
+            dashboard.title.toLowerCase().includes(query),
+          )
+        : dashboardListFixture;
+      const start = cursor === "dashboard-cursor" ? perPage : 0;
+      const page = dashboards.slice(start, start + perPage);
+      const hasMore = start + perPage < dashboards.length;
+
+      return HttpResponse.json(page, {
+        headers: hasMore
+          ? {
+              Link: '<https://sentry.io/api/0/organizations/sentry-mcp-evals/dashboards/?cursor=dashboard-cursor>; rel="next"; results="true"; cursor="dashboard-cursor"',
+            }
+          : undefined,
+      });
+    },
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/dashboards/101/",
+    fetch: () => HttpResponse.json(dashboardDetailsFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/dashboards/102/",
+    fetch: () =>
+      HttpResponse.json({
+        ...dashboardDetailsFixture,
+        id: "102",
+        title: "Errors Overview Copy",
+        widgets: [],
+        isFavorited: false,
+      }),
   },
   {
     method: "post",
@@ -1645,6 +1694,8 @@ export {
   organizationFixture,
   releaseFixture,
   clientKeyFixture,
+  dashboardDetailsFixture,
+  dashboardListFixture,
   userFixture,
   eventsErrorsFixture,
   eventsErrorsEmptyFixture,

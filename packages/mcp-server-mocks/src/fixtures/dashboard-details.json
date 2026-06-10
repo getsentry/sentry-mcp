@@ -1,0 +1,95 @@
+{
+  "id": "101",
+  "title": "Errors Overview",
+  "dateCreated": "2025-04-14T10:15:00.000Z",
+  "createdBy": {
+    "id": "1",
+    "name": "Jane Developer",
+    "email": "jane@example.com"
+  },
+  "widgets": [
+    {
+      "id": "201",
+      "title": "Handled Errors",
+      "description": "Handled errors over time",
+      "displayType": "line",
+      "thresholds": null,
+      "interval": "5m",
+      "dateCreated": "2025-04-14T10:16:00.000Z",
+      "dashboardId": "101",
+      "queries": [
+        {
+          "id": "301",
+          "name": "",
+          "fields": ["count()"],
+          "aggregates": ["count()"],
+          "columns": [],
+          "fieldAliases": [],
+          "conditions": "error.handled:true",
+          "orderby": "-count",
+          "widgetId": "201",
+          "onDemand": [],
+          "isHidden": false,
+          "selectedAggregate": 0,
+          "linkedDashboards": []
+        }
+      ],
+      "limit": null,
+      "widgetType": "error-events",
+      "layout": { "x": 0, "y": 0, "w": 6, "h": 2 },
+      "axisRange": null,
+      "legendType": null,
+      "datasetSource": "discover",
+      "changedReason": null
+    },
+    {
+      "id": "202",
+      "title": "Top Issues",
+      "description": null,
+      "displayType": "table",
+      "thresholds": null,
+      "interval": "5m",
+      "dateCreated": "2025-04-14T10:18:00.000Z",
+      "dashboardId": "101",
+      "queries": [
+        {
+          "id": "302",
+          "name": "Top Issues",
+          "fields": ["issue", "count()"],
+          "aggregates": ["count()"],
+          "columns": ["issue"],
+          "fieldAliases": [],
+          "conditions": "is:unresolved",
+          "orderby": "-count",
+          "widgetId": "202",
+          "onDemand": [],
+          "isHidden": false,
+          "selectedAggregate": 0,
+          "linkedDashboards": []
+        }
+      ],
+      "limit": 5,
+      "widgetType": "error-events",
+      "layout": { "x": 0, "y": 2, "w": 6, "h": 3 },
+      "axisRange": null,
+      "legendType": null,
+      "datasetSource": "discover",
+      "changedReason": null
+    }
+  ],
+  "filters": {
+    "release": ["frontend@1.2.3"],
+    "globalFilter": [{ "key": "browser.name", "value": "Chrome" }]
+  },
+  "permissions": {
+    "isEditableByEveryone": true,
+    "teamsWithEditAccess": []
+  },
+  "isFavorited": true,
+  "projects": [4509106749636608],
+  "environment": ["production"],
+  "period": "24h",
+  "utc": true,
+  "expired": false,
+  "prebuiltId": null
+}

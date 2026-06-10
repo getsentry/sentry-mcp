@@ -5,8 +5,13 @@
     "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, monitors, profiles, documentation, and project metadata",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 26,
+    "toolCount": 28,
     "tools": [
+      {
+        "name": "find_dashboards",
+        "description": "Find Sentry dashboards in an organization.\n\nUse this tool when you need to:\n- List dashboards in an organization\n- Find a dashboard ID before calling get_dashboard_details\n- Search dashboards by title\n\n<examples>\nfind_dashboards(organizationSlug='my-organization')\nfind_dashboards(organizationSlug='my-organization', titleQuery='errors')\n</examples>\n\n<hints>\n- Dashboard IDs are organization-scoped.\n- Use `get_dashboard_details` after finding the correct dashboard ID.\n</hints>",
+        "requiredScopes": ["org:read"]
+      },
       {
         "name": "find_monitors",
         "description": "Find Sentry cron monitors.\n\nUse this tool when you need to:\n- List cron monitors in an organization\n- Find a monitor by name or slug before getting details\n- Check monitor status, owner, project, schedule, or recent environment state\n\n<examples>\nfind_monitors(organizationSlug='my-organization')\nfind_monitors(organizationSlug='my-organization', projectSlug='backend', query='billing')\n</examples>",
@@ -36,6 +41,11 @@
         "name": "get_ai_conversation_details",
         "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'.",
         "requiredScopes": ["event:read", "project:read"]
+      },
+      {
+        "name": "get_dashboard_details",
+        "description": "Get detailed information about a specific Sentry dashboard.\n\nUse this tool when you need to:\n- Inspect a dashboard's widgets and saved query definitions\n- View dashboard projects, environments, filters, layout, and widget IDs\n- Resolve a dashboard by exact title or numeric ID\n\n<examples>\nget_dashboard_details(organizationSlug='my-organization', dashboardIdOrTitle='12345')\nget_dashboard_details(organizationSlug='my-organization', dashboardIdOrTitle='Errors Overview')\n</examples>\n\n<hints>\n- Numeric dashboard IDs are resolved directly.\n- Title lookups require one exact case-insensitive match. Use `find_dashboards` first if uncertain.\n- This returns saved widget query definitions, not live widget data.\n</hints>",
+        "requiredScopes": ["org:read"]
       },
       {
         "name": "get_doc",
