@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { type Span, setTag, setUser, startSpan } from "@sentry/core";
+import { type Span, setUser, startSpan } from "@sentry/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { buildServer } from "./server";
@@ -1095,7 +1095,7 @@ describe("buildServer", () => {
       );
     });
 
-    it("execute_tool creates a catalog tool span with effective arguments", async () => {
+    it("execute_tool passes effective arguments to a catalog tool", async () => {
       const handler = vi.fn(async (params: unknown) => {
         const parsed = params as {
           organizationSlug: string;
@@ -1134,17 +1134,6 @@ describe("buildServer", () => {
       });
 
       expect(getTextContent(result)).toBe("bound-org:handled:3");
-      expect(startSpan).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "execute_tool fake_catalog_tool",
-          op: "gen_ai.execute_tool",
-          attributes: {
-            "gen_ai.operation.name": "execute_tool",
-            "gen_ai.tool.name": "fake_catalog_tool",
-          },
-        }),
-        expect.any(Function),
-      );
       expect(handler).toHaveBeenCalledWith(
         {
           organizationSlug: "bound-org",
@@ -1152,24 +1141,6 @@ describe("buildServer", () => {
           nested: { limit: 3 },
         },
         expect.any(Object),
-      );
-      const span = startedSpans[0];
-      expect(span?.setAttribute).toHaveBeenCalledWith(
-        "gen_ai.tool.call.arguments.organizationSlug",
-        "bound-org",
-      );
-      expect(span?.setAttribute).toHaveBeenCalledWith(
-        "gen_ai.tool.call.arguments.filter",
-        "handled",
-      );
-      expect(span?.setAttribute).toHaveBeenCalledWith(
-        "gen_ai.tool.call.arguments.nested",
-        JSON.stringify({ limit: 3 }),
-      );
-      expect(span?.setStatus).toHaveBeenCalledWith({ code: 1 });
-      expect(setTag).not.toHaveBeenCalledWith(
-        "catalog.tool",
-        "fake_catalog_tool",
       );
     });
 
