@@ -15,9 +15,77 @@ pnpm run tsc && pnpm run lint && pnpm run test
 
 Fix any failures before proceeding.
 
-## Step 2: Test with CLI Client (Agent)
+## Step 2: Test MCP Tools with CLI Client (Stdio)
 
-This is the primary QA method. It uses an AI agent to exercise MCP tools against the local dev server.
+This is the primary QA method for tool behavior. It exercises `buildServer()` and
+the tool handlers without requiring the Cloudflare worker, local `/mcp` route, or
+Cloudflare OAuth configuration.
+
+### Auth setup
+
+Check whether stdio auth is already cached:
+
+```bash
+pnpm --filter @sentry/mcp-server start auth status
+```
+
+If it is not authenticated, warm the device-code cache from a real TTY:
+
+```bash
+pnpm --filter @sentry/mcp-server start auth login
+```
+
+Device-code auth uses the bundled stdio public client ID. It does not require a
+client secret and is separate from the Cloudflare OAuth app. The resulting token
+is cached in `~/.sentry/mcp.json`.
+
+### Run test queries
+
+The CLI connects to the local stdio server with `--transport stdio`:
+
+```bash
+# Verify auth and connectivity
+pnpm -w run cli --transport stdio "who am I?"
+
+# Verify tools are available (count varies by granted skills)
+pnpm -w run cli --transport stdio --list-tools
+
+# Test a specific tool relevant to your changes
+pnpm -w run cli --transport stdio "find my organizations"
+```
+
+Look for `Connected to MCP server (stdio)` in output to confirm stdio transport.
+
+If you need an isolated auth cache for QA, use:
+
+```bash
+AUTH_DIR=$(mktemp -d /tmp/sentry-mcp-auth.XXXXXX)
+export SENTRY_MCP_AUTH_CACHE="$AUTH_DIR/mcp.json"
+pnpm --filter @sentry/mcp-server start auth login
+pnpm -w run cli --transport stdio --list-tools
+```
+
+### Agent mode (optional)
+
+Tests the `use_sentry` meta-tool instead of individual tools. ~2x slower:
+
+```bash
+pnpm -w run cli --transport stdio --agent "show me my recent errors"
+```
+
+### Experimental tools
+
+If your changes involve experimental tools:
+
+```bash
+pnpm -w run cli --transport stdio --experimental "your query"
+```
+
+## Step 3: Test Cloudflare HTTP When Relevant
+
+Run this step when your changes touch Cloudflare, HTTP transport, `/mcp` routing,
+OAuth, web UI, or remote-server compatibility. It is not required for ordinary
+tool handler changes.
 
 ### Start the dev server
 
@@ -27,9 +95,10 @@ Run `pnpm dev` in the background. It starts at `http://localhost:5173`. Verify i
 curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/
 ```
 
-If it returns a non-200 or fails to connect, the server isn't running yet — wait and retry.
+If `pnpm dev` fails because local Cloudflare/Wrangler is not configured, note the
+failure and use stdio QA for tool behavior instead.
 
-### Run test queries
+### Run HTTP test queries
 
 The CLI connects to the local dev server via HTTP by default (no flags needed):
 
@@ -46,23 +115,7 @@ pnpm -w run cli "find my organizations"
 
 Look for `Connected to MCP server (remote)` in output to confirm HTTP transport to the dev server.
 
-### Agent mode (optional)
-
-Tests the `use_sentry` meta-tool instead of individual tools. ~2x slower:
-
-```bash
-pnpm -w run cli --agent "show me my recent errors"
-```
-
-### Experimental tools
-
-If your changes involve experimental tools:
-
-```bash
-pnpm -w run cli --experimental "your query"
-```
-
-## Step 3: Test Stdio / Auth Flows When Relevant
+## Step 4: Test Stdio / Auth Flows When Relevant
 
 Run this step when your changes touch stdio transport, auth, device-code flow, token caching, npm package behavior, or `mcp-test-client`.
 
@@ -81,30 +134,7 @@ pnpm -w run cli --transport stdio --list-tools
 Look for `Connected to MCP server (stdio)` in the explicit-token case.
 In the no-token non-interactive case, expect the error that instructs you to run `sentry-mcp auth login` interactively first.
 
-### Device-code auth with isolated cache
-
-Use an isolated cache file so QA does not depend on or overwrite `~/.sentry/mcp.json`:
-
-```bash
-AUTH_DIR=$(mktemp -d /tmp/sentry-mcp-auth.XXXXXX)
-export SENTRY_MCP_AUTH_CACHE="$AUTH_DIR/mcp.json"
-pnpm -w run cli --transport stdio --list-tools
-```
-
-This must run in a real TTY. The server should print a Sentry device-code URL and wait for authorization.
-Complete the browser flow, then confirm the client connects and lists tools.
-
-### Cached-token reuse
-
-After the device-code login succeeds, run the same command again with the same `SENTRY_MCP_AUTH_CACHE`:
-
-```bash
-pnpm -w run cli --transport stdio --list-tools
-```
-
-Confirm that it reuses the cached token and lists tools without starting another browser-based login.
-
-## Step 4: Test Real Agent CLIs When Relevant
+## Step 5: Test Real Agent CLIs When Relevant
 
 Run this step when validating Claude Code, Codex, or another issue that only reproduces in a real agent client.
 
@@ -152,7 +182,7 @@ Look for these signatures:
 - Claude: `ToolSearchTool`, `mcp__sentry-dev__whoami`, missing server/tool selection, `tool permission denied`
 - Codex: `UnexpectedContentType`, `AuthRequired`, `resources/list failed`
 
-## Step 5: Human-Only Testing (Reference)
+## Step 6: Human-Only Testing (Reference)
 
 These methods require human interaction and cannot be run by the agent. Suggest them to the user when relevant.
 
