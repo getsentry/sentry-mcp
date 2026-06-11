@@ -1,6 +1,6 @@
 # Logging Reference
 
-How logging works in the Sentry MCP server using LogTape and Sentry. For tracing, spans, or metrics see @docs/monitoring.md.
+How logging works in the Sentry MCP server using LogTape and Sentry. For tracing, spans, or metrics see [Monitoring](monitoring.md).
 
 ## Overview
 
@@ -14,13 +14,13 @@ Log levels are controlled by:
 
 **Important**: We use a custom LogTape sink that calls `Sentry.logger.*` methods to send logs to Sentry's Logs product. The `@logtape/sentry` package uses `captureException/captureMessage` which creates Issues instead of Logs.
 
-Implementation: @packages/mcp-server/src/telem/logging.ts
+Implementation: `packages/mcp-server/src/telem/logging.ts`
 
 ## Stdio Transport Invariant: Logs MUST Go to Stderr
 
 The MCP stdio transport reserves **stdout** for JSON-RPC frames. Any non-JSON-RPC line written to stdout makes the client fail framing and close the transport. **All log output — every level, every sink that writes to a console — must go to stderr.**
 
-This is enforced in @packages/mcp-core/src/telem/logging.ts via `STDERR_CONSOLE_LEVEL_MAP`, which routes every LogTape level through `console.error` (Node sends `console.error`/`console.warn` to stderr; `console.log`/`console.info`/`console.debug` go to stdout). Severity is preserved inside the JSON record (e.g. `"level":"INFO"`); the map only controls which `console.*` method is invoked.
+This is enforced in `packages/mcp-core/src/telem/logging.ts` via `STDERR_CONSOLE_LEVEL_MAP`, which routes every LogTape level through `console.error` (Node sends `console.error`/`console.warn` to stderr; `console.log`/`console.info`/`console.debug` go to stdout). Severity is preserved inside the JSON record (e.g. `"level":"INFO"`); the map only controls which `console.*` method is invoked.
 
 Regression history: #922 — LogTape's default level map sent `info`/`debug` records through `console.info`/`console.debug`, landing structured JSON on stdout and breaking stdio clients.
 
@@ -98,7 +98,7 @@ const eventId = logIssue(error, {
 **Skip logging:**
 - `UserInputError` - Expected validation failures
 - 4xx API responses - Client errors (except 429 rate limits)
-- See @docs/error-handling.md for complete rules
+- See [Error Handling](../contributing/error-handling.md) for complete rules
 
 ## Log Options
 
@@ -137,7 +137,7 @@ app.use(createRequestLogger(["cloudflare", "http"]));
 
 ## References
 
-- Implementation: @packages/mcp-server/src/telem/logging.ts
-- Error handling patterns: @docs/error-handling.md
-- Monitoring and tracing: @docs/monitoring.md
+- Implementation: `packages/mcp-server/src/telem/logging.ts`
+- Error handling patterns: [Error Handling](../contributing/error-handling.md)
+- Monitoring and tracing: [Monitoring](monitoring.md)
 - LogTape docs: https://logtape.org/

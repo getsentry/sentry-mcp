@@ -66,6 +66,13 @@ behavior. For catalog tools, expect `search_sentry_tools` followed by
 `execute_sentry_tool(name: <changed_tool>)`. For direct tools, expect the tool name in
 the transcript. `--list-tools` alone is not QA.
 
+For output-format changes, also inspect the raw MCP tool result when possible,
+not only the LLM's final answer. The final answer can add model-specific text
+that is not part of the tool response. Review raw tool output against
+`docs/contributing/tool-responses.md`: it should be user-facing, structured,
+and free of raw API JSON, internal implementation IDs, empty placeholders, and
+unrelated instructions.
+
 If your changes involve agent mode or experimental tools:
 
 ```bash

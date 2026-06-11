@@ -35,13 +35,13 @@ Think of it as:
 
 ## Documentation Structure
 
-- Architecture: @docs/cloudflare/architecture.md — Technical architecture of the web application
-- OAuth Architecture: @docs/cloudflare/oauth-architecture.md — OAuth flow and token management
-- Chat Interface: @docs/cloudflare/architecture.md — See "Chat Interface" section
-- Deployment: @docs/cloudflare/deployment.md — Deploying to Cloudflare Workers
+- Architecture: [Cloudflare Architecture](architecture.md) - Technical architecture of the web application
+- OAuth Architecture: [OAuth Architecture](oauth-architecture.md) - OAuth flow and token management
+- Chat Interface: [Cloudflare Architecture](architecture.md) - See "Chat Interface" section
+- Deployment: [Cloudflare Release](../releases/cloudflare.md) - Deploying to Cloudflare Workers
 
 ## Quick Links
 
 - Live deployment: https://mcp.sentry.dev
 - Package location: `packages/mcp-cloudflare`
-- **For MCP Server docs**: See "Architecture" in @docs/architecture.md
+- **For MCP Server docs**: See "Architecture" in [Architecture Overview](../architecture/overview.md)

@@ -76,5 +76,5 @@ Supported URL patterns:
 ```
 
 For implementation details and security notes, see:
-- `docs/cloudflare/constraint-flow-verification.md`
-- `docs/architecture.md`
+- `docs/specs/subpath-constraints.md`
+- `docs/architecture/overview.md`

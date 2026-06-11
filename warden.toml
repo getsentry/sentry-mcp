@@ -7,8 +7,9 @@ reportOn = "low"
 [[skills]]
 name = "mcp-audit"
 paths = [
-  "docs/adding-tools.md",
-  "docs/stdio-auth.md",
+  "docs/contributing/adding-tools.md",
+  "docs/contributing/tool-responses.md",
+  "docs/operations/stdio-auth.md",
   "packages/mcp-core/src/server.ts",
   "packages/mcp-core/src/server.test.ts",
   "packages/mcp-core/src/skillDefinitions.json",

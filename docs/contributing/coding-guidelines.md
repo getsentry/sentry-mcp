@@ -121,10 +121,10 @@ pnpm -w run build       # Build all
 ## Common Patterns
 
 For shared patterns see:
-- Error handling: `common-patterns.md#error-handling`
-- Zod schemas: `common-patterns.md#zod-schema-patterns`
-- API usage: `api-patterns.md`
-- Testing: `testing.md`
+- Error handling: [common-patterns.md](common-patterns.md#error-handling)
+- Zod schemas: [common-patterns.md](common-patterns.md#zod-schema-patterns)
+- API usage: [api-patterns.md](api-patterns.md)
+- Testing: [../testing/overview.md](../testing/overview.md)
 
 ## Monorepo Commands
 
@@ -138,7 +138,7 @@ pnpm test
 
 ## References
 
-- Architecture: `architecture.md`
-- Testing guide: `testing.md`
-- API patterns: `api-patterns.md`
-- Common patterns: `common-patterns.md`
+- Architecture: [../architecture/overview.md](../architecture/overview.md)
+- Testing guide: [../testing/overview.md](../testing/overview.md)
+- API patterns: [api-patterns.md](api-patterns.md)
+- Common patterns: [common-patterns.md](common-patterns.md)

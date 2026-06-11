@@ -126,4 +126,5 @@ tsx measure-token-cost.ts --help       # Show help
 
 - Script: `packages/mcp-core/scripts/measure-token-cost.ts`
 - Workflow: `.github/workflows/token-cost.yml`
-- Tool limits: See "Tool Count Limits" in `docs/adding-tools.md`
+- Tool limits: See "Tool Count Limits" in
+  [../contributing/adding-tools.md](../contributing/adding-tools.md)

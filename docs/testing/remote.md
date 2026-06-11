@@ -738,7 +738,7 @@ pnpm -w run cli --mcp-host=https://your-worker.workers.dev "who am I?"
 
 ## References
 
-- Remote setup: `docs/cloudflare/deployment.md`
+- Remote setup: `docs/releases/cloudflare.md`
 - OAuth architecture: `docs/cloudflare/oauth-architecture.md`
 - CLI client: `packages/mcp-test-client/README.md`
 - Cloudflare package: `packages/mcp-cloudflare/README.md`

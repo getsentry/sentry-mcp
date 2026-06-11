@@ -1,26 +1,75 @@
 # Contributor Docs
 
-This directory contains contributor documentation used by humans and LLMs. To avoid duplication, the canonical documentation map and contributor workflow live in `CLAUDE.md` (also available as `AGENTS.md`).
-
-## Purpose
-
-- Central home for all contributor-focused docs (.md files)
-- Consumed by tools (e.g., Cursor) via direct file references
+This directory contains contributor documentation used by humans and LLMs. The
+canonical workflow and required docs live in [../AGENTS.md](../AGENTS.md)
+(`CLAUDE.md` is a symlink to the same file).
 
 ## Start Here
 
-- Doc map and workflow: see `CLAUDE.md` / `AGENTS.md`
-- Per-topic guides live in this folder (e.g., `adding-tools.md`)
+- Tool implementation: [contributing/adding-tools.md](contributing/adding-tools.md)
+- Tool output policy: [contributing/tool-responses.md](contributing/tool-responses.md)
+- Testing: [testing/overview.md](testing/overview.md)
+- Shared implementation patterns: [contributing/common-patterns.md](contributing/common-patterns.md)
 
-## Integration with Tools
+## Topic Map
 
-- Cursor IDE: this folder is referenced directly as contextual rules
-- Other AI tools: reference specific `.md` files as needed
+### Contributing
 
-## LLM-Specific
+- [contributing/adding-tools.md](contributing/adding-tools.md) - Tool structure, visibility, implementation, and registration
+- [contributing/api-patterns.md](contributing/api-patterns.md) - Sentry API client and MSW patterns
+- [contributing/coding-guidelines.md](contributing/coding-guidelines.md) - TypeScript and code style guidance
+- [contributing/common-patterns.md](contributing/common-patterns.md) - Shared Zod, validation, and formatting patterns
+- [contributing/documentation-style-guide.md](contributing/documentation-style-guide.md) - Documentation style guide
+- [contributing/error-handling.md](contributing/error-handling.md) - Error hierarchy and propagation
+- [contributing/pr-management.md](contributing/pr-management.md) - Commit and PR guidelines
+- [contributing/quality-checks.md](contributing/quality-checks.md) - Quality gates and pre-commit checks
+- [contributing/search-events-api-patterns.md](contributing/search-events-api-patterns.md) - Search Events API guidance
+- [contributing/tool-responses.md](contributing/tool-responses.md) - User-facing tool output policy, snapshot review, and QA expectations
 
-- Meta-docs live under `llms/` (e.g., `llms/document-scopes.md`)
+### Testing
+
+- [testing/overview.md](testing/overview.md) - Unit, snapshot, eval, and agent CLI testing
+- [testing/stdio.md](testing/stdio.md) - Stdio transport testing
+- [testing/remote.md](testing/remote.md) - Remote server and OAuth testing
+
+### Architecture And Operations
+
+- [architecture/overview.md](architecture/overview.md) - System design
+- [operations/embedded-agents.md](operations/embedded-agents.md) - Embedded LLM provider configuration
+- [operations/github-actions.md](operations/github-actions.md) - GitHub Actions guidance
+- [operations/logging.md](operations/logging.md) - Logging guidance
+- [operations/monitoring.md](operations/monitoring.md) - Monitoring guidance
+- [operations/oauth-signout-playbook.md](operations/oauth-signout-playbook.md) - Remote OAuth diagnostic runbook
+- [operations/security.md](operations/security.md) - Authentication and security patterns
+- [operations/stdio-auth.md](operations/stdio-auth.md) - Device code auth and token caching
+- [operations/token-cost-tracking.md](operations/token-cost-tracking.md) - Tool definition token cost tracking
+
+### Cloudflare
+
+- [cloudflare/overview.md](cloudflare/overview.md) - Cloudflare package overview
+- [cloudflare/architecture.md](cloudflare/architecture.md) - Cloudflare architecture
+- [cloudflare/oauth-architecture.md](cloudflare/oauth-architecture.md) - Cloudflare OAuth architecture
+
+### Integrations
+
+- [integrations/claude-code-plugin.md](integrations/claude-code-plugin.md) - Plugin structure and agent prompts
+- [integrations/flue-hooks.md](integrations/flue-hooks.md) - Flue hook notes
+- [integrations/ide-instructions-refactor.md](integrations/ide-instructions-refactor.md) - IDE instruction refactor notes
+
+### Specs
+
+- [specs/README.md](specs/README.md) - Specs index
+- [specs/embedded-agent-openai-routing.md](specs/embedded-agent-openai-routing.md) - Embedded agent OpenAI routing spec
+- [specs/search-events.md](specs/search-events.md) - Search Events spec
+- [specs/subpath-constraints.md](specs/subpath-constraints.md) - Subpath constraints spec
+
+### Releases
+
+- [releases/stdio.md](releases/stdio.md) - npm package release
+- [releases/cloudflare.md](releases/cloudflare.md) - Cloudflare deployment
 
 ## Maintenance
 
-Update docs when patterns change, new tools are added, or common issues arise. Keep the index in `CLAUDE.md` authoritative; avoid mirroring it here.
+Update docs when patterns change, new tools are added, or common issues arise.
+Prefer cross-links over duplicated guidance: topic docs should link to the
+canonical policy or pattern that owns the detail.

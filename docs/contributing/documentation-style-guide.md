@@ -1,11 +1,12 @@
 # Documentation Style Guide
 
-This guide defines how to write effective documentation for LLMs working with the Sentry MCP codebase.
+This guide defines how to write effective documentation for humans and AI
+agents working with the Sentry MCP codebase.
 
 ## Core Principles
 
 ### 1. Assume Intelligence
-- LLMs understand programming concepts - don't explain basics
+- Readers understand programming concepts - don't explain basics
 - Focus on project-specific patterns and conventions
 - Skip obvious steps like "create a file" or "save your changes"
 
@@ -17,7 +18,7 @@ This guide defines how to write effective documentation for LLMs working with th
 
 ### 3. Show, Don't Tell
 - Include minimal, focused code examples
-- Reference actual implementations: `See @packages/mcp-server/src/server.ts:45`
+- Reference actual implementations: `packages/mcp-server/src/server.ts`
 - Use real patterns from the codebase
 
 ## Document Structure
@@ -48,12 +49,12 @@ Project-specific rules that must be followed.
 
 ## Common Patterns
 
-Link to reusable patterns: See "Error Handling" in @docs/common-patterns.md
+Link to reusable patterns: See "Error Handling" in [Common Patterns](common-patterns.md).
 
 ## References
 
-- Implementation: `@packages/mcp-server/src/[file].ts`
-- Tests: `@packages/mcp-server/src/[file].test.ts`
+- Implementation: `packages/mcp-server/src/[file].ts`
+- Tests: `packages/mcp-server/src/[file].test.ts`
 - Examples in codebase: [specific function/tool names]
 ```
 
@@ -71,7 +72,7 @@ Link to reusable patterns: See "Error Handling" in @docs/common-patterns.md
 - **Tool documentation** - How to use pnpm or Vitest
 - **Verbose examples** - Keep code samples minimal
 - **Redundant content** - Link to other docs instead
-- **Step-by-step tutorials** - LLMs don't need hand-holding
+- **Step-by-step tutorials** - Prefer concise project-specific procedures
 
 ## Code Examples
 
@@ -103,17 +104,17 @@ export const ParamOrganizationSlug = z
 ## Cross-References
 
 ### File References (MANDATORY):
-- Use @path syntax for local files: `@docs/common-patterns.md`
-- Always reference from repo root: `@packages/mcp-server/src/server.ts`
-- Do NOT use Markdown links for local files (avoid markdown `[text](./...)` patterns)
-- Prefer path-only mentions to help agents parse
+- Use Markdown links for documentation files: `[Common Patterns](common-patterns.md)`
+- Use repo-root relative paths in backticks for code files: `packages/mcp-server/src/server.ts`
+- Do not use at-prefixed local references; some agents inline the entire target document.
+- Prefer clear link text for docs and concrete path mentions for code.
 
 ### Section References:
-- Refer to sections by name, not anchors: `See "Error Handling" in @docs/common-patterns.md`
-- If multiple sections share a name, include a short hint: `("Zod Patterns" in @docs/common-patterns.md)`
+- Refer to sections by name, not anchors: `See "Error Handling" in [Common Patterns](common-patterns.md).`
+- If multiple sections share a name, include a short hint: `("Zod Patterns" in [Common Patterns](common-patterns.md))`
 
 ### Code References:
-- Use concrete paths and identifiers: `@packages/mcp-core/src/tools/catalog/search-events.ts:buildQuery`
+- Use concrete paths and identifiers: `packages/mcp-core/src/tools/catalog/search-events.ts:buildQuery`
 - Optional line hints for humans: `server.ts:45-52` (agents may ignore)
 - Prefer real implementations over fabricated examples
 
@@ -159,7 +160,7 @@ export const ParamOrganizationSlug = z
 
 ### Red Flags:
 - Verbose prose explaining what code could show
-- Repeated content → extract to common-patterns.md
+- Repeated content → extract to [Common Patterns](common-patterns.md)
 - No code references → add implementation examples
 - Generic programming advice → remove it
 - Multiple concepts in one doc → split by topic
@@ -187,15 +188,16 @@ pnpm install
 cp .env.example .env  # Add your API keys
 ```
 
-See "Development Setup" in @AGENTS.md for environment variables.
+See "Development Setup" in [AGENTS.md](../../AGENTS.md) for environment variables.
 ```
 
-## Agent Readability Checklist
+## Readability Checklist
 
-- Uses @path for all local file references
+- Uses Markdown links for docs and repo-root relative paths for code
 - Short, focused sections with concrete examples
 - Minimal prose; prefers code and commands
 - Clear preconditions and environment notes
 - Error handling and validation rules are explicit
 
-This style guide ensures documentation remains focused, valuable, and maintainable for LLM consumption.
+This style guide keeps documentation focused, valuable, and maintainable for
+both human contributors and AI agents.

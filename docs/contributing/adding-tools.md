@@ -178,14 +178,22 @@ async handler(params, context: ServerContext) {
 
 ### Response Formatting
 
-See [common-patterns.md](common-patterns.md#response-formatting) for:
-- Markdown structure
-- ID/URL formatting
-- Response notes guidance
+Tool responses must follow [tool-responses.md](tool-responses.md). In
+particular:
+
+- Format output as user-facing markdown, not raw upstream API payloads.
+- Include actionable IDs and URLs when they support navigation or follow-up tool
+  calls.
+- Omit internal implementation details, empty placeholder values, and raw JSON
+  unless the tool explicitly exists to return raw data.
+- Keep response notes scoped to this result.
+
+See [common-patterns.md](common-patterns.md#response-formatting) for shared
+formatting patterns and examples.
 
 ## Step 3: Add Tests
 
-Follow comprehensive testing patterns from `testing.md` for unit, integration, and evaluation tests.
+Follow comprehensive testing patterns from [../testing/overview.md](../testing/overview.md) for unit, integration, and evaluation tests.
 
 Create `packages/mcp-core/src/tools/catalog/your-tool-name.test.ts`:
 
@@ -214,12 +222,14 @@ describe("your_tool_name", () => {
 ```
 
 **Testing Requirements:**
-- Input validation (see [testing.md](testing.md#testing-error-cases))
+- Input validation (see [../testing/overview.md](../testing/overview.md#testing-error-cases))
 - Error handling (use patterns from [error-handling.md](error-handling.md))
 - Output formatting with snapshots
 - At least one happy-path test must snapshot the full formatted handler
   response with `toMatchInlineSnapshot()`; partial `toContain()` assertions are
   supplemental only
+- Review snapshots against [tool-responses.md](tool-responses.md), including
+  checks for internal IDs, raw JSON, empty placeholders, and user-facing labels
 - API integration with MSW mocks
 
 **After changing output, update snapshots:**
@@ -470,8 +480,9 @@ This pattern works with both Cloudflare-hosted and stdio transports.
 
 - Error handling: [error-handling.md](error-handling.md)
 - API usage: `api-patterns.md`
-- Testing: `testing.md`
-- Response formatting: [common-patterns.md](common-patterns.md#response-formatting)
+- Testing: [../testing/overview.md](../testing/overview.md)
+- Response policy: [tool-responses.md](tool-responses.md)
+- Formatting patterns: [common-patterns.md](common-patterns.md#response-formatting)
 
 ## References
 

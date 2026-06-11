@@ -267,16 +267,16 @@ Attributes: `gen_ai.provider.name`, `gen_ai.request.model`,
   full request bodies, or other high-cardinality or sensitive values.
 - Do not log secrets. Authorization headers and access tokens must remain
   scrubbed.
-- Update this document, `docs/monitoring.md`, and the relevant semantic lookup
+- Update this document, `docs/operations/monitoring.md`, and the relevant semantic lookup
   data file under `packages/mcp-core/src/internal/agents/tools/data/` when
   adding or renaming telemetry fields. Do not add unit tests solely to assert
   telemetry attribute spelling.
 
 ## References
 
-- `docs/monitoring.md`
-- `docs/oauth-signout-playbook.md`
-- `docs/error-handling.md`
+- `docs/operations/monitoring.md`
+- `docs/operations/oauth-signout-playbook.md`
+- `docs/contributing/error-handling.md`
 - `packages/mcp-cloudflare/src/server/metrics.ts`
 - `packages/mcp-cloudflare/src/server/oauth/helpers.ts`
 - `packages/mcp-core/src/internal/agents/tools/data/mcp.json`

@@ -4,7 +4,7 @@ Sentry MCP is a Model Context Protocol server that exposes Sentry's error tracki
 ## Principles
 
 - **Type Safety**: Prefer strict types over `any` - they catch bugs and improve tooling. Use `unknown` for truly unknown types.
-- **Security**: Never log secrets. Validate external input. See docs/security.md.
+- **Security**: Never log secrets. Validate external input. See docs/operations/security.md.
 - **Simplicity**: Follow existing patterns. Check neighboring files before inventing new approaches.
 
 ## Constraints
@@ -31,26 +31,60 @@ sentry-mcp/
 └── docs/                    # All documentation
 ```
 
-## Essential Documentation
+## Documentation Map
 
-**Read before making changes:**
-- docs/adding-tools.md — Tool implementation guide
-- docs/testing.md — Testing requirements
-- docs/common-patterns.md — Error handling, Zod schemas, response formatting
-- docs/error-handling.md — Error types and propagation
+- docs/README.md — Full documentation index
 
-**Reference:**
-- docs/architecture.md — System design
-- docs/api-patterns.md — Sentry API client usage
-- docs/quality-checks.md — Pre-commit checklist
-- docs/pr-management.md — Commit/PR guidelines
-- docs/security.md — Authentication patterns
-- docs/stdio-auth.md — Device code flow, token caching, client ID architecture
-- docs/oauth-signout-playbook.md — Remote OAuth failure modes, telemetry, diagnostic runbook
-- docs/embedded-agents.md — LLM provider configuration for AI-powered tools
+**Read before tool changes:**
+- docs/contributing/adding-tools.md — Tool implementation guide
+- docs/contributing/tool-responses.md — Tool output policy and QA review checklist
+- docs/testing/overview.md — Testing requirements and snapshot policy
+- docs/contributing/common-patterns.md — Error handling, Zod schemas, shared formatting patterns
+- docs/contributing/error-handling.md — Error types and propagation
+
+**Contributing:**
+- docs/contributing/api-patterns.md — Sentry API client usage
+- docs/contributing/coding-guidelines.md — TypeScript and code style guidance
+- docs/contributing/documentation-style-guide.md — Documentation style guide
+- docs/contributing/pr-management.md — Commit and PR guidelines
+- docs/contributing/quality-checks.md — Pre-commit checklist
+- docs/contributing/search-events-api-patterns.md — Search Events API patterns
+
+**Testing:**
+- docs/testing/overview.md — Unit, snapshot, eval, and agent CLI testing
+- docs/testing/stdio.md — Stdio transport testing
+- docs/testing/remote.md — Remote server and OAuth testing
+
+**Architecture and Operations:**
+- docs/architecture/overview.md — System design
+- docs/operations/security.md — Authentication and security patterns
+- docs/operations/stdio-auth.md — Device code flow, token caching, client ID architecture
+- docs/operations/oauth-signout-playbook.md — Remote OAuth diagnostic runbook
+- docs/operations/embedded-agents.md — LLM provider configuration for AI-powered tools
+- docs/operations/github-actions.md — GitHub Actions guidance
+- docs/operations/logging.md — Logging guidance
+- docs/operations/monitoring.md — Monitoring guidance
+- docs/operations/token-cost-tracking.md — Tool definition token cost tracking
+
+**Cloudflare:**
+- docs/cloudflare/overview.md — Cloudflare package overview
+- docs/cloudflare/architecture.md — Cloudflare architecture
+- docs/cloudflare/oauth-architecture.md — Cloudflare OAuth architecture
+
+**Integrations:**
+- docs/integrations/claude-code-plugin.md — Plugin structure and agent prompts
+- docs/integrations/flue-hooks.md — Flue hook notes
+- docs/integrations/ide-instructions-refactor.md — IDE instruction refactor notes
+
+**Specs:**
+- docs/specs/README.md — Specs index
+- docs/specs/embedded-agent-openai-routing.md — Embedded agent OpenAI routing spec
+- docs/specs/search-events.md — Search Events spec
+- docs/specs/subpath-constraints.md — Subpath constraints spec
+
+**Releases:**
 - docs/releases/stdio.md — npm package release
 - docs/releases/cloudflare.md — Cloudflare deployment
-- docs/claude-code-plugin.md — Plugin structure and agent prompts
 
 ## Commands
 
@@ -89,8 +123,8 @@ Use `/dex` skill to coordinate complex work. Create tasks with full context, bre
 1. Check neighboring files for existing patterns before writing new code.
 2. When adding or modifying Sentry API endpoint usage, ALWAYS validate the endpoint behavior against the Sentry source code in `~/src/sentry` instead of assuming docs or client parameters are authoritative.
 3. Update relevant docs when changing functionality.
-4. Follow docs/error-handling.md for error types.
-5. Follow docs/pr-management.md for commits and PRs.
+4. Follow docs/contributing/error-handling.md for error types.
+5. Follow docs/contributing/pr-management.md for commits and PRs.
 
 ## Commit Attribution
 
