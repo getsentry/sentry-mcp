@@ -42,6 +42,9 @@ the pivots and recipes below.
 | `app.server.mode.experimental` | experimental-mode flag | metrics, spans, tags | `?experimental=1` or stdio `--experimental` adoption |
 | `mcp.session.id` | MCP session identity | spans | session timeline |
 | `gen_ai.tool.name` | MCP tool being called | spans, issues | tool timeline |
+| `mcp.tool.name` | canonical MCP tool name on the span | spans | tool timeline for renamed tools |
+| `gen_ai.tool.call.result` | JSON tool result payload | spans | returned tool output |
+| `gen_ai.tool.call.result.count` | number of results returned by a tool | spans | zero-result tool calls |
 | `app.resource.type` | resolved Sentry resource type | spans | resource dispatch |
 | `app.constraint.organization_slug` | active organization constraint | spans | constrained session behavior |
 | `app.constraint.project_slug` | active project constraint | spans | constrained session behavior |
@@ -135,6 +138,14 @@ fields=timestamp,metric,app.consent.skill,app.client.family,value
 aggregate=sum(value) by app.consent.skill,app.client.family
 ```
 
+Zero-result `search_sentry_tools` catalog discovery queries.
+
+```text
+dataset=spans query='(mcp.tool.name:search_tools OR mcp.tool.name:search_sentry_tools) gen_ai.tool.call.result.count:0'
+fields=timestamp,trace,span_id,mcp.tool.name,gen_ai.tool.call.arguments.query,gen_ai.tool.call.result.count,app.transport,app.client.family,user.id
+sort=-timestamp
+```
+
 Tool execution timeline for a slow or failing tool.
 
 ```text
@@ -203,14 +214,18 @@ Attributes: `app.oauth.token_exchange.outcome`, `app.oauth.grant.shape`,
 
 ### MCP Tool Execution
 
-A tool is slow, failing, affected by session constraints, or calling the wrong
-Sentry API path.
+A tool is slow, failing, affected by session constraints, calling the wrong
+Sentry API path, or returning no catalog discovery results.
 
 Spans: tool call spans and downstream Sentry API spans
 
-Attributes: `gen_ai.tool.name`, `mcp.session.id`,
+Attributes: `gen_ai.tool.name`, `mcp.tool.name`, `gen_ai.tool.call.arguments.<key>`,
+`gen_ai.tool.call.result.count`, `mcp.session.id`,
 `app.constraint.organization_slug`, `app.constraint.project_slug`,
 `app.consent.skill.<skill>.granted`, `app.transport`, `user.id`
+
+For `search_sentry_tools`, inspect `gen_ai.tool.call.arguments.query` and
+`gen_ai.tool.call.result.count` to identify zero-result catalog searches.
 
 ### Resource Resolution
 
@@ -263,6 +278,13 @@ Attributes: `gen_ai.provider.name`, `gen_ai.request.model`,
   outcomes, route groups, constraints, and local response reasons.
 - `gen_ai.tool.call.arguments.<key>` intentionally extends GenAI semconv with
   per-key tool arguments after constraints.
+- `mcp.tool.name` is the canonical MCP tool name on spans. Use it when pivoting
+  on renamed tools such as `search_tools` / `search_sentry_tools`.
+- `gen_ai.tool.call.result.count` is a span-level integer result count. Zero
+  means the tool returned no results. Do not use in metrics dimensions.
+- `gen_ai.tool.call.result` is the full JSON tool result payload on spans. Use
+  for targeted inspection only; it is high-cardinality and unsuitable for
+  group-bys or metrics.
 - Keep metric attributes low-cardinality. Avoid raw URLs, tokens, prompts,
   full request bodies, or other high-cardinality or sensitive values.
 - Do not log secrets. Authorization headers and access tokens must remain
