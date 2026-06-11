@@ -141,21 +141,22 @@ describe("get_alert_rule", () => {
       **Status**: enabled
       **Frequency**: 30 minutes
       **Environment**: production
-      **Detector IDs**: 789
       **Owner**: team:backend
       **Created**: 2026-01-02T03:04:05.000Z
       **Updated**: 2026-01-02T04:04:05.000Z
       **URL**: https://sentry-mcp-evals.sentry.io/monitors/alerts/123/
       ### Triggers
 
-      - trigger-1 {"logicType":"any","conditions":[{"id":"condition-1","type":"event_frequency_count","comparison":10,"conditionResult":true}]}
+      - Logic: any
+      - Conditions: Event frequency count (comparison: 10, result: true)
       ### Action Filters
 
-      - filter-1 {"logicType":"all","conditions":[],"actions":[{"id":"action-1","type":"email","config":{"targetType":"Team","targetIdentifier":"1"}}]}
+      - Logic: all
+      - Actions: Email (target type: Team, target: 1)
 
       ## Response Notes
 
-      - This tool is read-only. Treat the returned payload as the canonical source for any future clone or mutation workflow.
+      - Use these details to inspect alert conditions, filters, routing, and notification actions before changing the rule in Sentry.
       "
     `);
   });
@@ -340,7 +341,9 @@ describe("get_alert_rule", () => {
     expect(listParams.get("projectSlug")).toBe("cloudflare-mcp");
     expect(detailRequestCount).toBe(1);
     expect(result).toContain("### Triggers");
-    expect(result).toContain("event_frequency_count");
+    expect(result).toContain(
+      "Event frequency count (comparison: 10, result: true)",
+    );
   });
 
   it("quotes issue alert name lookups for workflow query syntax", async () => {

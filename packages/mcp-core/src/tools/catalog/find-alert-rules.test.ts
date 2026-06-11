@@ -160,7 +160,6 @@ describe("find_alert_rules", () => {
       **Status**: enabled
       **Frequency**: 30 minutes
       **Environment**: production
-      **Detector IDs**: 789
       **Owner**: team:backend
       **Created**: 2026-01-02T03:04:05.000Z
       **Updated**: 2026-01-02T04:04:05.000Z
@@ -186,7 +185,7 @@ describe("find_alert_rules", () => {
       ## Response Notes
 
       - Use \`get_alert_rule\` with \`kind\` and the numeric rule ID for full details.
-      - Alert rule actions can include integration-specific payloads; inspect existing rules before planning mutations.
+      - Use full details to inspect alert conditions, filters, and notification actions before changing a rule in Sentry.
       "
     `);
   });
@@ -416,10 +415,30 @@ describe("find_alert_rules", () => {
       context,
     );
 
-    expect(result).toContain("Notify backend team");
-    expect(result).not.toContain("Notify frontend team");
-    expect(result).not.toContain("More issue alert rules are available");
-    expect(result).not.toContain("workflow-page-2");
+    expect(result).toMatchInlineSnapshot(`
+      "# Alert Rules in **sentry-mcp-evals/cloudflare-mcp**
+
+      ## Issue Alert Rules
+
+      ### Notify backend team
+
+      **Kind**: Issue Alert
+      **ID**: 123
+      **Project**: cloudflare-mcp
+      **Status**: enabled
+      **Frequency**: 30 minutes
+      **Environment**: production
+      **Owner**: team:backend
+      **Created**: 2026-01-02T03:04:05.000Z
+      **Updated**: 2026-01-02T04:04:05.000Z
+      **URL**: https://sentry-mcp-evals.sentry.io/monitors/alerts/123/
+
+      ## Response Notes
+
+      - Use \`get_alert_rule\` with \`kind\` and the numeric rule ID for full details.
+      - Use full details to inspect alert conditions, filters, and notification actions before changing a rule in Sentry.
+      "
+    `);
   });
 
   it("returns next cursors for combined-rules query searches", async () => {

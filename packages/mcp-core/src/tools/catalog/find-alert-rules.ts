@@ -178,7 +178,7 @@ export default defineTool({
     output +=
       "- Use `get_alert_rule` with `kind` and the numeric rule ID for full details.\n";
     output +=
-      "- Alert rule actions can include integration-specific payloads; inspect existing rules before planning mutations.\n";
+      "- Use full details to inspect alert conditions, filters, and notification actions before changing a rule in Sentry.\n";
     if (issuePage.nextCursor) {
       output += `- More issue alert rules are available. Pass \`kind: "issue"\` and \`cursor: "${issuePage.nextCursor}"\` with the same search scope to fetch the next page.\n`;
     }

@@ -11,26 +11,163 @@ import {
   formatDate,
   formatId,
   formatUnknown,
+  isRecord,
 } from "./api-formatting";
 
 const NUMERIC_ID_PATTERN = /^\d+$/;
 
 type AlertComponent = Record<string, unknown>;
+type AlertComponentDetail = [string, unknown];
 
 export function isNumericAlertRuleId(value: string): boolean {
   return NUMERIC_ID_PATTERN.test(value);
 }
 
-function formatComponent(component: AlertComponent): string {
-  const id = component.id;
-  if (typeof id === "string" && id.trim()) {
-    const { id: _id, ...params } = component;
-    if (Object.keys(params).length === 0) {
-      return id;
-    }
-    return `${id} ${formatUnknown(params)}`;
+function humanizeKey(value: string): string {
+  if (value === "conditionResult") {
+    return "result";
   }
-  return formatUnknown(component);
+  if (value === "targetIdentifier") {
+    return "target";
+  }
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function humanizeValue(value: string): string {
+  const normalized = value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  if (!normalized) {
+    return value;
+  }
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function formatScalar(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return formatUnknown(value);
+  }
+  return null;
+}
+
+function formatDetailValue(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    const items = value
+      .map(formatDetailValue)
+      .filter((item): item is string => item !== null);
+    return items.length > 0 ? items.join(", ") : null;
+  }
+  if (isRecord(value)) {
+    const details = Object.entries(value)
+      .filter(([key]) => key !== "id")
+      .map(([key, item]) => {
+        const formatted = formatDetailValue(item);
+        return formatted ? `${humanizeKey(key)}: ${formatted}` : null;
+      })
+      .filter((item): item is string => item !== null);
+    return details.length > 0 ? details.join(", ") : null;
+  }
+  return formatScalar(value);
+}
+
+function shouldSkipDetail(key: string, value: unknown): boolean {
+  return (
+    key === "targetDisplay" &&
+    typeof value === "string" &&
+    value.toLowerCase() === "unknown"
+  );
+}
+
+function formatComponent(component: AlertComponent): string {
+  const type = typeof component.type === "string" ? component.type : null;
+  const label = type ? humanizeValue(type) : "Component";
+  const detailEntries: AlertComponentDetail[] = [];
+  for (const [key, value] of Object.entries(component)) {
+    if (
+      key !== "id" &&
+      key !== "type" &&
+      key !== "conditions" &&
+      key !== "actions" &&
+      value !== undefined &&
+      value !== null &&
+      !shouldSkipDetail(key, value)
+    ) {
+      if (key === "config" && isRecord(value)) {
+        detailEntries.push(
+          ...Object.entries(value).filter(
+            ([configKey, configValue]) =>
+              !shouldSkipDetail(configKey, configValue),
+          ),
+        );
+        continue;
+      }
+      detailEntries.push([key, value]);
+    }
+  }
+  if (detailEntries.length === 0) {
+    return label;
+  }
+  const details = detailEntries
+    .map(([key, value]) => {
+      const formatted = formatDetailValue(value);
+      return formatted ? `${humanizeKey(key)}: ${formatted}` : null;
+    })
+    .filter((item): item is string => item !== null)
+    .join(", ");
+  if (!details) {
+    return label;
+  }
+  return `${label} (${details})`;
+}
+
+function readComponentList(value: unknown): AlertComponent[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  return value.filter(isRecord);
+}
+
+function formatWorkflowGroup(component: AlertComponent): string[] {
+  const lines: string[] = [];
+  const logicType =
+    typeof component.logicType === "string" ? component.logicType : null;
+  if (logicType) {
+    lines.push(`- Logic: ${logicType}`);
+  }
+
+  const conditions = readComponentList(component.conditions);
+  if (conditions?.length) {
+    lines.push(
+      `- Conditions: ${conditions.slice(0, 5).map(formatComponent).join("; ")}`,
+    );
+    if (conditions.length > 5) {
+      lines.push(`- ...and ${conditions.length - 5} more conditions`);
+    }
+  }
+
+  const actions = readComponentList(component.actions);
+  if (actions?.length) {
+    lines.push(
+      `- Actions: ${actions.slice(0, 5).map(formatComponent).join("; ")}`,
+    );
+    if (actions.length > 5) {
+      lines.push(`- ...and ${actions.length - 5} more actions`);
+    }
+  }
+
+  if (lines.length === 0) {
+    lines.push(`- ${formatComponent(component)}`);
+  }
+  return lines;
 }
 
 function formatComponentSummary(
@@ -44,7 +181,7 @@ function formatComponentSummary(
   const heading = "#".repeat(Math.min(headingLevel, 6));
   const lines = [`${heading} ${label}`, ""];
   for (const component of components.slice(0, 5)) {
-    lines.push(`- ${formatComponent(component)}`);
+    lines.push(...formatWorkflowGroup(component));
   }
   if (components.length > 5) {
     lines.push(`- ...and ${components.length - 5} more`);
@@ -73,7 +210,6 @@ export function formatIssueAlertRule(
   const includeComponents = options.includeComponents ?? true;
   const heading = "#".repeat(Math.min(headingLevel, 6));
   const owner = rule.owner ? formatActor(rule.owner) : null;
-  const detectorIds = rule.detectorIds ?? [];
   const frequency = getIssueAlertRuleFrequency(rule);
   const lines = compactLines([
     `${heading} ${rule.name}`,
@@ -90,9 +226,6 @@ export function formatIssueAlertRule(
     rule.filterMatch ? `**Filter Match**: ${rule.filterMatch}` : null,
     frequency !== null ? `**Frequency**: ${frequency} minutes` : null,
     rule.environment ? `**Environment**: ${rule.environment}` : null,
-    detectorIds.length > 0
-      ? `**Detector IDs**: ${detectorIds.map(String).join(", ")}`
-      : null,
     owner ? `**Owner**: ${owner}` : null,
     formatDate(rule.dateCreated)
       ? `**Created**: ${formatDate(rule.dateCreated)}`
