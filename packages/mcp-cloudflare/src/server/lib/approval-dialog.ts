@@ -3,7 +3,7 @@ import type {
   ClientInfo,
 } from "@cloudflare/workers-oauth-provider";
 import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
-import { sanitizeHtml, sanitizeHrefUrl } from "./html-utils";
+import { getUrlHost, sanitizeHtml, sanitizeHrefUrl } from "./html-utils";
 import skillDefinitions, {
   type SkillDefinition,
 } from "@sentry/mcp-core/skillDefinitions";
@@ -325,19 +325,27 @@ export async function renderApprovalDialog(
     ? sanitizeHtml(sanitizeHrefUrl(client.tosUri))
     : "";
 
-  const redirectWarningUri =
+  const rawRedirectUri =
     typeof redirectUri === "string" && redirectUri.length > 0
-      ? sanitizeHtml(redirectUri)
+      ? redirectUri
       : client?.redirectUris?.length === 1
-        ? sanitizeHtml(client.redirectUris[0])
+        ? client.redirectUris[0]
         : null;
+
+  const redirectWarningUri = rawRedirectUri
+    ? sanitizeHtml(rawRedirectUri)
+    : null;
+  const redirectHost = rawRedirectUri ? getUrlHost(rawRedirectUri) : "";
+  const redirectDestination = redirectHost
+    ? `<strong>${sanitizeHtml(redirectHost)}</strong>`
+    : "this URL";
 
   const redirectWarningsHtml = redirectWarningUri
     ? `
         <div class="redirect-warning">
           <div class="redirect-uri-display">${redirectWarningUri}</div>
           <div class="redirect-warning-text">
-            After approval, you will be redirected to this URL. Only approve if you recognize and trust this destination.
+            After approval, you will be redirected to ${redirectDestination}. Only approve if you recognize and trust this destination.
           </div>
         </div>
       `

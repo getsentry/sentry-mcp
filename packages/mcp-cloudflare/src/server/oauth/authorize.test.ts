@@ -88,8 +88,12 @@ describe("oauth authorize routes", () => {
       expect(html).not.toContain("https://example.com/another-callback");
       expect(html).not.toContain("https://example.com/fallback-callback");
       expect(
-        html.match(/After approval, you will be redirected to this URL\./g),
+        html.match(/After approval, you will be redirected to/g),
       ).toHaveLength(1);
+      // The true host is surfaced in the warning sentence.
+      expect(html).toContain(
+        "After approval, you will be redirected to <strong>example.com</strong>.",
+      );
     });
 
     it("rejects redirect URIs with a userinfo component", async () => {

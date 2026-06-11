@@ -103,7 +103,7 @@ export default new Hono<{ Bindings: Env }>()
       return c.text("Invalid request", 400);
     }
 
-    // Reject userinfo-spoofed redirect URIs (e.g. host@example.io)
+    // Reject redirect URIs with userinfo components
     if (redirectUriHasUserInfo(oauthReqInfo.redirectUri)) {
       logWarn("Rejected redirect URI with userinfo component", {
         loggerScope: ["cloudflare", "oauth", "authorize"],
@@ -223,7 +223,7 @@ export default new Hono<{ Bindings: Env }>()
       skills,
     };
 
-    // Reject userinfo-spoofed redirect URIs (e.g. host@example.io)
+    // Reject redirect URIs with userinfo components)
     if (redirectUriHasUserInfo(oauthReqWithSkills.redirectUri)) {
       logWarn("Rejected redirect URI with userinfo component", {
         loggerScope: ["cloudflare", "oauth", "authorize"],

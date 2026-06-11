@@ -34,6 +34,17 @@ export function redirectUriHasUserInfo(uri: string): boolean {
 }
 
 /**
+ * Returns the host of a URL, or an empty string if it can't be parsed.
+ */
+export function getUrlHost(url: string): string {
+  try {
+    return new URL(url.trim()).host;
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Sanitizes HTML content to prevent XSS attacks
  */
 export function sanitizeHtml(unsafe: string): string {

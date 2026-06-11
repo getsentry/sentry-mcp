@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  getUrlHost,
   redirectUriHasUserInfo,
   sanitizeHrefUrl,
   sanitizeHtml,
@@ -90,6 +91,17 @@ describe("redirectUriHasUserInfo", () => {
     ])("allows %s (%s)", (input) => {
       expect(redirectUriHasUserInfo(input)).toBe(false);
     });
+  });
+});
+
+describe("getUrlHost", () => {
+  it.each([
+    ["https://example.com/callback", "example.com"],
+    ["http://localhost:5173/api/auth/callback", "localhost:5173"],
+    ["https://example.com:8443/cb", "example.com:8443"],
+    ["not a url", ""],
+  ])("returns host of %s", (input, expected) => {
+    expect(getUrlHost(input)).toBe(expected);
   });
 });
 
