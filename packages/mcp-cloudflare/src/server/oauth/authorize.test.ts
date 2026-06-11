@@ -91,6 +91,24 @@ describe("oauth authorize routes", () => {
         html.match(/After approval, you will be redirected to this URL\./g),
       ).toHaveLength(1);
     });
+
+    it("rejects redirect URIs with a userinfo component", async () => {
+      mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+        clientId: "test-client",
+        redirectUri: "https://mcp.sentry.dev@example.io/callback",
+        scope: ["read"],
+        state: "orig",
+      });
+
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "GET",
+      });
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toBe("Invalid redirect URI");
+      expect(mockOAuthProvider.lookupClient).not.toHaveBeenCalled();
+    });
   });
 
   describe("POST /oauth/authorize", () => {
@@ -102,6 +120,33 @@ describe("oauth authorize routes", () => {
         tokenEndpointAuthMethod: "client_secret_basic",
       });
     });
+    it("rejects redirect URIs with a userinfo component", async () => {
+      const oauthReqInfo = {
+        clientId: "test-client",
+        redirectUri: "https://mcp.sentry.dev@example.io/callback",
+        scope: ["read"],
+        state: "original-state",
+      };
+      const formData = new FormData();
+      const signedState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      formData.append("state", signedState);
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "POST",
+        body: formData,
+      });
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toBe("Invalid redirect URI");
+    });
+
     it("should encode skills in the redirect state", async () => {
       const oauthReqInfo = {
         clientId: "test-client",

@@ -5,6 +5,7 @@ import {
   renderApprovalDialog,
   parseRedirectApproval,
 } from "../../lib/approval-dialog";
+import { redirectUriHasUserInfo } from "../../lib/html-utils";
 import { resolveClientFamilyFromName } from "../../lib/client-family";
 import type { Env } from "../../types";
 import { SENTRY_AUTH_URL } from "../constants";
@@ -100,6 +101,15 @@ export default new Hono<{ Bindings: Env }>()
     const { clientId } = oauthReqInfo;
     if (!clientId) {
       return c.text("Invalid request", 400);
+    }
+
+    // Reject userinfo-spoofed redirect URIs (e.g. host@example.io)
+    if (redirectUriHasUserInfo(oauthReqInfo.redirectUri)) {
+      logWarn("Rejected redirect URI with userinfo component", {
+        loggerScope: ["cloudflare", "oauth", "authorize"],
+        extra: { clientId, redirectUri: oauthReqInfo.redirectUri },
+      });
+      return c.text("Invalid redirect URI", 400);
     }
 
     // Validate resource parameter per RFC 8707
@@ -212,6 +222,18 @@ export default new Hono<{ Bindings: Env }>()
       ...state.oauthReqInfo,
       skills,
     };
+
+    // Reject userinfo-spoofed redirect URIs (e.g. host@example.io)
+    if (redirectUriHasUserInfo(oauthReqWithSkills.redirectUri)) {
+      logWarn("Rejected redirect URI with userinfo component", {
+        loggerScope: ["cloudflare", "oauth", "authorize"],
+        extra: {
+          clientId: oauthReqWithSkills.clientId,
+          redirectUri: oauthReqWithSkills.redirectUri,
+        },
+      });
+      return c.text("Invalid redirect URI", 400);
+    }
 
     // Validate redirectUri first to prevent open redirects from error responses
     let client = null;
