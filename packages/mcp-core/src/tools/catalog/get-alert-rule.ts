@@ -227,7 +227,6 @@ export default defineTool({
         ? formatIssueAlertRule(match.rule, match.projectSlug, {
             url: apiService.getIssueAlertRuleUrl(
               organizationSlug,
-              match.projectSlug,
               match.rule.id,
             ),
           })

@@ -14,28 +14,42 @@ const context = {
 const issueAlertRule = {
   id: "123",
   name: "Notify backend team",
-  status: "active",
-  actionMatch: "any",
-  filterMatch: "all",
-  frequency: 30,
+  enabled: true,
+  config: {
+    frequency: 30,
+  },
   environment: "production",
+  detectorIds: ["789"],
   owner: "team:backend",
   dateCreated: "2026-01-02T03:04:05.000Z",
-  conditions: [
+  dateUpdated: "2026-01-02T04:04:05.000Z",
+  triggers: {
+    id: "trigger-1",
+    logicType: "any",
+    conditions: [
+      {
+        id: "condition-1",
+        type: "event_frequency_count",
+        comparison: 10,
+        conditionResult: true,
+      },
+    ],
+  },
+  actionFilters: [
     {
-      id: "sentry.rules.conditions.first_seen_event.FirstSeenEventCondition",
-    },
-  ],
-  filters: [
-    {
-      id: "sentry.rules.filters.issue_occurrences.IssueOccurrencesFilter",
-    },
-  ],
-  actions: [
-    {
-      id: "sentry.mail.actions.NotifyEmailAction",
-      targetType: "Team",
-      targetIdentifier: "1",
+      id: "filter-1",
+      logicType: "all",
+      conditions: [],
+      actions: [
+        {
+          id: "action-1",
+          type: "email",
+          config: {
+            targetType: "Team",
+            targetIdentifier: "1",
+          },
+        },
+      ],
     },
   ],
 };
@@ -79,7 +93,7 @@ function useAlertRuleHandlers() {
       () => HttpResponse.json(project),
     ),
     http.get(
-      "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/",
+      "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
       () => HttpResponse.json([issueAlertRule]),
     ),
     http.get(
@@ -96,8 +110,16 @@ function useAlertRuleHandlers() {
 describe("find_alert_rules", () => {
   it("serializes project-scoped issue and metric alert rules", async () => {
     useAlertRuleHandlers();
+    let issueRequestUrl: string | null = null;
     let metricRequestUrl: string | null = null;
     mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
+        ({ request }) => {
+          issueRequestUrl = request.url;
+          return HttpResponse.json([issueAlertRule]);
+        },
+      ),
       http.get(
         "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/alert-rules/",
         ({ request }) => {
@@ -120,6 +142,10 @@ describe("find_alert_rules", () => {
       context,
     );
 
+    expect(issueRequestUrl).not.toBeNull();
+    expect(new URL(issueRequestUrl ?? "").searchParams.get("projectSlug")).toBe(
+      "cloudflare-mcp",
+    );
     expect(metricRequestUrl).not.toBeNull();
     expect(result).toMatchInlineSnapshot(`
       "# Alert Rules in **sentry-mcp-evals/cloudflare-mcp**
@@ -131,14 +157,14 @@ describe("find_alert_rules", () => {
       **Kind**: Issue Alert
       **ID**: 123
       **Project**: cloudflare-mcp
-      **Status**: active
-      **Action Match**: any
-      **Filter Match**: all
+      **Status**: enabled
       **Frequency**: 30 minutes
       **Environment**: production
+      **Detector IDs**: 789
       **Owner**: team:backend
       **Created**: 2026-01-02T03:04:05.000Z
-      **URL**: https://sentry-mcp-evals.sentry.io/issues/alerts/rules/cloudflare-mcp/123/details/
+      **Updated**: 2026-01-02T04:04:05.000Z
+      **URL**: https://sentry-mcp-evals.sentry.io/monitors/alerts/123/
 
       ## Metric Alert Rules
 
@@ -192,11 +218,11 @@ describe("find_alert_rules", () => {
     useAlertRuleHandlers();
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
         () =>
           HttpResponse.json([issueAlertRule], {
             headers: {
-              Link: '<https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/?cursor=issue-page-2>; rel="next"; results="true"; cursor="issue-page-2"',
+              Link: '<https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/?cursor=issue-page-2>; rel="next"; results="true"; cursor="issue-page-2"',
             },
           }),
       ),
@@ -220,20 +246,23 @@ describe("find_alert_rules", () => {
     );
   });
 
-  it("uses the supported combined-rules name filter for query searches", async () => {
-    const requestUrls: string[] = [];
+  it("uses workflows for issue query searches and combined-rules for metric query searches", async () => {
+    let issueRequestUrl: string | null = null;
+    const combinedRequestUrls: string[] = [];
     useAlertRuleHandlers();
     mswServer.use(
       http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
+        ({ request }) => {
+          issueRequestUrl = request.url;
+          return HttpResponse.json([issueAlertRule]);
+        },
+      ),
+      http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/combined-rules/",
         ({ request }) => {
-          requestUrls.push(request.url);
-          const params = new URL(request.url).searchParams;
-          return HttpResponse.json(
-            params.get("alertType") === "rule"
-              ? [issueAlertRule]
-              : [metricAlertRule],
-          );
+          combinedRequestUrls.push(request.url);
+          return HttpResponse.json([metricAlertRule]);
         },
       ),
     );
@@ -253,23 +282,102 @@ describe("find_alert_rules", () => {
 
     expect(result).toContain("Notify backend team");
     expect(result).toContain("P95 latency");
+    expect(issueRequestUrl).not.toBeNull();
+    const issueParams = new URL(issueRequestUrl ?? "").searchParams;
+    expect(issueParams.get("query")).toBe('name:"*backend*"');
+    expect(issueParams.get("projectSlug")).toBe("cloudflare-mcp");
+    expect(combinedRequestUrls).toHaveLength(1);
+    const metricParams = new URL(combinedRequestUrls[0]).searchParams;
+    expect(metricParams.get("name")).toBe("backend");
+    expect(metricParams.get("query")).toBeNull();
+    expect(metricParams.get("project")).toBe(project.id);
+    expect(metricParams.get("alertType")).toBe("alert_rule");
+  });
+
+  it("filters unattached organization workflows from project-scoped issue results", async () => {
+    useAlertRuleHandlers();
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
+        () =>
+          HttpResponse.json([
+            {
+              ...issueAlertRule,
+              id: "999",
+              name: "Organization workflow",
+              detectorIds: [],
+            },
+            issueAlertRule,
+          ]),
+      ),
+    );
+
+    const result = await findAlertRules.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        kind: "issue",
+        projectSlug: "cloudflare-mcp",
+        query: null,
+        cursor: null,
+        limit: 10,
+      },
+      context,
+    );
+
+    expect(result).toContain("Notify backend team");
+    expect(result).not.toContain("Organization workflow");
+  });
+
+  it("follows workflow pages until enough attached issue rules are found", async () => {
+    const requestUrls: string[] = [];
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
+        ({ request }) => {
+          requestUrls.push(request.url);
+          const params = new URL(request.url).searchParams;
+          if (params.get("cursor") === "workflow-page-2") {
+            return HttpResponse.json([issueAlertRule]);
+          }
+          return HttpResponse.json(
+            [
+              {
+                ...issueAlertRule,
+                id: "999",
+                name: "Organization workflow",
+                detectorIds: [],
+              },
+            ],
+            {
+              headers: {
+                Link: '<https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/?cursor=workflow-page-2>; rel="next"; results="true"; cursor="workflow-page-2"',
+              },
+            },
+          );
+        },
+      ),
+    );
+
+    const result = await findAlertRules.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        kind: "issue",
+        projectSlug: "cloudflare-mcp",
+        query: null,
+        cursor: null,
+        limit: 1,
+      },
+      context,
+    );
+
     expect(requestUrls).toHaveLength(2);
-    for (const requestUrl of requestUrls) {
-      const params = new URL(requestUrl).searchParams;
-      expect(params.get("name")).toBe("backend");
-      expect(params.get("query")).toBeNull();
-      expect(params.get("project")).toBe(project.id);
-    }
-    expect(
-      requestUrls
-        .map((url) => new URL(url).searchParams.get("alertType"))
-        .sort(),
-    ).toMatchInlineSnapshot(`
-        [
-          "alert_rule",
-          "rule",
-        ]
-      `);
+    expect(new URL(requestUrls[1]).searchParams.get("cursor")).toBe(
+      "workflow-page-2",
+    );
+    expect(result).toContain("Notify backend team");
+    expect(result).not.toContain("Organization workflow");
   });
 
   it("returns next cursors for combined-rules query searches", async () => {

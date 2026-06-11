@@ -265,15 +265,30 @@ export const IssueAlertRuleSchema = z
     id: z.union([z.string(), z.number()]),
     name: z.string(),
     status: z.string().optional(),
+    enabled: z.boolean().optional(),
     actionMatch: z.string().nullable().optional(),
     filterMatch: z.string().nullable().optional(),
     conditions: z.array(AlertRuleComponentSchema).optional().default([]),
     filters: z.array(AlertRuleComponentSchema).optional().default([]),
     actions: z.array(AlertRuleComponentSchema).optional().default([]),
+    triggers: AlertRuleComponentSchema.nullable().optional(),
+    actionFilters: z
+      .array(AlertRuleComponentSchema)
+      .nullable()
+      .optional()
+      .default([]),
+    detectorIds: z
+      .array(z.union([z.string(), z.number()]))
+      .nullable()
+      .optional()
+      .default([]),
+    config: z.record(z.string(), z.unknown()).optional().default({}),
     frequency: z.number().nullable().optional(),
     environment: z.string().nullable().optional(),
     owner: z.unknown().optional(),
     dateCreated: z.string().optional(),
+    dateUpdated: z.string().optional(),
+    lastTriggered: z.string().nullable().optional(),
   })
   .passthrough();
 

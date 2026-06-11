@@ -152,11 +152,7 @@ export default defineTool({
           formatIssueAlertRule(rule, projectSlug ?? "", {
             headingLevel: 3,
             includeComponents: false,
-            url: apiService.getIssueAlertRuleUrl(
-              organizationSlug,
-              projectSlug ?? "",
-              rule.id,
-            ),
+            url: apiService.getIssueAlertRuleUrl(organizationSlug, rule.id),
           }),
         )
         .join("\n\n");
