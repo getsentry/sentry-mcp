@@ -1,5 +1,4 @@
 # AGENTS.md
-
 Sentry MCP is a Model Context Protocol server that exposes Sentry's error tracking and performance monitoring to AI assistants through 19 tools.
 
 ## Principles
@@ -61,9 +60,9 @@ pnpm run dev                              # Start dev server
 pnpm run build                            # Build all packages
 
 # Testing
-pnpm -w run cli "who am I?"               # Test local dev server
-pnpm -w run cli --access-token=TOKEN "q"  # Test stdio transport
-pnpm -w run cli --agent "query"           # Test agent mode (~2x slower)
+pnpm -w run cli --transport stdio "q"      # Test MCP tools
+pnpm -w run cli --transport stdio --access-token=TOKEN "q"
+pnpm -w run cli --transport stdio --agent "query"
 
 # Quality (run before committing)
 pnpm run tsc && pnpm run lint && pnpm run test
@@ -77,7 +76,9 @@ pnpm run --filter @sentry/mcp-core generate-definitions
 
 ## QA Playbook
 
-For end-to-end validation with the local dev server and CLI client, follow `.agents/skills/qa/SKILL.md`. It covers the required quality gate, `pnpm dev` on `http://localhost:5173`, local CLI smoke tests, and when to extend coverage to stdio, auth, or real agent clients.
+For MCP tool QA, follow `.agents/skills/qa/SKILL.md`: stdio-first local CLI and
+real agent clients; Cloudflare HTTP or `/mcp` only for transport, OAuth,
+routing, or hosted-server compatibility.
 
 ## Task Management
 
