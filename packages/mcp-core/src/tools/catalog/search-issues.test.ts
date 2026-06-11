@@ -239,22 +239,22 @@ describe("search_issues", () => {
       {
         ...mockContext,
         availableToolNames: new Set([
-          "execute_tool",
+          "execute_sentry_tool",
           "find_organizations",
           "find_projects",
           "get_sentry_resource",
           "search_events",
           "search_issues",
-          "search_tools",
+          "search_sentry_tools",
         ]),
         directToolNames: new Set([
-          "execute_tool",
+          "execute_sentry_tool",
           "find_organizations",
           "find_projects",
           "get_sentry_resource",
           "search_events",
           "search_issues",
-          "search_tools",
+          "search_sentry_tools",
         ]),
       },
     );

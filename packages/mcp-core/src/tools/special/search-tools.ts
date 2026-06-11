@@ -58,7 +58,7 @@ function createSearchToolsResult(payload: SearchToolsOutput) {
 
 export function createSearchToolsTool(getTools: () => ToolRegistry) {
   return defineTool({
-    name: "search_tools",
+    name: "search_sentry_tools",
     skills: ALL_SKILLS,
     requiredScopes: [],
     description: [
@@ -72,10 +72,10 @@ export function createSearchToolsTool(getTools: () => ToolRegistry) {
       "- Inspect the executable JSON input schema for an available tool",
       "",
       "<examples>",
-      "search_tools(query='list projects')",
-      "search_tools(query='issue details')",
-      "search_tools(query='find dsn', limit=5)",
-      "search_tools(query='snapshot image')",
+      "search_sentry_tools(query='list projects')",
+      "search_sentry_tools(query='issue details')",
+      "search_sentry_tools(query='find dsn', limit=5)",
+      "search_sentry_tools(query='snapshot image')",
       "</examples>",
       "",
       "<hints>",

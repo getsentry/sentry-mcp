@@ -659,7 +659,7 @@ describe("get_trace_details", () => {
       children: [processSpan],
       duration: 4107,
       eventId: "44444444444444444444444444444444",
-      name: "execute_tool",
+      name: "execute_sentry_tool",
       op: "gen_ai.execute_tool",
       parentSpanId: "2222222222222222",
       spanId: "4444444444444444",

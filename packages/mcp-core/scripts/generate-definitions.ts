@@ -393,7 +393,7 @@ async function main() {
 
     // Sync allowedTools in agent frontmatter with the direct MCP surface that
     // is available under the default OAuth grant. Optional-skill tools remain
-    // available through search_tools/execute_tool when the user grants them,
+    // available through search_sentry_tools/execute_sentry_tool when the user grants them,
     // without advertising direct calls that many sessions cannot execute.
     const directTools = tools.filter((tool) => tool.surface === "direct");
     const experimentalDirectTools = experimentalTools.filter(

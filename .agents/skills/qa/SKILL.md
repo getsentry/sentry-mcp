@@ -62,8 +62,8 @@ pnpm -w run cli --transport stdio \
 
 Passing QA means the local CLI prints `Connected to MCP server (stdio)`, uses
 the expected MCP tool path, and returns real prod data that demonstrates the
-behavior. For catalog tools, expect `search_tools` followed by
-`execute_tool(name: <changed_tool>)`. For direct tools, expect the tool name in
+behavior. For catalog tools, expect `search_sentry_tools` followed by
+`execute_sentry_tool(name: <changed_tool>)`. For direct tools, expect the tool name in
 the transcript. `--list-tools` alone is not QA.
 
 If your changes involve agent mode or experimental tools:

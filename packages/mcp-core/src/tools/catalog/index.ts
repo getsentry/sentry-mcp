@@ -41,10 +41,10 @@ import type { ToolConfig } from "../types";
 /**
  * Catalog of ordinary Sentry MCP operations.
  *
- * These tools are searchable/executable through search_tools and execute_tool.
+ * These tools are searchable/executable through search_sentry_tools and execute_sentry_tool.
  * A central subset is also exposed directly via tools/list in surfaces.ts.
  *
- * Wrapper tools such as search_tools, execute_tool, and use_sentry intentionally
+ * Wrapper tools such as search_sentry_tools, execute_sentry_tool, and use_sentry intentionally
  * live outside this catalog.
  */
 const catalogTools = {

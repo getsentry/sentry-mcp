@@ -318,7 +318,7 @@ Opens at `http://localhost:6274`
 
 **Basic verification:**
 1. List tools → Verify expected tools available
-2. Call `execute_tool` with `name="whoami"` and `arguments={}` → Verify authentication
+2. Call `execute_sentry_tool` with `name="whoami"` and `arguments={}` → Verify authentication
 3. Call `find_organizations` → Verify data access
 
 **Parameter testing:**

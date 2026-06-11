@@ -109,13 +109,13 @@ function getStructuredContent<T extends Record<string, unknown>>(
 
 const DEFAULT_DIRECT_TOOL_NAMES = [
   "analyze_issue_with_seer",
-  "execute_tool",
+  "execute_sentry_tool",
   "find_organizations",
   "find_projects",
   "get_sentry_resource",
   "search_events",
   "search_issues",
-  "search_tools",
+  "search_sentry_tools",
   "update_issue",
 ].sort();
 
@@ -590,8 +590,8 @@ describe("buildServer", () => {
       expect(toolNames).not.toContain("get_snapshot");
       expect(toolNames).not.toContain("get_snapshot_image");
       expect(toolNames).not.toContain("get_snapshot_details");
-      expect(toolNames).toContain("search_tools");
-      expect(toolNames).toContain("execute_tool");
+      expect(toolNames).toContain("search_sentry_tools");
+      expect(toolNames).toContain("execute_sentry_tool");
       expect(toolNames.length).toBeGreaterThan(0);
     });
 
@@ -607,8 +607,8 @@ describe("buildServer", () => {
       expect(toolNames).toContain("get_sentry_resource");
       expect(toolNames).not.toContain("get_issue_details");
       expect(toolNames).not.toContain("get_trace_details");
-      expect(toolNames).toContain("search_tools");
-      expect(toolNames).toContain("execute_tool");
+      expect(toolNames).toContain("search_sentry_tools");
+      expect(toolNames).toContain("execute_sentry_tool");
     });
 
     it("includes all default tools when experimentalMode is true", () => {
@@ -623,8 +623,8 @@ describe("buildServer", () => {
       expect(toolNames).toContain("get_sentry_resource");
       expect(toolNames).not.toContain("get_issue_details");
       expect(toolNames).not.toContain("get_trace_details");
-      expect(toolNames).toContain("search_tools");
-      expect(toolNames).toContain("execute_tool");
+      expect(toolNames).toContain("search_sentry_tools");
+      expect(toolNames).toContain("execute_sentry_tool");
     });
 
     it("keeps get_sentry_resource available for legacy triage and seer skills", () => {
@@ -651,8 +651,8 @@ describe("buildServer", () => {
       const toolNames = registeredTools.map((tool) => tool.name).sort();
 
       expect(toolNames).toEqual(DEFAULT_DIRECT_TOOL_NAMES);
-      expect(toolNames).toContain("search_tools");
-      expect(toolNames).toContain("execute_tool");
+      expect(toolNames).toContain("search_sentry_tools");
+      expect(toolNames).toContain("execute_sentry_tool");
       expect(toolNames).not.toContain("whoami");
       expect(toolNames).not.toContain("use_sentry");
       expect(toolNames).not.toContain("search_docs");
@@ -679,10 +679,10 @@ describe("buildServer", () => {
         {
           grantedSkills: new Set(["docs"]),
           expectedDirectTools: [
-            "execute_tool",
+            "execute_sentry_tool",
             "find_organizations",
             "find_projects",
-            "search_tools",
+            "search_sentry_tools",
           ],
         },
       ] as const;
@@ -700,8 +700,8 @@ describe("buildServer", () => {
         expect(toolNames).toEqual(expectedDirectTools);
         expect(toolNames).not.toContain("search_docs");
         expect(toolNames).not.toContain("get_doc");
-        expect(toolNames).toContain("search_tools");
-        expect(toolNames).toContain("execute_tool");
+        expect(toolNames).toContain("search_sentry_tools");
+        expect(toolNames).toContain("execute_sentry_tool");
 
         const searchServer = buildServer({
           context: {
@@ -711,7 +711,7 @@ describe("buildServer", () => {
         });
         const searchResult = await callRegisteredTool(
           searchServer,
-          "search_tools",
+          "search_sentry_tools",
           {
             query: "documentation",
             limit: 10,
@@ -733,7 +733,7 @@ describe("buildServer", () => {
         });
         const executeResult = await callRegisteredTool(
           executeServer,
-          "execute_tool",
+          "execute_sentry_tool",
           {
             name: "get_doc",
             arguments: {
@@ -836,7 +836,7 @@ describe("buildServer", () => {
       expect(toolNames).not.toContain("find_releases");
       expect(toolNames).not.toContain("get_event_attachment");
 
-      const result = await callRegisteredTool(server, "search_tools", {
+      const result = await callRegisteredTool(server, "search_sentry_tools", {
         query: "create project",
         limit: 5,
       });
@@ -874,7 +874,7 @@ describe("buildServer", () => {
 
       const hiddenResult = await callRegisteredTool(
         withoutInspect,
-        "search_tools",
+        "search_sentry_tools",
         {
           query: "snapshot",
           limit: 10,
@@ -897,7 +897,7 @@ describe("buildServer", () => {
 
       const visibleResult = await callRegisteredTool(
         withInspect,
-        "search_tools",
+        "search_sentry_tools",
         {
           query: "snapshot",
           limit: 10,
@@ -940,14 +940,14 @@ describe("buildServer", () => {
 
       const registeredTools = await listRegisteredTools(server);
       const searchTools = registeredTools.find(
-        (tool) => tool.name === "search_tools",
+        (tool) => tool.name === "search_sentry_tools",
       );
       const executeTool = registeredTools.find(
-        (tool) => tool.name === "execute_tool",
+        (tool) => tool.name === "execute_sentry_tool",
       );
 
       expect(searchTools).toMatchObject({
-        name: "search_tools",
+        name: "search_sentry_tools",
         outputSchema: {
           type: "object",
           properties: {
@@ -962,7 +962,7 @@ describe("buildServer", () => {
         },
       });
       expect(executeTool).toMatchObject({
-        name: "execute_tool",
+        name: "execute_sentry_tool",
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
@@ -971,7 +971,7 @@ describe("buildServer", () => {
       });
     });
 
-    it("search_tools returns available tools with constrained schemas", async () => {
+    it("search_sentry_tools returns available tools with constrained schemas", async () => {
       const server = buildServer({
         context: {
           ...baseContext,
@@ -982,7 +982,7 @@ describe("buildServer", () => {
         },
       });
 
-      const result = await callRegisteredTool(server, "search_tools", {
+      const result = await callRegisteredTool(server, "search_sentry_tools", {
         query: "replay",
         limit: 1,
       });
@@ -1018,7 +1018,7 @@ describe("buildServer", () => {
       );
     });
 
-    it("search_tools hides constraint-injected schema parameters", async () => {
+    it("search_sentry_tools hides constraint-injected schema parameters", async () => {
       const server = buildServer({
         context: {
           ...baseContext,
@@ -1030,7 +1030,7 @@ describe("buildServer", () => {
         },
       });
 
-      const result = await callRegisteredTool(server, "search_tools", {
+      const result = await callRegisteredTool(server, "search_sentry_tools", {
         query: "issues",
         limit: 10,
       });
@@ -1058,7 +1058,7 @@ describe("buildServer", () => {
       expect(searchIssues?.inputSchema.properties).toHaveProperty("query");
     });
 
-    it("search_tools includes catalog-only tools that are not directly registered", async () => {
+    it("search_sentry_tools includes catalog-only tools that are not directly registered", async () => {
       const server = buildServer({
         context: baseContext,
       });
@@ -1066,7 +1066,7 @@ describe("buildServer", () => {
       const toolNames = getRegisteredToolNames(server);
       expect(toolNames).not.toContain("get_issue_details");
 
-      const result = await callRegisteredTool(server, "search_tools", {
+      const result = await callRegisteredTool(server, "search_sentry_tools", {
         query: "issue details",
         limit: 5,
       });
@@ -1079,7 +1079,7 @@ describe("buildServer", () => {
       );
     });
 
-    it("search_tools includes whoami as a catalog-only foundational tool", async () => {
+    it("search_sentry_tools includes whoami as a catalog-only foundational tool", async () => {
       const server = buildServer({
         context: {
           ...baseContext,
@@ -1090,7 +1090,7 @@ describe("buildServer", () => {
       const toolNames = getRegisteredToolNames(server);
       expect(toolNames).not.toContain("whoami");
 
-      const result = await callRegisteredTool(server, "search_tools", {
+      const result = await callRegisteredTool(server, "search_sentry_tools", {
         query: "authenticated user",
         limit: 10,
       });
@@ -1101,7 +1101,7 @@ describe("buildServer", () => {
       expect(payload.results.map((tool) => tool.name)).toContain("whoami");
     });
 
-    it("search_tools omits unavailable non-inspect tools", async () => {
+    it("search_sentry_tools omits unavailable non-inspect tools", async () => {
       const inspectSeerServer = buildServer({
         context: {
           ...baseContext,
@@ -1125,7 +1125,7 @@ describe("buildServer", () => {
         });
         const grantedResult = await callRegisteredTool(
           grantedServer,
-          "search_tools",
+          "search_sentry_tools",
           {
             query: toolName,
             limit: 10,
@@ -1140,7 +1140,7 @@ describe("buildServer", () => {
 
         const inspectSeerResult = await callRegisteredTool(
           inspectSeerServer,
-          "search_tools",
+          "search_sentry_tools",
           {
             query: toolName,
             limit: 10,
@@ -1155,7 +1155,7 @@ describe("buildServer", () => {
       }
     });
 
-    it("execute_tool rejects unavailable non-inspect tools", async () => {
+    it("execute_sentry_tool rejects unavailable non-inspect tools", async () => {
       const server = buildServer({
         context: {
           ...baseContext,
@@ -1163,7 +1163,7 @@ describe("buildServer", () => {
         },
       });
 
-      const result = await callRegisteredTool(server, "execute_tool", {
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
         name: "update_issue",
         arguments: {
           organizationSlug: "sentry-mcp-evals",
@@ -1178,7 +1178,7 @@ describe("buildServer", () => {
       );
     });
 
-    it("search_tools and execute_tool enforce project capabilities by default", async () => {
+    it("search_sentry_tools and execute_sentry_tool enforce project capabilities by default", async () => {
       const server = buildServer({
         context: {
           ...baseContext,
@@ -1195,7 +1195,7 @@ describe("buildServer", () => {
         },
       });
 
-      const result = await callRegisteredTool(server, "search_tools", {
+      const result = await callRegisteredTool(server, "search_sentry_tools", {
         query: "replay details",
         limit: 10,
       });
@@ -1206,12 +1206,16 @@ describe("buildServer", () => {
       expect(payload.results.map((tool) => tool.name)).not.toContain(
         "get_replay_details",
       );
-      const executeResult = await callRegisteredTool(server, "execute_tool", {
-        name: "get_replay_details",
-        arguments: {
-          replayId: "7e07485f12f9416b8b1426260799b51f",
+      const executeResult = await callRegisteredTool(
+        server,
+        "execute_sentry_tool",
+        {
+          name: "get_replay_details",
+          arguments: {
+            replayId: "7e07485f12f9416b8b1426260799b51f",
+          },
         },
-      });
+      );
 
       expect(executeResult).toMatchObject({ isError: true });
       expect(getTextContent(executeResult)).toContain(
@@ -1219,12 +1223,12 @@ describe("buildServer", () => {
       );
     });
 
-    it("execute_tool dispatches to an available tool", async () => {
+    it("execute_sentry_tool dispatches to an available tool", async () => {
       const server = buildServer({
         context: baseContext,
       });
 
-      const result = await callRegisteredTool(server, "execute_tool", {
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
         name: "find_organizations",
         arguments: {},
       });
@@ -1232,7 +1236,7 @@ describe("buildServer", () => {
       expect(getTextContent(result)).toContain("# Organizations");
     });
 
-    it("execute_tool dispatches to a catalog-only tool", async () => {
+    it("execute_sentry_tool dispatches to a catalog-only tool", async () => {
       const server = buildServer({
         context: baseContext,
       });
@@ -1240,7 +1244,7 @@ describe("buildServer", () => {
       const toolNames = getRegisteredToolNames(server);
       expect(toolNames).not.toContain("get_issue_details");
 
-      const result = await callRegisteredTool(server, "execute_tool", {
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
         name: "get_issue_details",
         arguments: {
           organizationSlug: "sentry-mcp-evals",
@@ -1253,7 +1257,7 @@ describe("buildServer", () => {
       );
     });
 
-    it("execute_tool dispatches to catalog-only whoami", async () => {
+    it("execute_sentry_tool dispatches to catalog-only whoami", async () => {
       const server = buildServer({
         context: {
           ...baseContext,
@@ -1264,7 +1268,7 @@ describe("buildServer", () => {
       const toolNames = getRegisteredToolNames(server);
       expect(toolNames).not.toContain("whoami");
 
-      const result = await callRegisteredTool(server, "execute_tool", {
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
         name: "whoami",
         arguments: {},
       });
@@ -1272,7 +1276,7 @@ describe("buildServer", () => {
       expect(getTextContent(result)).toContain("You are authenticated as");
     });
 
-    it("execute_tool passes effective arguments to a catalog tool", async () => {
+    it("execute_sentry_tool passes effective arguments to a catalog tool", async () => {
       const handler = vi.fn(async (params: unknown) => {
         const parsed = params as {
           organizationSlug: string;
@@ -1290,7 +1294,7 @@ describe("buildServer", () => {
         },
         handler,
       });
-      registry.execute_tool = createExecuteTool(() => registry);
+      registry.execute_sentry_tool = createExecuteTool(() => registry);
       const server = buildServer({
         context: {
           ...baseContext,
@@ -1302,7 +1306,7 @@ describe("buildServer", () => {
         tools: registry,
       });
 
-      const result = await callRegisteredTool(server, "execute_tool", {
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
         name: "fake_catalog_tool",
         arguments: {
           filter: "handled",
@@ -1337,20 +1341,20 @@ describe("buildServer", () => {
       expect(startSpan).not.toHaveBeenCalled();
     });
 
-    it("marks the catalog tool span as errored when execute_tool validation fails", async () => {
+    it("marks the catalog tool span as errored when execute_sentry_tool validation fails", async () => {
       const registry: Record<string, ToolConfig> = {};
       registry.fake_catalog_tool = createMockTool("fake_catalog_tool", {
         inputSchema: {
           requiredValue: z.string(),
         },
       });
-      registry.execute_tool = createExecuteTool(() => registry);
+      registry.execute_sentry_tool = createExecuteTool(() => registry);
       const server = buildServer({
         context: baseContext,
         tools: registry,
       });
 
-      const result = await callRegisteredTool(server, "execute_tool", {
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
         name: "fake_catalog_tool",
         arguments: {},
       });
@@ -1372,7 +1376,7 @@ describe("buildServer", () => {
       expect(span?.recordException).toHaveBeenCalledWith(expect.any(Error));
     });
 
-    it("execute_tool injects constrained arguments for catalog-only tools", async () => {
+    it("execute_sentry_tool injects constrained arguments for catalog-only tools", async () => {
       const server = buildServer({
         context: {
           ...baseContext,
@@ -1384,7 +1388,7 @@ describe("buildServer", () => {
         },
       });
 
-      const result = await callRegisteredTool(server, "execute_tool", {
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
         name: "get_issue_details",
         arguments: {
           issueId: "CLOUDFLARE-MCP-41",
@@ -1396,7 +1400,7 @@ describe("buildServer", () => {
       );
     });
 
-    it("exposes catalog-only tool safety annotations through search_tools", async () => {
+    it("exposes catalog-only tool safety annotations through search_sentry_tools", async () => {
       const server = buildServer({
         context: baseContext,
       });
@@ -1404,7 +1408,7 @@ describe("buildServer", () => {
       const registeredToolNames = getRegisteredToolNames(server);
       expect(registeredToolNames).not.toContain("get_profile_details");
 
-      const result = await callRegisteredTool(server, "search_tools", {
+      const result = await callRegisteredTool(server, "search_sentry_tools", {
         query: "profile details",
         limit: 5,
       });
@@ -1438,7 +1442,7 @@ describe("buildServer", () => {
         },
       });
 
-      const result = await callRegisteredTool(server, "search_tools", {
+      const result = await callRegisteredTool(server, "search_sentry_tools", {
         query: "replay details",
         limit: 1,
       });
