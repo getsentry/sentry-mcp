@@ -227,7 +227,6 @@ export default defineTool({
         ? formatIssueAlertRule(match.rule, match.projectSlug, {
             url: apiService.getIssueAlertRuleUrl(
               organizationSlug,
-              match.projectSlug,
               match.rule.id,
             ),
           })
@@ -239,7 +238,7 @@ export default defineTool({
           });
     output += "\n\n## Response Notes\n\n";
     output +=
-      "- This tool is read-only. Treat the returned payload as the canonical source for any future clone or mutation workflow.\n";
+      "- Use these details to inspect alert conditions, filters, routing, and notification actions before changing the rule in Sentry.\n";
     return output;
   },
 });

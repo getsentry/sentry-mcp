@@ -19,7 +19,9 @@ const api = new SentryApiService({
 });
 ```
 
-See: `packages/mcp-server/src/api-utils.ts` and `adding-tools.md#step-2-implement-the-handler` for usage in tools.
+See `packages/mcp-server/src/api-utils.ts` and
+[adding-tools.md](adding-tools.md#step-2-implement-the-handler) for usage in
+tools.
 
 ### Common Operations
 
@@ -79,11 +81,11 @@ const FlexibleSchema = BaseSchema
 z.union([DateSchema, z.null()])
 ```
 
-See Zod patterns: `common-patterns.md#zod-schema-patterns`
+See Zod patterns in [common-patterns.md](common-patterns.md#zod-schema-patterns).
 
 ### Type Safety
 
-For testing API patterns, see `testing.md#mock-server-setup`
+For testing API patterns, see [../testing/overview.md](../testing/overview.md#mock-server-setup).
 
 ```typescript
 // Derive types from schemas
@@ -202,7 +204,7 @@ try {
 }
 ```
 
-See error patterns: `common-patterns.md#error-handling`
+See error patterns in [common-patterns.md](common-patterns.md#error-handling).
 
 ## Best Practices
 

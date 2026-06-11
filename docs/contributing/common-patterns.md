@@ -59,6 +59,10 @@ Tool result text can include light, scoped steering when it helps the assistant 
 - Avoid: `IMPORTANT`, `MUST`, `CRITICAL`, `Display these...`, or `# Using this information` in handler output.
 - Avoid: instructions that override assistant behavior beyond this result.
 
+For the complete response contract, including what to include, what to omit,
+snapshot review expectations, and QA expectations, see
+[tool-responses.md](tool-responses.md).
+
 ### Markdown Structure
 
 ```typescript
@@ -139,5 +143,6 @@ export type ToolName = typeof TOOL_NAMES[number];
 
 - Error handling: [error-handling.md](error-handling.md)
 - API patterns: [api-patterns.md](api-patterns.md)
-- Testing: [testing.md](testing.md)
+- Tool responses: [tool-responses.md](tool-responses.md)
+- Testing: [../testing/overview.md](../testing/overview.md)
 - Quality checks: [quality-checks.md](quality-checks.md)

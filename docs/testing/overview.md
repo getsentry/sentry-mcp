@@ -79,6 +79,9 @@ Fast, focused tests of actual functionality:
   formatted handler response with `toMatchInlineSnapshot()`. Supplemental
   `toContain()` assertions are fine, but they do not replace a full-response
   snapshot.
+- Review tool output snapshots against
+  [../contributing/tool-responses.md](../contributing/tool-responses.md) so
+  formatted output stays user-facing and avoids raw internals.
 
 ### 2. Evaluation Tests
 Real-world scenarios with LLM:
@@ -159,7 +162,7 @@ For Codex, inspect the debug output for `UnexpectedContentType`, `AuthRequired`,
 
 ## Functional Testing Patterns
 
-See `adding-tools.md#step-3-add-tests` for the complete tool testing workflow.
+See [../contributing/adding-tools.md](../contributing/adding-tools.md#step-3-add-tests) for the complete tool testing workflow.
 
 ### Basic Test Structure
 
@@ -180,7 +183,7 @@ describe("tool_name", () => {
 });
 ```
 
-**NOTE**: Follow error handling patterns from [error-handling.md](error-handling.md) when testing error cases.
+**NOTE**: Follow error handling patterns from [../contributing/error-handling.md](../contributing/error-handling.md) when testing error cases.
 
 ### Testing Error Cases
 
@@ -205,7 +208,7 @@ it("handles API errors gracefully", async () => {
 
 ## Mock Server Setup
 
-See [api-patterns.md](api-patterns.md) for MSW mock setup, handler patterns, and request validation examples.
+See [../contributing/api-patterns.md](../contributing/api-patterns.md) for MSW mock setup, handler patterns, and request validation examples.
 
 ## Snapshot Testing
 
@@ -222,6 +225,10 @@ For MCP tools specifically:
   that snapshots the full handler response.
 - Use targeted substring assertions only for additional branch-specific checks,
   not as the only output coverage.
+- Snapshot fixtures should include representative upstream internals when the
+  formatter is expected to hide or humanize them.
+- Add negative assertions for known junk-output risks, such as raw JSON,
+  internal component IDs, or empty placeholder values.
 
 ### Updating Snapshots
 
@@ -232,7 +239,10 @@ cd packages/mcp-server
 pnpm vitest --run -u
 ```
 
-**Always review snapshot changes before committing!**
+**Always review snapshot changes before committing!** Review them as
+user-facing tool output using
+[../contributing/tool-responses.md](../contributing/tool-responses.md), not
+just as mechanically updated strings.
 
 ### Snapshot Best Practices
 
@@ -336,7 +346,12 @@ it("streams large responses efficiently", async () => {
 
 ## Common Testing Patterns
 
-See [common-patterns.md](common-patterns.md) for parameter validation and response formatting patterns, [error-handling.md](error-handling.md) for error testing, and [api-patterns.md](api-patterns.md) for mock setup.
+See [../contributing/common-patterns.md](../contributing/common-patterns.md)
+for parameter validation and formatting patterns,
+[../contributing/tool-responses.md](../contributing/tool-responses.md) for
+tool response policy, [../contributing/error-handling.md](../contributing/error-handling.md)
+for error testing, and [../contributing/api-patterns.md](../contributing/api-patterns.md)
+for mock setup.
 
 ## CI/CD Integration
 

@@ -16,7 +16,10 @@ See [adding-tools.md](adding-tools.md#tool-count-limits) for current limits and 
 
 ## Testing Requirements
 
-See [testing.md](testing.md) for testing philosophy, patterns, and snapshot guidelines. Every tool must have at least one happy-path inline snapshot test.
+See [../testing/overview.md](../testing/overview.md) for testing philosophy,
+patterns, and snapshot guidelines. Every tool must have at least one
+happy-path inline snapshot test. Review tool output snapshots against
+[tool-responses.md](tool-responses.md).
 
 ## Pre-Commit Checklist
 

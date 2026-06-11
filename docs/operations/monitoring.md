@@ -14,7 +14,7 @@ Different Sentry SDKs for different environments:
 
 ### Error Logging
 
-See `logIssue` in @packages/mcp-server/src/telem/logging.ts (documented in @docs/logging.md) for the canonical way to create an Issue and structured log entry.
+See `logIssue` in `packages/mcp-server/src/telem/logging.ts` (documented in [Logging Reference](logging.md)) for the canonical way to create an Issue and structured log entry.
 
 ### Tracing Pattern
 

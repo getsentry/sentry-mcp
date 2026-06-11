@@ -22,28 +22,42 @@ const projectConstrainedContext = {
 const issueAlertRule = {
   id: "123",
   name: "Notify backend team",
-  status: "active",
-  actionMatch: "any",
-  filterMatch: "all",
-  frequency: 30,
+  enabled: true,
+  config: {
+    frequency: 30,
+  },
   environment: "production",
+  detectorIds: ["789"],
   owner: "team:backend",
   dateCreated: "2026-01-02T03:04:05.000Z",
-  conditions: [
+  dateUpdated: "2026-01-02T04:04:05.000Z",
+  triggers: {
+    id: "trigger-1",
+    logicType: "any",
+    conditions: [
+      {
+        id: "condition-1",
+        type: "event_frequency_count",
+        comparison: 10,
+        conditionResult: true,
+      },
+    ],
+  },
+  actionFilters: [
     {
-      id: "sentry.rules.conditions.first_seen_event.FirstSeenEventCondition",
-    },
-  ],
-  filters: [
-    {
-      id: "sentry.rules.filters.issue_occurrences.IssueOccurrencesFilter",
-    },
-  ],
-  actions: [
-    {
-      id: "sentry.mail.actions.NotifyEmailAction",
-      targetType: "Team",
-      targetIdentifier: "1",
+      id: "filter-1",
+      logicType: "all",
+      conditions: [],
+      actions: [
+        {
+          id: "action-1",
+          type: "email",
+          config: {
+            targetType: "Team",
+            targetIdentifier: "1",
+          },
+        },
+      ],
     },
   ],
 };
@@ -87,12 +101,8 @@ function useAlertRuleHandlers() {
       () => HttpResponse.json(project),
     ),
     http.get(
-      "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/",
+      "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
       () => HttpResponse.json([issueAlertRule]),
-    ),
-    http.get(
-      "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/123/",
-      () => HttpResponse.json(issueAlertRule),
     ),
     http.get(
       "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/alert-rules/",
@@ -128,27 +138,27 @@ describe("get_alert_rule", () => {
       **Kind**: Issue Alert
       **ID**: 123
       **Project**: cloudflare-mcp
-      **Status**: active
-      **Action Match**: any
-      **Filter Match**: all
+      **Status**: enabled
       **Frequency**: 30 minutes
       **Environment**: production
       **Owner**: team:backend
       **Created**: 2026-01-02T03:04:05.000Z
-      **URL**: https://sentry-mcp-evals.sentry.io/issues/alerts/rules/cloudflare-mcp/123/details/
-      ### Conditions
+      **Updated**: 2026-01-02T04:04:05.000Z
+      **URL**: https://sentry-mcp-evals.sentry.io/monitors/alerts/123/
 
-      - sentry.rules.conditions.first_seen_event.FirstSeenEventCondition
-      ### Filters
+      ### Triggers
 
-      - sentry.rules.filters.issue_occurrences.IssueOccurrencesFilter
-      ### Actions
+      - Logic: any
+      - Conditions: Event frequency count (comparison: 10, result: true)
 
-      - sentry.mail.actions.NotifyEmailAction {"targetType":"Team","targetIdentifier":"1"}
+      ### Action Filters
+
+      - Logic: all
+      - Actions: Email (target type: Team, target: 1)
 
       ## Response Notes
 
-      - This tool is read-only. Treat the returned payload as the canonical source for any future clone or mutation workflow.
+      - Use these details to inspect alert conditions, filters, routing, and notification actions before changing the rule in Sentry.
       "
     `);
   });
@@ -167,10 +177,34 @@ describe("get_alert_rule", () => {
       context,
     );
 
-    expect(result).toContain("# Alert Rule in **sentry-mcp-evals**");
-    expect(result).toContain("**Kind**: Metric Alert");
-    expect(result).toContain("**ID**: 456");
-    expect(result).toContain("### Triggers");
+    expect(result).toMatchInlineSnapshot(`
+      "# Alert Rule in **sentry-mcp-evals**
+
+      ## P95 latency
+
+      **Kind**: Metric Alert
+      **ID**: 456
+      **Status**: 0
+      **Dataset**: transactions
+      **Aggregate**: p95(transaction.duration)
+      **Query**: environment:production
+      **Time Window**: 5 minutes
+      **Projects**: cloudflare-mcp
+      **Environment**: production
+      **Owner**: team:backend
+      **Created**: 2026-01-03T03:04:05.000Z
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/alerts/rules/details/456/
+
+      ### Triggers
+
+      - Trigger: Critical threshold: 500
+      - Actions: Slack (target: alerts)
+
+      ## Response Notes
+
+      - Use these details to inspect alert conditions, filters, routing, and notification actions before changing the rule in Sentry.
+      "
+    `);
   });
 
   it("falls back to organization metric alert details after a project ID miss", async () => {
@@ -270,19 +304,8 @@ describe("get_alert_rule", () => {
     expect(result).toContain("### Triggers");
   });
 
-  it("handles workflow-engine issue alerts with null match fields", async () => {
+  it("handles native workflow issue alert payloads", async () => {
     useAlertRuleHandlers();
-    mswServer.use(
-      http.get(
-        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/123/",
-        () =>
-          HttpResponse.json({
-            ...issueAlertRule,
-            actionMatch: null,
-            filterMatch: null,
-          }),
-      ),
-    );
 
     const result = await getAlertRule.handler(
       {
@@ -296,6 +319,8 @@ describe("get_alert_rule", () => {
     );
 
     expect(result).toContain("**Kind**: Issue Alert");
+    expect(result).toContain("### Triggers");
+    expect(result).toContain("### Action Filters");
     expect(result).not.toContain("**Action Match**");
     expect(result).not.toContain("**Filter Match**");
   });
@@ -303,28 +328,24 @@ describe("get_alert_rule", () => {
   it("fetches issue alert details after resolving an exact name", async () => {
     useAlertRuleHandlers();
     let detailRequestCount = 0;
+    let listRequestUrl: string | null = null;
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/combined-rules/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
         ({ request }) => {
           const params = new URL(request.url).searchParams;
-          return HttpResponse.json(
-            params.get("alertType") === "rule"
-              ? [
-                  {
-                    id: issueAlertRule.id,
-                    name: issueAlertRule.name,
-                  },
-                ]
-              : [],
-          );
-        },
-      ),
-      http.get(
-        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/123/",
-        () => {
-          detailRequestCount += 1;
-          return HttpResponse.json(issueAlertRule);
+          if (params.get("id") === "123") {
+            detailRequestCount += 1;
+            return HttpResponse.json([issueAlertRule]);
+          }
+          listRequestUrl = request.url;
+          return HttpResponse.json([
+            {
+              id: issueAlertRule.id,
+              name: issueAlertRule.name,
+              detectorIds: issueAlertRule.detectorIds,
+            },
+          ]);
         },
       ),
     );
@@ -340,37 +361,103 @@ describe("get_alert_rule", () => {
       context,
     );
 
+    expect(listRequestUrl).not.toBeNull();
+    const listParams = new URL(listRequestUrl ?? "").searchParams;
+    expect(listParams.get("query")).toBe('name:"*Notify backend team*"');
+    expect(listParams.get("projectSlug")).toBe("cloudflare-mcp");
     expect(detailRequestCount).toBe(1);
-    expect(result).toContain("### Conditions");
+    expect(result).toContain("### Triggers");
     expect(result).toContain(
-      "sentry.rules.conditions.first_seen_event.FirstSeenEventCondition",
+      "Event frequency count (comparison: 10, result: true)",
     );
+  });
+
+  it("quotes issue alert name lookups for workflow query syntax", async () => {
+    useAlertRuleHandlers();
+    let listRequestUrl: string | null = null;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
+        ({ request }) => {
+          const params = new URL(request.url).searchParams;
+          if (params.get("id") === "123") {
+            return HttpResponse.json([
+              { ...issueAlertRule, name: "Critical: backend" },
+            ]);
+          }
+          listRequestUrl = request.url;
+          return HttpResponse.json([
+            { ...issueAlertRule, name: "Critical: backend" },
+          ]);
+        },
+      ),
+    );
+
+    const result = await getAlertRule.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        kind: "issue",
+        projectSlug: "cloudflare-mcp",
+        ruleIdOrName: "Critical: backend",
+      },
+      context,
+    );
+
+    expect(listRequestUrl).not.toBeNull();
+    expect(new URL(listRequestUrl ?? "").searchParams.get("query")).toBe(
+      'name:"*Critical: backend*"',
+    );
+    expect(result).toContain("## Critical: backend");
+  });
+
+  it("ignores unattached organization workflows during issue detail lookup", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
+        () =>
+          HttpResponse.json([
+            {
+              ...issueAlertRule,
+              detectorIds: [],
+            },
+          ]),
+      ),
+    );
+
+    await expect(
+      getAlertRule.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          regionUrl: null,
+          kind: "issue",
+          projectSlug: "cloudflare-mcp",
+          ruleIdOrName: "123",
+        },
+        context,
+      ),
+    ).rejects.toThrow('Issue alert rule "123" was not found');
   });
 
   it("resolves digit-only issue alert names after a numeric ID miss", async () => {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
-        () => HttpResponse.json(project),
-      ),
-      http.get(
-        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/123/",
-        () => HttpResponse.json({}, { status: 404 }),
-      ),
-      http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/combined-rules/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
         ({ request }) => {
           const params = new URL(request.url).searchParams;
-          return HttpResponse.json(
-            params.get("alertType") === "rule"
-              ? [{ ...issueAlertRule, id: "789", name: "123" }]
-              : [],
-          );
+          if (params.get("id") === "123") {
+            return HttpResponse.json([]);
+          }
+          if (
+            params.get("id") === "789" ||
+            params.get("query") === 'name:"*123*"'
+          ) {
+            return HttpResponse.json([
+              { ...issueAlertRule, id: "789", name: "123" },
+            ]);
+          }
+          return HttpResponse.json([]);
         },
-      ),
-      http.get(
-        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/789/",
-        () => HttpResponse.json({ ...issueAlertRule, id: "789", name: "123" }),
       ),
     );
 
@@ -394,6 +481,10 @@ describe("get_alert_rule", () => {
       http.get(
         "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
         () => HttpResponse.json(project),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
+        () => HttpResponse.json([]),
       ),
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/combined-rules/",
@@ -439,15 +530,12 @@ describe("get_alert_rule", () => {
         () => HttpResponse.json(project),
       ),
       http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
+        () => HttpResponse.json([{ ...issueAlertRule, name: "Same name" }]),
+      ),
+      http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/combined-rules/",
-        ({ request }) => {
-          const params = new URL(request.url).searchParams;
-          return HttpResponse.json(
-            params.get("alertType") === "rule"
-              ? [{ ...issueAlertRule, name: "Same name" }]
-              : [{ ...metricAlertRule, name: "Same name" }],
-          );
-        },
+        () => HttpResponse.json([{ ...metricAlertRule, name: "Same name" }]),
       ),
     );
 

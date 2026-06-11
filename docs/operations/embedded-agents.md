@@ -270,6 +270,7 @@ Using openai responses API for AI-powered search tools (from EMBEDDED_AGENT_PROV
 
 ## Related Documentation
 
-- [Security](./security.md) - Authentication and token management
-- [Testing](./testing.md) - Testing MCP server functionality
-- [Common Patterns](./common-patterns.md) - Error handling and response formatting
+- [Security](security.md) - Authentication and token management
+- [Testing](../testing/overview.md) - Testing MCP server functionality
+- [Common Patterns](../contributing/common-patterns.md) - Error handling and shared formatting patterns
+- [Tool Responses](../contributing/tool-responses.md) - Tool output policy and QA review checklist
