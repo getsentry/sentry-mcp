@@ -145,10 +145,12 @@ describe("get_alert_rule", () => {
       **Created**: 2026-01-02T03:04:05.000Z
       **Updated**: 2026-01-02T04:04:05.000Z
       **URL**: https://sentry-mcp-evals.sentry.io/monitors/alerts/123/
+
       ### Triggers
 
       - Logic: any
       - Conditions: Event frequency count (comparison: 10, result: true)
+
       ### Action Filters
 
       - Logic: all
@@ -175,10 +177,34 @@ describe("get_alert_rule", () => {
       context,
     );
 
-    expect(result).toContain("# Alert Rule in **sentry-mcp-evals**");
-    expect(result).toContain("**Kind**: Metric Alert");
-    expect(result).toContain("**ID**: 456");
-    expect(result).toContain("### Triggers");
+    expect(result).toMatchInlineSnapshot(`
+      "# Alert Rule in **sentry-mcp-evals**
+
+      ## P95 latency
+
+      **Kind**: Metric Alert
+      **ID**: 456
+      **Status**: 0
+      **Dataset**: transactions
+      **Aggregate**: p95(transaction.duration)
+      **Query**: environment:production
+      **Time Window**: 5 minutes
+      **Projects**: cloudflare-mcp
+      **Environment**: production
+      **Owner**: team:backend
+      **Created**: 2026-01-03T03:04:05.000Z
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/alerts/rules/details/456/
+
+      ### Triggers
+
+      - Trigger: Critical threshold: 500
+      - Actions: Slack (target: alerts)
+
+      ## Response Notes
+
+      - Use these details to inspect alert conditions, filters, routing, and notification actions before changing the rule in Sentry.
+      "
+    `);
   });
 
   it("falls back to organization metric alert details after a project ID miss", async () => {

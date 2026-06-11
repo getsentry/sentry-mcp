@@ -19,6 +19,20 @@ const NUMERIC_ID_PATTERN = /^\d+$/;
 type AlertComponent = Record<string, unknown>;
 type AlertComponentDetail = [string, unknown];
 
+const COMPONENT_DETAIL_SKIP_KEYS = new Set([
+  "id",
+  "type",
+  "conditions",
+  "actions",
+]);
+const WORKFLOW_GROUP_DETAIL_SKIP_KEYS = new Set([
+  "id",
+  "type",
+  "logicType",
+  "conditions",
+  "actions",
+]);
+
 export function isNumericAlertRuleId(value: string): boolean {
   return NUMERIC_ID_PATTERN.test(value);
 }
@@ -29,6 +43,9 @@ function humanizeKey(value: string): string {
   }
   if (value === "targetIdentifier") {
     return "target";
+  }
+  if (value === "alertThreshold") {
+    return "threshold";
   }
   return value
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -87,16 +104,14 @@ function shouldSkipDetail(key: string, value: unknown): boolean {
   );
 }
 
-function formatComponent(component: AlertComponent): string {
-  const type = typeof component.type === "string" ? component.type : null;
-  const label = type ? humanizeValue(type) : "Component";
+function getComponentDetailEntries(
+  component: AlertComponent,
+  skippedKeys: ReadonlySet<string>,
+): AlertComponentDetail[] {
   const detailEntries: AlertComponentDetail[] = [];
   for (const [key, value] of Object.entries(component)) {
     if (
-      key !== "id" &&
-      key !== "type" &&
-      key !== "conditions" &&
-      key !== "actions" &&
+      !skippedKeys.has(key) &&
       value !== undefined &&
       value !== null &&
       !shouldSkipDetail(key, value)
@@ -113,35 +128,77 @@ function formatComponent(component: AlertComponent): string {
       detailEntries.push([key, value]);
     }
   }
-  if (detailEntries.length === 0) {
-    return label;
-  }
-  const details = detailEntries
+  return detailEntries;
+}
+
+function formatComponentDetails(
+  component: AlertComponent,
+  skippedKeys: ReadonlySet<string>,
+): string | null {
+  const details = getComponentDetailEntries(component, skippedKeys)
     .map(([key, value]) => {
       const formatted = formatDetailValue(value);
       return formatted ? `${humanizeKey(key)}: ${formatted}` : null;
     })
     .filter((item): item is string => item !== null)
     .join(", ");
+  return details || null;
+}
+
+function formatComponent(component: AlertComponent): string {
+  const type = typeof component.type === "string" ? component.type : null;
+  const label = type ? humanizeValue(type) : "Component";
+  const details = formatComponentDetails(component, COMPONENT_DETAIL_SKIP_KEYS);
   if (!details) {
     return label;
   }
   return `${label} (${details})`;
 }
 
-function readComponentList(value: unknown): AlertComponent[] | undefined {
-  if (!Array.isArray(value)) {
-    return undefined;
+function singularizeComponentLabel(label: string): string {
+  if (label.endsWith("ies")) {
+    return `${label.slice(0, -3)}y`;
   }
-  return value.filter(isRecord);
+  if (label.endsWith("s")) {
+    return label.slice(0, -1);
+  }
+  return label;
 }
 
-function formatWorkflowGroup(component: AlertComponent): string[] {
+function formatThresholdTrigger(component: AlertComponent): string | null {
+  const label = formatScalar(component.label);
+  const threshold = formatScalar(component.alertThreshold);
+  const resolveThreshold = formatScalar(component.resolveThreshold);
+  if (!threshold) {
+    return null;
+  }
+
+  const thresholdLabel = label
+    ? `${humanizeValue(label)} threshold`
+    : "Threshold";
+  return resolveThreshold
+    ? `${thresholdLabel}: ${threshold}; resolves below: ${resolveThreshold}`
+    : `${thresholdLabel}: ${threshold}`;
+}
+
+function formatWorkflowGroup(
+  component: AlertComponent,
+  componentLabel: string,
+): string[] {
   const lines: string[] = [];
   const logicType =
     typeof component.logicType === "string" ? component.logicType : null;
   if (logicType) {
     lines.push(`- Logic: ${logicType}`);
+  }
+
+  const componentDetails =
+    componentLabel === "Trigger"
+      ? (formatThresholdTrigger(component) ??
+        formatComponentDetails(component, WORKFLOW_GROUP_DETAIL_SKIP_KEYS))
+      : formatComponentDetails(component, WORKFLOW_GROUP_DETAIL_SKIP_KEYS);
+  if (componentDetails) {
+    lines.push(`- ${componentLabel}: ${componentDetails}`);
   }
 
   const conditions = readComponentList(component.conditions);
@@ -170,6 +227,13 @@ function formatWorkflowGroup(component: AlertComponent): string[] {
   return lines;
 }
 
+function readComponentList(value: unknown): AlertComponent[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  return value.filter(isRecord);
+}
+
 function formatComponentSummary(
   label: string,
   components: AlertComponent[] | undefined,
@@ -179,9 +243,10 @@ function formatComponentSummary(
     return [];
   }
   const heading = "#".repeat(Math.min(headingLevel, 6));
-  const lines = [`${heading} ${label}`, ""];
+  const lines = ["", `${heading} ${label}`, ""];
+  const componentLabel = singularizeComponentLabel(label);
   for (const component of components.slice(0, 5)) {
-    lines.push(...formatWorkflowGroup(component));
+    lines.push(...formatWorkflowGroup(component, componentLabel));
   }
   if (components.length > 5) {
     lines.push(`- ...and ${components.length - 5} more`);
