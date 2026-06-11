@@ -75,6 +75,10 @@ pnpm run measure-tokens                   # Check tool definition size
 pnpm run --filter @sentry/mcp-core generate-definitions
 ```
 
+## QA Playbook
+
+For end-to-end validation with the local dev server and CLI client, follow `.agents/skills/qa/SKILL.md`. It covers the required quality gate, `pnpm dev` on `http://localhost:5173`, local CLI smoke tests, and when to extend coverage to stdio, auth, or real agent clients.
+
 ## Task Management
 
 Use `/dex` skill to coordinate complex work. Create tasks with full context, break down into subtasks, complete with detailed results.
