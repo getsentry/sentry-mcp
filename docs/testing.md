@@ -154,7 +154,7 @@ claude --mcp-config /tmp/claude-sentry-dev-config.json --strict-mcp-config --per
 RUST_LOG=codex_core=debug,rmcp=debug RUST_BACKTRACE=1 codex exec --skip-git-repo-check --sandbox read-only --output-last-message /tmp/codex-sentry-dev-last.txt 'Use only the Sentry MCP server named "sentry-dev" to identify the authenticated user. Reply with only the authenticated email address.'
 ```
 
-For Claude, inspect the debug file for `ToolSearchTool`, `mcp__<server>__search_tools`, `mcp__<server>__execute_tool`, MCP connection lines, and any `tool permission denied` entries.
+For Claude, inspect the debug file for `ToolSearchTool`, `mcp__<server>__search_sentry_tools`, `mcp__<server>__execute_sentry_tool`, MCP connection lines, and any `tool permission denied` entries.
 For Codex, inspect the debug output for `UnexpectedContentType`, `AuthRequired`, or `resources/list failed`.
 
 ## Functional Testing Patterns

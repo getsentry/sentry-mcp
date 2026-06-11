@@ -60,8 +60,11 @@ describe("get_issue_activity", () => {
       },
       {
         ...context,
-        availableToolNames: new Set(["get_issue_activity", "execute_tool"]),
-        directToolNames: new Set(["execute_tool"]),
+        availableToolNames: new Set([
+          "get_issue_activity",
+          "execute_sentry_tool",
+        ]),
+        directToolNames: new Set(["execute_sentry_tool"]),
       },
     );
 

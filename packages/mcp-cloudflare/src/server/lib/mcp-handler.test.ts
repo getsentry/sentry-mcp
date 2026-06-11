@@ -422,13 +422,13 @@ describe("MCP Handler", () => {
       }>(response);
       const toolNames = body.result?.tools.map((tool) => tool.name) ?? [];
 
-      expect(toolNames).toContain("search_tools");
+      expect(toolNames).toContain("search_sentry_tools");
       expect(toolNames).not.toContain("search_docs");
       expect(toolNames).not.toContain("get_doc");
       expect(toolNames).not.toContain("get_issue_details");
 
       const searchRequest = createMcpRequest("tools/call", {
-        name: "search_tools",
+        name: "search_sentry_tools",
         arguments: {
           query: "documentation",
           limit: 10,

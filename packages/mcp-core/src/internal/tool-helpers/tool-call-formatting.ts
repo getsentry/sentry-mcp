@@ -96,10 +96,10 @@ export function formatToolCallInstruction({
   }
 
   const catalogGatewayAvailable =
-    isToolAvailableInSession("search_tools", availableToolNames) &&
-    isToolAvailableInSession("execute_tool", availableToolNames) &&
-    isDirectTool("search_tools", experimentalMode, directToolNames) &&
-    isDirectTool("execute_tool", experimentalMode, directToolNames);
+    isToolAvailableInSession("search_sentry_tools", availableToolNames) &&
+    isToolAvailableInSession("execute_sentry_tool", availableToolNames) &&
+    isDirectTool("search_sentry_tools", experimentalMode, directToolNames) &&
+    isDirectTool("execute_sentry_tool", experimentalMode, directToolNames);
 
   if (targetAvailable && catalogGatewayAvailable) {
     return `Use the Sentry tool \`${toolName}\`${formatPurpose(purpose)}`;

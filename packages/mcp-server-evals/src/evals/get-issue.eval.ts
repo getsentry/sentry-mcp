@@ -8,13 +8,13 @@ describeEval("get-issue", {
         input: `Explain CLOUDFLARE-MCP-41 from Sentry in ${FIXTURES.organizationSlug}.`,
         expectedTools: [
           {
-            name: "search_tools",
+            name: "search_sentry_tools",
             arguments: {
               query: "issue",
             },
           },
           {
-            name: "execute_tool",
+            name: "execute_sentry_tool",
             arguments: {
               name: "get_issue_details",
               arguments: {
@@ -29,13 +29,13 @@ describeEval("get-issue", {
         input: `Explain the event with ID 7ca573c0f4814912aaa9bdc77d1a7d51 from Sentry in ${FIXTURES.organizationSlug}.`,
         expectedTools: [
           {
-            name: "search_tools",
+            name: "search_sentry_tools",
             arguments: {
               query: "issue",
             },
           },
           {
-            name: "execute_tool",
+            name: "execute_sentry_tool",
             arguments: {
               name: "get_issue_details",
               arguments: {

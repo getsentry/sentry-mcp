@@ -13,8 +13,8 @@ function getAllTools(): ToolRegistry {
 const allTools = {
   ...catalogTools,
   use_sentry: useSentry,
-  search_tools: createSearchToolsTool(getAllTools),
-  execute_tool: createExecuteTool(getAllTools),
+  search_sentry_tools: createSearchToolsTool(getAllTools),
+  execute_sentry_tool: createExecuteTool(getAllTools),
 } as const satisfies ToolRegistry;
 
 // Default export: object mapping tool names to tools

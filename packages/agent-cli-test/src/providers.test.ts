@@ -61,7 +61,7 @@ describe("WHOAMI_SCENARIO", () => {
     expect(prompt).toContain('Sentry MCP server named "sentry-dev"');
     expect(prompt).toContain("authenticated email address");
     expect(prompt).not.toContain('"whoami" tool');
-    expect(prompt).not.toContain("execute_tool");
+    expect(prompt).not.toContain("execute_sentry_tool");
     expect(prompt).not.toContain("exactly once");
   });
 

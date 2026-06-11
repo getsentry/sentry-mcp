@@ -42,8 +42,8 @@ describe("tool call formatting", () => {
         experimentalMode: true,
         availableToolNames: new Set([
           "find_releases",
-          "search_tools",
-          "execute_tool",
+          "search_sentry_tools",
+          "execute_sentry_tool",
         ]),
         purpose: "to list releases and their details",
       }),
@@ -57,7 +57,10 @@ describe("tool call formatting", () => {
       formatToolCallInstruction({
         toolName: "find_releases",
         experimentalMode: true,
-        availableToolNames: new Set(["search_tools", "execute_tool"]),
+        availableToolNames: new Set([
+          "search_sentry_tools",
+          "execute_sentry_tool",
+        ]),
         fallbackInstruction: "Release listing is not available",
         purpose: "to list releases and their details",
       }),
@@ -88,8 +91,8 @@ describe("tool call formatting", () => {
         experimentalMode: true,
         availableToolNames: new Set([
           "get_sentry_resource",
-          "search_tools",
-          "execute_tool",
+          "search_sentry_tools",
+          "execute_sentry_tool",
         ]),
         fallbackInstruction: "Release listing is not available",
       }),
@@ -100,13 +103,13 @@ describe("tool call formatting", () => {
     expect(
       isToolAvailableInSession(
         "update_issue",
-        new Set(["search_tools", "execute_tool"]),
+        new Set(["search_sentry_tools", "execute_sentry_tool"]),
       ),
     ).toBe(false);
     expect(
       isToolAvailableInSession(
         "update_issue",
-        new Set(["update_issue", "search_tools", "execute_tool"]),
+        new Set(["update_issue", "search_sentry_tools", "execute_sentry_tool"]),
       ),
     ).toBe(true);
     expect(isToolAvailableInSession("update_issue", undefined)).toBe(true);
@@ -117,7 +120,10 @@ describe("tool call formatting", () => {
       formatAvailableToolCallInstruction({
         toolName: "update_issue",
         experimentalMode: false,
-        availableToolNames: new Set(["search_tools", "execute_tool"]),
+        availableToolNames: new Set([
+          "search_sentry_tools",
+          "execute_sentry_tool",
+        ]),
       }),
     ).toBeNull();
     expect(
@@ -126,8 +132,8 @@ describe("tool call formatting", () => {
         experimentalMode: false,
         availableToolNames: new Set([
           "update_issue",
-          "search_tools",
-          "execute_tool",
+          "search_sentry_tools",
+          "execute_sentry_tool",
         ]),
       }),
     ).toBe("Use the Sentry tool `update_issue`");
@@ -143,8 +149,8 @@ describe("tool call formatting", () => {
         experimentalMode: true,
         availableToolNames: new Set([
           "find_releases",
-          "search_tools",
-          "execute_tool",
+          "search_sentry_tools",
+          "execute_sentry_tool",
         ]),
       }),
     ).toBe("Use the Sentry tool `find_releases`");

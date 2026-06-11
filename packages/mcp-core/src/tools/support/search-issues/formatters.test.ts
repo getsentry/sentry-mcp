@@ -160,14 +160,14 @@ describe("formatIssueResults", () => {
         availableToolNames: new Set([
           "get_sentry_resource",
           "search_events",
-          "search_tools",
-          "execute_tool",
+          "search_sentry_tools",
+          "execute_sentry_tool",
         ]),
         directToolNames: new Set([
           "get_sentry_resource",
           "search_events",
-          "search_tools",
-          "execute_tool",
+          "search_sentry_tools",
+          "execute_sentry_tool",
         ]),
       });
 
@@ -187,15 +187,15 @@ describe("formatIssueResults", () => {
         availableToolNames: new Set([
           "get_sentry_resource",
           "search_events",
-          "search_tools",
-          "execute_tool",
+          "search_sentry_tools",
+          "execute_sentry_tool",
           "update_issue",
         ]),
         directToolNames: new Set([
           "get_sentry_resource",
           "search_events",
-          "search_tools",
-          "execute_tool",
+          "search_sentry_tools",
+          "execute_sentry_tool",
           "update_issue",
         ]),
       });
