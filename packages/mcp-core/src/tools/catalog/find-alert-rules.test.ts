@@ -380,6 +380,48 @@ describe("find_alert_rules", () => {
     expect(result).not.toContain("Organization workflow");
   });
 
+  it("does not expose a workflow cursor when an overfull page is capped", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
+        () =>
+          HttpResponse.json(
+            [
+              issueAlertRule,
+              {
+                ...issueAlertRule,
+                id: "124",
+                name: "Notify frontend team",
+              },
+            ],
+            {
+              headers: {
+                Link: '<https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/?cursor=workflow-page-2>; rel="next"; results="true"; cursor="workflow-page-2"',
+              },
+            },
+          ),
+      ),
+    );
+
+    const result = await findAlertRules.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        kind: "issue",
+        projectSlug: "cloudflare-mcp",
+        query: null,
+        cursor: null,
+        limit: 1,
+      },
+      context,
+    );
+
+    expect(result).toContain("Notify backend team");
+    expect(result).not.toContain("Notify frontend team");
+    expect(result).not.toContain("More issue alert rules are available");
+    expect(result).not.toContain("workflow-page-2");
+  });
+
   it("returns next cursors for combined-rules query searches", async () => {
     useAlertRuleHandlers();
     mswServer.use(

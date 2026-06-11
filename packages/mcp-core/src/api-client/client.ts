@@ -1782,9 +1782,17 @@ export class SentryApiService {
         opts,
       );
       const body = await this.parseJsonResponse(response);
-      rules.push(
-        ...filterAttachedIssueAlertRules(IssueAlertRuleListSchema.parse(body)),
+      const attachedRules = filterAttachedIssueAlertRules(
+        IssueAlertRuleListSchema.parse(body),
       );
+      const remaining = targetLimit - rules.length;
+      if (attachedRules.length > remaining) {
+        rules.push(...attachedRules.slice(0, remaining));
+        nextCursor = null;
+        break;
+      }
+
+      rules.push(...attachedRules);
       nextCursor = getNextCursor(response.headers.get("link"));
       currentCursor = nextCursor;
     } while (rules.length < targetLimit && nextCursor);
