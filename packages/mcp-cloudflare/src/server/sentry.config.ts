@@ -1,8 +1,8 @@
-import type { Env } from "./types";
-import { LIB_VERSION } from "@sentry/mcp-core/version";
 import * as Sentry from "@sentry/cloudflare";
 import type { CloudflareOptions } from "@sentry/cloudflare";
 import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
+import { LIB_VERSION } from "@sentry/mcp-core/version";
+import type { Env } from "./types";
 
 export default function getSentryConfig(env: Env): CloudflareOptions {
   const versionId = env.CF_VERSION_METADATA?.id;
@@ -24,11 +24,7 @@ export default function getSentryConfig(env: Env): CloudflareOptions {
       (process.env.NODE_ENV !== "production" ? "development" : "production"),
     enableLogs: true,
     enableMetrics: true,
-    integrations: [
-      Sentry.consoleLoggingIntegration(),
-      Sentry.zodErrorsIntegration(),
-      Sentry.vercelAIIntegration(),
-    ],
+    integrations: [Sentry.zodErrorsIntegration(), Sentry.vercelAIIntegration()],
   };
 }
 

@@ -271,10 +271,26 @@ Additional attributes on MCP response metrics:
 - `app.server.mode.agent` - `true` when the MCP URL includes `?agent=1`
 - `app.server.mode.experimental` - `true` when the MCP URL includes `?experimental=1`
 
+Additional attributes on direct OAuth client endpoints:
+
+- `app.client.family` - Bucketed client User-Agent on `/oauth/token` and
+  `/oauth/register`
+
 Optional local rate-limit attributes:
 
 - `app.response.reason` - `local_rate_limit`
 - `app.rate_limit.scope` - `ip` or `user`
+
+Optional OAuth error attributes:
+
+- `app.oauth.error` - Bounded OAuth error code such as `invalid_token`,
+  `invalid_grant`, or `other`
+- `app.oauth.error_description` - Low-cardinality description bucket such as
+  `invalid_access_token` or `grant_not_found`
+- `app.oauth.request.token_shape` - 401 bearer token shape such as `missing`,
+  `wrapper`, or `malformed`
+- `app.oauth.grant.id_hash` - Non-secret grant fingerprint on grant lifecycle
+  logs
 
 Interpretation:
 
@@ -286,6 +302,9 @@ Interpretation:
 - Use `sum(app.server.response)` filtered by
   `app.response.reason=local_rate_limit` to measure when we rate-limited the
   customer
+- Use `sum(app.server.response)` filtered by `app.oauth.error=invalid_token`
+  and grouped by `app.client.family`, `app.oauth.error_description`, and
+  `app.oauth.request.token_shape` for OAuth failure attribution
 - Upstream/provider 429s increment `app.server.response` with status `429`, but
   do not include `app.response.reason`
 

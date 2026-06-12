@@ -124,6 +124,11 @@ interface LogOptions {
 - Console: JSON Lines format for log aggregation
 - Sentry: Sends logs to Sentry for monitoring (uses `Sentry.init` config)
 
+Cloudflare Workers should not enable Sentry's `consoleLoggingIntegration`
+alongside this LogTape setup. The LogTape Sentry sink is the canonical Sentry
+Logs path; capturing the console sink as well duplicates every structured
+record as a high-cardinality JSON-message log.
+
 ## HTTP Request Logging
 
 Cloudflare middleware logs all HTTP requests automatically:

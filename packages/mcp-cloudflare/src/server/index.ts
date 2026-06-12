@@ -1,5 +1,6 @@
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import * as Sentry from "@sentry/cloudflare";
+import { logWarn } from "@sentry/mcp-core/telem/logging";
 import { SCOPES } from "../constants";
 import app from "./app";
 import { resolveClientFamily } from "./lib/client-family";
@@ -7,12 +8,17 @@ import { redirectUriHasUserInfo } from "./lib/html-utils";
 import sentryMcpHandler from "./lib/mcp-handler";
 import {
   type RateLimitScope,
-  annotateMcpRequestSpan,
+  annotateTrackedRequestSpan,
   extractResponseMetricOptions,
   recordResponseMetric,
   stripResponseMetricHeaders,
 } from "./metrics";
 import { tokenExchangeCallback } from "./oauth";
+import {
+  bucketOAuthErrorCode,
+  bucketOAuthErrorDescription,
+  getOAuthErrorTelemetry,
+} from "./oauth/telemetry";
 import getSentryConfig from "./sentry.config";
 import type { Env } from "./types";
 import { getClientIp } from "./utils/client-ip";
@@ -79,7 +85,7 @@ function patchWwwAuthenticate(response: Response, url: URL): Response {
   return newResponse;
 }
 
-function finalizeResponse(
+async function finalizeResponse(
   request: Request,
   url: URL,
   response: Response,
@@ -87,17 +93,27 @@ function finalizeResponse(
     rateLimitScope?: RateLimitScope;
     responseReason?: "local_rate_limit";
   },
-): Response {
+): Promise<Response> {
   const responseMetricOptions = extractResponseMetricOptions(response);
   const responseWithoutMetricHeaders = stripResponseMetricHeaders(response);
+  const oauthErrorTelemetry =
+    response.status >= 400 &&
+    (url.pathname.startsWith("/mcp") || url.pathname.startsWith("/oauth"))
+      ? await getOAuthErrorTelemetry(request, responseWithoutMetricHeaders)
+      : {};
   const finalized = isPublicMetadataEndpoint(url.pathname)
     ? addCorsHeaders(responseWithoutMetricHeaders)
     : stripCorsHeaders(responseWithoutMetricHeaders);
 
-  annotateMcpRequestSpan(request, url);
-  recordResponseMetric(request, finalized, {
+  const metricOptions = {
     ...responseMetricOptions,
+    ...oauthErrorTelemetry,
     ...options,
+  };
+
+  annotateTrackedRequestSpan(request, url, finalized, metricOptions);
+  recordResponseMetric(request, finalized, {
+    ...metricOptions,
   });
   return finalized;
 }
@@ -229,6 +245,18 @@ const wrappedOAuthProvider = {
       // Sentry access tokens also have a 30-day lifetime, so re-auth is
       // required after this window regardless.
       refreshTokenTTL: 30 * 24 * 60 * 60,
+      onError: ({ status, code, description }) => {
+        logWarn(`OAuth error response: ${status} ${code} - ${description}`, {
+          loggerScope: ["cloudflare", "oauth", "provider"],
+          extra: {
+            "http.response.status_code": status,
+            "app.oauth.error": bucketOAuthErrorCode(code),
+            "app.oauth.error_description":
+              bucketOAuthErrorDescription(description),
+            "app.client.family": clientFamily,
+          },
+        });
+      },
     });
 
     const response = await oAuthProvider.fetch(request, env, ctx);

@@ -17,6 +17,7 @@ import { logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ServerContext } from "@sentry/mcp-core/types";
 import { createMcpHandler } from "agents/mcp";
 import { annotateResponseMetric } from "../metrics";
+import { getOAuthGrantTelemetry } from "../oauth/telemetry";
 import type { WorkerProps } from "../types";
 import type { Env } from "../types";
 import {
@@ -62,6 +63,30 @@ export function getRequestGrantId(request: Request): string | null {
   return parts[1] || null;
 }
 
+type GrantRevokedReason =
+  | "stale_props_no_refresh"
+  | "upstream_rejected"
+  | "upstream_rejected_in_use";
+
+function logGrantReauthorization(
+  reason: GrantRevokedReason,
+  userId: string,
+  clientId: string,
+  clientFamily: string,
+  grantId: string | null,
+): void {
+  logWarn("OAuth grant rejected for reauthorization", {
+    loggerScope: ["cloudflare", "mcp-handler"],
+    extra: {
+      "app.oauth.grant_revoked.reason": reason,
+      "app.client.family": clientFamily,
+      userId,
+      clientId,
+      ...getOAuthGrantTelemetry(grantId),
+    },
+  });
+}
+
 /**
  * Revokes the OAuth grant for the current request in the background, then
  * returns a 401 response prompting re-authorization.
@@ -73,8 +98,18 @@ function revokeStaleGrant(
   clientId: string,
   grantId: string | null,
   logLabel: string,
+  revokeReason: Exclude<GrantRevokedReason, "upstream_rejected_in_use">,
+  clientFamily: string,
   errorDescription = "Token requires re-authorization",
 ): Response {
+  logGrantReauthorization(
+    revokeReason,
+    userId,
+    clientId,
+    clientFamily,
+    grantId,
+  );
+
   ctx.waitUntil(
     (async () => {
       if (!grantId) {
@@ -93,7 +128,12 @@ function revokeStaleGrant(
       } catch (err) {
         logWarn(`Failed to revoke ${logLabel}`, {
           loggerScope: ["cloudflare", "mcp-handler"],
-          extra: { error: String(err), clientId, userId, grantId },
+          extra: {
+            error: String(err),
+            clientId,
+            userId,
+            ...getOAuthGrantTelemetry(grantId),
+          },
         });
       }
     })(),
@@ -189,6 +229,8 @@ const mcpHandler: ExportedHandler<Env> = {
         clientId,
         requestGrantId,
         "legacy grant",
+        "stale_props_no_refresh",
+        clientFamily,
       );
     }
 
@@ -210,6 +252,8 @@ const mcpHandler: ExportedHandler<Env> = {
         clientId,
         requestGrantId,
         "stale grant (missing refresh token)",
+        "stale_props_no_refresh",
+        clientFamily,
       );
     }
 
@@ -229,6 +273,8 @@ const mcpHandler: ExportedHandler<Env> = {
         clientId,
         requestGrantId,
         "stale grant (invalid upstream token)",
+        "upstream_rejected",
+        clientFamily,
         "Upstream authorization is no longer valid",
       );
     }
@@ -363,6 +409,13 @@ const mcpHandler: ExportedHandler<Env> = {
             "app.client.family": clientFamily,
           },
         });
+        logGrantReauthorization(
+          "upstream_rejected_in_use",
+          userId,
+          clientId,
+          clientFamily,
+          requestGrantId,
+        );
         ctx.waitUntil(
           (async () => {
             try {
@@ -374,7 +427,7 @@ const mcpHandler: ExportedHandler<Env> = {
                   error: String(err),
                   clientId,
                   userId,
-                  grantId: requestGrantId,
+                  ...getOAuthGrantTelemetry(requestGrantId),
                 },
               });
             }

@@ -8,7 +8,8 @@
     },
     {
       "namespace": "app",
-      "description": "Describes attributes related to client-side applications (e.g. web apps or mobile apps).\n"
+      "description": "Describes attributes related to client-side applications (e.g. web apps or mobile apps), plus Sentry MCP application-owned telemetry attributes.\n",
+      "custom": true
     },
     {
       "namespace": "artifact",
