@@ -7,6 +7,8 @@ const {
   mockOAuthProviderFetch,
   mockGetClientIp,
   mockCheckRateLimit,
+  mockActiveSpan,
+  mockMetricsCount,
 } = vi.hoisted(() => {
   const mockOAuthProviderFetch = vi.fn();
   const MockOAuthProvider = vi.fn(function MockOAuthProvider() {
@@ -21,11 +23,24 @@ const {
     mockOAuthProviderFetch,
     mockGetClientIp,
     mockCheckRateLimit: vi.fn(),
+    mockActiveSpan: {
+      setAttribute: vi.fn(),
+    },
+    mockMetricsCount: vi.fn(),
   };
 });
 
 vi.mock("@cloudflare/workers-oauth-provider", () => ({
   default: MockOAuthProvider,
+}));
+
+vi.mock("@sentry/cloudflare", () => ({
+  getActiveSpan: vi.fn(() => mockActiveSpan),
+  metrics: {
+    count: mockMetricsCount,
+  },
+  setUser: vi.fn(),
+  withSentry: vi.fn((_config, handler) => handler),
 }));
 
 vi.mock("./app", () => ({
@@ -354,5 +369,52 @@ describe("worker entrypoint", () => {
       'Bearer realm="OAuth", error="invalid_token", error_description="Missing, invalid, or expired access token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp"',
     );
     expect(header.match(/resource_metadata\s*=/gi)?.length).toBe(1);
+  });
+
+  it("annotates OAuth provider invalid-token responses without logging token values", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate":
+            'Bearer realm="OAuth", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource", error="invalid_token", error_description="Missing or invalid access token"',
+        },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer user-id:grant-id:secret",
+          "User-Agent": "Claude-Code/1.0",
+        },
+      }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
+      "app.oauth.error",
+      "invalid_token",
+    );
+    expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
+      "app.oauth.error_description",
+      "missing_or_invalid_access_token",
+    );
+    expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
+      "app.oauth.request.token_shape",
+      "wrapper",
+    );
+    expect(mockMetricsCount).toHaveBeenCalledWith("app.server.response", 1, {
+      attributes: expect.objectContaining({
+        "app.client.family": "claude-code",
+        "app.oauth.error": "invalid_token",
+        "app.oauth.error_description": "missing_or_invalid_access_token",
+        "app.oauth.request.token_shape": "wrapper",
+        "http.response.status_code": 401,
+      }),
+    });
   });
 });

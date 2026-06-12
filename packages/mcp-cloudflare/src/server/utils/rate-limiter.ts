@@ -1,4 +1,5 @@
 import type { RateLimit } from "@cloudflare/workers-types";
+import { logError } from "@sentry/mcp-core/telem/logging";
 
 export const MCP_RATE_LIMIT_EXCEEDED_MESSAGE =
   "Rate limit exceeded. Please wait before trying again.";
@@ -99,7 +100,13 @@ export async function checkRateLimit(
   } catch (error) {
     // If rate limiter fails, log error but allow request to proceed
     // This prevents rate limiter issues from breaking the service
-    console.error("Rate limiter error:", error);
+    logError(error, {
+      loggerScope: ["cloudflare", "rate-limiter"],
+      extra: {
+        message: "Rate limiter error",
+        keyPrefix: options.keyPrefix,
+      },
+    });
     return { allowed: true };
   }
 }

@@ -71,6 +71,13 @@ Attributes:
 
 `upstream_rejected_in_use` indicates Sentry returned 401 to a tool call while the stored access token still looked locally valid — the sub-30d sign-out signal users typically report. The grant is revoked via `env.OAUTH_PROVIDER.revokeGrant` under `ctx.waitUntil`, short-circuiting the death-spiral where subsequent refreshes kept handing out wrapper tokens backed by a dead upstream token.
 
+The handler also emits a low-volume Sentry Log message,
+`OAuth grant rejected for reauthorization`, when it decides to force a client
+to reauthorize. This log carries the same `app.oauth.grant_revoked.reason`,
+`app.client.family`, `userId`, `clientId`, and `app.oauth.grant.id_hash`.
+Use the hash to correlate one grant/session without logging raw bearer-token
+components.
+
 ### `app.oauth.callback_completed` (counter)
 
 Fired on a successful `/oauth/callback`. Pairs with `grant_revoked` to derive per-user session lifetime.
@@ -92,6 +99,23 @@ Attributes:
 
 `OAuth authorization failed: Invalid redirect URI` (both GET and POST `/oauth/authorize`) and `Redirect URI not registered for client on callback` now carry `clientId`, `redirectUri`, `registeredUris`, `clientName` as `extra` fields.
 
+The OAuth provider itself emits high-volume logs shaped like
+`OAuth error response: 401 invalid_token - Invalid access token`. Treat those
+as the provider-level count source; do not add a second high-volume app log for
+the same response. These provider logs currently do not carry `user.id` or
+`app.client.family`, so use spans for client attribution and the handler
+reauthorization log for per-user/session attribution.
+
+Tracked `/mcp` and direct OAuth endpoint spans/response metrics include:
+
+- `http.response.status_code`
+- `http.route`
+- `app.route.group`
+- `app.client.family` for `/mcp`, `/oauth/token`, and `/oauth/register`
+- `app.oauth.error` for OAuth error responses, for example `invalid_token`
+- `app.oauth.error_description` as a bounded bucket, for example `invalid_access_token`
+- `app.oauth.request.token_shape` on 401s, for example `missing`, `wrapper`, or `malformed`
+
 ## Diagnostic queries
 
 Copy/paste-ready. All use the Sentry MCP's `search_events` natural-language query.
@@ -100,12 +124,14 @@ Copy/paste-ready. All use the Sentry MCP's `search_events` natural-language quer
 
 ```
 metric app.oauth.grant_revoked filtered by user.id:"<id>" sum of value grouped by app.oauth.grant_revoked.reason over 30 days
+logs message:"OAuth grant rejected for reauthorization" userId:"<id>" grouped by app.oauth.grant_revoked.reason, app.client.family, clientId, app.oauth.grant.id_hash over 30 days
 ```
 
 ### Per-client sign-out rate
 
 ```
 metric app.oauth.grant_revoked sum of value grouped by app.client.family, app.oauth.grant_revoked.reason over 24 hours
+spans /mcp http.response.status_code:401 grouped by app.client.family, app.oauth.error, app.oauth.request.token_shape over 24 hours
 ```
 
 ### Probe-failure status distribution (is Sentry ever returning 403/400?)
