@@ -20,6 +20,31 @@ export function sanitizeHrefUrl(url: string): string {
 }
 
 /**
+ * Rejects redirect URIs carrying a userinfo component (e.g.
+ * `https://mcp.sentry.dev@example.io/callback`). Returns true if userinfo
+ *  is present or the URI is unparseable.
+ */
+export function redirectUriHasUserInfo(uri: string): boolean {
+  try {
+    const parsed = new URL(uri.trim());
+    return parsed.username !== "" || parsed.password !== "";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Returns the host of a URL, or an empty string if it can't be parsed.
+ */
+export function getUrlHost(url: string): string {
+  try {
+    return new URL(url.trim()).host;
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Sanitizes HTML content to prevent XSS attacks
  */
 export function sanitizeHtml(unsafe: string): string {

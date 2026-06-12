@@ -287,6 +287,50 @@ describe("worker entrypoint", () => {
     expect(header.match(/resource_metadata\s*=/gi)?.length).toBe(1);
   });
 
+  it("rejects client registration with a userinfo-spoofed redirect URI", async () => {
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/oauth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_name: "Sentry MCP",
+          redirect_uris: ["https://mcp.sentry.dev@example.io/callback"],
+        }),
+      }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("invalid_redirect_uri");
+    expect(mockOAuthProviderFetch).not.toHaveBeenCalled();
+  });
+
+  it("allows client registration with legitimate redirect URIs", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ client_id: "abc" }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/oauth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_name: "Test Client",
+          redirect_uris: ["https://example.com/callback"],
+        }),
+      }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(201);
+    expect(mockOAuthProviderFetch).toHaveBeenCalled();
+  });
+
   it("ignores commas inside quoted error_description values when parsing the challenge", async () => {
     mockOAuthProviderFetch.mockResolvedValueOnce(
       new Response("unauthorized", {

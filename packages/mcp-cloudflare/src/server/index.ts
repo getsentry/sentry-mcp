@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/cloudflare";
 import { SCOPES } from "../constants";
 import app from "./app";
 import { resolveClientFamily } from "./lib/client-family";
+import { redirectUriHasUserInfo } from "./lib/html-utils";
 import sentryMcpHandler from "./lib/mcp-handler";
 import {
   type RateLimitScope,
@@ -173,6 +174,42 @@ const wrappedOAuthProvider = {
 
     const clientFamily = resolveClientFamily(request.headers.get("user-agent"));
     Sentry.getActiveSpan()?.setAttribute("app.client.family", clientFamily);
+
+    // Reject registrations with userinfo-spoofed redirect URIs before the
+    // library stores the client (e.g. host@example.io).
+    if (request.method === "POST" && url.pathname === "/oauth/register") {
+      try {
+        const body = (await request.clone().json()) as {
+          redirect_uris?: unknown;
+        };
+        const redirectUris = Array.isArray(body.redirect_uris)
+          ? body.redirect_uris
+          : [];
+        if (
+          redirectUris.some(
+            (uri) => typeof uri === "string" && redirectUriHasUserInfo(uri),
+          )
+        ) {
+          return finalizeResponse(
+            request,
+            url,
+            new Response(
+              JSON.stringify({
+                error: "invalid_redirect_uri",
+                error_description:
+                  "redirect_uris must not contain a userinfo component",
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+              },
+            ),
+          );
+        }
+      } catch {
+        // Malformed body — let the library produce its own error.
+      }
+    }
 
     // --- Phase 2: Let the OAuth library handle the request ---
     // We normalize any CORS headers it returns in the response handling below.
