@@ -36,6 +36,12 @@
  * ```
  */
 import { z } from "zod";
+import {
+  zAutofixPostResponse,
+  zGroupExternalIssueResponse,
+  zOrganizationEventsResponseDict,
+  zTagKeyDetailsDict,
+} from "@sentry/api/zod";
 
 /**
  * Schema for Sentry API error responses.
@@ -654,13 +660,8 @@ export const IssueCommentListSchema = z.array(IssueCommentSchema);
  * - `src/sentry/tagstore/types.py` (`TagKeySerializerResponse`)
  * - `src/sentry/api/endpoints/organization_tags.py`
  */
-export const TagSchema = z
-  .object({
-    key: z.string(),
-    name: z.string(),
-    totalValues: z.number().nullable().optional(),
-    uniqueValues: z.number().nullable().optional(),
-  })
+export const TagSchema = zTagKeyDetailsDict
+  .pick({ key: true, name: true, totalValues: true, uniqueValues: true })
   .transform((tag) => ({
     key: tag.key,
     name: tag.name,
@@ -1045,14 +1046,13 @@ export const EventSchema = z.union([
   UnknownEventSchema,
 ]);
 
-export const EventsResponseSchema = z.object({
-  data: z.array(z.unknown()),
-  meta: z
-    .object({
-      fields: z.record(z.string(), z.string()),
-    })
-    .passthrough(),
-});
+/**
+ * Uses auto-generated schema from `@sentry/api/zod`.
+ *
+ * The generated schema includes optional `datasetReason`, `isMetricsData`, and
+ * `isMetricsExtractedData` fields on `meta` beyond the required `fields`.
+ */
+export const EventsResponseSchema = zOrganizationEventsResponseDict;
 
 // https://us.sentry.io/api/0/organizations/sentry/events/?dataset=errors&field=issue&field=title&field=project&field=timestamp&field=trace&per_page=5&query=event.type%3Aerror&referrer=sentry-mcp&sort=-timestamp&statsPeriod=1w
 export const ErrorsSearchResponseSchema = EventsResponseSchema.extend({
@@ -1086,15 +1086,13 @@ export const SpansSearchResponseSchema = EventsResponseSchema.extend({
 /**
  * The Seer autofix POST endpoint currently returns a simple numeric `run_id`.
  *
+ * Uses auto-generated schema from `@sentry/api/zod`.
+ *
  * Upstream source of truth in getsentry/sentry:
  * - `src/sentry/seer/endpoints/group_ai_autofix.py`
  * - `src/sentry/seer/autofix/types.py` (`AutofixPostResponse`)
  */
-export const AutofixRunSchema = z
-  .object({
-    run_id: z.number(),
-  })
-  .passthrough();
+export const AutofixRunSchema = zAutofixPostResponse.passthrough();
 
 // Run statuses from Sentry's `SeerRunState` (`seer/agent/client_models.py`).
 const AutofixStatusSchema = z.enum([
@@ -1215,18 +1213,13 @@ export const IssueTagValuesSchema = z
 /**
  * Schema for external issue link (e.g., Jira, GitHub Issues).
  *
+ * Uses auto-generated schema from `@sentry/api/zod`.
+ *
  * Represents a link between a Sentry issue and an external issue tracking
  * system like Jira, GitHub Issues, GitLab, etc.
  */
-export const ExternalIssueSchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  issueId: z.union([z.string(), z.number()]),
-  serviceType: z.string(),
-  displayName: z.string(),
-  webUrl: z.string(),
-});
-
-export const ExternalIssueListSchema = z.array(ExternalIssueSchema);
+export const ExternalIssueListSchema = zGroupExternalIssueResponse;
+export const ExternalIssueSchema = zGroupExternalIssueResponse.element;
 
 /**
  * Schema for Sentry trace metadata response.
