@@ -60,6 +60,7 @@ canonical workflow and required docs live in [../AGENTS.md](../AGENTS.md)
 
 - [specs/README.md](specs/README.md) - Specs index
 - [specs/embedded-agent-openai-routing.md](specs/embedded-agent-openai-routing.md) - Embedded agent OpenAI routing spec
+- [specs/remembered-oauth-skills.md](specs/remembered-oauth-skills.md) - Remembered OAuth skill defaults spec
 - [specs/search-events.md](specs/search-events.md) - Search Events spec
 - [specs/subpath-constraints.md](specs/subpath-constraints.md) - Subpath constraints spec
 

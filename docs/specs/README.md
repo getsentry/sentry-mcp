@@ -45,6 +45,13 @@ agent behavior so Azure compatibility no longer depends on hidden heuristics.
 - **Status**: 📝 Proposed
 - **Key Benefits**: Preserves Azure compatibility, keeps unknown OpenAI-compatible providers predictable, and removes alias-based footguns
 
+### [remembered-oauth-skills](./remembered-oauth-skills.md)
+A spec for remembering prior remote OAuth skill selections in a bounded signed
+browser cookie and using them as future consent UI defaults.
+
+- **Status**: 📝 Proposed
+- **Key Benefits**: Reduces repeated consent work without making remembered values an authorization source
+
 ### [search-events](./search-events.md)
 A unified event search tool that uses OpenAI GPT-5 to translate natural language queries into Sentry's search syntax. Replaced the separate `find_errors` and `find_transactions` tools with a single, more powerful interface.
 

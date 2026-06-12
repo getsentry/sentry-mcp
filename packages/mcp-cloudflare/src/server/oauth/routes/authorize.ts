@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import * as Sentry from "@sentry/cloudflare";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import {
+  getRememberedSkillsForClient,
   renderApprovalDialog,
   parseRedirectApproval,
 } from "../../lib/approval-dialog";
@@ -31,24 +32,27 @@ async function redirectToUpstream(
   env: Env,
   request: Request,
   oauthReqInfo: AuthRequest | AuthRequestWithSkills,
-  headers: Record<string, string> = {},
+  headers: HeadersInit = {},
   stateOverride?: string,
 ) {
+  const responseHeaders = new Headers(headers);
+  responseHeaders.set(
+    "location",
+    getUpstreamAuthorizeUrl({
+      upstream_url: new URL(
+        SENTRY_AUTH_URL,
+        `https://${env.SENTRY_HOST || "sentry.io"}`,
+      ).href,
+      scope: Object.keys(SCOPES).join(" "),
+      client_id: env.SENTRY_CLIENT_ID,
+      redirect_uri: new URL("/oauth/callback", request.url).href,
+      state: stateOverride ?? btoa(JSON.stringify(oauthReqInfo)),
+    }),
+  );
+
   return new Response(null, {
     status: 302,
-    headers: {
-      ...headers,
-      location: getUpstreamAuthorizeUrl({
-        upstream_url: new URL(
-          SENTRY_AUTH_URL,
-          `https://${env.SENTRY_HOST || "sentry.io"}`,
-        ).href,
-        scope: Object.keys(SCOPES).join(" "),
-        client_id: env.SENTRY_CLIENT_ID,
-        redirect_uri: new URL("/oauth/callback", request.url).href,
-        state: stateOverride ?? btoa(JSON.stringify(oauthReqInfo)),
-      }),
-    },
+    headers: responseHeaders,
   });
 }
 
@@ -172,6 +176,11 @@ export default new Hono<{ Bindings: Env }>()
     // }
 
     const client = await c.env.OAUTH_PROVIDER.lookupClient(clientId);
+    const defaultSkills = await getRememberedSkillsForClient(
+      c.req.raw.headers.get("Cookie"),
+      clientId,
+      c.env.COOKIE_SECRET,
+    );
     const response = await renderApprovalDialog(c.req.raw, {
       client,
       server: {
@@ -181,6 +190,7 @@ export default new Hono<{ Bindings: Env }>()
       redirectUri: oauthReqInfoWithResource.redirectUri,
       state: { oauthReqInfo: oauthReqInfoWithResource },
       cookieSecret: c.env.COOKIE_SECRET,
+      defaultSkills,
     });
 
     Sentry.metrics.count("app.oauth.consent_prompted", 1, {
