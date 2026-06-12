@@ -110,9 +110,9 @@ pnpm run --filter @sentry/mcp-core generate-definitions
 
 ## QA Playbook
 
-For MCP tool QA, follow `.agents/skills/qa/SKILL.md`: stdio-first local CLI and
-real agent clients; Cloudflare HTTP or `/mcp` only for transport, OAuth,
-routing, or hosted-server compatibility.
+For MCP tool QA, use the `mcp-qa` skill at `.agents/skills/mcp-qa/SKILL.md`:
+stdio-first local CLI and real agent clients; Cloudflare HTTP or `/mcp` only
+for transport, OAuth, routing, or hosted-server compatibility.
 
 ## Task Management
 

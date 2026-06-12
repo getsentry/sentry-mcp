@@ -8,7 +8,7 @@ Use this policy when adding a tool, changing formatted handler output, updating
 snapshots, or QAing MCP behavior. For the full tool implementation flow, see
 [adding-tools.md](adding-tools.md). For snapshot requirements, see
 [../testing/overview.md](../testing/overview.md). For end-to-end MCP
-validation, see [.agents/skills/qa/SKILL.md](../../.agents/skills/qa/SKILL.md).
+validation, see [.agents/skills/mcp-qa/SKILL.md](../../.agents/skills/mcp-qa/SKILL.md).
 
 ## Response Contract
 
@@ -156,7 +156,7 @@ For output-format changes:
 
 - Run the normal quality gate from [quality-checks.md](quality-checks.md).
 - Use the stdio MCP QA path in
-  [.agents/skills/qa/SKILL.md](../../.agents/skills/qa/SKILL.md).
+  [.agents/skills/mcp-qa/SKILL.md](../../.agents/skills/mcp-qa/SKILL.md).
 - Inspect the raw MCP tool result when possible, not only the LLM's final
   answer. The test client's final answer can add model-specific phrasing that is
   not part of the tool response.

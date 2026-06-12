@@ -1,9 +1,7 @@
 ---
-name: qa
-description: QA MCP tool changes with local CLI and real agent clients. Use when explicitly invoked via /qa to verify changes work end-to-end.
+name: mcp-qa
+description: QA MCP tool changes with local CLI and real agent clients. Use when explicitly invoked via /mcp-qa or when asked to QA MCP tool changes end-to-end.
 ---
-
-# MCP QA Playbook
 
 Verify MCP tool behavior end-to-end before committing or creating a PR. Prefer
 agent-callable paths over browser or inspector workflows.
