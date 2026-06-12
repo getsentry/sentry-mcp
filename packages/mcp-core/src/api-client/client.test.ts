@@ -1470,41 +1470,47 @@ describe("API query builders", () => {
       });
       const urls: string[] = [];
 
-      globalThis.fetch = vi.fn().mockImplementation((url: string) => {
-        urls.push(url);
-        const requestUrl = new URL(url);
-        const attributeType = requestUrl.searchParams.get("attributeType");
-        const body =
-          attributeType === "boolean"
-            ? [
-                {
-                  key: "tags[enabled,boolean]",
-                  name: "enabled",
-                  attributeType: "boolean",
-                  attributeSource: { source_type: "user" },
-                },
-              ]
-            : [
-                {
-                  key: "tags[type]",
-                  name: "type",
-                  attributeType: "string",
-                  attributeSource: {
-                    source_type: "sentry",
-                    is_transformed_alias: true,
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((input: string | Request) => {
+          const url =
+            typeof input === "string"
+              ? input
+              : input instanceof Request
+                ? input.url
+                : String(input);
+          urls.push(url);
+          const requestUrl = new URL(url);
+          const attributeType = requestUrl.searchParams.get("attributeType");
+          const body =
+            attributeType === "boolean"
+              ? [
+                  {
+                    key: "tags[enabled,boolean]",
+                    name: "enabled",
+                    attributeType: "boolean",
+                    attributeSource: { source_type: "user" },
                   },
-                },
-              ];
+                ]
+              : [
+                  {
+                    key: "tags[type]",
+                    name: "type",
+                    attributeType: "string",
+                    attributeSource: {
+                      source_type: "sentry",
+                      is_transformed_alias: true,
+                    },
+                  },
+                ];
 
-        return Promise.resolve({
-          ok: true,
-          headers: {
-            get: (key: string) =>
-              key === "content-type" ? "application/json" : null,
-          },
-          json: () => Promise.resolve(body),
+          return Promise.resolve(
+            new Response(JSON.stringify(body), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
         });
-      });
 
       const result = await apiService.listTraceItemAttributes({
         organizationSlug: "test-org",

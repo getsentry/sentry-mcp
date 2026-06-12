@@ -258,11 +258,12 @@ describe("fetchCustomAttributes", () => {
         ),
       );
 
-      // Should throw ApiPermissionError with the improved error message
-      // The SDK wraps errors with context, but the detail message is preserved
+      // Should throw ApiPermissionError with the improved error message.
       await expect(
         fetchCustomAttributes(apiService, "test-org", "spans"),
-      ).rejects.toThrow("listTraceItemAttributes(string): 403 Forbidden");
+      ).rejects.toThrow(
+        "You do not have access to query across multiple projects. Please select a project for your query.",
+      );
 
       // Should NOT log - the caller handles logging
     });
@@ -280,11 +281,10 @@ describe("fetchCustomAttributes", () => {
         ),
       );
 
-      // Should throw ApiPermissionError with the raw error message
-      // The SDK wraps errors with context prefix
+      // Should throw ApiPermissionError with the API detail message.
       await expect(
         fetchCustomAttributes(apiService, "test-org", "logs", "project-123"),
-      ).rejects.toThrow("listTraceItemAttributes(string): 403 Forbidden");
+      ).rejects.toThrow("Permission denied");
     });
 
     it("should throw 404 errors for errors dataset", async () => {
@@ -326,9 +326,7 @@ describe("fetchCustomAttributes", () => {
       ).catch((e) => e);
 
       expect(error).toBeInstanceOf(Error);
-      expect(error.message).toBe(
-        "listTraceItemAttributes(string): 500 Internal Server Error",
-      );
+      expect(error.message).toBe("Internal server error");
     });
 
     it("should re-throw 502 errors", async () => {

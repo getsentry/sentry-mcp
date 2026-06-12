@@ -312,12 +312,13 @@ function parseTraceItemAttributes(
   body: unknown,
   fallbackType: TraceItemAttributeType,
 ): TraceItemAttribute[] {
-  if (!Array.isArray(body)) {
+  const values = isRecord(body) && Array.isArray(body.data) ? body.data : body;
+  if (!Array.isArray(values)) {
     return [];
   }
 
   const attributes: TraceItemAttribute[] = [];
-  for (const value of body) {
+  for (const value of values) {
     if (!isRecord(value) || typeof value.key !== "string") {
       continue;
     }
@@ -2633,6 +2634,17 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ReplayList> {
+    if (statsPeriod && (start || end)) {
+      throw new ApiValidationError(
+        "Cannot use both statsPeriod and start/end parameters",
+      );
+    }
+    if ((start && !end) || (!start && end)) {
+      throw new ApiValidationError(
+        "Both start and end parameters must be provided together",
+      );
+    }
+
     const result = await sdkListAnOrganizationSReplays({
       ...this.getSdkConfig(opts),
       path: { organization_id_or_slug: organizationSlug },
@@ -2643,8 +2655,7 @@ export class SentryApiService {
         statsPeriod,
         start,
         end,
-        // SDK types environment as a single string
-        environment: Array.isArray(environment) ? environment[0] : environment,
+        environment,
         ...(projectId ? { project: [Number(projectId)] } : {}),
         // SDK types field as a strict enum — the API accepts arbitrary strings at runtime
         ...(fields?.length
@@ -2655,7 +2666,7 @@ export class SentryApiService {
             }
           : {}),
       },
-    });
+    } as Parameters<typeof sdkListAnOrganizationSReplays>[0]);
     const data = this.unwrapSdkResult(result, "searchReplays");
 
     return ReplayListResponseSchema.parse(data).data;
