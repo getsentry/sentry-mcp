@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import oauthRoute from "./index";
 import type { Env } from "../types";
 import { verifyAndParseState, signState } from "./state";
+import { SKILL_PREFERENCES_COOKIE_NAME } from "../lib/approval-dialog";
 
 // Mock the OAuth provider
 const mockOAuthProvider = {
@@ -16,6 +17,73 @@ function createTestApp(env: Partial<Env> = {}) {
   const app = new Hono<{ Bindings: Env }>();
   app.route("/oauth", oauthRoute);
   return app;
+}
+
+function skillInputAttributes(html: string, skillId: string): string {
+  const match = html.match(
+    new RegExp(
+      `<input type="checkbox" name="skill" value="${skillId}"([^>]*)>`,
+    ),
+  );
+  return match?.[1] ?? "";
+}
+
+function expectSkillChecked(html: string, skillId: string): void {
+  expect(skillInputAttributes(html, skillId)).toContain("checked");
+}
+
+function expectSkillUnchecked(html: string, skillId: string): void {
+  expect(skillInputAttributes(html, skillId)).not.toContain("checked");
+}
+
+function extractCookiePair(setCookie: string, cookieName: string): string {
+  const marker = `${cookieName}=`;
+  const start = setCookie.indexOf(marker);
+  expect(start).toBeGreaterThanOrEqual(0);
+  const rest = setCookie.slice(start);
+  const end = rest.indexOf(";");
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+async function createSkillPreferenceCookie(
+  app: ReturnType<typeof createTestApp>,
+  testEnv: Partial<Env>,
+  clientId: string,
+  skills: string[],
+): Promise<string> {
+  const formData = new FormData();
+  const signedState = await signState(
+    {
+      req: {
+        oauthReqInfo: {
+          clientId,
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+        },
+      },
+      iat: Date.now(),
+      exp: Date.now() + 10 * 60 * 1000,
+    },
+    testEnv.COOKIE_SECRET!,
+  );
+  formData.append("state", signedState);
+  for (const skill of skills) {
+    formData.append("skill", skill);
+  }
+
+  const response = await app.fetch(
+    new Request("http://localhost/oauth/authorize", {
+      method: "POST",
+      body: formData,
+    }),
+    testEnv as Env,
+  );
+  expect(response.status).toBe(302);
+
+  return extractCookiePair(
+    response.headers.get("Set-Cookie") ?? "",
+    SKILL_PREFERENCES_COOKIE_NAME,
+  );
 }
 
 describe("oauth authorize routes", () => {
@@ -113,6 +181,118 @@ describe("oauth authorize routes", () => {
       expect(await response.text()).toBe("Invalid redirect URI");
       expect(mockOAuthProvider.lookupClient).not.toHaveBeenCalled();
     });
+
+    it("preselects remembered skills for the matching client ID", async () => {
+      mockOAuthProvider.lookupClient.mockResolvedValue({
+        clientId: "test-client",
+        clientName: "Test Client",
+        redirectUris: ["https://example.com/callback"],
+        tokenEndpointAuthMethod: "client_secret_basic",
+      });
+      const preferenceCookie = await createSkillPreferenceCookie(
+        app,
+        testEnv,
+        "test-client",
+        ["triage", "project-management"],
+      );
+      mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+        state: "orig",
+      });
+
+      const response = await app.fetch(
+        new Request("http://localhost/oauth/authorize", {
+          method: "GET",
+          headers: { Cookie: preferenceCookie },
+        }),
+        testEnv as Env,
+      );
+      const html = await response.text();
+
+      expect(response.status).toBe(200);
+      expectSkillUnchecked(html, "inspect");
+      expectSkillUnchecked(html, "seer");
+      expectSkillChecked(html, "triage");
+      expectSkillChecked(html, "project-management");
+    });
+
+    it("does not reuse remembered skills for a different client ID", async () => {
+      mockOAuthProvider.lookupClient.mockResolvedValue({
+        clientId: "test-client",
+        clientName: "Test Client",
+        redirectUris: ["https://example.com/callback"],
+        tokenEndpointAuthMethod: "client_secret_basic",
+      });
+      const preferenceCookie = await createSkillPreferenceCookie(
+        app,
+        testEnv,
+        "test-client",
+        ["triage"],
+      );
+      mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+        clientId: "other-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+        state: "orig",
+      });
+      mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+        clientId: "other-client",
+        clientName: "Other Client",
+        redirectUris: ["https://example.com/callback"],
+        tokenEndpointAuthMethod: "client_secret_basic",
+      });
+
+      const response = await app.fetch(
+        new Request("http://localhost/oauth/authorize", {
+          method: "GET",
+          headers: { Cookie: preferenceCookie },
+        }),
+        testEnv as Env,
+      );
+      const html = await response.text();
+
+      expect(response.status).toBe(200);
+      expectSkillChecked(html, "inspect");
+      expectSkillChecked(html, "seer");
+      expectSkillUnchecked(html, "triage");
+    });
+
+    it("ignores tampered remembered skill cookies and falls back to built-in defaults", async () => {
+      mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+        state: "orig",
+      });
+      mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+        clientId: "test-client",
+        clientName: "Test Client",
+        redirectUris: ["https://example.com/callback"],
+        tokenEndpointAuthMethod: "client_secret_basic",
+      });
+
+      const response = await app.fetch(
+        new Request("http://localhost/oauth/authorize", {
+          method: "GET",
+          headers: {
+            Cookie: `${SKILL_PREFERENCES_COOKIE_NAME}=bad-signature.${btoa(
+              JSON.stringify({
+                clients: [["test-client", ["triage"]]],
+              }),
+            )}`,
+          },
+        }),
+        testEnv as Env,
+      );
+      const html = await response.text();
+
+      expect(response.status).toBe(200);
+      expectSkillChecked(html, "inspect");
+      expectSkillChecked(html, "seer");
+      expectSkillUnchecked(html, "triage");
+    });
   });
 
   describe("POST /oauth/authorize", () => {
@@ -197,6 +377,57 @@ describe("oauth authorize routes", () => {
         "https://example.com/callback",
       );
       expect((decodedState.req as any).scope).toEqual(["read", "write"]);
+    });
+
+    it("uses submitted skills rather than remembered skills for redirect state", async () => {
+      mockOAuthProvider.lookupClient.mockResolvedValue({
+        clientId: "test-client",
+        clientName: "Test Client",
+        redirectUris: ["https://example.com/callback"],
+        tokenEndpointAuthMethod: "client_secret_basic",
+      });
+      const preferenceCookie = await createSkillPreferenceCookie(
+        app,
+        testEnv,
+        "test-client",
+        ["project-management"],
+      );
+      const oauthReqInfo = {
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read", "write"],
+        state: "original-state",
+      };
+      const formData = new FormData();
+      const signedState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      formData.append("state", signedState);
+      formData.append("skill", "triage");
+
+      const response = await app.fetch(
+        new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          headers: { Cookie: preferenceCookie },
+          body: formData,
+        }),
+        testEnv as Env,
+      );
+
+      expect(response.status).toBe(302);
+      const location = response.headers.get("location");
+      const redirectUrl = new URL(location!);
+      const stateParam = redirectUrl.searchParams.get("state");
+      const decodedState = await verifyAndParseState(
+        stateParam!,
+        testEnv.COOKIE_SECRET!,
+      );
+      expect((decodedState.req as any).skills).toEqual(["triage"]);
     });
 
     it("should handle no skills selected", async () => {

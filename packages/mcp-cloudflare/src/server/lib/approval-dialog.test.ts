@@ -1,6 +1,37 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { renderApprovalDialog, parseRedirectApproval } from "./approval-dialog";
+import {
+  getRememberedSkillsForClient,
+  parseRedirectApproval,
+  renderApprovalDialog,
+  SKILL_PREFERENCES_COOKIE_NAME,
+} from "./approval-dialog";
 import { signState } from "../oauth/state";
+
+function skillInputAttributes(html: string, skillId: string): string {
+  const match = html.match(
+    new RegExp(
+      `<input type="checkbox" name="skill" value="${skillId}"([^>]*)>`,
+    ),
+  );
+  return match?.[1] ?? "";
+}
+
+function expectSkillChecked(html: string, skillId: string): void {
+  expect(skillInputAttributes(html, skillId)).toContain("checked");
+}
+
+function expectSkillUnchecked(html: string, skillId: string): void {
+  expect(skillInputAttributes(html, skillId)).not.toContain("checked");
+}
+
+function extractCookiePair(setCookie: string, cookieName: string): string {
+  const marker = `${cookieName}=`;
+  const start = setCookie.indexOf(marker);
+  expect(start).toBeGreaterThanOrEqual(0);
+  const rest = setCookie.slice(start);
+  const end = rest.indexOf(";");
+  return end === -1 ? rest : rest.slice(0, end);
+}
 
 describe("approval-dialog", () => {
   const TEST_SECRET = "test-cookie-secret-32-chars-long";
@@ -33,6 +64,61 @@ describe("approval-dialog", () => {
       // Check that state is included in the form
       expect(html).toContain('name="state"');
       expect(html).toContain('value="');
+    });
+
+    it("uses built-in skill defaults when no remembered defaults are provided", async () => {
+      const response = await renderApprovalDialog(
+        new Request("https://example.com/oauth/authorize"),
+        {
+          client: mockClient,
+          server: { name: "Test Server" },
+          state: { oauthReqInfo: { clientId: "test-client" } },
+          cookieSecret: TEST_SECRET,
+        },
+      );
+      const html = await response.text();
+
+      expectSkillChecked(html, "inspect");
+      expectSkillChecked(html, "seer");
+      expectSkillUnchecked(html, "triage");
+      expectSkillUnchecked(html, "project-management");
+    });
+
+    it("uses remembered skill defaults when provided", async () => {
+      const response = await renderApprovalDialog(
+        new Request("https://example.com/oauth/authorize"),
+        {
+          client: mockClient,
+          server: { name: "Test Server" },
+          state: { oauthReqInfo: { clientId: "test-client" } },
+          cookieSecret: TEST_SECRET,
+          defaultSkills: ["triage", "project-management"],
+        },
+      );
+      const html = await response.text();
+
+      expectSkillUnchecked(html, "inspect");
+      expectSkillUnchecked(html, "seer");
+      expectSkillChecked(html, "triage");
+      expectSkillChecked(html, "project-management");
+    });
+
+    it("ignores unknown and deprecated remembered skill defaults", async () => {
+      const response = await renderApprovalDialog(
+        new Request("https://example.com/oauth/authorize"),
+        {
+          client: mockClient,
+          server: { name: "Test Server" },
+          state: { oauthReqInfo: { clientId: "test-client" } },
+          cookieSecret: TEST_SECRET,
+          defaultSkills: ["docs", "unknown", "triage"],
+        },
+      );
+      const html = await response.text();
+
+      expectSkillChecked(html, "triage");
+      expect(html).not.toContain('value="docs"');
+      expect(html).not.toContain('value="unknown"');
     });
 
     it("does not render deprecated skill checkboxes", async () => {
@@ -251,6 +337,184 @@ describe("approval-dialog", () => {
       expect(result.state).toBeDefined();
       expect(result.state.oauthReqInfo).toEqual(oauthReqInfo);
       expect(result.skills).toEqual(["inspect"]);
+    });
+
+    it("should write approval and skill preference cookies", async () => {
+      const oauthReqInfo = {
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+      };
+      const response = await renderApprovalDialog(
+        new Request("https://example.com/oauth/authorize"),
+        {
+          client: mockClient,
+          server: { name: "Sentry MCP" },
+          state: { oauthReqInfo },
+          cookieSecret: TEST_SECRET,
+        },
+      );
+      const html = await response.text();
+      const stateMatch = html.match(/name="state" value="([^"]+)"/);
+      const encodedState = stateMatch![1];
+
+      const formData = new FormData();
+      formData.append("state", encodedState);
+      formData.append("skill", "triage");
+      formData.append("skill", "project-management");
+
+      const result = await parseRedirectApproval(
+        new Request("https://example.com/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        }),
+        TEST_SECRET,
+      );
+
+      const setCookie = result.headers.get("Set-Cookie") ?? "";
+      expect(setCookie).toContain("mcp-approved-clients=");
+      expect(setCookie).toContain(`${SKILL_PREFERENCES_COOKIE_NAME}=`);
+
+      const preferenceCookie = extractCookiePair(
+        setCookie,
+        SKILL_PREFERENCES_COOKIE_NAME,
+      );
+      const remembered = await getRememberedSkillsForClient(
+        preferenceCookie,
+        "test-client",
+        TEST_SECRET,
+      );
+      expect(remembered).toEqual(["triage", "project-management"]);
+    });
+
+    it("should keep only the ten newest skill preference clients", async () => {
+      let preferenceCookie = "";
+
+      for (let index = 0; index < 12; index++) {
+        const oauthReqInfo = {
+          clientId: `client-${index}`,
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+        };
+        const encodedState = await signState(
+          {
+            req: { oauthReqInfo },
+            iat: Date.now(),
+            exp: Date.now() + 10 * 60 * 1000,
+          },
+          TEST_SECRET,
+        );
+        const formData = new FormData();
+        formData.append("state", encodedState);
+        formData.append("skill", "triage");
+
+        const result = await parseRedirectApproval(
+          new Request("https://example.com/oauth/authorize", {
+            method: "POST",
+            headers: preferenceCookie ? { Cookie: preferenceCookie } : {},
+            body: formData,
+          }),
+          TEST_SECRET,
+        );
+        preferenceCookie = extractCookiePair(
+          result.headers.get("Set-Cookie") ?? "",
+          SKILL_PREFERENCES_COOKIE_NAME,
+        );
+      }
+
+      expect(
+        await getRememberedSkillsForClient(
+          preferenceCookie,
+          "client-0",
+          TEST_SECRET,
+        ),
+      ).toBeUndefined();
+      expect(
+        await getRememberedSkillsForClient(
+          preferenceCookie,
+          "client-1",
+          TEST_SECRET,
+        ),
+      ).toBeUndefined();
+      expect(
+        await getRememberedSkillsForClient(
+          preferenceCookie,
+          "client-2",
+          TEST_SECRET,
+        ),
+      ).toEqual(["triage"]);
+      expect(
+        await getRememberedSkillsForClient(
+          preferenceCookie,
+          "client-11",
+          TEST_SECRET,
+        ),
+      ).toEqual(["triage"]);
+    });
+
+    it("should refresh an existing skill preference client as newest", async () => {
+      let preferenceCookie = "";
+
+      for (const clientId of [
+        "client-0",
+        "client-1",
+        "client-2",
+        "client-3",
+        "client-4",
+        "client-5",
+        "client-6",
+        "client-7",
+        "client-8",
+        "client-9",
+        "client-0",
+        "client-10",
+      ]) {
+        const encodedState = await signState(
+          {
+            req: {
+              oauthReqInfo: {
+                clientId,
+                redirectUri: "https://example.com/callback",
+                scope: ["read"],
+              },
+            },
+            iat: Date.now(),
+            exp: Date.now() + 10 * 60 * 1000,
+          },
+          TEST_SECRET,
+        );
+        const formData = new FormData();
+        formData.append("state", encodedState);
+        formData.append("skill", "triage");
+
+        const result = await parseRedirectApproval(
+          new Request("https://example.com/oauth/authorize", {
+            method: "POST",
+            headers: preferenceCookie ? { Cookie: preferenceCookie } : {},
+            body: formData,
+          }),
+          TEST_SECRET,
+        );
+        preferenceCookie = extractCookiePair(
+          result.headers.get("Set-Cookie") ?? "",
+          SKILL_PREFERENCES_COOKIE_NAME,
+        );
+      }
+
+      expect(
+        await getRememberedSkillsForClient(
+          preferenceCookie,
+          "client-0",
+          TEST_SECRET,
+        ),
+      ).toEqual(["triage"]);
+      expect(
+        await getRememberedSkillsForClient(
+          preferenceCookie,
+          "client-1",
+          TEST_SECRET,
+        ),
+      ).toBeUndefined();
     });
 
     it("should reject state with wrong secret", async () => {
