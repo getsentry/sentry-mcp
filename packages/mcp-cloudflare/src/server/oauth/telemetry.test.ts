@@ -4,6 +4,7 @@ import {
   bucketOAuthErrorDescription,
   getOAuthErrorTelemetry,
   getOAuthGrantTelemetry,
+  getOAuthGrantLifecycleTelemetry,
   getOAuthTokenShape,
 } from "./telemetry";
 
@@ -153,5 +154,23 @@ describe("OAuth telemetry", () => {
       first["app.oauth.grant.id_hash"],
     );
     expect(JSON.stringify(first)).not.toContain("grant-id");
+  });
+
+  it("projects lifecycle timestamps into bounded diagnostic buckets", () => {
+    const now = Date.now();
+
+    expect(
+      getOAuthGrantLifecycleTelemetry({
+        sessionStartedAt: now - 2 * 24 * 60 * 60 * 1000,
+        upstreamExpiresAt: now + 3 * 24 * 60 * 60 * 1000,
+      }),
+    ).toEqual({
+      "app.oauth.grant.age_bucket": "1d_7d",
+      "app.oauth.upstream.expires_in_bucket": "1d_7d",
+    });
+    expect(getOAuthGrantLifecycleTelemetry({})).toEqual({
+      "app.oauth.grant.age_bucket": "unknown",
+      "app.oauth.upstream.expires_in_bucket": "unknown",
+    });
   });
 });

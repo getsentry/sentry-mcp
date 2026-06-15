@@ -2,6 +2,19 @@ import type { ExecutionContext, RateLimit } from "@cloudflare/workers-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../types";
 
+const { sentryMetricsCount, sentrySetUser } = vi.hoisted(() => ({
+  sentryMetricsCount: vi.fn(),
+  sentrySetUser: vi.fn(),
+}));
+
+vi.mock("@sentry/cloudflare", () => ({
+  getActiveSpan: vi.fn(() => undefined),
+  metrics: {
+    count: sentryMetricsCount,
+  },
+  setUser: sentrySetUser,
+}));
+
 import mcpHandler from "./mcp-handler";
 
 interface OAuthProps {
@@ -9,6 +22,8 @@ interface OAuthProps {
   clientId: string;
   accessToken: string;
   refreshToken: string;
+  sessionStartedAt?: number;
+  upstreamExpiresAt?: number;
   grantedSkills: string[];
   constraintOrganizationSlug?: string | null;
   constraintProjectSlug?: string | null;
@@ -94,6 +109,8 @@ function createTestEnv(): Env {
 describe("MCP Handler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sentryMetricsCount.mockReset();
+    sentrySetUser.mockReset();
   });
 
   describe("authentication", () => {
@@ -110,9 +127,18 @@ describe("MCP Handler", () => {
     });
 
     it("should reject legacy tokens without grantedSkills", async () => {
-      const request = createMcpRequest("tools/list");
+      const now = Date.now();
+      const request = createMcpRequest(
+        "tools/list",
+        {},
+        {
+          bearerToken: "test-user-123:legacy-grant-id:secret",
+        },
+      );
       const ctx = createMcpContext({
         grantedSkills: undefined as unknown as string[],
+        sessionStartedAt: now - 2 * 24 * 60 * 60 * 1000,
+        upstreamExpiresAt: now + 3 * 24 * 60 * 60 * 1000,
       });
       (ctx.props as Record<string, unknown>).grantedScopes = [
         "org:read",
@@ -127,9 +153,21 @@ describe("MCP Handler", () => {
       expect(response.headers.get("WWW-Authenticate")).toContain(
         "invalid_token",
       );
+      expect(sentryMetricsCount).toHaveBeenCalledWith(
+        "app.oauth.grant_revoked",
+        1,
+        {
+          attributes: expect.objectContaining({
+            "app.oauth.grant_revoked.reason": "stale_props_no_refresh",
+            "app.oauth.grant.age_bucket": "1d_7d",
+            "app.oauth.upstream.expires_in_bucket": "1d_7d",
+          }),
+        },
+      );
     });
 
     it("should revoke and reject stale grants missing a refresh token", async () => {
+      const now = Date.now();
       const request = createMcpRequest(
         "tools/list",
         {},
@@ -139,6 +177,8 @@ describe("MCP Handler", () => {
       );
       const ctx = createMcpContext({
         refreshToken: undefined as unknown as string,
+        sessionStartedAt: now - 2 * 24 * 60 * 60 * 1000,
+        upstreamExpiresAt: now + 3 * 24 * 60 * 60 * 1000,
       });
       const env = createTestEnv();
 
@@ -150,6 +190,17 @@ describe("MCP Handler", () => {
         "invalid_token",
       );
       expect(ctx.waitUntil).toHaveBeenCalled();
+      expect(sentryMetricsCount).toHaveBeenCalledWith(
+        "app.oauth.grant_revoked",
+        1,
+        {
+          attributes: expect.objectContaining({
+            "app.oauth.grant_revoked.reason": "stale_props_no_refresh",
+            "app.oauth.grant.age_bucket": "1d_7d",
+            "app.oauth.upstream.expires_in_bucket": "1d_7d",
+          }),
+        },
+      );
 
       await (ctx.waitUntil as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
       expect(env.OAUTH_PROVIDER.revokeGrant).toHaveBeenCalledTimes(1);

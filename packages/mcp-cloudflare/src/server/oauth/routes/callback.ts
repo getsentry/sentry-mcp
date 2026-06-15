@@ -279,6 +279,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
   // Return back to the MCP client a new token
   const accessTokenExpiresAt = getUpstreamTokenExpiryTimestamp(payload);
+  const sessionStartedAt = Date.now();
   const userLabel = getUpstreamUserLabel(payload);
 
   const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
@@ -306,6 +307,8 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       // Cache upstream expiry so future refresh grants can avoid
       // unnecessary upstream refresh calls when still valid
       accessTokenExpiresAt,
+      sessionStartedAt,
+      upstreamExpiresAt: accessTokenExpiresAt,
       clientId: oauthReqInfo.clientId,
       clientName: registeredClientName,
       scope: oauthReqInfo.scope.join(" "),

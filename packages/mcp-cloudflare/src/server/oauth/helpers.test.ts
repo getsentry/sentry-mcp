@@ -223,9 +223,12 @@ describe("tokenExchangeCallback", () => {
   });
 
   it("should return cached token TTL when token is locally valid", async () => {
+    const now = Date.now();
     const futureExpiry = Date.now() + 10 * 60 * 1000;
     const options = createRefreshOptions({
       accessTokenExpiresAt: futureExpiry,
+      sessionStartedAt: now - 2 * 24 * 60 * 60 * 1000,
+      upstreamExpiresAt: now + 3 * 24 * 60 * 60 * 1000,
     });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch");
@@ -238,6 +241,17 @@ describe("tokenExchangeCallback", () => {
       accessTokenTTL: expect.any(Number),
     });
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(sentryMetricsCount).toHaveBeenCalledWith(
+      "app.oauth.token_exchange",
+      1,
+      {
+        attributes: expect.objectContaining({
+          "app.oauth.token_exchange.outcome": "cached_valid_local",
+          "app.oauth.grant.age_bucket": "1d_7d",
+          "app.oauth.upstream.expires_in_bucket": "1d_7d",
+        }),
+      },
+    );
   });
 
   it("should clear upstreamTokenInvalid after a successful probe", async () => {

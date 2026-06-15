@@ -25,6 +25,87 @@ export type OAuthErrorTelemetry = {
   oauthTokenShape?: OAuthTokenShape;
 };
 
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+function getTimestamp(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function bucketElapsedMs(value: unknown, now = Date.now()): string {
+  const timestamp = getTimestamp(value);
+  if (!timestamp) {
+    return "unknown";
+  }
+
+  const elapsedMs = now - timestamp;
+  if (elapsedMs < 0) {
+    return "future";
+  }
+  if (elapsedMs < HOUR_MS) {
+    return "lt_1h";
+  }
+  if (elapsedMs < 6 * HOUR_MS) {
+    return "1h_6h";
+  }
+  if (elapsedMs < DAY_MS) {
+    return "6h_1d";
+  }
+  if (elapsedMs < 7 * DAY_MS) {
+    return "1d_7d";
+  }
+  if (elapsedMs < 14 * DAY_MS) {
+    return "7d_14d";
+  }
+  if (elapsedMs < 30 * DAY_MS) {
+    return "14d_30d";
+  }
+  return "gte_30d";
+}
+
+function bucketRemainingMs(value: unknown, now = Date.now()): string {
+  const timestamp = getTimestamp(value);
+  if (!timestamp) {
+    return "unknown";
+  }
+
+  const remainingMs = timestamp - now;
+  if (remainingMs <= 0) {
+    return "expired";
+  }
+  if (remainingMs < HOUR_MS) {
+    return "lt_1h";
+  }
+  if (remainingMs < DAY_MS) {
+    return "1h_1d";
+  }
+  if (remainingMs < 7 * DAY_MS) {
+    return "1d_7d";
+  }
+  if (remainingMs < 14 * DAY_MS) {
+    return "7d_14d";
+  }
+  if (remainingMs < 30 * DAY_MS) {
+    return "14d_30d";
+  }
+  return "gte_30d";
+}
+
+/**
+ * Projects OAuth grant lifecycle timestamps into bounded diagnostic buckets.
+ */
+export function getOAuthGrantLifecycleTelemetry(props: {
+  sessionStartedAt?: unknown;
+  upstreamExpiresAt?: unknown;
+}): Record<string, string> {
+  return {
+    "app.oauth.grant.age_bucket": bucketElapsedMs(props.sessionStartedAt),
+    "app.oauth.upstream.expires_in_bucket": bucketRemainingMs(
+      props.upstreamExpiresAt,
+    ),
+  };
+}
+
 /**
  * Buckets OAuth error codes before they become span or metric attributes.
  */
