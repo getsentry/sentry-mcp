@@ -18,6 +18,8 @@ export type WorkerProps = {
   accessToken: string;
   refreshToken: string;
   accessTokenExpiresAt?: number; // Cached validity deadline; extended on successful probe.
+  sessionStartedAt?: number;
+  upstreamExpiresAt?: number;
   upstreamTokenInvalid?: boolean;
   clientId: string;
   clientName?: string;

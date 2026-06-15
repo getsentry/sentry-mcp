@@ -54,6 +54,8 @@ Attributes:
 - `app.oauth.token_exchange.outcome` — see above
 - `app.client.family` — bucketed User-Agent (`claude-code`, `cursor`, `codex`, `copilot`, `claude-desktop`, `opencode`, `reactor-netty`, `java-http-client`, `go-http-client`, `python`, `bun`, `node`, `other`, `unknown`)
 - `app.oauth.grant.shape` — currently always `refreshable`
+- `app.oauth.grant.age_bucket` — elapsed time since the MCP grant was created (`lt_1h`, `1h_6h`, `6h_1d`, `1d_7d`, `7d_14d`, `14d_30d`, `gte_30d`, `future`, `unknown`)
+- `app.oauth.upstream.expires_in_bucket` — remaining time before the original upstream Sentry expiry (`expired`, `lt_1h`, `1h_1d`, `1d_7d`, `7d_14d`, `14d_30d`, `gte_30d`, `unknown`)
 - `app.oauth.probe.status_code` — upstream HTTP status on outcomes where a probe fired (`200` / `400` / `401` / `403` / `429` / `500` / …)
 - `app.oauth.probe.reason` — `rate_limit` / `server_error` / `unknown` on `verification_indeterminate`
 
@@ -67,6 +69,8 @@ Attributes:
 
 - `app.oauth.grant_revoked.reason` — `stale_props_no_refresh` / `upstream_rejected` / `upstream_rejected_in_use`
 - `app.client.family`
+- `app.oauth.grant.age_bucket`
+- `app.oauth.upstream.expires_in_bucket`
 - `user.id` (via Sentry user context)
 
 `upstream_rejected_in_use` indicates Sentry returned 401 to a tool call while the stored access token still looked locally valid — the sub-30d sign-out signal users typically report. The grant is revoked via `env.OAUTH_PROVIDER.revokeGrant` under `ctx.waitUntil`, short-circuiting the death-spiral where subsequent refreshes kept handing out wrapper tokens backed by a dead upstream token.
@@ -74,7 +78,9 @@ Attributes:
 The handler also emits a low-volume Sentry Log message,
 `OAuth grant rejected for reauthorization`, when it decides to force a client
 to reauthorize. This log carries the same `app.oauth.grant_revoked.reason`,
-`app.client.family`, `userId`, `clientId`, and `app.oauth.grant.id_hash`.
+`app.client.family`, `userId`, `clientId`, `app.oauth.grant.id_hash`,
+`app.oauth.grant.age_bucket`, and
+`app.oauth.upstream.expires_in_bucket`.
 Use the hash to correlate one grant/session without logging raw bearer-token
 components.
 
@@ -124,7 +130,7 @@ Copy/paste-ready. All use the Sentry MCP's `search_events` natural-language quer
 
 ```
 metric app.oauth.grant_revoked filtered by user.id:"<id>" sum of value grouped by app.oauth.grant_revoked.reason over 30 days
-logs message:"OAuth grant rejected for reauthorization" userId:"<id>" grouped by app.oauth.grant_revoked.reason, app.client.family, clientId, app.oauth.grant.id_hash over 30 days
+logs message:"OAuth grant rejected for reauthorization" userId:"<id>" grouped by app.oauth.grant_revoked.reason, app.client.family, app.oauth.grant.age_bucket, app.oauth.upstream.expires_in_bucket, clientId, app.oauth.grant.id_hash over 30 days
 ```
 
 ### Per-client sign-out rate
@@ -138,6 +144,7 @@ spans /mcp http.response.status_code:401 grouped by app.client.family, app.oauth
 
 ```
 metric app.oauth.token_exchange filtered by app.oauth.token_exchange.outcome:upstream_rejected sum of value grouped by app.oauth.probe.status_code over 7 days
+metric app.oauth.token_exchange filtered by app.oauth.token_exchange.outcome:upstream_rejected sum of value grouped by app.oauth.grant.age_bucket, app.oauth.upstream.expires_in_bucket over 7 days
 ```
 
 ### Session-lifetime proxy (callbacks vs revocations per client)
@@ -201,7 +208,7 @@ Trade-off: KV storage holds extra grant entries (each up to 30d). Not a real con
    `metric app.oauth.grant_revoked filtered by user.id:"<id>" grouped by app.oauth.grant_revoked.reason over 30 days`
 2. **Interpret the `reason`:**
    - `upstream_rejected_in_use` — Sentry invalidated the token mid-session (SSO / org / password / admin revocation). Most common for sub-30d sign-outs. The grant was revoked automatically; user should re-auth cleanly on next request.
-   - `upstream_rejected` — natural 30d expiry (probe path). Expected.
+   - `upstream_rejected` — refresh probing got an upstream 4xx. Use `app.oauth.grant.age_bucket` and `app.oauth.upstream.expires_in_bucket` to separate near-scheduled expiry from premature upstream rejection.
    - `stale_props_no_refresh` — legacy grant predating PR #537. Expected, one-time.
 3. **If no revocations are recorded** (reason counts are empty), the user hasn't been revoked server-side. Either they're still authenticated and the perception is wrong, OR the client lost local state and re-registered without going through `/oauth/callback`:
    - Check `app.oauth.register grouped by app.client.family` for that client — high register:callback ratio (claude-code and cursor re-register on every cold start) is normal client behavior, not a server-side sign-out.
@@ -213,4 +220,4 @@ Trade-off: KV storage holds extra grant entries (each up to 30d). Not a real con
 - #917 — carried probe status as a metric attribute.
 - #918 — added client family, user tagging, `callback_completed` / `register` metrics, probe reason, structured Invalid-redirect-URI fields.
 - #919 — added `expired_on_schedule` on `upstream_rejected`. Removed in #920 once we realized the probe path can't produce `"false"` by construction.
-- #920 — closes Gaps #1 and #2 via tool-call 401 detection, grant revocation, and `app.oauth.grant_revoked.reason:upstream_rejected_in_use`. Also removes the unreachable `expired_on_schedule` attribute and its `upstreamExpiresAt` grant field.
+- #920 — closes Gaps #1 and #2 via tool-call 401 detection, grant revocation, and `app.oauth.grant_revoked.reason:upstream_rejected_in_use`. Also removes the unreachable `expired_on_schedule` attribute.

@@ -14,6 +14,7 @@ import type { z } from "zod";
 import type { WorkerProps } from "../types";
 import { setSentryUserFromRequest } from "../utils/sentry-user";
 import { TokenResponseSchema } from "./constants";
+import { getOAuthGrantLifecycleTelemetry } from "./telemetry";
 
 function escapeHtml(value: string): string {
   return value
@@ -590,6 +591,7 @@ export async function tokenExchangeCallback(
       recordTokenExchangeOutcome("cached_valid_local", {
         "app.oauth.grant.shape": "refreshable",
         "app.client.family": clientFamily,
+        ...getOAuthGrantLifecycleTelemetry(props),
       });
       return buildSuccessfulTokenExchangeResult(
         props,
@@ -611,6 +613,7 @@ export async function tokenExchangeCallback(
   const outcomeAttributes: Record<string, string> = {
     "app.oauth.grant.shape": "refreshable",
     "app.client.family": clientFamily,
+    ...getOAuthGrantLifecycleTelemetry(props),
   };
   if (typeof status === "number") {
     outcomeAttributes["app.oauth.probe.status_code"] = String(status);

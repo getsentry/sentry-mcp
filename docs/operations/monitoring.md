@@ -291,6 +291,9 @@ Optional OAuth error attributes:
   `wrapper`, or `malformed`
 - `app.oauth.grant.id_hash` - Non-secret grant fingerprint on grant lifecycle
   logs
+- `app.oauth.grant.age_bucket` - Bounded MCP grant age at refresh/revocation
+- `app.oauth.upstream.expires_in_bucket` - Bounded remaining time before the
+  original upstream Sentry expiry at refresh/revocation
 
 Interpretation:
 
