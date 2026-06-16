@@ -53,7 +53,6 @@ canonical workflow and required docs live in [../AGENTS.md](../AGENTS.md)
 ### Integrations
 
 - [integrations/claude-code-plugin.md](integrations/claude-code-plugin.md) - Plugin structure and agent prompts
-- [integrations/flue-hooks.md](integrations/flue-hooks.md) - Flue hook notes
 - [integrations/ide-instructions-refactor.md](integrations/ide-instructions-refactor.md) - IDE instruction refactor notes
 
 ### Specs
