@@ -8,6 +8,7 @@ import {
 import { formatAssignedTo } from "../../internal/tool-helpers/formatting";
 import { logIssue } from "../../telem/logging";
 import { UserInputError } from "../../errors";
+import { ApiClientError } from "../../api-client";
 import type {
   ExternalIssue,
   Issue,
@@ -19,7 +20,7 @@ import {
   resolveExternalIssueLinkTarget,
   type ExternalIssueLinkTarget,
   type LinkedExternalIssue,
-} from "./issue-linking";
+} from "../support/issue-linking";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
@@ -628,7 +629,7 @@ async function executeExternalIssueLink(
     }) => Promise<NativeExternalIssue>;
     createSentryAppExternalIssueLink: (params: {
       installationUuid: string;
-      issueId: number;
+      issueId: string;
       webUrl: string;
       project: string;
       identifier: string;
@@ -645,32 +646,34 @@ async function executeExternalIssueLink(
     const issue = await apiService.linkNativeExternalIssue({
       organizationSlug: params.organizationSlug,
       issueId: params.issueId,
-      integrationId: String(params.target.integration.id),
+      integrationId: params.target.integrationId,
       data: params.target.payload,
     });
     return {
       kind: "native",
       issue,
-      provider: params.target.integration.provider.key,
+      provider: params.target.provider,
+      fallbackDisplayName: params.target.fallbackDisplayName,
+      fallbackUrl: params.target.fallbackUrl,
     };
   }
 
-  const numericIssueId = Number(params.currentIssue.id);
-  if (!Number.isFinite(numericIssueId)) {
+  const sentryIssueId = String(params.currentIssue.id);
+  if (!/^\d+$/.test(sentryIssueId)) {
     throw new UserInputError(
       "Cannot link Sentry App external issue because the Sentry issue id is not numeric.",
     );
   }
 
   const issue = await apiService.createSentryAppExternalIssueLink({
-    installationUuid: params.target.installation.uuid,
-    issueId: numericIssueId,
+    installationUuid: params.target.installationUuid,
+    issueId: sentryIssueId,
     ...params.target.payload,
   });
   return {
     kind: "sentryApp",
     issue,
-    provider: params.target.installation.app.slug,
+    provider: params.target.provider,
   };
 }
 
@@ -724,7 +727,7 @@ function formatReasonCommentLine(
 export default defineTool({
   name: "update_issue",
   skills: ["triage"], // Only available in triage skill
-  requiredScopes: ["event:write"],
+  requiredScopes: ["event:write", "org:read"],
   description: [
     "Update a Sentry issue.",
     "",
@@ -948,7 +951,12 @@ export default defineTool({
         if (!hasIssueUpdate) {
           throw error;
         }
-        logIssue(error);
+        if (
+          !(error instanceof UserInputError) &&
+          !(error instanceof ApiClientError)
+        ) {
+          logIssue(error);
+        }
         const partialCommentResult = await tryPostReasonComment(
           apiService,
           orgSlug,

@@ -18,7 +18,6 @@ The implementation must not use the Sentry App endpoint as a universal Jira/GitH
 - Prefer native integration linking when the target provider is a native issue-tracking integration.
 - Support Sentry App/platform links when the target is an installed Sentry App, including Linear and Shortcut-style URLs.
 - Keep the tool API minimal: link by URL only.
-- Keep provider discovery, URL parsing, and payload construction reusable for future external issue creation.
 - Validate all link preconditions before mutating the Sentry issue.
 - Keep user-facing errors actionable and avoid exposing native integration ids, installation UUIDs, or provider form fields unless needed for diagnostics.
 
@@ -42,20 +41,6 @@ Add only one external linking parameter to `update_issue`:
 Rationale: the expected user workflow is "link this Sentry issue to this external issue URL." Native providers need internal fields, but those fields are implementation details that can be parsed from canonical URLs and validated against Sentry's link config.
 
 Alternative considered: exposing `externalIssueIntegrationId`, `externalIssueIdentifier`, `externalIssueProject`, `externalIssueFields`, and `externalIssueKind`. This is more flexible, but it leaks Sentry internals into the MCP API and makes common linking harder for agents. The implementation can still use these concepts internally.
-
-### Separate Link Semantics From Future Create Semantics
-
-Name helper types and API client methods around external issue operations rather than around one provider form. Suggested internal boundaries:
-
-- `parseExternalIssueUrl(url)` returns provider, host/account context, and issue identity for linking.
-- `resolveExternalIssueTarget(...)` resolves native integration id or Sentry App installation UUID.
-- `buildExternalIssueLinkPayload(...)` creates the internal native or platform link payload.
-
-Do not add creation parameters in this change. Future creation should be a separate action with its own explicit inputs, likely `externalIssueProvider`, optional `externalIssueProject`, optional `externalIssueTitle`, and optional `externalIssueDescription`, because creation does not have an existing URL to parse.
-
-Rationale: linking and creating share provider discovery, but they do not share the same user input model. Linking starts from a canonical external URL. Creating starts from desired ticket metadata and provider defaults.
-
-Alternative considered: add an `externalIssueAction` parameter now with `link` as the only supported value. That is unnecessary API surface until creation exists.
 
 ### Resolve Native Integrations Through Sentry's Group Integration List
 

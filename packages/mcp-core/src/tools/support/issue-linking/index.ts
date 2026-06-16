@@ -1,11 +1,11 @@
-import { UserInputError } from "../../errors";
+import { UserInputError } from "../../../errors";
 import type {
   ExternalIssue,
   IssueIntegration,
   IssueIntegrationLinkConfig,
   NativeExternalIssue,
   SentryAppInstallation,
-} from "../../api-client/types";
+} from "../../../api-client/types";
 
 type NativeProvider = "jira" | "github" | "gitlab" | "bitbucket" | "vsts";
 type AppProvider = "linear" | "shortcut";
@@ -37,21 +37,22 @@ type LinkConfigField = IssueIntegrationLinkConfig["linkIssueConfig"][number];
 
 export type NativeExternalIssueLinkTarget = {
   kind: "native";
-  integration: IssueIntegration;
-  config: IssueIntegrationLinkConfig;
+  integrationId: string;
+  provider: string;
+  fallbackDisplayName: string;
+  fallbackUrl: string;
   payload: Record<string, unknown>;
-  parsed: ParsedNativeIssueUrl;
 };
 
 export type SentryAppExternalIssueLinkTarget = {
   kind: "sentryApp";
-  installation: SentryAppInstallation;
+  installationUuid: string;
+  provider: string;
   payload: {
     webUrl: string;
     project: string;
     identifier: string;
   };
-  parsed: ParsedAppIssueUrl;
 };
 
 export type ExternalIssueLinkTarget =
@@ -59,7 +60,13 @@ export type ExternalIssueLinkTarget =
   | SentryAppExternalIssueLinkTarget;
 
 export type LinkedExternalIssue =
-  | { kind: "native"; issue: NativeExternalIssue; provider: string }
+  | {
+      kind: "native";
+      issue: NativeExternalIssue;
+      provider: string;
+      fallbackDisplayName: string;
+      fallbackUrl: string;
+    }
   | { kind: "sentryApp"; issue: ExternalIssue; provider: string };
 
 export type ExternalIssueLinkApi = {
@@ -512,15 +519,23 @@ async function resolveNativeTarget(params: {
       `No installed ${parsed.provider} issue integration can access the project or repository in ${parsed.url}.`,
     );
   }
-  // When multiple integrations still match, use the first one rather than
-  // surfacing an ambiguity error — the caller has no way to resolve it and
-  // any matching candidate should produce a correct link.
+  if (matchingCandidates.length > 1) {
+    throw new UserInputError(
+      `Multiple installed ${parsed.provider} issue integrations match ${parsed.url}: ${matchingCandidates
+        .map(
+          ({ integration }) =>
+            `${integration.name} (${integration.provider.key})`,
+        )
+        .join(", ")}.`,
+    );
+  }
   const [{ integration, config }] = matchingCandidates;
   return {
     kind: "native",
-    integration,
-    config,
-    parsed,
+    integrationId: String(integration.id),
+    provider: integration.provider.key,
+    fallbackDisplayName: parsed.issueId,
+    fallbackUrl: parsed.url,
     payload: buildNativeLinkPayload(parsed, config),
   };
 }
@@ -560,8 +575,8 @@ async function resolveSentryAppTarget(params: {
 
   return {
     kind: "sentryApp",
-    installation: candidates[0],
-    parsed,
+    installationUuid: candidates[0].uuid,
+    provider: candidates[0].app.slug,
     payload: {
       webUrl: parsed.url,
       project: parsed.project,
@@ -598,7 +613,8 @@ export function formatLinkedExternalIssue(linked: LinkedExternalIssue): string {
   if (linked.kind === "sentryApp") {
     return `${linked.issue.displayName || linked.issue.issueId} (${linked.issue.serviceType || linked.provider}) → ${linked.issue.webUrl}`;
   }
-  const displayName = linked.issue.displayName || linked.issue.key;
-  const url = linked.issue.url ? ` → ${linked.issue.url}` : "";
-  return `${displayName} (${linked.provider})${url}`;
+  const displayName =
+    linked.issue.displayName || linked.issue.key || linked.fallbackDisplayName;
+  const url = linked.issue.url || linked.fallbackUrl;
+  return `${displayName} (${linked.provider}) → ${url}`;
 }

@@ -140,6 +140,12 @@ describe("getTraceUrl", () => {
 });
 
 describe("external issue linking API methods", () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
   function mockJsonResponse(body: unknown) {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -307,7 +313,7 @@ describe("external issue linking API methods", () => {
 
     const result = await apiService.createSentryAppExternalIssueLink({
       installationUuid: "install-uuid",
-      issueId: 123,
+      issueId: "123",
       webUrl: "https://linear.app/acme/issue/ENG-123/test",
       project: "ENG",
       identifier: "ENG-123",
@@ -318,7 +324,7 @@ describe("external issue linking API methods", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
-          issueId: 123,
+          issueId: "123",
           webUrl: "https://linear.app/acme/issue/ENG-123/test",
           project: "ENG",
           identifier: "ENG-123",

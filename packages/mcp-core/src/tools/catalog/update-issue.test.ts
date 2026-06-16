@@ -1015,13 +1015,13 @@ describe("update_issue", () => {
         "https://sentry.io/api/0/sentry-app-installations/shortcut-installation-uuid/external-issues/",
         async ({ request }) => {
           const body = (await request.json()) as {
-            issueId: number;
+            issueId: string;
             webUrl: string;
             identifier: string;
           };
           return HttpResponse.json({
             id: "platform-external-issue-shortcut",
-            issueId: String(body.issueId),
+            issueId: body.issueId,
             serviceType: "shortcut",
             displayName: body.identifier,
             webUrl: body.webUrl,
@@ -1077,7 +1077,7 @@ describe("update_issue", () => {
     expect(updateCalled).toBe(false);
   });
 
-  it("uses the first matching integration when multiple candidates exist", async () => {
+  it("rejects ambiguous native integrations before updating the issue", async () => {
     let updateCalled = false;
     mswServer.use(
       http.get(
@@ -1109,20 +1109,21 @@ describe("update_issue", () => {
       ),
     );
 
-    const result = await updateIssue.handler(
-      {
-        organizationSlug: "sentry-mcp-evals",
-        issueId: "CLOUDFLARE-MCP-41",
-        status: "resolved",
-        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
-        assignedTo: undefined,
-        issueUrl: undefined,
-        regionUrl: null,
-      },
-      serverContext,
-    );
-    expect(updateCalled).toBe(true);
-    expect(result).toContain("CLOUDFLARE-MCP-41");
+    await expect(
+      updateIssue.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          status: "resolved",
+          externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+          assignedTo: undefined,
+          issueUrl: undefined,
+          regionUrl: null,
+        },
+        serverContext,
+      ),
+    ).rejects.toThrow("Multiple installed github issue integrations");
+    expect(updateCalled).toBe(false);
   });
 
   it("reports partial success when link write fails after issue update", async () => {

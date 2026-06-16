@@ -1,14 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { UserInputError } from "../../errors";
-import {
-  parseExternalIssueUrl,
-  resolveExternalIssueLinkTarget,
-} from "./issue-linking";
+import { UserInputError } from "../../../errors";
+import { parseExternalIssueUrl, resolveExternalIssueLinkTarget } from ".";
 import type {
   IssueIntegration,
   IssueIntegrationLinkConfig,
   SentryAppInstallation,
-} from "../../api-client/types";
+} from "../../../api-client/types";
 
 function integration(
   overrides: Partial<IssueIntegration> = {},
@@ -159,7 +156,7 @@ describe("resolveExternalIssueLinkTarget", () => {
 
     expect(target).toMatchObject({
       kind: "native",
-      integration: { id: "1" },
+      integrationId: "1",
       payload: {
         repo: "getsentry/sentry",
         externalIssue: "123",
@@ -210,7 +207,7 @@ describe("resolveExternalIssueLinkTarget", () => {
 
     expect(target).toMatchObject({
       kind: "native",
-      integration: { id: "2" },
+      integrationId: "2",
       payload: {
         project: "getsentry/backend/service",
         externalIssue: "getsentry/backend/service#123",
@@ -240,7 +237,7 @@ describe("resolveExternalIssueLinkTarget", () => {
 
     expect(target).toMatchObject({
       kind: "native",
-      integration: { id: "2" },
+      integrationId: "2",
     });
   });
 
@@ -276,7 +273,7 @@ describe("resolveExternalIssueLinkTarget", () => {
 
     expect(target).toMatchObject({
       kind: "native",
-      integration: { id: "2" },
+      integrationId: "2",
       payload: {
         externalIssue: "OPS-456",
       },
@@ -315,7 +312,7 @@ describe("resolveExternalIssueLinkTarget", () => {
 
     expect(target).toMatchObject({
       kind: "native",
-      integration: { id: "2" },
+      integrationId: "2",
       payload: {
         externalIssue: "42",
       },
@@ -368,7 +365,7 @@ describe("resolveExternalIssueLinkTarget", () => {
 
     expect(target).toMatchObject({
       kind: "native",
-      integration: { id: "1" },
+      integrationId: "1",
       payload: {
         repo: "getsentry/sentry",
         externalIssue: "123",
@@ -434,12 +431,29 @@ describe("resolveExternalIssueLinkTarget", () => {
     );
   });
 
-  it("uses the first matching candidate when multiple integrations match", async () => {
+  it("rejects ambiguous native integrations", async () => {
+    await expect(
+      resolveExternalIssueLinkTarget({
+        apiService: {
+          listIssueIntegrations: async () => [
+            integration({ id: "1", name: "GitHub A", domainName: null }),
+            integration({ id: "2", name: "GitHub B", domainName: null }),
+          ],
+          getIssueIntegrationLinkConfig: async () => linkConfig(),
+          listSentryAppInstallations: async () => [],
+        },
+        organizationSlug: "sentry",
+        issueId: "PROJ-1",
+        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+      }),
+    ).rejects.toThrow("Multiple installed github issue integrations");
+  });
+
+  it("resolves native integrations to the projected link target", async () => {
     const target = await resolveExternalIssueLinkTarget({
       apiService: {
         listIssueIntegrations: async () => [
           integration({ id: "1", name: "GitHub A", domainName: null }),
-          integration({ id: "2", name: "GitHub B", domainName: null }),
         ],
         getIssueIntegrationLinkConfig: async () => linkConfig(),
         listSentryAppInstallations: async () => [],
@@ -451,7 +465,10 @@ describe("resolveExternalIssueLinkTarget", () => {
 
     expect(target).toMatchObject({
       kind: "native",
-      integration: { id: "1" },
+      integrationId: "1",
+      provider: "github",
+      fallbackDisplayName: "123",
+      fallbackUrl: "https://github.com/getsentry/sentry/issues/123",
       payload: {
         repo: "getsentry/sentry",
         externalIssue: "123",
@@ -475,7 +492,8 @@ describe("resolveExternalIssueLinkTarget", () => {
 
     expect(target).toMatchObject({
       kind: "sentryApp",
-      installation: { uuid: "linear-installation" },
+      installationUuid: "linear-installation",
+      provider: "linear",
       payload: {
         webUrl: "https://linear.app/acme/issue/ENG-123/test",
         project: "ENG",

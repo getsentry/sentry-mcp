@@ -9,7 +9,6 @@ Users can inspect linked external issues through MCP today, but they cannot link
 - Support Sentry App/platform external links, including Linear and Shortcut-style app links, through the Sentry App external issue endpoint.
 - Keep the user-facing API minimal for linking: require only `externalIssueUrl`.
 - Resolve the target integration from URL shape, installed native integrations, Sentry App installations, and Sentry's own link configuration. Do not expose native integration ids, Sentry App installation UUIDs, provider hints, or provider form fields as normal user-facing parameters.
-- Structure the implementation around an internal external-issue action resolver so future ticket creation can reuse provider discovery without expanding the link API.
 - Fail before mutating the Sentry issue when the requested external link target is ambiguous, unavailable, or missing required fields.
 - Report partial success clearly when a Sentry status/assignment update succeeds but the subsequent external link operation fails.
 - Keep this in `update_issue`; do not add a new MCP tool.
@@ -27,9 +26,9 @@ Users can inspect linked external issues through MCP today, but they cannot link
 ## Impact
 
 - `packages/mcp-core/src/tools/update-issue.ts`: new minimal link input parameters, provider URL parsing, validation, execution ordering, and response formatting.
-- `packages/mcp-core/src/api-client/client.ts`, `schema.ts`, and `types.ts`: client methods and schemas for integration issue config/linking and Sentry App installation/linking APIs, named so create-ticket APIs can be added alongside them later.
+- `packages/mcp-core/src/api-client/client.ts`, `schema.ts`, and `types.ts`: client methods and schemas for integration issue config/linking and Sentry App installation/linking APIs.
 - `packages/mcp-core/src/tools/update-issue.test.ts` and API client tests: coverage for link-only, combined update-and-link, ambiguity, validation, and partial-failure behavior.
-- `packages/mcp-server-mocks/src/index.ts`: mock responses for native integration linking and Sentry App external issue creation.
+- `packages/mcp-server-mocks/src/index.ts`: mock responses for native integration linking and Sentry App external issue links.
 - Generated tool definitions after schema/description changes.
 - Upstream Sentry APIs used by this change:
   - `GET /api/0/organizations/{org}/issues/{issue}/integrations/{integration_id}/?action=link`

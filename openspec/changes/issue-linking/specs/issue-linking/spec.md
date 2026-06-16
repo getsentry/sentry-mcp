@@ -107,14 +107,3 @@ The `update_issue` tool SHALL report linked external issue changes consistently 
 #### Scenario: Link result lacks display fields
 - **WHEN** the external link API omits optional display fields
 - **THEN** the response falls back to the requested external issue identifier and URL
-
-### Requirement: Future External Issue Creation Compatibility
-The issue-linking implementation SHALL keep provider resolution and payload construction separate from the public link input schema so future external issue creation can reuse provider discovery without changing link behavior.
-
-#### Scenario: Link API remains URL-based
-- **WHEN** future ticket creation support is added
-- **THEN** existing link calls using `externalIssueUrl` continue to link existing external issues without requiring creation-specific parameters
-
-#### Scenario: Provider resolution is reusable
-- **WHEN** future ticket creation support needs to choose a native integration or Sentry App installation
-- **THEN** it can reuse the provider/app discovery helpers introduced for issue linking without depending on link-only URL payload construction

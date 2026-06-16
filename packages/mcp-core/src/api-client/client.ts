@@ -2962,7 +2962,7 @@ export class SentryApiService {
       identifier,
     }: {
       installationUuid: string;
-      issueId: number;
+      issueId: string;
       webUrl: string;
       project: string;
       identifier: string;

@@ -12,7 +12,6 @@
 - [x] 2.3 Implement Sentry App installation resolution from parsed URL without exposing UUIDs in errors.
 - [x] 2.4 Implement native link payload construction from URL parser output and Sentry link config defaults.
 - [x] 2.5 Implement Sentry App payload construction from URL parser output.
-- [x] 2.6 Keep provider/app resolution helpers independent from link payload construction so future ticket creation can reuse them.
 - [x] 2.7 Add focused helper tests for provider parsing, native resolution, Sentry App resolution, ambiguity, unsupported URL shapes, and helper separation.
 
 ## 3. `update_issue` Tool

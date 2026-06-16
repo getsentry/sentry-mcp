@@ -1234,11 +1234,17 @@ export const restHandlers = buildHandlers([
         repo?: string;
         externalIssue?: string;
       };
-      const key = `${body.repo ?? "getsentry/sentry"}#${body.externalIssue ?? "123"}`;
+      if (!body.repo || !body.externalIssue) {
+        return HttpResponse.json(
+          { detail: "repo and externalIssue are required" },
+          { status: 400 },
+        );
+      }
+      const key = `${body.repo}#${body.externalIssue}`;
       return HttpResponse.json({
         id: "external-issue-1",
         key,
-        url: `https://github.com/${body.repo ?? "getsentry/sentry"}/issues/${body.externalIssue ?? "123"}`,
+        url: `https://github.com/${body.repo}/issues/${body.externalIssue}`,
         integrationId: "github-integration-1",
         displayName: key,
       });
