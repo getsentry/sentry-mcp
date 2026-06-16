@@ -73,7 +73,6 @@ sentry-mcp/
 
 **Integrations:**
 - docs/integrations/claude-code-plugin.md — Plugin structure and agent prompts
-- docs/integrations/flue-hooks.md — Flue hook notes
 - docs/integrations/ide-instructions-refactor.md — IDE instruction refactor notes
 
 **Specs:**
