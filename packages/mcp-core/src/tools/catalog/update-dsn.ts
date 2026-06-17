@@ -244,7 +244,11 @@ export default defineTool({
     output += `**Name**: ${clientKey.name}\n`;
     output += `**Status**: ${clientKey.isActive ? "Active" : "Inactive"}\n`;
 
-    if (clientKey.rateLimit) {
+    if (
+      clientKey.rateLimit &&
+      clientKey.rateLimit.count > 0 &&
+      clientKey.rateLimit.window > 0
+    ) {
       output += `**Rate Limit**: ${clientKey.rateLimit.count} events per ${clientKey.rateLimit.window} seconds\n`;
     } else {
       output += `**Rate Limit**: Disabled\n`;

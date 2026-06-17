@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { http, HttpResponse } from "msw";
+import { mswServer } from "@sentry/mcp-server-mocks";
 import updateDsn from "./update-dsn.js";
 import { UserInputError } from "../../errors.js";
 
@@ -88,6 +90,55 @@ describe("update_dsn", () => {
     );
     expect(result).toContain("**Rate Limit**: Disabled");
     expect(result).toContain("- Updated rate limit disabled");
+  });
+
+  it("treats zero-valued API rate limit responses as disabled", async () => {
+    mswServer.use(
+      http.put(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/:keyId/",
+        ({ params }) =>
+          HttpResponse.json(
+            {
+              id: String(params.keyId),
+              name: "Default",
+              dsn: {
+                public:
+                  "https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945",
+              },
+              isActive: true,
+              dateCreated: "2025-04-07T00:12:25.139394Z",
+              rateLimit: {
+                count: 0,
+                window: 3600,
+              },
+            },
+            { status: 200 },
+          ),
+        { once: true },
+      ),
+    );
+
+    const result = await updateDsn.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        keyId: "d20df0a1ab5031c7f3c7edca9c02814d",
+        rateLimitWindow: 3600,
+        rateLimitCount: 100,
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          projectSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain("**Rate Limit**: Disabled");
+    expect(result).toContain("- Updated rate limit to 100 events per 3600s");
   });
 
   it("disables rate limit entirely", async () => {
