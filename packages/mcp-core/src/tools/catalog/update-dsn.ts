@@ -54,10 +54,13 @@ export default defineTool({
     keyId: z
       .string()
       .trim()
-      .describe("The ID of the DSN (client key) to update. Use find_dsns() to retrieve this ID first."),
+      .describe(
+        "The ID of the DSN (client key) to update. Use find_dsns() to retrieve this ID first.",
+      ),
     name: z
       .string()
       .trim()
+      .max(64)
       .describe("The new name for the DSN.")
       .optional(),
     isActive: z
@@ -67,23 +70,30 @@ export default defineTool({
     rateLimitWindow: z
       .number()
       .int()
-      .positive()
+      .min(0)
+      .max(60 * 60 * 24)
       .describe("The time window in seconds for the rate limit.")
       .optional(),
     rateLimitCount: z
       .number()
       .int()
-      .positive()
-      .describe("The maximum number of errors allowed within the rate limit window.")
+      .min(0)
+      .describe(
+        "The maximum number of errors allowed within the rate limit window.",
+      )
       .optional(),
     disableRateLimit: z
       .boolean()
-      .describe("Set to true to disable the rate limit entirely (removes the cap).")
+      .describe(
+        "Set to true to disable the rate limit entirely (removes the cap).",
+      )
       .optional(),
     browserSdkVersion: z
       .string()
       .trim()
-      .describe("The Sentry Javascript SDK version to use (e.g. 'latest', '7.x').")
+      .describe(
+        "The Sentry Javascript SDK version to use (e.g. 'latest', '7.x').",
+      )
       .optional(),
     loaderHasReplay: z
       .boolean()
@@ -91,11 +101,15 @@ export default defineTool({
       .optional(),
     loaderHasPerformance: z
       .boolean()
-      .describe("Configure Performance Monitoring for the Javascript Loader Script.")
+      .describe(
+        "Configure Performance Monitoring for the Javascript Loader Script.",
+      )
       .optional(),
     loaderHasDebug: z
       .boolean()
-      .describe("Configure Debug Bundles & Logging for the Javascript Loader Script.")
+      .describe(
+        "Configure Debug Bundles & Logging for the Javascript Loader Script.",
+      )
       .optional(),
     loaderHasFeedback: z
       .boolean()
@@ -103,7 +117,9 @@ export default defineTool({
       .optional(),
     loaderHasLogsAndMetrics: z
       .boolean()
-      .describe("Configure Logs and Metrics for the Javascript Loader Script (requires SDK >= 10.0.0).")
+      .describe(
+        "Configure Logs and Metrics for the Javascript Loader Script (requires SDK >= 10.0.0).",
+      )
       .optional(),
   },
   annotations: {
@@ -121,7 +137,6 @@ export default defineTool({
     setTag("organization.slug", organizationSlug);
     setTag("project.slug", params.projectSlug);
 
-    // Require at least one field to update
     const hasUpdates =
       params.name !== undefined ||
       params.isActive !== undefined ||
@@ -141,35 +156,50 @@ export default defineTool({
       );
     }
 
-    // Validate rate limit input combinations
     if (
-      (params.rateLimitWindow !== undefined && params.rateLimitCount === undefined) ||
-      (params.rateLimitWindow === undefined && params.rateLimitCount !== undefined)
+      (params.rateLimitWindow !== undefined &&
+        params.rateLimitCount === undefined) ||
+      (params.rateLimitWindow === undefined &&
+        params.rateLimitCount !== undefined)
     ) {
-      throw new UserInputError("Both rateLimitWindow and rateLimitCount must be provided together to set a rate limit.");
+      throw new UserInputError(
+        "Both rateLimitWindow and rateLimitCount must be provided together to set a rate limit.",
+      );
     }
 
-    if (params.disableRateLimit && (params.rateLimitWindow !== undefined || params.rateLimitCount !== undefined)) {
-      throw new UserInputError("Cannot both set a rate limit and disable it at the same time.");
+    if (
+      params.disableRateLimit &&
+      (params.rateLimitWindow !== undefined ||
+        params.rateLimitCount !== undefined)
+    ) {
+      throw new UserInputError(
+        "Cannot both set a rate limit and disable it at the same time.",
+      );
     }
 
-    let rateLimit: { window: number; count: number } | null | undefined = undefined;
+    let rateLimit: { window: number; count: number } | null | undefined =
+      undefined;
     if (params.disableRateLimit === true) {
       rateLimit = null;
-    } else if (params.rateLimitWindow !== undefined && params.rateLimitCount !== undefined) {
+    } else if (
+      params.rateLimitWindow !== undefined &&
+      params.rateLimitCount !== undefined
+    ) {
       rateLimit = {
         window: params.rateLimitWindow,
         count: params.rateLimitCount,
       };
     }
 
-    let dynamicSdkLoaderOptions: {
-      hasReplay?: boolean;
-      hasPerformance?: boolean;
-      hasDebug?: boolean;
-      hasFeedback?: boolean;
-      hasLogsAndMetrics?: boolean;
-    } | undefined = undefined;
+    let dynamicSdkLoaderOptions:
+      | {
+          hasReplay?: boolean;
+          hasPerformance?: boolean;
+          hasDebug?: boolean;
+          hasFeedback?: boolean;
+          hasLogsAndMetrics?: boolean;
+        }
+      | undefined = undefined;
 
     if (
       params.loaderHasReplay !== undefined ||
@@ -179,11 +209,17 @@ export default defineTool({
       params.loaderHasLogsAndMetrics !== undefined
     ) {
       dynamicSdkLoaderOptions = {};
-      if (params.loaderHasReplay !== undefined) dynamicSdkLoaderOptions.hasReplay = params.loaderHasReplay;
-      if (params.loaderHasPerformance !== undefined) dynamicSdkLoaderOptions.hasPerformance = params.loaderHasPerformance;
-      if (params.loaderHasDebug !== undefined) dynamicSdkLoaderOptions.hasDebug = params.loaderHasDebug;
-      if (params.loaderHasFeedback !== undefined) dynamicSdkLoaderOptions.hasFeedback = params.loaderHasFeedback;
-      if (params.loaderHasLogsAndMetrics !== undefined) dynamicSdkLoaderOptions.hasLogsAndMetrics = params.loaderHasLogsAndMetrics;
+      if (params.loaderHasReplay !== undefined)
+        dynamicSdkLoaderOptions.hasReplay = params.loaderHasReplay;
+      if (params.loaderHasPerformance !== undefined)
+        dynamicSdkLoaderOptions.hasPerformance = params.loaderHasPerformance;
+      if (params.loaderHasDebug !== undefined)
+        dynamicSdkLoaderOptions.hasDebug = params.loaderHasDebug;
+      if (params.loaderHasFeedback !== undefined)
+        dynamicSdkLoaderOptions.hasFeedback = params.loaderHasFeedback;
+      if (params.loaderHasLogsAndMetrics !== undefined)
+        dynamicSdkLoaderOptions.hasLogsAndMetrics =
+          params.loaderHasLogsAndMetrics;
     }
 
     const clientKey = await apiService.updateClientKey({
@@ -205,6 +241,8 @@ export default defineTool({
 
     if (clientKey.rateLimit) {
       output += `**Rate Limit**: ${clientKey.rateLimit.count} events per ${clientKey.rateLimit.window} seconds\n`;
+    } else if (rateLimit && (rateLimit.count === 0 || rateLimit.window === 0)) {
+      output += `**Rate Limit**: ${rateLimit.count} events per ${rateLimit.window} seconds\n`;
     } else {
       output += `**Rate Limit**: Disabled\n`;
     }
@@ -219,23 +257,30 @@ export default defineTool({
         `Replay: ${loader.hasReplay ? "Enabled" : "Disabled"}`,
         `Performance: ${loader.hasPerformance ? "Enabled" : "Disabled"}`,
         `Debug: ${loader.hasDebug ? "Enabled" : "Disabled"}`,
-        loader.hasFeedback !== undefined ? `Feedback: ${loader.hasFeedback ? "Enabled" : "Disabled"}` : null,
-        loader.hasLogsAndMetrics !== undefined ? `Logs & Metrics: ${loader.hasLogsAndMetrics ? "Enabled" : "Disabled"}` : null,
+        loader.hasFeedback !== undefined
+          ? `Feedback: ${loader.hasFeedback ? "Enabled" : "Disabled"}`
+          : null,
+        loader.hasLogsAndMetrics !== undefined
+          ? `Logs & Metrics: ${loader.hasLogsAndMetrics ? "Enabled" : "Disabled"}`
+          : null,
       ]
         .filter((val): val is string => val !== null)
         .join(", ");
       output += `**Loader Options**: ${optionsStr}\n`;
     }
 
-    // Display what was updated
     const updates: string[] = [];
     if (params.name) updates.push(`name to "${params.name}"`);
-    if (params.isActive !== undefined) updates.push(`status to ${params.isActive ? "active" : "inactive"}`);
+    if (params.isActive !== undefined)
+      updates.push(`status to ${params.isActive ? "active" : "inactive"}`);
     if (params.disableRateLimit) updates.push("rate limit disabled");
     else if (params.rateLimitWindow !== undefined) {
-      updates.push(`rate limit to ${params.rateLimitCount} events per ${params.rateLimitWindow}s`);
+      updates.push(
+        `rate limit to ${params.rateLimitCount} events per ${params.rateLimitWindow}s`,
+      );
     }
-    if (params.browserSdkVersion) updates.push(`browser SDK version to "${params.browserSdkVersion}"`);
+    if (params.browserSdkVersion)
+      updates.push(`browser SDK version to "${params.browserSdkVersion}"`);
     if (dynamicSdkLoaderOptions) {
       updates.push("loader options updated");
     }

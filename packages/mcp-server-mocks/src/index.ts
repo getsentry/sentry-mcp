@@ -220,6 +220,20 @@ type IssueUpdateBody = {
   substatus?: string;
 };
 
+type ClientKeyUpdateBody = {
+  name?: string;
+  isActive?: boolean;
+  rateLimit?: { window: number; count: number } | null;
+  browserSdkVersion?: string;
+  dynamicSdkLoaderOptions?: {
+    hasReplay?: boolean;
+    hasPerformance?: boolean;
+    hasDebug?: boolean;
+    hasFeedback?: boolean;
+    hasLogsAndMetrics?: boolean;
+  };
+};
+
 function buildMockIgnoredStatusDetails(
   body: IssueUpdateBody,
   substatus: string | null | undefined,
@@ -519,14 +533,23 @@ export const restHandlers = buildHandlers([
     method: "put",
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/:keyId/",
     fetch: async ({ request, params }) => {
-      const body = (await request.json()) as any;
+      const body = (await request.json()) as ClientKeyUpdateBody;
+      const rateLimit =
+        body.rateLimit && body.rateLimit.count > 0 && body.rateLimit.window > 0
+          ? body.rateLimit
+          : null;
       return HttpResponse.json({
         ...clientKeyFixture,
         id: params.keyId,
         name: body.name ?? clientKeyFixture.name,
-        isActive: body.isActive !== undefined ? body.isActive : clientKeyFixture.isActive,
-        rateLimit: body.rateLimit !== undefined ? body.rateLimit : clientKeyFixture.rateLimit,
-        browserSdkVersion: body.browserSdkVersion ?? clientKeyFixture.browserSdkVersion,
+        isActive:
+          body.isActive !== undefined
+            ? body.isActive
+            : clientKeyFixture.isActive,
+        rateLimit:
+          body.rateLimit !== undefined ? rateLimit : clientKeyFixture.rateLimit,
+        browserSdkVersion:
+          body.browserSdkVersion ?? clientKeyFixture.browserSdkVersion,
         dynamicSdkLoaderOptions: {
           ...clientKeyFixture.dynamicSdkLoaderOptions,
           ...body.dynamicSdkLoaderOptions,

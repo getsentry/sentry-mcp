@@ -2161,6 +2161,7 @@
         },
         "name": {
           "type": "string",
+          "maxLength": 64,
           "description": "The new name for the DSN."
         },
         "isActive": {
@@ -2169,12 +2170,13 @@
         },
         "rateLimitWindow": {
           "type": "integer",
-          "exclusiveMinimum": 0,
+          "minimum": 0,
+          "maximum": 86400,
           "description": "The time window in seconds for the rate limit."
         },
         "rateLimitCount": {
           "type": "integer",
-          "exclusiveMinimum": 0,
+          "minimum": 0,
           "description": "The maximum number of errors allowed within the rate limit window."
         },
         "disableRateLimit": {

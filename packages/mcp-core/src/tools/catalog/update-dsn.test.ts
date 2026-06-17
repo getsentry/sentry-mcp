@@ -67,6 +67,29 @@ describe("update_dsn", () => {
     expect(result).toContain("- Updated rate limit to 100 events per 3600s");
   });
 
+  it("reports zero-valued rate limit updates consistently", async () => {
+    const result = await updateDsn.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        keyId: "d20df0a1ab5031c7f3c7edca9c02814d",
+        rateLimitWindow: 3600,
+        rateLimitCount: 0,
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          projectSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+    expect(result).toContain("**Rate Limit**: 0 events per 3600 seconds");
+    expect(result).toContain("- Updated rate limit to 0 events per 3600s");
+  });
+
   it("disables rate limit entirely", async () => {
     const result = await updateDsn.handler(
       {

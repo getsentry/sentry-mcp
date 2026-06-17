@@ -1257,6 +1257,33 @@ describe("buildServer", () => {
       );
     });
 
+    it("execute_sentry_tool dispatches to catalog-only update_dsn", async () => {
+      const server = buildServer({
+        context: baseContext,
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      expect(toolNames).not.toContain("update_dsn");
+
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
+        name: "update_dsn",
+        arguments: {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          keyId: "d20df0a1ab5031c7f3c7edca9c02814d",
+          rateLimitWindow: 3600,
+          rateLimitCount: 0,
+        },
+      });
+
+      expect(getTextContent(result)).toContain(
+        "# Updated DSN in **sentry-mcp-evals/cloudflare-mcp**",
+      );
+      expect(getTextContent(result)).toContain(
+        "**Rate Limit**: 0 events per 3600 seconds",
+      );
+    });
+
     it("execute_sentry_tool dispatches to catalog-only whoami", async () => {
       const server = buildServer({
         context: {

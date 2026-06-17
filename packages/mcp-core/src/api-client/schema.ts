@@ -419,9 +419,11 @@ export const ClientKeySchema = z
   .object({
     id: z.union([z.string(), z.number()]),
     name: z.string(),
-    dsn: z.object({
-      public: z.string(),
-    }),
+    dsn: z
+      .object({
+        public: z.string(),
+      })
+      .passthrough(),
     isActive: z.boolean(),
     dateCreated: z.string().datetime().nullable(),
     rateLimit: z

@@ -218,6 +218,27 @@ type RequestOptions = {
 };
 
 export type TraceItemType = "spans" | "logs" | "tracemetrics";
+
+type ClientKeyRateLimit = {
+  window: number;
+  count: number;
+};
+
+type ClientKeyDynamicSdkLoaderOptions = {
+  hasReplay?: boolean;
+  hasPerformance?: boolean;
+  hasDebug?: boolean;
+  hasFeedback?: boolean;
+  hasLogsAndMetrics?: boolean;
+};
+
+type UpdateClientKeyRequest = {
+  name?: string;
+  isActive?: boolean;
+  rateLimit?: ClientKeyRateLimit | null;
+  browserSdkVersion?: string;
+  dynamicSdkLoaderOptions?: ClientKeyDynamicSdkLoaderOptions;
+};
 export type TraceItemAttributeType = "string" | "number" | "boolean";
 export type TraceItemAttributeSourceType = "sentry" | "user";
 
@@ -2090,26 +2111,25 @@ export class SentryApiService {
       organizationSlug: string;
       projectSlug: string;
       keyId: string | number;
-      name?: string;
-      isActive?: boolean;
-      rateLimit?: { window: number; count: number } | null;
-      browserSdkVersion?: string;
-      dynamicSdkLoaderOptions?: {
-        hasReplay?: boolean;
-        hasPerformance?: boolean;
-        hasDebug?: boolean;
-        hasFeedback?: boolean;
-        hasLogsAndMetrics?: boolean;
-      };
-    },
+    } & UpdateClientKeyRequest,
     opts?: RequestOptions,
   ): Promise<ClientKey> {
-    const updateData: Record<string, any> = {};
-    if (name !== undefined) updateData.name = name;
-    if (isActive !== undefined) updateData.isActive = isActive;
-    if (rateLimit !== undefined) updateData.rateLimit = rateLimit;
-    if (browserSdkVersion !== undefined) updateData.browserSdkVersion = browserSdkVersion;
-    if (dynamicSdkLoaderOptions !== undefined) updateData.dynamicSdkLoaderOptions = dynamicSdkLoaderOptions;
+    const updateData: UpdateClientKeyRequest = {};
+    if (name !== undefined) {
+      updateData.name = name;
+    }
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
+    }
+    if (rateLimit !== undefined) {
+      updateData.rateLimit = rateLimit;
+    }
+    if (browserSdkVersion !== undefined) {
+      updateData.browserSdkVersion = browserSdkVersion;
+    }
+    if (dynamicSdkLoaderOptions !== undefined) {
+      updateData.dynamicSdkLoaderOptions = dynamicSdkLoaderOptions;
+    }
 
     const body = await this.requestJSON(
       `/projects/${organizationSlug}/${projectSlug}/keys/${keyId}/`,
@@ -2121,7 +2141,6 @@ export class SentryApiService {
     );
     return ClientKeySchema.parse(body);
   }
-
 
   /**
    * Lists all client keys (DSNs) for a project.

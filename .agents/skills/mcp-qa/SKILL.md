@@ -64,6 +64,12 @@ behavior. For catalog tools, expect `search_sentry_tools` followed by
 `execute_sentry_tool(name: <changed_tool>)`. For direct tools, expect the tool name in
 the transcript. `--list-tools` alone is not QA.
 
+For mutating catalog-only tools, avoid live prod changes unless there is a
+disposable resource prepared for the test. Add or run a server-level
+`execute_sentry_tool` dispatch test with MSW coverage to prove catalog
+discovery, generated schema exposure, constraint injection, and tool dispatch
+without changing real Sentry data.
+
 For output-format changes, also inspect the raw MCP tool result when possible,
 not only the LLM's final answer. The final answer can add model-specific text
 that is not part of the tool response. Review raw tool output against
