@@ -48,6 +48,11 @@ program
     "MCP server host",
     process.env.MCP_URL || "http://localhost:5173",
   )
+  .option(
+    "--client-metadata-url <url>",
+    "Use OAuth Client ID Metadata Document URL instead of Dynamic Client Registration",
+    process.env.MCP_CLIENT_METADATA_URL,
+  )
   .option("--host <host>", "Sentry host for stdio transport")
   .option("--sentry-dsn <dsn>", "Sentry DSN for error reporting")
   .option(
@@ -129,6 +134,7 @@ program
         connection = await connectToRemoteMCPServer({
           mcpHost: options.mcpHost,
           accessToken,
+          clientMetadataUrl: options.clientMetadataUrl,
           useAgentEndpoint: options.agent,
           useExperimental: options.experimental,
         });

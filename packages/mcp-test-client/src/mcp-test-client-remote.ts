@@ -47,6 +47,7 @@ export async function connectToRemoteMCPServer(
                 try {
                   const oauthClient = new OAuthClient({
                     mcpHost: mcpUrl.href,
+                    clientMetadataUrl: config.clientMetadataUrl,
                   });
                   accessToken = await oauthClient.getAccessToken();
                   authSpan.setStatus({ code: 1 });

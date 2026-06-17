@@ -62,6 +62,23 @@ function createAuthRequest(clientId: string, resource: string) {
   return new Request(url);
 }
 
+function createHostedAuthorizeRequest(
+  clientId: string,
+  redirectUri = REDIRECT_URI,
+) {
+  const url = new URL("https://mcp.sentry.dev/oauth/authorize");
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("scope", "org:read");
+  url.searchParams.set("state", "test-state");
+  url.searchParams.set("resource", "https://mcp.sentry.dev/mcp");
+
+  return new Request(url, {
+    headers: { "CF-Connecting-IP": "192.0.2.1" },
+  });
+}
+
 function createTokenExchangeRequest(clientId: string, code: string) {
   return new Request("https://mcp.sentry.dev/oauth/token", {
     method: "POST",
@@ -187,6 +204,219 @@ async function parseSseJson<T>(response: Response): Promise<T> {
 }
 
 describe("/mcp", () => {
+  it("advertises CIMD support and DCR from root authorization metadata", async () => {
+    const ctx = createExecutionContext();
+    const response = await handler.fetch!(
+      new Request(
+        "https://mcp.sentry.dev/.well-known/oauth-authorization-server",
+      ),
+      workerEnv,
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+
+    const body = (await response.json()) as {
+      client_id_metadata_document_supported?: boolean;
+      registration_endpoint?: string;
+    };
+    expect(body.client_id_metadata_document_supported).toBe(true);
+    expect(body.registration_endpoint).toBe(
+      "https://mcp.sentry.dev/oauth/register",
+    );
+  });
+
+  it("renders consent for a valid URL client ID metadata document", async () => {
+    const metadataUrl = "https://client.example/oauth/client.json";
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation((input, init) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+
+        if (url === metadataUrl) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                client_id: metadataUrl,
+                client_name: "Example CIMD Client",
+                redirect_uris: [REDIRECT_URI],
+                grant_types: ["authorization_code"],
+                response_types: ["code"],
+                token_endpoint_auth_method: "none",
+              }),
+              {
+                headers: { "Content-Type": "application/json" },
+              },
+            ),
+          );
+        }
+
+        return originalFetch(input, init);
+      });
+
+    const ctx = createExecutionContext();
+    const response = await handler.fetch!(
+      createHostedAuthorizeRequest(metadataUrl),
+      workerEnv,
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("Example CIMD Client");
+    expect(html).toContain(metadataUrl);
+    expect(html).toContain(REDIRECT_URI);
+  });
+
+  it.each([
+    [
+      "metadata fetch non-200",
+      "https://client.example/oauth/not-found.json",
+      new Response("not found", { status: 404 }),
+      REDIRECT_URI,
+      "Invalid client",
+    ],
+    [
+      "client ID mismatch",
+      "https://client.example/oauth/mismatch.json",
+      new Response(
+        JSON.stringify({
+          client_id: "https://client.example/oauth/other.json",
+          redirect_uris: [REDIRECT_URI],
+          token_endpoint_auth_method: "none",
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      ),
+      REDIRECT_URI,
+      "Invalid client",
+    ],
+    [
+      "missing redirect URIs",
+      "https://client.example/oauth/no-redirects.json",
+      new Response(
+        JSON.stringify({
+          client_id: "https://client.example/oauth/no-redirects.json",
+          token_endpoint_auth_method: "none",
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      ),
+      REDIRECT_URI,
+      "Invalid client",
+    ],
+    [
+      "unlisted redirect URI",
+      "https://client.example/oauth/unlisted-redirect.json",
+      new Response(
+        JSON.stringify({
+          client_id: "https://client.example/oauth/unlisted-redirect.json",
+          redirect_uris: [REDIRECT_URI],
+          token_endpoint_auth_method: "none",
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      ),
+      "https://evil.example/callback",
+      "Invalid redirect URI",
+    ],
+    [
+      "unsupported grant type",
+      "https://client.example/oauth/unsupported-grant.json",
+      new Response(
+        JSON.stringify({
+          client_id: "https://client.example/oauth/unsupported-grant.json",
+          redirect_uris: [REDIRECT_URI],
+          grant_types: ["refresh_token"],
+          response_types: ["code"],
+          token_endpoint_auth_method: "none",
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      ),
+      REDIRECT_URI,
+      "Invalid client",
+    ],
+    [
+      "unsupported response type",
+      "https://client.example/oauth/unsupported-response.json",
+      new Response(
+        JSON.stringify({
+          client_id: "https://client.example/oauth/unsupported-response.json",
+          redirect_uris: [REDIRECT_URI],
+          grant_types: ["authorization_code"],
+          response_types: ["token"],
+          token_endpoint_auth_method: "none",
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      ),
+      REDIRECT_URI,
+      "Invalid client",
+    ],
+    [
+      "unsupported public key authentication method",
+      "https://client.example/oauth/private-key-jwt.json",
+      new Response(
+        JSON.stringify({
+          client_id: "https://client.example/oauth/private-key-jwt.json",
+          redirect_uris: [REDIRECT_URI],
+          grant_types: ["authorization_code"],
+          response_types: ["code"],
+          token_endpoint_auth_method: "private_key_jwt",
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      ),
+      REDIRECT_URI,
+      "Invalid client",
+    ],
+    [
+      "disallowed client authentication method",
+      "https://client.example/oauth/confidential.json",
+      new Response(
+        JSON.stringify({
+          client_id: "https://client.example/oauth/confidential.json",
+          redirect_uris: [REDIRECT_URI],
+          token_endpoint_auth_method: "client_secret_post",
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      ),
+      REDIRECT_URI,
+      "Invalid client",
+    ],
+  ])(
+    "rejects invalid CIMD metadata safely: %s",
+    async (_name, metadataUrl, metadataResponse, redirectUri, expectedBody) => {
+      const originalFetch = globalThis.fetch;
+      vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+
+        if (url === metadataUrl) {
+          return Promise.resolve(metadataResponse.clone());
+        }
+
+        return originalFetch(input, init);
+      });
+
+      const ctx = createExecutionContext();
+      const response = await handler.fetch!(
+        createHostedAuthorizeRequest(metadataUrl, redirectUri),
+        workerEnv,
+        ctx,
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toBe(expectedBody);
+      expect(response.headers.get("location")).toBeNull();
+    },
+  );
+
   it("authenticates through /oauth/token and serves MCP requests at /mcp", async () => {
     const accessToken = await issueAccessToken("https://mcp.sentry.dev/mcp");
 

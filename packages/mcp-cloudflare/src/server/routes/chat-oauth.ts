@@ -74,12 +74,54 @@ type ClientRegistrationResponse = z.infer<
   typeof ClientRegistrationResponseSchema
 >;
 
-// Get or register OAuth client with the MCP server
+const CHAT_CLIENT_REGISTRATION_KEY = "chat_oauth_client_registration";
+export const CHAT_CLIENT_METADATA_PATH =
+  "/.well-known/oauth-client/demo-chat.json";
+
+/**
+ * Builds the demo chat OAuth Client ID Metadata Document.
+ *
+ * This describes only the web chat client. The MCP resource remains the
+ * separate `/mcp` URL requested through the OAuth resource parameter.
+ */
+export function getChatClientMetadata(origin: string) {
+  const baseUrl = new URL(origin);
+  const clientId = new URL(CHAT_CLIENT_METADATA_PATH, baseUrl).href;
+
+  return {
+    client_id: clientId,
+    client_name: "Sentry MCP Demo Chat",
+    client_uri: baseUrl.origin,
+    redirect_uris: [new URL("/api/auth/callback", baseUrl).href],
+    grant_types: ["authorization_code", "refresh_token"],
+    response_types: ["code"],
+    token_endpoint_auth_method: "none",
+    scope: Object.keys(SCOPES).join(" "),
+  };
+}
+
+function shouldUseChatCimd(origin: string): boolean {
+  return new URL(origin).protocol === "https:";
+}
+
+export function getMcpResourceUrl(origin: string): string {
+  return new URL("/mcp", origin).href;
+}
+
+/**
+ * Resolves the demo chat OAuth client ID.
+ *
+ * HTTPS origins use CIMD; local HTTP development keeps DCR compatibility.
+ */
 export async function getOrRegisterChatClient(
   env: Env,
   redirectUri: string,
 ): Promise<string> {
-  const CHAT_CLIENT_REGISTRATION_KEY = "chat_oauth_client_registration";
+  const mcpHost = new URL(redirectUri).origin;
+
+  if (shouldUseChatCimd(mcpHost)) {
+    return getChatClientMetadata(mcpHost).client_id;
+  }
 
   // Check if we already have a registered client in KV
   const existingRegistration = await env.OAUTH_KV.get(
@@ -104,7 +146,6 @@ export async function getOrRegisterChatClient(
   }
 
   // Register new client with our MCP server using OAuth 2.1 dynamic client registration
-  const mcpHost = new URL(redirectUri).origin;
   const registrationUrl = `${mcpHost}/oauth/register`;
 
   const registrationData: ClientRegistrationRequest = {
@@ -166,6 +207,7 @@ async function exchangeCodeForToken(
     client_id: clientId,
     code: code,
     redirect_uri: redirectUri,
+    resource: getMcpResourceUrl(mcpHost),
   });
 
   const response = await fetch(tokenUrl, {
@@ -194,8 +236,8 @@ export default new Hono<{
 }>()
   /**
    * Initiate OAuth flow for chat application
-   * 1. Register with MCP server using OAuth 2.1 dynamic client registration
-   * 2. Redirect to MCP server OAuth with the registered client ID
+   * 1. Resolve the hosted chat OAuth client ID (CIMD on HTTPS, DCR locally)
+   * 2. Redirect to MCP server OAuth with the chat client ID
    */
   .get("/authorize", async (c) => {
     try {
@@ -221,6 +263,7 @@ export default new Hono<{
       authUrl.searchParams.set("response_type", "code");
       authUrl.searchParams.set("scope", Object.keys(SCOPES).join(" "));
       authUrl.searchParams.set("state", state);
+      authUrl.searchParams.set("resource", getMcpResourceUrl(mcpHost));
 
       return c.redirect(authUrl.toString());
     } catch (error) {

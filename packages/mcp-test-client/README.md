@@ -42,6 +42,10 @@ pnpm mcp-test-client
 
 # Or specify a custom MCP server
 pnpm mcp-test-client --mcp-host http://localhost:8787
+
+# Or force OAuth Client ID Metadata Document (CIMD) mode for hosted OAuth QA
+pnpm mcp-test-client --mcp-host http://localhost:8787 \
+  --client-metadata-url https://example.com/oauth/client.json
 ```
 
 The OAuth flow uses PKCE (Proof Key for Code Exchange) and doesn't require a client secret, making it secure for CLI applications.
@@ -61,13 +65,14 @@ SENTRY_ACCESS_TOKEN=your_sentry_access_token
 # Leave unset to target the SaaS host
 SENTRY_HOST=sentry.example.com  # Hostname only
 MCP_URL=https://mcp.sentry.dev  # MCP server host (defaults to production)
+MCP_CLIENT_METADATA_URL=https://example.com/oauth/client.json  # Optional CIMD client metadata URL
 MCP_MODEL=gpt-4o  # Override default model (GPT-4)
 
 # Optional - Error tracking
 SENTRY_DSN=your_sentry_dsn  # Error tracking for the client itself
 
-# OAuth clients are automatically registered via Dynamic Client Registration (RFC 7591)
-# No manual client ID configuration needed
+# OAuth clients are automatically registered via Dynamic Client Registration
+# (RFC 7591) unless MCP_CLIENT_METADATA_URL is set.
 ```
 
 ### 3. Command Line Flags
@@ -295,6 +300,12 @@ When connecting to a remote MCP server (default), the client supports OAuth 2.1 
 - Tokens are securely stored in memory during the session
 
 **Note**: OAuth clients are automatically registered using Dynamic Client Registration (RFC 7591). The client registration is cached in `~/.config/sentry-mcp/config.json` to avoid re-registration on subsequent authentications.
+
+To test OAuth Client ID Metadata Documents (CIMD), pass
+`--transport http --client-metadata-url` or set `MCP_CLIENT_METADATA_URL` with
+HTTP transport. The client uses that HTTPS URL directly as `client_id` and
+skips Dynamic Client Registration. If auto transport selects stdio because
+`SENTRY_ACCESS_TOKEN` is set, OAuth and CIMD are not used.
 
 ### Local Mode (Access Tokens)
 

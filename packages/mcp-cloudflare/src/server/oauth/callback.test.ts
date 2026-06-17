@@ -76,10 +76,14 @@ function createTestEnv(): Env {
   };
 }
 
-async function createClient(testEnv: Env, name = "Test Client") {
+async function createClient(
+  testEnv: Env,
+  name = "Test Client",
+  redirectUris = [REDIRECT_URI],
+) {
   return testEnv.OAUTH_PROVIDER.createClient({
     clientName: name,
-    redirectUris: [REDIRECT_URI],
+    redirectUris,
     tokenEndpointAuthMethod: "none",
   });
 }
@@ -88,12 +92,13 @@ async function createSignedCallbackState(
   clientId: string,
   resource?: string,
   skills: string[] = ["inspect"],
+  redirectUri = REDIRECT_URI,
 ): Promise<string> {
   const now = Date.now();
   const payload: OAuthState = {
     req: {
       clientId,
-      redirectUri: REDIRECT_URI,
+      redirectUri,
       scope: ["org:read"],
       skills,
       ...(resource ? { resource } : {}),
@@ -110,13 +115,14 @@ async function approveClient(
   testEnv: Env,
   clientId: string,
   resource?: string,
+  redirectUri = REDIRECT_URI,
 ) {
   const approvalState = await signState(
     {
       req: {
         oauthReqInfo: {
           clientId,
-          redirectUri: REDIRECT_URI,
+          redirectUri,
           scope: ["org:read"],
           ...(resource ? { resource } : {}),
         },
@@ -521,6 +527,39 @@ describe("oauth callback routes", () => {
 
       expect(response.status).toBe(302);
       expect(response.headers.get("location")).toContain(REDIRECT_URI);
+      expect(response.headers.get("location")).toContain("code=");
+    });
+
+    it("accepts callback loopback redirect URIs with provider-compatible port changes", async () => {
+      const registeredRedirectUri = "http://127.0.0.1:1111/callback";
+      const requestedRedirectUri = "http://127.0.0.1:2222/callback";
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv, "Loopback Client", [
+        registeredRedirectUri,
+      ]);
+      const cookie = await approveClient(
+        oauthApp,
+        testEnv,
+        client.clientId,
+        undefined,
+        requestedRedirectUri,
+      );
+      const state = await createSignedCallbackState(
+        client.clientId,
+        undefined,
+        ["inspect"],
+        requestedRedirectUri,
+      );
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        code: "test-code",
+        cookie,
+      });
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toContain(requestedRedirectUri);
       expect(response.headers.get("location")).toContain("code=");
     });
 

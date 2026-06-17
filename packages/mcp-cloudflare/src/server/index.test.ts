@@ -149,6 +149,56 @@ describe("worker entrypoint", () => {
     expect(response.headers.has("Access-Control-Expose-Headers")).toBe(false);
   });
 
+  it("keeps demo chat client metadata public and read-only", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("{}", {
+        headers: {
+          "Access-Control-Allow-Origin": "https://evil.com",
+          "Access-Control-Allow-Methods": "*",
+          "Access-Control-Allow-Headers": "Authorization, *",
+          "Access-Control-Allow-Credentials": "true",
+        },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request(
+        "https://mcp.sentry.dev/.well-known/oauth-client/demo-chat.json",
+      ),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(response.headers.get("Access-Control-Allow-Methods")).toBe(
+      "GET, OPTIONS",
+    );
+    expect(response.headers.get("Access-Control-Allow-Headers")).toBe(
+      "Content-Type",
+    );
+    expect(response.headers.has("Access-Control-Allow-Credentials")).toBe(
+      false,
+    );
+  });
+
+  it("enables CIMD while preserving Dynamic Client Registration", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(new Response("ok"));
+
+    await handler.fetch!(
+      new Request("https://mcp.sentry.dev/oauth/token", { method: "POST" }),
+      env,
+      ctx,
+    );
+
+    expect(MockOAuthProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientRegistrationEndpoint: "/oauth/register",
+        clientIdMetadataDocumentEnabled: true,
+      }),
+    );
+  });
+
   it("patches MCP 401 responses with protected resource metadata", async () => {
     mockOAuthProviderFetch.mockResolvedValueOnce(
       new Response("unauthorized", {

@@ -7,7 +7,7 @@ import { createRequestLogger } from "./logging";
 import sentryOauth from "./oauth";
 import { createProtectedResourceMetadataResponse } from "./protected-resource-metadata";
 import chat from "./routes/chat";
-import chatOauth from "./routes/chat-oauth";
+import chatOauth, { getChatClientMetadata } from "./routes/chat-oauth";
 import mcpRoutes from "./routes/mcp";
 import metadata from "./routes/metadata";
 import search from "./routes/search";
@@ -155,6 +155,13 @@ const app = new Hono<{
       icon: `${baseUrl}/favicon.ico`,
       endpoint: `${baseUrl}/mcp`,
     });
+  })
+  // OAuth Client ID Metadata Document for the hosted demo chat client.
+  //
+  // This identifies the web chat client only. The MCP server remains the
+  // protected resource and is requested separately through RFC 8707 `resource`.
+  .get("/.well-known/oauth-client/demo-chat.json", (c) => {
+    return c.json(getChatClientMetadata(getBaseUrl(c)));
   })
   // RFC 9728: OAuth 2.0 Protected Resource Metadata for /mcp resources.
   .get(

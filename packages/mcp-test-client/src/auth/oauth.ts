@@ -17,6 +17,7 @@ import { ConfigManager } from "./config.js";
 
 export interface OAuthConfig {
   mcpHost: string;
+  clientMetadataUrl?: string;
   scopes?: string[];
 }
 
@@ -62,8 +63,16 @@ export class OAuthClient {
       .href;
   }
 
+  /**
+   * Separates cached OAuth state by protected resource and optional CIMD URL.
+   */
   private getConfigKey(): string {
-    return this.getProtectedResourceUrl().href;
+    const resourceUrl = this.getProtectedResourceUrl().href;
+    if (!this.config.clientMetadataUrl) {
+      return resourceUrl;
+    }
+
+    return `${resourceUrl}#client_metadata_url=${encodeURIComponent(this.config.clientMetadataUrl)}`;
   }
 
   /**
@@ -244,6 +253,7 @@ export class OAuthClient {
       code: params.code,
       redirect_uri: OAUTH_REDIRECT_URI,
       code_verifier: params.codeVerifier,
+      resource: this.getProtectedResourceUrl().href,
     });
 
     const response = await fetch(tokenUrl, {
@@ -265,10 +275,24 @@ export class OAuthClient {
   }
 
   /**
-   * Get or register OAuth client ID for the MCP host
+   * Get a CIMD client ID or register one through Dynamic Client Registration.
    */
   private async getOrRegisterClientId(): Promise<string> {
     const configKey = this.getConfigKey();
+
+    if (this.config.clientMetadataUrl) {
+      const clientMetadataUrl = new URL(this.config.clientMetadataUrl);
+      if (clientMetadataUrl.protocol !== "https:") {
+        throw new Error("OAuth client metadata URL must use https");
+      }
+
+      await this.configManager.setOAuthClientId(
+        configKey,
+        clientMetadataUrl.href,
+      );
+      logInfo("Using OAuth client metadata URL", clientMetadataUrl.href);
+      return clientMetadataUrl.href;
+    }
 
     // Check if we already have a registered client for this host
     let clientId = await this.configManager.getOAuthClientId(configKey);

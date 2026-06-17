@@ -49,6 +49,7 @@ export function createScopedAuthorizationServerMetadataResponse(
     ),
     token_endpoint: new URL("/oauth/token", requestUrl.origin).href,
     registration_endpoint: new URL("/oauth/register", requestUrl.origin).href,
+    client_id_metadata_document_supported: true,
     scopes_supported: Object.keys(SCOPES),
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
