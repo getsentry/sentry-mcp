@@ -67,7 +67,7 @@ describe("update_dsn", () => {
     expect(result).toContain("- Updated rate limit to 100 events per 3600s");
   });
 
-  it("reports zero-valued rate limit updates consistently", async () => {
+  it("treats zero-valued rate limit updates as disabled", async () => {
     const result = await updateDsn.handler(
       {
         organizationSlug: "sentry-mcp-evals",
@@ -86,8 +86,8 @@ describe("update_dsn", () => {
         userId: "1",
       },
     );
-    expect(result).toContain("**Rate Limit**: 0 events per 3600 seconds");
-    expect(result).toContain("- Updated rate limit to 0 events per 3600s");
+    expect(result).toContain("**Rate Limit**: Disabled");
+    expect(result).toContain("- Updated rate limit disabled");
   });
 
   it("disables rate limit entirely", async () => {

@@ -1279,9 +1279,7 @@ describe("buildServer", () => {
       expect(getTextContent(result)).toContain(
         "# Updated DSN in **sentry-mcp-evals/cloudflare-mcp**",
       );
-      expect(getTextContent(result)).toContain(
-        "**Rate Limit**: 0 events per 3600 seconds",
-      );
+      expect(getTextContent(result)).toContain("**Rate Limit**: Disabled");
     });
 
     it("execute_sentry_tool dispatches to catalog-only whoami", async () => {

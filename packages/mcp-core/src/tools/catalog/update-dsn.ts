@@ -177,9 +177,14 @@ export default defineTool({
       );
     }
 
+    const zeroRateLimit =
+      params.rateLimitWindow !== undefined &&
+      params.rateLimitCount !== undefined &&
+      (params.rateLimitWindow === 0 || params.rateLimitCount === 0);
+
     let rateLimit: { window: number; count: number } | null | undefined =
       undefined;
-    if (params.disableRateLimit === true) {
+    if (params.disableRateLimit === true || zeroRateLimit) {
       rateLimit = null;
     } else if (
       params.rateLimitWindow !== undefined &&
@@ -241,8 +246,6 @@ export default defineTool({
 
     if (clientKey.rateLimit) {
       output += `**Rate Limit**: ${clientKey.rateLimit.count} events per ${clientKey.rateLimit.window} seconds\n`;
-    } else if (rateLimit && (rateLimit.count === 0 || rateLimit.window === 0)) {
-      output += `**Rate Limit**: ${rateLimit.count} events per ${rateLimit.window} seconds\n`;
     } else {
       output += `**Rate Limit**: Disabled\n`;
     }
@@ -273,7 +276,8 @@ export default defineTool({
     if (params.name) updates.push(`name to "${params.name}"`);
     if (params.isActive !== undefined)
       updates.push(`status to ${params.isActive ? "active" : "inactive"}`);
-    if (params.disableRateLimit) updates.push("rate limit disabled");
+    if (params.disableRateLimit || zeroRateLimit)
+      updates.push("rate limit disabled");
     else if (params.rateLimitWindow !== undefined) {
       updates.push(
         `rate limit to ${params.rateLimitCount} events per ${params.rateLimitWindow}s`,
