@@ -28,6 +28,7 @@ import {
   checkRateLimit,
 } from "../utils/rate-limiter";
 import { setSentryUserFromRequest } from "../utils/sentry-user";
+import { UTM_SOURCE_ATTRIBUTE, resolveUtmSourceFromUrl } from "./attribution";
 import { resolveClientFamily } from "./client-family";
 import { verifyConstraintsAccess } from "./constraint-utils";
 
@@ -202,6 +203,9 @@ const mcpHandler: ExportedHandler<Env> = {
     // Check for experimental mode query parameter
     const isExperimentalMode = url.searchParams.get("experimental") === "1";
 
+    // Read utm_source for attribution tracking
+    const utmSource = resolveUtmSourceFromUrl(url);
+
     // Extract OAuth props from ExecutionContext (set by OAuth provider)
     const oauthCtx = ctx as OAuthExecutionContext;
 
@@ -232,6 +236,9 @@ const mcpHandler: ExportedHandler<Env> = {
       "app.server.mode.experimental",
       isExperimentalMode,
     );
+    if (utmSource) {
+      activeSpan?.setAttribute(UTM_SOURCE_ATTRIBUTE, utmSource);
+    }
 
     // Parse and validate granted skills (primary authorization method)
     // Legacy tokens without grantedSkills are no longer supported

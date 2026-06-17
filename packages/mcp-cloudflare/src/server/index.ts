@@ -3,6 +3,10 @@ import * as Sentry from "@sentry/cloudflare";
 import { logWarn } from "@sentry/mcp-core/telem/logging";
 import { SCOPES } from "../constants";
 import app from "./app";
+import {
+  UTM_SOURCE_ATTRIBUTE,
+  resolveUtmSourceFromUrl,
+} from "./lib/attribution";
 import { resolveClientFamily } from "./lib/client-family";
 import { redirectUriHasUserInfo } from "./lib/html-utils";
 import sentryMcpHandler from "./lib/mcp-handler";
@@ -189,7 +193,16 @@ const wrappedOAuthProvider = {
     }
 
     const clientFamily = resolveClientFamily(request.headers.get("user-agent"));
-    Sentry.getActiveSpan()?.setAttribute("app.client.family", clientFamily);
+    const activeSpan = Sentry.getActiveSpan();
+    activeSpan?.setAttribute("app.client.family", clientFamily);
+    // Set utm_source early on /mcp requests so the attribute is present even
+    // if the request is rejected before reaching mcp-handler.ts.
+    if (url.pathname.startsWith("/mcp")) {
+      const utmSource = resolveUtmSourceFromUrl(url);
+      if (utmSource) {
+        activeSpan?.setAttribute(UTM_SOURCE_ATTRIBUTE, utmSource);
+      }
+    }
 
     // Reject registrations with userinfo-spoofed redirect URIs before the
     // library stores the client (e.g. host@example.io).
