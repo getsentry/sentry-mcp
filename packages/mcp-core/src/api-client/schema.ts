@@ -702,7 +702,7 @@ export const IssueSchema = z
     lastSeen: z.string().datetime().nullable(),
     count: z.union([z.string(), z.number()]),
     userCount: z.union([z.string(), z.number()]),
-    permalink: z.string().url(),
+    permalink: z.string(), // relative on self-hosted Sentry; .url() rejects it (permalink is display-only)
     project: ProjectSchema,
     platform: z.string().nullable().optional(),
     status: z.string(),
