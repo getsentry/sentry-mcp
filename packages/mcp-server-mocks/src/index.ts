@@ -516,6 +516,25 @@ export const restHandlers = buildHandlers([
     },
   },
   {
+    method: "put",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/:keyId/",
+    fetch: async ({ request, params }) => {
+      const body = (await request.json()) as any;
+      return HttpResponse.json({
+        ...clientKeyFixture,
+        id: params.keyId,
+        name: body.name ?? clientKeyFixture.name,
+        isActive: body.isActive !== undefined ? body.isActive : clientKeyFixture.isActive,
+        rateLimit: body.rateLimit !== undefined ? body.rateLimit : clientKeyFixture.rateLimit,
+        browserSdkVersion: body.browserSdkVersion ?? clientKeyFixture.browserSdkVersion,
+        dynamicSdkLoaderOptions: {
+          ...clientKeyFixture.dynamicSdkLoaderOptions,
+          ...body.dynamicSdkLoaderOptions,
+        },
+      });
+    },
+  },
+  {
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/events/",
     fetch: async ({ request }) => {

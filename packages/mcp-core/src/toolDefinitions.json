@@ -2129,6 +2129,92 @@
     "surface": "direct"
   },
   {
+    "name": "update_dsn",
+    "description": "Update settings for an existing DSN (client key) in a project, such as name, active status, rate limit, and loader script options.\n\nUSE THIS TOOL WHEN:\n- Deactivating or activating a DSN/client key\n- Setting or removing DSN rate limits ('set rate limit of 1000 per hour on DSN X')\n- Renaming a DSN ('rename DSN X to Production')\n- Configuring Javascript SDK loader script options (session replay, performance, debug, feedback, etc.)\n\nBe careful when using this tool!\n\n<examples>\n### Rename DSN and set rate limit\n```\nupdate_dsn(organizationSlug='my-organization', projectSlug='my-project', keyId='d20df0a1ab5031c7f3c7edca9c02814d', name='Production Key', rateLimitWindow=3600, rateLimitCount=500)\n```\n\n### Deactivate a DSN\n```\nupdate_dsn(organizationSlug='my-organization', projectSlug='my-project', keyId='d20df0a1ab5031c7f3c7edca9c02814d', isActive=false)\n```\n\n### Disable rate limit entirely\n```\nupdate_dsn(organizationSlug='my-organization', projectSlug='my-project', keyId='d20df0a1ab5031c7f3c7edca9c02814d', disableRateLimit=true)\n```\n</examples>\n\n<hints>\n- Use `find_dsns()` first to find the `keyId` for the DSN you want to update.\n- Both `rateLimitWindow` (seconds) and `rateLimitCount` (error cap) must be provided together to set a rate limit.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "keyId": {
+          "type": "string",
+          "description": "The ID of the DSN (client key) to update. Use find_dsns() to retrieve this ID first."
+        },
+        "name": {
+          "type": "string",
+          "description": "The new name for the DSN."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Activate or deactivate the DSN."
+        },
+        "rateLimitWindow": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "The time window in seconds for the rate limit."
+        },
+        "rateLimitCount": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "The maximum number of errors allowed within the rate limit window."
+        },
+        "disableRateLimit": {
+          "type": "boolean",
+          "description": "Set to true to disable the rate limit entirely (removes the cap)."
+        },
+        "browserSdkVersion": {
+          "type": "string",
+          "description": "The Sentry Javascript SDK version to use (e.g. 'latest', '7.x')."
+        },
+        "loaderHasReplay": {
+          "type": "boolean",
+          "description": "Configure Session Replay for the Javascript Loader Script."
+        },
+        "loaderHasPerformance": {
+          "type": "boolean",
+          "description": "Configure Performance Monitoring for the Javascript Loader Script."
+        },
+        "loaderHasDebug": {
+          "type": "boolean",
+          "description": "Configure Debug Bundles & Logging for the Javascript Loader Script."
+        },
+        "loaderHasFeedback": {
+          "type": "boolean",
+          "description": "Configure User Feedback for the Javascript Loader Script."
+        },
+        "loaderHasLogsAndMetrics": {
+          "type": "boolean",
+          "description": "Configure Logs and Metrics for the Javascript Loader Script (requires SDK >= 10.0.0)."
+        }
+      },
+      "required": ["organizationSlug", "projectSlug", "keyId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["project:write"],
+    "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
     "name": "update_issue",
     "description": "Update a Sentry issue's status or assignment.\n\nUse this to resolve, reopen, assign, or ignore an issue.\n\n<examples>\n```\nupdate_issue(organizationSlug='my-org', issueId='PROJECT-123', status='resolved')\nupdate_issue(organizationSlug='my-org', issueId='PROJECT-123', assignedTo='user:123456')\nupdate_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored')\nupdate_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='forever')\nupdate_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='untilOccurrenceCount', ignoreCount=100, ignoreWindowMinutes=60)\nupdate_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', reason='Ignoring because this is expected noise from the staging deploy')\n```\n</examples>\n\n<hints>\n- Provide `issueUrl` or `organizationSlug` + `issueId`.\n- At least one of `status` or `assignedTo` is required.\n- `assignedTo` format: `user:ID` or `team:ID_OR_SLUG`.\n- Use `execute_sentry_tool(name='whoami', arguments={})` to find your user ID for self-assignment.\n- Status values: `resolved`, `resolvedInNextRelease`, `unresolved`, `ignored`.\n- `status='ignored'` defaults to `ignoreMode='untilEscalating'`.\n- Ignore modes: `untilEscalating`, `forever`, `forDuration`, `untilOccurrenceCount`, `untilUserCount`.\n- Matching ignore inputs are `ignoreDurationMinutes`, `ignoreCount` + optional `ignoreWindowMinutes`, or `ignoreUserCount` + optional `ignoreUserWindowMinutes`.\n- To switch an already ignored issue between `untilEscalating`, `forever`, and condition-based ignore modes, first set `status='unresolved'`, then ignore it again with the new rule.\n- `reason` is optional. When provided, it will be posted as a comment on the issue's activity feed explaining why the action was taken.\n</hints>",
     "inputSchema": {

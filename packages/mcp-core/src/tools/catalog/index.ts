@@ -23,6 +23,7 @@ import createProject from "./create-project";
 import updateProject from "./update-project";
 import createDsn from "./create-dsn";
 import findDsns from "./find-dsns";
+import updateDsn from "./update-dsn";
 import analyzeIssueWithSeer from "./analyze-issue-with-seer";
 import searchDocs from "./search-docs";
 import getDoc from "./get-doc";
@@ -73,6 +74,7 @@ const catalogTools = {
   update_project: updateProject,
   create_dsn: createDsn,
   find_dsns: findDsns,
+  update_dsn: updateDsn,
   analyze_issue_with_seer: analyzeIssueWithSeer,
   search_docs: searchDocs,
   get_doc: getDoc,

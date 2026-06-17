@@ -2062,6 +2062,68 @@ export class SentryApiService {
   }
 
   /**
+   * Updates a client key (DSN) for a project.
+   *
+   * @param params Key update parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.keyId The ID of the key to update
+   * @param params.name Human-readable name for the key (optional)
+   * @param params.isActive Activate or deactivate the client key (optional)
+   * @param params.rateLimit Applies a rate limit to cap the number of errors accepted during a given time window (optional, null to disable)
+   * @param params.browserSdkVersion Sentry Javascript SDK version to use (optional)
+   * @param params.dynamicSdkLoaderOptions Configures options for the Javascript Loader Script (optional)
+   * @param opts Request options
+   * @returns Updated client key with DSN information
+   */
+  async updateClientKey(
+    {
+      organizationSlug,
+      projectSlug,
+      keyId,
+      name,
+      isActive,
+      rateLimit,
+      browserSdkVersion,
+      dynamicSdkLoaderOptions,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      keyId: string | number;
+      name?: string;
+      isActive?: boolean;
+      rateLimit?: { window: number; count: number } | null;
+      browserSdkVersion?: string;
+      dynamicSdkLoaderOptions?: {
+        hasReplay?: boolean;
+        hasPerformance?: boolean;
+        hasDebug?: boolean;
+        hasFeedback?: boolean;
+        hasLogsAndMetrics?: boolean;
+      };
+    },
+    opts?: RequestOptions,
+  ): Promise<ClientKey> {
+    const updateData: Record<string, any> = {};
+    if (name !== undefined) updateData.name = name;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    if (rateLimit !== undefined) updateData.rateLimit = rateLimit;
+    if (browserSdkVersion !== undefined) updateData.browserSdkVersion = browserSdkVersion;
+    if (dynamicSdkLoaderOptions !== undefined) updateData.dynamicSdkLoaderOptions = dynamicSdkLoaderOptions;
+
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/keys/${keyId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      },
+      opts,
+    );
+    return ClientKeySchema.parse(body);
+  }
+
+
+  /**
    * Lists all client keys (DSNs) for a project.
    *
    * @param params Query parameters
