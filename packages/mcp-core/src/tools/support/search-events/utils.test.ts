@@ -4,6 +4,7 @@ import { mswServer } from "@sentry/mcp-server-mocks";
 import {
   fetchCustomAttributes,
   formatEventValue,
+  formatEventsValidationResults,
   formatKnownUserValue,
   looksLikeSentrySearchSyntax,
 } from "./utils";
@@ -574,5 +575,76 @@ describe("fetchCustomAttributes", () => {
         },
       });
     });
+  });
+});
+
+describe("formatEventsValidationResults", () => {
+  it("returns an empty string when there are no validation sections", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: true,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: [],
+        orderby: [],
+      }),
+    ).toBe("");
+  });
+
+  it("formats all validation sections for a mixed result", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: false,
+        projects: [{ valid: true }],
+        dataset: [
+          {
+            valid: false,
+            error: "dataset must be one of: spans, errors",
+          },
+        ],
+        environment: [{ valid: true }],
+        field: [
+          { name: "span.duration", valid: true, type: "number" },
+          {
+            name: "tags[missing]",
+            valid: false,
+            error: "Unknown attribute",
+          },
+        ],
+        query: [
+          { valid: false, error: "Invalid syntax" },
+          { name: "transaction", valid: true, type: "string" },
+        ],
+        orderby: [
+          {
+            name: "-span.duration",
+            valid: false,
+            error: "Orderby must also be a selected field",
+          },
+        ],
+      }),
+    ).toBe(`Validation Result: invalid
+Validated Projects:
+- valid
+
+Validated Dataset:
+- invalid (dataset must be one of: spans, errors)
+
+Validated Environment:
+- valid
+
+Validated Fields:
+- span.duration: valid (number)
+- tags[missing]: invalid (Unknown attribute)
+
+Validated Query:
+- query syntax: invalid (Invalid syntax)
+- transaction: valid (string)
+
+Validated Order By:
+- -span.duration: invalid (Orderby must also be a selected field)
+`);
   });
 });

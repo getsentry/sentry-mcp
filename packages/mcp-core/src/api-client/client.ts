@@ -261,6 +261,135 @@ export type TraceItemAttributeValidationResult = {
   error?: string;
 };
 
+export type EventsValidationIssue = {
+  valid: boolean;
+  error?: string;
+};
+
+export type EventsAttributeValidationResult = {
+  name: string;
+  valid: boolean;
+  type?: TraceItemAttributeType;
+  error?: string;
+};
+
+export type EventsQueryValidationItem =
+  | EventsValidationIssue
+  | EventsAttributeValidationResult;
+
+export type EventsValidationResult = {
+  valid: boolean;
+  projects: EventsValidationIssue[];
+  dataset: EventsValidationIssue[];
+  environment: EventsValidationIssue[];
+  field: EventsAttributeValidationResult[];
+  query: EventsQueryValidationItem[];
+  orderby: EventsAttributeValidationResult[];
+};
+
+function parseEventsValidationIssue(
+  value: unknown,
+): EventsValidationIssue | null {
+  if (!isRecord(value) || typeof value.valid !== "boolean") {
+    return null;
+  }
+  const issue: EventsValidationIssue = { valid: value.valid };
+  if (typeof value.error === "string" && value.error.length > 0) {
+    issue.error = value.error;
+  }
+  return issue;
+}
+
+function parseEventsAttributeValidation(
+  value: unknown,
+): EventsAttributeValidationResult | null {
+  if (
+    !isRecord(value) ||
+    typeof value.name !== "string" ||
+    typeof value.valid !== "boolean"
+  ) {
+    return null;
+  }
+  const result: EventsAttributeValidationResult = {
+    name: value.name,
+    valid: value.valid,
+  };
+  if (isTraceItemAttributeType(value.attrType)) {
+    result.type = value.attrType;
+  }
+  if (typeof value.error === "string" && value.error.length > 0) {
+    result.error = value.error;
+  }
+  return result;
+}
+
+function parseEventsQueryValidation(
+  value: unknown,
+): EventsQueryValidationItem | null {
+  if (!isRecord(value) || typeof value.valid !== "boolean") {
+    return null;
+  }
+  if (typeof value.name === "string") {
+    return parseEventsAttributeValidation(value);
+  }
+  return parseEventsValidationIssue(value);
+}
+
+function parseEventsValidationIssues(value: unknown): EventsValidationIssue[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map(parseEventsValidationIssue)
+    .filter((issue): issue is EventsValidationIssue => issue !== null);
+}
+
+function parseEventsAttributeValidations(
+  value: unknown,
+): EventsAttributeValidationResult[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map(parseEventsAttributeValidation)
+    .filter((item): item is EventsAttributeValidationResult => item !== null);
+}
+
+function parseEventsQueryValidations(
+  value: unknown,
+): EventsQueryValidationItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map(parseEventsQueryValidation)
+    .filter((item): item is EventsQueryValidationItem => item !== null);
+}
+
+function parseEventsValidationResponse(body: unknown): EventsValidationResult {
+  if (!isRecord(body)) {
+    return {
+      valid: false,
+      projects: [],
+      dataset: [],
+      environment: [],
+      field: [],
+      query: [],
+      orderby: [],
+    };
+  }
+
+  return {
+    valid: typeof body.valid === "boolean" ? body.valid : false,
+    projects: parseEventsValidationIssues(body.projects),
+    dataset: parseEventsValidationIssues(body.dataset),
+    environment: parseEventsValidationIssues(body.environment),
+    field: parseEventsAttributeValidations(body.field),
+    query: parseEventsQueryValidations(body.query),
+    orderby: parseEventsAttributeValidations(body.orderby),
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -566,7 +695,7 @@ export class SentryApiService {
   private async request(
     path: string,
     options: RequestInit = {},
-    { host }: { host?: string } = {},
+    { host, allowStatuses }: { host?: string; allowStatuses?: number[] } = {},
   ): Promise<Response> {
     const url = host
       ? `${this.protocol}://${host}/api/0${path}`
@@ -642,6 +771,9 @@ export class SentryApiService {
 
     // Handle error responses generically
     if (!response.ok) {
+      if (allowStatuses?.includes(response.status)) {
+        return response;
+      }
       const errorText = await response.text();
       let parsed: unknown | undefined;
       try {
@@ -2692,63 +2824,63 @@ export class SentryApiService {
     return attributeResponses.flat();
   }
 
-  async validateTraceItemAttributes(
+  async validateEvents(
     {
       organizationSlug,
-      itemType = "spans",
-      attributes,
+      dataset = "spans",
+      fields,
+      query,
+      orderby,
       project,
+      environment,
       statsPeriod,
       start,
       end,
     }: {
       organizationSlug: string;
-      itemType?: TraceItemType;
-      attributes: string[];
+      dataset?: EventsDataset;
+      fields?: string[];
+      query?: string;
+      orderby?: string[];
       project?: string;
+      environment?: string | string[];
       statsPeriod?: string;
       start?: string;
       end?: string;
     },
     opts?: RequestOptions,
-  ): Promise<Record<string, TraceItemAttributeValidationResult>> {
+  ): Promise<EventsValidationResult> {
     const queryParams = new URLSearchParams();
-    queryParams.set("itemType", itemType);
+    queryParams.set("dataset", normalizeEventsDataset(dataset));
     if (project) {
       queryParams.set("project", project);
     }
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (environment) {
+      const environments = Array.isArray(environment)
+        ? environment
+        : [environment];
+      for (const value of environments) {
+        queryParams.append("environment", value);
+      }
+    }
     this.applyTimeParams(queryParams, statsPeriod, start, end);
+    for (const field of fields ?? []) {
+      queryParams.append("field", field);
+    }
+    for (const value of orderby ?? []) {
+      queryParams.append("orderby", value);
+    }
 
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/trace-items/attributes/validate/?${queryParams.toString()}`,
-      {
-        method: "POST",
-        body: JSON.stringify({ attributes }),
-      },
-      opts,
+    const response = await this.request(
+      `/organizations/${organizationSlug}/events/validate/?${queryParams.toString()}`,
+      undefined,
+      { ...opts, allowStatuses: [400] },
     );
-
-    if (!isRecord(body) || !isRecord(body.attributes)) {
-      return {};
-    }
-
-    const results: Record<string, TraceItemAttributeValidationResult> = {};
-    for (const [attribute, value] of Object.entries(body.attributes)) {
-      if (!isRecord(value) || typeof value.valid !== "boolean") {
-        continue;
-      }
-      const validationResult: TraceItemAttributeValidationResult = {
-        valid: value.valid,
-      };
-      if (isTraceItemAttributeType(value.type)) {
-        validationResult.type = value.type;
-      }
-      if (typeof value.error === "string") {
-        validationResult.error = value.error;
-      }
-      results[attribute] = validationResult;
-    }
-    return results;
+    const body = await this.parseJsonResponse(response);
+    return parseEventsValidationResponse(body);
   }
 
   private async fetchTraceItemAttributesByType(

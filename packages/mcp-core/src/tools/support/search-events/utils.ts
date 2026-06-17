@@ -2,7 +2,10 @@ import { z } from "zod";
 import type {
   SentryApiService,
   TraceItemAttributeType,
-  TraceItemAttributeValidationResult,
+  EventsAttributeValidationResult,
+  EventsQueryValidationItem,
+  EventsValidationIssue,
+  EventsValidationResult,
   TraceItemType,
 } from "../../../api-client";
 import {
@@ -423,24 +426,74 @@ function getTraceItemType(dataset: EventsDataset): TraceItemType | null {
   return null;
 }
 
-function formatValidationResults(
-  validationResults: Record<string, TraceItemAttributeValidationResult>,
+function formatAttributeValidationLine(
+  item: EventsAttributeValidationResult,
 ): string {
-  const entries = Object.entries(validationResults);
-  if (entries.length === 0) {
+  if (item.valid) {
+    return `- ${item.name}: valid${item.type ? ` (${item.type})` : ""}`;
+  }
+  return `- ${item.name}: invalid${item.error ? ` (${item.error})` : ""}`;
+}
+
+function formatValidationIssueLine(issue: EventsValidationIssue): string {
+  if (issue.valid) {
+    return "- valid";
+  }
+  return `- invalid${issue.error ? ` (${issue.error})` : ""}`;
+}
+
+function formatQueryValidationLine(item: EventsQueryValidationItem): string {
+  if ("name" in item && item.name) {
+    return formatAttributeValidationLine(item);
+  }
+  if (item.valid) {
+    return "- query syntax: valid";
+  }
+  return `- query syntax: invalid${item.error ? ` (${item.error})` : ""}`;
+}
+
+export function formatEventsValidationResults(
+  validationResults: EventsValidationResult,
+): string {
+  const sections: string[] = [];
+
+  if (validationResults.projects.length > 0) {
+    sections.push(
+      `Validated Projects:\n${validationResults.projects.map(formatValidationIssueLine).join("\n")}`,
+    );
+  }
+  if (validationResults.dataset.length > 0) {
+    sections.push(
+      `Validated Dataset:\n${validationResults.dataset.map(formatValidationIssueLine).join("\n")}`,
+    );
+  }
+  if (validationResults.environment.length > 0) {
+    sections.push(
+      `Validated Environment:\n${validationResults.environment.map(formatValidationIssueLine).join("\n")}`,
+    );
+  }
+  if (validationResults.field.length > 0) {
+    sections.push(
+      `Validated Fields:\n${validationResults.field.map(formatAttributeValidationLine).join("\n")}`,
+    );
+  }
+  if (validationResults.query.length > 0) {
+    sections.push(
+      `Validated Query:\n${validationResults.query.map(formatQueryValidationLine).join("\n")}`,
+    );
+  }
+  if (validationResults.orderby.length > 0) {
+    sections.push(
+      `Validated Order By:\n${validationResults.orderby.map(formatAttributeValidationLine).join("\n")}`,
+    );
+  }
+
+  if (sections.length === 0) {
     return "";
   }
 
-  return `Validated Attributes:
-${entries
-  .map(([attribute, result]) => {
-    if (result.valid) {
-      return `- ${attribute}: valid${result.type ? ` (${result.type})` : ""}`;
-    }
-    return `- ${attribute}: invalid${result.error ? ` (${result.error})` : ""}`;
-  })
-  .join("\n")}
-`;
+  const overall = validationResults.valid ? "valid" : "invalid";
+  return `Validation Result: ${overall}\n${sections.join("\n\n")}\n`;
 }
 
 /**
@@ -488,7 +541,23 @@ export function createDatasetAttributesTool(options: {
         .min(1)
         .optional()
         .describe(
-          "Optional exact attribute keys to validate, such as ['tags[type]', 'span.duration']",
+          "Optional exact field names to validate, such as ['tags[type]', 'span.duration']",
+        ),
+      orderby: z
+        .array(z.string().trim().min(1))
+        .min(1)
+        .optional()
+        .describe(
+          "Optional sort fields to validate against the selected fields, such as ['-span.duration']",
+        ),
+      environment: z
+        .union([
+          z.string().trim().min(1),
+          z.array(z.string().trim().min(1)).min(1),
+        ])
+        .optional()
+        .describe(
+          "Optional environment filter to validate, as a string or array of environment names",
         ),
     }),
     execute: async ({
@@ -497,6 +566,8 @@ export function createDatasetAttributesTool(options: {
       query,
       attributeTypes,
       attributes,
+      orderby,
+      environment,
     }) => {
       const {
         BASE_COMMON_FIELDS,
@@ -511,18 +582,17 @@ export function createDatasetAttributesTool(options: {
       // UserInputError will be converted to error string for the AI agent
       // Other errors will bubble up to be captured by Sentry
       const normalizedDataset = normalizeEventsDataset(dataset);
-      const traceItemType = getTraceItemType(normalizedDataset);
       const attributeTimeParams = { statsPeriod: "14d" };
-      const validationResults =
-        traceItemType && attributes?.length
-          ? await apiService.validateTraceItemAttributes({
-              organizationSlug,
-              itemType: traceItemType,
-              attributes,
-              project: projectId,
-              ...attributeTimeParams,
-            })
-          : {};
+      const validationResults = await apiService.validateEvents({
+        organizationSlug,
+        dataset,
+        fields: attributes,
+        query,
+        orderby,
+        environment,
+        project: projectId,
+        ...attributeTimeParams,
+      });
       const { attributes: customAttributes, fieldTypes } =
         await fetchCustomAttributes(
           apiService,
@@ -560,7 +630,7 @@ export function createDatasetAttributesTool(options: {
       recordAgentToolResultCount(fieldCount);
 
       return `Dataset: ${dataset}
-${formatValidationResults(validationResults)}
+${validationResults ? formatEventsValidationResults(validationResults) : ""}
 
 Available Fields (${fieldCount} total):
 ${Object.entries(allFields)

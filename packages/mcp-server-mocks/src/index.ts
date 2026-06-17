@@ -995,35 +995,63 @@ export const restHandlers = buildHandlers([
     fetch: () => HttpResponse.json(tagsFixture),
   },
   {
-    method: "post",
-    path: "/api/0/organizations/sentry-mcp-evals/trace-items/attributes/validate/",
-    fetch: async ({ request }) => {
-      const body = (await request.json().catch(() => null)) as unknown;
-      const attributesValue =
-        typeof body === "object" && body !== null && "attributes" in body
-          ? body.attributes
-          : undefined;
-      const attributes = Array.isArray(attributesValue)
-        ? attributesValue.filter(
-            (attribute): attribute is string => typeof attribute === "string",
-          )
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/events/validate/",
+    fetch: ({ request }) => {
+      const url = new URL(request.url);
+      const fields = url.searchParams.getAll("field");
+      const query = url.searchParams.get("query");
+      const orderby = url.searchParams.getAll("orderby");
+      const environments = url.searchParams.getAll("environment");
+
+      const fieldResults = fields.map((field) => ({
+        name: field,
+        valid: true,
+        attrType:
+          field.includes("sequence") ||
+          field.includes("count") ||
+          field.includes("duration")
+            ? "number"
+            : "string",
+        error: null,
+      }));
+
+      const queryResults = query
+        ? [
+            {
+              name: "transaction",
+              valid: true,
+              attrType: "string",
+              error: null,
+            },
+          ]
         : [];
 
+      const orderbyResults = orderby.map((value) => ({
+        name: value,
+        valid: fields.length > 0,
+        attrType: null,
+        error:
+          fields.length > 0 ? null : "Orderby must also be a selected field",
+      }));
+
+      const environmentResults = environments.map((environment) => ({
+        valid: true,
+        error: null,
+      }));
+
       return HttpResponse.json({
-        attributes: Object.fromEntries(
-          attributes.map((attribute) => [
-            attribute,
-            {
-              valid: true,
-              type:
-                attribute.includes("sequence") ||
-                attribute.includes("count") ||
-                attribute.includes("duration")
-                  ? "number"
-                  : "string",
-            },
-          ]),
-        ),
+        valid:
+          fieldResults.every((field) => field.valid) &&
+          queryResults.every((item) => item.valid) &&
+          orderbyResults.every((item) => item.valid) &&
+          environmentResults.every((item) => item.valid),
+        projects: [],
+        dataset: [],
+        environment: environmentResults,
+        field: fieldResults,
+        query: queryResults,
+        orderby: orderbyResults,
       });
     },
   },
