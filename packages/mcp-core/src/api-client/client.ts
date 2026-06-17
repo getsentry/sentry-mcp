@@ -218,6 +218,27 @@ type RequestOptions = {
 };
 
 export type TraceItemType = "spans" | "logs" | "tracemetrics";
+
+type ClientKeyRateLimit = {
+  window: number;
+  count: number;
+};
+
+type ClientKeyDynamicSdkLoaderOptions = {
+  hasReplay?: boolean;
+  hasPerformance?: boolean;
+  hasDebug?: boolean;
+  hasFeedback?: boolean;
+  hasLogsAndMetrics?: boolean;
+};
+
+type UpdateClientKeyRequest = {
+  name?: string;
+  isActive?: boolean;
+  rateLimit?: ClientKeyRateLimit | null;
+  browserSdkVersion?: string;
+  dynamicSdkLoaderOptions?: ClientKeyDynamicSdkLoaderOptions;
+};
 export type TraceItemAttributeType = "string" | "number" | "boolean";
 export type TraceItemAttributeSourceType = "sentry" | "user";
 
@@ -2055,6 +2076,66 @@ export class SentryApiService {
         body: JSON.stringify({
           name,
         }),
+      },
+      opts,
+    );
+    return ClientKeySchema.parse(body);
+  }
+
+  /**
+   * Updates a client key (DSN) for a project.
+   *
+   * @param params Key update parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.keyId The ID of the key to update
+   * @param params.name Human-readable name for the key (optional)
+   * @param params.isActive Activate or deactivate the client key (optional)
+   * @param params.rateLimit Applies a rate limit to cap the number of errors accepted during a given time window (optional, null to disable)
+   * @param params.browserSdkVersion Sentry Javascript SDK version to use (optional)
+   * @param params.dynamicSdkLoaderOptions Configures options for the Javascript Loader Script (optional)
+   * @param opts Request options
+   * @returns Updated client key with DSN information
+   */
+  async updateClientKey(
+    {
+      organizationSlug,
+      projectSlug,
+      keyId,
+      name,
+      isActive,
+      rateLimit,
+      browserSdkVersion,
+      dynamicSdkLoaderOptions,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      keyId: string | number;
+    } & UpdateClientKeyRequest,
+    opts?: RequestOptions,
+  ): Promise<ClientKey> {
+    const updateData: UpdateClientKeyRequest = {};
+    if (name !== undefined) {
+      updateData.name = name;
+    }
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
+    }
+    if (rateLimit !== undefined) {
+      updateData.rateLimit = rateLimit;
+    }
+    if (browserSdkVersion !== undefined) {
+      updateData.browserSdkVersion = browserSdkVersion;
+    }
+    if (dynamicSdkLoaderOptions !== undefined) {
+      updateData.dynamicSdkLoaderOptions = dynamicSdkLoaderOptions;
+    }
+
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/keys/${keyId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
       },
       opts,
     );

@@ -419,11 +419,30 @@ export const ClientKeySchema = z
   .object({
     id: z.union([z.string(), z.number()]),
     name: z.string(),
-    dsn: z.object({
-      public: z.string(),
-    }),
+    dsn: z
+      .object({
+        public: z.string(),
+      })
+      .passthrough(),
     isActive: z.boolean(),
     dateCreated: z.string().datetime().nullable(),
+    rateLimit: z
+      .object({
+        window: z.number(),
+        count: z.number(),
+      })
+      .nullable()
+      .optional(),
+    browserSdkVersion: z.string().optional(),
+    dynamicSdkLoaderOptions: z
+      .object({
+        hasReplay: z.boolean(),
+        hasPerformance: z.boolean(),
+        hasDebug: z.boolean(),
+        hasFeedback: z.boolean().optional(),
+        hasLogsAndMetrics: z.boolean().optional(),
+      })
+      .optional(),
   })
   .passthrough();
 
