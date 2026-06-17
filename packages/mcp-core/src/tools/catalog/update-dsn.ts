@@ -121,6 +121,26 @@ export default defineTool({
     setTag("organization.slug", organizationSlug);
     setTag("project.slug", params.projectSlug);
 
+    // Require at least one field to update
+    const hasUpdates =
+      params.name !== undefined ||
+      params.isActive !== undefined ||
+      params.disableRateLimit !== undefined ||
+      params.rateLimitWindow !== undefined ||
+      params.rateLimitCount !== undefined ||
+      params.browserSdkVersion !== undefined ||
+      params.loaderHasReplay !== undefined ||
+      params.loaderHasPerformance !== undefined ||
+      params.loaderHasDebug !== undefined ||
+      params.loaderHasFeedback !== undefined ||
+      params.loaderHasLogsAndMetrics !== undefined;
+
+    if (!hasUpdates) {
+      throw new UserInputError(
+        "At least one setting must be provided to update. Provide one or more of: name, isActive, rateLimitWindow + rateLimitCount, disableRateLimit, browserSdkVersion, or loader options.",
+      );
+    }
+
     // Validate rate limit input combinations
     if (
       (params.rateLimitWindow !== undefined && params.rateLimitCount === undefined) ||

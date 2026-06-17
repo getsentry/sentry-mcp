@@ -117,6 +117,24 @@ describe("update_dsn", () => {
     expect(result).toContain("- Updated loader options updated");
   });
 
+  it("throws when no update fields are provided", async () => {
+    await expect(
+      updateDsn.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          keyId: "d20df0a1ab5031c7f3c7edca9c02814d",
+          regionUrl: null,
+        },
+        {
+          constraints: { organizationSlug: null, projectSlug: null },
+          accessToken: "access-token",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow(UserInputError);
+  });
+
   it("validates rate limit input combinations", async () => {
     const mockContext = {
       constraints: { organizationSlug: null, projectSlug: null },
