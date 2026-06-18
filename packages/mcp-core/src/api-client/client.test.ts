@@ -1409,7 +1409,7 @@ describe("API query builders", () => {
       ).toEqual(["string", "boolean"]);
     });
 
-    it("should validate exact trace item attributes", async () => {
+    it("should validate events requests via the validate endpoint", async () => {
       const apiService = new SentryApiService({
         host: "sentry.io",
         accessToken: "test-token",
@@ -1423,46 +1423,105 @@ describe("API query builders", () => {
           requestUrl = url;
           requestOptions = options;
           return Promise.resolve({
-            ok: true,
+            ok: false,
+            status: 400,
             headers: {
               get: (key: string) =>
                 key === "content-type" ? "application/json" : null,
             },
             json: () =>
               Promise.resolve({
-                attributes: {
-                  "tags[type]": { valid: true, type: "string" },
-                  "tags[missing]": {
-                    valid: false,
-                    error: "Unknown attribute: tags[missing]",
+                valid: false,
+                projects: [],
+                dataset: [],
+                environment: [],
+                field: [
+                  {
+                    name: "tags[type]",
+                    valid: true,
+                    attrType: "string",
+                    error: null,
                   },
+                  {
+                    name: "tags[missing]",
+                    valid: false,
+                    attrType: null,
+                    error: "Unknown attribute",
+                  },
+                ],
+                query: {
+                  valid: false,
+                  error: "Invalid syntax",
+                  fields: [
+                    {
+                      name: "transaction",
+                      valid: true,
+                      attrType: "string",
+                      error: null,
+                    },
+                  ],
                 },
+                orderby: [
+                  {
+                    name: "-span.duration",
+                    valid: false,
+                    attrType: null,
+                    error: "Orderby must also be a selected field",
+                  },
+                ],
               }),
           });
         });
 
-      const result = await apiService.validateTraceItemAttributes({
+      const result = await apiService.validateEvents({
         organizationSlug: "test-org",
-        itemType: "spans",
-        attributes: ["tags[type]", "tags[missing]"],
+        dataset: "spans",
+        fields: ["tags[type]", "tags[missing]"],
+        query: 'transaction:"VPN connections"',
+        orderby: ["-span.duration"],
+        environment: ["production", "staging"],
         project: "123",
         statsPeriod: "7d",
       });
 
       expect(result).toEqual({
-        "tags[type]": { valid: true, type: "string" },
-        "tags[missing]": {
+        valid: false,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [
+          { name: "tags[type]", valid: true, type: "string" },
+          {
+            name: "tags[missing]",
+            valid: false,
+            error: "Unknown attribute",
+          },
+        ],
+        query: {
           valid: false,
-          error: "Unknown attribute: tags[missing]",
+          error: "Invalid syntax",
+          fields: [{ name: "transaction", valid: true, type: "string" }],
         },
+        orderby: [
+          {
+            name: "-span.duration",
+            valid: false,
+            error: "Orderby must also be a selected field",
+          },
+        ],
       });
       expect(requestUrl).toContain(
-        "/api/0/organizations/test-org/trace-items/attributes/validate/?itemType=spans&project=123&statsPeriod=7d",
+        "/api/0/organizations/test-org/events/validate/?",
       );
-      expect(requestOptions?.method).toBe("POST");
-      expect(JSON.parse(String(requestOptions?.body))).toEqual({
-        attributes: ["tags[type]", "tags[missing]"],
-      });
+      const params = new URL(String(requestUrl)).searchParams;
+      expect(params.get("dataset")).toBe("spans");
+      expect(params.get("project")).toBe("123");
+      expect(params.get("statsPeriod")).toBe("7d");
+      expect(params.get("query")).toBe('transaction:"VPN connections"');
+      expect(params.getAll("field")).toEqual(["tags[type]", "tags[missing]"]);
+      expect(params.getAll("orderby")).toEqual(["-span.duration"]);
+      expect(params.getAll("environment")).toEqual(["production", "staging"]);
+      expect(requestOptions?.method).toBeUndefined();
     });
   });
 
