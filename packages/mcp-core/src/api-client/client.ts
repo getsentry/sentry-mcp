@@ -2646,7 +2646,10 @@ export class SentryApiService {
         start,
         end,
         environment,
-        ...(projectId ? { project: [Number(projectId)] } : {}),
+        // Pass projectId through as-is: the SDK types `project` as
+        // Array<number | string> (IDs or slugs), so coercing with Number()
+        // would turn a slug into NaN and break slug-based filtering.
+        ...(projectId ? { project: [projectId] } : {}),
         // SDK types field as a strict enum — the API accepts arbitrary strings at runtime
         ...(fields?.length
           ? {

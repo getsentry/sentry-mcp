@@ -1322,6 +1322,30 @@ describe("API query builders", () => {
       expect(parsedUrl.searchParams.get("statsPeriod")).toBe("24h");
     });
 
+    it("should forward a project slug verbatim (not coerce to NaN)", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+
+      globalThis.fetch = makeSdkMock({ data: [] });
+
+      await apiService.searchReplays({
+        organizationSlug: "test-org",
+        projectId: "my-project-slug",
+        statsPeriod: "24h",
+      });
+
+      const url = extractFetchUrl(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0],
+      );
+      // The replays `project` param accepts IDs or slugs; the slug must pass
+      // through unchanged (Number(slug) would be NaN).
+      expect(new URL(url).searchParams.getAll("project")).toEqual([
+        "my-project-slug",
+      ]);
+    });
+
     it("should reject conflicting replay time parameters", async () => {
       const apiService = new SentryApiService({
         host: "sentry.io",
