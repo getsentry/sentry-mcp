@@ -471,18 +471,20 @@ export class SentryApiService {
    * Unwraps an SDK result (`{ data, error }` discriminated union) and converts
    * errors to the existing MCP error types.
    *
-   * The runtime shape matches {@link SdkResult} from `@sentry/api`, but SDK
-   * functions return `RequestResult` whose conditional generic encoding
-   * (`TData[keyof TData]`) is not structurally assignable to `SdkResult`.
-   * We accept `any` to avoid casting at every call site.
+   * Typed structurally (not as `SdkResult<T>`) because the SDK's `RequestResult`
+   * return — whose conditional generic encoding is not assignable to the strict
+   * `SdkResult` union — still satisfies this minimal shape, letting `TData` infer
+   * from the SDK's `data` field so the generated response type flows to callers.
    *
    * @param result The SDK result to unwrap
    * @param context A descriptive label for error messages (e.g. method name)
    * @returns The data on success
    * @throws {ApiError|ApiNotFoundError|ApiValidationError|Error} on failure
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private unwrapSdkResult<T>(result: any, context: string): T {
+  private unwrapSdkResult<TData>(
+    result: { data?: TData; error?: unknown; response?: Response },
+    context: string,
+  ): TData {
     if (result.error !== undefined) {
       const response: Response | undefined = result.response;
       if (response) {
@@ -514,7 +516,7 @@ export class SentryApiService {
       }
       throw new Error(`${context}: ${String(result.error)}`);
     }
-    return result.data as T;
+    return result.data as TData;
   }
 
   /**
