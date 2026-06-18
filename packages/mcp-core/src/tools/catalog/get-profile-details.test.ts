@@ -1,5 +1,6 @@
 import {
   mswServer,
+  profileChunkFixture,
   transactionProfileV1MissingFunctionFixture,
   transactionProfileV1Fixture,
 } from "@sentry/mcp-server-mocks";
@@ -184,6 +185,44 @@ describe("get_profile_details", () => {
       expect(result).toContain("## Summary");
       expect(result).toContain("## Raw Sample Analysis");
       expect(result).toContain("## Top Frames by Occurrence");
+    });
+
+    it("copies profilerId from the request when the chunk payload omits it", async () => {
+      const chunk = {
+        ...structuredClone(profileChunkFixture.chunk),
+        profiler_id: undefined,
+      };
+
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/projects/sentry-mcp-evals/backend/",
+          () =>
+            HttpResponse.json({ id: 12345, slug: "backend", name: "Backend" }),
+          { once: true },
+        ),
+        http.get(
+          "https://sentry.io/api/0/organizations/sentry-mcp-evals/profiling/chunks/",
+          () => HttpResponse.json({ chunk }),
+          { once: true },
+        ),
+      );
+
+      const result = await getProfileDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlugOrId: "backend",
+          profilerId: "041bde57b9844e36b8b7e5734efae5f7",
+          start: "2024-01-01T00:00:00Z",
+          end: "2024-01-01T01:00:00Z",
+          regionUrl: null,
+          focusOnUserCode: true,
+        },
+        baseContext,
+      );
+
+      expect(result).toContain(
+        "- **Profiler ID**: 041bde57b9844e36b8b7e5734efae5f7",
+      );
     });
 
     it("rejects incomplete continuous profile URLs", async () => {

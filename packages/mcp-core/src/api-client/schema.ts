@@ -1431,13 +1431,13 @@ export const AIConversationSpanListSchema = z.array(AIConversationSpanSchema);
  */
 export const FlamegraphFrameSchema = z
   .object({
-    file: z.string(),
+    file: z.preprocess((value) => value ?? "", z.string()),
     image: z.string().optional(),
-    is_application: z.boolean(),
-    line: z.number(),
-    name: z.string(),
+    is_application: z.preprocess((value) => value ?? false, z.boolean()),
+    line: z.preprocess((value) => value ?? 0, z.number()),
+    name: z.preprocess((value) => value ?? "(unknown)", z.string()),
     path: z.string().optional(),
-    fingerprint: z.number(),
+    fingerprint: z.preprocess((value) => value ?? 0, z.number()),
   })
   .passthrough();
 
@@ -1450,28 +1450,52 @@ export const FlamegraphFrameSchema = z
 export const FlamegraphFrameInfoSchema = z
   .object({
     count: z.number(),
-    weight: z.number(),
+    weight: z.number().optional(),
     sumDuration: z.number(),
     sumSelfTime: z.number(),
     p75Duration: z.number(),
     p95Duration: z.number(),
     p99Duration: z.number(),
   })
-  .passthrough();
+  .passthrough()
+  .transform((frameInfo) => ({
+    ...frameInfo,
+    weight: frameInfo.weight ?? frameInfo.sumDuration,
+  }));
 
 /**
  * Schema for profile metadata within a flamegraph response.
  *
- * Links to individual profile IDs and their time ranges.
+ * Links flamegraph samples back to transaction profile IDs or continuous
+ * profile chunks. References can also be raw profile ID strings in older
+ * speedscope-compatible payloads. Timing fields are optional because Sentry's
+ * continuous candidate sources do not all populate the same reference metadata.
  */
-export const FlamegraphProfileMetadataSchema = z
-  .object({
-    project_id: z.number(),
-    profile_id: z.string(),
-    start: z.number(),
-    end: z.number(),
-  })
-  .passthrough();
+export const FlamegraphProfileMetadataSchema = z.union([
+  z.string(),
+  z
+    .object({
+      project_id: z.number(),
+      profile_id: z.string(),
+      start: z.union([z.number(), z.string()]).optional(),
+      end: z.union([z.number(), z.string()]).optional(),
+    })
+    .passthrough(),
+  // Compatibility with getsentry/sentry `ContinuousProfileCandidate`:
+  // continuous flamegraph refs may come from transaction/spans/functions paths,
+  // so only project_id/profiler_id/chunk_id are always present.
+  z
+    .object({
+      project_id: z.number(),
+      profiler_id: z.string(),
+      chunk_id: z.string(),
+      thread_id: z.string().optional(),
+      start: z.union([z.number(), z.string()]).optional(),
+      end: z.union([z.number(), z.string()]).optional(),
+      transaction_id: z.string().nullable().optional(),
+    })
+    .passthrough(),
+]);
 
 /**
  * Schema for a single profile within a flamegraph (typically one per thread).
@@ -1509,28 +1533,61 @@ export const FlamegraphProfileSchema = z
  * This is the primary data source for profile analysis as it's
  * already aggregated and includes percentile calculations.
  */
-export const FlamegraphSchema = z
-  .object({
-    activeProfileIndex: z.preprocess((value) => value ?? 0, z.number()),
-    metadata: z.record(z.unknown()).optional(),
-    platform: z.string(),
-    profiles: z.array(FlamegraphProfileSchema),
-    projectID: z.number(),
-    shared: z.object({
-      frames: z.array(FlamegraphFrameSchema),
-      frame_infos: z.preprocess(
-        (value) => value ?? [],
-        z.array(FlamegraphFrameInfoSchema),
-      ),
+export const FlamegraphSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return value;
+    }
+
+    // Sparse no-data flamegraph responses can carry only `metadata`; keep them
+    // parseable so tools can render the explicit no-profile-data result.
+    const body = value as Record<string, unknown>;
+    const metadata =
+      body.metadata && typeof body.metadata === "object"
+        ? (body.metadata as Record<string, unknown>)
+        : {};
+
+    return {
+      ...body,
+      platform: body.platform ?? metadata.platform,
+      projectID: body.projectID ?? metadata.projectID,
+      transactionName: body.transactionName ?? metadata.transactionName,
+    };
+  },
+  z
+    .object({
+      activeProfileIndex: z.preprocess((value) => value ?? 0, z.number()),
+      metadata: z.record(z.unknown()).optional(),
+      platform: z.string(),
       profiles: z.preprocess(
         (value) => value ?? [],
-        z.array(FlamegraphProfileMetadataSchema),
+        z.array(FlamegraphProfileSchema),
       ),
-    }),
-    transactionName: z.string().optional(),
-    metrics: z.unknown().optional(),
-  })
-  .passthrough();
+      projectID: z.number(),
+      shared: z.preprocess(
+        (value) => value ?? {},
+        z
+          .object({
+            frames: z.preprocess(
+              (value) => value ?? [],
+              z.array(FlamegraphFrameSchema),
+            ),
+            frame_infos: z.preprocess(
+              (value) => value ?? [],
+              z.array(FlamegraphFrameInfoSchema),
+            ),
+            profiles: z.preprocess(
+              (value) => value ?? [],
+              z.array(FlamegraphProfileMetadataSchema),
+            ),
+          })
+          .passthrough(),
+      ),
+      transactionName: z.string().optional(),
+      metrics: z.unknown().optional(),
+    })
+    .passthrough(),
+);
 
 /**
  * Schema for individual frames in raw profile chunk data.
@@ -1570,7 +1627,9 @@ export const ProfileFrameSchema = z
 const ProfileThreadMetadataSchema = z.record(
   z
     .object({
-      name: z.string().nullable(),
+      // Matches Sentry's `Profiling.ContinuousProfile.thread_metadata` type,
+      // where metadata entries may include only priority.
+      name: z.string().nullable().optional(),
       priority: z.number().nullable().optional(),
     })
     .passthrough(),
@@ -1634,17 +1693,20 @@ export const TransactionProfileSampleSchema = z
 export const ProfileChunkSchema = z
   .object({
     chunk_id: z.string(),
-    profiler_id: z.string(),
+    profiler_id: z.string().optional(),
     event_id: z.string().optional(),
-    environment: z.string().nullable(),
-    platform: z.string(),
-    release: z.string(),
-    version: z.string(),
+    environment: z.preprocess((value) => value ?? null, z.string().nullable()),
+    platform: z.preprocess((value) => value ?? "unknown", z.string()),
+    release: z.preprocess((value) => value ?? "unknown", z.string()),
+    version: z.preprocess((value) => value ?? "2", z.string()),
     profile: z.object({
       frames: z.array(ProfileFrameSchema),
       samples: z.array(ProfileChunkSampleSchema),
       stacks: z.array(z.array(z.number())),
-      thread_metadata: ProfileThreadMetadataSchema,
+      thread_metadata: z.preprocess(
+        (value) => value ?? {},
+        ProfileThreadMetadataSchema,
+      ),
     }),
   })
   .passthrough();
@@ -1652,13 +1714,29 @@ export const ProfileChunkSchema = z
 /**
  * Schema for profile chunks API response wrapper.
  *
- * The API returns chunks in an array wrapper, even for single chunk requests.
+ * Sentry returns a singular `chunk` wrapper for single chunk requests. The
+ * frontend also backfills profiler_id from the query because profiling-service
+ * chunks may omit it. The legacy plural `chunks` wrapper remains accepted for
+ * older fixtures and mocks.
  */
-export const ProfileChunkResponseSchema = z
-  .object({
-    chunks: z.array(ProfileChunkSchema),
-  })
-  .passthrough();
+export const ProfileChunkResponseSchema = z.union([
+  z
+    .object({
+      chunk: ProfileChunkSchema.nullable(),
+    })
+    .passthrough()
+    .transform((response) => ({
+      chunks: response.chunk ? [response.chunk] : [],
+    })),
+  z
+    .object({
+      chunks: z.array(ProfileChunkSchema),
+    })
+    .passthrough()
+    .transform((response) => ({
+      chunks: response.chunks,
+    })),
+]);
 
 const ProfileReleaseSchema = z
   .union([

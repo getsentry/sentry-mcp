@@ -4055,9 +4055,9 @@ export class SentryApiService {
     const path = `/organizations/${organizationSlug}/profiling/chunks/?${queryParams.toString()}`;
     const body = await this.requestJSON(path, undefined, opts);
 
-    // Response wraps chunks in {chunks: []}
+    // Normalize the Sentry {chunk: ...} wrapper to the internal chunks array.
     const response = ProfileChunkResponseSchema.parse(body);
-    if (!response.chunks || response.chunks.length === 0) {
+    if (response.chunks.length === 0) {
       throw new ApiNotFoundError(
         `No profile chunk found for profiler_id ${profilerId}`,
         undefined,
@@ -4065,7 +4065,12 @@ export class SentryApiService {
       );
     }
 
-    return response.chunks[0];
+    return {
+      ...response.chunks[0],
+      // Sentry's frontend does the same query-param backfill for continuous
+      // profile chunks because profiling-service may omit profiler_id.
+      profiler_id: response.chunks[0].profiler_id ?? profilerId,
+    };
   }
 
   getPreprodSnapshotUrl(organizationSlug: string, snapshotId: string): string {
