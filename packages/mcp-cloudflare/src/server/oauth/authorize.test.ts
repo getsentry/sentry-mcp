@@ -256,10 +256,11 @@ describe("oauth authorize routes", () => {
       expect(response.status).toBe(200);
       expectSkillChecked(html, "inspect");
       expectSkillChecked(html, "seer");
-      expectSkillUnchecked(html, "triage");
+      expectSkillChecked(html, "triage");
+      expectSkillChecked(html, "project-management");
     });
 
-    it("ignores tampered remembered skill cookies and falls back to built-in defaults", async () => {
+    it("ignores tampered remembered skill cookies and falls back to all approvable skills", async () => {
       mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
         clientId: "test-client",
         redirectUri: "https://example.com/callback",
@@ -291,7 +292,8 @@ describe("oauth authorize routes", () => {
       expect(response.status).toBe(200);
       expectSkillChecked(html, "inspect");
       expectSkillChecked(html, "seer");
-      expectSkillUnchecked(html, "triage");
+      expectSkillChecked(html, "triage");
+      expectSkillChecked(html, "project-management");
     });
   });
 
