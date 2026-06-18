@@ -1346,6 +1346,50 @@ describe("API query builders", () => {
       ]);
     });
 
+    it("getFlamegraph forwards a project slug verbatim (not NaN)", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+      globalThis.fetch = makeSdkMock({ data: {} });
+      // Response won't parse; we only assert the outgoing request's project param
+      // (captured at fetch time, before parsing).
+      await apiService
+        .getFlamegraph({
+          organizationSlug: "test-org",
+          projectId: "my-project-slug",
+          transactionName: "GET /foo",
+        })
+        .catch(() => {});
+      const url = extractFetchUrl(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0],
+      );
+      expect(new URL(url).searchParams.getAll("project")).toEqual([
+        "my-project-slug",
+      ]);
+    });
+
+    it("getProfileChunk forwards a project slug verbatim (not NaN)", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+      globalThis.fetch = makeSdkMock({ data: {} });
+      await apiService
+        .getProfileChunk({
+          organizationSlug: "test-org",
+          profilerId: "prof-1",
+          projectId: "my-project-slug",
+          start: "2024-01-01T00:00:00Z",
+          end: "2024-01-01T01:00:00Z",
+        })
+        .catch(() => {});
+      const url = extractFetchUrl(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0],
+      );
+      expect(new URL(url).searchParams.get("project")).toBe("my-project-slug");
+    });
+
     it("should reject conflicting replay time parameters", async () => {
       const apiService = new SentryApiService({
         host: "sentry.io",

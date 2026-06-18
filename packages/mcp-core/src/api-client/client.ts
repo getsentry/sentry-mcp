@@ -4078,7 +4078,9 @@ export class SentryApiService {
       ...this.getSdkConfig(opts),
       path: { organization_id_or_slug: organizationSlug },
       query: {
-        project: [Number(projectId)],
+        // SDK types `project` as Array<number | string> (IDs or slugs); forward
+        // projectId as-is. Number() would turn a slug into NaN and break lookups.
+        project: [projectId],
         query: `event.type:transaction transaction:"${escapedTransaction}"`,
         statsPeriod,
       },
@@ -4167,7 +4169,11 @@ export class SentryApiService {
       path: { organization_id_or_slug: organizationSlug },
       query: {
         profiler_id: profilerId,
-        project: Number(projectId),
+        // The SDK types `project` as a scalar number (the spec under-types it
+        // vs the sibling flamegraph endpoint, which accepts IDs or slugs).
+        // Forward projectId as-is so slug lookups keep working; Number() would
+        // turn a slug into NaN. The value serializes to the query string either way.
+        project: projectId as number,
         start,
         end,
       },
