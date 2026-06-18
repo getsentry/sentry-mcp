@@ -1,4 +1,5 @@
 import {
+  parseSentryLinkHeader,
   addProjectTeam as sdkAddATeamToAProject,
   createProjectKey as sdkCreateANewClientKey,
   createTeamProject as sdkCreateANewProject,
@@ -215,22 +216,9 @@ function parseStatsPeriod(statsPeriod: string): {
 }
 
 function getNextCursor(linkHeader: string | null): string | null {
-  if (!linkHeader) {
-    return null;
-  }
-
-  for (const link of linkHeader.split(",")) {
-    if (!link.includes('rel="next"') || !link.includes('results="true"')) {
-      continue;
-    }
-
-    const cursorMatch = link.match(/cursor="([^"]+)"/);
-    if (cursorMatch?.[1]) {
-      return cursorMatch[1];
-    }
-  }
-
-  return null;
+  // Delegate Link-header parsing to the SDK's pagination helper, which honors
+  // Sentry's `results="true"` qualifier. Normalize its `undefined` to `null`.
+  return parseSentryLinkHeader(linkHeader).nextCursor ?? null;
 }
 
 /**
