@@ -266,6 +266,12 @@ export type EventsValidationIssue = {
   error?: string;
 };
 
+export type EventsNamedValidationIssue = {
+  name: string;
+  valid: boolean;
+  error?: string;
+};
+
 export type EventsAttributeValidationResult = {
   name: string;
   valid: boolean;
@@ -273,17 +279,19 @@ export type EventsAttributeValidationResult = {
   error?: string;
 };
 
-export type EventsQueryValidationItem =
-  | EventsValidationIssue
-  | EventsAttributeValidationResult;
+export type EventsQueryValidation = {
+  valid: boolean;
+  error?: string;
+  fields: EventsAttributeValidationResult[];
+};
 
 export type EventsValidationResult = {
   valid: boolean;
   projects: EventsValidationIssue[];
-  dataset: EventsValidationIssue[];
+  dataset: EventsNamedValidationIssue[];
   environment: EventsValidationIssue[];
   field: EventsAttributeValidationResult[];
-  query: EventsQueryValidationItem[];
+  query: EventsQueryValidation;
   orderby: EventsAttributeValidationResult[];
 };
 
@@ -323,18 +331,6 @@ function parseEventsAttributeValidation(
   return result;
 }
 
-function parseEventsQueryValidation(
-  value: unknown,
-): EventsQueryValidationItem | null {
-  if (!isRecord(value) || typeof value.valid !== "boolean") {
-    return null;
-  }
-  if (typeof value.name === "string") {
-    return parseEventsAttributeValidation(value);
-  }
-  return parseEventsValidationIssue(value);
-}
-
 function parseEventsValidationIssues(value: unknown): EventsValidationIssue[] {
   if (!Array.isArray(value)) {
     return [];
@@ -355,15 +351,49 @@ function parseEventsAttributeValidations(
     .filter((item): item is EventsAttributeValidationResult => item !== null);
 }
 
-function parseEventsQueryValidations(
+function parseEventsNamedValidationIssue(
   value: unknown,
-): EventsQueryValidationItem[] {
+): EventsNamedValidationIssue | null {
+  if (
+    !isRecord(value) ||
+    typeof value.name !== "string" ||
+    typeof value.valid !== "boolean"
+  ) {
+    return null;
+  }
+  const issue: EventsNamedValidationIssue = {
+    name: value.name,
+    valid: value.valid,
+  };
+  if (typeof value.error === "string" && value.error.length > 0) {
+    issue.error = value.error;
+  }
+  return issue;
+}
+
+function parseEventsNamedValidationIssues(
+  value: unknown,
+): EventsNamedValidationIssue[] {
   if (!Array.isArray(value)) {
     return [];
   }
   return value
-    .map(parseEventsQueryValidation)
-    .filter((item): item is EventsQueryValidationItem => item !== null);
+    .map(parseEventsNamedValidationIssue)
+    .filter((issue): issue is EventsNamedValidationIssue => issue !== null);
+}
+
+function parseEventsQueryValidation(value: unknown): EventsQueryValidation {
+  if (!isRecord(value) || typeof value.valid !== "boolean") {
+    return { valid: false, fields: [] };
+  }
+  const query: EventsQueryValidation = {
+    valid: value.valid,
+    fields: parseEventsAttributeValidations(value.fields),
+  };
+  if (typeof value.error === "string" && value.error.length > 0) {
+    query.error = value.error;
+  }
+  return query;
 }
 
 function parseEventsValidationResponse(body: unknown): EventsValidationResult {
@@ -374,7 +404,7 @@ function parseEventsValidationResponse(body: unknown): EventsValidationResult {
       dataset: [],
       environment: [],
       field: [],
-      query: [],
+      query: { valid: false, fields: [] },
       orderby: [],
     };
   }
@@ -382,10 +412,10 @@ function parseEventsValidationResponse(body: unknown): EventsValidationResult {
   return {
     valid: typeof body.valid === "boolean" ? body.valid : false,
     projects: parseEventsValidationIssues(body.projects),
-    dataset: parseEventsValidationIssues(body.dataset),
+    dataset: parseEventsNamedValidationIssues(body.dataset),
     environment: parseEventsValidationIssues(body.environment),
     field: parseEventsAttributeValidations(body.field),
-    query: parseEventsQueryValidations(body.query),
+    query: parseEventsQueryValidation(body.query),
     orderby: parseEventsAttributeValidations(body.orderby),
   };
 }

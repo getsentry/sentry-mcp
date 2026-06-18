@@ -1016,7 +1016,7 @@ export const restHandlers = buildHandlers([
         error: null,
       }));
 
-      const queryResults = query
+      const queryFieldResults = query
         ? [
             {
               name: "transaction",
@@ -1043,14 +1043,18 @@ export const restHandlers = buildHandlers([
       return HttpResponse.json({
         valid:
           fieldResults.every((field) => field.valid) &&
-          queryResults.every((item) => item.valid) &&
+          queryFieldResults.every((item) => item.valid) &&
           orderbyResults.every((item) => item.valid) &&
           environmentResults.every((item) => item.valid),
         projects: [],
         dataset: [],
         environment: environmentResults,
         field: fieldResults,
-        query: queryResults,
+        query: {
+          valid: queryFieldResults.every((item) => item.valid),
+          error: null,
+          fields: queryFieldResults,
+        },
         orderby: orderbyResults,
       });
     },

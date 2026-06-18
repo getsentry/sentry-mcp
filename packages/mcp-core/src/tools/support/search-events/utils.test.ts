@@ -587,7 +587,7 @@ describe("formatEventsValidationResults", () => {
         dataset: [],
         environment: [],
         field: [],
-        query: [],
+        query: { valid: true, fields: [] },
         orderby: [],
       }),
     ).toBe("");
@@ -600,6 +600,7 @@ describe("formatEventsValidationResults", () => {
         projects: [{ valid: true }],
         dataset: [
           {
+            name: "spans",
             valid: false,
             error: "dataset must be one of: spans, errors",
           },
@@ -613,38 +614,99 @@ describe("formatEventsValidationResults", () => {
             error: "Unknown attribute",
           },
         ],
-        query: [
-          { valid: false, error: "Invalid syntax" },
-          { name: "transaction", valid: true, type: "string" },
-        ],
+        query: {
+          valid: false,
+          error: "Invalid syntax",
+          fields: [{ name: "transaction", valid: true, type: "string" }],
+        },
         orderby: [
           {
-            name: "-span.duration",
+            name: "-spon.duration",
             valid: false,
             error: "Orderby must also be a selected field",
           },
         ],
       }),
     ).toBe(`Validation Result: invalid
-Validated Projects:
-- valid
-
 Validated Dataset:
-- invalid (dataset must be one of: spans, errors)
-
-Validated Environment:
-- valid
+- INVALID spans — dataset must be one of: spans, errors
 
 Validated Fields:
-- span.duration: valid (number)
-- tags[missing]: invalid (Unknown attribute)
+- INVALID tags[missing] — Unknown attribute
 
 Validated Query:
-- query syntax: invalid (Invalid syntax)
-- transaction: valid (string)
+- INVALID query — Invalid syntax
 
 Validated Order By:
-- -span.duration: invalid (Orderby must also be a selected field)
+- INVALID -spon.duration — Orderby must also be a selected field
+`);
+  });
+
+  it("formats invalid query with invalid query fields", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: false,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: {
+          valid: false,
+          error: 'quotes are not closed at "VPN connections',
+          fields: [
+            { name: "hello", valid: false, error: "Unknown attribute" },
+            { name: "tags[fake]", valid: false, error: "Unknown attribute" },
+          ],
+        },
+        orderby: [],
+      }),
+    ).toBe(`Validation Result: invalid
+Validated Query:
+- INVALID query — quotes are not closed at "VPN connections
+  - INVALID hello — Unknown attribute
+  - INVALID tags[fake] — Unknown attribute
+`);
+  });
+
+  it("formats valid query field details when validation passes", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: true,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: {
+          valid: true,
+          fields: [{ name: "transaction", valid: true, type: "string" }],
+        },
+        orderby: [],
+      }),
+    ).toBe(`Validation Result: valid
+Validated Query:
+- OK query
+  - OK transaction — type: string
+`);
+  });
+
+  it("formats query-only validation failure", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: false,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: {
+          valid: false,
+          error: "Invalid syntax",
+          fields: [],
+        },
+        orderby: [],
+      }),
+    ).toBe(`Validation Result: invalid
+Validated Query:
+- INVALID query — Invalid syntax
 `);
   });
 });

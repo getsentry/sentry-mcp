@@ -1449,18 +1449,18 @@ describe("API query builders", () => {
                     error: "Unknown attribute",
                   },
                 ],
-                query: [
-                  {
-                    valid: false,
-                    error: "Invalid syntax",
-                  },
-                  {
-                    name: "transaction",
-                    valid: true,
-                    attrType: "string",
-                    error: null,
-                  },
-                ],
+                query: {
+                  valid: false,
+                  error: "Invalid syntax",
+                  fields: [
+                    {
+                      name: "transaction",
+                      valid: true,
+                      attrType: "string",
+                      error: null,
+                    },
+                  ],
+                },
                 orderby: [
                   {
                     name: "-span.duration",
@@ -1497,10 +1497,11 @@ describe("API query builders", () => {
             error: "Unknown attribute",
           },
         ],
-        query: [
-          { valid: false, error: "Invalid syntax" },
-          { name: "transaction", valid: true, type: "string" },
-        ],
+        query: {
+          valid: false,
+          error: "Invalid syntax",
+          fields: [{ name: "transaction", valid: true, type: "string" }],
+        },
         orderby: [
           {
             name: "-span.duration",

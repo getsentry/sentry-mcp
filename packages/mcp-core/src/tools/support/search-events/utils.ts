@@ -2,9 +2,7 @@ import { z } from "zod";
 import type {
   SentryApiService,
   TraceItemAttributeType,
-  EventsAttributeValidationResult,
-  EventsQueryValidationItem,
-  EventsValidationIssue,
+  EventsQueryValidation,
   EventsValidationResult,
   TraceItemType,
 } from "../../../api-client";
@@ -426,74 +424,143 @@ function getTraceItemType(dataset: EventsDataset): TraceItemType | null {
   return null;
 }
 
-function formatAttributeValidationLine(
-  item: EventsAttributeValidationResult,
-): string {
-  if (item.valid) {
-    return `- ${item.name}: valid${item.type ? ` (${item.type})` : ""}`;
+function formatValidationStatusLine({
+  valid,
+  name,
+  type,
+  error,
+  indent = 0,
+}: {
+  valid: boolean;
+  name?: string;
+  type?: string;
+  error?: string;
+  indent?: number;
+}): string {
+  const status = valid ? "OK" : "INVALID";
+  const label = name ? ` ${name}` : "";
+  const prefix = `${" ".repeat(indent)}- ${status}${label}`;
+
+  if (valid && type) {
+    return `${prefix} — type: ${type}`;
   }
-  return `- ${item.name}: invalid${item.error ? ` (${item.error})` : ""}`;
+  if (error) {
+    return `${prefix} — ${error}`;
+  }
+  return prefix;
 }
 
-function formatValidationIssueLine(issue: EventsValidationIssue): string {
-  if (issue.valid) {
-    return "- valid";
+function formatQueryValidation(
+  query: EventsQueryValidation,
+  failuresOnly: boolean,
+): string[] {
+  const invalidFields = query.fields.filter((field) => !field.valid);
+  const visibleFields = failuresOnly ? invalidFields : query.fields;
+  const showQueryLine = failuresOnly
+    ? !query.valid || invalidFields.length > 0
+    : !query.valid || query.fields.length > 0;
+
+  if (!showQueryLine) {
+    return [];
   }
-  return `- invalid${issue.error ? ` (${issue.error})` : ""}`;
+
+  const lines: string[] = [];
+  if (!query.valid) {
+    lines.push(
+      formatValidationStatusLine({
+        valid: false,
+        name: "query",
+        error: query.error,
+      }),
+    );
+  } else {
+    lines.push(formatValidationStatusLine({ valid: true, name: "query" }));
+  }
+
+  lines.push(
+    ...visibleFields.map((field) =>
+      formatValidationStatusLine({ ...field, indent: 2 }),
+    ),
+  );
+  return lines;
 }
 
-function formatQueryValidationLine(item: EventsQueryValidationItem): string {
-  if ("name" in item && item.name) {
-    return formatAttributeValidationLine(item);
+function pushValidationSection(
+  sections: string[],
+  title: string,
+  items: ReadonlyArray<{
+    valid: boolean;
+    name?: string;
+    type?: string;
+    error?: string;
+  }>,
+  failuresOnly: boolean,
+): void {
+  const visibleItems = failuresOnly
+    ? items.filter((item) => !item.valid)
+    : items;
+  if (visibleItems.length === 0) {
+    return;
   }
-  if (item.valid) {
-    return "- query syntax: valid";
-  }
-  return `- query syntax: invalid${item.error ? ` (${item.error})` : ""}`;
+
+  sections.push(
+    `Validated ${title}:\n${visibleItems.map((item) => formatValidationStatusLine(item)).join("\n")}`,
+  );
 }
 
 export function formatEventsValidationResults(
   validationResults: EventsValidationResult,
 ): string {
+  const failuresOnly = !validationResults.valid;
   const sections: string[] = [];
 
-  if (validationResults.projects.length > 0) {
-    sections.push(
-      `Validated Projects:\n${validationResults.projects.map(formatValidationIssueLine).join("\n")}`,
-    );
+  pushValidationSection(
+    sections,
+    "Projects",
+    validationResults.projects,
+    failuresOnly,
+  );
+  pushValidationSection(
+    sections,
+    "Dataset",
+    validationResults.dataset,
+    failuresOnly,
+  );
+  pushValidationSection(
+    sections,
+    "Environment",
+    validationResults.environment,
+    failuresOnly,
+  );
+  pushValidationSection(
+    sections,
+    "Fields",
+    validationResults.field,
+    failuresOnly,
+  );
+
+  const queryLines = formatQueryValidation(
+    validationResults.query,
+    failuresOnly,
+  );
+  if (queryLines.length > 0) {
+    sections.push(`Validated Query:\n${queryLines.join("\n")}`);
   }
-  if (validationResults.dataset.length > 0) {
-    sections.push(
-      `Validated Dataset:\n${validationResults.dataset.map(formatValidationIssueLine).join("\n")}`,
-    );
-  }
-  if (validationResults.environment.length > 0) {
-    sections.push(
-      `Validated Environment:\n${validationResults.environment.map(formatValidationIssueLine).join("\n")}`,
-    );
-  }
-  if (validationResults.field.length > 0) {
-    sections.push(
-      `Validated Fields:\n${validationResults.field.map(formatAttributeValidationLine).join("\n")}`,
-    );
-  }
-  if (validationResults.query.length > 0) {
-    sections.push(
-      `Validated Query:\n${validationResults.query.map(formatQueryValidationLine).join("\n")}`,
-    );
-  }
-  if (validationResults.orderby.length > 0) {
-    sections.push(
-      `Validated Order By:\n${validationResults.orderby.map(formatAttributeValidationLine).join("\n")}`,
-    );
-  }
+
+  pushValidationSection(
+    sections,
+    "Order By",
+    validationResults.orderby,
+    failuresOnly,
+  );
 
   if (sections.length === 0) {
     return "";
   }
 
   const overall = validationResults.valid ? "valid" : "invalid";
-  return `Validation Result: ${overall}\n${sections.join("\n\n")}\n`;
+  const details = sections.join("\n\n");
+  return `Validation Result: ${overall}\n${details}\n`;
 }
 
 /**
