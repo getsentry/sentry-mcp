@@ -4,6 +4,7 @@ import { mswServer } from "@sentry/mcp-server-mocks";
 import {
   fetchCustomAttributes,
   formatEventValue,
+  formatEventsValidationResults,
   formatKnownUserValue,
   looksLikeSentrySearchSyntax,
 } from "./utils";
@@ -574,5 +575,138 @@ describe("fetchCustomAttributes", () => {
         },
       });
     });
+  });
+});
+
+describe("formatEventsValidationResults", () => {
+  it("returns an empty string when there are no validation sections", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: true,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: { valid: true, fields: [] },
+        orderby: [],
+      }),
+    ).toBe("");
+  });
+
+  it("formats all validation sections for a mixed result", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: false,
+        projects: [{ valid: true }],
+        dataset: [
+          {
+            name: "spans",
+            valid: false,
+            error: "dataset must be one of: spans, errors",
+          },
+        ],
+        environment: [{ valid: true }],
+        field: [
+          { name: "span.duration", valid: true, type: "number" },
+          {
+            name: "tags[missing]",
+            valid: false,
+            error: "Unknown attribute",
+          },
+        ],
+        query: {
+          valid: false,
+          error: "Invalid syntax",
+          fields: [{ name: "transaction", valid: true, type: "string" }],
+        },
+        orderby: [
+          {
+            name: "-spon.duration",
+            valid: false,
+            error: "Orderby must also be a selected field",
+          },
+        ],
+      }),
+    ).toBe(`Validation Result: invalid
+Validated Dataset:
+- INVALID spans — dataset must be one of: spans, errors
+
+Validated Fields:
+- INVALID tags[missing] — Unknown attribute
+
+Validated Query:
+- INVALID query — Invalid syntax
+
+Validated Order By:
+- INVALID -spon.duration — Orderby must also be a selected field
+`);
+  });
+
+  it("formats invalid query with invalid query fields", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: false,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: {
+          valid: false,
+          error: 'quotes are not closed at "VPN connections',
+          fields: [
+            { name: "hello", valid: false, error: "Unknown attribute" },
+            { name: "tags[fake]", valid: false, error: "Unknown attribute" },
+          ],
+        },
+        orderby: [],
+      }),
+    ).toBe(`Validation Result: invalid
+Validated Query:
+- INVALID query — quotes are not closed at "VPN connections
+  - INVALID hello — Unknown attribute
+  - INVALID tags[fake] — Unknown attribute
+`);
+  });
+
+  it("formats valid query field details when validation passes", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: true,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: {
+          valid: true,
+          fields: [{ name: "transaction", valid: true, type: "string" }],
+        },
+        orderby: [],
+      }),
+    ).toBe(`Validation Result: valid
+Validated Query:
+- OK query
+  - OK transaction — type: string
+`);
+  });
+
+  it("formats query-only validation failure", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: false,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: {
+          valid: false,
+          error: "Invalid syntax",
+          fields: [],
+        },
+        orderby: [],
+      }),
+    ).toBe(`Validation Result: invalid
+Validated Query:
+- INVALID query — Invalid syntax
+`);
   });
 });

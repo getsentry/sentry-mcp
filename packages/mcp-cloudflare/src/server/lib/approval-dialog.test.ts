@@ -66,7 +66,7 @@ describe("approval-dialog", () => {
       expect(html).toContain('value="');
     });
 
-    it("uses built-in skill defaults when no remembered defaults are provided", async () => {
+    it("selects all approvable skills when no remembered defaults are provided", async () => {
       const response = await renderApprovalDialog(
         new Request("https://example.com/oauth/authorize"),
         {
@@ -80,8 +80,8 @@ describe("approval-dialog", () => {
 
       expectSkillChecked(html, "inspect");
       expectSkillChecked(html, "seer");
-      expectSkillUnchecked(html, "triage");
-      expectSkillUnchecked(html, "project-management");
+      expectSkillChecked(html, "triage");
+      expectSkillChecked(html, "project-management");
     });
 
     it("uses remembered skill defaults when provided", async () => {

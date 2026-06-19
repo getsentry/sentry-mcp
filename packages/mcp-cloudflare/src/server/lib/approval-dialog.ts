@@ -382,7 +382,7 @@ export interface ApprovalDialogOptions {
    */
   cookieSecret: string;
   /**
-   * Skill IDs to preselect. When omitted, built-in defaultEnabled values apply.
+   * Skill IDs to preselect. When omitted, all approvable skills are selected.
    */
   defaultSkills?: string[];
 }
@@ -463,11 +463,7 @@ export async function renderApprovalDialog(
   } = options;
   const defaultSkillIds =
     defaultSkills === undefined
-      ? new Set(
-          APPROVABLE_SKILLS.filter((skill) => skill.defaultEnabled).map(
-            (skill) => skill.id,
-          ),
-        )
+      ? new Set(APPROVABLE_SKILLS.map((skill) => skill.id))
       : new Set(filterApprovableSkillIds(defaultSkills));
 
   // Use static skill definitions bundled at build time
