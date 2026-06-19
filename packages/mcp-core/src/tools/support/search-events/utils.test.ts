@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import {
+  assertEventsSearchIsValid,
   fetchCustomAttributes,
   formatEventValue,
   formatEventsValidationResults,
@@ -708,5 +709,66 @@ Validated Query:
 Validated Query:
 - INVALID query — Invalid syntax
 `);
+  });
+});
+
+describe("assertEventsSearchIsValid", () => {
+  it("throws UserInputError when validation fails", async () => {
+    const apiService = {
+      validateEvents: vi.fn().mockResolvedValue({
+        valid: false,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: {
+          valid: false,
+          error: "Invalid syntax",
+          fields: [
+            {
+              name: "tags[missing]",
+              valid: false,
+              attrType: null,
+              error: "Unknown attribute",
+            },
+          ],
+        },
+        orderby: [],
+      }),
+    } as unknown as SentryApiService;
+
+    await expect(
+      assertEventsSearchIsValid(apiService, {
+        organizationSlug: "test-org",
+        dataset: "spans",
+        fields: ["span.duration"],
+        query: "tags[missing]:true",
+        sort: "-span.duration",
+      }),
+    ).rejects.toThrow(/Search validation failed/);
+  });
+
+  it("resolves when validation succeeds", async () => {
+    const apiService = {
+      validateEvents: vi.fn().mockResolvedValue({
+        valid: true,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: { valid: true, error: null, fields: [] },
+        orderby: [],
+      }),
+    } as unknown as SentryApiService;
+
+    await expect(
+      assertEventsSearchIsValid(apiService, {
+        organizationSlug: "test-org",
+        dataset: "spans",
+        fields: ["span.duration"],
+        query: "span.op:db",
+        sort: "-span.duration",
+      }),
+    ).resolves.toBeUndefined();
   });
 });

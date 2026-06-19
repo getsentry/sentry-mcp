@@ -1,4 +1,4 @@
-import { getActiveSpan, setTag } from "@sentry/core";
+import { getActiveSpan, setTag, startSpan } from "@sentry/core";
 import { z } from "zod";
 import { UserInputError } from "../../errors";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
@@ -16,7 +16,10 @@ import {
   isMetricsDataset,
   normalizeEventsDataset,
 } from "../../utils/events-datasets";
-import { searchEventsAgent } from "../support/search-events/agent";
+import {
+  searchEventsAgent,
+  type searchEventsAgentOutputSchema,
+} from "../support/search-events/agent";
 import {
   RECOMMENDED_FIELDS,
   TRACE_METRICS_SAMPLE_IDENTITY_FIELDS,
@@ -35,12 +38,27 @@ import {
   isValidReplaySort,
 } from "../support/search-events/replays";
 import {
+  formatEventsValidationResults,
   isAggregateQuery,
   looksLikeSentrySearchSyntax,
+  MAX_EVENTS_VALIDATION_ATTEMPTS,
+  recordEventsSearchValidationTelemetry,
+  validateEventsSearch,
 } from "../support/search-events/utils";
 
 const SEARCH_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
 const DEFAULT_EVENTS_SORT = "-timestamp";
+
+type SearchEventsAgentResult = z.output<typeof searchEventsAgentOutputSchema>;
+
+type EventsSearchState = {
+  dataset: PublicEventsDataset;
+  sentryQuery: string;
+  fields: string[];
+  sortParam: string;
+  environment?: string | string[] | null;
+  timeParams: { statsPeriod?: string; start?: string; end?: string };
+};
 
 function defaultSortForDataset(dataset: PublicEventsDataset | "replays") {
   return dataset === "replays" ? DEFAULT_REPLAY_SORT : DEFAULT_EVENTS_SORT;
@@ -90,6 +108,45 @@ function parseAgentTimeRange(
   }
 
   return undefined;
+}
+
+function augmentFieldsWithSort(fields: string[], sort: string): string[] {
+  const sortField = sort.startsWith("-") ? sort.slice(1) : sort;
+  const sortIsAggregate = sortField.includes("(") && sortField.includes(")");
+  if (
+    sortField &&
+    !fields.includes(sortField) &&
+    (sortIsAggregate || !isAggregateQuery(fields))
+  ) {
+    return [...fields, sortField];
+  }
+  return fields;
+}
+
+function buildRequestFields(
+  dataset: PublicEventsDataset | "replays",
+  fields: string[],
+): string[] {
+  return dataset !== "replays" &&
+    isMetricsDataset(dataset) &&
+    !isAggregateQuery(fields)
+    ? Array.from(new Set([...fields, ...TRACE_METRICS_SAMPLE_IDENTITY_FIELDS]))
+    : fields;
+}
+
+function applyValidationRepairFromAgent(
+  state: EventsSearchState,
+  parsed: SearchEventsAgentResult,
+): EventsSearchState {
+  const sortParam = parsed.sort.trim();
+  return {
+    dataset: parsed.dataset === "replays" ? state.dataset : parsed.dataset,
+    sentryQuery: parsed.query || state.sentryQuery,
+    fields: augmentFieldsWithSort(parsed.fields ?? state.fields, sortParam),
+    sortParam,
+    environment: parsed.environment ? parsed.environment : state.environment,
+    timeParams: parseAgentTimeRange(parsed.timeRange) ?? state.timeParams,
+  };
 }
 
 function isTraceItemDataset(dataset: PublicEventsDataset | "replays"): boolean {
@@ -227,8 +284,8 @@ function buildSearchRepairPrompt(params: {
     "Fix this Sentry event search request.",
     "The query may be natural language or already-valid Sentry search syntax.",
     "Preserve valid explicit parameters, but correct dataset, query syntax, fields, sort, and time range when they conflict or would fail.",
-    "If the user query already uses Sentry search syntax, treat its filters as authoritative unless validation proves a field is invalid.",
-    "For spans, logs, and metrics, use datasetAttributes exact attribute validation for explicit fields or query filters before dropping or renaming them.",
+    "If the user query already uses Sentry search syntax, treat its filters as authoritative unless the search validation step proves a field is invalid.",
+    "For spans, logs, and metrics, use datasetAttributes to discover likely fields with substringMatch, query, and attributeTypes before dropping or renaming explicit fields.",
     "A broad datasetAttributes result may be truncated, so absence from that preview does not prove an explicit field is invalid.",
     "For non-replay datasets, convert environment parameters into query filters. For replays, keep environment in the separate environment parameter.",
     "",
@@ -241,6 +298,44 @@ function buildSearchRepairPrompt(params: {
         sort: params.sort ?? null,
         statsPeriod: params.statsPeriod ?? null,
         environment: params.environment ?? null,
+      },
+      null,
+      2,
+    ),
+  ].join("\n");
+}
+
+function buildValidationFailureRepairPrompt(params: {
+  originalQuery?: string;
+  dataset: PublicEventsDataset | "replays";
+  query: string;
+  fields: string[];
+  sort: string;
+  environment?: string | string[] | null;
+  timeParams: { statsPeriod?: string; start?: string; end?: string };
+  validation: string;
+}): string {
+  return [
+    "Sentry events search validation failed. Repair the request so it passes validation.",
+    "Use the validation results to correct every invalid parameter: dataset, environment, query filters, selected fields, sort, and time range.",
+    "Use datasetAttributes to discover valid field names before renaming or replacing invalid fields.",
+    "Prefer renaming invalid fields to valid attributes instead of dropping them.",
+    "Ensure the sort field is included in the fields array.",
+    "For non-replay datasets, convert environment filters into query syntax when validation rejects the environment parameter.",
+    "For replays, keep environment in the separate environment parameter.",
+    "",
+    params.validation.trim(),
+    "",
+    `Original user query: ${params.originalQuery || "(empty)"}`,
+    "Current request:",
+    JSON.stringify(
+      {
+        dataset: params.dataset,
+        query: params.query,
+        fields: params.fields,
+        sort: params.sort,
+        environment: params.environment ?? null,
+        ...params.timeParams,
       },
       null,
       2,
@@ -567,29 +662,134 @@ export default defineTool({
     // sortParam is also pre-normalization here. The API client normalizes
     // aggregate sort params to underscore form (e.g. "count_unique_user_id")
     // later, so an exact string match against fields is correct at this stage.
-    const sortField = sortParam.startsWith("-")
-      ? sortParam.slice(1)
-      : sortParam;
-    const sortIsAggregate = sortField.includes("(") && sortField.includes(")");
-    if (
-      sortField &&
-      !fields.includes(sortField) &&
-      (sortIsAggregate || !isAggregateQuery(fields))
-    ) {
-      fields = [...fields, sortField];
+    fields = augmentFieldsWithSort(fields, sortParam);
+
+    const requestFields = buildRequestFields(dataset, fields);
+
+    let validationExplanation: string | undefined;
+    let lastValidation = await validateEventsSearch(apiService, {
+      organizationSlug,
+      dataset,
+      fields: requestFields,
+      query: sentryQuery,
+      sort: sortParam,
+      projectId,
+      environment: environment ?? undefined,
+      ...timeParams,
+    });
+    recordEventsSearchValidationTelemetry({
+      attempt: 0,
+      validation: lastValidation,
+    });
+
+    if (!lastValidation.valid) {
+      if (!hasAgentProvider()) {
+        const formatted = formatEventsValidationResults(lastValidation);
+        throw new UserInputError(
+          formatted
+            ? `Search validation failed:\n${formatted}`
+            : "Search validation failed.",
+        );
+      }
+
+      for (
+        let attempt = 0;
+        attempt < MAX_EVENTS_VALIDATION_ATTEMPTS && !lastValidation.valid;
+        attempt++
+      ) {
+        await startSpan(
+          {
+            name: "search_events.validation_repair",
+            op: "gen_ai.embedded_agent",
+            attributes: {
+              "app.search_events.validation.repair_iteration": attempt + 1,
+            },
+          },
+          async () => {
+            const agentResult = await searchEventsAgent({
+              query: buildValidationFailureRepairPrompt({
+                originalQuery: params.query,
+                dataset,
+                query: sentryQuery,
+                fields,
+                sort: sortParam,
+                environment,
+                timeParams,
+                validation: formatEventsValidationResults(lastValidation),
+              }),
+              organizationSlug,
+              apiService,
+              projectId,
+            });
+
+            const parsed = agentResult.result;
+            if (!parsed.sort?.trim()) {
+              throw new UserInputError(
+                `Search validation repair failed: agent response missing required 'sort' parameter. Received: ${JSON.stringify(parsed, null, 2)}.`,
+              );
+            }
+
+            ({
+              dataset,
+              sentryQuery,
+              fields,
+              sortParam,
+              environment,
+              timeParams,
+            } = applyValidationRepairFromAgent(
+              {
+                dataset: dataset as PublicEventsDataset,
+                sentryQuery,
+                fields,
+                sortParam,
+                environment,
+                timeParams,
+              },
+              parsed,
+            ));
+            validationExplanation = parsed.explanation || validationExplanation;
+
+            lastValidation = await validateEventsSearch(apiService, {
+              organizationSlug,
+              dataset,
+              fields: buildRequestFields(dataset, fields),
+              query: sentryQuery,
+              sort: sortParam,
+              projectId,
+              environment: environment ?? undefined,
+              ...timeParams,
+            });
+            recordEventsSearchValidationTelemetry({
+              attempt: attempt + 1,
+              repairIteration: attempt + 1,
+              validation: lastValidation,
+            });
+          },
+        );
+      }
+
+      if (!lastValidation.valid) {
+        const formatted = formatEventsValidationResults(lastValidation);
+        throw new UserInputError(
+          formatted
+            ? `Search validation failed after repair attempts:\n${formatted}`
+            : "Search validation failed after repair attempts.",
+        );
+      }
+
+      if (validationExplanation) {
+        explanation = explanation
+          ? `${explanation} ${validationExplanation}`
+          : validationExplanation;
+      }
     }
 
-    const requestFields =
-      isMetricsDataset(dataset) && !isAggregateQuery(fields)
-        ? Array.from(
-            new Set([...fields, ...TRACE_METRICS_SAMPLE_IDENTITY_FIELDS]),
-          )
-        : fields;
+    const finalRequestFields = buildRequestFields(dataset, fields);
 
     const eventsResponse = await apiService.searchEvents({
       organizationSlug,
       query: sentryQuery,
-      fields: requestFields,
+      fields: finalRequestFields,
       limit: params.limit,
       projectId,
       dataset,

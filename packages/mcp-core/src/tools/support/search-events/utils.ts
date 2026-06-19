@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { getActiveSpan } from "@sentry/core";
+import { UserInputError } from "../../../errors";
 import type {
   SentryApiService,
   TraceItemAttributeType,
@@ -563,6 +565,138 @@ export function formatEventsValidationResults(
   return `Validation Result: ${overall}\n${details}\n`;
 }
 
+const VALIDATION_OUTPUT_MAX_LENGTH = 1024;
+
+function truncateValidationOutput(output: string): string {
+  if (output.length <= VALIDATION_OUTPUT_MAX_LENGTH) {
+    return output;
+  }
+  return `${output.slice(0, VALIDATION_OUTPUT_MAX_LENGTH)}…`;
+}
+
+export function recordEventsSearchValidationTelemetry({
+  attempt,
+  repairIteration,
+  validation,
+}: {
+  attempt: number;
+  repairIteration?: number;
+  validation: EventsValidationResult;
+}): void {
+  const span = getActiveSpan();
+  if (!span) {
+    return;
+  }
+
+  span.setAttribute("app.search_events.validation.attempt", attempt);
+  span.setAttribute("app.search_events.validation.valid", validation.valid);
+  if (repairIteration !== undefined) {
+    span.setAttribute(
+      "app.search_events.validation.repair_iteration",
+      repairIteration,
+    );
+  }
+
+  const formatted = formatEventsValidationResults(validation);
+  if (formatted) {
+    span.setAttribute(
+      "app.search_events.validation.output",
+      truncateValidationOutput(formatted),
+    );
+  }
+}
+
+export const MAX_EVENTS_VALIDATION_ATTEMPTS = 3;
+
+export async function validateEventsSearch(
+  apiService: SentryApiService,
+  {
+    organizationSlug,
+    dataset,
+    fields,
+    query,
+    sort,
+    projectId,
+    environment,
+    statsPeriod,
+    start,
+    end,
+  }: {
+    organizationSlug: string;
+    dataset: EventsDataset;
+    fields: string[];
+    query: string;
+    sort: string;
+    projectId?: string;
+    environment?: string | string[];
+    statsPeriod?: string;
+    start?: string;
+    end?: string;
+  },
+): Promise<EventsValidationResult> {
+  return apiService.validateEvents({
+    organizationSlug,
+    dataset,
+    fields,
+    query,
+    orderby: [sort],
+    project: projectId,
+    environment,
+    statsPeriod,
+    start,
+    end,
+  });
+}
+
+export async function assertEventsSearchIsValid(
+  apiService: SentryApiService,
+  {
+    organizationSlug,
+    dataset,
+    fields,
+    query,
+    sort,
+    projectId,
+    environment,
+    statsPeriod,
+    start,
+    end,
+  }: {
+    organizationSlug: string;
+    dataset: EventsDataset;
+    fields: string[];
+    query: string;
+    sort: string;
+    projectId?: string;
+    environment?: string | string[];
+    statsPeriod?: string;
+    start?: string;
+    end?: string;
+  },
+): Promise<void> {
+  const validationResults = await validateEventsSearch(apiService, {
+    organizationSlug,
+    dataset,
+    fields,
+    query,
+    sort,
+    projectId,
+    environment,
+    statsPeriod,
+    start,
+    end,
+  });
+
+  if (!validationResults.valid) {
+    const formatted = formatEventsValidationResults(validationResults);
+    throw new UserInputError(
+      formatted
+        ? `Search validation failed:\n${formatted}`
+        : "Search validation failed.",
+    );
+  }
+}
+
 /**
  * Create a tool for the agent to query available attributes by dataset
  * The tool is pre-bound with the API service and organization configured for the appropriate region
@@ -577,7 +711,7 @@ export function createDatasetAttributesTool(options: {
 
   return agentTool({
     description:
-      "Query, filter, and validate available attributes and fields for a specific Sentry dataset to understand what data is available",
+      "Query and filter available attributes and fields for a specific Sentry dataset to understand what data is available",
     parameters: z.object({
       dataset: z
         .enum(PUBLIC_EVENTS_DATASETS)
@@ -603,39 +737,8 @@ export function createDatasetAttributesTool(options: {
         .describe(
           "Optional attribute types to list. Use ['string','number','boolean'] when unsure.",
         ),
-      attributes: z
-        .array(z.string().trim().min(1))
-        .min(1)
-        .optional()
-        .describe(
-          "Optional exact field names to validate, such as ['tags[type]', 'span.duration']",
-        ),
-      orderby: z
-        .array(z.string().trim().min(1))
-        .min(1)
-        .optional()
-        .describe(
-          "Optional sort fields to validate against the selected fields, such as ['-span.duration']",
-        ),
-      environment: z
-        .union([
-          z.string().trim().min(1),
-          z.array(z.string().trim().min(1)).min(1),
-        ])
-        .optional()
-        .describe(
-          "Optional environment filter to validate, as a string or array of environment names",
-        ),
     }),
-    execute: async ({
-      dataset,
-      substringMatch,
-      query,
-      attributeTypes,
-      attributes,
-      orderby,
-      environment,
-    }) => {
+    execute: async ({ dataset, substringMatch, query, attributeTypes }) => {
       const {
         BASE_COMMON_FIELDS,
         DATASET_FIELDS,
@@ -650,16 +753,6 @@ export function createDatasetAttributesTool(options: {
       // Other errors will bubble up to be captured by Sentry
       const normalizedDataset = normalizeEventsDataset(dataset);
       const attributeTimeParams = { statsPeriod: "14d" };
-      const validationResults = await apiService.validateEvents({
-        organizationSlug,
-        dataset,
-        fields: attributes,
-        query,
-        orderby,
-        environment,
-        project: projectId,
-        ...attributeTimeParams,
-      });
       const { attributes: customAttributes, fieldTypes } =
         await fetchCustomAttributes(
           apiService,
@@ -697,7 +790,6 @@ export function createDatasetAttributesTool(options: {
       recordAgentToolResultCount(fieldCount);
 
       return `Dataset: ${dataset}
-${validationResults ? formatEventsValidationResults(validationResults) : ""}
 
 Available Fields (${fieldCount} total):
 ${Object.entries(allFields)
@@ -711,7 +803,7 @@ ${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}
 
 Field Types (CRITICAL for aggregate functions):
 ${Object.entries(allFieldTypes)
-  .slice(0, 30) // Show more field types since this is critical for validation
+  .slice(0, 30) // Show more field types since this is critical for aggregate functions
   .map(([key, type]) => `- ${key}: ${type}`)
   .join("\n")}
 ${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldTypes).length - 30} more fields` : ""}
