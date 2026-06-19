@@ -4169,11 +4169,9 @@ export class SentryApiService {
       path: { organization_id_or_slug: organizationSlug },
       query: {
         profiler_id: profilerId,
-        // The SDK types `project` as a scalar number (the spec under-types it
-        // vs the sibling flamegraph endpoint, which accepts IDs or slugs).
-        // Forward projectId as-is so slug lookups keep working; Number() would
-        // turn a slug into NaN. The value serializes to the query string either way.
-        project: projectId as number,
+        // SDK types `project` as a string (ID or slug). Stringify so a numeric
+        // projectId is sent as-is and slugs are preserved.
+        project: String(projectId),
         start,
         end,
       },
