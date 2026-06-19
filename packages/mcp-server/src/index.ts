@@ -25,6 +25,7 @@ import { startStdio } from "./transports/stdio";
 import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "@sentry/mcp-core/version";
 import { buildUsage } from "./cli/usage";
+import { printCliLine } from "./cli/output";
 import { parseArgv, parseEnv, merge } from "./cli/parse";
 import { finalize } from "./cli/resolve";
 import { resolveAccessToken } from "./auth/resolve-token";
@@ -61,11 +62,11 @@ async function main() {
 
   const cli = parseArgv(rawArgs);
   if (cli.help) {
-    console.log(usageText);
+    printCliLine(usageText);
     process.exit(0);
   }
   if (cli.version) {
-    console.log(`${packageName} ${LIB_VERSION}`);
+    printCliLine(`${packageName} ${LIB_VERSION}`);
     process.exit(0);
   }
   if (cli.unknownArgs.length > 0) {
