@@ -50,6 +50,7 @@
     "test": {
       "dependsOn": ["^build"],
       "inputs": [
+        "scripts/**/*.ts",
         "src/**/*.ts",
         "**/*.test.ts",
         "**/*.spec.ts",
