@@ -81,8 +81,7 @@ describe("analyze_issue_with_seer", () => {
                         steps: [
                           {
                             title: "Share canonical ID",
-                            description:
-                              "Pass the same ID to both procedures.",
+                            description: "Pass the same ID to both procedures.",
                           },
                           {
                             title: "Add regression coverage",
@@ -379,6 +378,7 @@ describe("analyze_issue_with_seer", () => {
           });
           return HttpResponse.json({
             run_id: 123,
+            sentry_run_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
           });
         },
       ),

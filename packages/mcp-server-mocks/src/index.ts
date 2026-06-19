@@ -1068,12 +1068,20 @@ export const restHandlers = buildHandlers([
   {
     method: "post",
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/autofix/",
-    fetch: () => HttpResponse.json({ run_id: 123 }),
+    fetch: () =>
+      HttpResponse.json({
+        run_id: 123,
+        sentry_run_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      }),
   },
   {
     method: "post",
     path: "/api/0/organizations/sentry-mcp-evals/issues/PEATED-A8/autofix/",
-    fetch: () => HttpResponse.json({ run_id: 123 }),
+    fetch: () =>
+      HttpResponse.json({
+        run_id: 123,
+        sentry_run_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      }),
   },
   {
     method: "get",
