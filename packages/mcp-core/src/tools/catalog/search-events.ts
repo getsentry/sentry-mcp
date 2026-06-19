@@ -139,10 +139,12 @@ function applyValidationRepairFromAgent(
   parsed: SearchEventsAgentResult,
 ): EventsSearchState {
   const sortParam = parsed.sort.trim();
+  const repairedFields =
+    parsed.fields && parsed.fields.length > 0 ? parsed.fields : state.fields;
   return {
     dataset: parsed.dataset === "replays" ? state.dataset : parsed.dataset,
     sentryQuery: parsed.query || state.sentryQuery,
-    fields: augmentFieldsWithSort(parsed.fields ?? state.fields, sortParam),
+    fields: augmentFieldsWithSort(repairedFields, sortParam),
     sortParam,
     environment: parsed.environment ? parsed.environment : state.environment,
     timeParams: parseAgentTimeRange(parsed.timeRange) ?? state.timeParams,
@@ -190,6 +192,17 @@ function appendSearchFilter(query: string, filter?: string): string {
     return trimmedQuery;
   }
   return [trimmedQuery, filter].filter(Boolean).join(" ");
+}
+
+function applyEnvironmentToEventsQuery(
+  dataset: PublicEventsDataset | "replays",
+  query: string,
+  environment?: string | string[] | null,
+): string {
+  if (dataset === "replays") {
+    return query;
+  }
+  return appendSearchFilter(query, formatEnvironmentFilter(environment));
 }
 
 function tokenizeSearchQuery(query: string): string[] {
@@ -667,6 +680,11 @@ export default defineTool({
     const requestFields = buildRequestFields(dataset, fields);
 
     let validationExplanation: string | undefined;
+    sentryQuery = applyEnvironmentToEventsQuery(
+      dataset,
+      sentryQuery,
+      environment,
+    );
     let lastValidation = await validateEventsSearch(apiService, {
       organizationSlug,
       dataset,
@@ -748,6 +766,11 @@ export default defineTool({
               parsed,
             ));
             validationExplanation = parsed.explanation || validationExplanation;
+            sentryQuery = applyEnvironmentToEventsQuery(
+              dataset,
+              sentryQuery,
+              environment,
+            );
 
             lastValidation = await validateEventsSearch(apiService, {
               organizationSlug,
@@ -785,6 +808,11 @@ export default defineTool({
     }
 
     const finalRequestFields = buildRequestFields(dataset, fields);
+    sentryQuery = applyEnvironmentToEventsQuery(
+      dataset,
+      sentryQuery,
+      environment,
+    );
 
     const eventsResponse = await apiService.searchEvents({
       organizationSlug,

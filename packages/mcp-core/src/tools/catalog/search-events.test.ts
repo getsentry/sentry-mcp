@@ -2529,6 +2529,172 @@ describe("search_events", () => {
     expect(result).toContain("span1");
   });
 
+  it("keeps prior fields when validation repair returns an empty fields array", async () => {
+    let validateCalls = 0;
+    let eventsRequestUrl: URL | undefined;
+
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "spans",
+        "span.duration:>100",
+        [],
+        undefined,
+        "-span.duration",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () => {
+          validateCalls += 1;
+          if (validateCalls === 1) {
+            return HttpResponse.json({
+              valid: false,
+              projects: [],
+              dataset: [],
+              environment: [],
+              field: [
+                {
+                  name: "spon.duration",
+                  valid: false,
+                  error: "Unknown attribute",
+                },
+              ],
+              query: {
+                valid: false,
+                error: "Invalid syntax",
+                fields: [],
+              },
+              orderby: [],
+            });
+          }
+
+          return HttpResponse.json(validEventsValidationResponse);
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          eventsRequestUrl = new URL(request.url);
+          return HttpResponse.json({
+            data: [{ id: "span1", "span.duration": 42 }],
+          });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "spans",
+        query: "spon.duration:>100",
+        fields: ["span.duration"],
+        sort: "-span.duration",
+        statsPeriod: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(eventsRequestUrl).toBeDefined();
+    expect(eventsRequestUrl!.searchParams.getAll("field")).toEqual([
+      "span.duration",
+    ]);
+  });
+
+  it("merges repaired environment into the events search query for non-replay datasets", async () => {
+    let validateCalls = 0;
+    let eventsRequestUrl: URL | undefined;
+
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "spans",
+        "span.duration:>100",
+        ["span.duration"],
+        undefined,
+        "-span.duration",
+        undefined,
+        "production",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () => {
+          validateCalls += 1;
+          if (validateCalls === 1) {
+            return HttpResponse.json({
+              valid: false,
+              projects: [],
+              dataset: [],
+              environment: [],
+              field: [],
+              query: {
+                valid: false,
+                error: "Invalid syntax",
+                fields: [],
+              },
+              orderby: [],
+            });
+          }
+
+          return HttpResponse.json(validEventsValidationResponse);
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          eventsRequestUrl = new URL(request.url);
+          return HttpResponse.json({
+            data: [{ id: "span1", "span.duration": 42 }],
+          });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "spans",
+        query: "spon.duration:>100",
+        fields: ["span.duration"],
+        sort: "-span.duration",
+        statsPeriod: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(eventsRequestUrl).toBeDefined();
+    expect(eventsRequestUrl!.searchParams.get("query")).toContain(
+      "environment:production",
+    );
+  });
+
   it("rejects search after MAX_EVENTS_VALIDATION_ATTEMPTS without calling events", async () => {
     let validateCalls = 0;
 
@@ -2601,7 +2767,8 @@ describe("search_events", () => {
   });
 
   it("rejects search immediately when validation fails without an agent provider", async () => {
-    process.env.OPENAI_API_KEY = undefined;
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
 
     mswServer.use(
       http.get(
