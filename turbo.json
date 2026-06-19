@@ -37,12 +37,20 @@
     },
     "lint": {
       "dependsOn": ["^build"],
-      "inputs": ["**/*.{ts,tsx,js,jsx}", "biome.json", "package.json"],
+      "inputs": [
+        "**/*.{ts,tsx,js,jsx}",
+        "ast-grep-rule-tests/**/*.yml",
+        "ast-grep-rules/**/*.yml",
+        "biome.json",
+        "package.json",
+        "sgconfig.yml"
+      ],
       "cache": true
     },
     "test": {
       "dependsOn": ["^build"],
       "inputs": [
+        "scripts/**/*.ts",
         "src/**/*.ts",
         "**/*.test.ts",
         "**/*.spec.ts",

@@ -1985,4 +1985,97 @@ describe("API query builders", () => {
       expect(result.source).toBe("manual");
     });
   });
+
+  describe("project identifier request shape regressions", () => {
+    let apiService: SentryApiService;
+
+    beforeEach(() => {
+      apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("preserves replay project slugs in path parameters", async () => {
+      let requestUrl: string | undefined;
+      globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+        requestUrl = url;
+        return Promise.resolve({
+          ok: true,
+          headers: {
+            get: (key: string) =>
+              key === "content-type" ? "application/json" : null,
+          },
+          json: () => Promise.resolve([["segment-1"]]),
+        });
+      });
+
+      await apiService.getReplayRecordingSegments({
+        organizationSlug: "test-org",
+        projectSlugOrId: "frontend",
+        replayId: "replay-123",
+      });
+
+      expect(requestUrl).toContain(
+        "/projects/test-org/frontend/replays/replay-123/recording-segments/",
+      );
+      expect(requestUrl).not.toContain("NaN");
+    });
+
+    it("uses projectSlug for release deploy slug filters", async () => {
+      let requestUrl: string | undefined;
+      globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+        requestUrl = url;
+        return Promise.resolve({
+          ok: true,
+          headers: {
+            get: (key: string) =>
+              key === "content-type" ? "application/json" : null,
+          },
+          json: () => Promise.resolve([]),
+        });
+      });
+
+      await apiService.listReleaseDeploys({
+        organizationSlug: "test-org",
+        releaseVersion: "frontend@1.0.0",
+        projectSlugOrId: "frontend",
+      });
+
+      const params = new URL(String(requestUrl)).searchParams;
+      expect(params.get("projectSlug")).toBe("frontend");
+      expect(params.get("project")).toBeNull();
+      expect(requestUrl).not.toContain("NaN");
+    });
+
+    it("uses project for release deploy numeric ID filters", async () => {
+      let requestUrl: string | undefined;
+      globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+        requestUrl = url;
+        return Promise.resolve({
+          ok: true,
+          headers: {
+            get: (key: string) =>
+              key === "content-type" ? "application/json" : null,
+          },
+          json: () => Promise.resolve([]),
+        });
+      });
+
+      await apiService.listReleaseDeploys({
+        organizationSlug: "test-org",
+        releaseVersion: "frontend@1.0.0",
+        projectSlugOrId: "12345",
+      });
+
+      const params = new URL(String(requestUrl)).searchParams;
+      expect(params.get("project")).toBe("12345");
+      expect(params.get("projectSlug")).toBeNull();
+      expect(requestUrl).not.toContain("NaN");
+    });
+  });
 });
