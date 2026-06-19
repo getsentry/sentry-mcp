@@ -368,36 +368,33 @@ describe("fetchCustomAttributes", () => {
 
   describe("successful responses", () => {
     it("should return attributes for spans dataset", async () => {
-      // Mock with separate string and number queries as the real API does
-      // The API client makes two separate calls with attributeType parameter
       mswServer.use(
         http.get(
           "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
           ({ request }) => {
             const url = new URL(request.url);
-            const attributeType = url.searchParams.get("attributeType");
             const itemType = url.searchParams.get("itemType");
 
-            // Validate the request has expected parameters
-            if (!attributeType || !itemType) {
+            if (!itemType) {
               return HttpResponse.json(
                 { detail: "Missing required parameters" },
                 { status: 400 },
               );
             }
 
-            if (attributeType === "string") {
-              return HttpResponse.json([
-                { key: "span.op", name: "Operation" },
-                { key: "sentry:internal", name: "Internal" }, // Should be filtered
-              ]);
-            }
-            if (attributeType === "number") {
-              return HttpResponse.json([
-                { key: "span.duration", name: "Duration" },
-              ]);
-            }
-            return HttpResponse.json([]);
+            return HttpResponse.json([
+              { key: "span.op", name: "Operation", attributeType: "string" },
+              {
+                key: "sentry:internal",
+                name: "Internal",
+                attributeType: "string",
+              },
+              {
+                key: "span.duration",
+                name: "Duration",
+                attributeType: "number",
+              },
+            ]);
           },
         ),
       );
@@ -452,25 +449,23 @@ describe("fetchCustomAttributes", () => {
           "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
           ({ request }) => {
             const url = new URL(request.url);
-            const attributeType = url.searchParams.get("attributeType");
             const itemType = url.searchParams.get("itemType");
 
             expect(itemType).toBe("tracemetrics");
 
-            if (attributeType === "string") {
-              return HttpResponse.json([
-                { key: "metric.name", name: "Metric Name" },
-                { key: "metric.type", name: "Metric Type" },
-              ]);
-            }
-
-            if (attributeType === "number") {
-              return HttpResponse.json([
-                { key: "value", name: "Metric Value" },
-              ]);
-            }
-
-            return HttpResponse.json([]);
+            return HttpResponse.json([
+              {
+                key: "metric.name",
+                name: "Metric Name",
+                attributeType: "string",
+              },
+              {
+                key: "metric.type",
+                name: "Metric Type",
+                attributeType: "string",
+              },
+              { key: "value", name: "Metric Value", attributeType: "number" },
+            ]);
           },
         ),
       );
@@ -505,35 +500,23 @@ describe("fetchCustomAttributes", () => {
             const url = new URL(request.url);
             requests.push(url.searchParams);
 
-            const attributeType = url.searchParams.get("attributeType");
-            if (attributeType === "string") {
-              return HttpResponse.json([
-                {
-                  key: "tags[type]",
-                  name: "type",
-                  attributeType: "string",
-                },
-              ]);
-            }
-            if (attributeType === "number") {
-              return HttpResponse.json([
-                {
-                  key: "tags[sequence,number]",
-                  name: "sequence",
-                  attributeType: "number",
-                },
-              ]);
-            }
-            if (attributeType === "boolean") {
-              return HttpResponse.json([
-                {
-                  key: "tags[enabled,boolean]",
-                  name: "enabled",
-                  attributeType: "boolean",
-                },
-              ]);
-            }
-            return HttpResponse.json([]);
+            return HttpResponse.json([
+              {
+                key: "tags[type]",
+                name: "type",
+                attributeType: "string",
+              },
+              {
+                key: "tags[sequence,number]",
+                name: "sequence",
+                attributeType: "number",
+              },
+              {
+                key: "tags[enabled,boolean]",
+                name: "enabled",
+                attributeType: "boolean",
+              },
+            ]);
           },
         ),
       );
@@ -551,10 +534,8 @@ describe("fetchCustomAttributes", () => {
         },
       );
 
-      expect(requests).toHaveLength(3);
-      expect(
-        requests.map((params) => params.get("attributeType")).sort(),
-      ).toEqual(["boolean", "number", "string"]);
+      expect(requests).toHaveLength(1);
+      expect(requests[0]!.get("attributeType")).toBeNull();
       for (const params of requests) {
         expect(params.get("itemType")).toBe("spans");
         expect(params.get("project")).toBe("123");

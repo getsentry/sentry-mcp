@@ -1075,13 +1075,6 @@ export const restHandlers = buildHandlers([
         );
       }
 
-      if (!attributeType) {
-        return HttpResponse.json(
-          { detail: "attributeType parameter is required" },
-          { status: 400 },
-        );
-      }
-
       // Validate itemType values (API accepts both singular and plural forms)
       const normalizedItemType = itemType === "spans" ? "span" : itemType;
       if (!["span", "logs", "tracemetrics"].includes(normalizedItemType)) {
@@ -1093,11 +1086,48 @@ export const restHandlers = buildHandlers([
         );
       }
 
+      if (!attributeType) {
+        if (normalizedItemType === "span") {
+          return HttpResponse.json([
+            ...traceItemsAttributesSpansStringFixture.map((attribute) => ({
+              ...attribute,
+              attributeType: "string",
+            })),
+            ...traceItemsAttributesSpansNumberFixture.map((attribute) => ({
+              ...attribute,
+              attributeType: "number",
+            })),
+          ]);
+        }
+        if (normalizedItemType === "logs") {
+          return HttpResponse.json([
+            ...traceItemsAttributesLogsStringFixture.map((attribute) => ({
+              ...attribute,
+              attributeType: "string",
+            })),
+            ...traceItemsAttributesLogsNumberFixture.map((attribute) => ({
+              ...attribute,
+              attributeType: "number",
+            })),
+          ]);
+        }
+        return HttpResponse.json([
+          ...traceItemsAttributesTraceMetricsStringFixture.map((attribute) => ({
+            ...attribute,
+            attributeType: "string",
+          })),
+          ...traceItemsAttributesTraceMetricsNumberFixture.map((attribute) => ({
+            ...attribute,
+            attributeType: "number",
+          })),
+        ]);
+      }
+
       // Validate attributeType values
-      if (!["string", "number"].includes(attributeType)) {
+      if (!["string", "number", "boolean"].includes(attributeType)) {
         return HttpResponse.json(
           {
-            detail: `Invalid attributeType '${attributeType}'. Must be 'string' or 'number'`,
+            detail: `Invalid attributeType '${attributeType}'. Must be 'string', 'number', or 'boolean'`,
           },
           { status: 400 },
         );

@@ -2806,6 +2806,7 @@ export class SentryApiService {
    * @param params.itemType Item type to query attributes for ("spans", "logs", or "tracemetrics")
    * @param params.project Numeric project ID to filter attributes
    * @param params.statsPeriod Time range for attribute statistics (e.g., "24h", "7d")
+   * @param params.attributeTypes Optional attribute types to keep in the response
    * @param opts Request options
    * @returns Array of available attributes with metadata including type
    */
@@ -2817,7 +2818,7 @@ export class SentryApiService {
       statsPeriod,
       start,
       end,
-      attributeTypes = ["string", "number"],
+      attributeTypes,
       substringMatch,
       query,
     }: {
@@ -2833,25 +2834,24 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<TraceItemAttribute[]> {
-    const uniqueAttributeTypes = Array.from(new Set(attributeTypes));
-    const attributeResponses = await Promise.all(
-      uniqueAttributeTypes.map((attributeType) =>
-        this.fetchTraceItemAttributesByType(
-          organizationSlug,
-          itemType,
-          attributeType,
-          project,
-          statsPeriod,
-          start,
-          end,
-          substringMatch,
-          query,
-          opts,
-        ),
-      ),
+    const attributes = await this.fetchTraceItemAttributes(
+      organizationSlug,
+      itemType,
+      project,
+      statsPeriod,
+      start,
+      end,
+      substringMatch,
+      query,
+      opts,
     );
 
-    return attributeResponses.flat();
+    if (!attributeTypes || attributeTypes.length === 0) {
+      return attributes;
+    }
+
+    const allowedTypes = new Set(attributeTypes);
+    return attributes.filter((attribute) => allowedTypes.has(attribute.type));
   }
 
   async validateEvents(
@@ -2913,10 +2913,9 @@ export class SentryApiService {
     return parseEventsValidationResponse(body);
   }
 
-  private async fetchTraceItemAttributesByType(
+  private async fetchTraceItemAttributes(
     organizationSlug: string,
     itemType: TraceItemType,
-    attributeType: TraceItemAttributeType,
     project?: string,
     statsPeriod?: string,
     start?: string,
@@ -2927,7 +2926,6 @@ export class SentryApiService {
   ): Promise<TraceItemAttribute[]> {
     const queryParams = new URLSearchParams();
     queryParams.set("itemType", itemType);
-    queryParams.set("attributeType", attributeType);
     if (project) {
       queryParams.set("project", project);
     }
@@ -2942,7 +2940,7 @@ export class SentryApiService {
     const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
 
     const body = await this.requestJSON(url, undefined, opts);
-    return parseTraceItemAttributes(body, attributeType);
+    return parseTraceItemAttributes(body, "string");
   }
 
   /**

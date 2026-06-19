@@ -1334,29 +1334,6 @@ describe("API query builders", () => {
 
       globalThis.fetch = vi.fn().mockImplementation((url: string) => {
         urls.push(url);
-        const requestUrl = new URL(url);
-        const attributeType = requestUrl.searchParams.get("attributeType");
-        const body =
-          attributeType === "boolean"
-            ? [
-                {
-                  key: "tags[enabled,boolean]",
-                  name: "enabled",
-                  attributeType: "boolean",
-                  attributeSource: { source_type: "user" },
-                },
-              ]
-            : [
-                {
-                  key: "tags[type]",
-                  name: "type",
-                  attributeType: "string",
-                  attributeSource: {
-                    source_type: "sentry",
-                    is_transformed_alias: true,
-                  },
-                },
-              ];
 
         return Promise.resolve({
           ok: true,
@@ -1364,7 +1341,29 @@ describe("API query builders", () => {
             get: (key: string) =>
               key === "content-type" ? "application/json" : null,
           },
-          json: () => Promise.resolve(body),
+          json: () =>
+            Promise.resolve([
+              {
+                key: "tags[type]",
+                name: "type",
+                attributeType: "string",
+                attributeSource: {
+                  source_type: "sentry",
+                  is_transformed_alias: true,
+                },
+              },
+              {
+                key: "tags[enabled,boolean]",
+                name: "enabled",
+                attributeType: "boolean",
+                attributeSource: { source_type: "user" },
+              },
+              {
+                key: "tags[count,number]",
+                name: "count",
+                attributeType: "number",
+              },
+            ]),
         });
       });
 
@@ -1395,18 +1394,14 @@ describe("API query builders", () => {
           attributeSource: { source_type: "user" },
         },
       ]);
-      expect(urls).toHaveLength(2);
-      for (const url of urls) {
-        const params = new URL(url).searchParams;
-        expect(params.get("itemType")).toBe("spans");
-        expect(params.get("project")).toBe("123");
-        expect(params.get("statsPeriod")).toBe("7d");
-        expect(params.get("substringMatch")).toBe("tags[");
-        expect(params.get("query")).toBe('transaction:"VPN connections"');
-      }
-      expect(
-        urls.map((url) => new URL(url).searchParams.get("attributeType")),
-      ).toEqual(["string", "boolean"]);
+      expect(urls).toHaveLength(1);
+      const params = new URL(urls[0]!).searchParams;
+      expect(params.get("itemType")).toBe("spans");
+      expect(params.get("project")).toBe("123");
+      expect(params.get("statsPeriod")).toBe("7d");
+      expect(params.get("substringMatch")).toBe("tags[");
+      expect(params.get("query")).toBe('transaction:"VPN connections"');
+      expect(params.get("attributeType")).toBeNull();
     });
 
     it("should validate events requests via the validate endpoint", async () => {
