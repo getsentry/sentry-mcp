@@ -5,7 +5,7 @@
     "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, monitors, profiles, documentation, and project metadata",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 30,
+    "toolCount": 31,
     "tools": [
       {
         "name": "find_alert_rules",
@@ -65,6 +65,11 @@
       {
         "name": "get_event_attachment",
         "description": "Download attachments from a Sentry event.\n\nUse this tool when you need to:\n- Download files attached to a specific event\n- Access screenshots, log files, or other attachments uploaded with an error report\n- Retrieve attachment metadata and download URLs\n\n<examples>\n### Download a specific attachment by ID\n\n```\nget_event_attachment(organizationSlug='my-organization', projectSlug='my-project', eventId='c49541c747cb4d8aa3efb70ca5aba243', attachmentId='12345')\n```\n\n### List all attachments for an event\n\n```\nget_event_attachment(organizationSlug='my-organization', projectSlug='my-project', eventId='c49541c747cb4d8aa3efb70ca5aba243')\n```\n\n</examples>\n\n<hints>\n- If `attachmentId` is provided, the specific attachment will be downloaded as an embedded resource\n- If `attachmentId` is omitted, all attachments for the event will be listed with download information\n- The `projectSlug` is required to identify which project the event belongs to\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "get_event_stacktrace",
+        "description": "Get a full thread stacktrace from a specific Sentry event.\n\nUse this tool when you need to:\n- Fetch the full stacktrace for a thread listed in issue details\n- Inspect a non-crashed thread from an event with multiple threads\n- Get Sentry's default selected thread stacktrace when no thread is specified\n\n<examples>\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123')\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', eventId='abc123', thread=259)\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', thread='main')\n</examples>\n\n<hints>\n- `thread` is optional. If omitted, this returns the same default thread Sentry selects: first crashed thread, then first thread with a stacktrace, then first thread.\n- Pass `thread` as a numeric Thread ID or exact thread Name from the issue details thread list.\n- If the issue details show only one useful thread, omit `thread`.\n</hints>",
         "requiredScopes": ["event:read"]
       },
       {
@@ -165,7 +170,7 @@
     "description": "Sentry's AI debugger that helps you analyze, root cause, and fix issues",
     "defaultEnabled": true,
     "order": 2,
-    "toolCount": 9,
+    "toolCount": 10,
     "tools": [
       {
         "name": "analyze_issue_with_seer",
@@ -186,6 +191,11 @@
         "name": "get_ai_conversation_details",
         "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'.",
         "requiredScopes": ["event:read", "project:read"]
+      },
+      {
+        "name": "get_event_stacktrace",
+        "description": "Get a full thread stacktrace from a specific Sentry event.\n\nUse this tool when you need to:\n- Fetch the full stacktrace for a thread listed in issue details\n- Inspect a non-crashed thread from an event with multiple threads\n- Get Sentry's default selected thread stacktrace when no thread is specified\n\n<examples>\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123')\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', eventId='abc123', thread=259)\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', thread='main')\n</examples>\n\n<hints>\n- `thread` is optional. If omitted, this returns the same default thread Sentry selects: first crashed thread, then first thread with a stacktrace, then first thread.\n- Pass `thread` as a numeric Thread ID or exact thread Name from the issue details thread list.\n- If the issue details show only one useful thread, omit `thread`.\n</hints>",
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "get_issue_details",
@@ -256,7 +266,7 @@
     "description": "Resolve, assign, and update issues",
     "defaultEnabled": false,
     "order": 4,
-    "toolCount": 13,
+    "toolCount": 14,
     "tools": [
       {
         "name": "add_issue_note",
@@ -282,6 +292,11 @@
         "name": "get_ai_conversation_details",
         "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'.",
         "requiredScopes": ["event:read", "project:read"]
+      },
+      {
+        "name": "get_event_stacktrace",
+        "description": "Get a full thread stacktrace from a specific Sentry event.\n\nUse this tool when you need to:\n- Fetch the full stacktrace for a thread listed in issue details\n- Inspect a non-crashed thread from an event with multiple threads\n- Get Sentry's default selected thread stacktrace when no thread is specified\n\n<examples>\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123')\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', eventId='abc123', thread=259)\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', thread='main')\n</examples>\n\n<hints>\n- `thread` is optional. If omitted, this returns the same default thread Sentry selects: first crashed thread, then first thread with a stacktrace, then first thread.\n- Pass `thread` as a numeric Thread ID or exact thread Name from the issue details thread list.\n- If the issue details show only one useful thread, omit `thread`.\n</hints>",
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "get_issue_activity",

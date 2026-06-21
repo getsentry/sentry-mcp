@@ -911,6 +911,59 @@
     "surface": "catalog"
   },
   {
+    "name": "get_event_stacktrace",
+    "description": "Get a full thread stacktrace from a specific Sentry event.\n\nUse this tool when you need to:\n- Fetch the full stacktrace for a thread listed in issue details\n- Inspect a non-crashed thread from an event with multiple threads\n- Get Sentry's default selected thread stacktrace when no thread is specified\n\n<examples>\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123')\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', eventId='abc123', thread=259)\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', thread='main')\n</examples>\n\n<hints>\n- `thread` is optional. If omitted, this returns the same default thread Sentry selects: first crashed thread, then first thread with a stacktrace, then first thread.\n- Pass `thread` as a numeric Thread ID or exact thread Name from the issue details thread list.\n- If the issue details show only one useful thread, omit `thread`.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "issueId": {
+          "type": "string",
+          "description": "The Issue ID. e.g. `PROJECT-1Z43`"
+        },
+        "eventId": {
+          "type": "string",
+          "default": "latest",
+          "description": "The event ID for the issue. Defaults to `latest`."
+        },
+        "thread": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "description": "Optional thread selector. Pass a numeric thread ID, or an exact thread name string. If omitted, returns the same default thread Sentry selects: first crashed thread, then first thread with a stacktrace, then first thread."
+        }
+      },
+      "required": ["organizationSlug", "issueId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["event:read"],
+    "skills": ["inspect", "triage", "seer"],
+    "surface": "catalog"
+  },
+  {
     "name": "get_issue_activity",
     "description": "Get the activity feed and comments for a Sentry issue.\n\nUse this tool when you need to:\n- Review prior comments before triaging an issue\n- Understand who resolved, ignored, assigned, or commented on an issue\n- See recent issue activity that is not included in `get_issue_details`\n\n<examples>\nget_issue_activity(organizationSlug='my-organization', issueId='PROJECT-123')\nget_issue_activity(issueUrl='https://my-organization.sentry.io/issues/PROJECT-123/')\n</examples>",
     "inputSchema": {

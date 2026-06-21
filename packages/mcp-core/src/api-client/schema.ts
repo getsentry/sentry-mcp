@@ -809,18 +809,28 @@ export const MessageEntrySchema = z
   })
   .partial();
 
+const StacktraceSchema = z
+  .object({
+    frames: z.array(FrameInterface),
+    framesOmitted: z.array(z.unknown()).nullable().optional(),
+    registers: z.record(z.unknown()).nullable().optional(),
+    hasSystemFrames: z.boolean().nullable().optional(),
+  })
+  .partial()
+  .extend({
+    frames: z.array(FrameInterface),
+  });
+
 export const ThreadEntrySchema = z
   .object({
-    id: z.number().nullable(),
+    id: z.union([z.number(), z.string()]).nullable(),
     name: z.string().nullable(),
     current: z.boolean().nullable(),
     crashed: z.boolean().nullable(),
     state: z.string().nullable(),
-    stacktrace: z
-      .object({
-        frames: z.array(FrameInterface),
-      })
-      .nullable(),
+    heldLocks: z.record(z.unknown()).nullable().optional(),
+    stacktrace: StacktraceSchema.nullable(),
+    rawStacktrace: StacktraceSchema.nullable().optional(),
   })
   .partial();
 
