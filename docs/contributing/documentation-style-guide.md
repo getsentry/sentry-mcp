@@ -181,7 +181,7 @@ all dependencies. Make sure to create your .env file with the required variables
 ```markdown
 ## Environment Setup
 
-Required: Node.js 20+, pnpm
+Required: Node.js 22.13+, pnpm
 
 ```bash
 pnpm install

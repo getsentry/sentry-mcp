@@ -3,9 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.15.1",
+  "packageManager": "pnpm@11.8.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "license": "FSL-1.1-ALv2",
   "author": "Sentry",
@@ -68,22 +68,6 @@
       "biome format --write --no-errors-on-unmatched --files-ignore-unknown=true",
       "biome lint --fix --no-errors-on-unmatched --files-ignore-unknown=true"
     ]
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@ast-grep/cli",
-      "@biomejs/biome",
-      "better-sqlite3",
-      "esbuild",
-      "sharp",
-      "simple-git-hooks",
-      "workerd"
-    ],
-    "overrides": {
-      "@modelcontextprotocol/sdk": "^1.26.0",
-      "fast-xml-parser": "5.7.2",
-      "undici": "^7.24.4"
-    }
   },
   "devDependencies": {
     "@types/json-schema": "^7.0.15"

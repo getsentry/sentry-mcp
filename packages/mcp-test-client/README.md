@@ -14,7 +14,7 @@ A simple CLI tool to test the Sentry MCP server using stdio transport with an AI
 
 ## Prerequisites
 
-- Node.js >= 20
+- Node.js >= 22.13
 - pnpm package manager
 - OpenAI API key for prompt/agent mode
 - Sentry access token with appropriate permissions for token-based stdio mode
