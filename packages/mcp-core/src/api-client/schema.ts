@@ -812,9 +812,9 @@ export const MessageEntrySchema = z
 const StacktraceSchema = z
   .object({
     frames: z.array(FrameInterface),
-    framesOmitted: z.array(z.unknown()).optional(),
+    framesOmitted: z.array(z.unknown()).nullable().optional(),
     registers: z.record(z.unknown()).nullable().optional(),
-    hasSystemFrames: z.boolean().optional(),
+    hasSystemFrames: z.boolean().nullable().optional(),
   })
   .partial()
   .extend({

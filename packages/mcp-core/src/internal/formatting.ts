@@ -750,7 +750,7 @@ export function formatThreadStacktraceOutput({
 }
 
 function formatFramesOmitted(
-  framesOmitted: unknown[] | undefined,
+  framesOmitted: unknown[] | null | undefined,
 ): string | null {
   if (!framesOmitted?.length) {
     return null;

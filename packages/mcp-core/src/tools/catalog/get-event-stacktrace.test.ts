@@ -180,6 +180,46 @@ describe("get_event_stacktrace", () => {
     );
   });
 
+  it("handles nullable stacktrace metadata from Sentry", async () => {
+    setupThreadMocks(
+      createDefaultEvent({
+        id: "event-with-null-stacktrace-metadata",
+        platform: "java",
+        entries: [
+          {
+            type: "threads",
+            data: {
+              values: [
+                {
+                  id: 20,
+                  name: "main",
+                  crashed: true,
+                  stacktrace: {
+                    frames: [
+                      {
+                        filename: "Worker.java",
+                        module: "com.example.Worker",
+                        function: "run",
+                        lineNo: 42,
+                      },
+                    ],
+                    framesOmitted: null,
+                    hasSystemFrames: null,
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+
+    const result = await callHandler();
+
+    expect(result).toContain("**Thread ID**: 20");
+    expect(result).toContain("at com.example.Worker.run(Worker.java:42)");
+  });
+
   it("falls back to the first thread with frames when no thread crashed", async () => {
     setupThreadMocks(
       createDefaultEvent({
