@@ -11,6 +11,7 @@ import getMonitorDetails from "./get-monitor-details";
 import findAlertRules from "./find-alert-rules";
 import getAlertRule from "./get-alert-rule";
 import getIssueDetails from "./get-issue-details";
+import getEventStacktrace from "./get-event-stacktrace";
 import getIssueActivity from "./get-issue-activity";
 import getIssueTagValues from "./get-issue-tag-values";
 import getTraceDetails from "./get-trace-details";
@@ -62,6 +63,7 @@ const catalogTools = {
   find_alert_rules: findAlertRules,
   get_alert_rule: getAlertRule,
   get_issue_details: getIssueDetails,
+  get_event_stacktrace: getEventStacktrace,
   get_issue_activity: getIssueActivity,
   get_issue_tag_values: getIssueTagValues,
   get_trace_details: getTraceDetails,

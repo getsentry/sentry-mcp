@@ -350,6 +350,161 @@ describe("get_issue_details", () => {
     expect(result).toContain("**Assigned To**: Platform Team (Team)");
   });
 
+  it("lists threads and stacktrace lookup guidance only for multi-thread events", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json(
+            createDefaultEvent({
+              id: "event-with-multiple-threads",
+              entries: [
+                {
+                  type: "message",
+                  data: {
+                    formatted: "Application crashed",
+                  },
+                },
+                {
+                  type: "threads",
+                  data: {
+                    values: [
+                      {
+                        id: 11,
+                        name: "worker",
+                        state: "WAITING",
+                        crashed: false,
+                        current: false,
+                        stacktrace: {
+                          frames: [
+                            {
+                              filename: "Worker.java",
+                              function: "waitForJob",
+                              lineNo: 12,
+                            },
+                          ],
+                        },
+                      },
+                      {
+                        id: 259,
+                        name: "main",
+                        state: "RUNNABLE",
+                        crashed: true,
+                        current: true,
+                        stacktrace: {
+                          frames: [
+                            {
+                              filename: "CheckoutActivity.java",
+                              function: "submitOrder",
+                              lineNo: 42,
+                            },
+                            {
+                              filename: "Thread.java",
+                              function: "run",
+                              lineNo: 833,
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            }),
+          ),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    const threadSection = result
+      .slice(result.indexOf("### Threads"), result.indexOf("### Tags"))
+      .trim();
+    expect(threadSection).toMatchInlineSnapshot(`
+      "### Threads
+
+      Found 2 threads in this event.
+
+      | Thread ID | Name | State | Flags | Frames |
+      | --- | --- | --- | --- | ---: |
+      | 11 | worker | WAITING | - | 1 |
+      | 259 | main | RUNNABLE | crashed, current | 2 |"
+    `);
+    expect(result).toContain(
+      "- Thread stacktrace lookup: Use the Sentry tool `get_event_stacktrace` to fetch a full thread stacktrace by numeric Thread ID or exact thread Name. Omit `thread` to use Sentry's default selected thread",
+    );
+  });
+
+  it("omits thread list and stacktrace lookup guidance for single-thread events", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json(
+            createDefaultEvent({
+              id: "event-with-one-thread",
+              entries: [
+                {
+                  type: "message",
+                  data: {
+                    formatted: "Application crashed",
+                  },
+                },
+                {
+                  type: "threads",
+                  data: {
+                    values: [
+                      {
+                        id: 259,
+                        name: "main",
+                        state: "RUNNABLE",
+                        crashed: true,
+                        current: true,
+                        stacktrace: {
+                          frames: [
+                            {
+                              filename: "CheckoutActivity.java",
+                              function: "submitOrder",
+                              lineNo: 42,
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            }),
+          ),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(result).not.toContain("### Threads");
+    expect(result).not.toContain("Thread stacktrace lookup");
+  });
+
   it("includes attached and related replays when available", async () => {
     const attachedReplayId = "7e07485f12f9416b8b1426260799b51f";
     const attachedReplayIdWithDashes = "7e07485f-12f9-416b-8b14-26260799b51f";

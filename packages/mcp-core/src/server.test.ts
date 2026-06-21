@@ -835,6 +835,7 @@ describe("buildServer", () => {
       expect(toolNames).not.toContain("create_project");
       expect(toolNames).not.toContain("find_releases");
       expect(toolNames).not.toContain("get_event_attachment");
+      expect(toolNames).not.toContain("get_event_stacktrace");
 
       const result = await callRegisteredTool(server, "search_sentry_tools", {
         query: "create project",
@@ -1065,18 +1066,19 @@ describe("buildServer", () => {
 
       const toolNames = getRegisteredToolNames(server);
       expect(toolNames).not.toContain("get_issue_details");
+      expect(toolNames).not.toContain("get_event_stacktrace");
 
       const result = await callRegisteredTool(server, "search_sentry_tools", {
-        query: "issue details",
+        query: "event stacktrace",
         limit: 5,
       });
       const payload = getStructuredContent<{
         results: Array<{ name: string }>;
       }>(result);
 
-      expect(payload.results.map((tool) => tool.name)).toContain(
-        "get_issue_details",
-      );
+      const resultNames = payload.results.map((tool) => tool.name);
+      expect(resultNames).toContain("get_issue_details");
+      expect(resultNames).toContain("get_event_stacktrace");
     });
 
     it("search_sentry_tools includes whoami as a catalog-only foundational tool", async () => {
@@ -1254,6 +1256,27 @@ describe("buildServer", () => {
 
       expect(getTextContent(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
+      );
+    });
+
+    it("execute_sentry_tool dispatches to catalog-only event stacktrace", async () => {
+      const server = buildServer({
+        context: baseContext,
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      expect(toolNames).not.toContain("get_event_stacktrace");
+
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
+        name: "get_event_stacktrace",
+        arguments: {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+        },
+      });
+
+      expect(getTextContent(result)).toContain(
+        "# Event Stacktrace in **sentry-mcp-evals**",
       );
     });
 
