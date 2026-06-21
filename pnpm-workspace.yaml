@@ -1,6 +1,26 @@
 packages:
   - packages/*
 
+allowBuilds:
+  "@ast-grep/cli": true
+  "@biomejs/biome": true
+  "@sentry/cli": false
+  "@tailwindcss/oxide": false
+  better-sqlite3: true
+  core-js: false
+  core-js-pure: false
+  esbuild: true
+  msw: false
+  sharp: true
+  simple-git-hooks: true
+  vitest-evals: false
+  workerd: true
+
+overrides:
+  "@modelcontextprotocol/sdk": ^1.26.0
+  fast-xml-parser: 5.7.2
+  undici: ^7.24.4
+
 catalog:
   "@ast-grep/cli": ^0.43.0
   "@ai-sdk/anthropic": ^3.0.33

@@ -21,7 +21,7 @@ The remote MCP server runs on Cloudflare Workers and provides HTTP-based access 
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22.13+
 - pnpm installed
 - Wrangler CLI (for Cloudflare deployment)
 - Sentry OAuth application credentials
