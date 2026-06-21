@@ -132,9 +132,13 @@ function selectSentryDefaultThread(threads: Thread[]): Thread {
   );
   return (
     sortedThreads.find((thread) => thread.crashed) ??
-    sortedThreads.find((thread) => thread.stacktrace) ??
+    sortedThreads.find((thread) => hasFrames(thread)) ??
     sortedThreads[0]!
   );
+}
+
+function hasFrames(thread: Thread): boolean {
+  return Boolean(thread.stacktrace?.frames?.length);
 }
 
 function selectUnique(

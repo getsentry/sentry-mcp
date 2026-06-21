@@ -714,8 +714,9 @@ export function formatThreadStacktraceOutput({
 
   parts.push("## Stacktrace");
   parts.push("");
-  if (thread.stacktrace?.framesOmitted?.length) {
-    parts.push(`**Frames Omitted**: ${thread.stacktrace.framesOmitted.length}`);
+  const framesOmitted = formatFramesOmitted(thread.stacktrace?.framesOmitted);
+  if (framesOmitted) {
+    parts.push(`**Frames Omitted**: ${framesOmitted}`);
     parts.push("");
   }
 
@@ -746,6 +747,26 @@ export function formatThreadStacktraceOutput({
   parts.push("");
 
   return parts.join("\n");
+}
+
+function formatFramesOmitted(
+  framesOmitted: unknown[] | undefined,
+): string | null {
+  if (!framesOmitted?.length) {
+    return null;
+  }
+
+  const [firstOmitted, lastOmitted] = framesOmitted;
+  if (
+    typeof firstOmitted === "number" &&
+    typeof lastOmitted === "number" &&
+    Number.isFinite(firstOmitted) &&
+    Number.isFinite(lastOmitted)
+  ) {
+    return String(Math.max(0, lastOmitted - firstOmitted));
+  }
+
+  return null;
 }
 
 /**

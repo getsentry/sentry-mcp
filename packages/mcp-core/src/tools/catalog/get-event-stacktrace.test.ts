@@ -46,6 +46,7 @@ const eventWithThreads = createDefaultEvent({
                   lineNo: 12,
                 },
               ],
+              framesOmitted: [10, 510],
               hasSystemFrames: false,
             },
           },
@@ -173,9 +174,57 @@ describe("get_event_stacktrace", () => {
     const result = await callHandler({ thread: 11 });
 
     expect(result).toContain("**Thread ID**: 11");
+    expect(result).toContain("**Frames Omitted**: 500");
     expect(result).toContain(
       "at com.example.Worker.waitForJob(Worker.java:12)",
     );
+  });
+
+  it("falls back to the first thread with frames when no thread crashed", async () => {
+    setupThreadMocks(
+      createDefaultEvent({
+        id: "event-with-empty-stacktrace",
+        platform: "java",
+        entries: [
+          {
+            type: "threads",
+            data: {
+              values: [
+                {
+                  id: 10,
+                  name: "empty",
+                  crashed: false,
+                  stacktrace: {
+                    frames: [],
+                  },
+                },
+                {
+                  id: 20,
+                  name: "usable",
+                  crashed: false,
+                  stacktrace: {
+                    frames: [
+                      {
+                        filename: "Worker.java",
+                        module: "com.example.Worker",
+                        function: "run",
+                        lineNo: 42,
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+
+    const result = await callHandler();
+
+    expect(result).toContain("**Thread ID**: 20");
+    expect(result).toContain("**Name**: usable");
+    expect(result).toContain("at com.example.Worker.run(Worker.java:42)");
   });
 
   it("selects a thread by exact name", async () => {
