@@ -349,9 +349,53 @@ export function registerFetchMockInterceptors(fetchMock: FetchMockLike) {
         const attributeType = url.searchParams.get("attributeType");
 
         if (!itemType || !attributeType) {
+          if (!itemType) {
+            return {
+              statusCode: 400,
+              data: { detail: "Missing parameters" },
+              responseOptions: { headers: JSON_HEADERS },
+            };
+          }
+
+          const normalizedItemType = itemType === "spans" ? "span" : itemType;
+
+          if (normalizedItemType === "span") {
+            return {
+              statusCode: 200,
+              data: [
+                ...traceItemsAttributesSpansStringFixture.map((attribute) => ({
+                  ...attribute,
+                  attributeType: "string",
+                })),
+                ...traceItemsAttributesSpansNumberFixture.map((attribute) => ({
+                  ...attribute,
+                  attributeType: "number",
+                })),
+              ],
+              responseOptions: { headers: JSON_HEADERS },
+            };
+          }
+
+          if (normalizedItemType === "logs") {
+            return {
+              statusCode: 200,
+              data: [
+                ...traceItemsAttributesLogsStringFixture.map((attribute) => ({
+                  ...attribute,
+                  attributeType: "string",
+                })),
+                ...traceItemsAttributesLogsNumberFixture.map((attribute) => ({
+                  ...attribute,
+                  attributeType: "number",
+                })),
+              ],
+              responseOptions: { headers: JSON_HEADERS },
+            };
+          }
+
           return {
             statusCode: 400,
-            data: { detail: "Missing parameters" },
+            data: { detail: "Invalid itemType" },
             responseOptions: { headers: JSON_HEADERS },
           };
         }
