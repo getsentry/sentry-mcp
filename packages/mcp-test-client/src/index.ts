@@ -71,6 +71,7 @@ program
         dsn: sentryDsn,
         sendDefaultPii: true,
         tracesSampleRate: 1,
+        traceLifecycle: "stream",
         beforeSend: sentryBeforeSend,
         initialScope: {
           tags: {

@@ -10,6 +10,7 @@ export default function getSentryConfig(env: Env): CloudflareOptions {
   return {
     dsn: env.SENTRY_DSN,
     tracesSampleRate: 1,
+    traceLifecycle: "stream",
     sendDefaultPii: true,
     beforeSend: sentryBeforeSend,
     initialScope: {
