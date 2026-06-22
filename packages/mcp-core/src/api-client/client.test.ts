@@ -1058,7 +1058,7 @@ describe("API query builders", () => {
       });
 
       expect(params.toString()).toMatchInlineSnapshot(
-        `"per_page=50&query=level%3Aerror&dataset=errors&statsPeriod=24h&project=backend&sort=-count&field=title&field=project&field=count%28%29"`,
+        `"per_page=50&query=level%3Aerror&dataset=errors&statsPeriod=24h&project=backend&sort=-count&field=title&field=project&field=count%28%29&referrer=api.mcp.search-events"`,
       );
     });
 
@@ -1143,7 +1143,7 @@ describe("API query builders", () => {
       });
 
       expect(params.toString()).toMatchInlineSnapshot(
-        `"per_page=20&query=span.op%3Adb&dataset=spans&statsPeriod=1h&project=frontend&sampling=NORMAL&sort=-span.duration&field=span.op&field=span.description&field=span.duration"`,
+        `"per_page=20&query=span.op%3Adb&dataset=spans&statsPeriod=1h&project=frontend&sampling=NORMAL&sort=-span.duration&field=span.op&field=span.description&field=span.duration&referrer=api.mcp.search-events"`,
       );
     });
 
@@ -1160,7 +1160,7 @@ describe("API query builders", () => {
       });
 
       expect(params.toString()).toMatchInlineSnapshot(
-        `"per_page=30&query=severity%3Aerror&dataset=logs&sort=-timestamp&field=timestamp&field=message&field=severity"`,
+        `"per_page=30&query=severity%3Aerror&dataset=logs&sort=-timestamp&field=timestamp&field=message&field=severity&referrer=api.mcp.search-events"`,
       );
 
       // Verify sampling is not added for logs
@@ -1217,6 +1217,10 @@ describe("API query builders", () => {
         expect.stringContaining("sort=-count"),
         expect.any(Object),
       );
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("referrer=api.mcp.search-events"),
+        expect.any(Object),
+      );
     });
 
     it("should route spans dataset to EAP API builder with sampling", async () => {
@@ -1249,6 +1253,10 @@ describe("API query builders", () => {
       );
       expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining("sampling=NORMAL"),
+        expect.any(Object),
+      );
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("referrer=api.mcp.search-events"),
         expect.any(Object),
       );
     });

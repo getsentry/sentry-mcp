@@ -131,6 +131,8 @@ import type {
 // logger isnt exposed (or rather, it is, but its not the right logger)
 // import { logger } from "@sentry/node";
 
+const SENTRY_MCP_SEARCH_EVENTS_REFERRER = "api.mcp.search-events";
+
 /**
  * Mapping of common network error codes to user-friendly messages.
  * These help users understand and resolve connection issues.
@@ -3735,6 +3737,8 @@ export class SentryApiService {
       queryParams.append("field", field);
     }
 
+    queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);
+
     return queryParams;
   }
 
@@ -3801,6 +3805,8 @@ export class SentryApiService {
     for (const field of params.fields) {
       queryParams.append("field", field);
     }
+
+    queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);
 
     return queryParams;
   }
