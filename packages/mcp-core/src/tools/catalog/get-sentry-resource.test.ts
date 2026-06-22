@@ -50,7 +50,8 @@ function callHandler(params: {
     | "replay"
     | "monitor"
     | "snapshot"
-    | "snapshotImage";
+    | "snapshotImage"
+    | "dashboard";
   resourceId?: string;
   organizationSlug?: string;
 }) {
@@ -728,6 +729,44 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(
         "[Open Release](http://sentry.internal:9000/organizations/my-org/releases/v1.2.3/)",
       );
+    });
+  });
+
+  // ─── URL mode: dashboard URLs ──────────────────────────────────────────────
+  describe("URL mode — dashboard URLs", () => {
+    it("dispatches dashboard URL to get_dashboard_details", async () => {
+      const result = await callHandler({
+        url: "https://sentry-mcp-evals.sentry.io/dashboard/101/",
+      });
+      expect(result).toContain(
+        "# Dashboard Errors Overview in **sentry-mcp-evals**",
+      );
+      expect(result).toContain("**ID**: 101");
+      expect(result).toContain("[Open Dashboard]");
+    });
+
+    it("dispatches explicit dashboard resourceType to get_dashboard_details", async () => {
+      const result = await callHandler({
+        resourceType: "dashboard",
+        resourceId: "101",
+        organizationSlug: "sentry-mcp-evals",
+      });
+      expect(result).toContain(
+        "# Dashboard Errors Overview in **sentry-mcp-evals**",
+      );
+      expect(result).toContain("**ID**: 101");
+    });
+
+    it("rejects dashboard URL when get_dashboard_details is not available", async () => {
+      await expect(
+        getSentryResource.handler(
+          { url: "https://sentry-mcp-evals.sentry.io/dashboard/101/" },
+          {
+            ...baseContext,
+            availableToolNames: new Set(["get_sentry_resource"]),
+          },
+        ),
+      ).rejects.toThrow("Dashboard resources require the inspect skill");
     });
   });
 
