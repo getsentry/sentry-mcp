@@ -1083,7 +1083,7 @@ export const EventsResponseSchema = z.object({
     .passthrough(),
 });
 
-// https://us.sentry.io/api/0/organizations/sentry/events/?dataset=errors&field=issue&field=title&field=project&field=timestamp&field=trace&per_page=5&query=event.type%3Aerror&referrer=sentry-mcp&sort=-timestamp&statsPeriod=1w
+// https://us.sentry.io/api/0/organizations/sentry/events/?dataset=errors&field=issue&field=title&field=project&field=timestamp&field=trace&per_page=5&query=event.type%3Aerror&referrer=api.mcp.search-events&sort=-timestamp&statsPeriod=1w
 export const ErrorsSearchResponseSchema = EventsResponseSchema.extend({
   data: z.array(
     z.object({
