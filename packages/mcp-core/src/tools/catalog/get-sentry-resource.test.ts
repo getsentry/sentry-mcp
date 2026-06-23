@@ -745,10 +745,22 @@ describe("get_sentry_resource", () => {
       expect(result).toContain("[Open Dashboard]");
     });
 
-    it("dispatches explicit dashboard resourceType to get_dashboard_details", async () => {
+    it("dispatches explicit dashboard resourceType to get_dashboard_details by ID", async () => {
       const result = await callHandler({
         resourceType: "dashboard",
         resourceId: "101",
+        organizationSlug: "sentry-mcp-evals",
+      });
+      expect(result).toContain(
+        "# Dashboard Errors Overview in **sentry-mcp-evals**",
+      );
+      expect(result).toContain("**ID**: 101");
+    });
+
+    it("dispatches explicit dashboard resourceType to get_dashboard_details by title", async () => {
+      const result = await callHandler({
+        resourceType: "dashboard",
+        resourceId: "Errors Overview",
         organizationSlug: "sentry-mcp-evals",
       });
       expect(result).toContain(

@@ -83,7 +83,7 @@ export interface ResolvedResourceParams {
   snapshotId?: string;
   selectedSnapshot?: string;
   // Dashboard params
-  dashboardId?: string;
+  dashboardIdOrTitle?: string;
 }
 
 export function resolveResourceParams(params: {
@@ -212,7 +212,7 @@ export function resolveResourceParams(params: {
       return {
         type: "dashboard",
         organizationSlug,
-        dashboardId: resourceId,
+        dashboardIdOrTitle: resourceId,
       };
   }
 }
@@ -422,7 +422,7 @@ function resolveFromParsedUrl(
       return {
         type: "dashboard",
         organizationSlug,
-        dashboardId: parsed.dashboardId,
+        dashboardIdOrTitle: parsed.dashboardId,
       };
   }
 }
@@ -562,7 +562,7 @@ export default defineTool({
     const resourceIds = [
       "- span: <traceId>:<spanId>",
       ...(monitorResourcesAvailable ? ["- monitor: <monitorSlug>"] : []),
-      "- dashboard: <dashboardId>",
+      "- dashboard: <dashboardId or title>",
       "- snapshot: <snapshotId>",
       "- snapshotImage: <snapshotId>:<image_file_name>",
     ];
@@ -620,7 +620,7 @@ export default defineTool({
       ])
       .optional()
       .describe(
-        "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL. Use `monitor` with a monitor slug only when inspect monitor tools are available, `snapshot` with a snapshot artifact ID, `snapshotImage` with `<snapshotId>:<image_file_name>`, or `dashboard` with a numeric dashboard ID when inspect dashboard tools are available.",
+        "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL. Use `monitor` with a monitor slug only when inspect monitor tools are available, `snapshot` with a snapshot artifact ID, `snapshotImage` with `<snapshotId>:<image_file_name>`, or `dashboard` with a dashboard ID or exact title when inspect dashboard tools are available.",
       ),
 
     resourceId: z
@@ -804,7 +804,7 @@ export default defineTool({
         return getDashboardDetails.handler(
           {
             organizationSlug: resolved.organizationSlug,
-            dashboardIdOrTitle: resolved.dashboardId!,
+            dashboardIdOrTitle: resolved.dashboardIdOrTitle!,
             regionUrl: context.constraints.regionUrl ?? null,
           },
           context,
