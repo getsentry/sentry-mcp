@@ -671,10 +671,7 @@ export default defineTool({
     // changes the GROUP BY and silently corrupts the result. Better to let
     // Sentry's 400 propagate so the caller can fix the request explicitly.
     //
-    // Note: fields remain in function form (e.g. "count_unique(user.id)") and
-    // sortParam is also pre-normalization here. The API client normalizes
-    // aggregate sort params to underscore form (e.g. "count_unique_user_id")
-    // later, so an exact string match against fields is correct at this stage.
+    // Note: fields and sortParam use the same function syntax sent to the API.
     fields = augmentFieldsWithSort(fields, sortParam);
 
     const requestFields = buildRequestFields(dataset, fields);

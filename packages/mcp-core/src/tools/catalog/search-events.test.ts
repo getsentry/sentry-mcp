@@ -205,7 +205,7 @@ describe("search_events", () => {
           expect(url.searchParams.get("dataset")).toBe("spans");
           expect(url.searchParams.get("query")).toBe(query);
           expect(url.searchParams.getAll("field")).toEqual(fields);
-          expect(url.searchParams.get("sort")).toBe("-count");
+          expect(url.searchParams.get("sort")).toBe("-count()");
           expect(url.searchParams.get("statsPeriod")).toBe("7d");
 
           return HttpResponse.json({
@@ -401,7 +401,7 @@ describe("search_events", () => {
           expect(url.searchParams.get("dataset")).toBe("spans");
           expect(url.searchParams.get("query")).toBe(query);
           expect(url.searchParams.getAll("field")).toEqual(fields);
-          expect(url.searchParams.get("sort")).toBe("-count");
+          expect(url.searchParams.get("sort")).toBe("-count()");
           expect(url.searchParams.get("statsPeriod")).toBe("7d");
 
           return HttpResponse.json({
@@ -593,9 +593,7 @@ describe("search_events", () => {
     );
 
     expect(mockGenerateText).not.toHaveBeenCalled();
-    // The API client normalizes aggregate sort params: count_unique(user.id)
-    // becomes count_unique_user_id. Fields keep their original form.
-    expect(capturedSort).toBe("-count_unique_user_id");
+    expect(capturedSort).toBe("-count_unique(user.id)");
     expect(capturedFields).toEqual([
       "span.op",
       "count()",
@@ -2223,7 +2221,7 @@ describe("search_events", () => {
           expect(url.searchParams.get("query")).toBe(
             "has:gen_ai.tool.name AND has:user_agent.original",
           );
-          expect(url.searchParams.get("sort")).toBe("-count"); // API transforms count() to count
+          expect(url.searchParams.get("sort")).toBe("-count()");
           expect(url.searchParams.get("statsPeriod")).toBe("24h");
           // Verify it's using user_agent.original, not user.id
           expect(url.searchParams.getAll("field")).toContain(
