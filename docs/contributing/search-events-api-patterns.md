@@ -73,12 +73,12 @@ Returns grouped and aggregated data, similar to SQL GROUP BY queries.
 
 Single groupBy field:
 ```
-https://us.sentry.io/api/0/organizations/sentry/events/?dataset=spans&field=ai.model.id&field=count()&per_page=50&query=&sort=-count&statsPeriod=24h
+https://us.sentry.io/api/0/organizations/sentry/events/?dataset=spans&field=ai.model.id&field=count()&per_page=50&query=&sort=-count()&statsPeriod=24h
 ```
 
 Multiple groupBy fields:
 ```
-https://us.sentry.io/api/0/organizations/sentry/events/?dataset=spans&field=ai.model.id&field=ai.model.provider&field=sum(span.duration)&per_page=50&query=&sort=-sum_span_duration&statsPeriod=24h
+https://us.sentry.io/api/0/organizations/sentry/events/?dataset=spans&field=ai.model.id&field=ai.model.provider&field=sum(span.duration)&per_page=50&query=&sort=-sum(span.duration)&statsPeriod=24h
 ```
 
 ## Query Parameters
@@ -228,7 +228,6 @@ Dataset: spans
 2. **Wrong sort field**: The field you sort by must be included in the fields array
 3. **Timestamp filters on logs**: Use `statsPeriod` parameter instead of query filters
 4. **Using project slugs**: API requires numeric project IDs, not slugs
-5. **Tracemetrics sort mangling**: Do not rewrite `-p95(value,...)` into Discover-style aliases; the raw aggregate expression must be preserved
 
 ## Web UI URL Generation
 

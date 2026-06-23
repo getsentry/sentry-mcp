@@ -1058,11 +1058,11 @@ describe("API query builders", () => {
       });
 
       expect(params.toString()).toMatchInlineSnapshot(
-        `"per_page=50&query=level%3Aerror&dataset=errors&statsPeriod=24h&project=backend&sort=-count&field=title&field=project&field=count%28%29&referrer=api.mcp.search-events"`,
+        `"per_page=50&query=level%3Aerror&dataset=errors&statsPeriod=24h&project=backend&sort=-count%28%29&field=title&field=project&field=count%28%29&referrer=api.mcp.search-events"`,
       );
     });
 
-    it("should transform aggregate sort parameters correctly", () => {
+    it("should pass aggregate sort parameters through unchanged", () => {
       const apiService = new SentryApiService({ host: "sentry.io" });
 
       // @ts-expect-error - accessing private method for testing
@@ -1073,10 +1073,10 @@ describe("API query builders", () => {
         sort: "-count(span.duration)",
       });
 
-      expect(params.get("sort")).toBe("-count_span_duration");
+      expect(params.get("sort")).toBe("-count(span.duration)");
     });
 
-    it("should handle empty aggregate functions in sort", () => {
+    it("should pass empty aggregate functions in sort through unchanged", () => {
       const apiService = new SentryApiService({ host: "sentry.io" });
 
       // @ts-expect-error - accessing private method for testing
@@ -1087,10 +1087,10 @@ describe("API query builders", () => {
         sort: "-count()",
       });
 
-      expect(params.get("sort")).toBe("-count");
+      expect(params.get("sort")).toBe("-count()");
     });
 
-    it("should safely handle malformed sort parameters", () => {
+    it("should pass malformed sort parameters through unchanged", () => {
       const apiService = new SentryApiService({ host: "sentry.io" });
 
       // @ts-expect-error - accessing private method for testing
@@ -1101,11 +1101,11 @@ describe("API query builders", () => {
         sort: "-count(((",
       });
 
-      // Should not crash and should return the original sort if malformed
+      // Should not crash and should return the original sort
       expect(params.get("sort")).toBe("-count(((");
     });
 
-    it("should preserve raw sort parameters for tracemetrics", () => {
+    it("should preserve sort parameters for tracemetrics", () => {
       const apiService = new SentryApiService({ host: "sentry.io" });
 
       // @ts-expect-error - accessing private method for testing
@@ -1167,7 +1167,7 @@ describe("API query builders", () => {
       expect(params.has("sampling")).toBe(false);
     });
 
-    it("should transform complex aggregate sorts with dots", () => {
+    it("should pass aggregate sorts with dots through unchanged", () => {
       const apiService = new SentryApiService({ host: "sentry.io" });
 
       // @ts-expect-error - accessing private method for testing
@@ -1179,7 +1179,7 @@ describe("API query builders", () => {
         sort: "-avg(span.self_time)",
       });
 
-      expect(params.get("sort")).toBe("-avg_span_self_time");
+      expect(params.get("sort")).toBe("-avg(span.self_time)");
     });
   });
 
@@ -1214,7 +1214,7 @@ describe("API query builders", () => {
         expect.any(Object),
       );
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("sort=-count"),
+        expect.stringContaining("sort=-count%28%29"),
         expect.any(Object),
       );
       expect(globalThis.fetch).toHaveBeenCalledWith(
