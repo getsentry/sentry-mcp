@@ -3708,29 +3708,7 @@ export class SentryApiService {
       queryParams.set("project", params.projectId);
     }
 
-    // Sort parameter transformation for API compatibility
-    let apiSort = params.sort;
-    // Skip transformation for equation fields - they should be passed as-is
-    if (
-      params.dataset !== "tracemetrics" &&
-      params.sort?.includes("(") &&
-      !params.sort?.includes("equation|")
-    ) {
-      // Transform: count(field) -> count_field, count() -> count
-      // Use safer string manipulation to avoid ReDoS
-      const parenStart = params.sort.indexOf("(");
-      const parenEnd = params.sort.indexOf(")", parenStart);
-      if (parenStart !== -1 && parenEnd !== -1) {
-        const beforeParen = params.sort.substring(0, parenStart);
-        const insideParen = params.sort.substring(parenStart + 1, parenEnd);
-        const afterParen = params.sort.substring(parenEnd + 1);
-        const transformedInside = insideParen
-          ? `_${insideParen.replace(/\./g, "_")}`
-          : "";
-        apiSort = beforeParen + transformedInside + afterParen;
-      }
-    }
-    queryParams.set("sort", apiSort);
+    queryParams.set("sort", params.sort);
 
     // Add fields
     for (const field of params.fields) {
@@ -3781,25 +3759,7 @@ export class SentryApiService {
       queryParams.set("sampling", "NORMAL");
     }
 
-    // Sort parameter transformation for API compatibility
-    let apiSort = params.sort;
-    // Skip transformation for equation fields - they should be passed as-is
-    if (params.sort?.includes("(") && !params.sort?.includes("equation|")) {
-      // Transform: count(field) -> count_field, count() -> count
-      // Use safer string manipulation to avoid ReDoS
-      const parenStart = params.sort.indexOf("(");
-      const parenEnd = params.sort.indexOf(")", parenStart);
-      if (parenStart !== -1 && parenEnd !== -1) {
-        const beforeParen = params.sort.substring(0, parenStart);
-        const insideParen = params.sort.substring(parenStart + 1, parenEnd);
-        const afterParen = params.sort.substring(parenEnd + 1);
-        const transformedInside = insideParen
-          ? `_${insideParen.replace(/\./g, "_")}`
-          : "";
-        apiSort = beforeParen + transformedInside + afterParen;
-      }
-    }
-    queryParams.set("sort", apiSort);
+    queryParams.set("sort", params.sort);
 
     // Add fields
     for (const field of params.fields) {
