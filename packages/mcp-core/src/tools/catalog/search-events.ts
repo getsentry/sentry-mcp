@@ -531,6 +531,8 @@ export default defineTool({
         organizationSlug,
         apiService,
         projectId,
+        dataset: inputDataset,
+        statsPeriod: params.statsPeriod,
       });
 
       const parsed = agentResult.result;
@@ -738,6 +740,8 @@ export default defineTool({
               organizationSlug,
               apiService,
               projectId,
+              dataset,
+              ...timeParams,
             });
 
             const parsed = agentResult.result;

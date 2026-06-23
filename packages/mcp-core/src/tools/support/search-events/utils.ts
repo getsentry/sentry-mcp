@@ -17,7 +17,12 @@ import {
   isPlainObject,
 } from "../../../internal/user-formatting";
 import {
+  discoverDatasetFields,
+  type DatasetFieldsResult,
+} from "../../../internal/agents/tools/dataset-fields";
+import {
   type EventsDataset,
+  type PublicEventsDataset,
   PUBLIC_EVENTS_DATASETS,
   normalizeEventsDataset,
 } from "../../../utils/events-datasets";
@@ -697,6 +702,173 @@ export async function assertEventsSearchIsValid(
   }
 }
 
+export function formatReplayFieldCatalog(result: DatasetFieldsResult): string {
+  const fieldLines = result.fields
+    .slice(0, 50)
+    .map((field) => {
+      const examples =
+        field.examples && field.examples.length > 0
+          ? ` (e.g. ${field.examples.join(", ")})`
+          : "";
+      return `- ${field.key}: ${field.name}${examples}`;
+    })
+    .join("\n");
+
+  const patternLines = result.commonPatterns
+    .map((pattern) => `- ${pattern.pattern}: ${pattern.description}`)
+    .join("\n");
+
+  return `Dataset: replays
+
+Available Fields (${result.fields.length} total):
+${fieldLines}
+${result.fields.length > 50 ? `\n... and ${result.fields.length - 50} more fields` : ""}
+
+Common Replay Query Patterns:
+${patternLines}
+
+Use these fields and patterns when constructing the replay query.`;
+}
+
+export async function buildDatasetAttributesCatalog(options: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  dataset: PublicEventsDataset;
+  projectId?: string;
+  statsPeriod?: string;
+  start?: string;
+  end?: string;
+  substringMatch?: string;
+  query?: string;
+  attributeTypes?: TraceItemAttributeType[];
+}): Promise<string> {
+  const {
+    BASE_COMMON_FIELDS,
+    DATASET_FIELDS,
+    RECOMMENDED_FIELDS,
+    NUMERIC_FIELDS,
+    DATASET_EXAMPLES,
+  } = await import("./config");
+
+  const {
+    apiService,
+    organizationSlug,
+    dataset,
+    projectId,
+    statsPeriod,
+    start,
+    end,
+    substringMatch,
+    query,
+    attributeTypes,
+  } = options;
+  const normalizedDataset = normalizeEventsDataset(dataset);
+  const attributeTimeParams = {
+    statsPeriod: statsPeriod ?? "14d",
+    start,
+    end,
+  };
+  const { attributes: customAttributes, fieldTypes } =
+    await fetchCustomAttributes(
+      apiService,
+      organizationSlug,
+      dataset,
+      projectId,
+      attributeTimeParams,
+      {
+        attributeTypes,
+        substringMatch,
+        query,
+      },
+    );
+
+  const allFields = {
+    ...BASE_COMMON_FIELDS,
+    ...DATASET_FIELDS[normalizedDataset],
+    ...customAttributes,
+  };
+  const fieldCount = Object.keys(allFields).length;
+
+  const recommendedFields = RECOMMENDED_FIELDS[normalizedDataset];
+
+  const allFieldTypes: Record<string, TraceItemAttributeType> = {
+    ...fieldTypes,
+  };
+  const staticNumericFields = NUMERIC_FIELDS[normalizedDataset] || new Set();
+  for (const field of staticNumericFields) {
+    allFieldTypes[field] = "number";
+  }
+
+  recordAgentToolResultCount(fieldCount);
+
+  return `Dataset: ${dataset}
+
+Available Fields (${fieldCount} total):
+${Object.entries(allFields)
+  .slice(0, 50) // Limit to first 50 to avoid overwhelming the agent
+  .map(([key, desc]) => `- ${key}: ${desc}`)
+  .join("\n")}
+${fieldCount > 50 ? `\n... and ${fieldCount - 50} more fields` : ""}
+
+Recommended Fields for ${dataset}:
+${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}
+
+Field Types (CRITICAL for aggregate functions):
+${Object.entries(allFieldTypes)
+  .slice(0, 30) // Show more field types since this is critical for aggregate functions
+  .map(([key, type]) => `- ${key}: ${type}`)
+  .join("\n")}
+${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldTypes).length - 30} more fields` : ""}
+
+IMPORTANT: Only use numeric aggregate functions (avg, sum, min, max, percentiles) with numeric fields. Use count() or count_unique() for non-numeric fields.
+
+EXAMPLE QUERIES FOR ${dataset.toUpperCase()}:
+${DATASET_EXAMPLES[normalizedDataset]
+  .map((ex) => `- "${ex.description}" →\n  ${JSON.stringify(ex.output)}`)
+  .join("\n\n")}
+
+Use these examples as patterns for constructing your query.`;
+}
+
+export async function buildPrefetchedFieldCatalog(options: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  dataset: PublicEventsDataset | "replays";
+  projectId?: string;
+  statsPeriod?: string;
+  start?: string;
+  end?: string;
+  substringMatch?: string;
+  query?: string;
+  attributeTypes?: TraceItemAttributeType[];
+}): Promise<string> {
+  // Replays are not events-dataset searches: they use replay tag discovery with
+  // built-in click/tap fields and replay query patterns, not trace-items
+  // attributes or DATASET_FIELDS/DATASET_EXAMPLES from config.
+  if (options.dataset === "replays") {
+    const replayFields = await discoverDatasetFields(
+      options.apiService,
+      options.organizationSlug,
+      "replays",
+      { projectId: options.projectId },
+    );
+    return formatReplayFieldCatalog(replayFields);
+  }
+
+  return buildDatasetAttributesCatalog({
+    apiService: options.apiService,
+    organizationSlug: options.organizationSlug,
+    dataset: options.dataset,
+    projectId: options.projectId,
+    statsPeriod: options.statsPeriod,
+    start: options.start,
+    end: options.end,
+    substringMatch: options.substringMatch,
+    query: options.query,
+    attributeTypes: options.attributeTypes,
+  });
+}
+
 /**
  * Create a tool for the agent to query available attributes by dataset
  * The tool is pre-bound with the API service and organization configured for the appropriate region
@@ -739,83 +911,18 @@ export function createDatasetAttributesTool(options: {
         ),
     }),
     execute: async ({ dataset, substringMatch, query, attributeTypes }) => {
-      const {
-        BASE_COMMON_FIELDS,
-        DATASET_FIELDS,
-        RECOMMENDED_FIELDS,
-        NUMERIC_FIELDS,
-        DATASET_EXAMPLES,
-      } = await import("./config");
-
-      // Get custom attributes for this dataset
       // IMPORTANT: Let ALL errors bubble up to wrapAgentToolExecute
       // UserInputError will be converted to error string for the AI agent
       // Other errors will bubble up to be captured by Sentry
-      const normalizedDataset = normalizeEventsDataset(dataset);
-      const attributeTimeParams = { statsPeriod: "14d" };
-      const { attributes: customAttributes, fieldTypes } =
-        await fetchCustomAttributes(
-          apiService,
-          organizationSlug,
-          dataset,
-          projectId,
-          attributeTimeParams,
-          {
-            attributeTypes,
-            substringMatch,
-            query,
-          },
-        );
-
-      // Combine all available fields
-      const allFields = {
-        ...BASE_COMMON_FIELDS,
-        ...DATASET_FIELDS[normalizedDataset],
-        ...customAttributes,
-      };
-      const fieldCount = Object.keys(allFields).length;
-
-      const recommendedFields = RECOMMENDED_FIELDS[normalizedDataset];
-
-      // Combine field types from both static config and dynamic API
-      const allFieldTypes: Record<string, TraceItemAttributeType> = {
-        ...fieldTypes,
-      };
-      const staticNumericFields =
-        NUMERIC_FIELDS[normalizedDataset] || new Set();
-      for (const field of staticNumericFields) {
-        allFieldTypes[field] = "number";
-      }
-
-      recordAgentToolResultCount(fieldCount);
-
-      return `Dataset: ${dataset}
-
-Available Fields (${fieldCount} total):
-${Object.entries(allFields)
-  .slice(0, 50) // Limit to first 50 to avoid overwhelming the agent
-  .map(([key, desc]) => `- ${key}: ${desc}`)
-  .join("\n")}
-${fieldCount > 50 ? `\n... and ${fieldCount - 50} more fields` : ""}
-
-Recommended Fields for ${dataset}:
-${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}
-
-Field Types (CRITICAL for aggregate functions):
-${Object.entries(allFieldTypes)
-  .slice(0, 30) // Show more field types since this is critical for aggregate functions
-  .map(([key, type]) => `- ${key}: ${type}`)
-  .join("\n")}
-${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldTypes).length - 30} more fields` : ""}
-
-IMPORTANT: Only use numeric aggregate functions (avg, sum, min, max, percentiles) with numeric fields. Use count() or count_unique() for non-numeric fields.
-
-EXAMPLE QUERIES FOR ${dataset.toUpperCase()}:
-${DATASET_EXAMPLES[normalizedDataset]
-  .map((ex) => `- "${ex.description}" →\n  ${JSON.stringify(ex.output)}`)
-  .join("\n\n")}
-
-Use these examples as patterns for constructing your query.`;
+      return buildDatasetAttributesCatalog({
+        apiService,
+        organizationSlug,
+        dataset,
+        projectId,
+        substringMatch,
+        query,
+        attributeTypes,
+      });
     },
   });
 }

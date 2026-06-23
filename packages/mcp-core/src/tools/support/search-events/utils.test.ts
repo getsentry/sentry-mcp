@@ -7,6 +7,9 @@ import {
   formatEventsValidationResults,
   formatKnownUserValue,
   looksLikeSentrySearchSyntax,
+  buildDatasetAttributesCatalog,
+  buildPrefetchedFieldCatalog,
+  formatReplayFieldCatalog,
 } from "./utils";
 import { SentryApiService } from "../../../api-client";
 import * as logging from "../../../telem/logging";
@@ -689,5 +692,145 @@ Validated Query:
 Validated Query:
 - INVALID query — Invalid syntax
 `);
+  });
+});
+
+describe("buildDatasetAttributesCatalog", () => {
+  let apiService: SentryApiService;
+
+  beforeEach(() => {
+    apiService = new SentryApiService({
+      accessToken: "test-token",
+    });
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        () =>
+          HttpResponse.json([
+            { key: "severity", name: "Severity", attributeType: "string" },
+            { key: "message", name: "Message", attributeType: "string" },
+          ]),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    mswServer.resetHandlers();
+  });
+
+  it("should include static, custom, and example fields for logs", async () => {
+    const catalog = await buildDatasetAttributesCatalog({
+      apiService,
+      organizationSlug: "test-org",
+      dataset: "logs",
+    });
+
+    expect(catalog).toContain("Dataset: logs");
+    expect(catalog).toContain("- severity: Severity");
+    expect(catalog).toContain("- message: Message");
+    expect(catalog).toContain("- severity_number: Numeric severity level");
+    expect(catalog).toContain("Recommended Fields for logs:");
+    expect(catalog).toContain("EXAMPLE QUERIES FOR LOGS");
+  });
+});
+
+describe("formatReplayFieldCatalog", () => {
+  it("should format replay fields and common query patterns", () => {
+    const catalog = formatReplayFieldCatalog({
+      dataset: "replays",
+      fields: [
+        {
+          key: "count_errors",
+          name: "Error Count",
+          totalValues: 12,
+          examples: ["0", "1", "5"],
+        },
+        {
+          key: "url",
+          name: "URL",
+          totalValues: 8,
+        },
+      ],
+      commonPatterns: [
+        {
+          pattern: "count_errors:>0",
+          description: "Replays with one or more errors",
+        },
+        {
+          pattern: "viewed_by_me:true",
+          description: "Replays viewed by the current user",
+        },
+      ],
+    });
+
+    expect(catalog).toContain("Dataset: replays");
+    expect(catalog).toContain("Available Fields (2 total):");
+    expect(catalog).toContain("- count_errors: Error Count (e.g. 0, 1, 5)");
+    expect(catalog).toContain("- url: URL");
+    expect(catalog).toContain("Common Replay Query Patterns:");
+    expect(catalog).toContain(
+      "- count_errors:>0: Replays with one or more errors",
+    );
+    expect(catalog).toContain(
+      "- viewed_by_me:true: Replays viewed by the current user",
+    );
+    expect(catalog).toContain(
+      "Use these fields and patterns when constructing the replay query.",
+    );
+  });
+
+  it("should note when more than 50 replay fields are available", () => {
+    const fields = Array.from({ length: 51 }, (_, index) => ({
+      key: `field_${index}`,
+      name: `Field ${index}`,
+      totalValues: 1,
+    }));
+
+    const catalog = formatReplayFieldCatalog({
+      dataset: "replays",
+      fields,
+      commonPatterns: [],
+    });
+
+    expect(catalog).toContain("Available Fields (51 total):");
+    expect(catalog).toContain("- field_0: Field 0");
+    expect(catalog).toContain("- field_49: Field 49");
+    expect(catalog).not.toContain("- field_50: Field 50");
+    expect(catalog).toContain("... and 1 more fields");
+  });
+});
+
+describe("buildPrefetchedFieldCatalog", () => {
+  let apiService: SentryApiService;
+
+  beforeEach(() => {
+    apiService = new SentryApiService({
+      accessToken: "test-token",
+    });
+  });
+
+  afterEach(() => {
+    mswServer.resetHandlers();
+  });
+
+  it("should build replay field catalogs from replay tags", async () => {
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/test-org/tags/", () =>
+        HttpResponse.json([
+          { key: "count_errors", name: "Error Count", totalValues: 12 },
+          { key: "url", name: "URL", totalValues: 8 },
+        ]),
+      ),
+    );
+
+    const catalog = await buildPrefetchedFieldCatalog({
+      apiService,
+      organizationSlug: "test-org",
+      dataset: "replays",
+    });
+
+    expect(catalog).toContain("Dataset: replays");
+    expect(catalog).toContain("- count_errors: Error Count");
+    expect(catalog).toContain("Common Replay Query Patterns:");
   });
 });

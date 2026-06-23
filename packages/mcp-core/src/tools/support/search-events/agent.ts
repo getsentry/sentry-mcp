@@ -4,9 +4,14 @@ import type { SentryApiService } from "../../../api-client";
 import { createOtelLookupTool } from "../../../internal/agents/tools/otel-semantics";
 import { createDatasetFieldsTool } from "../../../internal/agents/tools/dataset-fields";
 import { createWhoamiTool } from "../../../internal/agents/tools/whoami";
-import { createDatasetAttributesTool } from "./utils";
-import { systemPrompt } from "./config";
+import { logWarn } from "../../../telem/logging";
+import type { PublicEventsDataset } from "../../../utils/events-datasets";
 import { PUBLIC_EVENTS_DATASETS } from "../../../utils/events-datasets";
+import {
+  buildPrefetchedFieldCatalog,
+  createDatasetAttributesTool,
+} from "./utils";
+import { systemPrompt } from "./config";
 
 const SEARCH_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
 
@@ -81,6 +86,49 @@ export interface SearchEventsAgentOptions {
   organizationSlug: string;
   apiService: SentryApiService;
   projectId?: string;
+  dataset?: PublicEventsDataset | "replays";
+  statsPeriod?: string;
+  start?: string;
+  end?: string;
+}
+
+async function buildSearchEventsAgentPrompt(
+  options: SearchEventsAgentOptions,
+): Promise<string> {
+  const sections: string[] = [];
+
+  if (options.dataset) {
+    try {
+      const fieldCatalog = await buildPrefetchedFieldCatalog({
+        apiService: options.apiService,
+        organizationSlug: options.organizationSlug,
+        dataset: options.dataset,
+        projectId: options.projectId,
+        statsPeriod: options.statsPeriod,
+        start: options.start,
+        end: options.end,
+      });
+
+      sections.push(
+        `Prefetched field catalog for dataset "${options.dataset}":`,
+        "Construct the query using these discovered fields.",
+        "Call datasetAttributes or replayFields only for targeted substringMatch/query lookups, or if you choose a different dataset.",
+        "",
+        fieldCatalog,
+      );
+    } catch (error) {
+      logWarn(error, {
+        loggerScope: ["search-events", "prefetch-fields"],
+        extra: {
+          dataset: options.dataset,
+          organizationSlug: options.organizationSlug,
+        },
+      });
+    }
+  }
+
+  sections.push("---", "", options.query);
+  return sections.join("\n");
 }
 
 /**
@@ -112,6 +160,7 @@ export async function searchEventsAgent(
     projectId: options.projectId,
   });
   const whoamiTool = createWhoamiTool({ apiService: options.apiService });
+  const prompt = await buildSearchEventsAgentPrompt(options);
 
   // Use callEmbeddedAgent to translate the query with tool call capture
   return await callEmbeddedAgent<
@@ -119,7 +168,7 @@ export async function searchEventsAgent(
     typeof searchEventsAgentOutputSchema
   >({
     system: systemPrompt,
-    prompt: options.query,
+    prompt,
     tools: {
       datasetAttributes: datasetAttributesTool,
       replayFields: replayFieldsTool,

@@ -1813,6 +1813,60 @@ describe("search_events", () => {
     );
   });
 
+  it("should prefetch field catalog before agent query construction", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("logs", "severity:error", [
+        "timestamp",
+        "message",
+        "severity",
+      ]),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        () =>
+          HttpResponse.json([
+            { key: "severity", name: "Severity", attributeType: "string" },
+            { key: "message", name: "Message", attributeType: "string" },
+          ]),
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+        HttpResponse.json({ data: [] }),
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query: "error logs",
+        dataset: "logs",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    const prompt = mockGenerateText.mock.calls[0]?.[0]?.prompt;
+    expect(prompt).toContain('Prefetched field catalog for dataset "logs"');
+    expect(prompt).toContain("- severity:");
+    expect(prompt).toContain("EXAMPLE QUERIES FOR LOGS");
+    expect(prompt).toContain("error logs");
+  });
+
   it("should handle logs dataset queries", async () => {
     // Mock AI response for logs dataset
     mockGenerateText.mockResolvedValueOnce(
