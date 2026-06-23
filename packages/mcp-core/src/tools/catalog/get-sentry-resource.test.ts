@@ -12,6 +12,7 @@ import { encode as encodePng } from "fast-png";
 import { http, HttpResponse } from "msw";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import getSentryResource from "./get-sentry-resource.js";
+import { resolveDescription } from "../../tools/types.js";
 
 const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
 const originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
@@ -1513,6 +1514,44 @@ describe("get_sentry_resource", () => {
         "resourceId",
         "organizationSlug",
       ]);
+    });
+
+    it("omits dashboard hints when get_dashboard_details is unavailable", () => {
+      const desc = resolveDescription(getSentryResource.description, {
+        experimentalMode: false,
+        availableToolNames: new Set([
+          "get_sentry_resource",
+          "get_monitor_details",
+        ]),
+      });
+      expect(desc).not.toContain("dashboard");
+      expect(desc).toContain("monitor");
+    });
+
+    it("includes dashboard hints when get_dashboard_details is available", () => {
+      const desc = resolveDescription(getSentryResource.description, {
+        experimentalMode: false,
+        availableToolNames: new Set([
+          "get_sentry_resource",
+          "get_monitor_details",
+          "get_dashboard_details",
+        ]),
+      });
+      expect(desc).toContain("dashboards");
+      expect(desc).toContain("dashboard: <dashboardId or title>");
+      expect(desc).toContain("/dashboard/542438/");
+    });
+
+    it("omits monitor hints when get_monitor_details is unavailable", () => {
+      const desc = resolveDescription(getSentryResource.description, {
+        experimentalMode: false,
+        availableToolNames: new Set([
+          "get_sentry_resource",
+          "get_dashboard_details",
+        ]),
+      });
+      expect(desc).not.toContain("monitor");
+      expect(desc).toContain("dashboard");
     });
   });
 });

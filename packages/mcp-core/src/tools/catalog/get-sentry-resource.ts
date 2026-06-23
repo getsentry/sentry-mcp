@@ -536,6 +536,14 @@ export default defineTool({
       "get_monitor_details",
       availableToolNames,
     );
+    // Monitors and dashboards both delegate to inspect-only catalog tools.
+    // Only advertise them when their backing tools are available in this session.
+    // The URL parser still recognises /crons/ and /dashboard/{id}/ unconditionally;
+    // non-inspect sessions get a clear "requires the inspect skill" error at runtime.
+    const dashboardResourcesAvailable = isToolAvailable(
+      "get_dashboard_details",
+      availableToolNames,
+    );
     const fullResolutionInstruction = formatToolCallInstruction({
       toolName: "get_snapshot_image",
       arguments: {
@@ -551,18 +559,20 @@ export default defineTool({
         "Full-resolution snapshot image bytes are not available in this session",
       purpose: "for full-resolution image bytes",
     });
-    // Monitors are only listed when available — they require the inspect skill
-    // and are gated at execution time via assertCatalogToolAvailable.
-    // Dashboards are always advertised because identifyResource() routes all
-    // /dashboard/{id}/ URLs unconditionally; execution is still gated at
-    // runtime by assertCatalogToolAvailable.
-    const supportedResources = monitorResourcesAvailable
-      ? "issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, dashboards, preprod snapshots, and snapshot images."
-      : "issues, events, traces, spans, AI conversations, breadcrumbs, replays, dashboards, preprod snapshots, and snapshot images.";
+    const extraResources = [
+      ...(monitorResourcesAvailable ? ["monitors"] : []),
+      ...(dashboardResourcesAvailable ? ["dashboards"] : []),
+    ];
+    const supportedResources =
+      extraResources.length > 0
+        ? `issues, events, traces, spans, AI conversations, breadcrumbs, replays, ${extraResources.join(", ")}, preprod snapshots, and snapshot images.`
+        : "issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.";
     const resourceIds = [
       "- span: <traceId>:<spanId>",
       ...(monitorResourcesAvailable ? ["- monitor: <monitorSlug>"] : []),
-      "- dashboard: <dashboardId or title>",
+      ...(dashboardResourcesAvailable
+        ? ["- dashboard: <dashboardId or title>"]
+        : []),
       "- snapshot: <snapshotId>",
       "- snapshotImage: <snapshotId>:<image_file_name>",
     ];
@@ -588,7 +598,11 @@ export default defineTool({
       "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
       "get_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')",
       "get_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')",
-      "get_sentry_resource(url='https://sentry.sentry.io/dashboard/542438/')",
+      ...(dashboardResourcesAvailable
+        ? [
+            "get_sentry_resource(url='https://sentry.sentry.io/dashboard/542438/')",
+          ]
+        : []),
       "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')",
       "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')",
       "</examples>",
