@@ -436,7 +436,7 @@ export default defineTool({
   description: [
     "Fetch all spans for an AI conversation by its gen_ai.conversation.id.",
     "",
-    "A conversation is a set of spans sharing the same gen_ai.conversation.id. To discover conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'.",
+    "A conversation is a set of spans sharing the same gen_ai.conversation.id. To discover or list conversations, use search_ai_conversations.",
   ].join("\n"),
 
   inputSchema: {
@@ -452,6 +452,21 @@ export default defineTool({
       .describe(
         "Numeric project ID to scope the query. Falls back to context constraint or all projects.",
       ),
+    start: z
+      .string()
+      .trim()
+      .optional()
+      .describe("Explicit start time for the conversation lookup window."),
+    end: z
+      .string()
+      .trim()
+      .optional()
+      .describe("Explicit end time for the conversation lookup window."),
+    spanId: z
+      .string()
+      .trim()
+      .optional()
+      .describe("Optional focused span ID from a Sentry conversation URL."),
     regionUrl: ParamRegionUrl.optional(),
   },
 
@@ -481,6 +496,8 @@ export default defineTool({
         organizationSlug: params.organizationSlug,
         conversationId: params.conversationId,
         project: projectId ?? "-1",
+        start: params.start,
+        end: params.end,
       },
       undefined,
     );
@@ -499,6 +516,9 @@ export default defineTool({
       params.conversationId,
       spans,
     );
+    const focusedSpanPresent = params.spanId
+      ? artifact.spanIds.includes(params.spanId)
+      : undefined;
 
     const output = [
       `# AI Conversation \`${params.conversationId}\` in **${params.organizationSlug}**`,
@@ -514,10 +534,21 @@ export default defineTool({
       `**Tool Calls**: ${artifact.toolCallCount}`,
       `**Spans**: ${artifact.spanCount}`,
       `**Total Tokens**: ${artifact.totalTokens}`,
+      params.spanId ? `**Focused Span**: ${params.spanId}` : null,
+      params.spanId
+        ? `**Focused Span Present**: ${focusedSpanPresent ? "yes" : "no"}`
+        : null,
       "",
       "## View in Sentry",
       "",
       artifact.url,
+      "",
+      "## Related Telemetry",
+      "",
+      ...artifact.traceIds.map(
+        (traceId) =>
+          `- Trace \`${traceId}\`: use \`get_trace_details\` for the full trace, or \`search_events\` with dataset \`spans\` and query \`trace:${traceId}\` to inspect related non-GenAI spans.`,
+      ),
       "",
       "## Transcript",
       "",
@@ -525,9 +556,17 @@ export default defineTool({
       "## Structured Artifact",
       "",
       "```json",
-      JSON.stringify(artifact, null, 2),
+      JSON.stringify(
+        {
+          ...artifact,
+          focusedSpanId: params.spanId,
+          focusedSpanPresent,
+        },
+        null,
+        2,
+      ),
       "```",
-    ];
+    ].filter((line): line is string => line !== null);
 
     return output.join("\n");
   },

@@ -1434,6 +1434,46 @@ export const AIConversationSpanSchema = z
 export const AIConversationSpanListSchema = z.array(AIConversationSpanSchema);
 
 /**
+ * Schemas validated against getsentry/sentry:
+ * - `src/sentry/api/endpoints/organization_ai_conversations.py`
+ * - `src/sentry/api/serializers/rest_framework/ai_conversations.py`
+ * - `tests/sentry/api/endpoints/test_organization_ai_conversations.py`
+ */
+export const AIConversationUserSchema = z
+  .object({
+    id: z.string().nullable(),
+    email: z.string().nullable(),
+    username: z.string().nullable(),
+    ip_address: z.string().nullable(),
+  })
+  .passthrough();
+
+export const AIConversationSummarySchema = z
+  .object({
+    conversationId: z.string(),
+    flow: z.array(z.string()),
+    errors: z.number(),
+    llmCalls: z.number(),
+    toolCalls: z.number(),
+    totalTokens: z.number(),
+    totalCost: z.number(),
+    startTimestamp: z.number(),
+    endTimestamp: z.number(),
+    traceCount: z.number(),
+    traceIds: z.array(z.string()),
+    firstInput: z.string().nullable(),
+    lastOutput: z.string().nullable(),
+    user: AIConversationUserSchema.nullable(),
+    toolNames: z.array(z.string()),
+    toolErrors: z.number(),
+  })
+  .passthrough();
+
+export const AIConversationSummaryListSchema = z.array(
+  AIConversationSummarySchema,
+);
+
+/**
  * Schema for individual frames in a flamegraph.
  *
  * Represents a single stack frame with file/function information and

@@ -5,7 +5,7 @@
     "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, monitors, profiles, documentation, and project metadata",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 31,
+    "toolCount": 32,
     "tools": [
       {
         "name": "find_alert_rules",
@@ -44,7 +44,7 @@
       },
       {
         "name": "get_ai_conversation_details",
-        "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'.",
+        "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover or list conversations, use search_ai_conversations.",
         "requiredScopes": ["event:read", "project:read"]
       },
       {
@@ -119,7 +119,7 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID to fetch all spans for that conversation. To discover or list conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use the Sentry tool `get_snapshot_image` for full-resolution image bytes.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- monitor: <monitorSlug>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
+        "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use the Sentry tool `get_snapshot_image` for full-resolution image bytes.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- monitor: <monitorSlug>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
         "requiredScopes": ["event:read", "project:read"]
       },
       {
@@ -136,6 +136,11 @@
         "name": "get_trace_details",
         "description": "Get detailed information about a specific Sentry trace by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific trace ID (e.g., 'a4d1aae7216b47ff8117cf4e09ce9d0a')\n- Ask to 'show me trace [TRACE-ID]', 'explain trace [TRACE-ID]'\n- Want high-level overview and link to view trace details in Sentry\n- Need trace statistics and span breakdown\n- Want an overview first, then a guided pivot into additional spans or events\n\nDO NOT USE for:\n- General searching for traces (use search_events with trace queries)\n- Complete span enumeration or branch-by-branch reconstruction (use search_events scoped to the trace)\n\nTRIGGER PATTERNS:\n- 'Show me trace abc123' → use get_trace_details\n- 'Explain trace a4d1aae7216b47ff8117cf4e09ce9d0a' → use get_trace_details\n- 'What is trace [trace-id]' → use get_trace_details\n\n<examples>\n### Get trace overview\n```\nget_trace_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\n```\n\n### Focus a single span\n```\nget_trace_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a', spanId='aa8e7f3384ef4ff5')\n```\n</examples>\n\n<hints>\n- Trace IDs are 32-character hexadecimal strings\n- This returns a condensed trace overview, not a full span dump\n- Provide `spanId` to focus on a single span within the trace\n- If the response says it shows a subset of spans, use search_events to inspect the rest of the trace\n</hints>",
         "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "search_ai_conversations",
+        "description": "Search Sentry AI Conversations and return one summary row per conversation.\n\nUse this tool to find or list AI Conversations. Results are conversation summaries, not raw span rows.\nUse get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_ai_conversations(organizationSlug='my-org', query='failed conversations', statsPeriod='7d')\nsearch_ai_conversations(organizationSlug='my-org', query='checkout', project='backend', sort='-errors')\n</examples>",
+        "requiredScopes": ["event:read", "project:read"]
       },
       {
         "name": "search_docs",
@@ -170,7 +175,7 @@
     "description": "Sentry's AI debugger that helps you analyze, root cause, and fix issues",
     "defaultEnabled": true,
     "order": 2,
-    "toolCount": 10,
+    "toolCount": 11,
     "tools": [
       {
         "name": "analyze_issue_with_seer",
@@ -189,7 +194,7 @@
       },
       {
         "name": "get_ai_conversation_details",
-        "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'.",
+        "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover or list conversations, use search_ai_conversations.",
         "requiredScopes": ["event:read", "project:read"]
       },
       {
@@ -204,7 +209,12 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID to fetch all spans for that conversation. To discover or list conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Full-resolution snapshot image bytes are not available in this session.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
+        "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Full-resolution snapshot image bytes are not available in this session.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
+        "requiredScopes": ["event:read", "project:read"]
+      },
+      {
+        "name": "search_ai_conversations",
+        "description": "Search Sentry AI Conversations and return one summary row per conversation.\n\nUse this tool to find or list AI Conversations. Results are conversation summaries, not raw span rows.\nUse get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_ai_conversations(organizationSlug='my-org', query='failed conversations', statsPeriod='7d')\nsearch_ai_conversations(organizationSlug='my-org', query='checkout', project='backend', sort='-errors')\n</examples>",
         "requiredScopes": ["event:read", "project:read"]
       },
       {
@@ -266,7 +276,7 @@
     "description": "Resolve, assign, and update issues",
     "defaultEnabled": false,
     "order": 4,
-    "toolCount": 14,
+    "toolCount": 15,
     "tools": [
       {
         "name": "add_issue_note",
@@ -290,7 +300,7 @@
       },
       {
         "name": "get_ai_conversation_details",
-        "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'.",
+        "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover or list conversations, use search_ai_conversations.",
         "requiredScopes": ["event:read", "project:read"]
       },
       {
@@ -310,7 +320,12 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID to fetch all spans for that conversation. To discover or list conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Full-resolution snapshot image bytes are not available in this session.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
+        "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Full-resolution snapshot image bytes are not available in this session.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
+        "requiredScopes": ["event:read", "project:read"]
+      },
+      {
+        "name": "search_ai_conversations",
+        "description": "Search Sentry AI Conversations and return one summary row per conversation.\n\nUse this tool to find or list AI Conversations. Results are conversation summaries, not raw span rows.\nUse get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_ai_conversations(organizationSlug='my-org', query='failed conversations', statsPeriod='7d')\nsearch_ai_conversations(organizationSlug='my-org', query='checkout', project='backend', sort='-errors')\n</examples>",
         "requiredScopes": ["event:read", "project:read"]
       },
       {

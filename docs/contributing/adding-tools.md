@@ -26,6 +26,12 @@ Before adding a new tool, consider if it could be:
 3. Added to the searchable catalog instead of the top-level MCP surface
 4. Gated behind `requiredCapabilities` if only relevant to some projects
 
+When a new or changed tool calls a Sentry API endpoint, verify the endpoint
+contract against the Sentry source tree in `~/src/sentry` before implementing
+the MCP schema. Check the endpoint, serializer, URL registration, and tests so
+request params, response fields, pagination, feature gates, and retention
+behavior match the server. See [API Patterns](api-patterns.md#verify-endpoint-contracts).
+
 ### Choosing Direct Exposure
 
 After creating a tool module, add it to `packages/mcp-core/src/tools/catalog/index.ts`. Then update `packages/mcp-core/src/tools/surfaces.ts` only when it should be directly exposed through MCP `tools/list`:

@@ -126,6 +126,10 @@ describe("get_ai_conversation_details", () => {
 
       https://test-org.sentry.io/explore/conversations/conv-123/
 
+      ## Related Telemetry
+
+      - Trace \`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\`: use \`get_trace_details\` for the full trace, or \`search_events\` with dataset \`spans\` and query \`trace:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\` to inspect related non-GenAI spans.
+
       ## Transcript
 
       ### Turn 1 - 2024-04-22T17:03:20.000Z
@@ -308,6 +312,34 @@ describe("get_ai_conversation_details", () => {
 
     expect(result).toContain("# AI Conversation `conv-123`");
     expect(result).toContain("The checkout worker is timing out.");
+  });
+
+  it("preserves scoped query parameters from conversation URLs", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/ai-conversations/conv-123/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("statsPeriod")).toBeNull();
+          expect(url.searchParams.get("start")).toBe(
+            "2026-05-23T00:23:27.667Z",
+          );
+          expect(url.searchParams.get("end")).toBe("2026-05-23T02:34:56.137Z");
+          expect(url.searchParams.get("project")).toBe("4510944073809921");
+          return HttpResponse.json(conversationSpans);
+        },
+      ),
+    );
+
+    const result = await getSentryResource.handler(
+      {
+        url: "https://sentry-mcp-evals.sentry.io/explore/conversations/conv-123/?start=2026-05-23T00:23:27.667Z&end=2026-05-23T02:34:56.137Z&project=4510944073809921&spanId=1111111111111111",
+      },
+      baseContext,
+    );
+
+    expect(result).toContain("**Focused Span**: 1111111111111111");
+    expect(result).toContain("**Focused Span Present**: yes");
   });
 
   it("preserves repeated messages and their distinct tool calls", async () => {

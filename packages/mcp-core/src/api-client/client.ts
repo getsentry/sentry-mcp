@@ -75,6 +75,7 @@ import {
   ReplayListResponseSchema,
   ReplayIdsByResourceSchema,
   ReplayRecordingSegmentsSchema,
+  AIConversationSummaryListSchema,
   AIConversationSpanListSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
@@ -125,6 +126,7 @@ import type {
   ReplayDetails,
   ReplayList,
   ReplayRecordingSegments,
+  AIConversationSummary,
   AIConversationSpanList,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
@@ -3999,6 +4001,8 @@ export class SentryApiService {
       conversationId,
       project = "-1",
       statsPeriod = "30d",
+      start,
+      end,
       perPage = 1000,
       maxPages = 10,
     }: {
@@ -4006,6 +4010,8 @@ export class SentryApiService {
       conversationId: string;
       project?: string | string[];
       statsPeriod?: string;
+      start?: string;
+      end?: string;
       perPage?: number;
       maxPages?: number;
     },
@@ -4017,7 +4023,16 @@ export class SentryApiService {
     for (let page = 0; page < maxPages; page++) {
       const queryParams = new URLSearchParams();
       queryParams.set("per_page", String(perPage));
-      queryParams.set("statsPeriod", statsPeriod);
+      if (start || end) {
+        if (start) {
+          queryParams.set("start", start);
+        }
+        if (end) {
+          queryParams.set("end", end);
+        }
+      } else {
+        queryParams.set("statsPeriod", statsPeriod);
+      }
       const projects = Array.isArray(project) ? project : [project];
       for (const projectId of projects) {
         queryParams.append("project", projectId);
@@ -4041,6 +4056,90 @@ export class SentryApiService {
     }
 
     return spans;
+  }
+
+  async searchAIConversations(
+    {
+      organizationSlug,
+      query,
+      sort,
+      samplingMode,
+      project,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      limit,
+      cursor,
+    }: {
+      organizationSlug: string;
+      query?: string;
+      sort?: string;
+      samplingMode?: string;
+      project?: string | string[];
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+      cursor?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<{
+    conversations: AIConversationSummary[];
+    nextCursor: string | null;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (sort) {
+      queryParams.set("sort", sort);
+    }
+    if (samplingMode) {
+      queryParams.set("samplingMode", samplingMode);
+    }
+    if (project) {
+      const projects = Array.isArray(project) ? project : [project];
+      for (const projectId of projects) {
+        queryParams.append("project", projectId);
+      }
+    }
+    if (environment) {
+      const environments = Array.isArray(environment)
+        ? environment
+        : [environment];
+      for (const environmentName of environments) {
+        queryParams.append("environment", environmentName);
+      }
+    }
+    if (statsPeriod && !start && !end) {
+      queryParams.set("statsPeriod", statsPeriod);
+    }
+    if (start) {
+      queryParams.set("start", start);
+    }
+    if (end) {
+      queryParams.set("end", end);
+    }
+    if (limit !== undefined) {
+      queryParams.set("per_page", String(limit));
+    }
+    if (cursor) {
+      queryParams.set("cursor", cursor);
+    }
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/ai-conversations/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+
+    return {
+      conversations: AIConversationSummaryListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   /**

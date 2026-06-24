@@ -52,6 +52,14 @@ browser cookie and using them as future consent UI defaults.
 - **Status**: 📝 Proposed
 - **Key Benefits**: Reduces repeated consent work without making remembered values an authorization source
 
+### [ai-conversations](./ai-conversations.md)
+A conversation-native MCP interface for searching AI Conversations as
+conversation summaries, fetching transcripts by ID, and resolving Sentry
+conversation URLs without exposing raw span search as the primary workflow.
+
+- **Status**: 📝 Proposed
+- **Key Benefits**: Keeps AI Conversation search output-shaped, avoids duplicate span-row results, and preserves a small direct tool surface
+
 ### [search-events](./search-events.md)
 A unified event search tool that uses OpenAI GPT-5 to translate natural language queries into Sentry's search syntax. Replaced the separate `find_errors` and `find_transactions` tools with a single, more powerful interface.
 
