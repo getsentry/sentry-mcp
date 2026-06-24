@@ -213,7 +213,9 @@ describe("search_ai_conversations", () => {
         },
         getServerContext(),
       ),
-    ).rejects.toThrow("Cannot use both statsPeriod and start/end parameters");
+    ).rejects.toThrow(
+      "`statsPeriod` cannot be combined with `start` and `end`.",
+    );
   });
 
   it("rejects partial absolute time ranges", async () => {
@@ -227,9 +229,7 @@ describe("search_ai_conversations", () => {
         },
         getServerContext(),
       ),
-    ).rejects.toThrow(
-      "Both start and end parameters must be provided together",
-    );
+    ).rejects.toThrow("`start` and `end` must be provided together.");
   });
 
   it("is catalog-only", () => {

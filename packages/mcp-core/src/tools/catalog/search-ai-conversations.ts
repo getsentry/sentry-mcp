@@ -7,6 +7,7 @@ import {
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
+import { UserInputError } from "../../errors";
 import { isNumericId } from "../../utils/slug-validation";
 import type { AIConversationSummary, SentryApiService } from "../../api-client";
 import type { ServerContext } from "../../types";
@@ -298,7 +299,7 @@ export default defineTool({
       .trim()
       .optional()
       .describe("Pagination cursor from a previous response."),
-    limit: z.number().min(1).max(100).default(10),
+    limit: z.number().int().min(1).max(100).default(10),
     regionUrl: ParamRegionUrl.optional(),
   },
   annotations: {
@@ -306,6 +307,15 @@ export default defineTool({
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
+    if ((params.start && !params.end) || (!params.start && params.end)) {
+      throw new UserInputError("`start` and `end` must be provided together.");
+    }
+    if (params.statsPeriod && (params.start || params.end)) {
+      throw new UserInputError(
+        "`statsPeriod` cannot be combined with `start` and `end`.",
+      );
+    }
+
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
     });

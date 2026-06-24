@@ -3,6 +3,7 @@ import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+import { UserInputError } from "../../errors";
 import type { AIConversationSpan, SentryApiService } from "../../api-client";
 import type { ServerContext } from "../../types";
 
@@ -482,6 +483,10 @@ export default defineTool({
   async handler(params, context: ServerContext) {
     setTag("organization.slug", params.organizationSlug);
     setTag("ai_conversation.id", params.conversationId);
+
+    if ((params.start && !params.end) || (!params.start && params.end)) {
+      throw new UserInputError("`start` and `end` must be provided together.");
+    }
 
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,

@@ -373,6 +373,19 @@ describe("get_ai_conversation_details", () => {
     );
   });
 
+  it("rejects partial absolute time ranges", async () => {
+    await expect(
+      getAIConversationDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          conversationId: "conv-123",
+          start: "2026-05-23T00:23:27.667Z",
+        },
+        baseContext,
+      ),
+    ).rejects.toThrow("`start` and `end` must be provided together.");
+  });
+
   it("preserves repeated messages and their distinct tool calls", async () => {
     mockConversationEndpoint("test-org", "conv-repeat", [
       {
