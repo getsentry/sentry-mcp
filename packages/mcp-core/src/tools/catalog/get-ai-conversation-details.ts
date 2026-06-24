@@ -428,6 +428,13 @@ function buildConversationArtifact(
   };
 }
 
+function formatLookupWindow(params: { start?: string; end?: string }): string {
+  if (params.start && params.end) {
+    return `between ${params.start} and ${params.end}`;
+  }
+  return "in the last 30 days";
+}
+
 export default defineTool({
   name: "get_ai_conversation_details",
   skills: ["inspect", "triage", "seer"],
@@ -506,7 +513,7 @@ export default defineTool({
       return [
         `# AI Conversation \`${params.conversationId}\` in **${params.organizationSlug}**`,
         "",
-        "No AI spans found for this conversation in the last 30 days.",
+        `No AI spans found for this conversation ${formatLookupWindow(params)}.`,
       ].join("\n");
     }
 

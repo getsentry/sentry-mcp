@@ -342,6 +342,37 @@ describe("get_ai_conversation_details", () => {
     expect(result).toContain("**Focused Span Present**: yes");
   });
 
+  it("describes explicit lookup windows when no spans are found", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/ai-conversations/conv-empty/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("statsPeriod")).toBeNull();
+          expect(url.searchParams.get("start")).toBe(
+            "2026-05-23T00:23:27.667Z",
+          );
+          expect(url.searchParams.get("end")).toBe("2026-05-23T02:34:56.137Z");
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const result = await getAIConversationDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        conversationId: "conv-empty",
+        start: "2026-05-23T00:23:27.667Z",
+        end: "2026-05-23T02:34:56.137Z",
+      },
+      baseContext,
+    );
+
+    expect(result).toContain(
+      "No AI spans found for this conversation between 2026-05-23T00:23:27.667Z and 2026-05-23T02:34:56.137Z.",
+    );
+  });
+
   it("preserves repeated messages and their distinct tool calls", async () => {
     mockConversationEndpoint("test-org", "conv-repeat", [
       {

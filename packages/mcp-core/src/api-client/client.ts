@@ -4023,16 +4023,12 @@ export class SentryApiService {
     for (let page = 0; page < maxPages; page++) {
       const queryParams = new URLSearchParams();
       queryParams.set("per_page", String(perPage));
-      if (start || end) {
-        if (start) {
-          queryParams.set("start", start);
-        }
-        if (end) {
-          queryParams.set("end", end);
-        }
-      } else {
-        queryParams.set("statsPeriod", statsPeriod);
-      }
+      this.applyTimeParams(
+        queryParams,
+        start || end ? undefined : statsPeriod,
+        start,
+        end,
+      );
       const projects = Array.isArray(project) ? project : [project];
       for (const projectId of projects) {
         queryParams.append("project", projectId);
@@ -4113,15 +4109,7 @@ export class SentryApiService {
         queryParams.append("environment", environmentName);
       }
     }
-    if (statsPeriod && !start && !end) {
-      queryParams.set("statsPeriod", statsPeriod);
-    }
-    if (start) {
-      queryParams.set("start", start);
-    }
-    if (end) {
-      queryParams.set("end", end);
-    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
     if (limit !== undefined) {
       queryParams.set("per_page", String(limit));
     }

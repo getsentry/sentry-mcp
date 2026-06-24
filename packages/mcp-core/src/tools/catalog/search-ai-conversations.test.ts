@@ -177,7 +177,6 @@ describe("search_ai_conversations", () => {
         samplingMode: "HIGHEST_ACCURACY",
         project: "backend",
         environment: ["production", "staging"],
-        statsPeriod: "7d",
         start: "2026-06-01T00:00:00Z",
         end: "2026-06-02T00:00:00Z",
         cursor: "page-1",
@@ -199,6 +198,38 @@ describe("search_ai_conversations", () => {
     expect(params.get("per_page")).toBe("25");
     expect(result).toContain("No AI conversations found.");
     expect(result).toContain('cursor: "page-2"');
+  });
+
+  it("rejects conflicting relative and absolute time ranges", async () => {
+    await expect(
+      searchAIConversations.handler(
+        {
+          organizationSlug: "test-org",
+          sort: "-timestamp",
+          statsPeriod: "7d",
+          start: "2026-06-01T00:00:00Z",
+          end: "2026-06-02T00:00:00Z",
+          limit: 10,
+        },
+        getServerContext(),
+      ),
+    ).rejects.toThrow("Cannot use both statsPeriod and start/end parameters");
+  });
+
+  it("rejects partial absolute time ranges", async () => {
+    await expect(
+      searchAIConversations.handler(
+        {
+          organizationSlug: "test-org",
+          sort: "-timestamp",
+          start: "2026-06-01T00:00:00Z",
+          limit: 10,
+        },
+        getServerContext(),
+      ),
+    ).rejects.toThrow(
+      "Both start and end parameters must be provided together",
+    );
   });
 
   it("is catalog-only", () => {
