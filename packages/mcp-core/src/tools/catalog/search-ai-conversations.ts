@@ -377,8 +377,9 @@ export default defineTool({
       project: params.project,
       constrainedProjectSlug: context.constraints.projectSlug,
     });
+    const requestedStatsPeriod = params.statsPeriod?.trim();
     const statsPeriod =
-      params.start || params.end ? undefined : (params.statsPeriod ?? "30d");
+      params.start || params.end ? undefined : requestedStatsPeriod || "30d";
 
     const { conversations, nextCursor } =
       await apiService.searchAIConversations({

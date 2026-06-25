@@ -239,6 +239,37 @@ describe("search_ai_conversations", () => {
     );
   });
 
+  it("treats an empty statsPeriod like the default search window", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("statsPeriod")).toBe("30d");
+          expect(url.searchParams.get("per_page")).toBe("10");
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const result = await searchAIConversations.handler(
+      {
+        organizationSlug: "test-org",
+        statsPeriod: "   ",
+        limit: 10,
+      },
+      getServerContext(),
+    );
+
+    const structuredContent = getStructuredContent<{
+      searchUrl: string;
+    }>(result);
+
+    expect(structuredContent.searchUrl).toBe(
+      "https://test-org.sentry.io/explore/conversations/?statsPeriod=30d",
+    );
+  });
+
   it("passes filters, resolves project slugs, and returns pagination hints", async () => {
     const requestUrls: string[] = [];
     mswServer.use(
