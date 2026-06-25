@@ -12,6 +12,26 @@ const baseContext = {
   userId: "1",
 };
 
+function getStructuredContent<T extends Record<string, unknown>>(
+  result: unknown,
+): T {
+  const structuredContent = (result as { structuredContent?: unknown })
+    .structuredContent;
+  if (
+    !structuredContent ||
+    typeof structuredContent !== "object" ||
+    Array.isArray(structuredContent)
+  ) {
+    throw new Error("Expected structuredContent object");
+  }
+  return structuredContent as T;
+}
+
+function expectStructuredOnly(result: unknown) {
+  expect(result).toHaveProperty("structuredContent");
+  expect(result).not.toHaveProperty("content");
+}
+
 const conversationSpans: Array<Record<string, unknown>> = [
   {
     "gen_ai.conversation.id": "conv-123",
@@ -96,7 +116,7 @@ function mockConversationEndpoint(
 }
 
 describe("get_ai_conversation_details", () => {
-  it("returns a transcript", async () => {
+  it("returns structured conversation details", async () => {
     mockConversationEndpoint();
 
     const result = await getAIConversationDetails.handler(
@@ -107,76 +127,98 @@ describe("get_ai_conversation_details", () => {
       baseContext,
     );
 
-    expect(result).toMatchInlineSnapshot(`
-      "# AI Conversation \`conv-123\` in **test-org**
-
-      ## Summary
-
-      **Started**: 2024-04-22T17:03:20.000Z
-      **Ended**: 2024-04-22T17:03:25.000Z
-      **Projects**: mcp-server
-      **Trace IDs**: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-      **Turns**: 2
-      **Messages**: 4
-      **Tool Calls**: 1
-      **Spans**: 3
-      **Total Tokens**: 100
-
-      ## View in Sentry
-
-      https://test-org.sentry.io/explore/conversations/conv-123/
-
-      ## Related Telemetry
-
-      - Query spans with \`search_events\` using dataset \`spans\` and query \`gen_ai.conversation.id:conv-123\` to inspect telemetry across traces.
-      - This conversation spans 1 trace: \`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\`. Inspect trace IDs individually only when you need trace-local context.
-
-      ## Transcript
-
-      ### Turn 1 - 2024-04-22T17:03:20.000Z
-
-      _gpt-5-mini-2026-05-01 | triage-agent | 42 tokens | 1.5s | ok_
-
-      **User**
-
-      What failed in production?
-
-      **Assistant**
-
-      The checkout worker is timing out.
-
-      **Tools**
-
-      - search_events (2222222222222222) - ok - 300ms
-
-        Arguments:
-
-        \`\`\`json
-        {
-          "query": "level:error"
-        }
-        \`\`\`
-
-        Input:
-
-        \`\`\`json
-        {
-          "organizationSlug": "test-org"
-        }
-        \`\`\`
-
-      ### Turn 2 - 2024-04-22T17:03:24.000Z
-
-      _58 tokens | 1s | ok_
-
-      **User**
-
-      Can you inspect the failing event?
-
-      **Assistant**
-
-      I found the timeout stack trace.
-      "
+    expectStructuredOnly(result);
+    const structuredContent = getStructuredContent(result);
+    expect(structuredContent).not.toHaveProperty("lookupWindow");
+    expect(structuredContent).not.toHaveProperty("focusedSpanId");
+    expect(structuredContent).not.toHaveProperty("focusedSpanPresent");
+    expect(structuredContent).not.toHaveProperty("messages");
+    expect(structuredContent).not.toHaveProperty("spanIds");
+    expect(structuredContent).toMatchInlineSnapshot(`
+      {
+        "conversationId": "conv-123",
+        "endTimestamp": 1713805405,
+        "messageCount": 4,
+        "organizationSlug": "test-org",
+        "projects": [
+          "mcp-server",
+        ],
+        "spanCount": 3,
+        "startTimestamp": 1713805400,
+        "toolCallCount": 1,
+        "totalTokens": 100,
+        "traceIds": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        ],
+        "turnCount": 2,
+        "turns": [
+          {
+            "assistant": {
+              "content": "The checkout worker is timing out.",
+              "role": "assistant",
+              "spanId": "1111111111111111",
+              "timestamp": 1713805401.5,
+            },
+            "durationMs": 1500,
+            "ended": 1713805401.5,
+            "metadata": {
+              "agentName": "triage-agent",
+              "model": "gpt-5-mini-2026-05-01",
+              "status": "ok",
+              "totalTokens": 42,
+            },
+            "project": "mcp-server",
+            "spanId": "1111111111111111",
+            "started": 1713805400,
+            "toolCalls": [
+              {
+                "arguments": "{"query":"level:error"}",
+                "durationMs": 300,
+                "input": "{"organizationSlug":"test-org"}",
+                "name": "search_events",
+                "spanId": "2222222222222222",
+                "status": "ok",
+                "timestamp": 1713805401.7,
+              },
+            ],
+            "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "turn": 1,
+            "user": {
+              "content": "What failed in production?",
+              "role": "user",
+              "spanId": "1111111111111111",
+              "timestamp": 1713805400,
+            },
+          },
+          {
+            "assistant": {
+              "content": "I found the timeout stack trace.",
+              "role": "assistant",
+              "spanId": "3333333333333333",
+              "timestamp": 1713805405,
+            },
+            "durationMs": 1000,
+            "ended": 1713805405,
+            "metadata": {
+              "status": "ok",
+              "totalTokens": 58,
+            },
+            "project": "mcp-server",
+            "spanId": "3333333333333333",
+            "started": 1713805404,
+            "toolCalls": [],
+            "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "turn": 2,
+            "user": {
+              "content": "Can you inspect the failing event?",
+              "role": "user",
+              "spanId": "3333333333333333",
+              "timestamp": 1713805404,
+            },
+          },
+        ],
+        "url": "https://test-org.sentry.io/explore/conversations/conv-123/",
+      }
     `);
   });
 
@@ -190,8 +232,18 @@ describe("get_ai_conversation_details", () => {
       baseContext,
     );
 
-    expect(result).toContain("# AI Conversation `conv-123`");
-    expect(result).toContain("The checkout worker is timing out.");
+    expectStructuredOnly(result);
+    const structuredContent = getStructuredContent(result);
+    expect(structuredContent.conversationId).toBe("conv-123");
+    expect(structuredContent.turns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          assistant: expect.objectContaining({
+            content: "The checkout worker is timing out.",
+          }),
+        }),
+      ]),
+    );
   });
 
   it("preserves scoped query parameters from conversation URLs", async () => {
@@ -218,8 +270,12 @@ describe("get_ai_conversation_details", () => {
       baseContext,
     );
 
-    expect(result).toContain("**Focused Span**: 1111111111111111");
-    expect(result).toContain("**Focused Span Present**: yes");
+    const structuredContent = getStructuredContent(result);
+    expect(structuredContent).toMatchObject({
+      conversationId: "conv-123",
+      turnCount: 2,
+      traceIds: ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+    });
   });
 
   it("describes explicit lookup windows when no spans are found", async () => {
@@ -248,9 +304,17 @@ describe("get_ai_conversation_details", () => {
       baseContext,
     );
 
-    expect(result).toContain(
-      "No AI spans found for this conversation between 2026-05-23T00:23:27.667Z and 2026-05-23T02:34:56.137Z.",
-    );
+    expectStructuredOnly(result);
+    expect(getStructuredContent(result)).toMatchObject({
+      conversationId: "conv-empty",
+      startTimestamp: null,
+      endTimestamp: null,
+      spanCount: 0,
+      turnCount: 0,
+      messageCount: 0,
+      toolCallCount: 0,
+      turns: [],
+    });
   });
 
   it("rejects partial absolute time ranges", async () => {
@@ -312,10 +376,20 @@ describe("get_ai_conversation_details", () => {
       baseContext,
     );
 
-    expect(result).toContain("**Messages**: 4");
-    expect(result).toContain("### Turn 1 - 2024-04-22T17:03:20.000Z");
-    expect(result).toContain("### Turn 2 - 2024-04-22T17:03:24.000Z");
-    expect(result).toContain("- search_events (repeat-tool-1) - ok");
+    const structuredContent = getStructuredContent(result);
+    expect(structuredContent.messageCount).toBe(4);
+    expect(structuredContent.turns).toMatchObject([
+      {
+        turn: 1,
+        spanId: "repeat-ai-1",
+        toolCalls: [{ name: "search_events", spanId: "repeat-tool-1" }],
+      },
+      {
+        turn: 2,
+        spanId: "repeat-ai-2",
+        toolCalls: [],
+      },
+    ]);
   });
 
   it("attaches tool calls after the final AI client span", async () => {
@@ -351,9 +425,15 @@ describe("get_ai_conversation_details", () => {
       baseContext,
     );
 
-    expect(result).toContain("**Tool Calls**: 1");
-    expect(result).toContain("- get_issue_details (final-tool-1) - ok");
-    expect(result).toContain("**Tools**");
+    const structuredContent = getStructuredContent(result);
+    expect(structuredContent.toolCallCount).toBe(1);
+    expect(structuredContent.turns).toMatchObject([
+      {
+        toolCalls: [
+          { name: "get_issue_details", spanId: "final-tool-1", status: "ok" },
+        ],
+      },
+    ]);
   });
 
   it("counts only tool calls included in the transcript", async () => {
@@ -385,8 +465,8 @@ describe("get_ai_conversation_details", () => {
       baseContext,
     );
 
-    expect(result).toContain("**Tool Calls**: 0");
-    expect(result).not.toContain("**Tools**");
-    expect(result).not.toContain("(unnamed-tool-1)");
+    const structuredContent = getStructuredContent(result);
+    expect(structuredContent.toolCallCount).toBe(0);
+    expect(structuredContent.turns).toMatchObject([{ toolCalls: [] }]);
   });
 });
