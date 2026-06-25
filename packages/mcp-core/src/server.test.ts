@@ -1,7 +1,9 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { type Span, setUser, startSpan } from "@sentry/core";
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mswServer } from "@sentry/mcp-server-mocks";
 import { z } from "zod";
 import { buildServer } from "./server";
 import { structuredResult } from "./internal/tool-helpers/results";
@@ -21,6 +23,14 @@ vi.mock("@sentry/core", () => ({
   setUser: vi.fn(),
   getActiveSpan: vi.fn(),
   startSpan: vi.fn(),
+  withScope: vi.fn((callback) =>
+    callback({
+      addAttachment: vi.fn(),
+      setContext: vi.fn(),
+    }),
+  ),
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
   wrapMcpServerWithSentry: vi.fn((server) => server),
 }));
 
@@ -1344,6 +1354,77 @@ describe("buildServer", () => {
       });
 
       expect(getTextContent(result)).toContain("You are authenticated as");
+    });
+
+    it("execute_sentry_tool dispatches structured catalog results", async () => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            expect(url.searchParams.get("query")).toBe("checkout");
+            expect(url.searchParams.get("statsPeriod")).toBe("7d");
+            expect(url.searchParams.get("per_page")).toBe("10");
+            return HttpResponse.json([
+              {
+                conversationId: "conv-123",
+                flow: ["triage-agent"],
+                errors: 1,
+                llmCalls: 2,
+                toolCalls: 1,
+                toolErrors: 0,
+                totalTokens: 1200,
+                totalCost: 0.012,
+                startTimestamp: 1713805400000,
+                endTimestamp: 1713805415000,
+                traceCount: 1,
+                traceIds: ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+                firstInput: "What failed in checkout?",
+                lastOutput: "The checkout worker is timing out.",
+                user: {
+                  id: "1",
+                  email: "dev@example.com",
+                  username: "dev",
+                  ip_address: "127.0.0.1",
+                },
+                toolNames: ["search_events"],
+              },
+            ]);
+          },
+        ),
+      );
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["inspect"]),
+        },
+      });
+
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
+        name: "search_ai_conversations",
+        arguments: {
+          organizationSlug: "test-org",
+          query: "checkout",
+          statsPeriod: "7d",
+          limit: 10,
+        },
+      });
+      const payload = getStructuredContent<{
+        conversations: Array<{
+          conversationId: string;
+          sampleTraceIds: string[];
+        }>;
+      }>(result);
+
+      expect(payload.conversations).toMatchObject([
+        {
+          conversationId: "conv-123",
+          sampleTraceIds: ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+        },
+      ]);
+      expect(getTextContent(result)).toBe(
+        getGeneratedTextFromStructuredContent(result),
+      );
     });
 
     it("execute_sentry_tool passes effective arguments to a catalog tool", async () => {

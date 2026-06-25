@@ -716,7 +716,7 @@
   },
   {
     "name": "get_ai_conversation_details",
-    "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover or list conversations, use search_ai_conversations.",
+    "description": "Fetch the chronological transcript and debugging details for one AI conversation.\n\nReturns a timeline of user messages, assistant messages, and tool calls, with trace/span IDs for deeper debugging. To discover or list conversations, use search_ai_conversations.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -740,16 +740,182 @@
           "type": "string",
           "description": "Explicit end time for the conversation lookup window."
         },
-        "spanId": {
-          "type": "string",
-          "description": "Optional focused span ID from a Sentry conversation URL."
-        },
         "regionUrl": {
           "type": "string",
           "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
         }
       },
       "required": ["organizationSlug", "conversationId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string"
+        },
+        "organizationSlug": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "startTimestamp": {
+          "type": ["number", "null"]
+        },
+        "endTimestamp": {
+          "type": ["number", "null"]
+        },
+        "traceIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "spanCount": {
+          "type": "number"
+        },
+        "aiCallCount": {
+          "type": "number"
+        },
+        "messageCount": {
+          "type": "number"
+        },
+        "toolCallCount": {
+          "type": "number"
+        },
+        "totalTokens": {
+          "type": "number"
+        },
+        "timeline": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "message"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["user", "assistant"]
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "number"
+                  },
+                  "spanId": {
+                    "type": "string"
+                  },
+                  "traceId": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "properties": {
+                      "agentName": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "totalTokens": {
+                        "type": "number"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "durationMs": {
+                        "type": "number"
+                      }
+                    },
+                    "required": ["totalTokens", "durationMs"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "type",
+                  "role",
+                  "content",
+                  "timestamp",
+                  "spanId",
+                  "traceId"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "tool_call"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "spanId": {
+                    "type": "string"
+                  },
+                  "traceId": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "number"
+                  },
+                  "durationMs": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "arguments": {
+                    "type": "string"
+                  },
+                  "input": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "name",
+                  "spanId",
+                  "traceId",
+                  "timestamp",
+                  "durationMs"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "conversationId",
+        "organizationSlug",
+        "url",
+        "startTimestamp",
+        "endTimestamp",
+        "traceIds",
+        "projects",
+        "spanCount",
+        "aiCallCount",
+        "messageCount",
+        "toolCallCount",
+        "totalTokens",
+        "timeline"
+      ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
@@ -1732,11 +1898,6 @@
           "type": "string",
           "description": "Conversation query/filter string."
         },
-        "samplingMode": {
-          "type": "string",
-          "enum": ["NORMAL", "HIGHEST_ACCURACY", "HIGHEST_ACCURACY_FLEX_TIME"],
-          "description": "Sentry AI Conversations sampling mode."
-        },
         "project": {
           "anyOf": [
             {
@@ -1799,6 +1960,143 @@
         }
       },
       "required": ["organizationSlug"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string"
+        },
+        "searchUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "count": {
+          "type": "number"
+        },
+        "nextCursor": {
+          "type": ["string", "null"]
+        },
+        "conversations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "conversationId": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "startTimestamp": {
+                "type": "number"
+              },
+              "endTimestamp": {
+                "type": "number"
+              },
+              "durationMs": {
+                "type": "number"
+              },
+              "errors": {
+                "type": "number"
+              },
+              "aiCallCount": {
+                "type": "number"
+              },
+              "toolCallCount": {
+                "type": "number"
+              },
+              "toolErrorCount": {
+                "type": "number"
+              },
+              "totalTokens": {
+                "type": "number"
+              },
+              "totalCost": {
+                "type": "number"
+              },
+              "traceCount": {
+                "type": "number"
+              },
+              "sampleTraceIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "firstInputPreview": {
+                "type": ["string", "null"]
+              },
+              "lastOutputPreview": {
+                "type": ["string", "null"]
+              },
+              "flow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "toolNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "user": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "email": {
+                        "type": ["string", "null"]
+                      },
+                      "username": {
+                        "type": ["string", "null"]
+                      }
+                    },
+                    "required": ["email", "username"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "conversationId",
+              "url",
+              "startTimestamp",
+              "endTimestamp",
+              "durationMs",
+              "errors",
+              "aiCallCount",
+              "toolCallCount",
+              "toolErrorCount",
+              "totalTokens",
+              "totalCost",
+              "traceCount",
+              "sampleTraceIds",
+              "firstInputPreview",
+              "lastOutputPreview",
+              "flow",
+              "toolNames",
+              "user"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "organizationSlug",
+        "searchUrl",
+        "count",
+        "nextCursor",
+        "conversations"
+      ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
@@ -2274,6 +2572,56 @@
         }
       },
       "required": ["query"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "inputSchema": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "JSON Schema for the matching tool's arguments. Session-constrained parameters are omitted."
+              },
+              "annotations": {
+                "type": "object",
+                "properties": {
+                  "readOnlyHint": {
+                    "type": "boolean"
+                  },
+                  "destructiveHint": {
+                    "type": "boolean"
+                  },
+                  "idempotentHint": {
+                    "type": "boolean"
+                  },
+                  "openWorldHint": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["name", "description", "inputSchema", "annotations"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["query", "results"],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },

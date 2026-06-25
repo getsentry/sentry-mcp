@@ -81,10 +81,6 @@ returns one item per conversation, never one item per span.
 interface SearchAIConversationsParams {
   organizationSlug: string;
   query?: string;
-  samplingMode?:
-    | "NORMAL"
-    | "HIGHEST_ACCURACY"
-    | "HIGHEST_ACCURACY_FLEX_TIME";
   project?: string | string[];
   environment?: string | string[];
   statsPeriod?: string;
@@ -104,8 +100,6 @@ Parameter behavior:
 - Results use the Sentry endpoint's default ordering: most recent conversation
   activity first. Do not expose alternate sort options until the backend applies
   them.
-- `samplingMode` uses the Sentry endpoint's supported sampling modes. If
-  omitted, the backend defaults to `HIGHEST_ACCURACY`.
 - `project` scopes results to one or more projects. The backend accepts numeric
   project IDs; MCP may resolve project slugs to IDs for ergonomics.
 - `environment` scopes results to one or more environments.
@@ -128,7 +122,6 @@ Do not implement conversation search through
 Expected query parameters:
 
 - `query`
-- `samplingMode`
 - `project`
 - `environment`
 - `statsPeriod` or `start`/`end`
@@ -170,15 +163,18 @@ repository.
 
 ## Search Output
 
-The formatted `search_ai_conversations` response should be optimized for agent
-use and should include:
+`search_ai_conversations` should return structuredContent optimized for agent
+use. Do not hand-write markdown for this tool; the server generates
+compatibility text from the same structured payload for clients that do not read
+structuredContent yet.
 
-- A title with the organization, query, and time range.
-- An executed search block showing the query, filters, and page size.
+The top-level structured result should include:
+
+- Organization slug.
 - A Sentry Explore conversations URL when constructible.
 - Conversation summaries.
-- A structured JSON artifact.
-- Next-step instructions.
+- Result count.
+- Next cursor when Sentry pagination reports one.
 
 Each result should include:
 
@@ -186,17 +182,17 @@ Each result should include:
 - Sentry URL: `/explore/conversations/{conversationId}/`.
 - Start, end, and derived duration.
 - Flow, when available.
-- First input preview.
-- Last output preview.
+- First input preview, capped to a compact debugging snippet.
+- Last output preview, capped to a compact debugging snippet.
 - User summary.
 - Error count.
-- LLM call count.
+- AI call count.
 - Tool call count and tool error count.
 - Tool names.
 - Total tokens and total cost.
-- Trace count and trace IDs.
+- Trace count and a small sample of trace IDs.
 
-Next-step instructions should direct agents to:
+Agents should use the structured fields to decide follow-ups:
 
 - Use `get_ai_conversation_details` with `conversationId` for the transcript and
   full structured detail.
@@ -205,8 +201,8 @@ Next-step instructions should direct agents to:
 - Query spans with `search_events` using dataset `spans` and query
   `gen_ai.conversation.id:<conversationId>` when inspecting telemetry for the
   full conversation across traces.
-- Treat listed trace IDs as per-trace follow-up targets only; a conversation can
-  span multiple traces.
+- Treat sampled trace IDs as per-trace follow-up targets only; a conversation
+  can span more traces than the sample includes.
 
 ## Detail Interface
 
@@ -245,9 +241,6 @@ Required refinements:
 - Accept `start` and `end` when details are fetched from a URL with explicit
   time bounds.
 - Continue accepting `project` from URL query parameters.
-- If `spanId` is supplied from a URL, the detail response may use it only as a
-  retrieval hint. Do not add focus metadata unless it helps the caller debug the
-  transcript.
 
 ## URL Handling
 
@@ -265,7 +258,6 @@ The URL parser should extract:
 - `project`
 - `start`
 - `end`
-- `spanId`
 
 Fetch by URL must not require `search_ai_conversations`. If a user pastes a
 conversation URL, `get_sentry_resource` should route directly to
@@ -430,22 +422,22 @@ Add focused tests for:
 1. Basic search:
    - Calls `/organizations/{org}/ai-conversations/`.
    - Passes `query`, `per_page`, and time parameters.
-   - Renders one row per conversation.
+   - Returns one structured summary per conversation.
 2. Empty results:
-   - Returns a clear "No AI conversations found" message.
-   - Includes the executed search.
+   - Returns an empty `conversations` array.
+   - Includes result metadata such as organization slug and result count.
 3. Filters:
    - `project`
    - `environment`
    - `statsPeriod`
    - explicit `start` and `end`
    - `cursor`
-4. Formatting:
+4. Structured output:
    - Includes conversation URLs.
    - Includes first input and last output previews.
    - Includes tool names and tool errors.
-   - Includes trace IDs.
-   - Includes next-step instructions.
+   - Includes trace count and sampled trace IDs.
+   - Generates compatibility text from structuredContent at the server boundary.
 5. Content block normalization:
    - `firstInput` arrays become readable text.
 6. Catalog registration:
@@ -472,6 +464,5 @@ This feature is complete when:
 
 - Add a trace-level search tool that returns one row per trace, parallel to
   `search_ai_conversations`.
-- Add richer focused-span behavior for conversation URLs with `spanId`.
 - Add pagination metadata to formatted output if the API client standardizes
   cursor handling.

@@ -44,7 +44,7 @@
       },
       {
         "name": "get_ai_conversation_details",
-        "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover or list conversations, use search_ai_conversations.",
+        "description": "Fetch the chronological transcript and debugging details for one AI conversation.\n\nReturns a timeline of user messages, assistant messages, and tool calls, with trace/span IDs for deeper debugging. To discover or list conversations, use search_ai_conversations.",
         "requiredScopes": ["event:read", "project:read"]
       },
       {
@@ -194,7 +194,7 @@
       },
       {
         "name": "get_ai_conversation_details",
-        "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover or list conversations, use search_ai_conversations.",
+        "description": "Fetch the chronological transcript and debugging details for one AI conversation.\n\nReturns a timeline of user messages, assistant messages, and tool calls, with trace/span IDs for deeper debugging. To discover or list conversations, use search_ai_conversations.",
         "requiredScopes": ["event:read", "project:read"]
       },
       {
@@ -300,7 +300,7 @@
       },
       {
         "name": "get_ai_conversation_details",
-        "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover or list conversations, use search_ai_conversations.",
+        "description": "Fetch the chronological transcript and debugging details for one AI conversation.\n\nReturns a timeline of user messages, assistant messages, and tool calls, with trace/span IDs for deeper debugging. To discover or list conversations, use search_ai_conversations.",
         "requiredScopes": ["event:read", "project:read"]
       },
       {

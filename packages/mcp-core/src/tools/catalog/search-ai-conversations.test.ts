@@ -2,8 +2,6 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import searchAIConversations from "./search-ai-conversations";
-import catalogTools from "./index";
-import { isDefaultTopLevelToolName } from "../surfaces";
 import { getServerContext } from "../../test-setup";
 import {
   assertStructuredOnlyResult,
@@ -94,6 +92,7 @@ describe("search_ai_conversations", () => {
       {
         "conversations": [
           {
+            "aiCallCount": 2,
             "conversationId": "conv-123",
             "durationMs": 15000,
             "endTimestamp": 1713805415000,
@@ -103,13 +102,12 @@ describe("search_ai_conversations", () => {
               "triage-agent",
             ],
             "lastOutputPreview": "The checkout worker is timing out.",
-            "llmCalls": 2,
             "sampleTraceIds": [
               "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             ],
             "startTimestamp": 1713805400000,
-            "toolCalls": 1,
-            "toolErrors": 1,
+            "toolCallCount": 1,
+            "toolErrorCount": 1,
             "toolNames": [
               "search_events",
             ],
@@ -266,7 +264,6 @@ describe("search_ai_conversations", () => {
       {
         organizationSlug: "test-org",
         query: "failed",
-        samplingMode: "HIGHEST_ACCURACY",
         project: "backend",
         environment: ["production", "staging"],
         start: "2026-06-01T00:00:00Z",
@@ -280,7 +277,7 @@ describe("search_ai_conversations", () => {
     const params = new URL(requestUrls[0]!).searchParams;
     expect(params.get("query")).toBe("failed");
     expect(params.get("sort")).toBe(null);
-    expect(params.get("samplingMode")).toBe("HIGHEST_ACCURACY");
+    expect(params.get("samplingMode")).toBe(null);
     expect(params.getAll("project")).toEqual(["4509109107622913"]);
     expect(params.getAll("environment")).toEqual(["production", "staging"]);
     expect(params.get("statsPeriod")).toBe(null);
@@ -330,10 +327,5 @@ describe("search_ai_conversations", () => {
         getServerContext(),
       ),
     ).rejects.toThrow("`start` and `end` must be provided together.");
-  });
-
-  it("is catalog-only", () => {
-    expect(catalogTools.search_ai_conversations).toBe(searchAIConversations);
-    expect(isDefaultTopLevelToolName("search_ai_conversations")).toBe(false);
   });
 });

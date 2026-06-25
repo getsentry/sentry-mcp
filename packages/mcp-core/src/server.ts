@@ -60,6 +60,10 @@ function isCallToolResult(output: unknown): output is CallToolResult {
   );
 }
 
+/**
+ * Detects structured-only tool output. Full CallToolResult objects are excluded
+ * so compatibility text generation stays centralized in server.ts.
+ */
 function isStructuredToolOutput(
   output: unknown,
 ): output is StructuredToolOutput {
@@ -78,6 +82,10 @@ function isStructuredToolOutput(
   );
 }
 
+/**
+ * Wraps structured-only output in an MCP CallToolResult with generated JSON
+ * text for clients that do not read structuredContent yet.
+ */
 function structuredOutputToCallToolResult(
   output: StructuredToolOutput,
 ): CallToolResult {

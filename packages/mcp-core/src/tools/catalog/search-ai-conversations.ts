@@ -16,12 +16,6 @@ import { isNumericId } from "../../utils/slug-validation";
 import type { AIConversationSummary, SentryApiService } from "../../api-client";
 import type { ServerContext } from "../../types";
 
-const SAMPLING_MODES = [
-  "NORMAL",
-  "HIGHEST_ACCURACY",
-  "HIGHEST_ACCURACY_FLEX_TIME",
-] as const;
-
 const PREVIEW_LENGTH = 240;
 const TRACE_ID_SAMPLE_SIZE = 3;
 
@@ -32,9 +26,9 @@ const aiConversationSearchResultSchema = z.object({
   endTimestamp: z.number(),
   durationMs: z.number(),
   errors: z.number(),
-  llmCalls: z.number(),
-  toolCalls: z.number(),
-  toolErrors: z.number(),
+  aiCallCount: z.number(),
+  toolCallCount: z.number(),
+  toolErrorCount: z.number(),
   totalTokens: z.number(),
   totalCost: z.number(),
   traceCount: z.number(),
@@ -164,8 +158,8 @@ function buildArtifact(
         conversationId,
         flow,
         errors,
-        llmCalls,
-        toolCalls,
+        aiCallCount: llmCalls,
+        toolCallCount: toolCalls,
         totalTokens,
         totalCost,
         startTimestamp,
@@ -176,7 +170,7 @@ function buildArtifact(
         lastOutputPreview: previewText(lastOutput),
         user: projectUser(user),
         toolNames,
-        toolErrors,
+        toolErrorCount: toolErrors,
         url: apiService.getAIConversationUrl(organizationSlug, conversationId),
         durationMs: Math.max(0, endTimestamp - startTimestamp),
       };
@@ -206,10 +200,6 @@ export default defineTool({
       .trim()
       .optional()
       .describe("Conversation query/filter string."),
-    samplingMode: z
-      .enum(SAMPLING_MODES)
-      .optional()
-      .describe("Sentry AI Conversations sampling mode."),
     project: z
       .union([ParamProjectSlug, z.array(ParamProjectSlug).min(1)])
       .optional()
@@ -282,7 +272,6 @@ export default defineTool({
       await apiService.searchAIConversations({
         organizationSlug,
         query: params.query,
-        samplingMode: params.samplingMode,
         project: projectIds,
         environment: params.environment,
         statsPeriod,
@@ -299,7 +288,6 @@ export default defineTool({
       statsPeriod,
       start: params.start,
       end: params.end,
-      samplingMode: params.samplingMode,
     });
 
     const artifact = buildArtifact(

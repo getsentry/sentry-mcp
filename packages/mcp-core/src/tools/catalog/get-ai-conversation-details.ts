@@ -399,9 +399,9 @@ export default defineTool({
   requiredScopes: ["event:read", "project:read"],
 
   description: [
-    "Fetch all spans for an AI conversation by its gen_ai.conversation.id.",
+    "Fetch the chronological transcript and debugging details for one AI conversation.",
     "",
-    "A conversation is a set of spans sharing the same gen_ai.conversation.id. To discover or list conversations, use search_ai_conversations.",
+    "Returns a timeline of user messages, assistant messages, and tool calls, with trace/span IDs for deeper debugging. To discover or list conversations, use search_ai_conversations.",
   ].join("\n"),
 
   inputSchema: {
@@ -427,11 +427,6 @@ export default defineTool({
       .trim()
       .optional()
       .describe("Explicit end time for the conversation lookup window."),
-    spanId: z
-      .string()
-      .trim()
-      .optional()
-      .describe("Optional focused span ID from a Sentry conversation URL."),
     regionUrl: ParamRegionUrl.optional(),
   },
 

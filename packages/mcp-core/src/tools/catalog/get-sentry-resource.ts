@@ -329,7 +329,6 @@ function resolveFromParsedUrl(
         organizationSlug,
         conversationId: parsed.conversationId,
         projectSlugOrId: parsed.projectSlugOrId,
-        spanId: parsed.spanId,
         start: parsed.start,
         end: parsed.end,
       };
@@ -690,7 +689,6 @@ export default defineTool({
             project: resolved.projectSlugOrId,
             start: resolved.start,
             end: resolved.end,
-            spanId: resolved.spanId,
             regionUrl: context.constraints.regionUrl ?? undefined,
           },
           context,
