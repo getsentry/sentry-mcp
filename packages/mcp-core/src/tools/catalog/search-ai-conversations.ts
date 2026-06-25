@@ -2,6 +2,7 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { createStructuredTextResult } from "../../internal/tool-helpers/results";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
@@ -9,7 +10,11 @@ import {
 } from "../../schema";
 import { UserInputError } from "../../errors";
 import { isNumericId } from "../../utils/slug-validation";
-import type { AIConversationSummary, SentryApiService } from "../../api-client";
+import {
+  AIConversationSummarySchema,
+  type AIConversationSummary,
+  type SentryApiService,
+} from "../../api-client";
 import type { ServerContext } from "../../types";
 
 const SORT_VALUES = [
@@ -36,6 +41,22 @@ const SAMPLING_MODES = [
   "HIGHEST_ACCURACY",
   "HIGHEST_ACCURACY_FLEX_TIME",
 ] as const;
+
+const aiConversationSearchResultSchema = AIConversationSummarySchema.extend({
+  url: z.string().url(),
+  durationMs: z.number(),
+});
+
+export const searchAIConversationsOutputSchema = z.object({
+  organizationSlug: z.string(),
+  count: z.number(),
+  nextCursor: z.string().nullable(),
+  conversations: z.array(aiConversationSearchResultSchema),
+});
+
+type SearchAIConversationsOutput = z.infer<
+  typeof searchAIConversationsOutputSchema
+>;
 
 function normalizeList<T>(value: T | T[] | null | undefined): T[] | undefined {
   if (value == null) {
@@ -121,7 +142,7 @@ function buildArtifact(
   organizationSlug: string,
   conversations: AIConversationSummary[],
   nextCursor: string | null,
-) {
+): SearchAIConversationsOutput {
   return {
     organizationSlug,
     count: conversations.length,
@@ -306,6 +327,7 @@ export default defineTool({
     readOnlyHint: true,
     openWorldHint: true,
   },
+  outputSchema: searchAIConversationsOutputSchema,
   async handler(params, context: ServerContext) {
     if ((params.start && !params.end) || (!params.start && params.end)) {
       throw new UserInputError("`start` and `end` must be provided together.");
@@ -404,6 +426,9 @@ export default defineTool({
       "```",
     );
 
-    return output.join("\n");
+    return createStructuredTextResult({
+      text: output.join("\n"),
+      structuredContent: artifact,
+    });
   },
 });

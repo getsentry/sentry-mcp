@@ -30,6 +30,27 @@ const baseConversation = {
   toolErrors: 1,
 };
 
+function getTextContent(result: unknown): string {
+  const content = (result as { content?: Array<{ text?: string }> }).content;
+  return content?.find((item) => typeof item.text === "string")?.text ?? "";
+}
+
+function getStructuredContent<T extends Record<string, unknown>>(
+  result: unknown,
+): T {
+  const structuredContent = (result as { structuredContent?: unknown })
+    .structuredContent;
+  if (
+    !structuredContent ||
+    typeof structuredContent !== "object" ||
+    Array.isArray(structuredContent)
+  ) {
+    throw new Error(`No structured content found: ${JSON.stringify(result)}`);
+  }
+
+  return structuredContent as T;
+}
+
 describe("search_ai_conversations", () => {
   it("returns conversation-shaped search results", async () => {
     mswServer.use(
@@ -57,7 +78,29 @@ describe("search_ai_conversations", () => {
       getServerContext(),
     );
 
-    expect(result).toMatchInlineSnapshot(`
+    const text = getTextContent(result);
+    const structuredContent = getStructuredContent<{
+      organizationSlug: string;
+      count: number;
+      conversations: Array<{
+        conversationId: string;
+        url: string;
+        durationMs: number;
+      }>;
+    }>(result);
+
+    expect(structuredContent).toMatchObject({
+      organizationSlug: "test-org",
+      count: 1,
+      conversations: [
+        {
+          conversationId: "conv-123",
+          url: "https://test-org.sentry.io/explore/conversations/conv-123/",
+          durationMs: 15000,
+        },
+      ],
+    });
+    expect(text).toMatchInlineSnapshot(`
       "# AI Conversations in **test-org**
 
       ## Executed Search
@@ -197,8 +240,20 @@ describe("search_ai_conversations", () => {
     expect(params.get("end")).toBe("2026-06-02T00:00:00Z");
     expect(params.get("cursor")).toBe("page-1");
     expect(params.get("per_page")).toBe("25");
-    expect(result).toContain("No AI conversations found.");
-    expect(result).toContain('cursor: "page-2"');
+    const text = getTextContent(result);
+    const structuredContent = getStructuredContent<{
+      count: number;
+      nextCursor: string | null;
+      conversations: unknown[];
+    }>(result);
+
+    expect(text).toContain("No AI conversations found.");
+    expect(text).toContain('cursor: "page-2"');
+    expect(structuredContent).toMatchObject({
+      count: 0,
+      nextCursor: "page-2",
+      conversations: [],
+    });
   });
 
   it("rejects conflicting relative and absolute time ranges", async () => {
