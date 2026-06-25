@@ -66,6 +66,14 @@ export const ParamIssueUrl = z
     "The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43",
   );
 
+export const ParamExternalIssueUrl = z
+  .string()
+  .url()
+  .trim()
+  .describe(
+    "The URL of an existing external issue to link to this Sentry issue. This links an existing ticket; it does not create a new ticket. Supported URL shapes include Jira, GitHub, GitLab, Bitbucket, Azure DevOps, Linear, and Shortcut issue URLs.",
+  );
+
 export const ParamReplayId = z
   .string()
   .trim()

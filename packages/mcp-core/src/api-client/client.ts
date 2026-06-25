@@ -50,6 +50,11 @@ import {
   IssueSchema,
   IssueTagValuesSchema,
   ExternalIssueListSchema,
+  ExternalIssueSchema,
+  IssueIntegrationLinkConfigSchema,
+  IssueIntegrationListSchema,
+  NativeExternalIssueSchema,
+  SentryAppInstallationListSchema,
   EventSchema,
   EventAttachmentListSchema,
   ErrorsSearchResponseSchema,
@@ -99,6 +104,8 @@ import type {
   IssueCommentList,
   IssueList,
   IssueTagValues,
+  ExternalIssue,
+  NativeExternalIssue,
   ExternalIssueList,
   CommitList,
   DeployList,
@@ -108,6 +115,8 @@ import type {
   MonitorStats,
   MetricAlertRule,
   MetricAlertRuleList,
+  IssueIntegrationLinkConfig,
+  IssueIntegrationList,
   OrganizationList,
   Project,
   ProjectList,
@@ -126,6 +135,7 @@ import type {
   ReplayList,
   ReplayRecordingSegments,
   AIConversationSpanList,
+  SentryAppInstallationList,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
@@ -3105,6 +3115,117 @@ export class SentryApiService {
       opts,
     );
     return ExternalIssueListSchema.parse(body);
+  }
+
+  async listIssueIntegrations(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueIntegrationList> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/integrations/`,
+      undefined,
+      opts,
+    );
+    return IssueIntegrationListSchema.parse(body);
+  }
+
+  async getIssueIntegrationLinkConfig(
+    {
+      organizationSlug,
+      issueId,
+      integrationId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      integrationId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueIntegrationLinkConfig> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/integrations/${integrationId}/?action=link`,
+      undefined,
+      opts,
+    );
+    return IssueIntegrationLinkConfigSchema.parse(body);
+  }
+
+  async linkNativeExternalIssue(
+    {
+      organizationSlug,
+      issueId,
+      integrationId,
+      data,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      integrationId: string;
+      data: Record<string, unknown>;
+    },
+    opts?: RequestOptions,
+  ): Promise<NativeExternalIssue> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/integrations/${integrationId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      },
+      opts,
+    );
+    return NativeExternalIssueSchema.parse(body);
+  }
+
+  async listSentryAppInstallations(
+    {
+      organizationSlug,
+    }: {
+      organizationSlug: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<SentryAppInstallationList> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/sentry-app-installations/`,
+      undefined,
+      opts,
+    );
+    return SentryAppInstallationListSchema.parse(body);
+  }
+
+  async createSentryAppExternalIssueLink(
+    {
+      installationUuid,
+      issueId,
+      webUrl,
+      project,
+      identifier,
+    }: {
+      installationUuid: string;
+      issueId: string;
+      webUrl: string;
+      project: string;
+      identifier: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ExternalIssue> {
+    const body = await this.requestJSON(
+      `/sentry-app-installations/${installationUuid}/external-issues/`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          issueId,
+          webUrl,
+          project,
+          identifier,
+        }),
+      },
+      opts,
+    );
+    return ExternalIssueSchema.parse(body);
   }
 
   async getEventForIssue(

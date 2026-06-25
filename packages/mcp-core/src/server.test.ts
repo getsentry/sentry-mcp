@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { type Span, setUser, startSpan } from "@sentry/core";
+import { type Span, getActiveSpan, setUser, startSpan } from "@sentry/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { buildServer } from "./server";
@@ -191,6 +191,59 @@ describe("buildServer", () => {
         id: "user-123",
         ip_address: "192.0.2.1",
       });
+    });
+
+    it("preserves tool result error state", async () => {
+      const setStatus = vi.fn();
+      const span = {
+        setAttribute: vi.fn(),
+        setStatus,
+        recordException: vi.fn(),
+      } as unknown as Span;
+      vi.mocked(getActiveSpan).mockReturnValue(span);
+      const server = buildServer({
+        context: baseContext,
+        tools: {
+          example_tool: createMockTool("example_tool", {
+            annotations: { readOnlyHint: true },
+            handler: async () => ({
+              content: [
+                {
+                  type: "text",
+                  text: "partial failure",
+                },
+              ],
+              isError: true,
+            }),
+          }),
+        },
+      });
+      const registeredTools = (
+        server as unknown as {
+          _registeredTools: Record<
+            string,
+            {
+              handler: (
+                params: Record<string, unknown>,
+                extra: unknown,
+              ) => Promise<unknown>;
+            }
+          >;
+        }
+      )._registeredTools;
+
+      await expect(
+        registeredTools.example_tool?.handler({}, {}),
+      ).resolves.toEqual({
+        content: [
+          {
+            type: "text",
+            text: "partial failure",
+          },
+        ],
+        isError: true,
+      });
+      expect(setStatus).toHaveBeenCalledWith({ code: 2 });
     });
   });
 
