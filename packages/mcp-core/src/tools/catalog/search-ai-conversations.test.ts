@@ -31,6 +31,20 @@ const baseConversation = {
   toolErrors: 1,
 };
 
+const longConversation = {
+  ...baseConversation,
+  conversationId: "conv-long",
+  traceCount: 4,
+  traceIds: [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "cccccccccccccccccccccccccccccccc",
+    "dddddddddddddddddddddddddddddddd",
+  ],
+  firstInput: `${"Investigate checkout failures. ".repeat(20)}Root cause?`,
+  lastOutput: `${"The worker timed out while calling inventory. ".repeat(20)}Next step.`,
+};
+
 function getStructuredContent<T extends Record<string, unknown>>(
   result: unknown,
 ): T {
@@ -90,6 +104,9 @@ describe("search_ai_conversations", () => {
       }>;
     }>(result);
 
+    expect(structuredContent.conversations[0]).not.toHaveProperty("firstInput");
+    expect(structuredContent.conversations[0]).not.toHaveProperty("lastOutput");
+    expect(structuredContent.conversations[0]).not.toHaveProperty("traceIds");
     expect(structuredContent).toMatchInlineSnapshot(`
       {
         "conversations": [
@@ -98,12 +115,15 @@ describe("search_ai_conversations", () => {
             "durationMs": 15000,
             "endTimestamp": 1713805415000,
             "errors": 1,
-            "firstInput": "What failed in checkout?",
+            "firstInputPreview": "What failed in checkout?",
             "flow": [
               "triage-agent",
             ],
-            "lastOutput": "The checkout worker is timing out.",
+            "lastOutputPreview": "The checkout worker is timing out.",
             "llmCalls": 2,
+            "sampleTraceIds": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            ],
             "startTimestamp": 1713805400000,
             "toolCalls": 1,
             "toolErrors": 1,
@@ -113,14 +133,9 @@ describe("search_ai_conversations", () => {
             "totalCost": 0.012,
             "totalTokens": 1200,
             "traceCount": 1,
-            "traceIds": [
-              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            ],
             "url": "https://test-org.sentry.io/explore/conversations/conv-123/",
             "user": {
               "email": "dev@example.com",
-              "id": "1",
-              "ip_address": "127.0.0.1",
               "username": "dev",
             },
           },
@@ -135,6 +150,46 @@ describe("search_ai_conversations", () => {
     expect(structuredContent.conversations[0]?.user).not.toHaveProperty(
       "backendOnlyField",
     );
+    expect(structuredContent.conversations[0]?.user).not.toHaveProperty("id");
+    expect(structuredContent.conversations[0]?.user).not.toHaveProperty(
+      "ip_address",
+    );
+  });
+
+  it("keeps search results concise for large conversations", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+        () => HttpResponse.json([longConversation]),
+      ),
+    );
+
+    const result = await searchAIConversations.handler(
+      {
+        organizationSlug: "test-org",
+        limit: 10,
+      },
+      getServerContext(),
+    );
+
+    const structuredContent = getStructuredContent<{
+      conversations: Array<{
+        firstInputPreview: string | null;
+        lastOutputPreview: string | null;
+        sampleTraceIds: string[];
+      }>;
+    }>(result);
+    const conversation = structuredContent.conversations[0]!;
+
+    expect(conversation.firstInputPreview).toHaveLength(240);
+    expect(conversation.firstInputPreview?.endsWith("...")).toBe(true);
+    expect(conversation.lastOutputPreview).toHaveLength(240);
+    expect(conversation.lastOutputPreview?.endsWith("...")).toBe(true);
+    expect(conversation.sampleTraceIds).toEqual([
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "cccccccccccccccccccccccccccccccc",
+    ]);
   });
 
   it("defaults searches to the same 30d window as detail lookups", async () => {

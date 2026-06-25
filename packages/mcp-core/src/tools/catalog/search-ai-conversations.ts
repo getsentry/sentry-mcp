@@ -13,11 +13,7 @@ import {
 import { UserInputError } from "../../errors";
 import { structuredResult } from "../../internal/tool-helpers/results";
 import { isNumericId } from "../../utils/slug-validation";
-import {
-  AIConversationSummarySchema,
-  type AIConversationSummary,
-  type SentryApiService,
-} from "../../api-client";
+import type { AIConversationSummary, SentryApiService } from "../../api-client";
 import type { ServerContext } from "../../types";
 
 const SAMPLING_MODES = [
@@ -26,9 +22,33 @@ const SAMPLING_MODES = [
   "HIGHEST_ACCURACY_FLEX_TIME",
 ] as const;
 
-const aiConversationSearchResultSchema = AIConversationSummarySchema.extend({
+const PREVIEW_LENGTH = 240;
+const TRACE_ID_SAMPLE_SIZE = 3;
+
+const aiConversationSearchResultSchema = z.object({
+  conversationId: z.string(),
   url: z.string().url(),
+  startTimestamp: z.number(),
+  endTimestamp: z.number(),
   durationMs: z.number(),
+  errors: z.number(),
+  llmCalls: z.number(),
+  toolCalls: z.number(),
+  toolErrors: z.number(),
+  totalTokens: z.number(),
+  totalCost: z.number(),
+  traceCount: z.number(),
+  sampleTraceIds: z.array(z.string()),
+  firstInputPreview: z.string().nullable(),
+  lastOutputPreview: z.string().nullable(),
+  flow: z.array(z.string()),
+  toolNames: z.array(z.string()),
+  user: z
+    .object({
+      email: z.string().nullable(),
+      username: z.string().nullable(),
+    })
+    .nullable(),
 });
 
 export const searchAIConversationsOutputSchema = z.object({
@@ -88,15 +108,20 @@ async function resolveProjectIds({
   );
 }
 
+function previewText(value: string | null): string | null {
+  if (value == null || value.length <= PREVIEW_LENGTH) {
+    return value;
+  }
+  return `${value.slice(0, PREVIEW_LENGTH - 3)}...`;
+}
+
 function projectUser(user: AIConversationSummary["user"]) {
   if (!user) {
     return null;
   }
   return {
-    id: user.id,
     email: user.email,
     username: user.username,
-    ip_address: user.ip_address,
   };
 }
 
@@ -146,9 +171,9 @@ function buildArtifact(
         startTimestamp,
         endTimestamp,
         traceCount,
-        traceIds,
-        firstInput,
-        lastOutput,
+        sampleTraceIds: traceIds.slice(0, TRACE_ID_SAMPLE_SIZE),
+        firstInputPreview: previewText(firstInput),
+        lastOutputPreview: previewText(lastOutput),
         user: projectUser(user),
         toolNames,
         toolErrors,
