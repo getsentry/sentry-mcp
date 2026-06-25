@@ -277,7 +277,6 @@ describe("search_ai_conversations", () => {
     const params = new URL(requestUrls[0]!).searchParams;
     expect(params.get("query")).toBe("failed");
     expect(params.get("sort")).toBe(null);
-    expect(params.get("samplingMode")).toBe(null);
     expect(params.getAll("project")).toEqual(["4509109107622913"]);
     expect(params.getAll("environment")).toEqual(["production", "staging"]);
     expect(params.get("statsPeriod")).toBe(null);

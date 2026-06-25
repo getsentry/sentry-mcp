@@ -621,7 +621,6 @@ export function getAIConversationsUrl(
     statsPeriod?: string;
     start?: string;
     end?: string;
-    samplingMode?: string;
   } = {},
   protocol: SentryProtocol = "https",
 ): string {
@@ -647,10 +646,6 @@ export function getAIConversationsUrl(
   } else if (options.statsPeriod) {
     urlParams.set("statsPeriod", options.statsPeriod);
   }
-  if (options.samplingMode) {
-    urlParams.set("samplingMode", options.samplingMode);
-  }
-
   const baseUrl = getSentryWebBaseUrl(
     host,
     organizationSlug,

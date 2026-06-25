@@ -1037,7 +1037,6 @@ export class SentryApiService {
       statsPeriod?: string;
       start?: string;
       end?: string;
-      samplingMode?: string;
     },
   ): string {
     return getAIConversationsUrlUtil(
@@ -4083,7 +4082,6 @@ export class SentryApiService {
     {
       organizationSlug,
       query,
-      samplingMode,
       project,
       environment,
       statsPeriod,
@@ -4094,7 +4092,6 @@ export class SentryApiService {
     }: {
       organizationSlug: string;
       query?: string;
-      samplingMode?: string;
       project?: string | string[];
       environment?: string | string[];
       statsPeriod?: string;
@@ -4111,9 +4108,6 @@ export class SentryApiService {
     const queryParams = new URLSearchParams();
     if (query) {
       queryParams.set("query", query);
-    }
-    if (samplingMode) {
-      queryParams.set("samplingMode", samplingMode);
     }
     if (project) {
       const projects = Array.isArray(project) ? project : [project];
