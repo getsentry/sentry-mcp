@@ -1,7 +1,6 @@
 import { getActiveSpan } from "@sentry/core";
 import { z } from "zod";
 import { defineTool } from "../../internal/tool-helpers/define";
-import { createStructuredTextResult } from "../../internal/tool-helpers/results";
 import { ALL_SKILLS } from "../../skills";
 import type { ServerContext } from "../../types";
 import type { ToolRegistry } from "../catalog-runtime/availability";
@@ -46,10 +45,15 @@ function createSearchToolsResult(payload: SearchToolsOutput) {
     );
   }
 
-  return createStructuredTextResult({
-    text: JSON.stringify(payload, null, 2),
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify(payload, null, 2),
+      },
+    ],
     structuredContent: payload,
-  });
+  };
 }
 
 export function createSearchToolsTool(getTools: () => ToolRegistry) {

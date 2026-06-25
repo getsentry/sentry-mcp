@@ -25,6 +25,7 @@ const baseConversation = {
     email: "dev@example.com",
     username: "dev",
     ip_address: "127.0.0.1",
+    backendOnlyField: "do-not-leak",
   },
   toolNames: ["search_events"],
   toolErrors: 1,
@@ -59,7 +60,7 @@ describe("search_ai_conversations", () => {
         ({ request }) => {
           const url = new URL(request.url);
           expect(url.searchParams.get("query")).toBe("checkout");
-          expect(url.searchParams.get("sort")).toBe("-errors");
+          expect(url.searchParams.get("sort")).toBe(null);
           expect(url.searchParams.get("statsPeriod")).toBe("7d");
           expect(url.searchParams.get("per_page")).toBe("10");
           return HttpResponse.json([baseConversation]);
@@ -71,7 +72,6 @@ describe("search_ai_conversations", () => {
       {
         organizationSlug: "test-org",
         query: "checkout",
-        sort: "-errors",
         statsPeriod: "7d",
         limit: 10,
       },
@@ -81,34 +81,48 @@ describe("search_ai_conversations", () => {
     const text = getTextContent(result);
     const structuredContent = getStructuredContent<{
       organizationSlug: string;
+      searchUrl: string;
       count: number;
       conversations: Array<{
         conversationId: string;
         url: string;
         durationMs: number;
+        user: Record<string, unknown> | null;
       }>;
     }>(result);
 
     expect(structuredContent).toMatchObject({
       organizationSlug: "test-org",
+      searchUrl:
+        "https://test-org.sentry.io/explore/conversations/?query=checkout&statsPeriod=7d",
       count: 1,
       conversations: [
         {
           conversationId: "conv-123",
           url: "https://test-org.sentry.io/explore/conversations/conv-123/",
           durationMs: 15000,
+          user: {
+            id: "1",
+            email: "dev@example.com",
+            username: "dev",
+            ip_address: "127.0.0.1",
+          },
         },
       ],
     });
+    expect(structuredContent.conversations[0]?.user).not.toHaveProperty(
+      "backendOnlyField",
+    );
     expect(text).toMatchInlineSnapshot(`
       "# AI Conversations in **test-org**
 
       ## Executed Search
       - Query: \`checkout\`
-      - Sort: \`-errors\`
+      - Order: backend default (most recent activity first)
       - Limit: 10
       - Time range: Last 7d
 
+      **Sentry Search URL**: https://test-org.sentry.io/explore/conversations/?query=checkout&statsPeriod=7d
 
       Found 1 AI conversation.
 
@@ -150,6 +164,7 @@ describe("search_ai_conversations", () => {
       \`\`\`json
       {
         "organizationSlug": "test-org",
+        "searchUrl": "https://test-org.sentry.io/explore/conversations/?query=checkout&statsPeriod=7d",
         "count": 1,
         "nextCursor": null,
         "conversations": [
@@ -190,6 +205,40 @@ describe("search_ai_conversations", () => {
     `);
   });
 
+  it("defaults searches to the same 30d window as detail lookups", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("statsPeriod")).toBe("30d");
+          expect(url.searchParams.get("start")).toBe(null);
+          expect(url.searchParams.get("end")).toBe(null);
+          expect(url.searchParams.get("per_page")).toBe("10");
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const result = await searchAIConversations.handler(
+      {
+        organizationSlug: "test-org",
+        limit: 10,
+      },
+      getServerContext(),
+    );
+
+    const text = getTextContent(result);
+    const structuredContent = getStructuredContent<{
+      searchUrl: string;
+    }>(result);
+
+    expect(text).toContain("- Time range: Last 30d");
+    expect(structuredContent.searchUrl).toBe(
+      "https://test-org.sentry.io/explore/conversations/?statsPeriod=30d",
+    );
+  });
+
   it("passes filters, resolves project slugs, and returns pagination hints", async () => {
     const requestUrls: string[] = [];
     mswServer.use(
@@ -217,7 +266,6 @@ describe("search_ai_conversations", () => {
       {
         organizationSlug: "test-org",
         query: "failed",
-        sort: "-timestamp",
         samplingMode: "HIGHEST_ACCURACY",
         project: "backend",
         environment: ["production", "staging"],
@@ -231,7 +279,7 @@ describe("search_ai_conversations", () => {
 
     const params = new URL(requestUrls[0]!).searchParams;
     expect(params.get("query")).toBe("failed");
-    expect(params.get("sort")).toBe("-timestamp");
+    expect(params.get("sort")).toBe(null);
     expect(params.get("samplingMode")).toBe("HIGHEST_ACCURACY");
     expect(params.getAll("project")).toEqual(["4509109107622913"]);
     expect(params.getAll("environment")).toEqual(["production", "staging"]);
@@ -261,7 +309,6 @@ describe("search_ai_conversations", () => {
       searchAIConversations.handler(
         {
           organizationSlug: "test-org",
-          sort: "-timestamp",
           statsPeriod: "7d",
           start: "2026-06-01T00:00:00Z",
           end: "2026-06-02T00:00:00Z",
@@ -279,7 +326,6 @@ describe("search_ai_conversations", () => {
       searchAIConversations.handler(
         {
           organizationSlug: "test-org",
-          sort: "-timestamp",
           start: "2026-06-01T00:00:00Z",
           limit: 10,
         },

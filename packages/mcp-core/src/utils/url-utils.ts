@@ -611,6 +611,56 @@ export function getAIConversationUrl(
   );
 }
 
+export function getAIConversationsUrl(
+  host: string,
+  organizationSlug: string,
+  options: {
+    query?: string;
+    project?: string[];
+    environment?: string | string[];
+    statsPeriod?: string;
+    start?: string;
+    end?: string;
+    samplingMode?: string;
+  } = {},
+  protocol: SentryProtocol = "https",
+): string {
+  const urlParams = new URLSearchParams();
+
+  if (options.query) {
+    urlParams.set("query", options.query);
+  }
+  for (const projectId of options.project ?? []) {
+    urlParams.append("project", projectId);
+  }
+  const environments = Array.isArray(options.environment)
+    ? options.environment
+    : options.environment
+      ? [options.environment]
+      : [];
+  for (const environmentName of environments) {
+    urlParams.append("environment", environmentName);
+  }
+  if (options.start && options.end) {
+    urlParams.set("start", options.start);
+    urlParams.set("end", options.end);
+  } else if (options.statsPeriod) {
+    urlParams.set("statsPeriod", options.statsPeriod);
+  }
+  if (options.samplingMode) {
+    urlParams.set("samplingMode", options.samplingMode);
+  }
+
+  const baseUrl = getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    "/explore/conversations/",
+    protocol,
+  );
+  const queryString = urlParams.toString();
+  return queryString ? `${baseUrl}?${queryString}` : baseUrl;
+}
+
 export function getProfileUrl(
   host: string,
   organizationSlug: string,

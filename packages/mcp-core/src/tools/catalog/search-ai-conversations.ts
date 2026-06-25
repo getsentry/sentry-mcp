@@ -1,8 +1,10 @@
+// Catalog-only AI Conversations search. This owns the MCP-facing projection for
+// Sentry's conversation list endpoint and intentionally exposes backend default
+// ordering until alternate sorting is applied by the API.
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import { createStructuredTextResult } from "../../internal/tool-helpers/results";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
@@ -17,25 +19,6 @@ import {
 } from "../../api-client";
 import type { ServerContext } from "../../types";
 
-const SORT_VALUES = [
-  "timestamp",
-  "-timestamp",
-  "duration",
-  "-duration",
-  "errors",
-  "-errors",
-  "llmCalls",
-  "-llmCalls",
-  "toolCalls",
-  "-toolCalls",
-  "totalTokens",
-  "-totalTokens",
-  "totalCost",
-  "-totalCost",
-  "toolErrors",
-  "-toolErrors",
-] as const;
-
 const SAMPLING_MODES = [
   "NORMAL",
   "HIGHEST_ACCURACY",
@@ -49,6 +32,7 @@ const aiConversationSearchResultSchema = AIConversationSummarySchema.extend({
 
 export const searchAIConversationsOutputSchema = z.object({
   organizationSlug: z.string(),
+  searchUrl: z.string().url(),
   count: z.number(),
   nextCursor: z.string().nullable(),
   conversations: z.array(aiConversationSearchResultSchema),
@@ -137,27 +121,74 @@ function formatUser(conversation: AIConversationSummary): string {
   return user.email ?? user.username ?? user.id ?? user.ip_address ?? "Unknown";
 }
 
+function projectUser(user: AIConversationSummary["user"]) {
+  if (!user) {
+    return null;
+  }
+  return {
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    ip_address: user.ip_address,
+  };
+}
+
+/**
+ * Builds the stable structuredContent projection returned by the search tool.
+ */
 function buildArtifact(
   apiService: SentryApiService,
   organizationSlug: string,
   conversations: AIConversationSummary[],
   nextCursor: string | null,
+  searchUrl: string,
 ): SearchAIConversationsOutput {
   return {
     organizationSlug,
+    searchUrl,
     count: conversations.length,
     nextCursor,
-    conversations: conversations.map((conversation) => ({
-      ...conversation,
-      url: apiService.getAIConversationUrl(
-        organizationSlug,
-        conversation.conversationId,
-      ),
-      durationMs: Math.max(
-        0,
-        conversation.endTimestamp - conversation.startTimestamp,
-      ),
-    })),
+    conversations: conversations.map((conversation) => {
+      const {
+        conversationId,
+        flow,
+        errors,
+        llmCalls,
+        toolCalls,
+        totalTokens,
+        totalCost,
+        startTimestamp,
+        endTimestamp,
+        traceCount,
+        traceIds,
+        firstInput,
+        lastOutput,
+        user,
+        toolNames,
+        toolErrors,
+      } = conversation;
+
+      return {
+        conversationId,
+        flow,
+        errors,
+        llmCalls,
+        toolCalls,
+        totalTokens,
+        totalCost,
+        startTimestamp,
+        endTimestamp,
+        traceCount,
+        traceIds,
+        firstInput,
+        lastOutput,
+        user: projectUser(user),
+        toolNames,
+        toolErrors,
+        url: apiService.getAIConversationUrl(organizationSlug, conversationId),
+        durationMs: Math.max(0, endTimestamp - startTimestamp),
+      };
+    }),
   };
 }
 
@@ -214,7 +245,6 @@ function formatConversation(
 
 function formatExecutedSearch(params: {
   query?: string | null;
-  sort?: string | null;
   projectIds?: string[];
   environment?: string | string[] | null;
   statsPeriod?: string | null;
@@ -227,7 +257,7 @@ function formatExecutedSearch(params: {
   const lines = [
     "## Executed Search",
     `- Query: \`${params.query || "(empty)"}\``,
-    `- Sort: \`${params.sort || "-timestamp"}\``,
+    "- Order: backend default (most recent activity first)",
     `- Limit: ${params.limit}`,
   ];
 
@@ -242,10 +272,8 @@ function formatExecutedSearch(params: {
       `- Environments: ${environments.map((env) => `\`${env}\``).join(", ")}`,
     );
   }
-  if (params.start || params.end) {
-    lines.push(
-      `- Time range: ${params.start || "(unspecified start)"} to ${params.end || "(unspecified end)"}`,
-    );
+  if (params.start && params.end) {
+    lines.push(`- Time range: ${params.start} to ${params.end}`);
   } else if (params.statsPeriod) {
     lines.push(`- Time range: Last ${params.statsPeriod}`);
   }
@@ -256,7 +284,7 @@ function formatExecutedSearch(params: {
     lines.push(`- Sampling mode: \`${params.samplingMode}\``);
   }
 
-  return `${lines.join("\n")}\n`;
+  return lines.join("\n");
 }
 
 export default defineTool({
@@ -271,7 +299,7 @@ export default defineTool({
     "",
     "<examples>",
     "search_ai_conversations(organizationSlug='my-org', query='failed conversations', statsPeriod='7d')",
-    "search_ai_conversations(organizationSlug='my-org', query='checkout', project='backend', sort='-errors')",
+    "search_ai_conversations(organizationSlug='my-org', query='checkout', project='backend')",
     "</examples>",
   ].join("\n"),
   inputSchema: {
@@ -281,10 +309,6 @@ export default defineTool({
       .trim()
       .optional()
       .describe("Conversation query/filter string."),
-    sort: z
-      .enum(SORT_VALUES)
-      .default("-timestamp")
-      .describe("Conversation summary sort key."),
     samplingMode: z
       .enum(SAMPLING_MODES)
       .optional()
@@ -304,7 +328,9 @@ export default defineTool({
       .string()
       .trim()
       .optional()
-      .describe("Relative time range such as 24h, 7d, or 30d."),
+      .describe(
+        "Relative time range such as 24h, 7d, or 30d. Defaults to 30d.",
+      ),
     start: z
       .string()
       .trim()
@@ -351,27 +377,39 @@ export default defineTool({
       project: params.project,
       constrainedProjectSlug: context.constraints.projectSlug,
     });
+    const statsPeriod =
+      params.start || params.end ? undefined : (params.statsPeriod ?? "30d");
 
     const { conversations, nextCursor } =
       await apiService.searchAIConversations({
         organizationSlug,
         query: params.query,
-        sort: params.sort,
         samplingMode: params.samplingMode,
         project: projectIds,
         environment: params.environment,
-        statsPeriod: params.statsPeriod,
+        statsPeriod,
         start: params.start,
         end: params.end,
         limit: params.limit,
         cursor: params.cursor,
       });
 
+    const searchUrl = apiService.getAIConversationsUrl(organizationSlug, {
+      query: params.query,
+      project: projectIds,
+      environment: params.environment,
+      statsPeriod,
+      start: params.start,
+      end: params.end,
+      samplingMode: params.samplingMode,
+    });
+
     const artifact = buildArtifact(
       apiService,
       organizationSlug,
       conversations,
       nextCursor,
+      searchUrl,
     );
 
     const output = [
@@ -379,16 +417,17 @@ export default defineTool({
       "",
       formatExecutedSearch({
         query: params.query,
-        sort: params.sort,
         projectIds,
         environment: params.environment,
-        statsPeriod: params.statsPeriod,
+        statsPeriod,
         start: params.start,
         end: params.end,
         limit: params.limit,
         cursor: params.cursor,
         samplingMode: params.samplingMode,
       }),
+      "",
+      `**Sentry Search URL**: ${searchUrl}`,
       "",
     ];
 
@@ -426,9 +465,14 @@ export default defineTool({
       "```",
     );
 
-    return createStructuredTextResult({
-      text: output.join("\n"),
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: output.join("\n"),
+        },
+      ],
       structuredContent: artifact,
-    });
+    };
   },
 });

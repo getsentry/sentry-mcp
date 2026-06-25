@@ -81,23 +81,6 @@ returns one item per conversation, never one item per span.
 interface SearchAIConversationsParams {
   organizationSlug: string;
   query?: string;
-  sort?:
-    | "timestamp"
-    | "-timestamp"
-    | "duration"
-    | "-duration"
-    | "errors"
-    | "-errors"
-    | "llmCalls"
-    | "-llmCalls"
-    | "toolCalls"
-    | "-toolCalls"
-    | "totalTokens"
-    | "-totalTokens"
-    | "totalCost"
-    | "-totalCost"
-    | "toolErrors"
-    | "-toolErrors";
   samplingMode?:
     | "NORMAL"
     | "HIGHEST_ACCURACY"
@@ -118,8 +101,9 @@ Parameter behavior:
 - `organizationSlug` is required.
 - `query` is a user-facing conversation query/filter string passed to the
   Sentry AI Conversations list endpoint.
-- `sort` uses the Sentry endpoint's supported conversation summary sort keys.
-  If omitted, the backend defaults to `-timestamp`.
+- Results use the Sentry endpoint's default ordering: most recent conversation
+  activity first. Do not expose alternate sort options until the backend applies
+  them.
 - `samplingMode` uses the Sentry endpoint's supported sampling modes. If
   omitted, the backend defaults to `HIGHEST_ACCURACY`.
 - `project` scopes results to one or more projects. The backend accepts numeric
@@ -144,7 +128,6 @@ Do not implement conversation search through
 Expected query parameters:
 
 - `query`
-- `sort`
 - `samplingMode`
 - `project`
 - `environment`
@@ -327,6 +310,7 @@ The method should:
 - Support repeated `project` and `environment` parameters.
 - Support `statsPeriod` or `start`/`end`.
 - Support `cursor` and `per_page`.
+- Avoid sending `sort` until the Sentry endpoint applies alternate ordering.
 - Parse the list response.
 - Preserve pagination metadata if existing client patterns support it.
 
@@ -350,8 +334,8 @@ For this spec, the relevant source files are:
 - `tests/sentry/api/endpoints/test_organization_ai_conversation_details.py`
 
 The implementation should be updated if those files show that accepted query
-parameters, sort values, sampling modes, response fields, pagination behavior,
-feature gates, or retention behavior differ from this spec.
+parameters, ordering behavior, sampling modes, response fields, pagination
+behavior, feature gates, or retention behavior differ from this spec.
 
 ## Tool Registration
 

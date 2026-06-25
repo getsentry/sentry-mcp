@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   getContinuousProfileUrl as getContinuousProfileUrlUtil,
+  getAIConversationsUrl as getAIConversationsUrlUtil,
   getAIConversationUrl as getAIConversationUrlUtil,
   getDashboardUrl as getDashboardUrlUtil,
   getIssueUrl as getIssueUrlUtil,
@@ -1023,6 +1024,26 @@ export class SentryApiService {
       this.host,
       organizationSlug,
       conversationId,
+      this.protocol,
+    );
+  }
+
+  getAIConversationsUrl(
+    organizationSlug: string,
+    options?: {
+      query?: string;
+      project?: string[];
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      samplingMode?: string;
+    },
+  ): string {
+    return getAIConversationsUrlUtil(
+      this.host,
+      organizationSlug,
+      options,
       this.protocol,
     );
   }
@@ -4054,11 +4075,14 @@ export class SentryApiService {
     return spans;
   }
 
+  /**
+   * Searches Sentry AI Conversations using the conversation list endpoint and
+   * returns the current page plus cursor metadata from the response headers.
+   */
   async searchAIConversations(
     {
       organizationSlug,
       query,
-      sort,
       samplingMode,
       project,
       environment,
@@ -4070,7 +4094,6 @@ export class SentryApiService {
     }: {
       organizationSlug: string;
       query?: string;
-      sort?: string;
       samplingMode?: string;
       project?: string | string[];
       environment?: string | string[];
@@ -4088,9 +4111,6 @@ export class SentryApiService {
     const queryParams = new URLSearchParams();
     if (query) {
       queryParams.set("query", query);
-    }
-    if (sort) {
-      queryParams.set("sort", sort);
     }
     if (samplingMode) {
       queryParams.set("samplingMode", samplingMode);

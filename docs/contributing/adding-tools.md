@@ -433,7 +433,9 @@ try {
    - Known limitations
 
 2. **Keep agent prompts focused** - Don't duplicate general MCP knowledge
-3. **Use structured outputs** - Define clear schemas for agent responses
+3. **Use structured outputs** - Define clear schemas for agent responses, and
+   follow the `structuredContent` contract in
+   [tool-responses.md](tool-responses.md)
 4. **Provide tool discovery** - Let agents explore available fields dynamically
 
 See `packages/mcp-core/src/tools/catalog/search-events.ts` and `packages/mcp-core/src/tools/catalog/search-issues.ts` for examples. Their helper code lives under `packages/mcp-core/src/tools/support/`.
