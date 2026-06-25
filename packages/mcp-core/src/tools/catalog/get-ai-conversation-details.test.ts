@@ -120,6 +120,7 @@ describe("get_ai_conversation_details", () => {
     expect(structuredContent).not.toHaveProperty("spanIds");
     expect(structuredContent).toMatchInlineSnapshot(`
       {
+        "aiCallCount": 2,
         "conversationId": "conv-123",
         "endTimestamp": 1713805405,
         "messageCount": 4,
@@ -129,75 +130,67 @@ describe("get_ai_conversation_details", () => {
         ],
         "spanCount": 3,
         "startTimestamp": 1713805400,
-        "toolCallCount": 1,
-        "totalTokens": 100,
-        "traceIds": [
-          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        ],
-        "turnCount": 2,
-        "turns": [
+        "timeline": [
           {
-            "assistant": {
-              "content": "The checkout worker is timing out.",
-              "role": "assistant",
-              "spanId": "1111111111111111",
-              "timestamp": 1713805401.5,
-            },
-            "durationMs": 1500,
-            "ended": 1713805401.5,
+            "content": "What failed in production?",
+            "role": "user",
+            "spanId": "1111111111111111",
+            "timestamp": 1713805400,
+            "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "type": "message",
+          },
+          {
+            "content": "The checkout worker is timing out.",
             "metadata": {
               "agentName": "triage-agent",
+              "durationMs": 1500,
               "model": "gpt-5-mini-2026-05-01",
               "status": "ok",
               "totalTokens": 42,
             },
+            "role": "assistant",
             "spanId": "1111111111111111",
-            "started": 1713805400,
-            "toolCalls": [
-              {
-                "arguments": "{"query":"level:error"}",
-                "durationMs": 300,
-                "input": "{"organizationSlug":"test-org"}",
-                "name": "search_events",
-                "spanId": "2222222222222222",
-                "status": "ok",
-                "timestamp": 1713805401.7,
-              },
-            ],
+            "timestamp": 1713805401.5,
             "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "turn": 1,
-            "user": {
-              "content": "What failed in production?",
-              "role": "user",
-              "spanId": "1111111111111111",
-              "timestamp": 1713805400,
-            },
+            "type": "message",
           },
           {
-            "assistant": {
-              "content": "I found the timeout stack trace.",
-              "role": "assistant",
-              "spanId": "3333333333333333",
-              "timestamp": 1713805405,
-            },
-            "durationMs": 1000,
-            "ended": 1713805405,
+            "arguments": "{"query":"level:error"}",
+            "durationMs": 300,
+            "input": "{"organizationSlug":"test-org"}",
+            "name": "search_events",
+            "spanId": "2222222222222222",
+            "status": "ok",
+            "timestamp": 1713805401.7,
+            "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "type": "tool_call",
+          },
+          {
+            "content": "Can you inspect the failing event?",
+            "role": "user",
+            "spanId": "3333333333333333",
+            "timestamp": 1713805404,
+            "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "type": "message",
+          },
+          {
+            "content": "I found the timeout stack trace.",
             "metadata": {
+              "durationMs": 1000,
               "status": "ok",
               "totalTokens": 58,
             },
+            "role": "assistant",
             "spanId": "3333333333333333",
-            "started": 1713805404,
-            "toolCalls": [],
+            "timestamp": 1713805405,
             "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "turn": 2,
-            "user": {
-              "content": "Can you inspect the failing event?",
-              "role": "user",
-              "spanId": "3333333333333333",
-              "timestamp": 1713805404,
-            },
+            "type": "message",
           },
+        ],
+        "toolCallCount": 1,
+        "totalTokens": 100,
+        "traceIds": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         ],
         "url": "https://test-org.sentry.io/explore/conversations/conv-123/",
       }
@@ -217,12 +210,12 @@ describe("get_ai_conversation_details", () => {
     assertStructuredOnlyResult(result);
     const structuredContent = getStructuredContent(result);
     expect(structuredContent.conversationId).toBe("conv-123");
-    expect(structuredContent.turns).toEqual(
+    expect(structuredContent.timeline).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          assistant: expect.objectContaining({
-            content: "The checkout worker is timing out.",
-          }),
+          type: "message",
+          role: "assistant",
+          content: "The checkout worker is timing out.",
         }),
       ]),
     );
@@ -255,7 +248,7 @@ describe("get_ai_conversation_details", () => {
     const structuredContent = getStructuredContent(result);
     expect(structuredContent).toMatchObject({
       conversationId: "conv-123",
-      turnCount: 2,
+      aiCallCount: 2,
       traceIds: ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
     });
   });
@@ -292,10 +285,10 @@ describe("get_ai_conversation_details", () => {
       startTimestamp: null,
       endTimestamp: null,
       spanCount: 0,
-      turnCount: 0,
+      aiCallCount: 0,
       messageCount: 0,
       toolCallCount: 0,
-      turns: [],
+      timeline: [],
     });
   });
 
@@ -360,21 +353,16 @@ describe("get_ai_conversation_details", () => {
 
     const structuredContent = getStructuredContent(result);
     expect(structuredContent.messageCount).toBe(4);
-    expect(structuredContent.turns).toMatchObject([
-      {
-        turn: 1,
-        spanId: "repeat-ai-1",
-        toolCalls: [{ name: "search_events", spanId: "repeat-tool-1" }],
-      },
-      {
-        turn: 2,
-        spanId: "repeat-ai-2",
-        toolCalls: [],
-      },
+    expect(structuredContent.timeline).toMatchObject([
+      { type: "message", role: "user", spanId: "repeat-ai-1" },
+      { type: "message", role: "assistant", spanId: "repeat-ai-1" },
+      { type: "tool_call", name: "search_events", spanId: "repeat-tool-1" },
+      { type: "message", role: "user", spanId: "repeat-ai-2" },
+      { type: "message", role: "assistant", spanId: "repeat-ai-2" },
     ]);
   });
 
-  it("orders turns and tool calls by span start time", async () => {
+  it("orders messages and tool calls by span timestamp", async () => {
     mockConversationEndpoint("test-org", "conv-out-of-order", [
       {
         ...conversationSpans[1],
@@ -423,24 +411,47 @@ describe("get_ai_conversation_details", () => {
     );
 
     const structuredContent = getStructuredContent(result);
-    expect(structuredContent.turns).toMatchObject([
+    expect(structuredContent.timeline).toMatchObject([
       {
+        type: "message",
+        role: "user",
         spanId: "ai-first",
-        started: 1713805400,
-        toolCalls: [
-          { name: "search_events", spanId: "tool-first" },
-          { name: "get_issue_details", spanId: "tool-second" },
-        ],
+        timestamp: 1713805400,
       },
       {
+        type: "message",
+        role: "assistant",
+        spanId: "ai-first",
+        timestamp: 1713805400.5,
+      },
+      {
+        type: "tool_call",
+        name: "search_events",
+        spanId: "tool-first",
+        timestamp: 1713805401,
+      },
+      {
+        type: "tool_call",
+        name: "get_issue_details",
+        spanId: "tool-second",
+        timestamp: 1713805402,
+      },
+      {
+        type: "message",
+        role: "user",
         spanId: "ai-second",
-        started: 1713805404,
-        toolCalls: [],
+        timestamp: 1713805404,
+      },
+      {
+        type: "message",
+        role: "assistant",
+        spanId: "ai-second",
+        timestamp: 1713805405,
       },
     ]);
   });
 
-  it("attaches tool calls after the final AI client span", async () => {
+  it("keeps tool calls chronological after the final AI client span", async () => {
     mockConversationEndpoint("test-org", "conv-final-tool", [
       {
         ...conversationSpans[0],
@@ -475,11 +486,14 @@ describe("get_ai_conversation_details", () => {
 
     const structuredContent = getStructuredContent(result);
     expect(structuredContent.toolCallCount).toBe(1);
-    expect(structuredContent.turns).toMatchObject([
+    expect(structuredContent.timeline).toMatchObject([
+      { type: "message", role: "user", spanId: "final-ai-1" },
+      { type: "message", role: "assistant", spanId: "final-ai-1" },
       {
-        toolCalls: [
-          { name: "get_issue_details", spanId: "final-tool-1", status: "ok" },
-        ],
+        type: "tool_call",
+        name: "get_issue_details",
+        spanId: "final-tool-1",
+        status: "ok",
       },
     ]);
   });
@@ -515,6 +529,18 @@ describe("get_ai_conversation_details", () => {
 
     const structuredContent = getStructuredContent(result);
     expect(structuredContent.toolCallCount).toBe(0);
-    expect(structuredContent.turns).toMatchObject([{ toolCalls: [] }]);
+    expect(structuredContent.timeline).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "message", spanId: "unnamed-ai-1" }),
+      ]),
+    );
+    expect(structuredContent.timeline).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "tool_call",
+          spanId: "unnamed-tool-1",
+        }),
+      ]),
+    );
   });
 });

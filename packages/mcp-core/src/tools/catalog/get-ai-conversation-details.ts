@@ -9,8 +9,10 @@ import type { AIConversationSpan, SentryApiService } from "../../api-client";
 import type { ServerContext } from "../../types";
 
 type ToolCall = {
+  type: "tool_call";
   name: string;
   spanId: string;
+  traceId: string;
   timestamp: number;
   durationMs: number;
   status?: string;
@@ -19,29 +21,22 @@ type ToolCall = {
 };
 
 type ConversationMessage = {
+  type: "message";
   role: "user" | "assistant";
   content: string;
   timestamp: number;
   spanId: string;
-};
-
-type ConversationTurn = {
-  turn: number;
-  spanId: string;
   traceId: string;
-  started: number;
-  ended: number;
-  durationMs: number;
-  user?: ConversationMessage;
-  assistant?: ConversationMessage;
-  toolCalls: ToolCall[];
-  metadata: {
+  metadata?: {
     agentName?: string;
     model?: string;
     totalTokens: number;
     status?: string;
+    durationMs: number;
   };
 };
+
+type TimelineEvent = ConversationMessage | ToolCall;
 
 function withoutUndefined<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(
@@ -50,8 +45,10 @@ function withoutUndefined<T extends Record<string, unknown>>(value: T): T {
 }
 
 const toolCallSchema = z.object({
+  type: z.literal("tool_call"),
   name: z.string(),
   spanId: z.string(),
+  traceId: z.string(),
   timestamp: z.number(),
   durationMs: z.number(),
   status: z.string().optional(),
@@ -60,29 +57,27 @@ const toolCallSchema = z.object({
 });
 
 const conversationMessageSchema = z.object({
+  type: z.literal("message"),
   role: z.enum(["user", "assistant"]),
   content: z.string(),
   timestamp: z.number(),
   spanId: z.string(),
+  traceId: z.string(),
+  metadata: z
+    .object({
+      agentName: z.string().optional(),
+      model: z.string().optional(),
+      totalTokens: z.number(),
+      status: z.string().optional(),
+      durationMs: z.number(),
+    })
+    .optional(),
 });
 
-const conversationTurnSchema = z.object({
-  turn: z.number(),
-  spanId: z.string(),
-  traceId: z.string(),
-  started: z.number(),
-  ended: z.number(),
-  durationMs: z.number(),
-  user: conversationMessageSchema.optional(),
-  assistant: conversationMessageSchema.optional(),
-  toolCalls: z.array(toolCallSchema),
-  metadata: z.object({
-    agentName: z.string().optional(),
-    model: z.string().optional(),
-    totalTokens: z.number(),
-    status: z.string().optional(),
-  }),
-});
+const timelineEventSchema = z.discriminatedUnion("type", [
+  conversationMessageSchema,
+  toolCallSchema,
+]);
 
 export const aiConversationDetailsOutputSchema = z.object({
   conversationId: z.string(),
@@ -93,11 +88,11 @@ export const aiConversationDetailsOutputSchema = z.object({
   traceIds: z.array(z.string()),
   projects: z.array(z.string()),
   spanCount: z.number(),
-  turnCount: z.number(),
+  aiCallCount: z.number(),
   messageCount: z.number(),
   toolCallCount: z.number(),
   totalTokens: z.number(),
-  turns: z.array(conversationTurnSchema),
+  timeline: z.array(timelineEventSchema),
 });
 
 type AIConversationDetailsOutput = z.infer<
@@ -264,8 +259,10 @@ function buildToolCall(span: AIConversationSpan): ToolCall | null {
   }
 
   return withoutUndefined({
+    type: "tool_call" as const,
     name,
     spanId: span.span_id,
+    traceId: span.trace,
     timestamp: span["precise.start_ts"],
     durationMs: Math.round(
       (span["precise.finish_ts"] - span["precise.start_ts"]) * 1000,
@@ -276,67 +273,85 @@ function buildToolCall(span: AIConversationSpan): ToolCall | null {
   });
 }
 
-function extractTurns(spans: AIConversationSpan[]): ConversationTurn[] {
-  const sorted = [...spans].sort(
-    (a, b) => a["precise.start_ts"] - b["precise.start_ts"],
+function buildMessageEvents(span: AIConversationSpan): ConversationMessage[] {
+  const durationMs = Math.round(
+    (span["precise.finish_ts"] - span["precise.start_ts"]) * 1000,
   );
-  const aiClientSpans = sorted.filter(
-    (span) => getOperationType(span) === "ai_client",
-  );
-  const toolSpans = sorted.filter((span) => getOperationType(span) === "tool");
+  const metadata = withoutUndefined({
+    agentName: span["gen_ai.agent.name"],
+    model: span["gen_ai.response.model"] ?? span["gen_ai.request.model"],
+    totalTokens: numeric(span["gen_ai.usage.total_tokens"]),
+    status: span["span.status"],
+    durationMs,
+  });
+  const events: ConversationMessage[] = [];
+  const userContent = extractUserContent(span);
+  if (userContent) {
+    events.push(
+      withoutUndefined({
+        type: "message" as const,
+        role: "user" as const,
+        content: userContent,
+        timestamp: span["precise.start_ts"],
+        spanId: span.span_id,
+        traceId: span.trace,
+        metadata: undefined,
+      }),
+    );
+  }
 
-  return aiClientSpans.map((span, index) => {
-    const nextTimestamp =
-      index < aiClientSpans.length - 1
-        ? aiClientSpans[index + 1]!["precise.start_ts"]
-        : Number.POSITIVE_INFINITY;
-    const toolCalls = toolSpans
-      .filter((toolSpan) => {
-        const timestamp = toolSpan["precise.start_ts"];
-        return (
-          timestamp >= span["precise.start_ts"] && timestamp < nextTimestamp
-        );
-      })
-      .map(buildToolCall)
-      .filter((toolCall): toolCall is ToolCall => toolCall !== null);
-
-    const userContent = extractUserContent(span);
-    const assistantContent = extractAssistantContent(span);
-
-    return withoutUndefined({
-      turn: index + 1,
+  const assistantContent = extractAssistantContent(span);
+  if (assistantContent) {
+    events.push({
+      type: "message",
+      role: "assistant",
+      content: assistantContent,
+      timestamp: span["precise.finish_ts"],
       spanId: span.span_id,
       traceId: span.trace,
-      started: span["precise.start_ts"],
-      ended: span["precise.finish_ts"],
-      durationMs: Math.round(
-        (span["precise.finish_ts"] - span["precise.start_ts"]) * 1000,
-      ),
-      user: userContent
-        ? withoutUndefined({
-            role: "user" as const,
-            content: userContent,
-            timestamp: span["precise.start_ts"],
-            spanId: span.span_id,
-          })
-        : undefined,
-      assistant: assistantContent
-        ? {
-            role: "assistant" as const,
-            content: assistantContent,
-            timestamp: span["precise.finish_ts"],
-            spanId: span.span_id,
-          }
-        : undefined,
-      toolCalls,
-      metadata: withoutUndefined({
-        agentName: span["gen_ai.agent.name"],
-        model: span["gen_ai.response.model"] ?? span["gen_ai.request.model"],
-        totalTokens: numeric(span["gen_ai.usage.total_tokens"]),
-        status: span["span.status"],
-      }),
+      metadata,
     });
+  } else if (events.length > 0) {
+    events[events.length - 1] = {
+      ...events[events.length - 1]!,
+      metadata,
+    };
+  }
+
+  return events;
+}
+
+function extractTimeline(spans: AIConversationSpan[]): TimelineEvent[] {
+  const events: TimelineEvent[] = [];
+
+  for (const span of spans) {
+    const operationType = getOperationType(span);
+    if (operationType === "tool") {
+      const toolCall = buildToolCall(span);
+      if (toolCall) {
+        events.push(toolCall);
+      }
+      continue;
+    }
+    if (operationType === "ai_client") {
+      events.push(...buildMessageEvents(span));
+    }
+  }
+
+  return events.sort((a, b) => {
+    const timestampDiff = a.timestamp - b.timestamp;
+    if (timestampDiff !== 0) {
+      return timestampDiff;
+    }
+    if (a.type !== b.type) {
+      return a.type === "message" ? -1 : 1;
+    }
+    return a.spanId.localeCompare(b.spanId);
   });
+}
+
+function countAICalls(spans: AIConversationSpan[]): number {
+  return spans.filter((span) => getOperationType(span) === "ai_client").length;
 }
 
 function buildConversationArtifact(
@@ -345,7 +360,7 @@ function buildConversationArtifact(
   conversationId: string,
   spans: AIConversationSpan[],
 ): AIConversationDetailsOutput {
-  const turns = extractTurns(spans);
+  const timeline = extractTimeline(spans);
   const traceIds = [...new Set(spans.map((span) => span.trace))].sort();
   const projects = [...new Set(spans.map((span) => span.project))].sort();
   const startTimestamp =
@@ -356,10 +371,6 @@ function buildConversationArtifact(
     spans.length > 0
       ? Math.max(...spans.map((span) => span["precise.finish_ts"]))
       : null;
-  const messageCount = turns.reduce(
-    (sum, turn) => sum + (turn.user ? 1 : 0) + (turn.assistant ? 1 : 0),
-    0,
-  );
 
   return withoutUndefined({
     conversationId,
@@ -370,14 +381,15 @@ function buildConversationArtifact(
     traceIds,
     projects,
     spanCount: spans.length,
-    turnCount: turns.length,
-    messageCount,
-    toolCallCount: turns.reduce((sum, turn) => sum + turn.toolCalls.length, 0),
+    aiCallCount: countAICalls(spans),
+    messageCount: timeline.filter((event) => event.type === "message").length,
+    toolCallCount: timeline.filter((event) => event.type === "tool_call")
+      .length,
     totalTokens: spans.reduce(
       (sum, span) => sum + numeric(span["gen_ai.usage.total_tokens"]),
       0,
     ),
-    turns,
+    timeline,
   });
 }
 
