@@ -210,16 +210,31 @@ Next-step instructions should direct agents to:
 
 ## Detail Interface
 
-`get_ai_conversation_details` remains the transcript/detail tool.
+`get_ai_conversation_details` remains the transcript/detail tool. The detail
+response should be a conversation-native projection of GenAI telemetry, not a
+raw span dump and not a lossy grouping invented by MCP.
 
 Current expected behavior:
 
 - Input is organization slug plus conversation ID.
-- Output includes a transcript grouped into turns.
-- User and assistant messages are extracted from GenAI input/output fields.
-- Tool calls are attached to the nearest turn.
-- Trace IDs, projects, span IDs, token totals, and summary counts are included.
+- Output includes a chronological transcript timeline.
+- Timeline events are sorted by event timestamp and include a `type`
+  discriminator.
+- User and assistant message events are extracted from GenAI input/output
+  fields.
+- Tool call events are represented as first-class timeline events, not nested
+  under a synthetic turn.
+- Each timeline event includes enough trace context to debug it, including
+  `spanId`, `traceId`, timestamp, status or duration when available, and compact
+  tool input/argument fields when useful.
+- Conversation-level context includes trace IDs, projects, token totals, and
+  summary counts.
 - A structured JSON artifact is included.
+
+The transcript goal is chronological inspection. Agents should not need to
+infer event order from nested turn structures, and MCP should not imply that a
+tool call belongs to a message unless that relationship is explicit in the
+underlying telemetry. Use trace/span IDs for deeper execution-tree analysis.
 
 Required refinements:
 
@@ -230,8 +245,9 @@ Required refinements:
 - Accept `start` and `end` when details are fetched from a URL with explicit
   time bounds.
 - Continue accepting `project` from URL query parameters.
-- If `spanId` is supplied from a URL, include focus metadata or highlight
-  whether the focused span is present in the conversation.
+- If `spanId` is supplied from a URL, the detail response may use it only as a
+  retrieval hint. Do not add focus metadata unless it helps the caller debug the
+  transcript.
 
 ## URL Handling
 
