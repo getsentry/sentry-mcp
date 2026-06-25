@@ -29,7 +29,6 @@ type ConversationTurn = {
   turn: number;
   spanId: string;
   traceId: string;
-  project: string;
   started: number;
   ended: number;
   durationMs: number;
@@ -71,7 +70,6 @@ const conversationTurnSchema = z.object({
   turn: z.number(),
   spanId: z.string(),
   traceId: z.string(),
-  project: z.string(),
   started: z.number(),
   ended: z.number(),
   durationMs: z.number(),
@@ -309,7 +307,6 @@ function extractTurns(spans: AIConversationSpan[]): ConversationTurn[] {
       turn: index + 1,
       spanId: span.span_id,
       traceId: span.trace,
-      project: span.project,
       started: span["precise.start_ts"],
       ended: span["precise.finish_ts"],
       durationMs: Math.round(

@@ -151,7 +151,6 @@ describe("get_ai_conversation_details", () => {
               "status": "ok",
               "totalTokens": 42,
             },
-            "project": "mcp-server",
             "spanId": "1111111111111111",
             "started": 1713805400,
             "toolCalls": [
@@ -187,7 +186,6 @@ describe("get_ai_conversation_details", () => {
               "status": "ok",
               "totalTokens": 58,
             },
-            "project": "mcp-server",
             "spanId": "3333333333333333",
             "started": 1713805404,
             "toolCalls": [],
@@ -371,6 +369,72 @@ describe("get_ai_conversation_details", () => {
       {
         turn: 2,
         spanId: "repeat-ai-2",
+        toolCalls: [],
+      },
+    ]);
+  });
+
+  it("orders turns and tool calls by span start time", async () => {
+    mockConversationEndpoint("test-org", "conv-out-of-order", [
+      {
+        ...conversationSpans[1],
+        "gen_ai.conversation.id": "conv-out-of-order",
+        "precise.start_ts": 1713805402,
+        "precise.finish_ts": 1713805402.1,
+        span_id: "tool-second",
+        "gen_ai.tool.name": "get_issue_details",
+      },
+      {
+        ...conversationSpans[0],
+        "gen_ai.conversation.id": "conv-out-of-order",
+        "precise.start_ts": 1713805404,
+        "precise.finish_ts": 1713805405,
+        span_id: "ai-second",
+        "gen_ai.input.messages": JSON.stringify([
+          { role: "user", content: "summarize the event" },
+        ]),
+      },
+      {
+        ...conversationSpans[1],
+        "gen_ai.conversation.id": "conv-out-of-order",
+        "precise.start_ts": 1713805401,
+        "precise.finish_ts": 1713805401.1,
+        span_id: "tool-first",
+        "gen_ai.tool.name": "search_events",
+      },
+      {
+        ...conversationSpans[0],
+        "gen_ai.conversation.id": "conv-out-of-order",
+        "precise.start_ts": 1713805400,
+        "precise.finish_ts": 1713805400.5,
+        span_id: "ai-first",
+        "gen_ai.input.messages": JSON.stringify([
+          { role: "user", content: "find the failing event" },
+        ]),
+      },
+    ]);
+
+    const result = await getAIConversationDetails.handler(
+      {
+        organizationSlug: "test-org",
+        conversationId: "conv-out-of-order",
+      },
+      baseContext,
+    );
+
+    const structuredContent = getStructuredContent(result);
+    expect(structuredContent.turns).toMatchObject([
+      {
+        spanId: "ai-first",
+        started: 1713805400,
+        toolCalls: [
+          { name: "search_events", spanId: "tool-first" },
+          { name: "get_issue_details", spanId: "tool-second" },
+        ],
+      },
+      {
+        spanId: "ai-second",
+        started: 1713805404,
         toolCalls: [],
       },
     ]);
