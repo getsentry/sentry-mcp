@@ -5,26 +5,34 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 
-export default defineConfig({
-  plugins: [
-    react(),
-    cloudflare(),
-    tailwindcss(),
-    sentryVitePlugin({
-      org: "sentry",
-      project: "mcp-server",
-    }),
-  ],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+const LOCAL_DEV_COOKIE_SECRET = "sentry-mcp-local-dev-cookie-secret";
+
+export default defineConfig(({ command }) => {
+  if (command === "serve") {
+    process.env.COOKIE_SECRET ??= LOCAL_DEV_COOKIE_SECRET;
+  }
+
+  return {
+    plugins: [
+      react(),
+      cloudflare(),
+      tailwindcss(),
+      sentryVitePlugin({
+        org: "sentry",
+        project: "mcp-server",
+      }),
+    ],
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
     },
-  },
-  build: {
-    sourcemap: true,
-  },
-  server: {
-    port: 5173,
-    strictPort: true, // Fail if port is already in use instead of trying another port
-  },
+    build: {
+      sourcemap: true,
+    },
+    server: {
+      port: 5173,
+      strictPort: true, // Fail if port is already in use instead of trying another port
+    },
+  };
 });

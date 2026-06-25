@@ -21,6 +21,7 @@ export interface MCPConfig {
 export interface RemoteMCPConfig {
   mcpHost?: string;
   accessToken?: string;
+  clientMetadataUrl?: string;
   useAgentEndpoint?: boolean;
   useExperimental?: boolean;
 }

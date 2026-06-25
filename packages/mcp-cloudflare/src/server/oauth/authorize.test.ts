@@ -182,6 +182,52 @@ describe("oauth authorize routes", () => {
       expect(mockOAuthProvider.lookupClient).not.toHaveBeenCalled();
     });
 
+    it("returns 400 for invalid CIMD clients without creating a Sentry issue", async () => {
+      mockOAuthProvider.parseAuthRequest.mockRejectedValueOnce(
+        new Error(
+          "Invalid client. The clientId provided does not match to this client.",
+        ),
+      );
+
+      const response = await app.fetch(
+        new Request(
+          "http://localhost/oauth/authorize?client_id=https%3A%2F%2Fclient.example%2Foauth%2Fclient.json&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback",
+          { method: "GET" },
+        ),
+        testEnv as Env,
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toBe("Invalid client");
+      expect(mockOAuthProvider.lookupClient).not.toHaveBeenCalled();
+    });
+
+    it("rejects incompatible root URL client metadata", async () => {
+      const clientId = "https://client.example/";
+      mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+        clientId,
+        redirectUri: "https://example.com/callback",
+        responseType: "code",
+        scope: ["read"],
+      });
+      mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+        clientId,
+        clientName: "Example CIMD Client",
+        redirectUris: ["https://example.com/callback"],
+        grantTypes: ["refresh_token"],
+        responseTypes: ["code"],
+        tokenEndpointAuthMethod: "none",
+      });
+
+      const response = await app.fetch(
+        new Request("http://localhost/oauth/authorize", { method: "GET" }),
+        testEnv as Env,
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toBe("Invalid client");
+    });
+
     it("preselects remembered skills for the matching client ID", async () => {
       mockOAuthProvider.lookupClient.mockResolvedValue({
         clientId: "test-client",
@@ -878,6 +924,127 @@ describe("oauth authorize routes", () => {
         expect(response.status).toBe(302);
         const location = response.headers.get("location");
         expect(location).toContain("sentry.io");
+      });
+
+      it("validates URL client redirect URI through provider lookup before upstream redirect", async () => {
+        const clientId = "https://client.example/oauth/client.json";
+        mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+          clientId,
+          clientName: "Example CIMD Client",
+          redirectUris: ["https://example.com/callback"],
+          grantTypes: ["authorization_code"],
+          responseTypes: ["code"],
+          tokenEndpointAuthMethod: "none",
+        });
+
+        const oauthReqInfo = {
+          clientId,
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp",
+        };
+        const formData = new FormData();
+        const signedState = await signState(
+          {
+            req: { oauthReqInfo },
+            iat: Date.now(),
+            exp: Date.now() + 10 * 60 * 1000,
+          },
+          testEnv.COOKIE_SECRET!,
+        );
+        formData.append("state", signedState);
+
+        const response = await app.fetch(
+          new Request("http://localhost/oauth/authorize", {
+            method: "POST",
+            body: formData,
+          }),
+          testEnv as Env,
+        );
+
+        expect(response.status).toBe(302);
+        expect(response.headers.get("location")).toContain("sentry.io");
+        expect(mockOAuthProvider.lookupClient).toHaveBeenCalledWith(clientId);
+      });
+
+      it("allows loopback redirect URIs with provider-compatible port changes", async () => {
+        const clientId = "test-client";
+        mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+          clientId,
+          clientName: "Native Client",
+          redirectUris: ["http://127.0.0.1:8000/callback"],
+          tokenEndpointAuthMethod: "client_secret_basic",
+        });
+
+        const oauthReqInfo = {
+          clientId,
+          redirectUri: "http://127.0.0.1:49152/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp",
+        };
+        const formData = new FormData();
+        const signedState = await signState(
+          {
+            req: { oauthReqInfo },
+            iat: Date.now(),
+            exp: Date.now() + 10 * 60 * 1000,
+          },
+          testEnv.COOKIE_SECRET!,
+        );
+        formData.append("state", signedState);
+
+        const response = await app.fetch(
+          new Request("http://localhost/oauth/authorize", {
+            method: "POST",
+            body: formData,
+          }),
+          testEnv as Env,
+        );
+
+        expect(response.status).toBe(302);
+        expect(response.headers.get("location")).toContain("sentry.io");
+      });
+
+      it("rejects incompatible URL client metadata before upstream redirect", async () => {
+        const clientId = "https://client.example/oauth/client.json";
+        mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+          clientId,
+          clientName: "Example CIMD Client",
+          redirectUris: ["https://example.com/callback"],
+          grantTypes: ["refresh_token"],
+          responseTypes: ["code"],
+          tokenEndpointAuthMethod: "none",
+        });
+
+        const oauthReqInfo = {
+          clientId,
+          redirectUri: "https://example.com/callback",
+          responseType: "code",
+          scope: ["read"],
+          resource: "http://localhost/mcp",
+        };
+        const formData = new FormData();
+        const signedState = await signState(
+          {
+            req: { oauthReqInfo },
+            iat: Date.now(),
+            exp: Date.now() + 10 * 60 * 1000,
+          },
+          testEnv.COOKIE_SECRET!,
+        );
+        formData.append("state", signedState);
+
+        const response = await app.fetch(
+          new Request("http://localhost/oauth/authorize", {
+            method: "POST",
+            body: formData,
+          }),
+          testEnv as Env,
+        );
+
+        expect(response.status).toBe(400);
+        expect(await response.text()).toBe("Invalid client");
+        expect(response.headers.get("location")).toBeNull();
       });
 
       it("should reject request with origin-only resource parameter", async () => {

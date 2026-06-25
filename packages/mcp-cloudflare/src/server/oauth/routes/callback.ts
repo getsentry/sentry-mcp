@@ -14,6 +14,7 @@ import {
   getOAuthCallbackFailureDetails,
   validateResourceParameter,
 } from "../helpers";
+import { isRedirectUriAllowed } from "../redirect-uri";
 import { parseResourceMcpConstraints } from "../resource-scope";
 import { type OAuthState, verifyAndParseState } from "../state";
 
@@ -180,9 +181,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       oauthReqInfo.clientId,
     );
     registeredClientName = client?.clientName;
-    const uriIsAllowed =
-      Array.isArray(client?.redirectUris) &&
-      client.redirectUris.includes(oauthReqInfo.redirectUri);
+    const uriIsAllowed = isRedirectUriAllowed(
+      oauthReqInfo.redirectUri,
+      client?.redirectUris,
+    );
     if (!uriIsAllowed) {
       logWarn("Redirect URI not registered for client on callback", {
         loggerScope: ["cloudflare", "oauth", "callback"],

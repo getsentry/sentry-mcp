@@ -22,6 +22,14 @@
     "binding": "CF_VERSION_METADATA"
   },
   "vars": {},
+  "secrets": {
+    "required": [
+      "COOKIE_SECRET",
+      "SENTRY_CLIENT_ID",
+      "SENTRY_CLIENT_SECRET",
+      "OPENAI_API_KEY"
+    ]
+  },
   "unsafe": {
     "bindings": [
       {

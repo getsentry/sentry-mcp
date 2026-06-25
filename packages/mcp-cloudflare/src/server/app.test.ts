@@ -238,6 +238,7 @@ describe("app", () => {
           "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp%2Fsentry%2Fmcp-server",
         token_endpoint: "https://mcp.sentry.dev/oauth/token",
         registration_endpoint: "https://mcp.sentry.dev/oauth/register",
+        client_id_metadata_document_supported: true,
         scopes_supported: [
           "org:read",
           "project:write",
@@ -270,6 +271,36 @@ describe("app", () => {
         "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp%2Fsentry%2Fmcp-server%3Fexperimental%3D1",
       );
       expect(json.issuer).toBe("https://mcp.sentry.dev/mcp/sentry/mcp-server");
+    });
+
+    it("should advertise CIMD support for base MCP scoped metadata", async () => {
+      const res = await app.request(
+        "https://mcp.sentry.dev/.well-known/oauth-authorization-server/mcp",
+        { headers: TEST_HEADERS },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.client_id_metadata_document_supported).toBe(true);
+      expect(json.authorization_endpoint).toBe(
+        "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp",
+      );
+    });
+
+    it("should advertise CIMD support for organization scoped metadata", async () => {
+      const res = await app.request(
+        "https://mcp.sentry.dev/.well-known/oauth-authorization-server/mcp/sentry",
+        { headers: TEST_HEADERS },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.client_id_metadata_document_supported).toBe(true);
+      expect(json.authorization_endpoint).toBe(
+        "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp%2Fsentry",
+      );
     });
   });
 });

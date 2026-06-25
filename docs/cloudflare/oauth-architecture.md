@@ -101,11 +101,12 @@ sequenceDiagram
 
 The MCP OAuth Provider is built with `@cloudflare/workers-oauth-provider` and provides:
 
-1. **Dynamic client registration** - MCP clients can register on-demand
-2. **PKCE support** - Secure authorization code flow
-3. **Token management** - Issues and validates MCP tokens
-4. **Consent UI** - Custom approval screen for permissions
-5. **Token encryption** - Stores Sentry tokens encrypted in MCP token props
+1. **Client ID metadata documents (CIMD)** - MCP clients can use an HTTPS metadata URL as `client_id`
+2. **Dynamic client registration fallback** - MCP clients can still register on-demand at `/oauth/register`
+3. **PKCE support** - Secure authorization code flow
+4. **Token management** - Issues and validates MCP tokens
+5. **Consent UI** - Custom approval screen for permissions
+6. **Token encryption** - Stores Sentry tokens encrypted in MCP token props
 
 ### Sentry OAuth Integration
 
@@ -124,13 +125,19 @@ The integration with Sentry OAuth happens through:
 sequenceDiagram
     participant Agent as AI Agent
     participant MCPOAuth as MCP OAuth Provider
+    participant ClientMeta as Client Metadata URL
     participant KV as Cloudflare KV
     participant User as User
     participant MCP as MCP Server
 
-    Agent->>MCPOAuth: Register as client
-    MCPOAuth->>KV: Store client registration
-    MCPOAuth-->>Agent: MCP Client ID & Secret
+    alt CIMD client
+        Agent->>MCPOAuth: Use HTTPS metadata URL as client_id
+        MCPOAuth->>ClientMeta: Fetch client metadata document
+    else DCR fallback
+        Agent->>MCPOAuth: Register as client
+        MCPOAuth->>KV: Store client registration
+        MCPOAuth-->>Agent: MCP Client ID & Secret
+    end
 
     Agent->>MCPOAuth: Request authorization
     MCPOAuth->>User: Show MCP consent screen
@@ -166,9 +173,15 @@ const oAuthProvider = new OAuthProvider({
   authorizeEndpoint: "/oauth/authorize",
   tokenEndpoint: "/oauth/token", 
   clientRegistrationEndpoint: "/oauth/register",
+  clientIdMetadataDocumentEnabled: true,
   scopesSupported: Object.keys(SCOPES),
 });
 ```
+
+With CIMD enabled, the authorization-server metadata advertises
+`client_id_metadata_document_supported: true`. URL client IDs must resolve to
+metadata for a public authorization-code client; opaque dynamically registered
+client IDs continue to use the stored DCR metadata.
 
 ### 2. API Handler
 

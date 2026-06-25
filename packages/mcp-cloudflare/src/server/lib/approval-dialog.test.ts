@@ -164,6 +164,54 @@ describe("approval-dialog", () => {
       expect(html).not.toContain("<script>");
     });
 
+    it("shows URL client identity for CIMD clients", async () => {
+      const response = await renderApprovalDialog(
+        new Request("https://example.com/oauth/authorize"),
+        {
+          client: {
+            clientId: "https://client.example/oauth/client.json",
+            clientName: "Example CIMD Client",
+            redirectUris: ["https://example.com/callback"],
+            tokenEndpointAuthMethod: "none",
+          },
+          server: { name: "Sentry MCP" },
+          state: {
+            oauthReqInfo: {
+              clientId: "https://client.example/oauth/client.json",
+            },
+          },
+          cookieSecret: TEST_SECRET,
+        },
+      );
+
+      const html = await response.text();
+
+      expect(html).toContain("Example CIMD Client");
+      expect(html).toContain("Client ID");
+      expect(html).toContain("https://client.example/oauth/client.json");
+    });
+
+    it("does not show a client identity row for opaque DCR client IDs", async () => {
+      const response = await renderApprovalDialog(
+        new Request("https://example.com/oauth/authorize"),
+        {
+          client: mockClient,
+          server: { name: "Sentry MCP" },
+          state: { oauthReqInfo: { clientId: "test-client-id" } },
+          cookieSecret: TEST_SECRET,
+        },
+      );
+
+      const html = await response.text();
+
+      expect(html).not.toContain(
+        '<span class="client-identity-label">Client ID</span>',
+      );
+      expect(html).not.toContain(
+        '<span class="client-identity-value">test-client-id</span>',
+      );
+    });
+
     it("should render organization scope summary when provided", async () => {
       const response = await renderApprovalDialog(
         new Request("https://example.com/oauth/authorize"),

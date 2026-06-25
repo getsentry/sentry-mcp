@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import * as Sentry from "@sentry/cloudflare";
-import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
+import type {
+  AuthRequest,
+  ClientInfo,
+} from "@cloudflare/workers-oauth-provider";
 import {
   getRememberedSkillsForClient,
   renderApprovalDialog,
@@ -19,6 +22,7 @@ import { SCOPES } from "../../../constants";
 import { signState, type OAuthState } from "../state";
 import { logWarn } from "@sentry/mcp-core/telem/logging";
 import { parseResourceMcpConstraints } from "../resource-scope";
+import { isRedirectUriAllowed } from "../redirect-uri";
 
 /**
  * Extended AuthRequest that includes skills and resource parameter
@@ -26,6 +30,36 @@ import { parseResourceMcpConstraints } from "../resource-scope";
 interface AuthRequestWithSkills extends AuthRequest {
   skills?: unknown;
   resource?: string;
+}
+
+function isClientMetadataUrl(clientId: string): boolean {
+  try {
+    const url = new URL(clientId);
+    return url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+// URL client IDs come from CIMD and must describe a public auth-code client.
+// Opaque DCR client IDs keep the provider's existing compatibility behavior.
+function isCimdClientCompatible(
+  client: ClientInfo | null,
+  responseType: string | undefined,
+): boolean {
+  if (!client) {
+    return false;
+  }
+
+  if (!isClientMetadataUrl(client.clientId)) {
+    return true;
+  }
+
+  return (
+    client.tokenEndpointAuthMethod === "none" &&
+    client.grantTypes?.includes("authorization_code") === true &&
+    client.responseTypes?.includes(responseType || "code") === true
+  );
 }
 
 async function redirectToUpstream(
@@ -68,9 +102,12 @@ export default new Hono<{ Bindings: Env }>()
     try {
       oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
     } catch (err) {
-      // Log invalid redirect URI errors without sending them to Sentry
+      // Log expected client-side OAuth errors without sending them to Sentry.
       const errorMessage = err instanceof Error ? err.message : String(err);
-      if (errorMessage.includes("Invalid redirect URI")) {
+      const isClientError =
+        errorMessage.includes("Invalid redirect URI") ||
+        errorMessage.includes("Invalid client");
+      if (isClientError) {
         // parseAuthRequest threw before producing a request, so read the
         // attempted values directly from the query string.
         const authUrl = new URL(c.req.url);
@@ -78,7 +115,10 @@ export default new Hono<{ Bindings: Env }>()
         const attemptedRedirectUri = authUrl.searchParams.get("redirect_uri");
         let registeredUris: string[] | undefined;
         let clientName: string | undefined;
-        if (attemptedClientId) {
+        if (
+          errorMessage.includes("Invalid redirect URI") &&
+          attemptedClientId
+        ) {
           try {
             const client =
               await c.env.OAUTH_PROVIDER.lookupClient(attemptedClientId);
@@ -96,7 +136,12 @@ export default new Hono<{ Bindings: Env }>()
             clientName,
           },
         });
-        return c.text("Invalid redirect URI", 400);
+        return c.text(
+          errorMessage.includes("Invalid redirect URI")
+            ? "Invalid redirect URI"
+            : "Invalid client",
+          400,
+        );
       }
       // Re-throw other errors to be captured by Sentry
       throw err;
@@ -176,6 +221,21 @@ export default new Hono<{ Bindings: Env }>()
     // }
 
     const client = await c.env.OAUTH_PROVIDER.lookupClient(clientId);
+    if (
+      !isCimdClientCompatible(client, oauthReqInfoWithResource.responseType)
+    ) {
+      logWarn("OAuth authorization failed: incompatible CIMD client metadata", {
+        loggerScope: ["cloudflare", "oauth", "authorize"],
+        extra: {
+          clientId,
+          grantTypes: client?.grantTypes,
+          responseTypes: client?.responseTypes,
+          tokenEndpointAuthMethod: client?.tokenEndpointAuthMethod,
+        },
+      });
+      return c.text("Invalid client", 400);
+    }
+
     const defaultSkills = await getRememberedSkillsForClient(
       c.req.raw.headers.get("Cookie"),
       clientId,
@@ -253,7 +313,10 @@ export default new Hono<{ Bindings: Env }>()
       );
       const uriIsAllowed =
         Array.isArray(client?.redirectUris) &&
-        client.redirectUris.includes(oauthReqWithSkills.redirectUri);
+        isRedirectUriAllowed(
+          oauthReqWithSkills.redirectUri,
+          client.redirectUris,
+        );
       if (!uriIsAllowed) {
         logWarn("Redirect URI not registered for client", {
           loggerScope: ["cloudflare", "oauth", "authorize"],
@@ -265,6 +328,28 @@ export default new Hono<{ Bindings: Env }>()
           },
         });
         return c.text("Invalid redirect URI", 400);
+      }
+      if (
+        !isCimdClientCompatible(
+          client,
+          typeof oauthReqWithSkills.responseType === "string"
+            ? oauthReqWithSkills.responseType
+            : undefined,
+        )
+      ) {
+        logWarn(
+          "OAuth authorization failed: incompatible CIMD client metadata",
+          {
+            loggerScope: ["cloudflare", "oauth", "authorize"],
+            extra: {
+              clientId: oauthReqWithSkills.clientId,
+              grantTypes: client?.grantTypes,
+              responseTypes: client?.responseTypes,
+              tokenEndpointAuthMethod: client?.tokenEndpointAuthMethod,
+            },
+          },
+        );
+        return c.text("Invalid client", 400);
       }
     } catch (lookupErr) {
       logWarn("Failed to validate client redirect URI", {

@@ -491,6 +491,20 @@ export async function renderApprovalDialog(
   const clientName = client?.clientName
     ? sanitizeHtml(client.clientName)
     : "Unknown MCP Client";
+  const rawClientId =
+    typeof client?.clientId === "string" && client.clientId.length > 0
+      ? client.clientId
+      : null;
+  const clientIdUrl = rawClientId ? getUrlHost(rawClientId) : "";
+  const clientIdentityHtml =
+    rawClientId && clientIdUrl
+      ? `
+        <div class="client-identity">
+          <span class="client-identity-label">Client ID</span>
+          <span class="client-identity-value">${sanitizeHtml(rawClientId)}</span>
+        </div>
+      `
+      : "";
 
   const clientUri = client?.clientUri
     ? sanitizeHtml(sanitizeHrefUrl(client.clientUri))
@@ -691,6 +705,32 @@ export async function renderApprovalDialog(
             margin: 0;
             color: var(--text-secondary);
             font-size: 0.9375rem;
+          }
+
+          .client-identity {
+            margin: calc(-1 * var(--space-md)) 0 var(--space-xl) 0;
+            padding: var(--space-md);
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.035);
+          }
+
+          .client-identity-label {
+            display: block;
+            margin-bottom: var(--space-xs);
+            color: var(--text-tertiary);
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+          }
+
+          .client-identity-value {
+            display: block;
+            color: var(--text-secondary);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.8125rem;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
           }
 
           .scope-token {
@@ -979,6 +1019,8 @@ export async function renderApprovalDialog(
           <main class="card">
 
             <p class="alert"><strong>${clientUri ? `<a href="${clientUri}" target="_blank" rel="noopener noreferrer">${clientName}</a>` : clientName}</strong> is requesting access to Sentry</p>
+
+            ${clientIdentityHtml}
 
             ${scopeHtml}
 

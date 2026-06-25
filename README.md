@@ -166,7 +166,7 @@ To contribute changes, you'll need to set up your local environment:
    - Edit `packages/mcp-cloudflare/.env` and add:
      - `SENTRY_CLIENT_ID=your_development_sentry_client_id`
      - `SENTRY_CLIENT_SECRET=your_development_sentry_client_secret`
-     - `COOKIE_SECRET=my-super-secret-cookie`
+     - `COOKIE_SECRET=my-super-secret-cookie` (optional for local dev; `pnpm dev` provides a development-only default when omitted)
 
 4. **Start the development server:**
 
