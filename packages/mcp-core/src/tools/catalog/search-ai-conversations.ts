@@ -386,7 +386,8 @@ export default defineTool({
     output.push(
       "- Fetch a transcript with `get_ai_conversation_details` using a `conversationId` above.",
       "- Fetch by URL with `get_sentry_resource` using a conversation URL above.",
-      "- Drill into related traces with `get_trace_details` using a trace ID above.",
+      "- Query related spans with `search_events` using dataset `spans` and query `gen_ai.conversation.id:<conversationId>` to inspect telemetry across traces.",
+      "- Use listed trace IDs only for per-trace follow-up; a conversation can span multiple traces.",
     );
     if (nextCursor) {
       output.push(

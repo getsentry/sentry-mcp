@@ -219,7 +219,11 @@ Next-step instructions should direct agents to:
   full structured detail.
 - Use `get_sentry_resource` with the conversation URL when the user provides or
   wants to reuse a Sentry URL.
-- Use `get_trace_details` only when drilling into a specific trace ID.
+- Query spans with `search_events` using dataset `spans` and query
+  `gen_ai.conversation.id:<conversationId>` when inspecting telemetry for the
+  full conversation across traces.
+- Treat listed trace IDs as per-trace follow-up targets only; a conversation can
+  span multiple traces.
 
 ## Detail Interface
 
@@ -282,6 +286,11 @@ Trace:
 - `get_trace_details`: returns one full trace by trace ID.
 - A true trace-level search tool does not currently exist.
 - `search_events(dataset="spans")` returns span rows, not trace rows.
+
+A conversation can include spans from multiple traces. `get_trace_details`
+should not be the primary conversation follow-up because it only inspects one
+trace. Agents should query spans by `gen_ai.conversation.id` when they need
+conversation-related telemetry across trace boundaries.
 
 AI Conversations should not copy the current trace-search limitation.
 Conversation search should be conversation-native from the start.

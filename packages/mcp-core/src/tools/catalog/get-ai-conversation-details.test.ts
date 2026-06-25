@@ -128,7 +128,8 @@ describe("get_ai_conversation_details", () => {
 
       ## Related Telemetry
 
-      - Trace \`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\`: use \`get_trace_details\` for the full trace, or \`search_events\` with dataset \`spans\` and query \`trace:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\` to inspect related non-GenAI spans.
+      - Query spans with \`search_events\` using dataset \`spans\` and query \`gen_ai.conversation.id:conv-123\` to inspect telemetry across traces.
+      - This conversation spans 1 trace: \`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\`. Inspect trace IDs individually only when you need trace-local context.
 
       ## Transcript
 

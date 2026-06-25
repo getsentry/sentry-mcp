@@ -557,10 +557,10 @@ export default defineTool({
       "",
       "## Related Telemetry",
       "",
-      ...artifact.traceIds.map(
-        (traceId) =>
-          `- Trace \`${traceId}\`: use \`get_trace_details\` for the full trace, or \`search_events\` with dataset \`spans\` and query \`trace:${traceId}\` to inspect related non-GenAI spans.`,
-      ),
+      `- Query spans with \`search_events\` using dataset \`spans\` and query \`gen_ai.conversation.id:${params.conversationId}\` to inspect telemetry across traces.`,
+      artifact.traceIds.length > 0
+        ? `- This conversation spans ${artifact.traceIds.length} trace${artifact.traceIds.length === 1 ? "" : "s"}: ${artifact.traceIds.map((traceId) => `\`${traceId}\``).join(", ")}. Inspect trace IDs individually only when you need trace-local context.`
+        : "- No trace IDs were found on the conversation spans.",
       "",
       "## Transcript",
       "",
