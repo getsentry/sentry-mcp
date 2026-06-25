@@ -192,6 +192,9 @@ Each result should include:
 - Total tokens and total cost.
 - Trace count and a small sample of trace IDs.
 
+Search and detail structured outputs use Unix millisecond timestamps for
+conversation-level and timeline timestamp fields.
+
 Agents should use the structured fields to decide follow-ups:
 
 - Use `get_ai_conversation_details` with `conversationId` for the transcript and
@@ -216,6 +219,8 @@ Current expected behavior:
 - Output includes a chronological transcript timeline.
 - Timeline events are sorted by event timestamp and include a `type`
   discriminator.
+- Output includes the lookup window used for the Sentry request: either the
+  default `statsPeriod` or explicit `start` and `end` values.
 - User and assistant message events are extracted from GenAI input/output
   fields.
 - Tool call events are represented as first-class timeline events, not nested

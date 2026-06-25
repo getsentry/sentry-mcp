@@ -762,6 +762,21 @@
           "type": "string",
           "format": "uri"
         },
+        "lookupWindow": {
+          "type": "object",
+          "properties": {
+            "statsPeriod": {
+              "type": "string"
+            },
+            "start": {
+              "type": "string"
+            },
+            "end": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
         "startTimestamp": {
           "type": ["number", "null"]
         },
@@ -905,6 +920,7 @@
         "conversationId",
         "organizationSlug",
         "url",
+        "lookupWindow",
         "startTimestamp",
         "endTimestamp",
         "traceIds",

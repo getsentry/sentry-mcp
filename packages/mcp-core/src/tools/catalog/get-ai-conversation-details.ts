@@ -37,6 +37,11 @@ type ConversationMessage = {
 };
 
 type TimelineEvent = ConversationMessage | ToolCall;
+type LookupWindow = {
+  statsPeriod?: string;
+  start?: string;
+  end?: string;
+};
 
 function withoutUndefined<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(
@@ -79,10 +84,17 @@ const timelineEventSchema = z.discriminatedUnion("type", [
   toolCallSchema,
 ]);
 
+const lookupWindowSchema = z.object({
+  statsPeriod: z.string().optional(),
+  start: z.string().optional(),
+  end: z.string().optional(),
+});
+
 export const aiConversationDetailsOutputSchema = z.object({
   conversationId: z.string(),
   organizationSlug: z.string(),
   url: z.string().url(),
+  lookupWindow: lookupWindowSchema,
   startTimestamp: z.number().nullable(),
   endTimestamp: z.number().nullable(),
   traceIds: z.array(z.string()),
@@ -108,6 +120,10 @@ function numeric(value: string | number | null | undefined): number {
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
+}
+
+function timestampMs(value: number): number {
+  return Math.round(value * 1000);
 }
 
 function getOperationType(span: AIConversationSpan): string | undefined {
@@ -263,7 +279,7 @@ function buildToolCall(span: AIConversationSpan): ToolCall | null {
     name,
     spanId: span.span_id,
     traceId: span.trace,
-    timestamp: span["precise.start_ts"],
+    timestamp: timestampMs(span["precise.start_ts"]),
     durationMs: Math.round(
       (span["precise.finish_ts"] - span["precise.start_ts"]) * 1000,
     ),
@@ -292,7 +308,7 @@ function buildMessageEvents(span: AIConversationSpan): ConversationMessage[] {
         type: "message" as const,
         role: "user" as const,
         content: userContent,
-        timestamp: span["precise.start_ts"],
+        timestamp: timestampMs(span["precise.start_ts"]),
         spanId: span.span_id,
         traceId: span.trace,
         metadata: undefined,
@@ -306,7 +322,7 @@ function buildMessageEvents(span: AIConversationSpan): ConversationMessage[] {
       type: "message",
       role: "assistant",
       content: assistantContent,
-      timestamp: span["precise.finish_ts"],
+      timestamp: timestampMs(span["precise.finish_ts"]),
       spanId: span.span_id,
       traceId: span.trace,
       metadata,
@@ -359,6 +375,7 @@ function buildConversationArtifact(
   organizationSlug: string,
   conversationId: string,
   spans: AIConversationSpan[],
+  lookupWindow: LookupWindow,
 ): AIConversationDetailsOutput {
   const timeline = extractTimeline(spans);
   const traceIds = [...new Set(spans.map((span) => span.trace))].sort();
@@ -376,8 +393,10 @@ function buildConversationArtifact(
     conversationId,
     organizationSlug,
     url: apiService.getAIConversationUrl(organizationSlug, conversationId),
-    startTimestamp,
-    endTimestamp,
+    lookupWindow,
+    startTimestamp:
+      startTimestamp === null ? null : timestampMs(startTimestamp),
+    endTimestamp: endTimestamp === null ? null : timestampMs(endTimestamp),
     traceIds,
     projects,
     spanCount: spans.length,
@@ -472,6 +491,9 @@ export default defineTool({
       params.organizationSlug,
       params.conversationId,
       spans,
+      params.start && params.end
+        ? { start: params.start, end: params.end }
+        : { statsPeriod: "30d" },
     );
     return structuredResult(artifact);
   },

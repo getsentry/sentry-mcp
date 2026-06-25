@@ -113,7 +113,6 @@ describe("get_ai_conversation_details", () => {
 
     assertStructuredOnlyResult(result);
     const structuredContent = getStructuredContent(result);
-    expect(structuredContent).not.toHaveProperty("lookupWindow");
     expect(structuredContent).not.toHaveProperty("focusedSpanId");
     expect(structuredContent).not.toHaveProperty("focusedSpanPresent");
     expect(structuredContent).not.toHaveProperty("messages");
@@ -122,20 +121,23 @@ describe("get_ai_conversation_details", () => {
       {
         "aiCallCount": 2,
         "conversationId": "conv-123",
-        "endTimestamp": 1713805405,
+        "endTimestamp": 1713805405000,
+        "lookupWindow": {
+          "statsPeriod": "30d",
+        },
         "messageCount": 4,
         "organizationSlug": "test-org",
         "projects": [
           "mcp-server",
         ],
         "spanCount": 3,
-        "startTimestamp": 1713805400,
+        "startTimestamp": 1713805400000,
         "timeline": [
           {
             "content": "What failed in production?",
             "role": "user",
             "spanId": "1111111111111111",
-            "timestamp": 1713805400,
+            "timestamp": 1713805400000,
             "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "type": "message",
           },
@@ -150,7 +152,7 @@ describe("get_ai_conversation_details", () => {
             },
             "role": "assistant",
             "spanId": "1111111111111111",
-            "timestamp": 1713805401.5,
+            "timestamp": 1713805401500,
             "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "type": "message",
           },
@@ -161,7 +163,7 @@ describe("get_ai_conversation_details", () => {
             "name": "search_events",
             "spanId": "2222222222222222",
             "status": "ok",
-            "timestamp": 1713805401.7,
+            "timestamp": 1713805401700,
             "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "type": "tool_call",
           },
@@ -169,7 +171,7 @@ describe("get_ai_conversation_details", () => {
             "content": "Can you inspect the failing event?",
             "role": "user",
             "spanId": "3333333333333333",
-            "timestamp": 1713805404,
+            "timestamp": 1713805404000,
             "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "type": "message",
           },
@@ -182,7 +184,7 @@ describe("get_ai_conversation_details", () => {
             },
             "role": "assistant",
             "spanId": "3333333333333333",
-            "timestamp": 1713805405,
+            "timestamp": 1713805405000,
             "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "type": "message",
           },
@@ -282,6 +284,10 @@ describe("get_ai_conversation_details", () => {
     assertStructuredOnlyResult(result);
     expect(getStructuredContent(result)).toMatchObject({
       conversationId: "conv-empty",
+      lookupWindow: {
+        start: "2026-05-23T00:23:27.667Z",
+        end: "2026-05-23T02:34:56.137Z",
+      },
       startTimestamp: null,
       endTimestamp: null,
       spanCount: 0,
@@ -416,37 +422,37 @@ describe("get_ai_conversation_details", () => {
         type: "message",
         role: "user",
         spanId: "ai-first",
-        timestamp: 1713805400,
+        timestamp: 1713805400000,
       },
       {
         type: "message",
         role: "assistant",
         spanId: "ai-first",
-        timestamp: 1713805400.5,
+        timestamp: 1713805400500,
       },
       {
         type: "tool_call",
         name: "search_events",
         spanId: "tool-first",
-        timestamp: 1713805401,
+        timestamp: 1713805401000,
       },
       {
         type: "tool_call",
         name: "get_issue_details",
         spanId: "tool-second",
-        timestamp: 1713805402,
+        timestamp: 1713805402000,
       },
       {
         type: "message",
         role: "user",
         spanId: "ai-second",
-        timestamp: 1713805404,
+        timestamp: 1713805404000,
       },
       {
         type: "message",
         role: "assistant",
         spanId: "ai-second",
-        timestamp: 1713805405,
+        timestamp: 1713805405000,
       },
     ]);
   });
