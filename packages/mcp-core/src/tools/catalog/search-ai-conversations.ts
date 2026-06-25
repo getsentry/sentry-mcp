@@ -172,7 +172,7 @@ function buildArtifact(
         toolNames,
         toolErrorCount: toolErrors,
         url: apiService.getAIConversationUrl(organizationSlug, conversationId),
-        durationMs: Math.max(0, endTimestamp - startTimestamp),
+        durationMs: endTimestamp - startTimestamp,
       };
     }),
   };

@@ -1,3 +1,6 @@
+// Catalog-only AI conversation detail lookup. This owns the MCP-facing
+// transcript projection and keeps detail output chronological and debugger
+// oriented instead of mirroring every raw span attribute.
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
@@ -370,6 +373,7 @@ function countAICalls(spans: AIConversationSpan[]): number {
   return spans.filter((span) => getOperationType(span) === "ai_client").length;
 }
 
+/** Builds the stable structured artifact returned as conversation details. */
 function buildConversationArtifact(
   apiService: SentryApiService,
   organizationSlug: string,

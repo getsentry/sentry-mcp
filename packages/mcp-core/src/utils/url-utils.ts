@@ -611,6 +611,9 @@ export function getAIConversationUrl(
   );
 }
 
+/**
+ * Generates a Sentry AI conversations list URL with optional search filters.
+ */
 export function getAIConversationsUrl(
   host: string,
   organizationSlug: string,

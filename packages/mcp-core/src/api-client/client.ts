@@ -1028,6 +1028,7 @@ export class SentryApiService {
     );
   }
 
+  /** Builds the Sentry UI URL for the AI Conversations list with optional filters. */
   getAIConversationsUrl(
     organizationSlug: string,
     options?: {
@@ -4015,6 +4016,9 @@ export class SentryApiService {
     return TraceSchema.parse(body);
   }
 
+  /**
+   * Fetches all spans for one AI conversation within a relative or absolute time window.
+   */
   async getAIConversation(
     {
       organizationSlug,
