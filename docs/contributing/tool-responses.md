@@ -117,17 +117,20 @@ need.
 
 ## Structured Content
 
-MCP tools may return `structuredContent` alongside normal text `content`. Use it
-when clients need a typed result, pagination token, stable follow-up handle, or
-machine-readable projection of the same result. The current MCP spec defines
-`structuredContent` as a JSON object on `CallToolResult`, and `outputSchema` as
-the schema for that object:
+MCP tools may expose `structuredContent` alongside generated text `content`.
+Use it when clients need a typed result, pagination token, stable follow-up
+handle, or machine-readable projection of the same result. The current MCP spec
+defines `structuredContent` as a JSON object on `CallToolResult`, and
+`outputSchema` as the schema for that object:
 
+- Choose one response contract per tool: handwritten markdown or
+  `structuredContent`. Do not hand-write markdown and also return
+  `structuredContent` from the handler.
 - If a tool declares `outputSchema`, every successful `structuredContent` result
   must conform to that schema.
-- Keep `content` as the readable fallback. For compatibility, include a concise
-  text or serialized JSON representation even when `structuredContent` is
-  present.
+- Return structured results with `structuredResult(payload)`. The server
+  generates `content` as a compatibility fallback from the same payload.
+- Do not duplicate a large structured payload into a markdown artifact block.
 - Treat `structuredContent` as a stable product contract, not a raw upstream API
   passthrough. Map only documented fields that callers should depend on.
 - Do not spread `.passthrough()` API schema objects directly into
@@ -135,9 +138,11 @@ the schema for that object:
   interface.
 - Keep names, nullability, arrays, cursors, and URLs aligned between
   `outputSchema`, tests, and generated definitions.
-- Snapshot the text fallback and assert representative `structuredContent`
-  fields in tests. Include a regression assertion for fields that must not leak
-  when the upstream response schema is passthrough.
+- Snapshot `structuredContent` for structured tools, similar to handwritten
+  content snapshots for markdown tools. Include a regression assertion for
+  fields that must not leak when the upstream response schema is passthrough.
+- Test generated compatibility text at the server boundary, not inside
+  structured tool handler tests.
 - Use tool execution errors with `isError: true` for recoverable tool failures.
   Do not return partial success-shaped `structuredContent` for errors unless the
   error shape is explicitly modeled.

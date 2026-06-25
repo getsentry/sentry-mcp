@@ -96,7 +96,7 @@ function mockConversationEndpoint(
 }
 
 describe("get_ai_conversation_details", () => {
-  it("returns a transcript and structured artifact", async () => {
+  it("returns a transcript", async () => {
     mockConversationEndpoint();
 
     const result = await getAIConversationDetails.handler(
@@ -176,128 +176,7 @@ describe("get_ai_conversation_details", () => {
       **Assistant**
 
       I found the timeout stack trace.
-
-      ## Structured Artifact
-
-      \`\`\`json
-      {
-        "conversationId": "conv-123",
-        "organizationSlug": "test-org",
-        "url": "https://test-org.sentry.io/explore/conversations/conv-123/",
-        "startTimestamp": 1713805400,
-        "endTimestamp": 1713805405,
-        "traceIds": [
-          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        ],
-        "projects": [
-          "mcp-server"
-        ],
-        "spanCount": 3,
-        "turnCount": 2,
-        "messageCount": 4,
-        "toolCallCount": 1,
-        "totalTokens": 100,
-        "turns": [
-          {
-            "turn": 1,
-            "spanId": "1111111111111111",
-            "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "project": "mcp-server",
-            "started": 1713805400,
-            "ended": 1713805401.5,
-            "durationMs": 1500,
-            "user": {
-              "role": "user",
-              "content": "What failed in production?",
-              "timestamp": 1713805400,
-              "spanId": "1111111111111111",
-              "userEmail": "dev@example.com"
-            },
-            "assistant": {
-              "role": "assistant",
-              "content": "The checkout worker is timing out.",
-              "timestamp": 1713805401.5,
-              "spanId": "1111111111111111"
-            },
-            "toolCalls": [
-              {
-                "name": "search_events",
-                "spanId": "2222222222222222",
-                "timestamp": 1713805401.7,
-                "durationMs": 300,
-                "status": "ok",
-                "arguments": "{\\"query\\":\\"level:error\\"}",
-                "input": "{\\"organizationSlug\\":\\"test-org\\"}"
-              }
-            ],
-            "metadata": {
-              "agentName": "triage-agent",
-              "model": "gpt-5-mini-2026-05-01",
-              "totalTokens": 42,
-              "status": "ok"
-            }
-          },
-          {
-            "turn": 2,
-            "spanId": "3333333333333333",
-            "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "project": "mcp-server",
-            "started": 1713805404,
-            "ended": 1713805405,
-            "durationMs": 1000,
-            "user": {
-              "role": "user",
-              "content": "Can you inspect the failing event?",
-              "timestamp": 1713805404,
-              "spanId": "3333333333333333"
-            },
-            "assistant": {
-              "role": "assistant",
-              "content": "I found the timeout stack trace.",
-              "timestamp": 1713805405,
-              "spanId": "3333333333333333"
-            },
-            "toolCalls": [],
-            "metadata": {
-              "totalTokens": 58,
-              "status": "ok"
-            }
-          }
-        ],
-        "messages": [
-          {
-            "role": "user",
-            "content": "What failed in production?",
-            "timestamp": 1713805400,
-            "spanId": "1111111111111111",
-            "userEmail": "dev@example.com"
-          },
-          {
-            "role": "assistant",
-            "content": "The checkout worker is timing out.",
-            "timestamp": 1713805401.5,
-            "spanId": "1111111111111111"
-          },
-          {
-            "role": "user",
-            "content": "Can you inspect the failing event?",
-            "timestamp": 1713805404,
-            "spanId": "3333333333333333"
-          },
-          {
-            "role": "assistant",
-            "content": "I found the timeout stack trace.",
-            "timestamp": 1713805405,
-            "spanId": "3333333333333333"
-          }
-        ],
-        "spanIds": [
-          "1111111111111111",
-          "2222222222222222",
-          "3333333333333333"
-        ]
-      }
-      \`\`\`"
+      "
     `);
   });
 
@@ -434,9 +313,8 @@ describe("get_ai_conversation_details", () => {
     );
 
     expect(result).toContain("**Messages**: 4");
-    expect(result).toContain('"messageCount": 4');
-    expect(result).toContain('"spanId": "repeat-ai-1"');
-    expect(result).toContain('"spanId": "repeat-ai-2"');
+    expect(result).toContain("### Turn 1 - 2024-04-22T17:03:20.000Z");
+    expect(result).toContain("### Turn 2 - 2024-04-22T17:03:24.000Z");
     expect(result).toContain("- search_events (repeat-tool-1) - ok");
   });
 
@@ -475,8 +353,7 @@ describe("get_ai_conversation_details", () => {
 
     expect(result).toContain("**Tool Calls**: 1");
     expect(result).toContain("- get_issue_details (final-tool-1) - ok");
-    expect(result).toContain('"toolCallCount": 1');
-    expect(result).toContain('"toolCalls": [');
+    expect(result).toContain("**Tools**");
   });
 
   it("counts only tool calls included in the transcript", async () => {
@@ -509,8 +386,7 @@ describe("get_ai_conversation_details", () => {
     );
 
     expect(result).toContain("**Tool Calls**: 0");
-    expect(result).toContain('"toolCallCount": 0');
-    expect(result).toContain('"toolCalls": []');
+    expect(result).not.toContain("**Tools**");
     expect(result).not.toContain("(unnamed-tool-1)");
   });
 });

@@ -43,6 +43,7 @@ import {
   resolveToolDescription,
 } from "./tools/catalog-runtime/availability";
 import tools from "./tools/index";
+import type { StructuredToolOutput } from "./tools/types";
 import type { ServerContext } from "./types";
 import { LIB_VERSION } from "./version";
 
@@ -57,6 +58,38 @@ function isCallToolResult(output: unknown): output is CallToolResult {
     !Array.isArray(output) &&
     Array.isArray((output as { content?: unknown }).content)
   );
+}
+
+function isStructuredToolOutput(
+  output: unknown,
+): output is StructuredToolOutput {
+  return (
+    !!output &&
+    typeof output === "object" &&
+    !Array.isArray(output) &&
+    "structuredContent" in output &&
+    !("content" in output) &&
+    !!(output as { structuredContent?: unknown }).structuredContent &&
+    typeof (output as { structuredContent?: unknown }).structuredContent ===
+      "object" &&
+    !Array.isArray(
+      (output as { structuredContent?: unknown }).structuredContent,
+    )
+  );
+}
+
+function structuredOutputToCallToolResult(
+  output: StructuredToolOutput,
+): CallToolResult {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify(output.structuredContent, null, 2),
+      },
+    ],
+    structuredContent: output.structuredContent,
+  };
 }
 
 /**
@@ -348,10 +381,13 @@ function configureServer({
               content: output,
             };
           }
-          // Some tools return a full MCP CallToolResult so they can expose
-          // structuredContent alongside a text fallback.
+          // Some tools return a full MCP CallToolResult for custom content
+          // payloads such as images or resources.
           if (isCallToolResult(output)) {
             return output;
+          }
+          if (isStructuredToolOutput(output)) {
+            return structuredOutputToCallToolResult(output);
           }
           throw new Error(`Invalid tool output: ${output}`);
         } catch (error) {

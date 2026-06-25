@@ -4,6 +4,7 @@ import { type Span, setUser, startSpan } from "@sentry/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { buildServer } from "./server";
+import { structuredResult } from "./internal/tool-helpers/results";
 import type { Skill } from "./skills";
 import { createExecuteTool } from "./tools/special/execute-tool";
 import type { ToolConfig } from "./tools/types";
@@ -158,6 +159,39 @@ describe("buildServer", () => {
   });
 
   describe("telemetry context", () => {
+    it("generates compatibility text for structured-only tool output", async () => {
+      const server = buildServer({
+        context: baseContext,
+        tools: {
+          structured_tool: createMockTool("structured_tool", {
+            outputSchema: z.object({
+              status: z.string(),
+              count: z.number(),
+            }),
+            handler: async () =>
+              structuredResult({
+                status: "ok",
+                count: 2,
+              }),
+          }),
+        },
+      });
+
+      const result = await callRegisteredTool(server, "structured_tool", {});
+      const payload = getStructuredContent<{
+        status: string;
+        count: number;
+      }>(result);
+
+      expect(payload).toMatchInlineSnapshot(`
+        {
+          "count": 2,
+          "status": "ok",
+        }
+      `);
+      expect(getTextContent(result)).toBe(JSON.stringify(payload, null, 2));
+    });
+
     it("sets user ID and IP address together for tool calls", async () => {
       const server = buildServer({
         context: {

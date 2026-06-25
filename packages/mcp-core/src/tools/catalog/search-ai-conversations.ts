@@ -11,6 +11,7 @@ import {
   ParamProjectSlug,
 } from "../../schema";
 import { UserInputError } from "../../errors";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import { isNumericId } from "../../utils/slug-validation";
 import {
   AIConversationSummarySchema,
@@ -87,40 +88,6 @@ async function resolveProjectIds({
   );
 }
 
-function formatTimestamp(timestampMs: number): string {
-  return timestampMs > 0 ? new Date(timestampMs).toISOString() : "Unknown";
-}
-
-function formatDuration(startTimestampMs: number, endTimestampMs: number) {
-  const durationMs = Math.max(0, endTimestampMs - startTimestampMs);
-  if (durationMs < 1000) {
-    return `${durationMs}ms`;
-  }
-  const seconds = durationMs / 1000;
-  if (seconds < 60) {
-    return `${seconds.toFixed(seconds % 1 === 0 ? 0 : 1)}s`;
-  }
-  const minutes = seconds / 60;
-  return `${minutes.toFixed(minutes % 1 === 0 ? 0 : 1)}m`;
-}
-
-function truncate(value: string | null | undefined, maxLength = 280): string {
-  if (!value) {
-    return "None";
-  }
-  return value.length <= maxLength
-    ? value
-    : `${value.slice(0, maxLength - 3)}...`;
-}
-
-function formatUser(conversation: AIConversationSummary): string {
-  const user = conversation.user;
-  if (!user) {
-    return "Unknown";
-  }
-  return user.email ?? user.username ?? user.id ?? user.ip_address ?? "Unknown";
-}
-
 function projectUser(user: AIConversationSummary["user"]) {
   if (!user) {
     return null;
@@ -190,101 +157,6 @@ function buildArtifact(
       };
     }),
   };
-}
-
-function formatConversation(
-  apiService: SentryApiService,
-  organizationSlug: string,
-  conversation: AIConversationSummary,
-): string {
-  const url = apiService.getAIConversationUrl(
-    organizationSlug,
-    conversation.conversationId,
-  );
-  const details = [
-    `## ${conversation.conversationId}`,
-    "",
-    `**URL**: ${url}`,
-    `**Started**: ${formatTimestamp(conversation.startTimestamp)}`,
-    `**Ended**: ${formatTimestamp(conversation.endTimestamp)}`,
-    `**Duration**: ${formatDuration(conversation.startTimestamp, conversation.endTimestamp)}`,
-    `**User**: ${formatUser(conversation)}`,
-    `**Errors**: ${conversation.errors}`,
-    `**LLM Calls**: ${conversation.llmCalls}`,
-    `**Tool Calls**: ${conversation.toolCalls}`,
-    `**Tool Errors**: ${conversation.toolErrors}`,
-    `**Total Tokens**: ${conversation.totalTokens}`,
-    `**Total Cost**: ${conversation.totalCost}`,
-    `**Trace Count**: ${conversation.traceCount}`,
-  ];
-
-  if (conversation.flow.length > 0) {
-    details.push(`**Flow**: ${conversation.flow.join(" -> ")}`);
-  }
-  if (conversation.toolNames.length > 0) {
-    details.push(`**Tools**: ${conversation.toolNames.join(", ")}`);
-  }
-  if (conversation.traceIds.length > 0) {
-    details.push(`**Trace IDs**: ${conversation.traceIds.join(", ")}`);
-  }
-
-  details.push(
-    "",
-    "**First Input**",
-    "",
-    truncate(conversation.firstInput),
-    "",
-    "**Last Output**",
-    "",
-    truncate(conversation.lastOutput),
-    "",
-  );
-
-  return details.join("\n");
-}
-
-function formatExecutedSearch(params: {
-  query?: string | null;
-  projectIds?: string[];
-  environment?: string | string[] | null;
-  statsPeriod?: string | null;
-  start?: string | null;
-  end?: string | null;
-  limit: number;
-  cursor?: string | null;
-  samplingMode?: string | null;
-}) {
-  const lines = [
-    "## Executed Search",
-    `- Query: \`${params.query || "(empty)"}\``,
-    "- Order: backend default (most recent activity first)",
-    `- Limit: ${params.limit}`,
-  ];
-
-  if (params.projectIds && params.projectIds.length > 0) {
-    lines.push(
-      `- Projects: ${params.projectIds.map((id) => `\`${id}\``).join(", ")}`,
-    );
-  }
-  const environments = normalizeList(params.environment);
-  if (environments && environments.length > 0) {
-    lines.push(
-      `- Environments: ${environments.map((env) => `\`${env}\``).join(", ")}`,
-    );
-  }
-  if (params.start && params.end) {
-    lines.push(`- Time range: ${params.start} to ${params.end}`);
-  } else if (params.statsPeriod) {
-    lines.push(`- Time range: Last ${params.statsPeriod}`);
-  }
-  if (params.cursor) {
-    lines.push(`- Cursor: \`${params.cursor}\``);
-  }
-  if (params.samplingMode) {
-    lines.push(`- Sampling mode: \`${params.samplingMode}\``);
-  }
-
-  return lines.join("\n");
 }
 
 export default defineTool({
@@ -413,67 +285,6 @@ export default defineTool({
       searchUrl,
     );
 
-    const output = [
-      `# AI Conversations in **${organizationSlug}**`,
-      "",
-      formatExecutedSearch({
-        query: params.query,
-        projectIds,
-        environment: params.environment,
-        statsPeriod,
-        start: params.start,
-        end: params.end,
-        limit: params.limit,
-        cursor: params.cursor,
-        samplingMode: params.samplingMode,
-      }),
-      "",
-      `**Sentry Search URL**: ${searchUrl}`,
-      "",
-    ];
-
-    if (conversations.length === 0) {
-      output.push("No AI conversations found.", "");
-    } else {
-      output.push(
-        `Found ${conversations.length} AI conversation${conversations.length === 1 ? "" : "s"}.`,
-        "",
-        ...conversations.map((conversation) =>
-          formatConversation(apiService, organizationSlug, conversation),
-        ),
-      );
-    }
-
-    output.push("## Next Steps", "");
-    output.push(
-      "- Fetch a transcript with `get_ai_conversation_details` using a `conversationId` above.",
-      "- Fetch by URL with `get_sentry_resource` using a conversation URL above.",
-      "- Query related spans with `search_events` using dataset `spans` and query `gen_ai.conversation.id:<conversationId>` to inspect telemetry across traces.",
-      "- Use listed trace IDs only for per-trace follow-up; a conversation can span multiple traces.",
-    );
-    if (nextCursor) {
-      output.push(
-        `- More conversations are available. Pass \`cursor: "${nextCursor}"\` with the same search scope to fetch the next page.`,
-      );
-    }
-
-    output.push(
-      "",
-      "## Structured Artifact",
-      "",
-      "```json",
-      JSON.stringify(artifact, null, 2),
-      "```",
-    );
-
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: output.join("\n"),
-        },
-      ],
-      structuredContent: artifact,
-    };
+    return structuredResult(artifact);
   },
 });

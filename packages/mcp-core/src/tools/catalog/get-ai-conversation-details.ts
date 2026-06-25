@@ -565,19 +565,6 @@ export default defineTool({
       "## Transcript",
       "",
       ...artifact.turns.flatMap(formatTurn),
-      "## Structured Artifact",
-      "",
-      "```json",
-      JSON.stringify(
-        {
-          ...artifact,
-          focusedSpanId: params.spanId,
-          focusedSpanPresent,
-        },
-        null,
-        2,
-      ),
-      "```",
     ].filter((line): line is string => line !== null);
 
     return output.join("\n");
