@@ -716,7 +716,7 @@
   },
   {
     "name": "get_ai_conversation_details",
-    "description": "Fetch all spans for an AI conversation by its gen_ai.conversation.id.\n\nA conversation is a set of spans sharing the same gen_ai.conversation.id. To discover conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'.",
+    "description": "Fetch the chronological transcript and debugging details for one AI conversation.\n\nReturns a timeline of user messages, assistant messages, and tool calls, with trace/span IDs for deeper debugging. To discover or list conversations, use search_ai_conversations.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -732,12 +732,206 @@
           "type": "string",
           "description": "Numeric project ID to scope the query. Falls back to context constraint or all projects."
         },
+        "start": {
+          "type": "string",
+          "description": "Explicit start time for the conversation lookup window."
+        },
+        "end": {
+          "type": "string",
+          "description": "Explicit end time for the conversation lookup window."
+        },
         "regionUrl": {
           "type": "string",
           "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
         }
       },
       "required": ["organizationSlug", "conversationId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string"
+        },
+        "organizationSlug": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "lookupWindow": {
+          "type": "object",
+          "properties": {
+            "statsPeriod": {
+              "type": "string"
+            },
+            "start": {
+              "type": "string"
+            },
+            "end": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "startTimestamp": {
+          "type": ["number", "null"]
+        },
+        "endTimestamp": {
+          "type": ["number", "null"]
+        },
+        "traceIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "spanCount": {
+          "type": "number"
+        },
+        "aiCallCount": {
+          "type": "number"
+        },
+        "messageCount": {
+          "type": "number"
+        },
+        "toolCallCount": {
+          "type": "number"
+        },
+        "totalTokens": {
+          "type": "number"
+        },
+        "timeline": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "message"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["user", "assistant"]
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "number"
+                  },
+                  "spanId": {
+                    "type": "string"
+                  },
+                  "traceId": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "properties": {
+                      "agentName": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "totalTokens": {
+                        "type": "number"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "durationMs": {
+                        "type": "number"
+                      }
+                    },
+                    "required": ["totalTokens", "durationMs"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "type",
+                  "role",
+                  "content",
+                  "timestamp",
+                  "spanId",
+                  "traceId"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "tool_call"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "spanId": {
+                    "type": "string"
+                  },
+                  "traceId": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "number"
+                  },
+                  "durationMs": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "arguments": {
+                    "type": "string"
+                  },
+                  "input": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "name",
+                  "spanId",
+                  "traceId",
+                  "timestamp",
+                  "durationMs"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "conversationId",
+        "organizationSlug",
+        "url",
+        "lookupWindow",
+        "startTimestamp",
+        "endTimestamp",
+        "traceIds",
+        "projects",
+        "spanCount",
+        "aiCallCount",
+        "messageCount",
+        "toolCallCount",
+        "totalTokens",
+        "timeline"
+      ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
@@ -1533,7 +1727,7 @@
   },
   {
     "name": "get_sentry_resource",
-    "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID to fetch all spans for that conversation. To discover or list conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use the Sentry tool `get_snapshot_image` for full-resolution image bytes.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- monitor: <monitorSlug>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
+    "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use the Sentry tool `get_snapshot_image` for full-resolution image bytes.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- monitor: <monitorSlug>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1704,6 +1898,226 @@
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect"],
+    "surface": "catalog"
+  },
+  {
+    "name": "search_ai_conversations",
+    "description": "Search Sentry AI Conversations and return one summary row per conversation.\n\nUse this tool to find or list AI Conversations. Results are conversation summaries, not raw span rows.\nUse get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_ai_conversations(organizationSlug='my-org', query='failed conversations', statsPeriod='7d')\nsearch_ai_conversations(organizationSlug='my-org', query='checkout', project='backend')\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "query": {
+          "type": "string",
+          "description": "Conversation query/filter string."
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "Project slug or numeric project ID, or an array of projects."
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "Environment name, or an array of environments."
+        },
+        "statsPeriod": {
+          "type": "string",
+          "description": "Relative time range such as 24h, 7d, or 30d. Defaults to 30d."
+        },
+        "start": {
+          "type": "string",
+          "description": "Explicit start time for the search window."
+        },
+        "end": {
+          "type": "string",
+          "description": "Explicit end time for the search window."
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Pagination cursor from a previous response."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10
+        },
+        "regionUrl": {
+          "type": "string",
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+        }
+      },
+      "required": ["organizationSlug"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string"
+        },
+        "searchUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "count": {
+          "type": "number"
+        },
+        "nextCursor": {
+          "type": ["string", "null"]
+        },
+        "conversations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "conversationId": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "startTimestamp": {
+                "type": "number"
+              },
+              "endTimestamp": {
+                "type": "number"
+              },
+              "durationMs": {
+                "type": "number"
+              },
+              "errors": {
+                "type": "number"
+              },
+              "aiCallCount": {
+                "type": "number"
+              },
+              "toolCallCount": {
+                "type": "number"
+              },
+              "toolErrorCount": {
+                "type": "number"
+              },
+              "totalTokens": {
+                "type": "number"
+              },
+              "totalCost": {
+                "type": "number"
+              },
+              "traceCount": {
+                "type": "number"
+              },
+              "sampleTraceIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "firstInputPreview": {
+                "type": ["string", "null"]
+              },
+              "lastOutputPreview": {
+                "type": ["string", "null"]
+              },
+              "flow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "toolNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "user": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "email": {
+                        "type": ["string", "null"]
+                      },
+                      "username": {
+                        "type": ["string", "null"]
+                      }
+                    },
+                    "required": ["email", "username"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "conversationId",
+              "url",
+              "startTimestamp",
+              "endTimestamp",
+              "durationMs",
+              "errors",
+              "aiCallCount",
+              "toolCallCount",
+              "toolErrorCount",
+              "totalTokens",
+              "totalCost",
+              "traceCount",
+              "sampleTraceIds",
+              "firstInputPreview",
+              "lastOutputPreview",
+              "flow",
+              "toolNames",
+              "user"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "organizationSlug",
+        "searchUrl",
+        "count",
+        "nextCursor",
+        "conversations"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["event:read", "project:read"],
+    "skills": ["inspect", "triage", "seer"],
     "surface": "catalog"
   },
   {
@@ -2174,6 +2588,56 @@
         }
       },
       "required": ["query"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "inputSchema": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "JSON Schema for the matching tool's arguments. Session-constrained parameters are omitted."
+              },
+              "annotations": {
+                "type": "object",
+                "properties": {
+                  "readOnlyHint": {
+                    "type": "boolean"
+                  },
+                  "destructiveHint": {
+                    "type": "boolean"
+                  },
+                  "idempotentHint": {
+                    "type": "boolean"
+                  },
+                  "openWorldHint": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["name", "description", "inputSchema", "annotations"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["query", "results"],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },

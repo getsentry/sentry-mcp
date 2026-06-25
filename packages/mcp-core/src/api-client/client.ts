@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   getContinuousProfileUrl as getContinuousProfileUrlUtil,
+  getAIConversationsUrl as getAIConversationsUrlUtil,
   getAIConversationUrl as getAIConversationUrlUtil,
   getDashboardUrl as getDashboardUrlUtil,
   getIssueUrl as getIssueUrlUtil,
@@ -75,6 +76,7 @@ import {
   ReplayListResponseSchema,
   ReplayIdsByResourceSchema,
   ReplayRecordingSegmentsSchema,
+  AIConversationSummaryListSchema,
   AIConversationSpanListSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
@@ -125,6 +127,7 @@ import type {
   ReplayDetails,
   ReplayList,
   ReplayRecordingSegments,
+  AIConversationSummary,
   AIConversationSpanList,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
@@ -1021,6 +1024,26 @@ export class SentryApiService {
       this.host,
       organizationSlug,
       conversationId,
+      this.protocol,
+    );
+  }
+
+  /** Builds the Sentry UI URL for the AI Conversations list with optional filters. */
+  getAIConversationsUrl(
+    organizationSlug: string,
+    options?: {
+      query?: string;
+      project?: string[];
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+    },
+  ): string {
+    return getAIConversationsUrlUtil(
+      this.host,
+      organizationSlug,
+      options,
       this.protocol,
     );
   }
@@ -3993,12 +4016,17 @@ export class SentryApiService {
     return TraceSchema.parse(body);
   }
 
+  /**
+   * Fetches all spans for one AI conversation within a relative or absolute time window.
+   */
   async getAIConversation(
     {
       organizationSlug,
       conversationId,
       project = "-1",
       statsPeriod = "30d",
+      start,
+      end,
       perPage = 1000,
       maxPages = 10,
     }: {
@@ -4006,6 +4034,8 @@ export class SentryApiService {
       conversationId: string;
       project?: string | string[];
       statsPeriod?: string;
+      start?: string;
+      end?: string;
       perPage?: number;
       maxPages?: number;
     },
@@ -4017,7 +4047,12 @@ export class SentryApiService {
     for (let page = 0; page < maxPages; page++) {
       const queryParams = new URLSearchParams();
       queryParams.set("per_page", String(perPage));
-      queryParams.set("statsPeriod", statsPeriod);
+      this.applyTimeParams(
+        queryParams,
+        start || end ? undefined : statsPeriod,
+        start,
+        end,
+      );
       const projects = Array.isArray(project) ? project : [project];
       for (const projectId of projects) {
         queryParams.append("project", projectId);
@@ -4041,6 +4076,76 @@ export class SentryApiService {
     }
 
     return spans;
+  }
+
+  /**
+   * Searches Sentry AI Conversations using the conversation list endpoint and
+   * returns the current page plus cursor metadata from the response headers.
+   */
+  async searchAIConversations(
+    {
+      organizationSlug,
+      query,
+      project,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      limit,
+      cursor,
+    }: {
+      organizationSlug: string;
+      query?: string;
+      project?: string | string[];
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+      cursor?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<{
+    conversations: AIConversationSummary[];
+    nextCursor: string | null;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (project) {
+      const projects = Array.isArray(project) ? project : [project];
+      for (const projectId of projects) {
+        queryParams.append("project", projectId);
+      }
+    }
+    if (environment) {
+      const environments = Array.isArray(environment)
+        ? environment
+        : [environment];
+      for (const environmentName of environments) {
+        queryParams.append("environment", environmentName);
+      }
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
+    if (limit !== undefined) {
+      queryParams.set("per_page", String(limit));
+    }
+    if (cursor) {
+      queryParams.set("cursor", cursor);
+    }
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/ai-conversations/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+
+    return {
+      conversations: AIConversationSummaryListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   /**

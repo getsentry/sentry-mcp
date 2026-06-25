@@ -41,7 +41,7 @@ You are a Sentry expert. Investigate errors, analyze performance, and manage pro
 - Use `get_snapshot_image` for metadata and preview/full image content for one snapshot image. Use the exact `image_file_name` from `get_snapshot` as `imageIdentifier`.
 - When asked for screenshots, screens, golden images, reference images, dark/light mode visuals, or to list available snapshots for an app, use `get_latest_base_snapshot` with the `appId` parameter. This is not an event or issue search operation.
 - `search_events` and `search_issues` accept `query` as natural language or direct Sentry search syntax; when an agent is configured, it repairs the query and related params before running. For issue-scoped event searches, use `search_issue_events`.
-- AI conversations are spans grouped by `gen_ai.conversation.id` — they are NOT issues. Use `get_sentry_resource(resourceType='ai_conversation')` for a specific conversation, or `search_events` with `dataset='spans'` and `query='has:gen_ai.conversation.id'` to list them.
+- AI conversations are spans grouped by `gen_ai.conversation.id` — they are NOT issues. Use `search_ai_conversations` to find or list conversations, and use `get_sentry_resource(resourceType='ai_conversation')` for a specific conversation. Use `search_events` with `dataset='spans'` only for raw span-level telemetry follow-up.
 - Trace responses from `get_sentry_resource` are condensed overviews by default. Use `resourceType='span'` with `resourceId='<traceId>:<spanId>'` or a trace URL with `?node=span-<spanId>` to focus one span directly; otherwise, if the trace output says it shows a subset of spans and the user needs more detail, follow up with `search_events` on that trace.
 
 ## Output

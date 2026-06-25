@@ -10,7 +10,16 @@ import type { Skill } from "../skills";
 import type { ProjectCapabilities, ServerContext } from "../types";
 
 export type ToolContent = TextContent | ImageContent | EmbeddedResource;
-export type ToolOutput = string | ToolContent[] | CallToolResult;
+export interface StructuredToolOutput<
+  TStructuredContent extends Record<string, unknown> = Record<string, unknown>,
+> {
+  structuredContent: TStructuredContent;
+}
+export type ToolOutput =
+  | string
+  | ToolContent[]
+  | CallToolResult
+  | StructuredToolOutput;
 /**
  * Keeps schema-inferred handler params at tool definition sites while allowing
  * heterogeneous tool registries to store many concrete handler signatures.
