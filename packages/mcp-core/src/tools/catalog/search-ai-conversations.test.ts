@@ -5,6 +5,10 @@ import searchAIConversations from "./search-ai-conversations";
 import catalogTools from "./index";
 import { isDefaultTopLevelToolName } from "../surfaces";
 import { getServerContext } from "../../test-setup";
+import {
+  assertStructuredOnlyResult,
+  getStructuredContent,
+} from "../../test-utils/structured-content";
 
 const baseConversation = {
   conversationId: "conv-123",
@@ -44,27 +48,6 @@ const longConversation = {
   firstInput: `${"Investigate checkout failures. ".repeat(20)}Root cause?`,
   lastOutput: `${"The worker timed out while calling inventory. ".repeat(20)}Next step.`,
 };
-
-function getStructuredContent<T extends Record<string, unknown>>(
-  result: unknown,
-): T {
-  const structuredContent = (result as { structuredContent?: unknown })
-    .structuredContent;
-  if (
-    !structuredContent ||
-    typeof structuredContent !== "object" ||
-    Array.isArray(structuredContent)
-  ) {
-    throw new Error(`No structured content found: ${JSON.stringify(result)}`);
-  }
-
-  return structuredContent as T;
-}
-
-function expectStructuredOnlyResult(result: unknown) {
-  expect(result).toHaveProperty("structuredContent");
-  expect(result).not.toHaveProperty("content");
-}
 
 describe("search_ai_conversations", () => {
   it("returns conversation-shaped search results", async () => {
@@ -146,7 +129,7 @@ describe("search_ai_conversations", () => {
         "searchUrl": "https://test-org.sentry.io/explore/conversations/?query=checkout&statsPeriod=7d",
       }
     `);
-    expectStructuredOnlyResult(result);
+    assertStructuredOnlyResult(result);
     expect(structuredContent.conversations[0]?.user).not.toHaveProperty(
       "backendOnlyField",
     );
@@ -219,7 +202,7 @@ describe("search_ai_conversations", () => {
       searchUrl: string;
     }>(result);
 
-    expectStructuredOnlyResult(result);
+    assertStructuredOnlyResult(result);
     expect(structuredContent.searchUrl).toBe(
       "https://test-org.sentry.io/explore/conversations/?statsPeriod=30d",
     );
@@ -311,7 +294,7 @@ describe("search_ai_conversations", () => {
       conversations: unknown[];
     }>(result);
 
-    expectStructuredOnlyResult(result);
+    assertStructuredOnlyResult(result);
     expect(structuredContent).toMatchObject({
       count: 0,
       nextCursor: "page-2",

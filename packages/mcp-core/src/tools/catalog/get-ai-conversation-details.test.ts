@@ -3,6 +3,10 @@ import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import getAIConversationDetails from "./get-ai-conversation-details";
 import getSentryResource from "./get-sentry-resource";
+import {
+  assertStructuredOnlyResult,
+  getStructuredContent,
+} from "../../test-utils/structured-content";
 
 const baseContext = {
   constraints: {
@@ -11,26 +15,6 @@ const baseContext = {
   accessToken: "access-token",
   userId: "1",
 };
-
-function getStructuredContent<T extends Record<string, unknown>>(
-  result: unknown,
-): T {
-  const structuredContent = (result as { structuredContent?: unknown })
-    .structuredContent;
-  if (
-    !structuredContent ||
-    typeof structuredContent !== "object" ||
-    Array.isArray(structuredContent)
-  ) {
-    throw new Error("Expected structuredContent object");
-  }
-  return structuredContent as T;
-}
-
-function expectStructuredOnly(result: unknown) {
-  expect(result).toHaveProperty("structuredContent");
-  expect(result).not.toHaveProperty("content");
-}
 
 const conversationSpans: Array<Record<string, unknown>> = [
   {
@@ -127,7 +111,7 @@ describe("get_ai_conversation_details", () => {
       baseContext,
     );
 
-    expectStructuredOnly(result);
+    assertStructuredOnlyResult(result);
     const structuredContent = getStructuredContent(result);
     expect(structuredContent).not.toHaveProperty("lookupWindow");
     expect(structuredContent).not.toHaveProperty("focusedSpanId");
@@ -232,7 +216,7 @@ describe("get_ai_conversation_details", () => {
       baseContext,
     );
 
-    expectStructuredOnly(result);
+    assertStructuredOnlyResult(result);
     const structuredContent = getStructuredContent(result);
     expect(structuredContent.conversationId).toBe("conv-123");
     expect(structuredContent.turns).toEqual(
@@ -304,7 +288,7 @@ describe("get_ai_conversation_details", () => {
       baseContext,
     );
 
-    expectStructuredOnly(result);
+    assertStructuredOnlyResult(result);
     expect(getStructuredContent(result)).toMatchObject({
       conversationId: "conv-empty",
       startTimestamp: null,

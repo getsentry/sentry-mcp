@@ -1,0 +1,33 @@
+export function getTextContent(result: unknown): string {
+  const content = (result as { content?: Array<{ text?: string }> }).content;
+  return content?.find((item) => typeof item.text === "string")?.text ?? "";
+}
+
+export function getStructuredContent<T extends Record<string, unknown>>(
+  result: unknown,
+): T {
+  const structuredContent = (result as { structuredContent?: unknown })
+    .structuredContent;
+  if (
+    !structuredContent ||
+    typeof structuredContent !== "object" ||
+    Array.isArray(structuredContent)
+  ) {
+    throw new Error(`No structuredContent found: ${JSON.stringify(result)}`);
+  }
+
+  return structuredContent as T;
+}
+
+export function assertStructuredOnlyResult(result: unknown): void {
+  getStructuredContent(result);
+  if ("content" in Object(result)) {
+    throw new Error(
+      `Expected structured-only result without content: ${JSON.stringify(result)}`,
+    );
+  }
+}
+
+export function getGeneratedTextFromStructuredContent(result: unknown): string {
+  return JSON.stringify(getStructuredContent(result), null, 2);
+}

@@ -6,6 +6,11 @@ import { z } from "zod";
 import { buildServer } from "./server";
 import { structuredResult } from "./internal/tool-helpers/results";
 import type { Skill } from "./skills";
+import {
+  getGeneratedTextFromStructuredContent,
+  getStructuredContent,
+  getTextContent,
+} from "./test-utils/structured-content";
 import { createExecuteTool } from "./tools/special/execute-tool";
 import type { ToolConfig } from "./tools/types";
 import type { ServerContext } from "./types";
@@ -85,27 +90,6 @@ async function callRegisteredTool(
     await client.close();
     await server.close();
   }
-}
-
-function getTextContent(result: unknown): string {
-  const content = (result as { content?: Array<{ text?: string }> }).content;
-  return content?.find((item) => typeof item.text === "string")?.text ?? "";
-}
-
-function getStructuredContent<T extends Record<string, unknown>>(
-  result: unknown,
-): T {
-  const structuredContent = (result as { structuredContent?: unknown })
-    .structuredContent;
-  if (
-    !structuredContent ||
-    typeof structuredContent !== "object" ||
-    Array.isArray(structuredContent)
-  ) {
-    throw new Error(`No structured content found: ${JSON.stringify(result)}`);
-  }
-
-  return structuredContent as T;
 }
 
 const DEFAULT_DIRECT_TOOL_NAMES = [
@@ -189,7 +173,9 @@ describe("buildServer", () => {
           "status": "ok",
         }
       `);
-      expect(getTextContent(result)).toBe(JSON.stringify(payload, null, 2));
+      expect(getTextContent(result)).toBe(
+        getGeneratedTextFromStructuredContent(result),
+      );
     });
 
     it("sets user ID and IP address together for tool calls", async () => {
@@ -1035,7 +1021,9 @@ describe("buildServer", () => {
       const firstResult = payload.results[0];
 
       expect(payload.query).toBe("replay");
-      expect(getTextContent(result)).toBe(JSON.stringify(payload, null, 2));
+      expect(getTextContent(result)).toBe(
+        getGeneratedTextFromStructuredContent(result),
+      );
       expect(getTextContent(result)).not.toContain("# Tool Search Results");
       expect(getTextContent(result)).not.toContain("```json");
       expect(firstResult?.name).toBe("get_replay_details");
