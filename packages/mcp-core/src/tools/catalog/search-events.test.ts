@@ -292,7 +292,7 @@ describe("search_events", () => {
         dataset: "spans",
         fields: ["span.op", "span.description", "span.duration"],
         sort: "-span.duration",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
