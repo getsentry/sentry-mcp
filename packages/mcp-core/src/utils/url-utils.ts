@@ -606,9 +606,43 @@ export function getAIConversationUrl(
   return getSentryWebBaseUrl(
     host,
     organizationSlug,
-    `/explore/conversations/${conversationId}/`,
+    `/explore/conversations/${encodeURIComponent(conversationId)}/`,
     protocol,
   );
+}
+
+/**
+ * Extract a single non-negated AI conversation ID from a Sentry search query
+ * that filters on `gen_ai.conversation.id`. Returns undefined when the query
+ * does not contain exactly one such filter or contains a negated filter.
+ */
+export function extractConversationIdFromSearchQuery(
+  query: string | undefined | null,
+): string | undefined {
+  if (!query) {
+    return undefined;
+  }
+
+  if (
+    /!gen_ai\.conversation\.id:|\bNOT\s+(?:\(\s*)?gen_ai\.conversation\.id:/i.test(
+      query,
+    )
+  ) {
+    return undefined;
+  }
+
+  const pattern = /gen_ai\.conversation\.id:(?:"([^"]+)"|([^\s)]+))/g;
+  const matches = [...query.matchAll(pattern)];
+  if (matches.length !== 1) {
+    return undefined;
+  }
+
+  const conversationId = matches[0][1] ?? matches[0][2];
+  if (conversationId.startsWith("[")) {
+    return undefined;
+  }
+
+  return conversationId;
 }
 
 /**

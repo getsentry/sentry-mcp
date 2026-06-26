@@ -258,6 +258,61 @@ describe("search_events", () => {
     );
   });
 
+  it("should link directly to AI conversation details for a single conversation id filter", async () => {
+    const query = 'gen_ai.conversation.id:"14365297"';
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("spans");
+          expect(url.searchParams.get("query")).toBe(query);
+
+          return HttpResponse.json({
+            data: [
+              {
+                id: "span1",
+                "span.op": "ai.pipeline",
+                "span.description": "AI conversation",
+                "span.duration": 120,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query,
+        dataset: "spans",
+        fields: ["span.op", "span.description", "span.duration"],
+        sort: "-span.duration",
+        statsPeriod: "14d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain(
+      "https://test-org.sentry.io/explore/conversations/14365297/",
+    );
+    expect(result).not.toContain("https://test-org.sentry.io/explore/traces/");
+  });
+
   it("should append environment filters for structured trace searches", async () => {
     const query =
       'transaction:"VPN connections" message:"environment: prod" tags[type]:Unified tags[country]:CN';
