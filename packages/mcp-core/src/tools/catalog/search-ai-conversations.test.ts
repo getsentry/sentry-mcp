@@ -67,7 +67,7 @@ describe("search_ai_conversations", () => {
       {
         organizationSlug: "test-org",
         query: "checkout",
-        statsPeriod: "7d",
+        period: "7d",
         limit: 10,
       },
       getServerContext(),
@@ -148,6 +148,7 @@ describe("search_ai_conversations", () => {
     const result = await searchAIConversations.handler(
       {
         organizationSlug: "test-org",
+        period: "30d",
         limit: 10,
       },
       getServerContext(),
@@ -191,6 +192,7 @@ describe("search_ai_conversations", () => {
     const result = await searchAIConversations.handler(
       {
         organizationSlug: "test-org",
+        period: "30d",
         limit: 10,
       },
       getServerContext(),
@@ -206,7 +208,7 @@ describe("search_ai_conversations", () => {
     );
   });
 
-  it("treats an empty statsPeriod like the default search window", async () => {
+  it("defaults to the configured search window when period is omitted", async () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
@@ -222,7 +224,7 @@ describe("search_ai_conversations", () => {
     const result = await searchAIConversations.handler(
       {
         organizationSlug: "test-org",
-        statsPeriod: "   ",
+        period: "30d",
         limit: 10,
       },
       getServerContext(),
@@ -266,6 +268,7 @@ describe("search_ai_conversations", () => {
         query: "failed",
         project: "backend",
         environment: ["production", "staging"],
+        period: "30d",
         start: "2026-06-01T00:00:00Z",
         end: "2026-06-02T00:00:00Z",
         cursor: "page-1",
@@ -298,21 +301,33 @@ describe("search_ai_conversations", () => {
     });
   });
 
-  it("rejects conflicting relative and absolute time ranges", async () => {
-    await expect(
-      searchAIConversations.handler(
-        {
-          organizationSlug: "test-org",
-          statsPeriod: "7d",
-          start: "2026-06-01T00:00:00Z",
-          end: "2026-06-02T00:00:00Z",
-          limit: 10,
+  it("lets absolute time ranges override period", async () => {
+    let requestUrl: string | undefined;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+        ({ request }) => {
+          requestUrl = request.url;
+          return HttpResponse.json([]);
         },
-        getServerContext(),
       ),
-    ).rejects.toThrow(
-      "`statsPeriod` cannot be combined with `start` and `end`.",
     );
+
+    await searchAIConversations.handler(
+      {
+        organizationSlug: "test-org",
+        period: "7d",
+        start: "2026-06-01T00:00:00Z",
+        end: "2026-06-02T00:00:00Z",
+        limit: 10,
+      },
+      getServerContext(),
+    );
+
+    const params = new URL(requestUrl!).searchParams;
+    expect(params.get("statsPeriod")).toBe(null);
+    expect(params.get("start")).toBe("2026-06-01T00:00:00Z");
+    expect(params.get("end")).toBe("2026-06-02T00:00:00Z");
   });
 
   it("rejects partial absolute time ranges", async () => {
@@ -320,6 +335,7 @@ describe("search_ai_conversations", () => {
       searchAIConversations.handler(
         {
           organizationSlug: "test-org",
+          period: "30d",
           start: "2026-06-01T00:00:00Z",
           limit: 10,
         },

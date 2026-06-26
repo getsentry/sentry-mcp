@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_SEARCH_ISSUES_PERIOD } from "../constants";
 import {
   getContinuousProfileUrl as getContinuousProfileUrlUtil,
   getAIConversationsUrl as getAIConversationsUrlUtil,
@@ -2994,7 +2995,7 @@ export class SentryApiService {
    * // High-frequency errors in specific project
    * const critical = await apiService.listIssues({
    *   organizationSlug: "my-org",
-   *   projectSlug: "backend",
+   *   projectId: "123456",
    *   query: "level:error",
    *   sortBy: "freq"
    * });
@@ -3003,16 +3004,24 @@ export class SentryApiService {
   async listIssues(
     {
       organizationSlug,
-      projectSlug,
+      projectId,
       query,
       sortBy,
       limit = 10,
+      statsPeriod = DEFAULT_SEARCH_ISSUES_PERIOD,
     }: {
       organizationSlug: string;
-      projectSlug?: string;
+      projectId?: string;
       query?: string | null;
       sortBy?: "user" | "freq" | "date" | "new";
       limit?: number;
+      /**
+       * Controls the search time window - which issues are included in results.
+       * Note: this is NOT the sparkline/stats period (that would be groupStatsPeriod).
+       * The Sentry API accepts any Nh/Nd/Nw format and defaults to 90d when omitted,
+       * but large windows risk timeouts on busy orgs.
+       */
+      statsPeriod?: string;
     },
     opts?: RequestOptions,
   ): Promise<IssueList> {
@@ -3024,14 +3033,15 @@ export class SentryApiService {
     const queryParams = new URLSearchParams();
     queryParams.set("limit", String(limit));
     if (sortBy) queryParams.set("sort", sortBy);
-    queryParams.set("statsPeriod", "24h");
+    queryParams.set("statsPeriod", statsPeriod ?? DEFAULT_SEARCH_ISSUES_PERIOD);
     queryParams.set("query", sentryQuery.join(" "));
 
+    if (projectId) {
+      queryParams.append("project", projectId);
+    }
     queryParams.append("collapse", "unhandled");
 
-    const apiUrl = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/issues/?${queryParams.toString()}`
-      : `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
+    const apiUrl = `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
 
     const body = await this.requestJSON(apiUrl, undefined, opts);
     return IssueListSchema.parse(body);

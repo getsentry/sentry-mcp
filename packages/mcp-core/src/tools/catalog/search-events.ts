@@ -6,6 +6,7 @@ import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import {
   ParamOrganizationSlug,
+  ParamPeriod,
   ParamProjectSlug,
   ParamRegionUrl,
 } from "../../schema";
@@ -437,10 +438,7 @@ export default defineTool({
       .describe(
         "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead.",
       ),
-    statsPeriod: z
-      .string()
-      .optional()
-      .describe("Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."),
+    period: ParamPeriod.optional(),
     regionUrl: ParamRegionUrl.nullable().default(null),
     limit: z
       .number()
@@ -507,7 +505,7 @@ export default defineTool({
     const hasExplicitDataset = params.dataset !== undefined;
     const hasExplicitFields = hasFields(params.fields);
     const hasExplicitSort = explicitSort !== undefined;
-    const hasExplicitStatsPeriod = params.statsPeriod !== undefined;
+    const hasExplicitPeriod = params.period !== undefined;
     const hasExplicitTraceItemDataset =
       hasExplicitDataset && isTraceItemDataset(inputDataset);
     const shouldTrustStructuredTraceSearch =
@@ -526,7 +524,7 @@ export default defineTool({
           dataset: inputDataset,
           fields: params.fields,
           sort: params.sort,
-          statsPeriod: params.statsPeriod,
+          statsPeriod: params.period,
           environment: params.environment,
         }),
         organizationSlug,
@@ -566,8 +564,8 @@ export default defineTool({
       environment = params.environment ?? parsed.environment;
 
       timeParams =
-        shouldTrustExplicitSearchParams && hasExplicitStatsPeriod
-          ? { statsPeriod: params.statsPeriod }
+        shouldTrustExplicitSearchParams && hasExplicitPeriod
+          ? { statsPeriod: params.period }
           : (parseAgentTimeRange(parsed.timeRange) ?? { statsPeriod: "14d" });
 
       if (dataset === "replays") {
@@ -586,7 +584,7 @@ export default defineTool({
         ? explicitStructuredTraceQuery
         : (params.query ?? "");
       sortParam = explicitSort || defaultSortForDataset(dataset);
-      timeParams = { statsPeriod: params.statsPeriod ?? "14d" };
+      timeParams = { statsPeriod: params.period ?? "14d" };
       fields =
         dataset === "replays"
           ? []

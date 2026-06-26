@@ -7,6 +7,7 @@ import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import {
   ParamOrganizationSlug,
+  ParamPeriod,
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
@@ -189,7 +190,7 @@ export default defineTool({
     "Use get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.",
     "",
     "<examples>",
-    "search_ai_conversations(organizationSlug='my-org', query='failed conversations', statsPeriod='7d')",
+    "search_ai_conversations(organizationSlug='my-org', query='failed conversations', period='7d')",
     "search_ai_conversations(organizationSlug='my-org', query='checkout', project='backend')",
     "</examples>",
   ].join("\n"),
@@ -211,13 +212,9 @@ export default defineTool({
       ])
       .optional()
       .describe("Environment name, or an array of environments."),
-    statsPeriod: z
-      .string()
-      .trim()
-      .optional()
-      .describe(
-        "Relative time range such as 24h, 7d, or 30d. Defaults to 30d.",
-      ),
+    period: ParamPeriod.default("30d").describe(
+      "Relative time range. Defaults to 30d.",
+    ),
     start: z
       .string()
       .trim()
@@ -245,11 +242,7 @@ export default defineTool({
     if ((params.start && !params.end) || (!params.start && params.end)) {
       throw new UserInputError("`start` and `end` must be provided together.");
     }
-    if (params.statsPeriod && (params.start || params.end)) {
-      throw new UserInputError(
-        "`statsPeriod` cannot be combined with `start` and `end`.",
-      );
-    }
+    const requestedPeriod = params.period ?? "30d";
 
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -264,9 +257,8 @@ export default defineTool({
       project: params.project,
       constrainedProjectSlug: context.constraints.projectSlug,
     });
-    const requestedStatsPeriod = params.statsPeriod?.trim();
     const statsPeriod =
-      params.start || params.end ? undefined : requestedStatsPeriod || "30d";
+      params.start || params.end ? undefined : requestedPeriod;
 
     const { conversations, nextCursor } =
       await apiService.searchAIConversations({

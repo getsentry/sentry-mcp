@@ -10,6 +10,28 @@
 export const MCP_SERVER_NAME = "Sentry MCP" as const;
 
 /**
+ * Supported issue-search windows exposed by search_issues.
+ * Intentionally bounded for query performance; lower-level API methods still accept arbitrary Sentry statsPeriod strings.
+ */
+export const SEARCH_ISSUES_PERIOD_VALUES = [
+  "24h",
+  "7d",
+  "14d",
+  "30d",
+  "90d",
+] as const;
+export type SearchIssuesPeriodValue =
+  (typeof SEARCH_ISSUES_PERIOD_VALUES)[number];
+
+/**
+ * Default time window used when no period is specified.
+ * 30d balances coverage against timeout risk on busy orgs.
+ * (The Sentry API's own default is 90d when omitted entirely.)
+ */
+export const DEFAULT_SEARCH_ISSUES_PERIOD =
+  "30d" as const satisfies SearchIssuesPeriodValue;
+
+/**
  * Allowed region domains for sentry.io
  * Only these specific domains are permitted when using Sentry's cloud service
  * This is used to prevent SSRF attacks by restricting regionUrl to known domains
