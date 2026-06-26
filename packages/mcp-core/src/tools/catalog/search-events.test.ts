@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import searchEvents from "./search-events";
 import { MAX_EVENTS_VALIDATION_ATTEMPTS } from "../support/search-events/utils";
+import { RECOMMENDED_FIELDS } from "../support/search-events/config";
 import { generateText } from "ai";
 import { UserInputError } from "../../errors";
 
@@ -27,6 +28,12 @@ vi.mock("ai", async (importOriginal) => {
 
 describe("search_events", () => {
   const mockGenerateText = vi.mocked(generateText);
+
+  it("includes user identity in the default errors field set", () => {
+    expect(RECOMMENDED_FIELDS.errors.basic).toEqual(
+      expect.arrayContaining(["user.email", "user.id"]),
+    );
+  });
 
   // Helper to create AI response for different datasets
   const mockAIResponse = (

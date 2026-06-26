@@ -30,6 +30,7 @@ type ConversationMessage = {
   timestamp: number;
   spanId: string;
   traceId: string;
+  userEmail?: string;
   metadata?: {
     agentName?: string;
     model?: string;
@@ -71,6 +72,7 @@ const conversationMessageSchema = z.object({
   timestamp: z.number(),
   spanId: z.string(),
   traceId: z.string(),
+  userEmail: z.string().optional(),
   metadata: z
     .object({
       agentName: z.string().optional(),
@@ -314,6 +316,7 @@ function buildMessageEvents(span: AIConversationSpan): ConversationMessage[] {
         timestamp: timestampMs(span["precise.start_ts"]),
         spanId: span.span_id,
         traceId: span.trace,
+        userEmail: span["user.email"],
         metadata: undefined,
       }),
     );

@@ -140,6 +140,7 @@ describe("get_ai_conversation_details", () => {
             "timestamp": 1713805400000,
             "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "type": "message",
+            "userEmail": "dev@example.com",
           },
           {
             "content": "The checkout worker is timing out.",
@@ -197,6 +198,33 @@ describe("get_ai_conversation_details", () => {
         "url": "https://test-org.sentry.io/explore/conversations/conv-123/",
       }
     `);
+  });
+
+  it("omits userEmail from user messages when span has no user.email", async () => {
+    const spansWithoutEmail = conversationSpans.map((span) => {
+      const { "user.email": _userEmail, ...rest } = span;
+      return rest;
+    });
+    mockConversationEndpoint("test-org", "conv-123", spansWithoutEmail);
+
+    const result = await getAIConversationDetails.handler(
+      {
+        organizationSlug: "test-org",
+        conversationId: "conv-123",
+      },
+      baseContext,
+    );
+
+    assertStructuredOnlyResult(result);
+    const structuredContent = getStructuredContent(result);
+    const userMessages = structuredContent.timeline.filter(
+      (event: { type: string; role?: string }) =>
+        event.type === "message" && event.role === "user",
+    );
+    expect(userMessages).toHaveLength(2);
+    for (const message of userMessages) {
+      expect(message).not.toHaveProperty("userEmail");
+    }
   });
 
   it("resolves an Explore conversation URL through get_sentry_resource", async () => {
