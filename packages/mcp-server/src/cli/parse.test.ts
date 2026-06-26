@@ -57,6 +57,14 @@ describe("cli/parseArgv", () => {
     expect(parsed.agentProvider).toBe("azure-openai");
   });
 
+  it("parses --agent-provider=openrouter", () => {
+    const parsed = parseArgv([
+      "--access-token=tok",
+      "--agent-provider=openrouter",
+    ]);
+    expect(parsed.agentProvider).toBe("openrouter");
+  });
+
   it("collects unknown args", () => {
     const parsed = parseArgv(["--unknown", "--another=1"]);
     expect(parsed.unknownArgs.length).toBeGreaterThan(0);

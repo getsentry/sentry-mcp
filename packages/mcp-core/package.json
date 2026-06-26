@@ -117,6 +117,10 @@
       "types": "./dist/internal/agents/anthropic-provider.d.ts",
       "default": "./dist/internal/agents/anthropic-provider.js"
     },
+    "./internal/agents/openrouter-provider": {
+      "types": "./dist/internal/agents/openrouter-provider.d.ts",
+      "default": "./dist/internal/agents/openrouter-provider.js"
+    },
     "./internal/agents/provider-factory": {
       "types": "./dist/internal/agents/provider-factory.d.ts",
       "default": "./dist/internal/agents/provider-factory.js"

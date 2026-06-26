@@ -6,12 +6,15 @@ import { getOpenAIModel, setOpenAIBaseUrl } from "./openai-provider.js";
 describe("openai-provider", () => {
   const originalModel = process.env.OPENAI_MODEL;
   const originalApiKey = process.env.OPENAI_API_KEY;
+  const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
   const originalApiVersion = process.env.OPENAI_API_VERSION;
 
   beforeEach(() => {
     setOpenAIBaseUrl(undefined);
     // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.OPENAI_MODEL;
+    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+    delete process.env.OPENROUTER_API_KEY;
     // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.OPENAI_API_VERSION;
   });
@@ -29,6 +32,13 @@ describe("openai-provider", () => {
       delete process.env.OPENAI_API_KEY;
     } else {
       process.env.OPENAI_API_KEY = originalApiKey;
+    }
+
+    if (originalOpenRouterApiKey === undefined) {
+      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey;
     }
 
     if (originalApiVersion === undefined) {

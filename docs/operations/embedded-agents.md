@@ -10,7 +10,7 @@ Sentry MCP uses embedded AI agents for the following tools:
 - `search_issue_events` - Search events within a specific issue
 - `use_sentry` - Unified natural language interface to all Sentry operations
 
-These tools require an LLM provider (OpenAI, Azure OpenAI, or Anthropic) to be configured.
+These tools require an LLM provider (OpenAI, Azure OpenAI, Anthropic, or OpenRouter) to be configured.
 
 ## Provider Selection
 
@@ -19,7 +19,7 @@ These tools require an LLM provider (OpenAI, Azure OpenAI, or Anthropic) to be c
 Always set `EMBEDDED_AGENT_PROVIDER` to explicitly specify your LLM provider:
 
 ```bash
-export EMBEDDED_AGENT_PROVIDER=openai   # or 'azure-openai' / 'anthropic'
+export EMBEDDED_AGENT_PROVIDER=openai   # or 'azure-openai' / 'anthropic' / 'openrouter'
 export OPENAI_API_KEY=sk-...            # corresponding API key
 ```
 
@@ -34,12 +34,13 @@ Sentry MCP resolves the LLM provider in this order:
    - `--agent-provider` CLI flag
 
 2. **Conflict detection**
-   - If both `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are set without explicit provider selection, an error is thrown
+   - If multiple provider keys are set without explicit provider selection, an error is thrown
    - This prevents silent bugs when external tools inject API keys
 
 3. **Auto-detection** (lowest priority, **deprecated**)
    - If only `ANTHROPIC_API_KEY` is set → use Anthropic
    - If only `OPENAI_API_KEY` is set → use OpenAI
+   - If only `OPENROUTER_API_KEY` is set → use OpenRouter
    - A deprecation warning is logged when this fallback is used
 
 ### Configuration Methods
@@ -66,6 +67,16 @@ Or:
 ```bash
 export EMBEDDED_AGENT_PROVIDER=anthropic
 export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+For OpenRouter:
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...
+# Optional; defaults to openai/gpt-5
+export OPENROUTER_MODEL=openai/gpt-5
+# Recommended, and required when multiple provider keys are set
+export EMBEDDED_AGENT_PROVIDER=openrouter
 ```
 
 #### Method 2: CLI Flag
@@ -136,12 +147,12 @@ Always set `EMBEDDED_AGENT_PROVIDER` when multiple API keys might be present:
 
 ## Error Messages
 
-### "Both API keys are set"
+### "Multiple LLM API keys are set"
 
 ```
-Error: Both ANTHROPIC_API_KEY and OPENAI_API_KEY are set.
+Error: Multiple LLM API keys are set.
 Please specify which provider to use by setting the EMBEDDED_AGENT_PROVIDER
-environment variable to 'openai', 'azure-openai', or 'anthropic'.
+environment variable to 'openai', 'azure-openai', 'anthropic', or 'openrouter'.
 ```
 
 **Cause:** Multiple API keys detected without explicit provider selection.
@@ -163,7 +174,7 @@ Please set the API key environment variable.
 
 ```
 Error: No embedded agent provider configured.
-Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable,
+Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY environment variable,
 or use --agent-provider flag to specify a provider.
 ```
 
@@ -208,6 +219,9 @@ export OPENAI_MODEL=gpt-4
 
 # Anthropic (default: claude-opus-4-5-20251101)
 export ANTHROPIC_MODEL=claude-sonnet-4-5-20250929
+
+# OpenRouter (default: openai/gpt-5)
+export OPENROUTER_MODEL=anthropic/claude-sonnet-4
 ```
 
 ### Verify Configuration
@@ -228,6 +242,11 @@ Or:
 Using anthropic for AI-powered search tools (auto-detected).
 ```
 
+Or:
+```
+Using openrouter for AI-powered search tools (auto-detected).
+```
+
 ## Troubleshooting
 
 ### Provider not detected
@@ -236,12 +255,14 @@ Using anthropic for AI-powered search tools (auto-detected).
 ```bash
 echo $ANTHROPIC_API_KEY
 echo $OPENAI_API_KEY
+echo $OPENROUTER_API_KEY
 echo $EMBEDDED_AGENT_PROVIDER
 ```
 
 **Verify API key format:**
 - OpenAI: `sk-...` (starts with `sk-`)
 - Anthropic: `sk-ant-...` (starts with `sk-ant-`)
+- OpenRouter: `sk-or-...` (starts with `sk-or-`)
 
 ### External tool conflicts
 

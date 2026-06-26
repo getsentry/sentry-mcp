@@ -94,7 +94,10 @@
   "globalPassThroughEnv": [
     "NODE_ENV",
     "CI",
+    "EMBEDDED_AGENT_PROVIDER",
     "OPENAI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "OPENROUTER_MODEL",
     "COOKIE_SECRET",
     "SENTRY_CLIENT_ID",
     "SENTRY_CLIENT_SECRET",

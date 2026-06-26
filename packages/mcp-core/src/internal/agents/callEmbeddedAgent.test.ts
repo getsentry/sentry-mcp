@@ -36,6 +36,7 @@ describe("callEmbeddedAgent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OPENAI_API_KEY = "test-key";
+    process.env.OPENROUTER_API_KEY = "";
   });
 
   it("throws LLMProviderError for OpenAI region restriction", async () => {

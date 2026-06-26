@@ -15,6 +15,7 @@ import getSentryResource from "./get-sentry-resource.js";
 
 const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
 const originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
+const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
 const originalEmbeddedAgentProvider = process.env.EMBEDDED_AGENT_PROVIDER;
 
 const baseContext = {
@@ -117,6 +118,7 @@ describe("get_sentry_resource", () => {
   beforeEach(() => {
     Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
     Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
+    Reflect.deleteProperty(process.env, "OPENROUTER_API_KEY");
     Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
   });
 
@@ -131,6 +133,12 @@ describe("get_sentry_resource", () => {
       Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
     } else {
       process.env.ANTHROPIC_API_KEY = originalAnthropicApiKey;
+    }
+
+    if (originalOpenRouterApiKey === undefined) {
+      Reflect.deleteProperty(process.env, "OPENROUTER_API_KEY");
+    } else {
+      process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey;
     }
 
     if (originalEmbeddedAgentProvider === undefined) {
