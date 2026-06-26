@@ -1722,16 +1722,20 @@ function formatMetricAlertCondition(
   }
 
   const type = condition.type;
-  const typeLabel =
-    type === 0 || type === "0"
-      ? "above"
-      : type === 1 || type === "1"
-        ? "below"
-        : type != null
-          ? String(type)
-          : undefined;
+  const typeLabel = (() => {
+    if (type === 0 || type === "0" || type === "gt" || type === "gte") {
+      return type === "gte" ? "at or above" : "above";
+    }
+    if (type === 1 || type === "1" || type === "lt" || type === "lte") {
+      return type === "lte" ? "at or below" : "below";
+    }
+    if (type != null) {
+      return String(type);
+    }
+    return undefined;
+  })();
 
-  if (typeLabel && typeLabel !== String(type)) {
+  if (typeLabel && !/^\d+$/.test(typeLabel)) {
     return `${typeLabel} ${comparison}`;
   }
 
@@ -1808,10 +1812,11 @@ function formatGenericEventOutput(event: Event): string {
 
   const evidenceData = occurrence.evidenceData;
   if (
+    evidenceData &&
     isMetricAlertEvidence(evidenceData) &&
     !isRegressionEvidence(evidenceData)
   ) {
-    return formatMetricAlertDetails(evidenceData!);
+    return formatMetricAlertDetails(evidenceData);
   }
 
   // Add a section header for performance regression details

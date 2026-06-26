@@ -2148,7 +2148,7 @@ describe("formatEventOutput metric alert details", () => {
         evidenceData: {
           value: 150,
           alert_id: 42,
-          conditions: [{ type: 0, comparison: 100 }],
+          conditions: [{ type: "gt", comparison: 100 }],
           data_sources: [
             {
               query_obj: {
@@ -2216,5 +2216,82 @@ describe("formatEventOutput metric alert details", () => {
     expect(output).toContain("### Performance Regression Details");
     expect(output).not.toContain("### Metric Alert Details");
     expect(output).toContain("POST /oauth/token duration increased");
+  });
+
+  it("formats below-threshold conditions using workflow-engine type strings", () => {
+    const event = {
+      id: "metric-event-2",
+      type: "generic",
+      title: "Low throughput",
+      platform: "other",
+      dateCreated: "2026-06-01T00:00:00.000Z",
+      entries: [],
+      occurrence: {
+        id: "occ-3",
+        projectId: 1,
+        eventId: "metric-event-2",
+        fingerprint: ["ghi"],
+        issueTitle: "Low throughput",
+        type: 1,
+        culprit: "",
+        evidenceData: {
+          value: 5,
+          alert_id: 99,
+          conditions: [{ type: "lt", comparison: 10 }],
+          data_sources: [
+            {
+              query_obj: {
+                snuba_query: {
+                  dataset: "events",
+                  query: "",
+                  aggregate: "count()",
+                  time_window: 300,
+                },
+              },
+            },
+          ],
+        },
+      },
+    } as Event;
+
+    const output = formatEventOutput(event);
+
+    expect(output).toContain("**Threshold**: below 10");
+    expect(output).not.toContain("**Environment**:");
+  });
+
+  it("supports alert_id-only metric alert evidence without data_sources", () => {
+    const event = {
+      id: "metric-event-3",
+      type: "generic",
+      title: "Alert triggered",
+      platform: "other",
+      dateCreated: "2026-06-01T00:00:00.000Z",
+      entries: [],
+      occurrence: {
+        id: "occ-4",
+        projectId: 1,
+        eventId: "metric-event-3",
+        fingerprint: ["jkl"],
+        issueTitle: "Alert triggered",
+        type: 1,
+        culprit: "",
+        evidenceData: {
+          value: 42,
+          alert_id: 7,
+          conditions: [
+            { type: "gte", comparison: 40 },
+            { type: "lte", comparison: 50 },
+          ],
+        },
+      },
+    } as Event;
+
+    const output = formatEventOutput(event);
+
+    expect(output).toContain("**Evaluated Value**: 42");
+    expect(output).toContain("**Alert Rule ID**: 7");
+    expect(output).toContain("**Threshold**: at or above 40, at or below 50");
+    expect(output).not.toContain("**Dataset**:");
   });
 });
