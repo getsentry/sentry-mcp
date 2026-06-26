@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// Pre-commit generated-output dispatcher. It runs before lint-staged, owns
+// staging generated artifacts for staged generator inputs, refuses partially
+// staged inputs, and only stages generated outputs that were clean beforehand.
+
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 
@@ -10,8 +14,6 @@ const GENERATED_TASKS = [
     inputs: [
       /^packages\/mcp-core\/src\/tools\/(?!.*\.test\.ts$).*\.ts$/,
       /^packages\/mcp-core\/src\/skills\.ts$/,
-      /^packages\/mcp-core\/src\/tools\/surfaces\.ts$/,
-      /^packages\/mcp-core\/src\/tools\/types\.ts$/,
       /^packages\/mcp-core\/src\/internal\/tool-helpers\/tool-call-formatting\.ts$/,
       /^packages\/mcp-core\/scripts\/generate-definitions\.ts$/,
       /^plugins\/sentry-mcp\/agents\/sentry-mcp\.md$/,
@@ -26,9 +28,9 @@ const GENERATED_TASKS = [
   },
 ];
 
-function run(command, options = {}) {
+function run(command) {
   execFileSync(command[0], command.slice(1), {
-    stdio: options.stdio ?? "inherit",
+    stdio: "inherit",
   });
 }
 
@@ -42,6 +44,21 @@ function getStagedFiles() {
   return output.split("\n").filter(Boolean);
 }
 
+function hasWorkingTreeChanges(path) {
+  try {
+    execFileSync("git", ["diff", "--quiet", path], { stdio: "pipe" });
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function getDirtyFiles(files) {
+  return files.filter(
+    (file) => existsSync(file) && hasWorkingTreeChanges(file),
+  );
+}
+
 const stagedFiles = getStagedFiles();
 
 if (stagedFiles.length === 0) {
@@ -51,29 +68,39 @@ if (stagedFiles.length === 0) {
 let ranTask = false;
 
 for (const task of GENERATED_TASKS) {
-  const shouldRun = stagedFiles.some((file) =>
+  const stagedInputs = stagedFiles.filter((file) =>
     task.inputs.some((pattern) => pattern.test(file)),
   );
 
-  if (!shouldRun) {
+  if (stagedInputs.length === 0) {
     continue;
   }
 
+  const dirtyStagedInputs = getDirtyFiles(stagedInputs);
+  if (dirtyStagedInputs.length > 0) {
+    console.error(
+      [
+        `Cannot generate ${task.name} with unstaged changes in staged inputs:`,
+        ...dirtyStagedInputs.map((file) => `  - ${file}`),
+        "Stage or discard those changes before committing.",
+      ].join("\n"),
+    );
+    process.exit(1);
+  }
+
   console.log(`Generating ${task.name}...`);
+  const dirtyOutputsBeforeGeneration = new Set(getDirtyFiles(task.outputs));
   run(task.command);
 
-  // Only stage outputs that exist on disk and currently differ from the index.
+  // Only stage outputs that exist on disk, were clean before generation, and
+  // currently differ from the index.
   // Skipping missing files avoids a crash when an output is staged for deletion
-  // (e.g. via git rm) and the generator does not recreate it. Skipping clean
-  // files avoids unnecessary git-add calls when generation was a no-op.
+  // (e.g. via git rm) and the generator does not recreate it. Skipping
+  // previously dirty files avoids staging unrelated working-tree edits.
   const outputsToStage = task.outputs.filter((output) => {
     if (!existsSync(output)) return false;
-    try {
-      execFileSync("git", ["diff", "--quiet", output], { stdio: "pipe" });
-      return false; // no working-tree changes vs index
-    } catch {
-      return true; // has changes
-    }
+    if (dirtyOutputsBeforeGeneration.has(output)) return false;
+    return hasWorkingTreeChanges(output);
   });
   if (outputsToStage.length > 0) {
     run(["git", "add", ...outputsToStage]);
