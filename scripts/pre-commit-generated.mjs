@@ -89,7 +89,18 @@ for (const task of GENERATED_TASKS) {
   }
 
   console.log(`Generating ${task.name}...`);
-  const dirtyOutputsBeforeGeneration = new Set(getDirtyFiles(task.outputs));
+  const dirtyOutputsBeforeGeneration = getDirtyFiles(task.outputs);
+  if (dirtyOutputsBeforeGeneration.length > 0) {
+    console.error(
+      [
+        `Cannot generate ${task.name} with unstaged changes in generated outputs:`,
+        ...dirtyOutputsBeforeGeneration.map((file) => `  - ${file}`),
+        "Stage or discard those changes before committing.",
+      ].join("\n"),
+    );
+    process.exit(1);
+  }
+
   run(task.command);
 
   // Only stage outputs that exist on disk, were clean before generation, and
@@ -99,7 +110,6 @@ for (const task of GENERATED_TASKS) {
   // previously dirty files avoids staging unrelated working-tree edits.
   const outputsToStage = task.outputs.filter((output) => {
     if (!existsSync(output)) return false;
-    if (dirtyOutputsBeforeGeneration.has(output)) return false;
     return hasWorkingTreeChanges(output);
   });
   if (outputsToStage.length > 0) {
