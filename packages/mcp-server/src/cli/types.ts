@@ -62,6 +62,12 @@ export type MergedArgs = {
   unknownArgs: string[];
 };
 
+export type CliAgentProvider =
+  | "openai"
+  | "azure-openai"
+  | "anthropic"
+  | "openrouter";
+
 /**
  * Partially resolved config — accessToken may not yet be available
  * (will be resolved via device code flow or cache).
@@ -77,7 +83,7 @@ export type PartiallyResolvedConfig = {
   openaiModel?: string;
   anthropicBaseUrl?: string;
   anthropicModel?: string;
-  agentProvider?: "openai" | "azure-openai" | "anthropic";
+  agentProvider?: CliAgentProvider;
   /** Skills granted for this session (always populated by finalize()) */
   finalSkills: Set<Skill>;
   organizationSlug?: string;

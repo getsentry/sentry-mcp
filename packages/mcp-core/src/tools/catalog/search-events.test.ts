@@ -122,6 +122,7 @@ describe("search_events", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OPENAI_API_KEY = "test-key";
+    process.env.OPENROUTER_API_KEY = "";
     mockGenerateText.mockResolvedValue(mockAIResponse("errors"));
     mockValidEventsValidation();
   });
@@ -2281,6 +2282,7 @@ describe("search_events", () => {
   it("should search events with direct query syntax (no agent)", async () => {
     process.env.OPENAI_API_KEY = "";
     process.env.ANTHROPIC_API_KEY = "";
+    process.env.OPENROUTER_API_KEY = "";
 
     mswServer.use(
       http.get(
@@ -2767,6 +2769,7 @@ describe("search_events", () => {
   it("rejects search immediately when validation fails without an agent provider", async () => {
     process.env.OPENAI_API_KEY = "";
     process.env.ANTHROPIC_API_KEY = "";
+    process.env.OPENROUTER_API_KEY = "";
 
     mswServer.use(
       http.get(

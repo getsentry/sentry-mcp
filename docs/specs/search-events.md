@@ -2,7 +2,7 @@
 
 ## Overview
 
-A unified search tool that accepts natural language queries and translates them to Sentry's discover endpoint parameters using OpenAI GPT-5. Replaces `find_errors` and `find_transactions` with a single, more flexible interface.
+A unified search tool that accepts natural language queries and translates them to Sentry's discover endpoint parameters using the configured embedded LLM provider. Replaces `find_errors` and `find_transactions` with a single, more flexible interface.
 
 ## Motivation
 
@@ -62,7 +62,7 @@ search_events({
 2. **Fetches searchable attributes** based on dataset:
    - For `spans`/`logs`/`metrics`: Uses `/organizations/{org}/trace-items/attributes/` endpoint with parallel calls for string and number attribute types
    - For `errors`: Uses `/organizations/{org}/tags/` endpoint (legacy, will migrate when new API supports errors)
-3. **OpenAI GPT-5 translates** natural language to Sentry query syntax using:
+3. **Configured LLM provider translates** natural language to Sentry query syntax using:
    - Comprehensive system prompt with Sentry query syntax rules
    - Dataset-specific field mappings and query patterns
    - Organization's custom attributes (fetched in step 2)
@@ -78,11 +78,11 @@ search_events({
 
 ## Key Implementation Details
 
-### OpenAI Integration
+### Embedded Agent Provider
 
-- **Model**: GPT-5 for natural language to Sentry query translation (configurable via `configureOpenAIProvider`)
+- **Default model**: GPT-5 for natural language to Sentry query translation
 - **System prompt**: Contains comprehensive Sentry query syntax, dataset-specific rules, and available fields
-- **Environment**: Requires `OPENAI_API_KEY` environment variable
+- **Environment**: Requires a configured embedded agent provider, such as `OPENAI_API_KEY` or `OPENROUTER_API_KEY`
 - **Custom attributes**: Automatically fetched and included in system prompt for each organization
 
 ### Dataset-Specific Translation
@@ -150,7 +150,7 @@ search_events({
 4. **Error Handling**:
    - ✅ Enhanced error messages with Sentry event IDs for debugging
    - ✅ Graceful handling of missing projects, API failures
-   - ✅ Clear error messages for missing OpenAI API key
+   - ✅ Clear error messages for missing embedded agent provider key
 
 5. **Output Formatting**:
    - ✅ Dataset-specific rendering instructions for AI agents
@@ -173,6 +173,6 @@ search_events({
 
 ## Dependencies
 
-- **Runtime**: OpenAI API key required (`OPENAI_API_KEY` environment variable)
+- **Runtime**: Embedded agent provider key required, such as `OPENAI_API_KEY` or `OPENROUTER_API_KEY`
 - **Build**: @ai-sdk/openai, ai packages added to dependencies
-- **Testing**: Comprehensive mocks for OpenAI and Sentry APIs
+- **Testing**: Comprehensive mocks for LLM provider and Sentry APIs

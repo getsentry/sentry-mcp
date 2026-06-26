@@ -1,8 +1,12 @@
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { streamText, stepCountIs } from "ai";
 import { startNewTrace, startSpan } from "@sentry/core";
 import type { MCPConnection } from "./types.js";
-import { DEFAULT_MODEL } from "./constants.js";
+import {
+  DEFAULT_OPENAI_MODEL,
+  DEFAULT_OPENROUTER_MODEL,
+  OPENROUTER_BASE_URL,
+} from "./constants.js";
 import {
   logError,
   logTool,
@@ -37,16 +41,41 @@ P.S. If you're excited about building cool developer tools and working with cutt
 export interface AgentConfig {
   model?: string;
   maxSteps?: number;
+  provider?: "openai" | "openrouter";
 }
 
+/**
+ * Runs the MCP test client agent against a connected MCP server.
+ */
 export async function runAgent(
   connection: MCPConnection,
   userPrompt: string,
   config: AgentConfig = {},
 ) {
-  const model = config.model || process.env.MCP_MODEL || DEFAULT_MODEL;
+  const provider = config.provider ?? "openai";
+  const model =
+    config.model ||
+    process.env.MCP_MODEL ||
+    (provider === "openrouter"
+      ? process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL
+      : process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL);
   const maxSteps = config.maxSteps || 10;
   const sessionId = connection.sessionId;
+  const modelProvider =
+    provider === "openrouter"
+      ? createOpenAI({
+          apiKey: process.env.OPENROUTER_API_KEY,
+          baseURL: OPENROUTER_BASE_URL,
+          headers: {
+            "HTTP-Referer": "https://github.com/getsentry/sentry-mcp",
+            "X-OpenRouter-Title": "Sentry MCP Test Client",
+          },
+        })
+      : createOpenAI();
+  const languageModel =
+    provider === "openrouter"
+      ? modelProvider.chat(model)
+      : modelProvider(model);
 
   // Wrap entire function in a new trace
   return await startNewTrace(async () => {
@@ -57,7 +86,7 @@ export async function runAgent(
           "service.version": LIB_VERSION,
           "gen_ai.conversation.id": sessionId,
           "gen_ai.agent.name": "sentry-mcp-agent",
-          "gen_ai.provider.name": "openai",
+          "gen_ai.provider.name": provider,
           "gen_ai.request.model": model,
           "gen_ai.operation.name": "chat",
         },
@@ -70,7 +99,7 @@ export async function runAgent(
           let isStreaming = false;
 
           const result = await streamText({
-            model: openai(model),
+            model: languageModel,
             system: SYSTEM_PROMPT,
             messages: [{ role: "user", content: userPrompt }],
             tools,

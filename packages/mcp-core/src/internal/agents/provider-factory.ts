@@ -6,6 +6,7 @@ import {
 } from "./azure-openai-provider";
 import { getOpenAIModel, setOpenAIBaseUrl } from "./openai-provider";
 import { getAnthropicModel, setAnthropicBaseUrl } from "./anthropic-provider";
+import { getOpenRouterModel } from "./openrouter-provider";
 import { ConfigurationError } from "../../errors";
 
 // Module-level state for explicit provider selection
@@ -38,8 +39,11 @@ export function setProviderBaseUrls(config: {
  */
 function detectProviderConflict(): boolean {
   return (
-    Boolean(process.env.ANTHROPIC_API_KEY) &&
-    Boolean(process.env.OPENAI_API_KEY)
+    [
+      process.env.ANTHROPIC_API_KEY,
+      process.env.OPENAI_API_KEY,
+      process.env.OPENROUTER_API_KEY,
+    ].filter(Boolean).length > 1
   );
 }
 
@@ -53,6 +57,8 @@ function hasApiKeyForProvider(type: AgentProviderType): boolean {
     case "openai":
     case "azure-openai":
       return Boolean(process.env.OPENAI_API_KEY);
+    case "openrouter":
+      return Boolean(process.env.OPENROUTER_API_KEY);
   }
 }
 
@@ -66,6 +72,8 @@ function getApiKeyName(type: AgentProviderType): string {
     case "openai":
     case "azure-openai":
       return "OPENAI_API_KEY";
+    case "openrouter":
+      return "OPENROUTER_API_KEY";
   }
 }
 
@@ -115,6 +123,18 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
         }),
       };
     }
+    case "openrouter":
+      return {
+        type: "openrouter",
+        label: "openrouter",
+        getModel: getOpenRouterModel,
+        getProviderOptions: () => ({
+          openai: {
+            structuredOutputs: false,
+            strictJsonSchema: false,
+          },
+        }),
+      };
   }
 }
 
@@ -133,7 +153,8 @@ function resolveProviderType(): AgentProviderType | undefined {
   if (
     envProvider === "openai" ||
     envProvider === "azure-openai" ||
-    envProvider === "anthropic"
+    envProvider === "anthropic" ||
+    envProvider === "openrouter"
   ) {
     return envProvider;
   }
@@ -146,6 +167,7 @@ function resolveProviderType(): AgentProviderType | undefined {
   // 4. Auto-detect
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
   if (process.env.OPENAI_API_KEY) return "openai";
+  if (process.env.OPENROUTER_API_KEY) return "openrouter";
 
   return undefined;
 }
@@ -173,8 +195,8 @@ export function getAgentProvider(): EmbeddedAgentProvider {
   // Check for conflicts when both API keys are present
   if (!providerType && detectProviderConflict()) {
     throw new ConfigurationError(
-      "Both ANTHROPIC_API_KEY and OPENAI_API_KEY are set. " +
-        "Please specify which provider to use by setting the EMBEDDED_AGENT_PROVIDER environment variable to 'openai', 'azure-openai', or 'anthropic'.",
+      "Multiple LLM API keys are set. " +
+        "Please specify which provider to use by setting the EMBEDDED_AGENT_PROVIDER environment variable to 'openai', 'azure-openai', 'anthropic', or 'openrouter'.",
     );
   }
 
@@ -182,7 +204,7 @@ export function getAgentProvider(): EmbeddedAgentProvider {
   if (!providerType) {
     throw new ConfigurationError(
       "No embedded agent provider configured. " +
-        "Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable, " +
+        "Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY environment variable, " +
         "or use --agent-provider flag to specify a provider.",
     );
   }
