@@ -837,6 +837,9 @@
                   "traceId": {
                     "type": "string"
                   },
+                  "userEmail": {
+                    "type": "string"
+                  },
                   "metadata": {
                     "type": "object",
                     "properties": {

@@ -69,6 +69,7 @@ search_events({
 4. **Executes** discover endpoint: `/organizations/{org}/events/` with:
    - Translated query string
    - Dataset-specific field selection
+   - Default error field selection includes `user.email` and `user.id`
    - Numeric project ID (converted from slug if provided)
    - Public dataset normalization (`metrics` maps to the current API dataset `tracemetrics`)
 5. **Returns** formatted results with:

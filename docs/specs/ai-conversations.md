@@ -223,6 +223,8 @@ Current expected behavior:
   default `statsPeriod` or explicit `start` and `end` values.
 - User and assistant message events are extracted from GenAI input/output
   fields.
+- User message events include `userEmail` when the source span has
+  `user.email`.
 - Tool call events are represented as first-class timeline events, not nested
   under a synthetic turn.
 - Each timeline event includes enough trace context to debug it, including
