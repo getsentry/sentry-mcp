@@ -10,6 +10,20 @@
 export const MCP_SERVER_NAME = "Sentry MCP" as const;
 
 /**
+ * Supported relative time window values for Sentry API queries.
+ * All endpoints that accept a statsPeriod parameter support these values.
+ */
+export const PERIOD_VALUES = ["1h", "24h", "7d", "14d", "30d", "90d"] as const;
+export type PeriodValue = (typeof PERIOD_VALUES)[number];
+
+/**
+ * Default time window used when no period is specified.
+ * 30d balances coverage against timeout risk on busy orgs.
+ * (The Sentry API's own default is 90d when omitted entirely.)
+ */
+export const DEFAULT_PERIOD = "30d" as const satisfies PeriodValue;
+
+/**
  * Allowed region domains for sentry.io
  * Only these specific domains are permitted when using Sentry's cloud service
  * This is used to prevent SSRF attacks by restricting regionUrl to known domains

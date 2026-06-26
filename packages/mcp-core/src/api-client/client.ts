@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_PERIOD, type PeriodValue } from "../constants";
 import {
   getContinuousProfileUrl as getContinuousProfileUrlUtil,
   getAIConversationsUrl as getAIConversationsUrlUtil,
@@ -3007,7 +3008,7 @@ export class SentryApiService {
       query,
       sortBy,
       limit = 10,
-      statsPeriod = "30d",
+      statsPeriod = DEFAULT_PERIOD,
     }: {
       organizationSlug: string;
       projectSlug?: string;
@@ -3020,7 +3021,7 @@ export class SentryApiService {
        * The Sentry API accepts any Nh/Nd/Nw format and defaults to 90d when omitted,
        * but large windows risk timeouts on busy orgs.
        */
-      statsPeriod?: "24h" | "7d" | "14d" | "30d" | "90d";
+      statsPeriod?: PeriodValue;
     },
     opts?: RequestOptions,
   ): Promise<IssueList> {
@@ -3032,7 +3033,7 @@ export class SentryApiService {
     const queryParams = new URLSearchParams();
     queryParams.set("limit", String(limit));
     if (sortBy) queryParams.set("sort", sortBy);
-    queryParams.set("statsPeriod", statsPeriod ?? "30d");
+    queryParams.set("statsPeriod", statsPeriod ?? DEFAULT_PERIOD);
     queryParams.set("query", sentryQuery.join(" "));
 
     queryParams.append("collapse", "unhandled");
@@ -4032,7 +4033,7 @@ export class SentryApiService {
       organizationSlug,
       conversationId,
       project = "-1",
-      statsPeriod = "30d",
+      statsPeriod = DEFAULT_PERIOD,
       start,
       end,
       perPage = 1000,

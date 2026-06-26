@@ -7,6 +7,7 @@ import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import {
   ParamOrganizationSlug,
+  ParamPeriod,
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
@@ -211,13 +212,9 @@ export default defineTool({
       ])
       .optional()
       .describe("Environment name, or an array of environments."),
-    period: z
-      .string()
-      .trim()
-      .optional()
-      .describe(
-        "Relative time range such as 24h, 7d, or 30d. Defaults to 30d.",
-      ),
+    period: ParamPeriod.optional().describe(
+      "Relative time range. Defaults to 30d.",
+    ),
     start: z
       .string()
       .trim()

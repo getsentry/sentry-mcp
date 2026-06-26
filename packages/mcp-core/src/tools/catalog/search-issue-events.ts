@@ -6,6 +6,7 @@ import { ensureIssueWithinProjectConstraint } from "../../internal/tool-helpers/
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,
+  ParamPeriod,
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
@@ -98,10 +99,7 @@ export default defineTool({
       .describe(
         "Sort field (prefix with - for descending). Default: -timestamp",
       ),
-    period: z
-      .string()
-      .optional()
-      .describe("Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."),
+    period: ParamPeriod.optional().describe("Initial time period hint."),
 
     // Optional context parameters
     projectSlug: ParamProjectSlug.nullable()

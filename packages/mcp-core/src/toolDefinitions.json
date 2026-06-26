@@ -1419,13 +1419,14 @@
           "anyOf": [
             {
               "type": "string",
-              "description": "Relative time range, such as `24h`, `7d`, or `14d`. Defaults to `24h` when `start` and `end` are omitted."
+              "enum": ["1h", "24h", "7d", "14d", "30d", "90d"],
+              "description": "Relative time range. Defaults to `24h` when `start` and `end` are omitted."
             },
             {
               "type": "null"
             }
           ],
-          "description": "Relative time range, such as `24h`, `7d`, or `14d`. Defaults to `24h` when `start` and `end` are omitted.",
+          "description": "Relative time range. Defaults to `24h` when `start` and `end` are omitted.",
           "default": null
         },
         "start": {
@@ -1529,8 +1530,9 @@
         },
         "period": {
           "type": "string",
-          "default": "7d",
-          "description": "Time period: '1h', '24h', '7d', '14d', '30d' (default: '7d')"
+          "enum": ["1h", "24h", "7d", "14d", "30d", "90d"],
+          "description": "Profiling time window (default: '7d'). Use '1h' for very recent profiling data.",
+          "default": "7d"
         },
         "compareAgainstPeriod": {
           "type": "string",
@@ -1953,7 +1955,8 @@
         },
         "period": {
           "type": "string",
-          "description": "Relative time range such as 24h, 7d, or 30d. Defaults to 30d."
+          "enum": ["1h", "24h", "7d", "14d", "30d", "90d"],
+          "description": "Relative time range. Defaults to 30d."
         },
         "start": {
           "type": "string",
@@ -2375,7 +2378,8 @@
         },
         "period": {
           "type": "string",
-          "description": "Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."
+          "enum": ["1h", "24h", "7d", "14d", "30d", "90d"],
+          "description": "Initial time period hint."
         },
         "regionUrl": {
           "anyOf": [
@@ -2449,7 +2453,8 @@
         },
         "period": {
           "type": "string",
-          "description": "Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."
+          "enum": ["1h", "24h", "7d", "14d", "30d", "90d"],
+          "description": "Initial time period hint."
         },
         "projectSlug": {
           "anyOf": [
@@ -2552,9 +2557,9 @@
         },
         "period": {
           "type": "string",
-          "enum": ["24h", "7d", "14d", "30d", "90d"],
-          "default": "30d",
-          "description": "Time window for issue search results. Controls which issues are returned based on when they had activity. Default 30d is a balance between coverage and query performance; use 24h for very recent issues or 90d for broader historical searches."
+          "enum": ["1h", "24h", "7d", "14d", "30d", "90d"],
+          "description": "Time window for issue search results. Controls which issues are returned based on when they had activity. Default 30d is a balance between coverage and query performance; use 24h for very recent issues or 90d for broader historical searches.",
+          "default": "30d"
         },
         "includeExplanation": {
           "type": "boolean",

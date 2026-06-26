@@ -9,7 +9,11 @@ import type {
   MonitorStat,
 } from "../../api-client/types";
 import type { ServerContext } from "../../types";
-import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+import {
+  ParamOrganizationSlug,
+  ParamPeriod,
+  ParamRegionUrl,
+} from "../../schema";
 import { isNumericId, validateSlugOrId } from "../../utils/slug-validation";
 import {
   compactLines,
@@ -106,12 +110,9 @@ export default defineTool({
       )
       .nullable()
       .default(null),
-    period: z
-      .string()
-      .trim()
-      .describe(
-        "Relative time range, such as `24h`, `7d`, or `14d`. Defaults to `24h` when `start` and `end` are omitted.",
-      )
+    period: ParamPeriod.describe(
+      "Relative time range. Defaults to `24h` when `start` and `end` are omitted.",
+    )
       .nullable()
       .default(null),
     start: z

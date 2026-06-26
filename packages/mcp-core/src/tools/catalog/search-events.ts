@@ -6,6 +6,7 @@ import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import {
   ParamOrganizationSlug,
+  ParamPeriod,
   ParamProjectSlug,
   ParamRegionUrl,
 } from "../../schema";
@@ -437,10 +438,7 @@ export default defineTool({
       .describe(
         "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead.",
       ),
-    period: z
-      .string()
-      .optional()
-      .describe("Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."),
+    period: ParamPeriod.optional().describe("Initial time period hint."),
     regionUrl: ParamRegionUrl.nullable().default(null),
     limit: z
       .number()

@@ -299,7 +299,7 @@ describe("get_monitor_details", () => {
     ).rejects.toThrow("`period` cannot be combined with `start` and `end`.");
   });
 
-  it("defaults blank period to a 24h monitor window", async () => {
+  it("defaults null period to a 24h monitor window", async () => {
     let checkInsRequestUrl: string | null = null;
     let statsRequestUrl: string | null = null;
     const monitorResponse = {
@@ -347,7 +347,7 @@ describe("get_monitor_details", () => {
         projectSlugOrId: null,
         monitorSlug: "nightly-import",
         environment: null,
-        period: "   ",
+        period: null,
         start: null,
         end: null,
         checkInLimit: 10,

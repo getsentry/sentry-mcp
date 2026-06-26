@@ -6,6 +6,7 @@
  * (e.g., toLowerCase, trim) and LLM-friendly descriptions.
  */
 import { z } from "zod";
+import { PERIOD_VALUES, } from "./constants";
 import { SENTRY_GUIDES } from "./constants";
 import { validateSlug } from "./utils/slug-validation";
 
@@ -114,6 +115,21 @@ export const ParamQuery = z
   .trim()
   .describe(
     `The search query to apply. Use the \`help(subject="query_syntax")\` tool to get more information about the query syntax rather than guessing.`,
+  );
+
+/**
+ * Relative time window parameter for Sentry API queries.
+ *
+ * Maps to the `statsPeriod` URL parameter in Sentry's API, which controls the
+ * search time window (i.e., which records are returned). This is distinct from
+ * `groupStatsPeriod`, which only affects sparkline data in the serializer.
+ *
+ * Tools apply their own `.default()`, `.optional()`, or `.nullable()` on top.
+ */
+export const ParamPeriod = z
+  .enum(PERIOD_VALUES)
+  .describe(
+    `Relative time window: ${PERIOD_VALUES.join(", ")}. Controls which records fall within the search window.`,
   );
 
 /**

@@ -206,7 +206,7 @@ describe("search_ai_conversations", () => {
     );
   });
 
-  it("treats an empty period like the default search window", async () => {
+  it("defaults to the configured search window when period is omitted", async () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
@@ -222,7 +222,7 @@ describe("search_ai_conversations", () => {
     const result = await searchAIConversations.handler(
       {
         organizationSlug: "test-org",
-        period: "   ",
+
         limit: 10,
       },
       getServerContext(),

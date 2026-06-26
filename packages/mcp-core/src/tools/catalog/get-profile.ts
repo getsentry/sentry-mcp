@@ -4,7 +4,11 @@ import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
-import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+import {
+  ParamOrganizationSlug,
+  ParamPeriod,
+  ParamRegionUrl,
+} from "../../schema";
 import { isNumericId } from "../../utils/slug-validation";
 import {
   formatFlamegraphAnalysis,
@@ -158,10 +162,9 @@ export default defineTool({
       .describe("Transaction name (e.g., '/api/users', 'POST /graphql')"),
 
     // Time params
-    period: z
-      .string()
-      .default("7d")
-      .describe("Time period: '1h', '24h', '7d', '14d', '30d' (default: '7d')"),
+    period: ParamPeriod.default("7d").describe(
+      "Profiling time window (default: '7d'). Use '1h' for very recent profiling data.",
+    ),
 
     // Comparison mode
     compareAgainstPeriod: z
