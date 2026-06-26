@@ -25,6 +25,9 @@ export function isSeerSupportedIssue(
   return true;
 }
 
+/**
+ * Format user-facing guidance when Seer cannot analyze the issue type.
+ */
 export function getSeerUnsupportedIssueMessage(
   issue: Pick<Issue, "shortId" | "issueCategory" | "issueType">,
 ): string {
@@ -183,7 +186,9 @@ function formatSolutionArtifact(data: unknown): string | null {
   }
   if (steps.length > 0) {
     sections.push(
-      steps.map((step) => `- **${step.title}**: ${step.description}`).join("\n"),
+      steps
+        .map((step) => `- **${step.title}**: ${step.description}`)
+        .join("\n"),
     );
   }
   return sections.length > 0 ? sections.join("\n\n") : null;
@@ -242,9 +247,7 @@ export function getAutofixArtifactSummaries(autofix: AutofixRun): {
   solution: string | null;
 } {
   const artifacts = getAutofixArtifacts(autofix);
-  const rootCause = RootCauseArtifactDataSchema.safeParse(
-    artifacts.root_cause,
-  );
+  const rootCause = RootCauseArtifactDataSchema.safeParse(artifacts.root_cause);
   const solution = SolutionArtifactDataSchema.safeParse(artifacts.solution);
   return {
     rootCause:
