@@ -18,6 +18,10 @@ export default function getSentryConfig(env: Env): CloudflareOptions {
         "app.server.version": LIB_VERSION,
         "app.upstream.host": env.SENTRY_HOST,
       },
+      attributes: {
+        "app.server.version": LIB_VERSION,
+        "app.upstream.host": env.SENTRY_HOST,
+      },
     },
     ...(versionId ? { release: versionId } : {}),
     environment:

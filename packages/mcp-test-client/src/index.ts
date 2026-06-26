@@ -78,6 +78,10 @@ program
             "gen_ai.agent.name": "sentry-mcp-agent",
             "gen_ai.provider.name": "openai",
           },
+          attributes: {
+            "gen_ai.agent.name": "sentry-mcp-agent",
+            "gen_ai.provider.name": "openai",
+          },
         },
         release: process.env.SENTRY_RELEASE,
         integrations: [

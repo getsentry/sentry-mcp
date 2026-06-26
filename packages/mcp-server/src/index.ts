@@ -269,6 +269,14 @@ async function main() {
         "app.upstream.host": cfg.sentryHost,
         "app.url.full": cfg.mcpUrl,
       },
+      attributes: {
+        "app.server.version": LIB_VERSION,
+        "app.transport": "stdio",
+        "app.server.mode.agent": cli.agent ? "true" : "false",
+        "app.server.mode.experimental": cli.experimental ? "true" : "false",
+        "app.upstream.host": cfg.sentryHost,
+        "app.url.full": cfg.mcpUrl,
+      },
     },
     release: process.env.SENTRY_RELEASE,
     integrations: [
