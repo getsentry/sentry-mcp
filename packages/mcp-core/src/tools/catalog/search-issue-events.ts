@@ -99,7 +99,7 @@ export default defineTool({
       .describe(
         "Sort field (prefix with - for descending). Default: -timestamp",
       ),
-    period: ParamPeriod.optional().describe("Initial time period hint."),
+    period: ParamPeriod.optional(),
 
     // Optional context parameters
     projectSlug: ParamProjectSlug.nullable()

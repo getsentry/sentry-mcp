@@ -438,7 +438,7 @@ export default defineTool({
       .describe(
         "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead.",
       ),
-    period: ParamPeriod.optional().describe("Initial time period hint."),
+    period: ParamPeriod.optional(),
     regionUrl: ParamRegionUrl.nullable().default(null),
     limit: z
       .number()
