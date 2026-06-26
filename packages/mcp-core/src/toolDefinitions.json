@@ -1364,7 +1364,7 @@
   },
   {
     "name": "get_monitor_details",
-    "description": "Get details for a Sentry cron monitor.\n\nUse this tool when you need to:\n- Inspect a monitor's schedule, status, owner, project, and environments\n- Review recent check-ins for missed, failed, timeout, or OK runs\n- Check monitor stats over a recent time range\n\n<examples>\nget_monitor_details(organizationSlug='my-organization', monitorSlug='nightly-import')\nget_monitor_details(organizationSlug='my-organization', monitorSlug='nightly-import', projectSlugOrId='backend', environment='production', statsPeriod='7d')\n</examples>",
+    "description": "Get details for a Sentry cron monitor.\n\nUse this tool when you need to:\n- Inspect a monitor's schedule, status, owner, project, and environments\n- Review recent check-ins for missed, failed, timeout, or OK runs\n- Check monitor stats over a recent time range\n\n<examples>\nget_monitor_details(organizationSlug='my-organization', monitorSlug='nightly-import')\nget_monitor_details(organizationSlug='my-organization', monitorSlug='nightly-import', projectSlugOrId='backend', environment='production', period='7d')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1415,7 +1415,7 @@
           "description": "Optional environment name to filter monitor environments, recent check-ins, and stats.",
           "default": null
         },
-        "statsPeriod": {
+        "period": {
           "anyOf": [
             {
               "type": "string",
@@ -1433,13 +1433,13 @@
             {
               "type": "string",
               "format": "date-time",
-              "description": "Absolute start time. Must be provided with `end`; do not combine with `statsPeriod`."
+              "description": "Absolute start time. Must be provided with `end`; do not combine with `period`."
             },
             {
               "type": "null"
             }
           ],
-          "description": "Absolute start time. Must be provided with `end`; do not combine with `statsPeriod`.",
+          "description": "Absolute start time. Must be provided with `end`; do not combine with `period`.",
           "default": null
         },
         "end": {
@@ -1447,13 +1447,13 @@
             {
               "type": "string",
               "format": "date-time",
-              "description": "Absolute end time. Must be provided with `start`; do not combine with `statsPeriod`."
+              "description": "Absolute end time. Must be provided with `start`; do not combine with `period`."
             },
             {
               "type": "null"
             }
           ],
-          "description": "Absolute end time. Must be provided with `start`; do not combine with `statsPeriod`.",
+          "description": "Absolute end time. Must be provided with `start`; do not combine with `period`.",
           "default": null
         },
         "checkInLimit": {
@@ -1493,7 +1493,7 @@
   },
   {
     "name": "get_profile",
-    "description": "Analyze CPU profiling data to identify performance bottlenecks and detect regressions.\n\nUSE THIS TOOL WHEN:\n- User asks why a specific endpoint/transaction is slow\n- User wants to understand where CPU time is spent\n- User asks about performance bottlenecks\n- User wants to compare performance between time periods\n- User shares a Sentry profile URL\n\nRETURNS:\n- Hot paths (call stacks consuming the most CPU time)\n- Performance percentiles (p75, p95, p99) for each function\n- User code vs library code breakdown\n- Actionable recommendations for optimization\n- Regression analysis when comparing periods\n\n<examples>\n### Analyze from URL (with transaction name)\n```\nget_profile(\n  profileUrl='https://my-org.sentry.io/explore/profiling/profile/backend/flamegraph/?profilerId=abc123',\n  transactionName='/api/users'\n)\n```\n\n### Analyze by transaction name\n```\nget_profile(\n  organizationSlug='my-org',\n  transactionName='/api/users',\n  projectSlugOrId='backend'\n)\n```\n\n### Compare performance between periods\n```\nget_profile(\n  organizationSlug='my-org',\n  transactionName='/api/users',\n  projectSlugOrId='backend',\n  statsPeriod='7d',\n  compareAgainstPeriod='14d'\n)\n```\n</examples>\n\n<hints>\n- Use `focusOnUserCode: true` (default) to filter out library code\n- High p99 relative to p75 indicates inconsistent performance\n- Use compareAgainstPeriod to detect regressions over time\n- Transaction names are case-sensitive\n</hints>",
+    "description": "Analyze CPU profiling data to identify performance bottlenecks and detect regressions.\n\nUSE THIS TOOL WHEN:\n- User asks why a specific endpoint/transaction is slow\n- User wants to understand where CPU time is spent\n- User asks about performance bottlenecks\n- User wants to compare performance between time periods\n- User shares a Sentry profile URL\n\nRETURNS:\n- Hot paths (call stacks consuming the most CPU time)\n- Performance percentiles (p75, p95, p99) for each function\n- User code vs library code breakdown\n- Actionable recommendations for optimization\n- Regression analysis when comparing periods\n\n<examples>\n### Analyze from URL (with transaction name)\n```\nget_profile(\n  profileUrl='https://my-org.sentry.io/explore/profiling/profile/backend/flamegraph/?profilerId=abc123',\n  transactionName='/api/users'\n)\n```\n\n### Analyze by transaction name\n```\nget_profile(\n  organizationSlug='my-org',\n  transactionName='/api/users',\n  projectSlugOrId='backend'\n)\n```\n\n### Compare performance between periods\n```\nget_profile(\n  organizationSlug='my-org',\n  transactionName='/api/users',\n  projectSlugOrId='backend',\n  period='7d',\n  compareAgainstPeriod='14d'\n)\n```\n</examples>\n\n<hints>\n- Use `focusOnUserCode: true` (default) to filter out library code\n- High p99 relative to p75 indicates inconsistent performance\n- Use compareAgainstPeriod to detect regressions over time\n- Transaction names are case-sensitive\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1527,7 +1527,7 @@
           "type": "string",
           "description": "Transaction name (e.g., '/api/users', 'POST /graphql')"
         },
-        "statsPeriod": {
+        "period": {
           "type": "string",
           "default": "7d",
           "description": "Time period: '1h', '24h', '7d', '14d', '30d' (default: '7d')"
@@ -1905,7 +1905,7 @@
   },
   {
     "name": "search_ai_conversations",
-    "description": "Search Sentry AI Conversations and return one summary row per conversation.\n\nUse this tool to find or list AI Conversations. Results are conversation summaries, not raw span rows.\nUse get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_ai_conversations(organizationSlug='my-org', query='failed conversations', statsPeriod='7d')\nsearch_ai_conversations(organizationSlug='my-org', query='checkout', project='backend')\n</examples>",
+    "description": "Search Sentry AI Conversations and return one summary row per conversation.\n\nUse this tool to find or list AI Conversations. Results are conversation summaries, not raw span rows.\nUse get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_ai_conversations(organizationSlug='my-org', query='failed conversations', period='7d')\nsearch_ai_conversations(organizationSlug='my-org', query='checkout', project='backend')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1951,7 +1951,7 @@
           ],
           "description": "Environment name, or an array of environments."
         },
-        "statsPeriod": {
+        "period": {
           "type": "string",
           "description": "Relative time range such as 24h, 7d, or 30d. Defaults to 30d."
         },
@@ -2373,7 +2373,7 @@
           ],
           "description": "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead."
         },
-        "statsPeriod": {
+        "period": {
           "type": "string",
           "description": "Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."
         },
@@ -2413,7 +2413,7 @@
   },
   {
     "name": "search_issue_events",
-    "description": "Search and filter events within a specific issue.\n\nProvide `query` as natural language or Sentry event search syntax. When an embedded agent is configured, it fixes filters, fields, sort, and time range before running.\n\nThe tool automatically constrains results to the specified issue.\n\nCommon Query Filters:\n- environment:production - Filter by environment\n- release:1.0.0 - Filter by release version\n- user.email:alice@example.com - Filter by user\n- trace:TRACE_ID - Filter by trace ID\n\nFor cross-issue searches use search_issues. For single issue or event details use get_sentry_resource.\n\n<examples>\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', query='from last hour')\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', query='environment:production')\nsearch_issue_events(issueUrl='https://sentry.io/.../issues/123/', query='release:v1.0.0', statsPeriod='7d')\n</examples>",
+    "description": "Search and filter events within a specific issue.\n\nProvide `query` as natural language or Sentry event search syntax. When an embedded agent is configured, it fixes filters, fields, sort, and time range before running.\n\nThe tool automatically constrains results to the specified issue.\n\nCommon Query Filters:\n- environment:production - Filter by environment\n- release:1.0.0 - Filter by release version\n- user.email:alice@example.com - Filter by user\n- trace:TRACE_ID - Filter by trace ID\n\nFor cross-issue searches use search_issues. For single issue or event details use get_sentry_resource.\n\n<examples>\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', query='from last hour')\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', query='environment:production')\nsearch_issue_events(issueUrl='https://sentry.io/.../issues/123/', query='release:v1.0.0', period='7d')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2447,7 +2447,7 @@
           "type": "string",
           "description": "Sort field (prefix with - for descending). Default: -timestamp"
         },
-        "statsPeriod": {
+        "period": {
           "type": "string",
           "description": "Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."
         },
@@ -2549,6 +2549,12 @@
           "maximum": 100,
           "default": 10,
           "description": "Maximum number of issues to return (1-100)"
+        },
+        "period": {
+          "type": "string",
+          "enum": ["24h", "7d", "14d", "30d", "90d"],
+          "default": "30d",
+          "description": "Time window for issue search results. Controls which issues are returned based on when they had activity. Default 30d is a balance between coverage and query performance; use 24h for very recent issues or 90d for broader historical searches."
         },
         "includeExplanation": {
           "type": "boolean",

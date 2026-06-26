@@ -3007,12 +3007,20 @@ export class SentryApiService {
       query,
       sortBy,
       limit = 10,
+      statsPeriod = "30d",
     }: {
       organizationSlug: string;
       projectSlug?: string;
       query?: string | null;
       sortBy?: "user" | "freq" | "date" | "new";
       limit?: number;
+      /**
+       * Controls the search time window - which issues are included in results.
+       * Note: this is NOT the sparkline/stats period (that would be groupStatsPeriod).
+       * The Sentry API accepts any Nh/Nd/Nw format and defaults to 90d when omitted,
+       * but large windows risk timeouts on busy orgs.
+       */
+      statsPeriod?: "24h" | "7d" | "14d" | "30d" | "90d";
     },
     opts?: RequestOptions,
   ): Promise<IssueList> {
@@ -3024,7 +3032,7 @@ export class SentryApiService {
     const queryParams = new URLSearchParams();
     queryParams.set("limit", String(limit));
     if (sortBy) queryParams.set("sort", sortBy);
-    queryParams.set("statsPeriod", "24h");
+    queryParams.set("statsPeriod", statsPeriod ?? "30d");
     queryParams.set("query", sentryQuery.join(" "));
 
     queryParams.append("collapse", "unhandled");

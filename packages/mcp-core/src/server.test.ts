@@ -1405,7 +1405,7 @@ describe("buildServer", () => {
         arguments: {
           organizationSlug: "test-org",
           query: "checkout",
-          statsPeriod: "7d",
+          period: "7d",
           limit: 10,
         },
       });

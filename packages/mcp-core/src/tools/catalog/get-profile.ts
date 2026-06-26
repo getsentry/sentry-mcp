@@ -120,7 +120,7 @@ export default defineTool({
     "  organizationSlug='my-org',",
     "  transactionName='/api/users',",
     "  projectSlugOrId='backend',",
-    "  statsPeriod='7d',",
+    "  period='7d',",
     "  compareAgainstPeriod='14d'",
     ")",
     "```",
@@ -158,7 +158,7 @@ export default defineTool({
       .describe("Transaction name (e.g., '/api/users', 'POST /graphql')"),
 
     // Time params
-    statsPeriod: z
+    period: z
       .string()
       .default("7d")
       .describe("Time period: '1h', '24h', '7d', '14d', '30d' (default: '7d')"),
@@ -241,7 +241,7 @@ export default defineTool({
     // Comparison mode: compare two time periods
     if (params.compareAgainstPeriod) {
       setTag("baseline.period", params.compareAgainstPeriod);
-      setTag("current.period", params.statsPeriod);
+      setTag("current.period", params.period);
 
       // Fetch both flamegraphs in parallel
       const [baselineFlamegraph, currentFlamegraph] = await Promise.all([
@@ -255,7 +255,7 @@ export default defineTool({
           organizationSlug,
           projectId,
           transactionName,
-          statsPeriod: params.statsPeriod,
+          statsPeriod: params.period,
         }),
       ]);
 
@@ -289,7 +289,7 @@ export default defineTool({
           "## Insufficient Baseline Data",
           "",
           `No profiling data found for the baseline period (${params.compareAgainstPeriod}).`,
-          `Current period (${params.statsPeriod}) has data.`,
+          `Current period (${params.period}) has data.`,
           "",
           "**Suggestion:** Try a shorter baseline period or analyze the current period only by removing compareAgainstPeriod.",
         ].join("\n");
@@ -301,7 +301,7 @@ export default defineTool({
           "",
           "## Insufficient Current Data",
           "",
-          `No profiling data found for the current period (${params.statsPeriod}).`,
+          `No profiling data found for the current period (${params.period}).`,
           `Baseline period (${params.compareAgainstPeriod}) has data.`,
           "",
           "**Suggestion:** The transaction may not have been executed recently. Try a longer current period.",
@@ -319,7 +319,7 @@ export default defineTool({
       organizationSlug,
       projectId,
       transactionName,
-      statsPeriod: params.statsPeriod,
+      statsPeriod: params.period,
     });
 
     // Check if we got data
@@ -329,7 +329,7 @@ export default defineTool({
         "",
         "## No Profile Data Found",
         "",
-        `No profiling data found for transaction **${transactionName}** in the last ${params.statsPeriod}.`,
+        `No profiling data found for transaction **${transactionName}** in the last ${params.period}.`,
         "",
         "**Possible reasons:**",
         "- Transaction name doesn't match exactly (names are case-sensitive)",

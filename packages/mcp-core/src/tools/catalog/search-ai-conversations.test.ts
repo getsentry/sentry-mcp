@@ -67,7 +67,7 @@ describe("search_ai_conversations", () => {
       {
         organizationSlug: "test-org",
         query: "checkout",
-        statsPeriod: "7d",
+        period: "7d",
         limit: 10,
       },
       getServerContext(),
@@ -206,7 +206,7 @@ describe("search_ai_conversations", () => {
     );
   });
 
-  it("treats an empty statsPeriod like the default search window", async () => {
+  it("treats an empty period like the default search window", async () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
@@ -222,7 +222,7 @@ describe("search_ai_conversations", () => {
     const result = await searchAIConversations.handler(
       {
         organizationSlug: "test-org",
-        statsPeriod: "   ",
+        period: "   ",
         limit: 10,
       },
       getServerContext(),
@@ -303,16 +303,14 @@ describe("search_ai_conversations", () => {
       searchAIConversations.handler(
         {
           organizationSlug: "test-org",
-          statsPeriod: "7d",
+          period: "7d",
           start: "2026-06-01T00:00:00Z",
           end: "2026-06-02T00:00:00Z",
           limit: 10,
         },
         getServerContext(),
       ),
-    ).rejects.toThrow(
-      "`statsPeriod` cannot be combined with `start` and `end`.",
-    );
+    ).rejects.toThrow("`period` cannot be combined with `start` and `end`.");
   });
 
   it("rejects partial absolute time ranges", async () => {

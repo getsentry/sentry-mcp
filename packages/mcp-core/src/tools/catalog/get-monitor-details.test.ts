@@ -20,7 +20,7 @@ describe("get_monitor_details", () => {
         projectSlugOrId: null,
         monitorSlug: "nightly-import",
         environment: null,
-        statsPeriod: "24h",
+        period: "24h",
         start: null,
         end: null,
         checkInLimit: 10,
@@ -87,7 +87,7 @@ describe("get_monitor_details", () => {
           projectSlugOrId: "cloudflare-mcp",
           monitorSlug: "nightly-import",
           environment: null,
-          statsPeriod: "24h",
+          period: "24h",
           start: null,
           end: null,
           checkInLimit: 10,
@@ -157,7 +157,7 @@ describe("get_monitor_details", () => {
         projectSlugOrId: null,
         monitorSlug: "nightly-import",
         environment: null,
-        statsPeriod: "24h",
+        period: "24h",
         start: null,
         end: null,
         checkInLimit: 10,
@@ -231,7 +231,7 @@ describe("get_monitor_details", () => {
         projectSlugOrId: null,
         monitorSlug: "nightly-import",
         environment: "production",
-        statsPeriod: null,
+        period: null,
         start: "2025-04-14T02:00:00.000Z",
         end: "2025-04-14T03:00:00.000Z",
         checkInLimit: 10,
@@ -266,7 +266,7 @@ describe("get_monitor_details", () => {
           projectSlugOrId: null,
           monitorSlug: "nightly-import",
           environment: null,
-          statsPeriod: null,
+          period: null,
           start: "2025-04-14T02:00:00.000Z",
           end: null,
           checkInLimit: 10,
@@ -278,7 +278,7 @@ describe("get_monitor_details", () => {
     ).rejects.toThrow("`start` and `end` must be provided together.");
   });
 
-  it("rejects combining statsPeriod with an absolute monitor time range", async () => {
+  it("rejects combining period with an absolute monitor time range", async () => {
     await expect(
       getMonitorDetails.handler(
         {
@@ -287,7 +287,7 @@ describe("get_monitor_details", () => {
           projectSlugOrId: null,
           monitorSlug: "nightly-import",
           environment: null,
-          statsPeriod: "24h",
+          period: "24h",
           start: "2025-04-14T02:00:00.000Z",
           end: "2025-04-14T03:00:00.000Z",
           checkInLimit: 10,
@@ -296,12 +296,10 @@ describe("get_monitor_details", () => {
         },
         context,
       ),
-    ).rejects.toThrow(
-      "`statsPeriod` cannot be combined with `start` and `end`.",
-    );
+    ).rejects.toThrow("`period` cannot be combined with `start` and `end`.");
   });
 
-  it("defaults blank statsPeriod to a 24h monitor window", async () => {
+  it("defaults blank period to a 24h monitor window", async () => {
     let checkInsRequestUrl: string | null = null;
     let statsRequestUrl: string | null = null;
     const monitorResponse = {
@@ -349,7 +347,7 @@ describe("get_monitor_details", () => {
         projectSlugOrId: null,
         monitorSlug: "nightly-import",
         environment: null,
-        statsPeriod: "   ",
+        period: "   ",
         start: null,
         end: null,
         checkInLimit: 10,
@@ -414,7 +412,7 @@ describe("get_monitor_details", () => {
         projectSlugOrId: null,
         monitorSlug: "nightly-import",
         environment: null,
-        statsPeriod: "24h",
+        period: "24h",
         start: null,
         end: null,
         checkInLimit: 10,

@@ -741,7 +741,7 @@ export default defineTool({
             monitorSlug: resolved.monitorSlug!,
             regionUrl: context.constraints.regionUrl ?? null,
             environment: null,
-            statsPeriod: "24h",
+            period: "24h",
             start: null,
             end: null,
             checkInLimit: 10,

@@ -189,7 +189,7 @@ export default defineTool({
     "Use get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.",
     "",
     "<examples>",
-    "search_ai_conversations(organizationSlug='my-org', query='failed conversations', statsPeriod='7d')",
+    "search_ai_conversations(organizationSlug='my-org', query='failed conversations', period='7d')",
     "search_ai_conversations(organizationSlug='my-org', query='checkout', project='backend')",
     "</examples>",
   ].join("\n"),
@@ -211,7 +211,7 @@ export default defineTool({
       ])
       .optional()
       .describe("Environment name, or an array of environments."),
-    statsPeriod: z
+    period: z
       .string()
       .trim()
       .optional()
@@ -245,9 +245,9 @@ export default defineTool({
     if ((params.start && !params.end) || (!params.start && params.end)) {
       throw new UserInputError("`start` and `end` must be provided together.");
     }
-    if (params.statsPeriod && (params.start || params.end)) {
+    if (params.period && (params.start || params.end)) {
       throw new UserInputError(
-        "`statsPeriod` cannot be combined with `start` and `end`.",
+        "`period` cannot be combined with `start` and `end`.",
       );
     }
 
@@ -264,9 +264,9 @@ export default defineTool({
       project: params.project,
       constrainedProjectSlug: context.constraints.projectSlug,
     });
-    const requestedStatsPeriod = params.statsPeriod?.trim();
+    const requestedPeriod = params.period?.trim();
     const statsPeriod =
-      params.start || params.end ? undefined : requestedStatsPeriod || "30d";
+      params.start || params.end ? undefined : requestedPeriod || "30d";
 
     const { conversations, nextCursor } =
       await apiService.searchAIConversations({

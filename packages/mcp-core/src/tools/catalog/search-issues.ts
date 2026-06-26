@@ -97,6 +97,12 @@ export default defineTool({
       .max(100)
       .default(10)
       .describe("Maximum number of issues to return (1-100)"),
+    period: z
+      .enum(["24h", "7d", "14d", "30d", "90d"])
+      .default("30d")
+      .describe(
+        "Time window for issue search results. Controls which issues are returned based on when they had activity. Default 30d is a balance between coverage and query performance; use 24h for very recent issues or 90d for broader historical searches.",
+      ),
     includeExplanation: z
       .boolean()
       .default(false)
@@ -167,6 +173,7 @@ export default defineTool({
       query,
       sortBy: sort,
       limit: params.limit,
+      statsPeriod: params.period,
     });
 
     getActiveSpan()?.setAttribute(
