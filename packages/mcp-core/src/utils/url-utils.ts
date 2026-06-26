@@ -612,6 +612,27 @@ export function getAIConversationUrl(
 }
 
 /**
+ * Extract a single AI conversation ID from a Sentry search query that filters
+ * on `gen_ai.conversation.id`. Returns undefined when the query does not
+ * contain exactly one such filter.
+ */
+export function extractConversationIdFromSearchQuery(
+  query: string | undefined | null,
+): string | undefined {
+  if (!query) {
+    return undefined;
+  }
+
+  const pattern = /gen_ai\.conversation\.id:(?:"([^"]+)"|([^\s]+))/g;
+  const matches = [...query.matchAll(pattern)];
+  if (matches.length !== 1) {
+    return undefined;
+  }
+
+  return matches[0][1] ?? matches[0][2];
+}
+
+/**
  * Generates a Sentry AI conversations list URL with optional search filters.
  */
 export function getAIConversationsUrl(

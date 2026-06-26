@@ -12,6 +12,7 @@ import {
   getMonitorUrl,
   getTraceUrl,
   getEventsExplorerUrl,
+  extractConversationIdFromSearchQuery,
   getTraceMetricsExploreUrl,
 } from "./url-utils";
 
@@ -450,6 +451,38 @@ describe("url-utils", () => {
       expect(url.searchParams.get("statsPeriod")).toBe("7d");
       expect(url.searchParams.get("sort")).toBe("-count()");
       expect(url.searchParams.getAll("field")).toEqual(["release", "count()"]);
+    });
+  });
+
+  describe("extractConversationIdFromSearchQuery", () => {
+    it("extracts a quoted conversation id", () => {
+      expect(
+        extractConversationIdFromSearchQuery(
+          'gen_ai.conversation.id:"14365297"',
+        ),
+      ).toBe("14365297");
+    });
+
+    it("extracts an unquoted conversation id", () => {
+      expect(
+        extractConversationIdFromSearchQuery("gen_ai.conversation.id:14365297"),
+      ).toBe("14365297");
+    });
+
+    it("returns undefined when no conversation id is present", () => {
+      expect(
+        extractConversationIdFromSearchQuery("span.op:ai"),
+      ).toBeUndefined();
+      expect(extractConversationIdFromSearchQuery("")).toBeUndefined();
+      expect(extractConversationIdFromSearchQuery(null)).toBeUndefined();
+    });
+
+    it("returns undefined when multiple conversation ids are present", () => {
+      expect(
+        extractConversationIdFromSearchQuery(
+          'gen_ai.conversation.id:"1" OR gen_ai.conversation.id:"2"',
+        ),
+      ).toBeUndefined();
     });
   });
 

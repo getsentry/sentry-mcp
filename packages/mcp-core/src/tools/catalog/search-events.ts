@@ -16,6 +16,7 @@ import {
   isMetricsDataset,
   normalizeEventsDataset,
 } from "../../utils/events-datasets";
+import { extractConversationIdFromSearchQuery } from "../../utils/url-utils";
 import {
   searchEventsAgent,
   type searchEventsAgentOutputSchema,
@@ -858,20 +859,23 @@ export default defineTool({
       eventData.length,
     );
 
-    const explorerUrl = apiService.getEventsExplorerUrl(
-      organizationSlug,
-      sentryQuery,
-      projectId,
-      dataset,
-      fields,
-      sortParam,
-      aggregateFunctions,
-      groupByFields,
-      timeParams.statsPeriod,
-      timeParams.start,
-      timeParams.end,
-      eventData,
-    );
+    const conversationId = extractConversationIdFromSearchQuery(sentryQuery);
+    const explorerUrl = conversationId
+      ? apiService.getAIConversationUrl(organizationSlug, conversationId)
+      : apiService.getEventsExplorerUrl(
+          organizationSlug,
+          sentryQuery,
+          projectId,
+          dataset,
+          fields,
+          sortParam,
+          aggregateFunctions,
+          groupByFields,
+          timeParams.statsPeriod,
+          timeParams.start,
+          timeParams.end,
+          eventData,
+        );
 
     const formatParams = {
       eventData,
