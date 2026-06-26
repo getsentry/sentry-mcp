@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 
 const GENERATED_TASKS = [
   {
@@ -60,7 +61,23 @@ for (const task of GENERATED_TASKS) {
 
   console.log(`Generating ${task.name}...`);
   run(task.command);
-  run(["git", "add", ...task.outputs]);
+
+  // Only stage outputs that exist on disk and were actually changed by
+  // generation. Skipping missing files avoids a crash when an agent .md
+  // output is staged for deletion; skipping unchanged files avoids
+  // accidentally staging unrelated working-tree edits.
+  const outputsToStage = task.outputs.filter((output) => {
+    if (!existsSync(output)) return false;
+    try {
+      execFileSync("git", ["diff", "--quiet", output], { stdio: "pipe" });
+      return false; // no working-tree changes vs index
+    } catch {
+      return true; // has changes
+    }
+  });
+  if (outputsToStage.length > 0) {
+    run(["git", "add", ...outputsToStage]);
+  }
   ranTask = true;
 }
 
