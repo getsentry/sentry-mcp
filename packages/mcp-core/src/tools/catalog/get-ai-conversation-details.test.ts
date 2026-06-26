@@ -200,9 +200,12 @@ describe("get_ai_conversation_details", () => {
     `);
   });
 
-  it("omits userEmail from user messages when span has no user.email", async () => {
+  it("omits userEmail from user messages when span has no user.email or null user.email", async () => {
     const spansWithoutEmail = conversationSpans.map((span) => {
       const { "user.email": _userEmail, ...rest } = span;
+      if ("user.email" in span) {
+        return { ...rest, "user.email": null };
+      }
       return rest;
     });
     mockConversationEndpoint("test-org", "conv-123", spansWithoutEmail);
@@ -216,10 +219,11 @@ describe("get_ai_conversation_details", () => {
     );
 
     assertStructuredOnlyResult(result);
-    const structuredContent = getStructuredContent(result);
+    const structuredContent = getStructuredContent<{
+      timeline: Array<{ type: string; role?: string; userEmail?: string }>;
+    }>(result);
     const userMessages = structuredContent.timeline.filter(
-      (event: { type: string; role?: string }) =>
-        event.type === "message" && event.role === "user",
+      (event) => event.type === "message" && event.role === "user",
     );
     expect(userMessages).toHaveLength(2);
     for (const message of userMessages) {

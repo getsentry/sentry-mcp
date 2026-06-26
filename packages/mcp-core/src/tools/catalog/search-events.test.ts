@@ -3,7 +3,6 @@ import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import searchEvents from "./search-events";
 import { MAX_EVENTS_VALIDATION_ATTEMPTS } from "../support/search-events/utils";
-import { RECOMMENDED_FIELDS } from "../support/search-events/config";
 import { generateText } from "ai";
 import { UserInputError } from "../../errors";
 
@@ -28,12 +27,6 @@ vi.mock("ai", async (importOriginal) => {
 
 describe("search_events", () => {
   const mockGenerateText = vi.mocked(generateText);
-
-  it("includes user identity in the default errors field set", () => {
-    expect(RECOMMENDED_FIELDS.errors.basic).toEqual(
-      expect.arrayContaining(["user.email", "user.id"]),
-    );
-  });
 
   // Helper to create AI response for different datasets
   const mockAIResponse = (
@@ -1536,6 +1529,12 @@ describe("search_events", () => {
         ({ request }) => {
           const url = new URL(request.url);
           expect(url.searchParams.get("dataset")).toBe("errors");
+          expect(url.searchParams.getAll("field")).toEqual([
+            "issue",
+            "title",
+            "level",
+            "timestamp",
+          ]);
           return HttpResponse.json({
             data: [
               {
@@ -1578,6 +1577,63 @@ describe("search_events", () => {
     expect(mockGenerateText).toHaveBeenCalled();
     expect(result).toContain("Database Connection Error");
     expect(result).toContain("PROJ-123");
+  });
+
+  it("includes user identity in default error search fields", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("errors", "level:error", []),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("errors");
+          expect(url.searchParams.getAll("field")).toEqual(
+            expect.arrayContaining(["user.email", "user.id"]),
+          );
+          return HttpResponse.json({
+            data: [
+              {
+                id: "error1",
+                issue: "PROJ-123",
+                title: "Database Connection Error",
+                "user.email": "dev@example.com",
+                "user.id": "123",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query: "database errors",
+        dataset: "errors",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain("dev@example.com");
+    expect(result).toContain("user.id");
   });
 
   it("should format object fields without [object Object] output", async () => {
