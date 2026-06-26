@@ -2144,7 +2144,7 @@ describe("formatEventOutput metric alert details", () => {
         fingerprint: ["abc"],
         issueTitle: "High error count",
         subtitle: "Critical: Number of events in the last minute above 100",
-        type: 1,
+        type: 8001,
         culprit: "",
         evidenceData: {
           value: 150,
@@ -2170,15 +2170,25 @@ describe("formatEventOutput metric alert details", () => {
 
     const output = formatEventOutput(event);
 
-    expect(output).toContain("### Metric Alert Details");
-    expect(output).toContain("**Dataset**: events");
-    expect(output).toContain("**Aggregate**: count()");
-    expect(output).toContain("process_shard OR OutboxFlushError");
-    expect(output).toContain("**Interval**: 60 second(s)");
-    expect(output).toContain("**Environment**: production");
-    expect(output).toContain("**Evaluated Value**: 150");
-    expect(output).toContain("**Threshold**: above 100");
-    expect(output).toContain("**Alert Rule ID**: 42");
+    expect(output).toMatchInlineSnapshot(`
+      "### Metric Alert Details
+
+      **Dataset**: events
+      **Aggregate**: count()
+      **Query**: \`process_shard OR OutboxFlushError\`
+      **Interval**: 60 second(s)
+      **Environment**: production
+
+      **Evaluated Value**: 150
+      **Threshold**: above 100
+      **Alert Rule ID**: 42
+
+      ### Tags
+
+      **level**: error
+
+      "
+    `);
   });
 
   it("keeps performance regression formatting for regression evidence", () => {
@@ -2235,7 +2245,7 @@ describe("formatEventOutput metric alert details", () => {
         eventId: "metric-event-2",
         fingerprint: ["ghi"],
         issueTitle: "Low throughput",
-        type: 1,
+        type: 8001,
         culprit: "",
         evidenceData: {
           value: 5,
@@ -2278,7 +2288,7 @@ describe("formatEventOutput metric alert details", () => {
         eventId: "metric-event-3",
         fingerprint: ["jkl"],
         issueTitle: "Alert triggered",
-        type: 1,
+        type: 8001,
         culprit: "",
         evidenceData: {
           value: 42,
@@ -2297,5 +2307,46 @@ describe("formatEventOutput metric alert details", () => {
     expect(output).toContain("**Alert Rule ID**: 7");
     expect(output).toContain("**Threshold**: at or above 40, at or below 50");
     expect(output).not.toContain("**Dataset**:");
+  });
+
+  it("formats dynamic alert values without object placeholders", () => {
+    const event = {
+      id: "metric-event-4",
+      type: "generic",
+      title: "Dynamic throughput alert",
+      message: null,
+      platform: "other",
+      dateCreated: "2026-06-01T00:00:00.000Z",
+      entries: [],
+      occurrence: {
+        id: "occ-5",
+        projectId: 1,
+        eventId: "metric-event-4",
+        fingerprint: ["mno"],
+        issueTitle: "Dynamic throughput alert",
+        type: 8001,
+        culprit: "",
+        evidenceData: {
+          value: { value: 12.5, source_id: "123", timestamp: 1780272000 },
+          alert_id: 11,
+          conditions: [
+            {
+              type: "anomaly_detection",
+              comparison: {
+                sensitivity: "medium",
+                seasonality: "auto",
+                threshold_type: 0,
+              },
+            },
+          ],
+        },
+      },
+    } as Event;
+
+    const output = formatEventOutput(event);
+
+    expect(output).toContain("**Evaluated Value**: 12.5");
+    expect(output).not.toContain("[object Object]");
+    expect(output).not.toContain("**Threshold**:");
   });
 });

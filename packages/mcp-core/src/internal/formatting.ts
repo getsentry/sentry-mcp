@@ -1662,6 +1662,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isPrimitive(value: unknown): value is string | number | boolean {
+  return (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
+}
+
+function formatPrimitive(value: unknown): string | undefined {
+  return isPrimitive(value) ? String(value) : undefined;
+}
+
+/**
+ * Extracts the Snuba query from metric alert evidence data.
+ */
 function getMetricAlertSnubaQuery(
   evidenceData: Record<string, unknown>,
 ): Record<string, unknown> | undefined {
@@ -1687,37 +1702,12 @@ function getMetricAlertSnubaQuery(
   return undefined;
 }
 
-function isMetricAlertEvidence(
-  evidenceData: Record<string, unknown> | undefined,
-): boolean {
-  if (!evidenceData) {
-    return false;
-  }
-
-  return (
-    getMetricAlertSnubaQuery(evidenceData) !== undefined ||
-    evidenceData.alert_id != null
-  );
-}
-
-function isRegressionEvidence(
-  evidenceData: Record<string, unknown> | undefined,
-): boolean {
-  if (!evidenceData) {
-    return false;
-  }
-
-  return (
-    evidenceData.change === "regression" ||
-    typeof evidenceData.transaction === "string"
-  );
-}
-
 function formatMetricAlertCondition(
   condition: Record<string, unknown>,
 ): string | undefined {
   const comparison = condition.comparison;
-  if (comparison == null) {
+  const formattedComparison = formatPrimitive(comparison);
+  if (formattedComparison == null) {
     return undefined;
   }
 
@@ -1736,10 +1726,23 @@ function formatMetricAlertCondition(
   })();
 
   if (typeLabel && !/^\d+$/.test(typeLabel)) {
-    return `${typeLabel} ${comparison}`;
+    return `${typeLabel} ${formattedComparison}`;
   }
 
-  return String(comparison);
+  return formattedComparison;
+}
+
+function formatMetricAlertValue(value: unknown): string | undefined {
+  const formattedValue = formatPrimitive(value);
+  if (formattedValue) {
+    return formattedValue;
+  }
+
+  if (isRecord(value)) {
+    return formatPrimitive(value.value);
+  }
+
+  return undefined;
 }
 
 function formatMetricAlertDetails(
@@ -1767,8 +1770,9 @@ function formatMetricAlertDetails(
     parts.push("");
   }
 
-  if (evidenceData.value != null) {
-    parts.push(`**Evaluated Value**: ${String(evidenceData.value)}`);
+  const formattedValue = formatMetricAlertValue(evidenceData.value);
+  if (formattedValue) {
+    parts.push(`**Evaluated Value**: ${formattedValue}`);
   }
 
   const conditions = evidenceData.conditions;
@@ -1811,11 +1815,7 @@ function formatGenericEventOutput(event: Event): string {
   }
 
   const evidenceData = occurrence.evidenceData;
-  if (
-    evidenceData &&
-    isMetricAlertEvidence(evidenceData) &&
-    !isRegressionEvidence(evidenceData)
-  ) {
+  if (occurrence.type === 8001 && evidenceData) {
     return formatMetricAlertDetails(evidenceData);
   }
 
