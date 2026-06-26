@@ -32,6 +32,7 @@
     "lint": "biome lint && pnpm run lint:ast-grep",
     "lint:ast-grep": "ast-grep scan && ast-grep test --skip-snapshot-tests",
     "lint:fix": "biome lint --fix",
+    "pre-commit:generated": "node scripts/pre-commit-generated.mjs",
     "inspector": "pnpx @modelcontextprotocol/inspector@latest",
     "inspector:stdio": "pnpx @modelcontextprotocol/inspector@latest -- tsx packages/mcp-server/src/index.ts",
     "measure-tokens": "pnpm run --filter ./packages/mcp-core measure-tokens",
@@ -61,7 +62,7 @@
     "vitest-evals": "catalog:"
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm exec lint-staged --concurrent false"
+    "pre-commit": "pnpm run pre-commit:generated && pnpm exec lint-staged --concurrent false"
   },
   "lint-staged": {
     "*": [
