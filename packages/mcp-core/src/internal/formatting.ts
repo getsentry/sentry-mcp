@@ -1658,6 +1658,142 @@ function formatPerformanceIssueOutput(
   return parts.length > 0 ? `${parts.join("\n")}\n` : "";
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isPrimitive(value: unknown): value is string | number | boolean {
+  return (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
+}
+
+function formatPrimitive(value: unknown): string | undefined {
+  return isPrimitive(value) ? String(value) : undefined;
+}
+
+/**
+ * Extracts the Snuba query from metric alert evidence data.
+ */
+function getMetricAlertSnubaQuery(
+  evidenceData: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const dataSources = evidenceData.data_sources;
+  if (!Array.isArray(dataSources)) {
+    return undefined;
+  }
+
+  for (const dataSource of dataSources) {
+    if (!isRecord(dataSource)) {
+      continue;
+    }
+    const queryObj = dataSource.query_obj;
+    if (!isRecord(queryObj)) {
+      continue;
+    }
+    const snubaQuery = queryObj.snuba_query;
+    if (isRecord(snubaQuery)) {
+      return snubaQuery;
+    }
+  }
+
+  return undefined;
+}
+
+function formatMetricAlertCondition(
+  condition: Record<string, unknown>,
+): string | undefined {
+  const comparison = condition.comparison;
+  const formattedComparison = formatPrimitive(comparison);
+  if (formattedComparison == null) {
+    return undefined;
+  }
+
+  const type = condition.type;
+  const typeLabel = (() => {
+    if (type === 0 || type === "0" || type === "gt" || type === "gte") {
+      return type === "gte" ? "at or above" : "above";
+    }
+    if (type === 1 || type === "1" || type === "lt" || type === "lte") {
+      return type === "lte" ? "at or below" : "below";
+    }
+    if (type != null) {
+      return String(type);
+    }
+    return undefined;
+  })();
+
+  if (typeLabel && !/^\d+$/.test(typeLabel)) {
+    return `${typeLabel} ${formattedComparison}`;
+  }
+
+  return formattedComparison;
+}
+
+function formatMetricAlertValue(value: unknown): string | undefined {
+  const formattedValue = formatPrimitive(value);
+  if (formattedValue) {
+    return formattedValue;
+  }
+
+  if (isRecord(value)) {
+    return formatPrimitive(value.value);
+  }
+
+  return undefined;
+}
+
+function formatMetricAlertDetails(
+  evidenceData: Record<string, unknown>,
+): string {
+  const parts: string[] = ["### Metric Alert Details", ""];
+
+  const snubaQuery = getMetricAlertSnubaQuery(evidenceData);
+  if (snubaQuery) {
+    if (snubaQuery.dataset != null) {
+      parts.push(`**Dataset**: ${String(snubaQuery.dataset)}`);
+    }
+    if (snubaQuery.aggregate != null) {
+      parts.push(`**Aggregate**: ${String(snubaQuery.aggregate)}`);
+    }
+    if (snubaQuery.query != null && String(snubaQuery.query).length > 0) {
+      parts.push(`**Query**: \`${String(snubaQuery.query)}\``);
+    }
+    if (snubaQuery.time_window != null) {
+      parts.push(`**Interval**: ${String(snubaQuery.time_window)} second(s)`);
+    }
+    if (snubaQuery.environment != null) {
+      parts.push(`**Environment**: ${String(snubaQuery.environment)}`);
+    }
+    parts.push("");
+  }
+
+  const formattedValue = formatMetricAlertValue(evidenceData.value);
+  if (formattedValue) {
+    parts.push(`**Evaluated Value**: ${formattedValue}`);
+  }
+
+  const conditions = evidenceData.conditions;
+  if (Array.isArray(conditions)) {
+    const formattedConditions = conditions
+      .filter(isRecord)
+      .map(formatMetricAlertCondition)
+      .filter((condition): condition is string => condition != null);
+    if (formattedConditions.length > 0) {
+      parts.push(`**Threshold**: ${formattedConditions.join(", ")}`);
+    }
+  }
+
+  if (evidenceData.alert_id != null) {
+    parts.push(`**Alert Rule ID**: ${String(evidenceData.alert_id)}`);
+  }
+
+  parts.push("");
+  return `${parts.join("\n")}\n`;
+}
+
 /**
  * Formats generic event output (performance regressions, metric-based issues).
  * Generic events don't have traditional error entries, but have occurrence data
@@ -1678,8 +1814,12 @@ function formatGenericEventOutput(event: Event): string {
     return "";
   }
 
-  // Add a section header for performance regression details
   const evidenceData = occurrence.evidenceData;
+  if (occurrence.type === 8001 && evidenceData) {
+    return formatMetricAlertDetails(evidenceData);
+  }
+
+  // Add a section header for performance regression details
   if (evidenceData) {
     parts.push("### Performance Regression Details");
     parts.push("");
