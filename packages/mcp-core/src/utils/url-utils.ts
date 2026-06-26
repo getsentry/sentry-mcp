@@ -623,7 +623,11 @@ export function extractConversationIdFromSearchQuery(
     return undefined;
   }
 
-  const pattern = /(?<![!])gen_ai\.conversation\.id:(?:"([^"]+)"|([^\s]+))/g;
+  if (/!gen_ai\.conversation\.id:/.test(query)) {
+    return undefined;
+  }
+
+  const pattern = /gen_ai\.conversation\.id:(?:"([^"]+)"|([^\s]+))/g;
   const matches = [...query.matchAll(pattern)];
   if (matches.length !== 1) {
     return undefined;

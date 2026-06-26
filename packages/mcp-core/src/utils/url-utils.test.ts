@@ -493,6 +493,14 @@ describe("url-utils", () => {
       ).toBeUndefined();
     });
 
+    it("returns undefined when negated and positive conversation id filters are combined", () => {
+      expect(
+        extractConversationIdFromSearchQuery(
+          '!gen_ai.conversation.id:"1" OR gen_ai.conversation.id:"2"',
+        ),
+      ).toBeUndefined();
+    });
+
     it("returns undefined for IN-style bracket conversation id filters", () => {
       expect(
         extractConversationIdFromSearchQuery("gen_ai.conversation.id:[1,2]"),
