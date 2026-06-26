@@ -10,18 +10,26 @@
 export const MCP_SERVER_NAME = "Sentry MCP" as const;
 
 /**
- * Supported relative time window values for Sentry API queries.
- * All endpoints that accept a statsPeriod parameter support these values.
+ * Supported issue-search windows exposed by search_issues.
+ * Intentionally bounded for query performance; lower-level API methods still accept arbitrary Sentry statsPeriod strings.
  */
-export const PERIOD_VALUES = ["1h", "24h", "7d", "14d", "30d", "90d"] as const;
-export type PeriodValue = (typeof PERIOD_VALUES)[number];
+export const SEARCH_ISSUES_PERIOD_VALUES = [
+  "24h",
+  "7d",
+  "14d",
+  "30d",
+  "90d",
+] as const;
+export type SearchIssuesPeriodValue =
+  (typeof SEARCH_ISSUES_PERIOD_VALUES)[number];
 
 /**
  * Default time window used when no period is specified.
  * 30d balances coverage against timeout risk on busy orgs.
  * (The Sentry API's own default is 90d when omitted entirely.)
  */
-export const DEFAULT_PERIOD = "30d" as const satisfies PeriodValue;
+export const DEFAULT_SEARCH_ISSUES_PERIOD =
+  "30d" as const satisfies SearchIssuesPeriodValue;
 
 /**
  * Allowed region domains for sentry.io

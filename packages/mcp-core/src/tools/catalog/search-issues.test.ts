@@ -332,7 +332,10 @@ describe("search_issues", () => {
           name: "My Project",
         });
       }),
-      http.get("*/api/0/projects/*/my-project/issues/*", () => {
+      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("project")).toBe("789");
+        expect(url.searchParams.get("statsPeriod")).toBe("30d");
         return HttpResponse.json([]);
       }),
     );
@@ -358,7 +361,10 @@ describe("search_issues", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse("", "date"));
 
     mswServer.use(
-      http.get("*/api/0/projects/*/123456/issues/*", () => {
+      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("project")).toBe("123456");
+        expect(url.searchParams.get("statsPeriod")).toBe("30d");
         return HttpResponse.json([]);
       }),
     );

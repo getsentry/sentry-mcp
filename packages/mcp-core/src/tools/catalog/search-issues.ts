@@ -1,13 +1,10 @@
 import { getActiveSpan, setTag } from "@sentry/core";
 import { z } from "zod";
+import { SEARCH_ISSUES_PERIOD_VALUES } from "../../constants";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
-import {
-  ParamOrganizationSlug,
-  ParamPeriod,
-  ParamRegionUrl,
-} from "../../schema";
+import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
 import type { ServerContext } from "../../types";
 import { isNumericId, validateSlugOrId } from "../../utils/slug-validation";
 import { searchIssuesAgent } from "../support/search-issues/agent";
@@ -15,6 +12,12 @@ import {
   formatIssueResults,
   formatExplanation,
 } from "../support/search-issues/formatters";
+
+const ProjectSlugOrIdSchema = z
+  .string()
+  .toLowerCase()
+  .trim()
+  .superRefine(validateSlugOrId);
 
 function buildIssueSearchRepairPrompt(params: {
   query: string;
@@ -86,12 +89,7 @@ export default defineTool({
       .describe(
         "Sort order: date (last seen), freq (frequency), new (first seen), user (user count)",
       ),
-    projectSlugOrId: z
-      .string()
-      .toLowerCase()
-      .trim()
-      .superRefine(validateSlugOrId)
-      .nullable()
+    projectSlugOrId: ProjectSlugOrIdSchema.nullable()
       .default(null)
       .describe("The project's slug or numeric ID (optional)"),
     regionUrl: ParamRegionUrl.nullable().default(null),
@@ -101,9 +99,12 @@ export default defineTool({
       .max(100)
       .default(10)
       .describe("Maximum number of issues to return (1-100)"),
-    period: ParamPeriod.default("30d").describe(
-      "Time window for issue search results. Controls which issues are returned based on when they had activity. Default 30d is a balance between coverage and query performance; use 24h for very recent issues or 90d for broader historical searches.",
-    ),
+    period: z
+      .enum(SEARCH_ISSUES_PERIOD_VALUES)
+      .default("30d")
+      .describe(
+        "Time window for issue search results. Controls which issues are returned based on when they had activity. Default 30d is a balance between coverage and query performance; use 24h for very recent issues or 90d for broader historical searches.",
+      ),
     includeExplanation: z
       .boolean()
       .default(false)
@@ -133,21 +134,24 @@ export default defineTool({
     let sort: "date" | "freq" | "new" | "user";
     let explanation: string | undefined;
 
+    let projectId: string | undefined;
+    if (params.projectSlugOrId) {
+      const projectSlugOrId = ProjectSlugOrIdSchema.parse(
+        params.projectSlugOrId,
+      );
+      if (isNumericId(projectSlugOrId)) {
+        projectId = projectSlugOrId;
+      } else {
+        const project = await apiService.getProject({
+          organizationSlug: params.organizationSlug,
+          projectSlugOrId,
+        });
+        projectId = String(project.id);
+      }
+    }
+
     if (hasAgentProvider()) {
       // Agent mode: repair requests before calling Sentry.
-      let projectId: string | undefined;
-      if (params.projectSlugOrId) {
-        if (isNumericId(params.projectSlugOrId)) {
-          projectId = params.projectSlugOrId;
-        } else {
-          const project = await apiService.getProject({
-            organizationSlug: params.organizationSlug,
-            projectSlugOrId: params.projectSlugOrId,
-          });
-          projectId = String(project.id);
-        }
-      }
-
       const agentResult = await searchIssuesAgent({
         query: buildIssueSearchRepairPrompt({
           query: params.query,
@@ -170,7 +174,7 @@ export default defineTool({
 
     const issues = await apiService.listIssues({
       organizationSlug: params.organizationSlug,
-      projectSlug: params.projectSlugOrId ?? undefined,
+      projectId,
       query,
       sortBy: sort,
       limit: params.limit,

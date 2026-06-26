@@ -83,7 +83,7 @@ interface SearchAIConversationsParams {
   query?: string;
   project?: string | string[];
   environment?: string | string[];
-  statsPeriod?: string;
+  period?: string;
   start?: string;
   end?: string;
   limit?: number;
@@ -103,7 +103,7 @@ Parameter behavior:
 - `project` scopes results to one or more projects. The backend accepts numeric
   project IDs; MCP may resolve project slugs to IDs for ergonomics.
 - `environment` scopes results to one or more environments.
-- `statsPeriod` or `start`/`end` controls the time range.
+- `period` or `start`/`end` controls the MCP-facing time range.
 - `limit` controls page size and must respect the backend maximum.
 - `cursor` requests the next page when Sentry pagination provides one.
 - `regionUrl` selects the Sentry region endpoint.
@@ -391,7 +391,7 @@ Search recent conversations:
 search_ai_conversations({
   organizationSlug: "my-org",
   query: "recent conversations",
-  statsPeriod: "24h",
+  period: "24h",
 })
 ```
 
@@ -401,7 +401,7 @@ Find failed conversations:
 search_ai_conversations({
   organizationSlug: "my-org",
   query: "failed conversations",
-  statsPeriod: "7d",
+  period: "7d",
 })
 ```
 

@@ -343,14 +343,14 @@ async handler(params, context) {
         dataset: params.dataset,
         fields: params.fields,
         sort: params.sort,
-        statsPeriod: params.statsPeriod,
+        statsPeriod: params.period,
       })
     : {
         query: params.query,
         dataset: params.dataset,
         fields: params.fields,
         sort: params.sort,
-        statsPeriod: params.statsPeriod,
+        statsPeriod: params.period,
       };
   
   // Tool executes either the repaired request or the direct parameters.

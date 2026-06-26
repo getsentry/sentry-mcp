@@ -167,12 +167,9 @@ export default defineTool({
     ),
 
     // Comparison mode
-    compareAgainstPeriod: z
-      .string()
-      .optional()
-      .describe(
-        "Compare against this baseline period (e.g., '14d', '30d'). Enables regression detection.",
-      ),
+    compareAgainstPeriod: ParamPeriod.optional().describe(
+      "Compare against this baseline profiling time window. Enables regression detection.",
+    ),
 
     // Analysis options
     focusOnUserCode: z

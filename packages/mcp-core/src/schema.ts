@@ -6,7 +6,6 @@
  * (e.g., toLowerCase, trim) and LLM-friendly descriptions.
  */
 import { z } from "zod";
-import { PERIOD_VALUES, } from "./constants";
 import { SENTRY_GUIDES } from "./constants";
 import { validateSlug } from "./utils/slug-validation";
 
@@ -127,9 +126,14 @@ export const ParamQuery = z
  * Tools apply their own `.default()`, `.optional()`, or `.nullable()` on top.
  */
 export const ParamPeriod = z
-  .enum(PERIOD_VALUES)
+  .string()
+  .trim()
+  .regex(
+    /^\d+[hdw]$/,
+    "Period must be a relative time window like `24h`, `7d`, `14d`, `30d`, or `90d`.",
+  )
   .describe(
-    `Relative time window: ${PERIOD_VALUES.join(", ")}. Controls which records fall within the search window.`,
+    "Relative time window, such as `24h`, `7d`, `14d`, `30d`, or `90d`. Controls which records fall within the search window.",
   );
 
 /**
