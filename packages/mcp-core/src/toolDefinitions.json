@@ -1957,7 +1957,8 @@
         "period": {
           "type": "string",
           "pattern": "^\\d+[hdw]$",
-          "description": "Relative time range. Defaults to 30d."
+          "description": "Relative time range. Defaults to 30d.",
+          "default": "30d"
         },
         "start": {
           "type": "string",

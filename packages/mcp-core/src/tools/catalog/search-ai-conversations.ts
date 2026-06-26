@@ -212,7 +212,7 @@ export default defineTool({
       ])
       .optional()
       .describe("Environment name, or an array of environments."),
-    period: ParamPeriod.optional().describe(
+    period: ParamPeriod.default("30d").describe(
       "Relative time range. Defaults to 30d.",
     ),
     start: z
@@ -242,7 +242,8 @@ export default defineTool({
     if ((params.start && !params.end) || (!params.start && params.end)) {
       throw new UserInputError("`start` and `end` must be provided together.");
     }
-    if (params.period && (params.start || params.end)) {
+    const requestedPeriod = params.period ?? "30d";
+    if (requestedPeriod !== "30d" && (params.start || params.end)) {
       throw new UserInputError(
         "`period` cannot be combined with `start` and `end`.",
       );
@@ -261,9 +262,8 @@ export default defineTool({
       project: params.project,
       constrainedProjectSlug: context.constraints.projectSlug,
     });
-    const requestedPeriod = params.period?.trim();
     const statsPeriod =
-      params.start || params.end ? undefined : requestedPeriod || "30d";
+      params.start || params.end ? undefined : requestedPeriod;
 
     const { conversations, nextCursor } =
       await apiService.searchAIConversations({

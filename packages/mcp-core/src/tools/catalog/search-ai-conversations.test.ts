@@ -148,6 +148,7 @@ describe("search_ai_conversations", () => {
     const result = await searchAIConversations.handler(
       {
         organizationSlug: "test-org",
+        period: "30d",
         limit: 10,
       },
       getServerContext(),
@@ -191,6 +192,7 @@ describe("search_ai_conversations", () => {
     const result = await searchAIConversations.handler(
       {
         organizationSlug: "test-org",
+        period: "30d",
         limit: 10,
       },
       getServerContext(),
@@ -222,7 +224,7 @@ describe("search_ai_conversations", () => {
     const result = await searchAIConversations.handler(
       {
         organizationSlug: "test-org",
-
+        period: "30d",
         limit: 10,
       },
       getServerContext(),
@@ -266,6 +268,7 @@ describe("search_ai_conversations", () => {
         query: "failed",
         project: "backend",
         environment: ["production", "staging"],
+        period: "30d",
         start: "2026-06-01T00:00:00Z",
         end: "2026-06-02T00:00:00Z",
         cursor: "page-1",
@@ -318,6 +321,7 @@ describe("search_ai_conversations", () => {
       searchAIConversations.handler(
         {
           organizationSlug: "test-org",
+          period: "30d",
           start: "2026-06-01T00:00:00Z",
           limit: 10,
         },
