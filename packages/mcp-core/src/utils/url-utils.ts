@@ -623,13 +623,18 @@ export function extractConversationIdFromSearchQuery(
     return undefined;
   }
 
-  const pattern = /gen_ai\.conversation\.id:(?:"([^"]+)"|([^\s]+))/g;
+  const pattern = /(?<![!])gen_ai\.conversation\.id:(?:"([^"]+)"|([^\s]+))/g;
   const matches = [...query.matchAll(pattern)];
   if (matches.length !== 1) {
     return undefined;
   }
 
-  return matches[0][1] ?? matches[0][2];
+  const conversationId = matches[0][1] ?? matches[0][2];
+  if (conversationId.startsWith("[")) {
+    return undefined;
+  }
+
+  return conversationId;
 }
 
 /**

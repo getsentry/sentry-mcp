@@ -484,6 +484,20 @@ describe("url-utils", () => {
         ),
       ).toBeUndefined();
     });
+
+    it("returns undefined for negated conversation id filters", () => {
+      expect(
+        extractConversationIdFromSearchQuery(
+          '!gen_ai.conversation.id:"14365297"',
+        ),
+      ).toBeUndefined();
+    });
+
+    it("returns undefined for IN-style bracket conversation id filters", () => {
+      expect(
+        extractConversationIdFromSearchQuery("gen_ai.conversation.id:[1,2]"),
+      ).toBeUndefined();
+    });
   });
 
   describe("getTraceMetricsExploreUrl", () => {
