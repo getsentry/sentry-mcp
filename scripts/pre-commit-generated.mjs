@@ -62,10 +62,10 @@ for (const task of GENERATED_TASKS) {
   console.log(`Generating ${task.name}...`);
   run(task.command);
 
-  // Only stage outputs that exist on disk and were actually changed by
-  // generation. Skipping missing files avoids a crash when an agent .md
-  // output is staged for deletion; skipping unchanged files avoids
-  // accidentally staging unrelated working-tree edits.
+  // Only stage outputs that exist on disk and currently differ from the index.
+  // Skipping missing files avoids a crash when an output is staged for deletion
+  // (e.g. via git rm) and the generator does not recreate it. Skipping clean
+  // files avoids unnecessary git-add calls when generation was a no-op.
   const outputsToStage = task.outputs.filter((output) => {
     if (!existsSync(output)) return false;
     try {
