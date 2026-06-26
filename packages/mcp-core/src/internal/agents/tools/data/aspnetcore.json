@@ -1,0 +1,53 @@
+{
+  "namespace": "aspnetcore",
+  "description": "ASP.NET Core attributes",
+  "attributes": {
+    "aspnetcore.rate_limiting.policy": {
+      "description": "Rate limiting policy name.",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["fixed", "sliding", "token"]
+    },
+    "aspnetcore.rate_limiting.result": {
+      "description": "Rate-limiting result, shows whether the lease was acquired or contains a rejection reason",
+      "type": "string",
+      "stability": "stable",
+      "examples": [
+        "acquired",
+        "endpoint_limiter",
+        "global_limiter",
+        "request_canceled"
+      ]
+    },
+    "aspnetcore.routing.is_fallback": {
+      "description": "A value that indicates whether the matched route is a fallback route.",
+      "type": "boolean",
+      "stability": "stable",
+      "examples": ["true"]
+    },
+    "aspnetcore.diagnostics.handler.type": {
+      "description": "Full type name of the [`IExceptionHandler`](https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.diagnostics.iexceptionhandler) implementation that handled the exception.",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["Contoso.MyHandler"]
+    },
+    "aspnetcore.request.is_unhandled": {
+      "description": "Flag indicating if request was handled by the application pipeline.",
+      "type": "boolean",
+      "stability": "stable",
+      "examples": ["true"]
+    },
+    "aspnetcore.routing.match_status": {
+      "description": "Match result - success or failure",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["success", "failure"]
+    },
+    "aspnetcore.diagnostics.exception.result": {
+      "description": "ASP.NET Core exception middleware handling result",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["handled", "unhandled", "skipped", "aborted"]
+    }
+  }
+}

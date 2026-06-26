@@ -1,0 +1,12 @@
+{
+  "namespace": "elasticsearch",
+  "description": "This section defines attributes for Elasticsearch.\n",
+  "attributes": {
+    "elasticsearch.node.name": {
+      "description": "Represents the human-readable identifier of the node/instance to which a request was routed.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["instance-0000000001"]
+    }
+  }
+}

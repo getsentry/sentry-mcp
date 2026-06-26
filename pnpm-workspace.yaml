@@ -1,0 +1,84 @@
+packages:
+  - packages/*
+
+allowBuilds:
+  "@ast-grep/cli": true
+  "@biomejs/biome": true
+  "@sentry/cli": false
+  "@tailwindcss/oxide": false
+  better-sqlite3: true
+  core-js: false
+  core-js-pure: false
+  esbuild: true
+  msw: false
+  sharp: true
+  simple-git-hooks: true
+  vitest-evals: false
+  workerd: true
+
+overrides:
+  "@modelcontextprotocol/sdk": ^1.26.0
+  fast-xml-parser: 5.7.2
+  undici: ^7.24.4
+
+catalog:
+  "@ast-grep/cli": ^0.43.0
+  "@ai-sdk/anthropic": ^3.0.33
+  "@ai-sdk/mcp": ^1.0.16
+  "@ai-sdk/openai": ^3.0.23
+  "@ai-sdk/react": ^3.0.66
+  "@biomejs/biome": ^1.9.4
+  "@cloudflare/vite-plugin": ^1.31.0
+  "@cloudflare/vitest-pool-workers": 0.14.1
+  "@cloudflare/workers-oauth-provider": ^0.3.0
+  "@cloudflare/workers-types": ^4.20260405.1
+  "@modelcontextprotocol/sdk": ^1.26.0
+  "@radix-ui/react-accordion": ^1.2.11
+  "@radix-ui/react-slot": ^1.2.3
+  "@sentry/cloudflare": 10.54.0
+  "@sentry/core": 10.54.0
+  "@sentry/node": 10.54.0
+  "@sentry/react": 10.54.0
+  "@sentry/vite-plugin": ^4.6.1
+  "@tailwindcss/typography": ^0.5.16
+  "@tailwindcss/vite": ^4.1.11
+  "@types/node": ^22.15.33
+  "@types/react": ^19.1.8
+  "@types/react-dom": ^19.1.6
+  "@vitejs/plugin-react": ^4.6.0
+  "@vitest/coverage-v8": ^4.1.2
+  agents: ^0.3.10
+  ai: ^6.0.64
+  better-sqlite3: ^11.10.0
+  chalk: ^5.4.1
+  class-variance-authority: ^0.7.1
+  clsx: ^2.1.1
+  commander: ^14.0.0
+  dotenv: ^16.6.1
+  dotenv-cli: ^8.0.0
+  hono: ^4.11.4
+  lint-staged: ^15.5.2
+  lucide-react: ^0.503.0
+  miniflare: 4.20260401.0
+  msw: ^2.10.2
+  open: ^10.1.2
+  react: ^19.1.0
+  react-dom: ^19.1.0
+  react-markdown: ^9.1.0
+  remark-gfm: ^4.0.1
+  simple-git-hooks: ^2.13.0
+  tailwind-merge: ^3.3.1
+  tailwindcss: ^4.1.11
+  tsdown: ^0.12.9
+  tsx: ^4.20.3
+  turbo: ^2.5.4
+  tw-animate-css: ^1.3.4
+  typescript: ^5.8.3
+  valibot: ^1.4.0
+  vite: ^6.3.5
+  vitest: ^4.1.2
+  vitest-evals: ^0.4.0
+  workers-mcp: 0.1.0-3
+  wrangler: 4.80.0
+  zod: ^3.25.67
+  zod-to-json-schema: ^3.24.6

@@ -1,0 +1,71 @@
+{
+  "logs": 0,
+  "errors": 0,
+  "performance_issues": 0,
+  "span_count": 112.0,
+  "transaction_child_count_map": [
+    {
+      "transaction.event_id": "0daf40dc453a429c8c57e4c215c4e82c",
+      "count()": 10.0
+    },
+    {
+      "transaction.event_id": "845c0f1eb7544741a9d08cf28e144f42",
+      "count()": 1.0
+    },
+    {
+      "transaction.event_id": "b49a5b53cba046a2bab9323d8f00de96",
+      "count()": 7.0
+    },
+    {
+      "transaction.event_id": "c0db3d88529744d393f091b692c024ca",
+      "count()": 11.0
+    },
+    {
+      "transaction.event_id": "ee6e7f39107847f980e06119bf116d38",
+      "count()": 7.0
+    },
+    {
+      "transaction.event_id": "efa09ae9091e400e8865fe48aaae80d6",
+      "count()": 12.0
+    },
+    {
+      "transaction.event_id": "f398bbc635c64e2091d94679dade2957",
+      "count()": 3.0
+    },
+    {
+      "transaction.event_id": "f531c48c3eaa43be9587dd880b8ec4bb",
+      "count()": 6.0
+    },
+    {
+      "transaction.event_id": "f779775e1c6a4f09b62d68818a25d7b5",
+      "count()": 55.0
+    }
+  ],
+  "span_count_map": {
+    "cache.get": 41.0,
+    "middleware.django": 24.0,
+    "db": 11.0,
+    "function": 6.0,
+    "db.redis": 4.0,
+    "feature.flagpole.batch_has": 4.0,
+    "processor": 2.0,
+    "execute": 2.0,
+    "fetch_organization_projects": 2.0,
+    "other": 1.0,
+    "db.clickhouse": 1.0,
+    "validator": 1.0,
+    "serialize": 1.0,
+    "http.client": 1.0,
+    "base.paginate.on_results": 1.0,
+    "ratelimit.__call__": 1.0,
+    "base.dispatch.request": 1.0,
+    "discover.endpoint": 1.0,
+    "serialize.iterate": 1.0,
+    "base.dispatch.setup": 1.0,
+    "serialize.get_attrs": 1.0,
+    "build_plan.storage_query_plan_builder": 1.0,
+    "serialize.get_attrs.project.options": 1.0,
+    "check_object_permissions_on_organization": 1.0,
+    "allocation_policy.get_quota_allowance": 1.0
+  }
+}

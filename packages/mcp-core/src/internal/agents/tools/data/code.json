@@ -1,0 +1,43 @@
+{
+  "namespace": "code",
+  "description": "These attributes provide context about source code\n",
+  "attributes": {
+    "code.function.name": {
+      "description": "The method or function fully-qualified name without arguments. The value should fit the natural representation of the language runtime, which is also likely the same used within `code.stacktrace` attribute value. This attribute MUST NOT be used on the Profile signal since the data is already captured in 'message Function'. This constraint is imposed to prevent redundancy and maintain data integrity.\n",
+      "type": "string",
+      "note": "Values and format depends on each language runtime, thus it is impossible to provide an exhaustive list of examples.\nThe values are usually the same (or prefixes of) the ones found in native stack trace representation stored in\n`code.stacktrace` without information on arguments.\n\nExamples:\n\n* Java method: `com.example.MyHttpService.serveRequest`\n* Java anonymous class method: `com.mycompany.Main$1.myMethod`\n* Java lambda method: `com.mycompany.Main$$Lambda/0x0000748ae4149c00.myMethod`\n* PHP function: `GuzzleHttp\\Client::transfer`\n* Go function: `github.com/my/repo/pkg.foo.func5`\n* Elixir: `OpenTelemetry.Ctx.new`\n* Erlang: `opentelemetry_ctx:new`\n* Rust: `playground::my_module::my_cool_func`\n* C function: `fopen`\n",
+      "stability": "stable",
+      "examples": [
+        "com.example.MyHttpService.serveRequest",
+        "GuzzleHttp\\Client::transfer",
+        "fopen"
+      ]
+    },
+    "code.file.path": {
+      "description": "The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path). This attribute MUST NOT be used on the Profile signal since the data is already captured in 'message Function'. This constraint is imposed to prevent redundancy and maintain data integrity.\n",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["/usr/local/MyApplication/content_root/app/index.php"]
+    },
+    "code.line.number": {
+      "description": "The line number in `code.file.path` best representing the operation. It SHOULD point within the code unit named in `code.function.name`. This attribute MUST NOT be used on the Profile signal since the data is already captured in 'message Line'. This constraint is imposed to prevent redundancy and maintain data integrity.\n",
+      "type": "number",
+      "stability": "stable",
+      "examples": ["42"]
+    },
+    "code.column.number": {
+      "description": "The column number in `code.file.path` best representing the operation. It SHOULD point within the code unit named in `code.function.name`. This attribute MUST NOT be used on the Profile signal since the data is already captured in 'message Line'. This constraint is imposed to prevent redundancy and maintain data integrity.\n",
+      "type": "number",
+      "stability": "stable",
+      "examples": ["16"]
+    },
+    "code.stacktrace": {
+      "description": "A stacktrace as a string in the natural representation for the language runtime. The representation is identical to [`exception.stacktrace`](/docs/exceptions/exceptions-spans.md#stacktrace-representation). This attribute MUST NOT be used on the Profile signal since the data is already captured in 'message Location'. This constraint is imposed to prevent redundancy and maintain data integrity.\n",
+      "type": "string",
+      "stability": "stable",
+      "examples": [
+        "at com.example.GenerateTrace.methodB(GenerateTrace.java:13)\\n at com.example.GenerateTrace.methodA(GenerateTrace.java:9)\\n at com.example.GenerateTrace.main(GenerateTrace.java:5)\n"
+      ]
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "name": "@sentry/mcp-cloudflare",
+  "version": "0.36.0",
+  "private": true,
+  "type": "module",
+  "license": "FSL-1.1-ALv2",
+  "files": [
+    "./dist/*"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "dev": "vite",
+    "deploy": "pnpm exec wrangler deploy",
+    "cf:versions:upload": "npx wrangler versions upload",
+    "preview": "vite preview",
+    "cf-typegen": "wrangler types",
+    "test": "vitest run",
+    "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test:watch": "vitest",
+    "tsc": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.13.15",
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@sentry/mcp-core": "workspace:*",
+    "@sentry/mcp-server-mocks": "workspace:*",
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "@sentry/vite-plugin": "catalog:",
+    "@tailwindcss/typography": "catalog:",
+    "@tailwindcss/vite": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@types/react-scroll-to-bottom": "^4.2.5",
+    "@vitejs/plugin-react": "catalog:",
+    "tailwindcss": "catalog:",
+    "urlpattern-polyfill": "^10.1.0",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "miniflare": "catalog:",
+    "wrangler": "4.80.0"
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "catalog:",
+    "@ai-sdk/openai": "catalog:",
+    "@ai-sdk/react": "catalog:",
+    "@cloudflare/workers-oauth-provider": "catalog:",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@radix-ui/react-accordion": "catalog:",
+    "@radix-ui/react-slot": "catalog:",
+    "@sentry/cloudflare": "catalog:",
+    "@sentry/react": "catalog:",
+    "agents": "catalog:",
+    "ai": "catalog:",
+    "asciinema-player": "^3.10.0",
+    "better-sqlite3": "catalog:",
+    "class-variance-authority": "catalog:",
+    "clsx": "catalog:",
+    "hono": "catalog:",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-markdown": "catalog:",
+    "react-router-dom": "^7.11.0",
+    "react-scroll-to-bottom": "^4.2.0",
+    "remark-gfm": "catalog:",
+    "tailwind-merge": "catalog:",
+    "tw-animate-css": "catalog:",
+    "workers-mcp": "catalog:",
+    "zod": "catalog:"
+  }
+}

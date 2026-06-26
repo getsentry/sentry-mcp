@@ -1,0 +1,51 @@
+{
+  "namespace": "telemetry",
+  "description": "This document defines attributes for telemetry SDK.\n",
+  "attributes": {
+    "telemetry.sdk.name": {
+      "description": "The name of the telemetry SDK as defined above.\n",
+      "type": "string",
+      "note": "The OpenTelemetry SDK MUST set the `telemetry.sdk.name` attribute to `opentelemetry`.\nIf another SDK, like a fork or a vendor-provided implementation, is used, this SDK MUST set the\n`telemetry.sdk.name` attribute to the fully-qualified class or module name of this SDK's main entry point\nor another suitable identifier depending on the language.\nThe identifier `opentelemetry` is reserved and MUST NOT be used in this case.\nAll custom identifiers SHOULD be stable across different versions of an implementation.\n",
+      "stability": "stable",
+      "examples": ["opentelemetry"]
+    },
+    "telemetry.sdk.language": {
+      "description": "The language of the telemetry SDK.\n",
+      "type": "string",
+      "stability": "stable",
+      "examples": [
+        "cpp",
+        "dotnet",
+        "erlang",
+        "go",
+        "java",
+        "nodejs",
+        "php",
+        "python",
+        "ruby",
+        "rust",
+        "swift",
+        "webjs"
+      ]
+    },
+    "telemetry.sdk.version": {
+      "description": "The version string of the telemetry SDK.\n",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["1.2.3"]
+    },
+    "telemetry.distro.name": {
+      "description": "The name of the auto instrumentation agent or distribution, if used.\n",
+      "type": "string",
+      "note": "Official auto instrumentation agents and distributions SHOULD set the `telemetry.distro.name` attribute to\na string starting with `opentelemetry-`, e.g. `opentelemetry-java-instrumentation`.\n",
+      "stability": "development",
+      "examples": ["parts-unlimited-java"]
+    },
+    "telemetry.distro.version": {
+      "description": "The version string of the auto instrumentation agent or distribution, if used.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["1.2.3"]
+    }
+  }
+}

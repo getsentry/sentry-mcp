@@ -1,0 +1,50 @@
+[
+  {
+    "key": "message",
+    "name": "Log Message"
+  },
+  {
+    "key": "severity",
+    "name": "Log Severity"
+  },
+  {
+    "key": "sentry.item_id",
+    "name": "Sentry Item ID"
+  },
+  {
+    "key": "project",
+    "name": "Project"
+  },
+  {
+    "key": "environment",
+    "name": "Environment"
+  },
+  {
+    "key": "release",
+    "name": "Release"
+  },
+  {
+    "key": "trace",
+    "name": "Trace ID"
+  },
+  {
+    "key": "level",
+    "name": "Log Level"
+  },
+  {
+    "key": "logger",
+    "name": "Logger Name"
+  },
+  {
+    "key": "module",
+    "name": "Module"
+  },
+  {
+    "key": "custom.service",
+    "name": "Service Name"
+  },
+  {
+    "key": "custom.component",
+    "name": "Component"
+  }
+]

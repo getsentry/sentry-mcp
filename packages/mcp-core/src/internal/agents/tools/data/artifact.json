@@ -1,0 +1,67 @@
+{
+  "namespace": "artifact",
+  "description": "This group describes attributes specific to artifacts. Artifacts are files or other immutable objects that are intended for distribution. This definition aligns directly with the [SLSA](https://slsa.dev/spec/v1.0/terminology#package-model) package model.\n",
+  "attributes": {
+    "artifact.filename": {
+      "description": "The human readable file name of the artifact, typically generated during build and release processes. Often includes the package name and version in the file name.\n",
+      "type": "string",
+      "note": "This file name can also act as the [Package Name](https://slsa.dev/spec/v1.0/terminology#package-model)\nin cases where the package ecosystem maps accordingly.\nAdditionally, the artifact [can be published](https://slsa.dev/spec/v1.0/terminology#software-supply-chain)\nfor others, but that is not a guarantee.\n",
+      "stability": "development",
+      "examples": [
+        "golang-binary-amd64-v0.1.0",
+        "docker-image-amd64-v0.1.0",
+        "release-1.tar.gz",
+        "file-name-package.tar.gz"
+      ]
+    },
+    "artifact.version": {
+      "description": "The version of the artifact.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["v0.1.0", "1.2.1", "122691-build"]
+    },
+    "artifact.purl": {
+      "description": "The [Package URL](https://github.com/package-url/purl-spec) of the [package artifact](https://slsa.dev/spec/v1.0/terminology#package-model) provides a standard way to identify and locate the packaged artifact.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "pkg:github/package-url/purl-spec@1209109710924",
+        "pkg:npm/foo@12.12.3"
+      ]
+    },
+    "artifact.hash": {
+      "description": "The full [hash value (see glossary)](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf), often found in checksum.txt on a release of the artifact and used to verify package integrity.\n",
+      "type": "string",
+      "note": "The specific algorithm used to create the cryptographic hash value is\nnot defined. In situations where an artifact has multiple\ncryptographic hashes, it is up to the implementer to choose which\nhash value to set here; this should be the most secure hash algorithm\nthat is suitable for the situation and consistent with the\ncorresponding attestation. The implementer can then provide the other\nhash values through an additional set of attribute extensions as they\ndeem necessary.\n",
+      "stability": "development",
+      "examples": [
+        "9ff4c52759e2c4ac70b7d517bc7fcdc1cda631ca0045271ddd1b192544f8a3e9"
+      ]
+    },
+    "artifact.attestation.id": {
+      "description": "The id of the build [software attestation](https://slsa.dev/attestation-model).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["123"]
+    },
+    "artifact.attestation.filename": {
+      "description": "The provenance filename of the built attestation which directly relates to the build artifact filename. This filename SHOULD accompany the artifact at publish time. See the [SLSA Relationship](https://slsa.dev/spec/v1.0/distributing-provenance#relationship-between-artifacts-and-attestations) specification for more information.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "golang-binary-amd64-v0.1.0.attestation",
+        "docker-image-amd64-v0.1.0.intoto.json1",
+        "release-1.tar.gz.attestation",
+        "file-name-package.tar.gz.intoto.json1"
+      ]
+    },
+    "artifact.attestation.hash": {
+      "description": "The full [hash value (see glossary)](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf), of the built attestation. Some envelopes in the [software attestation space](https://github.com/in-toto/attestation/tree/main/spec) also refer to this as the **digest**.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "1b31dfcd5b7f9267bf2ff47651df1cfb9147b9e4df1f335accf65b4cda498408"
+      ]
+    }
+  }
+}

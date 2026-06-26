@@ -1,0 +1,35 @@
+{
+  "name": "@sentry/mcp-server-mocks",
+  "version": "0.36.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "FSL-1.1-ALv2",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./payloads": {
+      "types": "./dist/payloads.d.ts",
+      "default": "./dist/payloads.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "default": "./dist/utils.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w"
+  },
+  "devDependencies": {
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "tsdown": "catalog:"
+  },
+  "dependencies": {
+    "msw": "catalog:"
+  }
+}

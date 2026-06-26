@@ -1,0 +1,83 @@
+{
+  "id": "a6251c18f0194b8e8158518b8ee99545",
+  "groupID": "6898891101",
+  "eventID": "a6251c18f0194b8e8158518b8ee99545",
+  "projectID": "4509062593708032",
+  "size": 547,
+  "entries": [],
+  "dist": null,
+  "message": "",
+  "title": "Endpoint Regression",
+  "location": null,
+  "user": null,
+  "contexts": {},
+  "sdk": null,
+  "context": {},
+  "packages": {},
+  "type": "generic",
+  "metadata": {
+    "title": "Endpoint Regression"
+  },
+  "tags": [
+    {
+      "key": "level",
+      "value": "info"
+    },
+    {
+      "key": "transaction",
+      "value": "POST /oauth/token"
+    }
+  ],
+  "platform": "python",
+  "dateReceived": "2025-11-18T06:01:22.186680Z",
+  "dateCreated": "2025-11-18T06:01:20Z",
+  "errors": [],
+  "occurrence": {
+    "id": "ae3754a99b294006b8d13ad59bb84d0f",
+    "projectId": 4509062593708032,
+    "eventId": "a6251c18f0194b8e8158518b8ee99545",
+    "fingerprint": ["ddf744fc1a47831ed53d9a489160fa7a"],
+    "issueTitle": "Endpoint Regression",
+    "subtitle": "Increased from 909.77ms to 1711.36ms (P95)",
+    "resourceId": null,
+    "evidenceData": {
+      "absolutePercentageChange": 1.8810815660491678,
+      "aggregateRange1": 909.7721153846148,
+      "aggregateRange2": 1711.3555555555554,
+      "breakpoint": 1763416800,
+      "change": "regression",
+      "transaction": "POST /oauth/token"
+    },
+    "evidenceDisplay": [
+      {
+        "name": "Regression",
+        "value": "POST /oauth/token duration increased from 909.77ms to 1711.36ms (P95)",
+        "important": true
+      },
+      {
+        "name": "Transaction",
+        "value": "POST /oauth/token",
+        "important": true
+      }
+    ],
+    "type": 1018,
+    "detectionTime": 1763445680.827214,
+    "level": "info",
+    "culprit": "POST /oauth/token",
+    "priority": 50,
+    "assignee": null
+  },
+  "crashFile": null,
+  "culprit": "POST /oauth/token",
+  "fingerprints": ["d41d8cd98f00b204e9800998ecf8427e"],
+  "groupingConfig": {
+    "id": "newstyle:2023-01-11",
+    "enhancements": "test"
+  },
+  "release": null,
+  "userReport": null,
+  "sdkUpdates": [],
+  "resolvedWith": [],
+  "nextEventID": null,
+  "previousEventID": "65d7c166833945efad0a4d38a4fd3665"
+}

@@ -1,0 +1,91 @@
+{
+  "event_id": "cfe78a5c892d4a64a962d837673398d2",
+  "profile_id": "cfe78a5c892d4a64a962d837673398d2",
+  "platform": "python",
+  "environment": "production",
+  "release": {
+    "version": "backend@1.2.3"
+  },
+  "version": "2",
+  "profile": {
+    "frames": [
+      {
+        "filename": "main.py",
+        "in_app": true,
+        "lineno": 42,
+        "module": "app.main",
+        "abs_path": "/app/src/main.py",
+        "platform": "python",
+        "lang": "python"
+      },
+      {
+        "filename": "db.py",
+        "function": "execute_query",
+        "in_app": true,
+        "lineno": 118,
+        "module": "app.db",
+        "abs_path": "/app/src/db.py",
+        "platform": "python",
+        "lang": "python"
+      },
+      {
+        "filename": "connection.py",
+        "function": "cursor.execute",
+        "in_app": false,
+        "lineno": 230,
+        "module": "psycopg2.extensions",
+        "abs_path": "/usr/lib/python3.11/site-packages/psycopg2/extensions.py",
+        "platform": "python",
+        "lang": "python"
+      }
+    ],
+    "samples": [
+      {
+        "stack_id": 0,
+        "thread_id": 1,
+        "elapsed_since_start_ns": 0
+      },
+      {
+        "stack_id": 1,
+        "thread_id": 1,
+        "elapsed_since_start_ns": 50000000
+      },
+      {
+        "stack_id": 1,
+        "thread_id": 1,
+        "elapsed_since_start_ns": 100000000
+      }
+    ],
+    "stacks": [
+      [0],
+      [0, 1, 2]
+    ],
+    "thread_metadata": {
+      "1": {
+        "name": "MainThread",
+        "priority": 10
+      }
+    }
+  },
+  "transaction": {
+    "name": "/api/users",
+    "trace_id": "a4d1aae7216b47ff8117cf4e09ce9d0a",
+    "id": "7ca573c0f4814912aaa9bdc77d1a7d51",
+    "active_thread_id": 1,
+    "relative_start_ns": 0,
+    "relative_end_ns": 120000000
+  },
+  "device": {
+    "model": "MacBook Pro",
+    "classification": "high",
+    "arch": "arm64"
+  },
+  "os": {
+    "name": "macOS",
+    "version": "14.4"
+  },
+  "client_sdk": {
+    "name": "sentry.python",
+    "version": "2.24.1"
+  }
+}

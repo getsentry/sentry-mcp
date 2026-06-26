@@ -1,0 +1,18 @@
+{
+  "namespace": "zos",
+  "description": "This document defines attributes of a z/OS resource.\n",
+  "attributes": {
+    "zos.smf.id": {
+      "description": "The System Management Facility (SMF) Identifier uniquely identified a z/OS system within a SYSPLEX or mainframe environment and is used for system and performance analysis.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["SYS1"]
+    },
+    "zos.sysplex.name": {
+      "description": "The name of the SYSPLEX to which the z/OS system belongs too.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["SYSPLEX1"]
+    }
+  }
+}

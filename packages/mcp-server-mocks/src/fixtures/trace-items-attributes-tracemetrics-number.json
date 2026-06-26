@@ -1,0 +1,18 @@
+[
+  {
+    "key": "value",
+    "name": "Metric Value"
+  },
+  {
+    "key": "timestamp_precise",
+    "name": "timestamp_precise"
+  },
+  {
+    "key": "observed_timestamp",
+    "name": "observed_timestamp"
+  },
+  {
+    "key": "payload_size",
+    "name": "payload_size"
+  }
+]

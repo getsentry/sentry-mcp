@@ -1,0 +1,123 @@
+{
+  "namespace": "file",
+  "description": "Describes file attributes.",
+  "attributes": {
+    "file.accessed": {
+      "description": "Time when the file was last accessed, in ISO 8601 format.\n",
+      "type": "string",
+      "note": "This attribute might not be supported by some file systems — NFS, FAT32, in embedded OS, etc.\n",
+      "stability": "development",
+      "examples": ["2021-01-01T12:00:00Z"]
+    },
+    "file.attributes": {
+      "description": "Array of file attributes.\n",
+      "type": "string",
+      "note": "Attributes names depend on the OS or file system. Here’s a non-exhaustive list of values expected for this attribute: `archive`, `compressed`, `directory`, `encrypted`, `execute`, `hidden`, `immutable`, `journaled`, `read`, `readonly`, `symbolic link`, `system`, `temporary`, `write`.\n",
+      "stability": "development",
+      "examples": ["[\"readonly\",\"hidden\"]"]
+    },
+    "file.created": {
+      "description": "Time when the file was created, in ISO 8601 format.\n",
+      "type": "string",
+      "note": "This attribute might not be supported by some file systems — NFS, FAT32, in embedded OS, etc.\n",
+      "stability": "development",
+      "examples": ["2021-01-01T12:00:00Z"]
+    },
+    "file.changed": {
+      "description": "Time when the file attributes or metadata was last changed, in ISO 8601 format.\n",
+      "type": "string",
+      "note": "`file.changed` captures the time when any of the file's properties or attributes (including the content) are changed, while `file.modified` captures the timestamp when the file content is modified.\n",
+      "stability": "development",
+      "examples": ["2021-01-01T12:00:00Z"]
+    },
+    "file.directory": {
+      "description": "Directory where the file is located. It should include the drive letter, when appropriate.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["/home/user", "C:\\Program Files\\MyApp"]
+    },
+    "file.extension": {
+      "description": "File extension, excluding the leading dot.\n",
+      "type": "string",
+      "note": "When the file name has multiple extensions (example.tar.gz), only the last one should be captured (\"gz\", not \"tar.gz\").\n",
+      "stability": "development",
+      "examples": ["png", "gz"]
+    },
+    "file.fork_name": {
+      "description": "Name of the fork. A fork is additional data associated with a filesystem object.\n",
+      "type": "string",
+      "note": "On Linux, a resource fork is used to store additional data with a filesystem object. A file always has at least one fork for the data portion, and additional forks may exist.\nOn NTFS, this is analogous to an Alternate Data Stream (ADS), and the default data stream for a file is just called $DATA. Zone.Identifier is commonly used by Windows to track contents downloaded from the Internet. An ADS is typically of the form: C:\\path\\to\\filename.extension:some_fork_name, and some_fork_name is the value that should populate `fork_name`. `filename.extension` should populate `file.name`, and `extension` should populate `file.extension`. The full path, `file.path`, will include the fork name.\n",
+      "stability": "development",
+      "examples": ["Zone.Identifer"]
+    },
+    "file.group.id": {
+      "description": "Primary Group ID (GID) of the file.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["1000"]
+    },
+    "file.group.name": {
+      "description": "Primary group name of the file.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["users"]
+    },
+    "file.inode": {
+      "description": "Inode representing the file in the filesystem.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["256383"]
+    },
+    "file.mode": {
+      "description": "Mode of the file in octal representation.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["0640"]
+    },
+    "file.modified": {
+      "description": "Time when the file content was last modified, in ISO 8601 format.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["2021-01-01T12:00:00Z"]
+    },
+    "file.name": {
+      "description": "Name of the file including the extension, without the directory.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["example.png"]
+    },
+    "file.owner.id": {
+      "description": "The user ID (UID) or security identifier (SID) of the file owner.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["1000"]
+    },
+    "file.owner.name": {
+      "description": "Username of the file owner.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["root"]
+    },
+    "file.path": {
+      "description": "Full path to the file, including the file name. It should include the drive letter, when appropriate.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "/home/alice/example.png",
+        "C:\\Program Files\\MyApp\\myapp.exe"
+      ]
+    },
+    "file.size": {
+      "description": "File size in bytes.\n",
+      "type": "number",
+      "stability": "development"
+    },
+    "file.symbolic_link.target_path": {
+      "description": "Path to the target of a symbolic link.\n",
+      "type": "string",
+      "note": "This attribute is only applicable to symbolic links.\n",
+      "stability": "development",
+      "examples": ["/usr/bin/python3"]
+    }
+  }
+}

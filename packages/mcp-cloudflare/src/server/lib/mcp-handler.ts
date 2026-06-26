@@ -1,0 +1,470 @@
+/**
+ * MCP Handler using createMcpHandler from Cloudflare agents library.
+ *
+ * Stateless request handling approach:
+ * - Uses createMcpHandler to wrap the MCP server
+ * - Extracts auth props directly from ExecutionContext (set by OAuth provider)
+ * - Context captured in tool handler closures during buildServer()
+ * - No session state required - each request is independent
+ */
+
+import type { ExportedHandler } from "@cloudflare/workers-types";
+import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
+import * as Sentry from "@sentry/cloudflare";
+import { buildServer } from "@sentry/mcp-core/server";
+import { parseSkills } from "@sentry/mcp-core/skills";
+import { logWarn } from "@sentry/mcp-core/telem/logging";
+import type { ServerContext } from "@sentry/mcp-core/types";
+import { createMcpHandler } from "agents/mcp";
+import { annotateResponseMetric } from "../metrics";
+import {
+  getOAuthGrantLifecycleTelemetry,
+  getOAuthGrantTelemetry,
+} from "../oauth/telemetry";
+import type { WorkerProps } from "../types";
+import type { Env } from "../types";
+import {
+  MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
+  checkRateLimit,
+} from "../utils/rate-limiter";
+import { setSentryUserFromRequest } from "../utils/sentry-user";
+import { UTM_SOURCE_ATTRIBUTE, resolveUtmSourceFromUrl } from "./attribution";
+import { resolveClientFamily } from "./client-family";
+import { verifyConstraintsAccess } from "./constraint-utils";
+
+/**
+ * ExecutionContext with OAuth props injected by the OAuth provider.
+ */
+type OAuthExecutionContext = ExecutionContext & {
+  props?: Record<string, unknown>;
+};
+
+function getSkillGrantedAttributeName(skill: string): string {
+  return `app.consent.skill.${skill.replaceAll("-", "_")}.granted`;
+}
+
+function escapeAuthenticateHeaderValue(value: string): string {
+  return value
+    .replaceAll("\\", "\\\\")
+    .replaceAll('"', '\\"')
+    .replaceAll("\r", "")
+    .replaceAll("\n", "");
+}
+
+/**
+ * Extracts the grantId from the wrapper bearer token (format
+ * `userId:grantId:secret`, validated by the library before our handler runs).
+ * Concurrent grants per `(userId, clientId)` mean a clientId-based lookup
+ * cannot safely identify the request's own grant.
+ */
+export function getRequestGrantId(request: Request): string | null {
+  const auth = request.headers.get("Authorization");
+  if (!auth) return null;
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  if (!match) return null;
+  const parts = match[1].split(":");
+  if (parts.length !== 3) return null;
+  return parts[1] || null;
+}
+
+type GrantRevokedReason =
+  | "stale_props_no_refresh"
+  | "upstream_rejected"
+  | "upstream_rejected_in_use";
+
+function logGrantReauthorization(
+  reason: GrantRevokedReason,
+  userId: string,
+  clientId: string,
+  clientFamily: string,
+  grantId: string | null,
+  lifecycleTelemetry: Record<string, string>,
+): void {
+  logWarn("OAuth grant rejected for reauthorization", {
+    loggerScope: ["cloudflare", "mcp-handler"],
+    extra: {
+      "app.oauth.grant_revoked.reason": reason,
+      "app.client.family": clientFamily,
+      userId,
+      clientId,
+      ...getOAuthGrantTelemetry(grantId),
+      ...lifecycleTelemetry,
+    },
+  });
+}
+
+/**
+ * Revokes the OAuth grant for the current request in the background, then
+ * returns a 401 response prompting re-authorization.
+ */
+function revokeStaleGrant(
+  ctx: ExecutionContext,
+  env: Env,
+  userId: string,
+  clientId: string,
+  grantId: string | null,
+  logLabel: string,
+  revokeReason: Exclude<GrantRevokedReason, "upstream_rejected_in_use">,
+  clientFamily: string,
+  lifecycleTelemetry: Record<string, string>,
+  errorDescription = "Token requires re-authorization",
+): Response {
+  if (grantId) {
+    Sentry.metrics.count("app.oauth.grant_revoked", 1, {
+      attributes: {
+        "app.oauth.grant_revoked.reason": revokeReason,
+        "app.client.family": clientFamily,
+        ...lifecycleTelemetry,
+      },
+    });
+  }
+
+  logGrantReauthorization(
+    revokeReason,
+    userId,
+    clientId,
+    clientFamily,
+    grantId,
+    lifecycleTelemetry,
+  );
+
+  ctx.waitUntil(
+    (async () => {
+      if (!grantId) {
+        // Without a grantId, falling back to clientId-based lookup would
+        // risk revoking another active session. Log and skip — the user
+        // will still see the 401 and re-auth, just leaving the stale grant
+        // behind to expire naturally (refreshTokenTTL = 30d).
+        logWarn(`Cannot revoke ${logLabel} without grantId`, {
+          loggerScope: ["cloudflare", "mcp-handler"],
+          extra: { clientId, userId },
+        });
+        return;
+      }
+      try {
+        await env.OAUTH_PROVIDER.revokeGrant(grantId, userId);
+      } catch (err) {
+        logWarn(`Failed to revoke ${logLabel}`, {
+          loggerScope: ["cloudflare", "mcp-handler"],
+          extra: {
+            error: String(err),
+            clientId,
+            userId,
+            ...getOAuthGrantTelemetry(grantId),
+          },
+        });
+      }
+    })(),
+  );
+  return new Response(
+    "Your authorization has expired. Please re-authorize to continue using Sentry MCP.",
+    {
+      status: 401,
+      headers: {
+        "WWW-Authenticate": `Bearer realm="Sentry MCP", error="invalid_token", error_description="${escapeAuthenticateHeaderValue(errorDescription)}"`,
+      },
+    },
+  );
+}
+
+/**
+ * Main request handler that:
+ * 1. Extracts auth props from ExecutionContext
+ * 2. Applies per-user rate limiting for authenticated traffic
+ * 3. Parses org/project constraints from URL
+ * 4. Verifies user has access to the constraints
+ * 5. Builds complete ServerContext
+ * 6. Creates and configures MCP server per-request (context captured in closures)
+ * 7. Runs MCP handler
+ */
+const mcpHandler: ExportedHandler<Env> = {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
+    const url = new URL(request.url);
+
+    // Parse constraints from URL pattern /mcp/:org?/:project?
+    const pattern = new URLPattern({ pathname: "/mcp/:org?/:project?" });
+    const result = pattern.exec(url);
+
+    if (!result) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    const { groups } = result.pathname;
+    const organizationSlug = groups?.org || null;
+    const projectSlug = groups?.project || null;
+
+    // Check for agent mode query parameter
+    const isAgentMode = url.searchParams.get("agent") === "1";
+
+    // Check for experimental mode query parameter
+    const isExperimentalMode = url.searchParams.get("experimental") === "1";
+
+    // Read utm_source for attribution tracking
+    const utmSource = resolveUtmSourceFromUrl(url);
+
+    // Extract OAuth props from ExecutionContext (set by OAuth provider)
+    const oauthCtx = ctx as OAuthExecutionContext;
+
+    if (!oauthCtx.props) {
+      throw new Error("No authentication context available");
+    }
+
+    const rawProps = oauthCtx.props as Partial<WorkerProps>;
+
+    const userId = rawProps.id as string;
+    const accessToken = rawProps.accessToken as string;
+    const clientId = rawProps.clientId as string;
+    const clientName = rawProps.clientName;
+    const sentryHost = env.SENTRY_HOST || "sentry.io";
+    const clientFamily = resolveClientFamily(request.headers.get("user-agent"));
+    const requestGrantId = getRequestGrantId(request);
+    const lifecycleTelemetry = getOAuthGrantLifecycleTelemetry(rawProps);
+    const { ip_address: userIpAddress } = setSentryUserFromRequest(
+      request,
+      userId,
+    );
+
+    const activeSpan = Sentry.getActiveSpan();
+    activeSpan?.setAttribute("app.transport", "http");
+    activeSpan?.setAttribute("app.client.family", clientFamily);
+    activeSpan?.setAttribute("app.server.mode.agent", isAgentMode);
+    activeSpan?.setAttribute(
+      "app.server.mode.experimental",
+      isExperimentalMode,
+    );
+    if (utmSource) {
+      activeSpan?.setAttribute(UTM_SOURCE_ATTRIBUTE, utmSource);
+    }
+
+    // Parse and validate granted skills (primary authorization method)
+    // Legacy tokens without grantedSkills are no longer supported
+    if (!rawProps.grantedSkills) {
+      logWarn("Legacy token without grantedSkills detected - revoking grant", {
+        loggerScope: ["cloudflare", "mcp-handler"],
+        extra: { clientId, userId },
+      });
+      return revokeStaleGrant(
+        ctx,
+        env,
+        userId,
+        clientId,
+        requestGrantId,
+        "legacy grant",
+        "stale_props_no_refresh",
+        clientFamily,
+        lifecycleTelemetry,
+      );
+    }
+
+    // Attribute values avoid the substring "token" so Sentry's default PII
+    // scrubber doesn't replace them with "[Filtered]" on ingest.
+    if (!rawProps.refreshToken) {
+      return revokeStaleGrant(
+        ctx,
+        env,
+        userId,
+        clientId,
+        requestGrantId,
+        "stale grant (missing refresh token)",
+        "stale_props_no_refresh",
+        clientFamily,
+        lifecycleTelemetry,
+      );
+    }
+
+    if (rawProps.upstreamTokenInvalid) {
+      return revokeStaleGrant(
+        ctx,
+        env,
+        userId,
+        clientId,
+        requestGrantId,
+        "stale grant (invalid upstream token)",
+        "upstream_rejected",
+        clientFamily,
+        lifecycleTelemetry,
+        "Upstream authorization is no longer valid",
+      );
+    }
+
+    const grantedSkills = (rawProps.grantedSkills as string[]).map((skill) =>
+      skill === "preprod" ? "inspect" : skill,
+    );
+    const { valid: validSkills, invalid: invalidSkills } =
+      parseSkills(grantedSkills);
+
+    if (invalidSkills.length > 0) {
+      logWarn("Ignoring invalid skills from OAuth provider", {
+        loggerScope: ["cloudflare", "mcp-handler"],
+        extra: {
+          invalidSkills,
+        },
+      });
+    }
+
+    // Validate that at least one valid skill was granted
+    if (validSkills.size === 0) {
+      logWarn("Authorization rejected: No valid skills in token", {
+        loggerScope: ["cloudflare", "mcp-handler"],
+        extra: {
+          clientId,
+          userId: rawProps.id,
+          rawGrantedSkills: rawProps.grantedSkills,
+          rawGrantedSkillsType: typeof rawProps.grantedSkills,
+          rawGrantedSkillsIsArray: Array.isArray(rawProps.grantedSkills),
+        },
+      });
+      return new Response(
+        "Authorization failed: No valid skills were granted. Please re-authorize and select at least one permission.",
+        { status: 400 },
+      );
+    }
+
+    for (const skill of Array.from(validSkills).sort()) {
+      activeSpan?.setAttribute(getSkillGrantedAttributeName(skill), true);
+    }
+
+    const rateLimitResult = await checkRateLimit(
+      userId,
+      env.MCP_USER_RATE_LIMITER ?? env.MCP_RATE_LIMITER,
+      {
+        keyPrefix: "mcp:user",
+        errorMessage: MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
+      },
+    );
+
+    if (!rateLimitResult.allowed) {
+      return annotateResponseMetric(
+        new Response(rateLimitResult.errorMessage, {
+          status: 429,
+        }),
+        {
+          responseReason: "local_rate_limit",
+          rateLimitScope: "user",
+        },
+      );
+    }
+
+    const tokenOrg = rawProps.constraintOrganizationSlug?.trim() || null;
+    const tokenProject = rawProps.constraintProjectSlug?.trim() || null;
+    if (tokenOrg && organizationSlug !== tokenOrg) {
+      return new Response(
+        "This token is scoped to an organization. Use the MCP URL for the organization you authorized.",
+        { status: 403 },
+      );
+    }
+    if (tokenProject) {
+      if (!projectSlug || projectSlug !== tokenProject) {
+        return new Response(
+          "This token is scoped to a project. Use the MCP URL that includes that project (for example /mcp/<org>/<project>).",
+          { status: 403 },
+        );
+      }
+    }
+
+    // Verify user has access to the requested org/project
+    // Cache verification results in KV to avoid repeated API calls
+    const verification = await verifyConstraintsAccess(
+      { organizationSlug, projectSlug },
+      {
+        accessToken,
+        sentryHost,
+        cache: {
+          kv: env.MCP_CACHE,
+          userId,
+        },
+      },
+    );
+
+    if (!verification.ok) {
+      return new Response(verification.message, {
+        status: verification.status ?? 500,
+      });
+    }
+
+    const constraints = verification.constraints;
+
+    // Build complete ServerContext from OAuth props + verified constraints.
+    // Latched so use_sentry's multi-tool runs revoke at most once per request.
+    let upstreamUnauthorizedHandled = false;
+    const serverContext: ServerContext = {
+      userId,
+      userIpAddress,
+      clientId,
+      clientName,
+      clientFamily,
+      accessToken,
+      grantedSkills: validSkills,
+      constraints,
+      sentryHost,
+      mcpUrl: env.MCP_URL,
+      agentMode: isAgentMode,
+      experimentalMode: isExperimentalMode,
+      transport: "http",
+      onUpstreamUnauthorized: () => {
+        if (upstreamUnauthorizedHandled) return;
+        upstreamUnauthorizedHandled = true;
+        if (!requestGrantId) {
+          logWarn("Cannot revoke grant after upstream 401 without grantId", {
+            loggerScope: ["cloudflare", "mcp-handler"],
+            extra: { clientId, userId },
+          });
+          return;
+        }
+        Sentry.metrics.count("app.oauth.grant_revoked", 1, {
+          attributes: {
+            "app.oauth.grant_revoked.reason": "upstream_rejected_in_use",
+            "app.client.family": clientFamily,
+            ...lifecycleTelemetry,
+          },
+        });
+        logGrantReauthorization(
+          "upstream_rejected_in_use",
+          userId,
+          clientId,
+          clientFamily,
+          requestGrantId,
+          lifecycleTelemetry,
+        );
+        ctx.waitUntil(
+          (async () => {
+            try {
+              await env.OAUTH_PROVIDER.revokeGrant(requestGrantId, userId);
+            } catch (err) {
+              logWarn("Failed to revoke grant after upstream 401", {
+                loggerScope: ["cloudflare", "mcp-handler"],
+                extra: {
+                  error: String(err),
+                  clientId,
+                  userId,
+                  ...getOAuthGrantTelemetry(requestGrantId),
+                },
+              });
+            }
+          })(),
+        );
+      },
+    };
+
+    // Create and configure MCP server with tools filtered by context
+    // Context is captured in tool handler closures during buildServer()
+    // Use CfWorkerJsonSchemaValidator for Cloudflare Workers (ajv is not compatible with workerd)
+    const server = buildServer({
+      context: serverContext,
+      agentMode: isAgentMode,
+      experimentalMode: isExperimentalMode,
+      jsonSchemaValidator: new CfWorkerJsonSchemaValidator(),
+    });
+
+    // Run MCP handler - context already captured in closures
+    return createMcpHandler(server, {
+      route: url.pathname,
+    })(request, env, ctx);
+  },
+};
+
+export default mcpHandler;

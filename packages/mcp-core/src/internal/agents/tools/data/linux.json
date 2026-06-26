@@ -1,0 +1,12 @@
+{
+  "namespace": "linux",
+  "description": "Describes Linux Memory attributes",
+  "attributes": {
+    "linux.memory.slab.state": {
+      "description": "The Linux Slab memory state",
+      "type": "string",
+      "stability": "development",
+      "examples": ["reclaimable", "unreclaimable"]
+    }
+  }
+}

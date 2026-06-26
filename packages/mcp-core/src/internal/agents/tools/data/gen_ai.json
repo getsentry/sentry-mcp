@@ -1,0 +1,210 @@
+{
+  "namespace": "gen_ai",
+  "description": "This document defines the attributes used to describe telemetry in the context of Generative Artificial Intelligence (GenAI) Models requests and responses.\n",
+  "attributes": {
+    "gen_ai.provider.name": {
+      "description": "The Generative AI provider as identified by the client or server instrumentation.",
+      "type": "string",
+      "note": "The attribute SHOULD be set based on the instrumentation's best\nknowledge and may differ from the actual model provider.\n\nMultiple providers, including Azure OpenAI, Gemini, and AI hosting platforms\nare accessible using the OpenAI REST API and corresponding client libraries,\nbut may proxy or host models from different providers.\n\nThe `gen_ai.request.model`, `gen_ai.response.model`, and `server.address`\nattributes may help identify the actual system in use.\n\nThe `gen_ai.provider.name` attribute acts as a discriminator that\nidentifies the GenAI telemetry format flavor specific to that provider\nwithin GenAI semantic conventions.\nIt SHOULD be set consistently with provider-specific attributes and signals.\nFor example, GenAI spans, metrics, and events related to AWS Bedrock\nshould have the `gen_ai.provider.name` set to `aws.bedrock` and include\napplicable `aws.bedrock.*` attributes and are not expected to include\n`openai.*` attributes.\n",
+      "stability": "development",
+      "examples": [
+        "openai",
+        "gcp.gen_ai",
+        "gcp.vertex_ai",
+        "gcp.gemini",
+        "anthropic",
+        "cohere",
+        "azure.ai.inference",
+        "azure.ai.openai",
+        "ibm.watsonx.ai",
+        "aws.bedrock",
+        "perplexity",
+        "x_ai",
+        "deepseek",
+        "groq",
+        "mistral_ai"
+      ]
+    },
+    "gen_ai.request.model": {
+      "description": "The name of the GenAI model a request is being made to.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["gpt-4"]
+    },
+    "gen_ai.request.max_tokens": {
+      "description": "The maximum number of tokens the model generates for a request.",
+      "type": "number",
+      "stability": "development",
+      "examples": ["100"]
+    },
+    "gen_ai.request.choice.count": {
+      "description": "The target number of candidate completions to return.",
+      "type": "number",
+      "stability": "development",
+      "examples": ["3"]
+    },
+    "gen_ai.request.temperature": {
+      "description": "The temperature setting for the GenAI request.",
+      "type": "number",
+      "stability": "development",
+      "examples": ["0"]
+    },
+    "gen_ai.request.top_p": {
+      "description": "The top_p sampling setting for the GenAI request.",
+      "type": "number",
+      "stability": "development",
+      "examples": ["1"]
+    },
+    "gen_ai.request.top_k": {
+      "description": "The top_k sampling setting for the GenAI request.",
+      "type": "number",
+      "stability": "development",
+      "examples": ["1"]
+    },
+    "gen_ai.request.stop_sequences": {
+      "description": "List of sequences that the model will use to stop generating further tokens.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["[\"forest\",\"lived\"]"]
+    },
+    "gen_ai.request.frequency_penalty": {
+      "description": "The frequency penalty setting for the GenAI request.",
+      "type": "number",
+      "stability": "development",
+      "examples": ["0.1"]
+    },
+    "gen_ai.request.presence_penalty": {
+      "description": "The presence penalty setting for the GenAI request.",
+      "type": "number",
+      "stability": "development",
+      "examples": ["0.1"]
+    },
+    "gen_ai.request.encoding_formats": {
+      "description": "The encoding formats requested in an embeddings operation, if specified.",
+      "type": "string",
+      "note": "In some GenAI systems the encoding formats are called embedding types. Also, some GenAI systems only accept a single format per request.\n",
+      "stability": "development",
+      "examples": ["[\"base64\"]", "[\"float\",\"binary\"]"]
+    },
+    "gen_ai.request.seed": {
+      "description": "Requests with same seed value more likely to return same result.",
+      "type": "number",
+      "stability": "development",
+      "examples": ["100"]
+    },
+    "gen_ai.response.id": {
+      "description": "The unique identifier for the completion.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["chatcmpl-123"]
+    },
+    "gen_ai.response.model": {
+      "description": "The name of the model that generated the response.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["gpt-4-0613"]
+    },
+    "gen_ai.response.finish_reasons": {
+      "description": "Array of reasons the model stopped generating tokens, corresponding to each generation received.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["[\"stop\"]", "[\"stop\",\"length\"]"]
+    },
+    "gen_ai.usage.input_tokens": {
+      "description": "The number of tokens used in the GenAI input (prompt).",
+      "type": "number",
+      "stability": "development",
+      "examples": ["100"]
+    },
+    "gen_ai.usage.output_tokens": {
+      "description": "The number of tokens used in the GenAI response (completion).",
+      "type": "number",
+      "stability": "development",
+      "examples": ["180"]
+    },
+    "gen_ai.token.type": {
+      "description": "The type of token being counted.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["input", "output", "output"]
+    },
+    "gen_ai.conversation.id": {
+      "description": "The unique identifier for a conversation (session, thread), used to store and correlate messages within this conversation.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["conv_5j66UpCpwteGg4YSxUnt7lPY"]
+    },
+    "gen_ai.agent.id": {
+      "description": "The unique identifier of the GenAI agent.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["asst_5j66UpCpwteGg4YSxUnt7lPY"]
+    },
+    "gen_ai.agent.name": {
+      "description": "Human-readable name of the GenAI agent provided by the application.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["Math Tutor", "Fiction Writer"]
+    },
+    "gen_ai.agent.description": {
+      "description": "Free-form description of the GenAI agent provided by the application.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["Helps with math problems", "Generates fiction stories"]
+    },
+    "gen_ai.tool.name": {
+      "description": "Name of the tool utilized by the agent.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["Flights"]
+    },
+    "gen_ai.tool.call.id": {
+      "description": "The tool call identifier.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["call_mszuSIzqtI65i1wAUOE8w5H4"]
+    },
+    "gen_ai.tool.description": {
+      "description": "The tool description.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["Multiply two numbers"]
+    },
+    "gen_ai.tool.type": {
+      "description": "Type of the tool utilized by the agent",
+      "type": "string",
+      "note": "Extension: A tool executed on the agent-side to directly call external APIs, bridging the gap between the agent and real-world systems.\n  Agent-side operations involve actions that are performed by the agent on the server or within the agent's controlled environment.\nFunction: A tool executed on the client-side, where the agent generates parameters for a predefined function, and the client executes the logic.\n  Client-side operations are actions taken on the user's end or within the client application.\nDatastore: A tool used by the agent to access and query structured or unstructured external data for retrieval-augmented tasks or knowledge updates.\n",
+      "stability": "development",
+      "examples": ["function", "extension", "datastore"]
+    },
+    "gen_ai.data_source.id": {
+      "description": "The data source identifier.",
+      "type": "string",
+      "note": "Data sources are used by AI agents and RAG applications to store grounding data. A data source may be an external database, object store, document collection, website, or any other storage system used by the GenAI agent or application. The `gen_ai.data_source.id` SHOULD match the identifier used by the GenAI system rather than a name specific to the external storage, such as a database or object store. Semantic conventions referencing `gen_ai.data_source.id` MAY also leverage additional attributes, such as `db.*`, to further identify and describe the data source.\n",
+      "stability": "development",
+      "examples": ["H7STPQYOND"]
+    },
+    "gen_ai.operation.name": {
+      "description": "The name of the operation being performed.",
+      "type": "string",
+      "note": "If one of the predefined values applies, but specific system uses a different name it's RECOMMENDED to document it in the semantic conventions for specific GenAI system and use system-specific name in the instrumentation. If a different name is not documented, instrumentation libraries SHOULD use applicable predefined value.\n",
+      "stability": "development",
+      "examples": [
+        "chat",
+        "generate_content",
+        "text_completion",
+        "embeddings",
+        "create_agent",
+        "invoke_agent",
+        "execute_tool"
+      ]
+    },
+    "gen_ai.output.type": {
+      "description": "Represents the content type requested by the client.",
+      "type": "string",
+      "note": "This attribute SHOULD be used when the client requests output of a specific type. The model may return zero or more outputs of this type.\nThis attribute specifies the output modality and not the actual output format. For example, if an image is requested, the actual output could be a URL pointing to an image file.\nAdditional output format details may be recorded in the future in the `gen_ai.output.{type}.*` attributes.\n",
+      "stability": "development",
+      "examples": ["text", "json", "image", "speech"]
+    }
+  }
+}

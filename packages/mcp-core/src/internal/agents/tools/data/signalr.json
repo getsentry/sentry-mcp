@@ -1,0 +1,18 @@
+{
+  "namespace": "signalr",
+  "description": "SignalR attributes",
+  "attributes": {
+    "signalr.connection.status": {
+      "description": "SignalR HTTP connection closure status.",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["normal_closure", "timeout", "app_shutdown"]
+    },
+    "signalr.transport": {
+      "description": "[SignalR transport type](https://github.com/dotnet/aspnetcore/blob/main/src/SignalR/docs/specs/TransportProtocols.md)",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["server_sent_events", "long_polling", "web_sockets"]
+    }
+  }
+}

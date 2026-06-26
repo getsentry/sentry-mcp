@@ -1,0 +1,33 @@
+import { describe, it, expect } from "vitest";
+import createTeam from "./create-team.js";
+
+describe("create_team", () => {
+  it("serializes", async () => {
+    const result = await createTeam.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        name: "the-goats",
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# New Team in **sentry-mcp-evals**
+
+      **ID**: 4509109078196224
+      **Slug**: the-goats
+      **Name**: the-goats
+
+      ## Response Notes
+
+      - Please tell the user the team slug.
+      "
+    `);
+  });
+});

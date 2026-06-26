@@ -1,0 +1,147 @@
+{
+  "namespace": "network",
+  "description": "These attributes may be used for any network related operation.\n",
+  "attributes": {
+    "network.carrier.icc": {
+      "description": "The ISO 3166-1 alpha-2 2-character country code associated with the mobile carrier network.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["DE"]
+    },
+    "network.carrier.mcc": {
+      "description": "The mobile carrier country code.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["310"]
+    },
+    "network.carrier.mnc": {
+      "description": "The mobile carrier network code.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["001"]
+    },
+    "network.carrier.name": {
+      "description": "The name of the mobile carrier.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["sprint"]
+    },
+    "network.connection.subtype": {
+      "description": "This describes more details regarding the connection.type. It may be the type of cell technology connection, but it could be used for describing details about a wifi connection.",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "gprs",
+        "edge",
+        "umts",
+        "cdma",
+        "evdo_0",
+        "evdo_a",
+        "cdma2000_1xrtt",
+        "hsdpa",
+        "hsupa",
+        "hspa",
+        "iden",
+        "evdo_b",
+        "lte",
+        "ehrpd",
+        "hspap",
+        "gsm",
+        "td_scdma",
+        "iwlan",
+        "nr",
+        "nrnsa",
+        "lte_ca"
+      ]
+    },
+    "network.connection.type": {
+      "description": "The internet connection type.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["wifi", "wired", "cell", "unavailable", "unknown"]
+    },
+    "network.local.address": {
+      "description": "Local address of the network connection - IP address or Unix domain socket name.",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["10.1.2.80", "/tmp/my.sock"]
+    },
+    "network.local.port": {
+      "description": "Local port number of the network connection.",
+      "type": "number",
+      "stability": "stable",
+      "examples": ["65123"]
+    },
+    "network.peer.address": {
+      "description": "Peer address of the network connection - IP address or Unix domain socket name.",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["10.1.2.80", "/tmp/my.sock"]
+    },
+    "network.peer.port": {
+      "description": "Peer port number of the network connection.",
+      "type": "number",
+      "stability": "stable",
+      "examples": ["65123"]
+    },
+    "network.protocol.name": {
+      "description": "[OSI application layer](https://wikipedia.org/wiki/Application_layer) or non-OSI equivalent.",
+      "type": "string",
+      "note": "The value SHOULD be normalized to lowercase.",
+      "stability": "stable",
+      "examples": ["amqp", "http", "mqtt"]
+    },
+    "network.protocol.version": {
+      "description": "The actual version of the protocol used for network communication.",
+      "type": "string",
+      "note": "If protocol version is subject to negotiation (for example using [ALPN](https://www.rfc-editor.org/rfc/rfc7301.html)), this attribute SHOULD be set to the negotiated version. If the actual protocol version is not known, this attribute SHOULD NOT be set.\n",
+      "stability": "stable",
+      "examples": ["1.1", "2"]
+    },
+    "network.transport": {
+      "description": "[OSI transport layer](https://wikipedia.org/wiki/Transport_layer) or [inter-process communication method](https://wikipedia.org/wiki/Inter-process_communication).\n",
+      "type": "string",
+      "note": "The value SHOULD be normalized to lowercase.\n\nConsider always setting the transport when setting a port number, since\na port number is ambiguous without knowing the transport. For example\ndifferent processes could be listening on TCP port 12345 and UDP port 12345.\n",
+      "stability": "stable",
+      "examples": ["tcp", "udp", "pipe", "unix", "quic"]
+    },
+    "network.type": {
+      "description": "[OSI network layer](https://wikipedia.org/wiki/Network_layer) or non-OSI equivalent.",
+      "type": "string",
+      "note": "The value SHOULD be normalized to lowercase.",
+      "stability": "stable",
+      "examples": ["ipv4", "ipv6"]
+    },
+    "network.io.direction": {
+      "description": "The network IO operation direction.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["transmit", "receive"]
+    },
+    "network.interface.name": {
+      "description": "The network interface name.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["lo", "eth0"]
+    },
+    "network.connection.state": {
+      "description": "The state of network connection",
+      "type": "string",
+      "note": "Connection states are defined as part of the [rfc9293](https://datatracker.ietf.org/doc/html/rfc9293#section-3.3.2)",
+      "stability": "development",
+      "examples": [
+        "closed",
+        "close_wait",
+        "closing",
+        "established",
+        "fin_wait_1",
+        "fin_wait_2",
+        "last_ack",
+        "listen",
+        "syn_received",
+        "syn_sent",
+        "time_wait"
+      ]
+    }
+  }
+}

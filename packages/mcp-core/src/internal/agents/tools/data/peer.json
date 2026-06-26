@@ -1,0 +1,12 @@
+{
+  "namespace": "peer",
+  "description": "Operations that access some remote service.\n",
+  "attributes": {
+    "peer.service": {
+      "description": "The [`service.name`](/docs/resource/README.md#service) of the remote service. SHOULD be equal to the actual `service.name` resource attribute of the remote service if any.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["AuthTokenCache"]
+    }
+  }
+}

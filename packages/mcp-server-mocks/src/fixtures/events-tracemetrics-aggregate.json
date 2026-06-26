@@ -1,0 +1,36 @@
+{
+  "data": [
+    {
+      "transaction": "GET /api/users",
+      "p95(value,http.request.duration,distribution,millisecond)": 320,
+      "count(value,http.request.duration,distribution,millisecond)": 42
+    },
+    {
+      "transaction": "GET /api/teams",
+      "p95(value,http.request.duration,distribution,millisecond)": 180,
+      "count(value,http.request.duration,distribution,millisecond)": 27
+    }
+  ],
+  "meta": {
+    "fields": {
+      "transaction": "string",
+      "p95(value,http.request.duration,distribution,millisecond)": "duration",
+      "count(value,http.request.duration,distribution,millisecond)": "integer"
+    },
+    "units": {
+      "transaction": null,
+      "p95(value,http.request.duration,distribution,millisecond)": "millisecond",
+      "count(value,http.request.duration,distribution,millisecond)": null
+    },
+    "isMetricsData": true,
+    "isMetricsExtractedData": true,
+    "tips": {},
+    "datasetReason": "unchanged",
+    "dataset": "tracemetrics",
+    "dataScanned": "full",
+    "accuracy": {
+      "confidence": [{}, {}]
+    }
+  },
+  "confidence": [{}, {}]
+}

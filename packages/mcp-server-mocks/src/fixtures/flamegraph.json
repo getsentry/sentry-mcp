@@ -1,0 +1,86 @@
+{
+  "activeProfileIndex": 0,
+  "platform": "python",
+  "projectID": 4509062593708032,
+  "transactionName": "/api/users",
+  "profiles": [
+    {
+      "endValue": 100,
+      "isMainThread": true,
+      "name": "main",
+      "samples": [
+        [0, 1, 2],
+        [0, 1]
+      ],
+      "sample_counts": [50, 30],
+      "sample_durations_ns": [100000000, 60000000],
+      "weights": [100, 60],
+      "startValue": 0,
+      "threadID": 1,
+      "type": "sampled",
+      "unit": "nanoseconds"
+    }
+  ],
+  "shared": {
+    "frames": [
+      {
+        "file": "main.py",
+        "name": "handle_request",
+        "line": 10,
+        "is_application": true,
+        "fingerprint": 1001
+      },
+      {
+        "file": "utils.py",
+        "name": "fetch_data",
+        "line": 25,
+        "is_application": true,
+        "fingerprint": 1002
+      },
+      {
+        "file": "psycopg2/pool.py",
+        "name": "execute",
+        "line": 100,
+        "is_application": false,
+        "fingerprint": 1003
+      }
+    ],
+    "frame_infos": [
+      {
+        "count": 80,
+        "weight": 160,
+        "sumDuration": 160000000,
+        "sumSelfTime": 0,
+        "p75Duration": 50000000,
+        "p95Duration": 80000000,
+        "p99Duration": 120000000
+      },
+      {
+        "count": 80,
+        "weight": 160,
+        "sumDuration": 160000000,
+        "sumSelfTime": 20000000,
+        "p75Duration": 40000000,
+        "p95Duration": 70000000,
+        "p99Duration": 100000000
+      },
+      {
+        "count": 50,
+        "weight": 100,
+        "sumDuration": 100000000,
+        "sumSelfTime": 100000000,
+        "p75Duration": 50000000,
+        "p95Duration": 90000000,
+        "p99Duration": 200000000
+      }
+    ],
+    "profiles": [
+      {
+        "project_id": 4509062593708032,
+        "profile_id": "profile-abc123",
+        "start": 1706054400000,
+        "end": 1706054400160
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "namespace": "android",
+  "description": "The Android platform on which the Android application is running.\n",
+  "attributes": {
+    "android.os.api_level": {
+      "description": "Uniquely identifies the framework API revision offered by a version (`os.version`) of the android operating system. More information can be found [here](https://developer.android.com/guide/topics/manifest/uses-sdk-element#ApiLevels).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["33", "32"]
+    },
+    "android.app.state": {
+      "description": "This attribute represents the state of the application.\n",
+      "type": "string",
+      "note": "The Android lifecycle states are defined in [Activity lifecycle callbacks](https://developer.android.com/guide/components/activities/activity-lifecycle#lc), and from which the `OS identifiers` are derived.\n",
+      "stability": "development",
+      "examples": ["created", "background", "foreground"]
+    }
+  }
+}

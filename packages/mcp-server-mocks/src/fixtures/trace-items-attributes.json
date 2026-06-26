@@ -1,0 +1,134 @@
+[
+  {
+    "key": "span.op",
+    "name": "Span Operation"
+  },
+  {
+    "key": "span.description",
+    "name": "Span Description"
+  },
+  {
+    "key": "span.status",
+    "name": "Span Status"
+  },
+  {
+    "key": "span.duration",
+    "name": "Span Duration"
+  },
+  {
+    "key": "transaction",
+    "name": "Transaction"
+  },
+  {
+    "key": "transaction.op",
+    "name": "Transaction Operation"
+  },
+  {
+    "key": "transaction.duration",
+    "name": "Transaction Duration"
+  },
+  {
+    "key": "transaction.status",
+    "name": "Transaction Status"
+  },
+  {
+    "key": "project",
+    "name": "Project"
+  },
+  {
+    "key": "environment",
+    "name": "Environment"
+  },
+  {
+    "key": "release",
+    "name": "Release"
+  },
+  {
+    "key": "user.id",
+    "name": "User ID"
+  },
+  {
+    "key": "user.email",
+    "name": "User Email"
+  },
+  {
+    "key": "user.username",
+    "name": "Username"
+  },
+  {
+    "key": "error.type",
+    "name": "Error Type"
+  },
+  {
+    "key": "error.value",
+    "name": "Error Value"
+  },
+  {
+    "key": "error.handled",
+    "name": "Error Handled"
+  },
+  {
+    "key": "message",
+    "name": "Message"
+  },
+  {
+    "key": "level",
+    "name": "Level"
+  },
+  {
+    "key": "platform",
+    "name": "Platform"
+  },
+  {
+    "key": "sdk.name",
+    "name": "SDK Name"
+  },
+  {
+    "key": "sdk.version",
+    "name": "SDK Version"
+  },
+  {
+    "key": "http.method",
+    "name": "HTTP Method"
+  },
+  {
+    "key": "http.status_code",
+    "name": "HTTP Status Code"
+  },
+  {
+    "key": "http.url",
+    "name": "HTTP URL"
+  },
+  {
+    "key": "browser.name",
+    "name": "Browser Name"
+  },
+  {
+    "key": "os.name",
+    "name": "OS Name"
+  },
+  {
+    "key": "device",
+    "name": "Device"
+  },
+  {
+    "key": "geo.country_code",
+    "name": "Country Code"
+  },
+  {
+    "key": "geo.region",
+    "name": "Geographic Region"
+  },
+  {
+    "key": "geo.city",
+    "name": "City"
+  },
+  {
+    "key": "custom.tier",
+    "name": "Customer Tier"
+  },
+  {
+    "key": "custom.feature_flag",
+    "name": "Feature Flag"
+  }
+]

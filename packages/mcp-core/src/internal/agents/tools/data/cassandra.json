@@ -1,0 +1,53 @@
+{
+  "namespace": "cassandra",
+  "description": "This section defines attributes for Cassandra.\n",
+  "attributes": {
+    "cassandra.coordinator.dc": {
+      "description": "The data center of the coordinating node for a query.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["us-west-2"]
+    },
+    "cassandra.coordinator.id": {
+      "description": "The ID of the coordinating node for a query.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["be13faa2-8574-4d71-926d-27f16cf8a7af"]
+    },
+    "cassandra.consistency.level": {
+      "description": "The consistency level of the query. Based on consistency values from [CQL](https://docs.datastax.com/en/cassandra-oss/3.0/cassandra/dml/dmlConfigConsistency.html).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "all",
+        "each_quorum",
+        "quorum",
+        "local_quorum",
+        "one",
+        "two",
+        "three",
+        "local_one",
+        "any",
+        "serial",
+        "local_serial"
+      ]
+    },
+    "cassandra.query.idempotent": {
+      "description": "Whether or not the query is idempotent.\n",
+      "type": "boolean",
+      "stability": "development"
+    },
+    "cassandra.page.size": {
+      "description": "The fetch size used for paging, i.e. how many rows will be returned at once.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["5000"]
+    },
+    "cassandra.speculative_execution.count": {
+      "description": "The number of times a query was speculatively executed. Not set or `0` if the query was not executed speculatively.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["0", "2"]
+    }
+  }
+}

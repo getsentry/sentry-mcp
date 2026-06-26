@@ -1,0 +1,65 @@
+{
+  "namespace": "jvm",
+  "description": "This document defines Java Virtual machine related attributes.\n",
+  "attributes": {
+    "jvm.gc.action": {
+      "description": "Name of the garbage collector action.",
+      "type": "string",
+      "note": "Garbage collector action is generally obtained via [GarbageCollectionNotificationInfo#getGcAction()](https://docs.oracle.com/en/java/javase/11/docs/api/jdk.management/com/sun/management/GarbageCollectionNotificationInfo.html#getGcAction()).\n",
+      "stability": "stable",
+      "examples": ["end of minor GC", "end of major GC"]
+    },
+    "jvm.gc.cause": {
+      "description": "Name of the garbage collector cause.",
+      "type": "string",
+      "note": "Garbage collector cause is generally obtained via [GarbageCollectionNotificationInfo#getGcCause()](https://docs.oracle.com/en/java/javase/11/docs/api/jdk.management/com/sun/management/GarbageCollectionNotificationInfo.html#getGcCause()).\n",
+      "stability": "development",
+      "examples": ["System.gc()", "Allocation Failure"]
+    },
+    "jvm.gc.name": {
+      "description": "Name of the garbage collector.",
+      "type": "string",
+      "note": "Garbage collector name is generally obtained via [GarbageCollectionNotificationInfo#getGcName()](https://docs.oracle.com/en/java/javase/11/docs/api/jdk.management/com/sun/management/GarbageCollectionNotificationInfo.html#getGcName()).\n",
+      "stability": "stable",
+      "examples": ["G1 Young Generation", "G1 Old Generation"]
+    },
+    "jvm.memory.type": {
+      "description": "The type of memory.",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["heap", "non_heap"]
+    },
+    "jvm.memory.pool.name": {
+      "description": "Name of the memory pool.",
+      "type": "string",
+      "note": "Pool names are generally obtained via [MemoryPoolMXBean#getName()](https://docs.oracle.com/en/java/javase/11/docs/api/java.management/java/lang/management/MemoryPoolMXBean.html#getName()).\n",
+      "stability": "stable",
+      "examples": ["G1 Old Gen", "G1 Eden space", "G1 Survivor Space"]
+    },
+    "jvm.thread.daemon": {
+      "description": "Whether the thread is daemon or not.",
+      "type": "boolean",
+      "stability": "stable"
+    },
+    "jvm.thread.state": {
+      "description": "State of the thread.",
+      "type": "string",
+      "stability": "stable",
+      "examples": [
+        "new",
+        "runnable",
+        "blocked",
+        "waiting",
+        "timed_waiting",
+        "terminated"
+      ]
+    },
+    "jvm.buffer.pool.name": {
+      "description": "Name of the buffer pool.",
+      "type": "string",
+      "note": "Pool names are generally obtained via [BufferPoolMXBean#getName()](https://docs.oracle.com/en/java/javase/11/docs/api/java.management/java/lang/management/BufferPoolMXBean.html#getName()).\n",
+      "stability": "development",
+      "examples": ["mapped", "direct"]
+    }
+  }
+}

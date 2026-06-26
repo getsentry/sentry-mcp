@@ -1,0 +1,129 @@
+{
+  "namespace": "messaging",
+  "description": "Attributes describing telemetry around messaging systems and messaging activities.",
+  "attributes": {
+    "messaging.batch.message_count": {
+      "description": "The number of messages sent, received, or processed in the scope of the batching operation.",
+      "type": "number",
+      "note": "Instrumentations SHOULD NOT set `messaging.batch.message_count` on spans that operate with a single message. When a messaging client library supports both batch and single-message API for the same operation, instrumentations SHOULD use `messaging.batch.message_count` for batching APIs and SHOULD NOT use it for single-message APIs.\n",
+      "stability": "development",
+      "examples": ["0", "1", "2"]
+    },
+    "messaging.client.id": {
+      "description": "A unique identifier for the client that consumes or produces a message.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["client-5", "myhost@8742@s8083jm"]
+    },
+    "messaging.consumer.group.name": {
+      "description": "The name of the consumer group with which a consumer is associated.\n",
+      "type": "string",
+      "note": "Semantic conventions for individual messaging systems SHOULD document whether `messaging.consumer.group.name` is applicable and what it means in the context of that system.\n",
+      "stability": "development",
+      "examples": ["my-group", "indexer"]
+    },
+    "messaging.destination.name": {
+      "description": "The message destination name",
+      "type": "string",
+      "note": "Destination name SHOULD uniquely identify a specific queue, topic or other entity within the broker. If\nthe broker doesn't have such notion, the destination name SHOULD uniquely identify the broker.\n",
+      "stability": "development",
+      "examples": ["MyQueue", "MyTopic"]
+    },
+    "messaging.destination.subscription.name": {
+      "description": "The name of the destination subscription from which a message is consumed.",
+      "type": "string",
+      "note": "Semantic conventions for individual messaging systems SHOULD document whether `messaging.destination.subscription.name` is applicable and what it means in the context of that system.\n",
+      "stability": "development",
+      "examples": ["subscription-a"]
+    },
+    "messaging.destination.template": {
+      "description": "Low cardinality representation of the messaging destination name",
+      "type": "string",
+      "note": "Destination names could be constructed from templates. An example would be a destination name involving a user name or product id. Although the destination name in this case is of high cardinality, the underlying template is of low cardinality and can be effectively used for grouping and aggregation.\n",
+      "stability": "development",
+      "examples": ["/customers/{customerId}"]
+    },
+    "messaging.destination.anonymous": {
+      "description": "A boolean that is true if the message destination is anonymous (could be unnamed or have auto-generated name).",
+      "type": "boolean",
+      "stability": "development"
+    },
+    "messaging.destination.temporary": {
+      "description": "A boolean that is true if the message destination is temporary and might not exist anymore after messages are processed.",
+      "type": "boolean",
+      "stability": "development"
+    },
+    "messaging.destination.partition.id": {
+      "description": "The identifier of the partition messages are sent to or received from, unique within the `messaging.destination.name`.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["1"]
+    },
+    "messaging.message.conversation_id": {
+      "description": "The conversation ID identifying the conversation to which the message belongs, represented as a string. Sometimes called \"Correlation ID\".\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["MyConversationId"]
+    },
+    "messaging.message.envelope.size": {
+      "description": "The size of the message body and metadata in bytes.\n",
+      "type": "number",
+      "note": "This can refer to both the compressed or uncompressed size. If both sizes are known, the uncompressed\nsize should be used.\n",
+      "stability": "development",
+      "examples": ["2738"]
+    },
+    "messaging.message.id": {
+      "description": "A value used by the messaging system as an identifier for the message, represented as a string.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["452a7c7c7c7048c2f887f61572b18fc2"]
+    },
+    "messaging.message.body.size": {
+      "description": "The size of the message body in bytes.\n",
+      "type": "number",
+      "note": "This can refer to both the compressed or uncompressed body size. If both sizes are known, the uncompressed\nbody size should be used.\n",
+      "stability": "development",
+      "examples": ["1439"]
+    },
+    "messaging.operation.type": {
+      "description": "A string identifying the type of the messaging operation.\n",
+      "type": "string",
+      "note": "If a custom value is used, it MUST be of low cardinality.",
+      "stability": "development",
+      "examples": [
+        "create",
+        "send",
+        "receive",
+        "process",
+        "settle",
+        "deliver",
+        "publish"
+      ]
+    },
+    "messaging.operation.name": {
+      "description": "The system-specific name of the messaging operation.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["ack", "nack", "send"]
+    },
+    "messaging.system": {
+      "description": "The messaging system as identified by the client instrumentation.",
+      "type": "string",
+      "note": "The actual messaging system may differ from the one known by the client. For example, when using Kafka client libraries to communicate with Azure Event Hubs, the `messaging.system` is set to `kafka` based on the instrumentation's best knowledge.\n",
+      "stability": "development",
+      "examples": [
+        "activemq",
+        "aws_sqs",
+        "eventgrid",
+        "eventhubs",
+        "servicebus",
+        "gcp_pubsub",
+        "jms",
+        "kafka",
+        "rabbitmq",
+        "rocketmq",
+        "pulsar"
+      ]
+    }
+  }
+}

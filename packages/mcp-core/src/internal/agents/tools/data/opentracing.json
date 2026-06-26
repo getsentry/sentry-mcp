@@ -1,0 +1,13 @@
+{
+  "namespace": "opentracing",
+  "description": "Attributes used by the OpenTracing Shim layer.",
+  "attributes": {
+    "opentracing.ref_type": {
+      "description": "Parent-child Reference type",
+      "type": "string",
+      "note": "The causal relationship between a child Span and a parent Span.\n",
+      "stability": "development",
+      "examples": ["child_of", "follows_from"]
+    }
+  }
+}

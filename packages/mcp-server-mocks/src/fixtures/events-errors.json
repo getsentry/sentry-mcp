@@ -1,0 +1,33 @@
+{
+  "data": [
+    {
+      "issue.id": 6114575469,
+      "title": "Error: Tool list_organizations is already registered",
+      "project": "test-suite",
+      "count()": 2,
+      "last_seen()": "2025-04-07T12:23:39+00:00",
+      "issue": "CLOUDFLARE-MCP-41"
+    }
+  ],
+  "meta": {
+    "fields": {
+      "issue.id": "integer",
+      "title": "string",
+      "project": "string",
+      "count()": "integer",
+      "last_seen()": "date"
+    },
+    "units": {
+      "issue.id": null,
+      "title": null,
+      "project": null,
+      "count()": null,
+      "last_seen()": null
+    },
+    "isMetricsData": false,
+    "isMetricsExtractedData": false,
+    "tips": { "query": null, "columns": null },
+    "datasetReason": "unchanged",
+    "dataset": "errors"
+  }
+}

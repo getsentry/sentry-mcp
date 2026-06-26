@@ -1,0 +1,80 @@
+import { describe, it, expect } from "vitest";
+import createProject from "./create-project.js";
+
+describe("create_project", () => {
+  it("serializes", async () => {
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: "the-goats",
+        name: "cloudflare-mcp",
+        platform: "node",
+        regionUrl: null,
+        repository: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# New Project in **sentry-mcp-evals**
+
+      **ID**: 4509109104082945
+      **Slug**: cloudflare-mcp
+      **Name**: cloudflare-mcp
+      **SENTRY_DSN**: https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945
+
+      ## Response Notes
+
+      - Please tell the user the project slug and **SENTRY_DSN**.
+      - The **SENTRY_DSN** value is used to initialize Sentry SDKs.
+      "
+    `);
+  });
+
+  it("links repository when provided", async () => {
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: "the-goats",
+        name: "cloudflare-mcp",
+        platform: "node",
+        regionUrl: null,
+        repository: "getsentry/sentry",
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+    expect(result).toContain("**Repository**: getsentry/sentry (linked)");
+  });
+
+  it("reports when repository is not found", async () => {
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: "the-goats",
+        name: "cloudflare-mcp",
+        platform: "node",
+        regionUrl: null,
+        repository: "nonexistent/repo",
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+    expect(result).toContain('Could not find repository "nonexistent/repo"');
+  });
+});

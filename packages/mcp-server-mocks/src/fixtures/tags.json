@@ -1,0 +1,97 @@
+[
+  {
+    "key": "transaction",
+    "name": "Transaction",
+    "uniqueValues": 1080
+  },
+  {
+    "key": "runtime.name",
+    "name": "Runtime.Name",
+    "uniqueValues": 1080
+  },
+  {
+    "key": "level",
+    "name": "Level",
+    "uniqueValues": 1144
+  },
+  {
+    "key": "device",
+    "name": "Device",
+    "uniqueValues": 25
+  },
+  {
+    "key": "os",
+    "name": "OS",
+    "uniqueValues": 1133
+  },
+  {
+    "key": "user",
+    "name": "User",
+    "uniqueValues": 1080
+  },
+  {
+    "key": "runtime",
+    "name": "Runtime",
+    "uniqueValues": 1080
+  },
+  {
+    "key": "release",
+    "name": "Release",
+    "uniqueValues": 1135
+  },
+  {
+    "key": "url",
+    "name": "URL",
+    "uniqueValues": 1080
+  },
+  {
+    "key": "uptime_rule",
+    "name": "Uptime Rule",
+    "uniqueValues": 9
+  },
+  {
+    "key": "server_name",
+    "name": "Server",
+    "uniqueValues": 1080
+  },
+  {
+    "key": "browser",
+    "name": "Browser",
+    "uniqueValues": 56
+  },
+  {
+    "key": "os.name",
+    "name": "Os.Name",
+    "uniqueValues": 1135
+  },
+  {
+    "key": "device.family",
+    "name": "Device.Family",
+    "uniqueValues": 25
+  },
+  {
+    "key": "replayId",
+    "name": "Replayid",
+    "uniqueValues": 55
+  },
+  {
+    "key": "client_os.name",
+    "name": "Client Os.Name",
+    "uniqueValues": 1
+  },
+  {
+    "key": "environment",
+    "name": "Environment",
+    "uniqueValues": 1144
+  },
+  {
+    "key": "service",
+    "name": "Service",
+    "uniqueValues": 1135
+  },
+  {
+    "key": "browser.name",
+    "name": "Browser.Name",
+    "uniqueValues": 56
+  }
+]

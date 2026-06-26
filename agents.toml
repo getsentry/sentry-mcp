@@ -1,0 +1,45 @@
+version = 1
+agents = ["claude", "cursor", "codex"]
+
+[trust]
+allow_all = true
+
+[[skills]]
+name = "agents-md"
+source = "getsentry/skills"
+
+[[skills]]
+name = "commit"
+source = "getsentry/skills"
+
+[[skills]]
+name = "code-simplifier"
+source = "getsentry/skills"
+
+[[skills]]
+name = "brand-guidelines"
+source = "getsentry/skills"
+
+[[skills]]
+name = "claude-settings-audit"
+source = "getsentry/skills"
+
+[[skills]]
+name = "pr-writer"
+source = "getsentry/skills"
+
+[[skills]]
+name = "skill-writer"
+source = "getsentry/skills"
+
+[[skills]]
+name = "iterate-pr"
+source = "getsentry/skills"
+
+[[mcp]]
+name = "sentry"
+url = "https://mcp.sentry.dev/mcp/sentry/mcp-server?experimental=1"
+
+[[mcp]]
+name = "sentry-dev"
+url = "http://localhost:5173/mcp/sentry/mcp-server?experimental=1"

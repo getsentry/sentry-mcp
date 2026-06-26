@@ -1,0 +1,38 @@
+{
+  "name": "@sentry/mcp-test-client",
+  "version": "0.36.0",
+  "private": true,
+  "type": "module",
+  "description": "CLI tool to test the Sentry MCP server",
+  "bin": {
+    "sentry-mcp-test-client": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "start": "tsx src/index.ts",
+    "test-client": "node dist/index.js",
+    "test": "vitest run",
+    "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "catalog:",
+    "@ai-sdk/openai": "catalog:",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@sentry/core": "catalog:",
+    "@sentry/mcp-core": "workspace:*",
+    "@sentry/node": "catalog:",
+    "ai": "catalog:",
+    "chalk": "catalog:",
+    "commander": "catalog:",
+    "dotenv": "catalog:",
+    "open": "catalog:"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

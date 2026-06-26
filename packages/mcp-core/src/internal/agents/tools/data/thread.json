@@ -1,0 +1,18 @@
+{
+  "namespace": "thread",
+  "description": "These attributes may be used for any operation to store information about a thread that started a span.\n",
+  "attributes": {
+    "thread.id": {
+      "description": "Current \"managed\" thread ID (as opposed to OS thread ID).\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["42"]
+    },
+    "thread.name": {
+      "description": "Current thread name.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["main"]
+    }
+  }
+}

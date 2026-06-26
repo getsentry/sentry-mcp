@@ -1,0 +1,41 @@
+{
+  "namespace": "test",
+  "description": "This group describes attributes specific to [software tests](https://wikipedia.org/wiki/Software_testing).\n",
+  "attributes": {
+    "test.suite.name": {
+      "description": "The human readable name of a [test suite](https://wikipedia.org/wiki/Test_suite).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["TestSuite1"]
+    },
+    "test.suite.run.status": {
+      "description": "The status of the test suite run.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "success",
+        "failure",
+        "skipped",
+        "aborted",
+        "timed_out",
+        "in_progress"
+      ]
+    },
+    "test.case.name": {
+      "description": "The fully qualified human readable name of the [test case](https://wikipedia.org/wiki/Test_case).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "org.example.TestCase1.test1",
+        "example/tests/TestCase1.test1",
+        "ExampleTestCase1_test1"
+      ]
+    },
+    "test.case.result.status": {
+      "description": "The status of the actual test case result from test execution.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["pass", "fail"]
+    }
+  }
+}

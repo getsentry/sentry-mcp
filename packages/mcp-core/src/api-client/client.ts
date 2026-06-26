@@ -1,0 +1,4402 @@
+import { z } from "zod";
+import {
+  getContinuousProfileUrl as getContinuousProfileUrlUtil,
+  getAIConversationsUrl as getAIConversationsUrlUtil,
+  getAIConversationUrl as getAIConversationUrlUtil,
+  getDashboardUrl as getDashboardUrlUtil,
+  getIssueUrl as getIssueUrlUtil,
+  getMonitorUrl as getMonitorUrlUtil,
+  getPreprodSnapshotUrl as getPreprodSnapshotUrlUtil,
+  getProfileUrl as getProfileUrlUtil,
+  getProfilingExplorerUrl,
+  getReleaseUrl as getReleaseUrlUtil,
+  getReplayUrl as getReplayUrlUtil,
+  getReplaysSearchUrl as getReplaysSearchUrlUtil,
+  getTraceMetricsExploreUrl,
+  getTraceUrl as getTraceUrlUtil,
+  isSentryHost,
+  type DashboardUrlOptions,
+  type TraceMetricIdentifier,
+} from "../utils/url-utils";
+import { isNumericId } from "../utils/slug-validation";
+import {
+  isMetricsDataset,
+  isProfilesDataset,
+  normalizeEventsDataset,
+  type EventsDataset,
+} from "../utils/events-datasets";
+import { logIssue, logWarn } from "../telem/logging";
+import {
+  OrganizationListSchema,
+  OrganizationSchema,
+  ClientKeySchema,
+  TeamListSchema,
+  TeamSchema,
+  ProjectListSchema,
+  ProjectRepoLinkSchema,
+  ProjectSchema,
+  CommitListSchema,
+  DeployListSchema,
+  MonitorCheckInListSchema,
+  MonitorListSchema,
+  MonitorSchema,
+  MonitorStatsSchema,
+  RepositoryListSchema,
+  ReleaseDetailsSchema,
+  ReleaseListSchema,
+  IssueActivityListResponseSchema,
+  IssueCommentListSchema,
+  IssueCommentSchema,
+  IssueListSchema,
+  IssueSchema,
+  IssueTagValuesSchema,
+  ExternalIssueListSchema,
+  EventSchema,
+  EventAttachmentListSchema,
+  ErrorsSearchResponseSchema,
+  SpansSearchResponseSchema,
+  TagListSchema,
+  ApiErrorSchema,
+  ClientKeyListSchema,
+  AutofixRunSchema,
+  AutofixRunStateSchema,
+  DashboardListSchema,
+  DashboardSchema,
+  TraceMetaSchema,
+  TraceSchema,
+  UserSchema,
+  UserRegionsSchema,
+  IssueAlertRuleListSchema,
+  MetricAlertRuleListSchema,
+  MetricAlertRuleSchema,
+  FlamegraphSchema,
+  ProfileChunkResponseSchema,
+  TransactionProfileSchema,
+  ReplayDetailsSchema,
+  ReplayListResponseSchema,
+  ReplayIdsByResourceSchema,
+  ReplayRecordingSegmentsSchema,
+  AIConversationSummaryListSchema,
+  AIConversationSpanListSchema,
+} from "./schema";
+import { ConfigurationError } from "../errors";
+import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
+import { USER_AGENT } from "../version";
+import type { SentryProtocol } from "../types";
+import type {
+  AutofixRun,
+  AutofixRunState,
+  ClientKey,
+  ClientKeyList,
+  Dashboard,
+  DashboardListItem,
+  Event,
+  EventAttachment,
+  EventAttachmentList,
+  Issue,
+  IssueActivityList,
+  IssueAlertRule,
+  IssueAlertRuleList,
+  IssueComment,
+  IssueCommentList,
+  IssueList,
+  IssueTagValues,
+  ExternalIssueList,
+  CommitList,
+  DeployList,
+  Monitor,
+  MonitorCheckInList,
+  MonitorList,
+  MonitorStats,
+  MetricAlertRule,
+  MetricAlertRuleList,
+  OrganizationList,
+  Project,
+  ProjectList,
+  ReleaseDetails,
+  ReleaseList,
+  TagList,
+  Team,
+  TeamList,
+  Trace,
+  TraceMeta,
+  User,
+  Flamegraph,
+  ProfileChunk,
+  TransactionProfile,
+  ReplayDetails,
+  ReplayList,
+  ReplayRecordingSegments,
+  AIConversationSummary,
+  AIConversationSpanList,
+} from "./types";
+// TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
+// logger isnt exposed (or rather, it is, but its not the right logger)
+// import { logger } from "@sentry/node";
+
+const SENTRY_MCP_SEARCH_EVENTS_REFERRER = "api.mcp.search-events";
+
+/**
+ * Mapping of common network error codes to user-friendly messages.
+ * These help users understand and resolve connection issues.
+ */
+const NETWORK_ERROR_MESSAGES: Record<string, string> = {
+  EAI_AGAIN: "DNS temporarily unavailable. Check your internet connection.",
+  ENOTFOUND: "Hostname not found. Verify the URL is correct.",
+  ECONNREFUSED: "Connection refused. Ensure the service is accessible.",
+  ETIMEDOUT: "Connection timed out. Check network connectivity.",
+  ECONNRESET: "Connection reset. Try again in a moment.",
+};
+
+function normalizeStatsPeriod(statsPeriod?: string): string | undefined {
+  const normalized = statsPeriod?.trim();
+  return normalized || undefined;
+}
+
+function formatWorkflowNameQuery(query: string): string {
+  const escapedQuery = query.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `name:"*${escapedQuery}*"`;
+}
+
+// Workflow projectSlug responses can include unattached org-level workflows.
+function filterAttachedIssueAlertRules(
+  rules: IssueAlertRuleList,
+): IssueAlertRuleList {
+  return rules.filter((rule) => (rule.detectorIds ?? []).length > 0);
+}
+
+function parseStatsPeriod(statsPeriod: string): {
+  amount: number;
+  unit: string;
+} {
+  const match = /^(\d+)([smhdw])$/.exec(statsPeriod);
+  if (!match) {
+    throw new ApiValidationError(
+      "statsPeriod must use a supported relative time format, such as `24h`, `7d`, or `2w`.",
+    );
+  }
+  return {
+    amount: Number(match[1]),
+    unit: match[2],
+  };
+}
+
+function getNextCursor(linkHeader: string | null): string | null {
+  if (!linkHeader) {
+    return null;
+  }
+
+  for (const link of linkHeader.split(",")) {
+    if (!link.includes('rel="next"') || !link.includes('results="true"')) {
+      continue;
+    }
+
+    const cursorMatch = link.match(/cursor="([^"]+)"/);
+    if (cursorMatch?.[1]) {
+      return cursorMatch[1];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Custom error class for Sentry API responses.
+ *
+ * Provides enhanced error messages for LLM consumption and handles
+ * common API error scenarios with user-friendly messaging.
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   await apiService.listIssues({ organizationSlug: "invalid" });
+ * } catch (error) {
+ *   if (error instanceof ApiError) {
+ *     console.log(`API Error ${error.status}: ${error.message}`);
+ *   }
+ * }
+ * ```
+ */
+
+type RequestOptions = {
+  host?: string;
+};
+
+export type TraceItemType = "spans" | "logs" | "tracemetrics";
+
+type ClientKeyRateLimit = {
+  window: number;
+  count: number;
+};
+
+type ClientKeyDynamicSdkLoaderOptions = {
+  hasReplay?: boolean;
+  hasPerformance?: boolean;
+  hasDebug?: boolean;
+  hasFeedback?: boolean;
+  hasLogsAndMetrics?: boolean;
+};
+
+type UpdateClientKeyRequest = {
+  name?: string;
+  isActive?: boolean;
+  rateLimit?: ClientKeyRateLimit | null;
+  browserSdkVersion?: string;
+  dynamicSdkLoaderOptions?: ClientKeyDynamicSdkLoaderOptions;
+};
+export type TraceItemAttributeType = "string" | "number" | "boolean";
+export type TraceItemAttributeSourceType = "sentry" | "user";
+
+export type TraceItemAttributeSource = {
+  source_type: TraceItemAttributeSourceType;
+  is_transformed_alias?: boolean;
+};
+
+export type TraceItemAttribute = {
+  key: string;
+  name: string;
+  type: TraceItemAttributeType;
+  attributeSource?: TraceItemAttributeSource;
+  secondaryAliases?: string[];
+};
+
+export type TraceItemAttributeValidationResult = {
+  valid: boolean;
+  type?: TraceItemAttributeType;
+  error?: string;
+};
+
+export type EventsValidationIssue = {
+  valid: boolean;
+  error?: string;
+};
+
+export type EventsNamedValidationIssue = {
+  name: string;
+  valid: boolean;
+  error?: string;
+};
+
+export type EventsAttributeValidationResult = {
+  name: string;
+  valid: boolean;
+  type?: TraceItemAttributeType;
+  error?: string;
+};
+
+export type EventsQueryValidation = {
+  valid: boolean;
+  error?: string;
+  fields: EventsAttributeValidationResult[];
+};
+
+export type EventsValidationResult = {
+  valid: boolean;
+  projects: EventsValidationIssue[];
+  dataset: EventsNamedValidationIssue[];
+  environment: EventsValidationIssue[];
+  field: EventsAttributeValidationResult[];
+  query: EventsQueryValidation;
+  orderby: EventsAttributeValidationResult[];
+};
+
+function parseEventsValidationIssue(
+  value: unknown,
+): EventsValidationIssue | null {
+  if (!isRecord(value) || typeof value.valid !== "boolean") {
+    return null;
+  }
+  const issue: EventsValidationIssue = { valid: value.valid };
+  if (typeof value.error === "string" && value.error.length > 0) {
+    issue.error = value.error;
+  }
+  return issue;
+}
+
+function parseEventsAttributeValidation(
+  value: unknown,
+): EventsAttributeValidationResult | null {
+  if (
+    !isRecord(value) ||
+    typeof value.name !== "string" ||
+    typeof value.valid !== "boolean"
+  ) {
+    return null;
+  }
+  const result: EventsAttributeValidationResult = {
+    name: value.name,
+    valid: value.valid,
+  };
+  if (isTraceItemAttributeType(value.attrType)) {
+    result.type = value.attrType;
+  }
+  if (typeof value.error === "string" && value.error.length > 0) {
+    result.error = value.error;
+  }
+  return result;
+}
+
+function parseEventsValidationIssues(value: unknown): EventsValidationIssue[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map(parseEventsValidationIssue)
+    .filter((issue): issue is EventsValidationIssue => issue !== null);
+}
+
+function parseEventsAttributeValidations(
+  value: unknown,
+): EventsAttributeValidationResult[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map(parseEventsAttributeValidation)
+    .filter((item): item is EventsAttributeValidationResult => item !== null);
+}
+
+function parseEventsNamedValidationIssue(
+  value: unknown,
+): EventsNamedValidationIssue | null {
+  if (
+    !isRecord(value) ||
+    typeof value.name !== "string" ||
+    typeof value.valid !== "boolean"
+  ) {
+    return null;
+  }
+  const issue: EventsNamedValidationIssue = {
+    name: value.name,
+    valid: value.valid,
+  };
+  if (typeof value.error === "string" && value.error.length > 0) {
+    issue.error = value.error;
+  }
+  return issue;
+}
+
+function parseEventsNamedValidationIssues(
+  value: unknown,
+): EventsNamedValidationIssue[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map(parseEventsNamedValidationIssue)
+    .filter((issue): issue is EventsNamedValidationIssue => issue !== null);
+}
+
+function parseEventsQueryValidation(value: unknown): EventsQueryValidation {
+  if (!isRecord(value) || typeof value.valid !== "boolean") {
+    return { valid: false, fields: [] };
+  }
+  const query: EventsQueryValidation = {
+    valid: value.valid,
+    fields: parseEventsAttributeValidations(value.fields),
+  };
+  if (typeof value.error === "string" && value.error.length > 0) {
+    query.error = value.error;
+  }
+  return query;
+}
+
+function parseEventsValidationResponse(body: unknown): EventsValidationResult {
+  if (!isRecord(body)) {
+    return {
+      valid: false,
+      projects: [],
+      dataset: [],
+      environment: [],
+      field: [],
+      query: { valid: false, fields: [] },
+      orderby: [],
+    };
+  }
+
+  return {
+    valid: typeof body.valid === "boolean" ? body.valid : false,
+    projects: parseEventsValidationIssues(body.projects),
+    dataset: parseEventsNamedValidationIssues(body.dataset),
+    environment: parseEventsValidationIssues(body.environment),
+    field: parseEventsAttributeValidations(body.field),
+    query: parseEventsQueryValidation(body.query),
+    orderby: parseEventsAttributeValidations(body.orderby),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isTraceItemAttributeType(
+  value: unknown,
+): value is TraceItemAttributeType {
+  return value === "string" || value === "number" || value === "boolean";
+}
+
+function isTraceItemAttributeSourceType(
+  value: unknown,
+): value is TraceItemAttributeSourceType {
+  return value === "sentry" || value === "user";
+}
+
+function parseTraceItemAttributeSource(
+  value: unknown,
+): TraceItemAttributeSource | undefined {
+  if (!isRecord(value) || !isTraceItemAttributeSourceType(value.source_type)) {
+    return undefined;
+  }
+
+  const source: TraceItemAttributeSource = { source_type: value.source_type };
+  if (typeof value.is_transformed_alias === "boolean") {
+    source.is_transformed_alias = value.is_transformed_alias;
+  }
+  return source;
+}
+
+function parseTraceItemAttributes(
+  body: unknown,
+  fallbackType: TraceItemAttributeType,
+): TraceItemAttribute[] {
+  if (!Array.isArray(body)) {
+    return [];
+  }
+
+  const attributes: TraceItemAttribute[] = [];
+  for (const value of body) {
+    if (!isRecord(value) || typeof value.key !== "string") {
+      continue;
+    }
+
+    const attribute: TraceItemAttribute = {
+      key: value.key,
+      name: typeof value.name === "string" ? value.name : value.key,
+      type: isTraceItemAttributeType(value.attributeType)
+        ? value.attributeType
+        : fallbackType,
+    };
+
+    const attributeSource = parseTraceItemAttributeSource(
+      value.attributeSource,
+    );
+    if (attributeSource) {
+      attribute.attributeSource = attributeSource;
+    }
+    if (Array.isArray(value.secondaryAliases)) {
+      attribute.secondaryAliases = value.secondaryAliases.filter(
+        (alias): alias is string => typeof alias === "string",
+      );
+    }
+    attributes.push(attribute);
+  }
+
+  return attributes;
+}
+
+/**
+ * Sentry API client service for interacting with Sentry's REST API.
+ *
+ * This service provides a comprehensive interface to Sentry's API endpoints,
+ * handling authentication, error processing, multi-region support, and
+ * response validation through Zod schemas.
+ *
+ * Key Features:
+ * - Multi-region support for Sentry SaaS and self-hosted instances
+ * - Automatic schema validation with Zod
+ * - Enhanced error handling with LLM-friendly messages
+ * - URL generation for Sentry resources (issues, traces)
+ * - Bearer token authentication
+ * - Uses HTTPS by default, with opt-in HTTP for self-hosted stdio deployments
+ *
+ * @example Basic Usage
+ * ```typescript
+ * const apiService = new SentryApiService({
+ *   accessToken: "your-token",
+ *   host: "sentry.io"
+ * });
+ *
+ * const orgs = await apiService.listOrganizations();
+ * const issues = await apiService.listIssues({
+ *   organizationSlug: "my-org",
+ *   query: "is:unresolved"
+ * });
+ * ```
+ *
+ * @example Multi-Region Support
+ * ```typescript
+ * // Self-hosted instance with hostname
+ * const selfHosted = new SentryApiService({
+ *   accessToken: "token",
+ *   host: "sentry.company.com"
+ * });
+ *
+ * // Regional endpoint override
+ * const issues = await apiService.listIssues(
+ *   { organizationSlug: "org" },
+ *   { host: "eu.sentry.io" }
+ * );
+ * ```
+ */
+export class SentryApiService {
+  private accessToken: string | null;
+  private clientId: string | null;
+  private clientName: string | null;
+  private clientFamily: string | null;
+  protected host: string;
+  protected protocol: SentryProtocol;
+  protected apiPrefix: string;
+
+  /**
+   * Creates a new Sentry API service instance.
+   *
+   * Uses HTTPS by default. Stdio may opt into HTTP for self-hosted deployments.
+   *
+   * @param config Configuration object
+   * @param config.accessToken OAuth access token for authentication (optional for some endpoints)
+   * @param config.host Sentry hostname (e.g. "sentry.io", "sentry.example.com")
+   * @param config.clientId DCR-registered OAuth client ID
+   * @param config.clientName DCR-registered OAuth client name
+   * @param config.clientFamily Bucketed client family (e.g. "claude-code", "cursor")
+   */
+  constructor({
+    accessToken = null,
+    host = "sentry.io",
+    protocol = "https",
+    clientId = null,
+    clientName = null,
+    clientFamily = null,
+  }: {
+    accessToken?: string | null;
+    host?: string;
+    protocol?: SentryProtocol;
+    clientId?: string | null;
+    clientName?: string | null;
+    clientFamily?: string | null;
+  }) {
+    this.accessToken = accessToken;
+    this.clientId = clientId;
+    this.clientName = clientName;
+    this.clientFamily = clientFamily;
+    this.host = host;
+    this.protocol = protocol;
+    this.apiPrefix = `${protocol}://${host}/api/0`;
+  }
+
+  /**
+   * Updates the host for API requests.
+   *
+   * Used for multi-region support or switching between Sentry instances.
+   * Preserves the configured URL scheme.
+   *
+   * @param host New hostname to use for API requests
+   */
+  setHost(host: string) {
+    this.host = host;
+    this.apiPrefix = `${this.protocol}://${this.host}/api/0`;
+  }
+
+  /**
+   * Checks if the current host is Sentry SaaS (sentry.io).
+   *
+   * Used to determine API endpoint availability and URL formats.
+   * Self-hosted instances may not have all endpoints available.
+   *
+   * @returns True if using Sentry SaaS, false for self-hosted instances
+   */
+  private isSaas(): boolean {
+    return isSentryHost(this.host);
+  }
+
+  /**
+   * Validates and applies time parameters to a URLSearchParams object.
+   *
+   * Enforces mutual exclusivity between relative (statsPeriod) and
+   * absolute (start/end) time ranges, and ensures start/end are paired.
+   *
+   * @param queryParams The URLSearchParams to modify
+   * @param statsPeriod Relative time period (e.g., "24h", "7d")
+   * @param start Absolute start time (ISO 8601)
+   * @param end Absolute end time (ISO 8601)
+   * @throws {ApiValidationError} If time parameters are invalid
+   */
+  private applyTimeParams(
+    queryParams: URLSearchParams,
+    statsPeriod?: string,
+    start?: string,
+    end?: string,
+  ): void {
+    if (statsPeriod && (start || end)) {
+      throw new ApiValidationError(
+        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
+      );
+    }
+    if ((start && !end) || (!start && end)) {
+      throw new ApiValidationError(
+        "Both start and end parameters must be provided together for absolute time ranges.",
+      );
+    }
+    if (statsPeriod) {
+      queryParams.set("statsPeriod", statsPeriod);
+    } else if (start && end) {
+      queryParams.set("start", start);
+      queryParams.set("end", end);
+    }
+  }
+
+  private applyStatsMixinTimeParams(
+    queryParams: URLSearchParams,
+    statsPeriod?: string,
+    start?: string,
+    end?: string,
+    resolutionSeconds?: number,
+  ): void {
+    if (statsPeriod && (start || end)) {
+      throw new ApiValidationError(
+        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
+      );
+    }
+    if ((start && !end) || (!start && end)) {
+      throw new ApiValidationError(
+        "Both start and end parameters must be provided together for absolute time ranges.",
+      );
+    }
+
+    let since: number;
+    let until: number;
+
+    if (start && end) {
+      const startMs = Date.parse(start);
+      const endMs = Date.parse(end);
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+        throw new ApiValidationError(
+          "start and end parameters must be valid ISO 8601 date strings.",
+        );
+      }
+      since = Math.floor(startMs / 1000);
+      until = Math.floor(endMs / 1000);
+    } else {
+      const period = statsPeriod ?? "24h";
+      const { amount, unit } = parseStatsPeriod(period);
+      let unitSeconds: number;
+      switch (unit) {
+        case "s":
+          unitSeconds = 1;
+          break;
+        case "m":
+          unitSeconds = 60;
+          break;
+        case "h":
+          unitSeconds = 60 * 60;
+          break;
+        case "d":
+          unitSeconds = 60 * 60 * 24;
+          break;
+        case "w":
+          unitSeconds = 60 * 60 * 24 * 7;
+          break;
+        default:
+          throw new ApiValidationError(
+            "statsPeriod must use a supported relative time format, such as `24h`, `7d`, or `2w`.",
+          );
+      }
+      until = Math.floor(Date.now() / 1000);
+      since = until - amount * unitSeconds;
+    }
+
+    queryParams.set("since", String(since));
+    queryParams.set("until", String(until));
+    if (resolutionSeconds !== undefined) {
+      queryParams.set("resolution", `${resolutionSeconds}s`);
+    }
+  }
+
+  /**
+   * Internal method for making authenticated requests to Sentry API.
+   *
+   * Handles:
+   * - Bearer token authentication
+   * - Error response parsing and enhancement
+   * - Multi-region host overrides
+   * - Fetch availability validation
+   *
+   * @param path API endpoint path (without /api/0 prefix)
+   * @param options Fetch options
+   * @param requestOptions Additional request configuration
+   * @returns Promise resolving to Response object
+   * @throws {ApiError} Enhanced API errors with user-friendly messages
+   * @throws {Error} Network or parsing errors
+   */
+  private async request(
+    path: string,
+    options: RequestInit = {},
+    { host, allowStatuses }: { host?: string; allowStatuses?: number[] } = {},
+  ): Promise<Response> {
+    const url = host
+      ? `${this.protocol}://${host}/api/0${path}`
+      : `${this.apiPrefix}${path}`;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "User-Agent": USER_AGENT,
+    };
+    if (this.accessToken) {
+      headers.Authorization = `Bearer ${this.accessToken}`;
+    }
+    if (this.clientId) {
+      headers["X-Sentry-MCP-Client-Id"] = this.clientId;
+    }
+    if (this.clientName) {
+      headers["X-Sentry-MCP-Client-Name"] = this.clientName;
+    }
+    if (this.clientFamily) {
+      headers["X-Sentry-MCP-Client-Family"] = this.clientFamily;
+    }
+
+    // Check if fetch is available, otherwise provide a helpful error message
+    if (typeof globalThis.fetch === "undefined") {
+      throw new ConfigurationError(
+        "fetch is not available. Please use Node.js >= 18 or ensure fetch is available in your environment.",
+      );
+    }
+
+    // logger.info(logger.fmt`[sentryApi] ${options.method || "GET"} ${url}`);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+      });
+    } catch (error) {
+      // Extract the root cause from the error chain
+      let rootCause = error;
+      while (rootCause instanceof Error && rootCause.cause) {
+        rootCause = rootCause.cause;
+      }
+
+      const errorMessage =
+        rootCause instanceof Error ? rootCause.message : String(rootCause);
+
+      let friendlyMessage = `Unable to connect to ${url}`;
+
+      // Check if we have a specific message for this error
+      const errorCode = Object.keys(NETWORK_ERROR_MESSAGES).find((code) =>
+        errorMessage.includes(code),
+      );
+
+      if (errorCode) {
+        friendlyMessage += ` - ${NETWORK_ERROR_MESSAGES[errorCode]}`;
+      } else {
+        friendlyMessage += ` - ${errorMessage}`;
+      }
+
+      // DNS resolution failures and connection timeouts to custom hosts are configuration issues
+      if (
+        errorCode === "ENOTFOUND" ||
+        errorCode === "EAI_AGAIN" ||
+        errorCode === "ECONNREFUSED" ||
+        errorCode === "ETIMEDOUT" ||
+        errorMessage.includes("Connect Timeout Error")
+      ) {
+        throw new ConfigurationError(friendlyMessage, { cause: error });
+      }
+
+      throw new Error(friendlyMessage, { cause: error });
+    }
+
+    // Handle error responses generically
+    if (!response.ok) {
+      if (allowStatuses?.includes(response.status)) {
+        return response;
+      }
+      const errorText = await response.text();
+      let parsed: unknown | undefined;
+      try {
+        parsed = JSON.parse(errorText);
+      } catch (error) {
+        // If we can't parse JSON, check if it's HTML (server error)
+        if (errorText.includes("<!DOCTYPE") || errorText.includes("<html")) {
+          logWarn("Received HTML error page instead of JSON", {
+            loggerScope: ["api", "client"],
+            extra: {
+              status: response.status,
+              statusText: response.statusText,
+              host: this.host,
+              path,
+              parseErrorMessage:
+                error instanceof Error ? error.message : String(error),
+            },
+          });
+          // HTML response instead of JSON typically indicates a server configuration issue
+          throw createApiError(
+            `Server error: Received HTML instead of JSON (${response.status} ${response.statusText}). This may indicate an invalid URL or server issue.`,
+            response.status,
+            errorText,
+            undefined,
+          );
+        }
+        logWarn("Failed to parse JSON error response", {
+          loggerScope: ["api", "client"],
+          extra: {
+            status: response.status,
+            statusText: response.statusText,
+            host: this.host,
+            path,
+            bodyPreview:
+              errorText.length > 256
+                ? `${errorText.slice(0, 253)}…`
+                : errorText,
+            parseErrorMessage:
+              error instanceof Error ? error.message : String(error),
+          },
+        });
+      }
+
+      if (parsed) {
+        const { data, success, error } = ApiErrorSchema.safeParse(parsed);
+
+        if (success) {
+          // Use the new error factory to create the appropriate error type
+          throw createApiError(
+            data.detail,
+            response.status,
+            data.detail,
+            parsed,
+          );
+        }
+
+        logWarn("Failed to parse validated API error response", {
+          loggerScope: ["api", "client"],
+          extra: {
+            status: response.status,
+            statusText: response.statusText,
+            host: this.host,
+            path,
+            bodyPreview:
+              errorText.length > 256
+                ? `${errorText.slice(0, 253)}…`
+                : errorText,
+            validationErrorMessage:
+              error instanceof Error ? error.message : String(error),
+          },
+        });
+      }
+
+      // Use the error factory to create the appropriate error type based on status
+      throw createApiError(
+        `API request failed: ${response.statusText}\n${errorText}`,
+        response.status,
+        errorText,
+        undefined,
+      );
+    }
+
+    return response;
+  }
+
+  /**
+   * Safely parses a JSON response, checking Content-Type header first.
+   *
+   * @param response The Response object from fetch
+   * @returns Promise resolving to the parsed JSON object
+   * @throws {Error} If response is not JSON or parsing fails
+   */
+  private async parseJsonResponse(response: Response): Promise<unknown> {
+    // Handle case where response might not have all properties (e.g., in tests or promise chains)
+    if (!response.headers?.get) {
+      return response.json();
+    }
+
+    const contentType = response.headers.get("content-type");
+
+    // Check if the response is JSON
+    if (!contentType || !contentType.includes("application/json")) {
+      const responseText = await response.text();
+
+      // Check if it's HTML
+      if (
+        contentType?.includes("text/html") ||
+        responseText.includes("<!DOCTYPE") ||
+        responseText.includes("<html")
+      ) {
+        // HTML when expecting JSON usually indicates authentication or routing issues
+        throw new Error(
+          `Expected JSON response but received HTML (${response.status} ${response.statusText}). This may indicate you're not authenticated, the URL is incorrect, or there's a server issue.`,
+        );
+      }
+
+      // Generic non-JSON error
+      throw new Error(
+        `Expected JSON response but received ${contentType || "unknown content type"} ` +
+          `(${response.status} ${response.statusText})`,
+      );
+    }
+
+    try {
+      return await response.json();
+    } catch (error) {
+      // JSON parsing failure after successful response
+      throw new Error(
+        `Failed to parse JSON response: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Makes a request to the Sentry API and parses the JSON response.
+   *
+   * This is the primary method for API calls that expect JSON responses.
+   * It automatically validates Content-Type and provides helpful error messages
+   * for common issues like authentication failures or server errors.
+   *
+   * @param path API endpoint path (without /api/0 prefix)
+   * @param options Fetch options
+   * @param requestOptions Additional request configuration
+   * @returns Promise resolving to the parsed JSON response
+   * @throws {ApiError} Enhanced API errors with user-friendly messages
+   * @throws {Error} Network, parsing, or validation errors
+   */
+  private async requestJSON(
+    path: string,
+    options: RequestInit = {},
+    requestOptions?: { host?: string },
+  ): Promise<unknown> {
+    const response = await this.request(path, options, requestOptions);
+    return this.parseJsonResponse(response);
+  }
+
+  /**
+   * Generates a Sentry issue URL for browser navigation.
+   *
+   * Handles both SaaS (subdomain-based) and self-hosted URL formats.
+   * Uses the configured protocol.
+   *
+   * @param organizationSlug Organization identifier
+   * @param issueId Issue identifier (short ID or numeric ID)
+   * @returns Full URL to the issue in Sentry UI
+   *
+   * @example
+   * ```typescript
+   * // SaaS: https://my-org.sentry.io/issues/PROJ-123
+   * apiService.getIssueUrl("my-org", "PROJ-123")
+   *
+   * // Self-hosted: https://sentry.company.com/organizations/my-org/issues/PROJ-123
+   * apiService.getIssueUrl("my-org", "PROJ-123")
+   * ```
+   */
+  getIssueUrl(organizationSlug: string, issueId: string): string {
+    return getIssueUrlUtil(this.host, organizationSlug, issueId, this.protocol);
+  }
+
+  /**
+   * Generates a Sentry trace URL for performance investigation.
+   *
+   * Uses the configured protocol.
+   *
+   * @param organizationSlug Organization identifier
+   * @param traceId Trace identifier (hex string)
+   * @returns Full URL to the trace in Sentry UI
+   *
+   * @example
+   * ```typescript
+   * const traceUrl = apiService.getTraceUrl("my-org", "6a477f5b0f31ef7b6b9b5e1dea66c91d");
+   * // https://my-org.sentry.io/explore/traces/trace/6a477f5b0f31ef7b6b9b5e1dea66c91d
+   * ```
+   */
+  getTraceUrl(organizationSlug: string, traceId: string): string {
+    return getTraceUrlUtil(this.host, organizationSlug, traceId, this.protocol);
+  }
+
+  getReplayUrl(organizationSlug: string, replayId: string): string {
+    return getReplayUrlUtil(
+      this.host,
+      organizationSlug,
+      replayId,
+      this.protocol,
+    );
+  }
+
+  getAIConversationUrl(
+    organizationSlug: string,
+    conversationId: string,
+  ): string {
+    return getAIConversationUrlUtil(
+      this.host,
+      organizationSlug,
+      conversationId,
+      this.protocol,
+    );
+  }
+
+  /** Builds the Sentry UI URL for the AI Conversations list with optional filters. */
+  getAIConversationsUrl(
+    organizationSlug: string,
+    options?: {
+      query?: string;
+      project?: string[];
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+    },
+  ): string {
+    return getAIConversationsUrlUtil(
+      this.host,
+      organizationSlug,
+      options,
+      this.protocol,
+    );
+  }
+
+  getProfileUrl(
+    organizationSlug: string,
+    projectSlug: string,
+    profileId: string,
+  ): string {
+    return getProfileUrlUtil(
+      this.host,
+      organizationSlug,
+      projectSlug,
+      profileId,
+      this.protocol,
+    );
+  }
+
+  getContinuousProfileUrl(
+    organizationSlug: string,
+    projectSlug: string,
+    options: {
+      profilerId: string;
+      start: string;
+      end: string;
+    },
+  ): string {
+    return getContinuousProfileUrlUtil(
+      this.host,
+      organizationSlug,
+      projectSlug,
+      options,
+      this.protocol,
+    );
+  }
+
+  getReplaysSearchUrl(
+    organizationSlug: string,
+    options: Parameters<typeof getReplaysSearchUrlUtil>[2] = {},
+  ): string {
+    return getReplaysSearchUrlUtil(
+      this.host,
+      organizationSlug,
+      options,
+      this.protocol,
+    );
+  }
+
+  getMonitorUrl(
+    organizationSlug: string,
+    monitorSlug: string,
+    projectSlug?: string,
+  ): string {
+    return getMonitorUrlUtil(
+      this.host,
+      organizationSlug,
+      monitorSlug,
+      this.protocol,
+      projectSlug,
+    );
+  }
+
+  getReleaseUrl(organizationSlug: string, releaseVersion: string): string {
+    return getReleaseUrlUtil(
+      this.host,
+      organizationSlug,
+      releaseVersion,
+      this.protocol,
+    );
+  }
+
+  getDashboardUrl(
+    organizationSlug: string,
+    dashboardId: string,
+    options: DashboardUrlOptions = {},
+  ): string {
+    return getDashboardUrlUtil(
+      this.host,
+      organizationSlug,
+      dashboardId,
+      options,
+      this.protocol,
+    );
+  }
+
+  getIssueAlertRuleUrl(
+    organizationSlug: string,
+    ruleId: string | number,
+  ): string {
+    const encodedRuleId = encodeURIComponent(String(ruleId));
+    if (this.isSaas()) {
+      return `${this.protocol}://${organizationSlug}.sentry.io/monitors/alerts/${encodedRuleId}/`;
+    }
+    return `${this.protocol}://${this.host}/organizations/${organizationSlug}/monitors/alerts/${encodedRuleId}/`;
+  }
+
+  getMetricAlertRuleUrl(
+    organizationSlug: string,
+    ruleId: string | number,
+  ): string {
+    const encodedRuleId = encodeURIComponent(String(ruleId));
+    if (this.isSaas()) {
+      return `${this.protocol}://${organizationSlug}.sentry.io/issues/alerts/rules/details/${encodedRuleId}/`;
+    }
+    return `${this.protocol}://${this.host}/organizations/${organizationSlug}/issues/alerts/rules/details/${encodedRuleId}/`;
+  }
+
+  // ================================================================================
+  // URL BUILDERS FOR DIFFERENT SENTRY APIS
+  // ================================================================================
+
+  /**
+   * Builds a URL for the legacy Discover API (used by errors dataset).
+   *
+   * The Discover API is the older query interface that includes aggregate
+   * functions directly in the field list.
+   *
+   * @example
+   * // URL format: /explore/discover/homepage/?field=title&field=count_unique(user)
+   * buildDiscoverUrl("my-org", "level:error", "123", ["title", "count_unique(user)"], "-timestamp")
+   */
+  private buildDiscoverUrl(params: {
+    organizationSlug: string;
+    query: string;
+    projectId?: string;
+    fields?: string[];
+    sort?: string;
+    statsPeriod?: string;
+    start?: string;
+    end?: string;
+    aggregateFunctions?: string[];
+    groupByFields?: string[];
+  }): string {
+    const {
+      organizationSlug,
+      query,
+      projectId,
+      fields,
+      sort,
+      statsPeriod,
+      start,
+      end,
+      aggregateFunctions,
+      groupByFields,
+    } = params;
+
+    const urlParams = new URLSearchParams();
+
+    // Discover API specific parameters
+    urlParams.set("dataset", "errors");
+    urlParams.set("queryDataset", "error-events");
+    urlParams.set("query", query);
+
+    if (projectId) {
+      urlParams.set("project", projectId);
+    }
+
+    // Discover API includes aggregate functions directly in field list
+    if (fields && fields.length > 0) {
+      for (const field of fields) {
+        urlParams.append("field", field);
+      }
+    } else {
+      // Default fields for Discover
+      urlParams.append("field", "title");
+      urlParams.append("field", "project");
+      urlParams.append("field", "user.display");
+      urlParams.append("field", "timestamp");
+    }
+
+    urlParams.set("sort", sort || "-timestamp");
+
+    // Add time parameters - either statsPeriod or start/end
+    if (start && end) {
+      urlParams.set("start", start);
+      urlParams.set("end", end);
+    } else {
+      urlParams.set("statsPeriod", statsPeriod || "24h");
+    }
+
+    // Check if this is an aggregate query
+    const isAggregate = (aggregateFunctions?.length ?? 0) > 0;
+    if (isAggregate) {
+      urlParams.set("mode", "aggregate");
+      // For aggregate queries in Discover, set yAxis to the first aggregate function
+      if (aggregateFunctions && aggregateFunctions.length > 0) {
+        urlParams.set("yAxis", aggregateFunctions[0]);
+      }
+    } else {
+      urlParams.set("yAxis", "count()");
+    }
+
+    // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+    // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
+    const webHost = this.isSaas() ? "sentry.io" : this.host;
+    const path = this.isSaas()
+      ? `${this.protocol}://${organizationSlug}.${webHost}/explore/discover/homepage/`
+      : `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
+
+    return `${path}?${urlParams.toString()}`;
+  }
+
+  /**
+   * Builds a URL for the modern EAP (Event Analytics Platform) API used by spans/logs.
+   *
+   * The EAP API uses structured aggregate queries with separate aggregateField
+   * parameters containing JSON objects for groupBy and yAxes.
+   *
+   * @example
+   * // URL format: /explore/traces/?aggregateField={"groupBy":"span.op"}&aggregateField={"yAxes":["count()"]}
+   * buildEapUrl("my-org", "span.op:db", "123", ["span.op", "count()"], "-count()", ["count()"], ["span.op"])
+   */
+  private buildEapUrl(params: {
+    organizationSlug: string;
+    query: string;
+    dataset: "spans" | "logs";
+    projectId?: string;
+    fields?: string[];
+    sort?: string;
+    statsPeriod?: string;
+    start?: string;
+    end?: string;
+    aggregateFunctions?: string[];
+    groupByFields?: string[];
+  }): string {
+    const {
+      organizationSlug,
+      query,
+      dataset,
+      projectId,
+      fields,
+      sort,
+      statsPeriod,
+      start,
+      end,
+      aggregateFunctions,
+      groupByFields,
+    } = params;
+
+    const urlParams = new URLSearchParams();
+    urlParams.set("query", query);
+
+    if (projectId) {
+      urlParams.set("project", projectId);
+    }
+
+    // Determine if this is an aggregate query
+    const isAggregateQuery =
+      (aggregateFunctions?.length ?? 0) > 0 ||
+      fields?.some((field) => field.includes("(") && field.includes(")")) ||
+      false;
+
+    if (isAggregateQuery) {
+      // EAP API uses structured aggregate parameters
+      if (
+        (aggregateFunctions?.length ?? 0) > 0 ||
+        (groupByFields?.length ?? 0) > 0
+      ) {
+        // Add each groupBy field as a separate aggregateField parameter
+        if (groupByFields && groupByFields.length > 0) {
+          for (const field of groupByFields) {
+            urlParams.append(
+              "aggregateField",
+              JSON.stringify({ groupBy: field }),
+            );
+          }
+        }
+
+        // Add aggregate functions (yAxes)
+        if (aggregateFunctions && aggregateFunctions.length > 0) {
+          urlParams.append(
+            "aggregateField",
+            JSON.stringify({ yAxes: aggregateFunctions }),
+          );
+        }
+      } else {
+        // Fallback: parse fields to extract aggregate info
+        const parsedGroupByFields =
+          fields?.filter(
+            (field) => !field.includes("(") && !field.includes(")"),
+          ) || [];
+        const parsedAggregateFunctions =
+          fields?.filter(
+            (field) => field.includes("(") && field.includes(")"),
+          ) || [];
+
+        for (const field of parsedGroupByFields) {
+          urlParams.append(
+            "aggregateField",
+            JSON.stringify({ groupBy: field }),
+          );
+        }
+
+        if (parsedAggregateFunctions.length > 0) {
+          urlParams.append(
+            "aggregateField",
+            JSON.stringify({ yAxes: parsedAggregateFunctions }),
+          );
+        }
+      }
+
+      urlParams.set("mode", "aggregate");
+    } else {
+      // Non-aggregate query, add individual fields
+      if (fields && fields.length > 0) {
+        for (const field of fields) {
+          urlParams.append("field", field);
+        }
+      }
+    }
+
+    // Add sort parameter for all queries
+    if (sort) {
+      urlParams.set("sort", sort);
+    }
+
+    // Add time parameters - either statsPeriod or start/end
+    if (start && end) {
+      urlParams.set("start", start);
+      urlParams.set("end", end);
+    } else {
+      urlParams.set("statsPeriod", statsPeriod || "24h");
+    }
+
+    // Add table parameter for spans dataset (required for UI)
+    if (dataset === "spans") {
+      urlParams.set("table", "span");
+    }
+
+    const basePath = dataset === "logs" ? "logs" : "traces";
+    // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+    // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
+    const webHost = this.isSaas() ? "sentry.io" : this.host;
+    const path = this.isSaas()
+      ? `${this.protocol}://${organizationSlug}.${webHost}/explore/${basePath}/`
+      : `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/${basePath}/`;
+
+    return `${path}?${urlParams.toString()}`;
+  }
+
+  private extractTraceMetricsFromResults(
+    eventData?: Record<string, unknown>[],
+  ): TraceMetricIdentifier[] {
+    const metrics = new Map<string, TraceMetricIdentifier>();
+
+    for (const event of eventData ?? []) {
+      const name = event["metric.name"];
+      const type = event["metric.type"];
+      const rawUnit = event["metric.unit"];
+
+      if (typeof name !== "string" || typeof type !== "string") {
+        continue;
+      }
+
+      const unit =
+        typeof rawUnit === "string" && rawUnit !== "-" ? rawUnit : undefined;
+      const key = `${name}|${type}|${unit ?? ""}`;
+
+      if (!metrics.has(key)) {
+        metrics.set(key, { name, type, unit });
+      }
+    }
+
+    return [...metrics.values()];
+  }
+
+  /**
+   * Generates a Sentry events explorer URL for viewing search results.
+   *
+   * Routes to the appropriate API based on dataset:
+   * - Errors: Uses legacy Discover API
+   * - Spans/Logs: Uses modern EAP (Event Analytics Platform) API
+   * - Metrics: Uses the Metrics page URL format
+   *
+   * @param organizationSlug Organization identifier
+   * @param query Sentry search query
+   * @param projectId Optional project filter
+   * @param dataset Dataset type (spans, errors, logs, or metrics)
+   * @param fields Array of fields to include in results
+   * @param sort Sort parameter (e.g., "-timestamp", "-count()")
+   * @param aggregateFunctions Array of aggregate functions for aggregate queries
+   * @param groupByFields Array of fields to group by for aggregate queries
+   * @param statsPeriod Relative time period (e.g., "24h", "7d")
+   * @param start Absolute start time (ISO 8601)
+   * @param end Absolute end time (ISO 8601)
+   * @param eventData Optional event rows used to derive trace metric identity for metrics sample URLs
+   * @returns Full URL to the events explorer in Sentry UI
+   */
+  getEventsExplorerUrl(
+    organizationSlug: string,
+    query: string,
+    projectId?: string,
+    dataset: EventsDataset = "spans",
+    fields?: string[],
+    sort?: string,
+    aggregateFunctions?: string[],
+    groupByFields?: string[],
+    statsPeriod?: string,
+    start?: string,
+    end?: string,
+    eventData?: Record<string, unknown>[],
+  ): string {
+    if (dataset === "errors") {
+      // Route to legacy Discover API
+      return this.buildDiscoverUrl({
+        organizationSlug,
+        query,
+        projectId,
+        fields,
+        sort,
+        statsPeriod,
+        start,
+        end,
+        aggregateFunctions,
+        groupByFields,
+      });
+    }
+
+    if (isMetricsDataset(dataset)) {
+      return getTraceMetricsExploreUrl(
+        this.host,
+        organizationSlug,
+        {
+          query,
+          projectId,
+          sort,
+          statsPeriod,
+          start,
+          end,
+          aggregateFunctions,
+          groupByFields,
+          traceMetrics: this.extractTraceMetricsFromResults(eventData),
+        },
+        this.protocol,
+      );
+    }
+
+    if (isProfilesDataset(dataset)) {
+      return getProfilingExplorerUrl(
+        this.host,
+        organizationSlug,
+        {
+          query,
+          projectId,
+          fields,
+          sort,
+          statsPeriod,
+          start,
+          end,
+          aggregateFunctions,
+          groupByFields,
+        },
+        this.protocol,
+      );
+    }
+
+    // Route to modern EAP API (spans and logs)
+    return this.buildEapUrl({
+      organizationSlug,
+      query,
+      dataset,
+      projectId,
+      fields,
+      sort,
+      statsPeriod,
+      start,
+      end,
+      aggregateFunctions,
+      groupByFields,
+    });
+  }
+
+  /**
+   * Retrieves the authenticated user's profile information.
+   *
+   * @param opts Request options including host override
+   * @returns User profile data
+   * @throws {ApiError} If authentication fails or user not found
+   */
+  async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
+    // Auth endpoints only exist on the main API server, never on regional endpoints
+    let authHost: string | undefined;
+
+    if (this.isSaas()) {
+      // For SaaS, always use the main sentry.io host, not regional hosts
+      // This handles cases like us.sentry.io, eu.sentry.io, etc.
+      authHost = "sentry.io";
+    }
+    // For self-hosted, use the configured host (authHost remains undefined)
+
+    const body = await this.requestJSON("/auth/", undefined, {
+      ...opts,
+      host: authHost,
+    });
+    return UserSchema.parse(body);
+  }
+
+  /**
+   * Lists all organizations accessible to the authenticated user.
+   *
+   * Automatically handles multi-region queries by fetching from all
+   * available regions and combining results.
+   *
+   * @param params Query parameters
+   * @param params.query Search query to filter organizations by name/slug
+   * @param opts Request options
+   * @returns Array of organizations across all accessible regions (limited to 25 results)
+   *
+   * @example
+   * ```typescript
+   * const orgs = await apiService.listOrganizations();
+   * orgs.forEach(org => {
+   *   // regionUrl present for Cloud Service, empty for self-hosted
+   *   console.log(`${org.name} (${org.slug}) - ${org.links?.regionUrl || 'No region URL'}`);
+   * });
+   * ```
+   */
+  async listOrganizations(
+    params?: { query?: string },
+    opts?: RequestOptions,
+  ): Promise<OrganizationList> {
+    // Build query parameters
+    const queryParams = new URLSearchParams();
+    queryParams.set("per_page", "25");
+    if (params?.query) {
+      queryParams.set("query", params.query);
+    }
+    const queryString = queryParams.toString();
+    const path = `/organizations/?${queryString}`;
+
+    // For self-hosted instances, the regions endpoint doesn't exist
+    if (!this.isSaas()) {
+      const body = await this.requestJSON(path, undefined, opts);
+      return OrganizationListSchema.parse(body);
+    }
+
+    // For SaaS, try to use regions endpoint first
+    try {
+      // TODO: Sentry is currently not returning all orgs without hitting region endpoints
+      // The regions endpoint only exists on the main API server, not on regional endpoints
+      const regionsBody = await this.requestJSON(
+        "/users/me/regions/",
+        undefined,
+        {}, // Don't pass opts to ensure we use the main host
+      );
+      const regionData = UserRegionsSchema.parse(regionsBody);
+
+      const allOrganizations = (
+        await Promise.all(
+          regionData.regions.map(async (region) =>
+            this.requestJSON(path, undefined, {
+              ...opts,
+              host: new URL(region.url).host,
+            }),
+          ),
+        )
+      )
+        .map((data) => OrganizationListSchema.parse(data))
+        .reduce((acc, curr) => acc.concat(curr), []);
+
+      // Apply the limit after combining results from all regions
+      return allOrganizations.slice(0, 25);
+    } catch (error) {
+      // If regions endpoint fails (e.g., older self-hosted versions identifying as sentry.io),
+      // fall back to direct organizations endpoint
+      if (error instanceof ApiNotFoundError) {
+        // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
+        const body = await this.requestJSON(path, undefined, opts);
+        return OrganizationListSchema.parse(body);
+      }
+
+      // Re-throw other errors
+      throw error;
+    }
+  }
+
+  /**
+   * Gets a single organization by slug.
+   *
+   * @param organizationSlug Organization identifier
+   * @param opts Request options including host override
+   * @returns Organization data
+   */
+  async getOrganization(organizationSlug: string, opts?: RequestOptions) {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/`,
+      undefined,
+      opts,
+    );
+    return OrganizationSchema.parse(body);
+  }
+
+  /**
+   * Lists teams within an organization.
+   *
+   * @param organizationSlug Organization identifier
+   * @param params Query parameters
+   * @param params.query Search query to filter teams by name/slug
+   * @param opts Request options including host override
+   * @returns Array of teams in the organization (limited to 25 results)
+   */
+  async listTeams(
+    organizationSlug: string,
+    params?: { query?: string },
+    opts?: RequestOptions,
+  ): Promise<TeamList> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("per_page", "25");
+    if (params?.query) {
+      queryParams.set("query", params.query);
+    }
+    const queryString = queryParams.toString();
+    const path = `/organizations/${organizationSlug}/teams/?${queryString}`;
+
+    const body = await this.requestJSON(path, undefined, opts);
+    return TeamListSchema.parse(body);
+  }
+
+  /**
+   * Creates a new team within an organization.
+   *
+   * @param params Team creation parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.name Team name
+   * @param opts Request options
+   * @returns Created team data
+   * @throws {ApiError} If team creation fails (e.g., name conflicts)
+   */
+  async createTeam(
+    {
+      organizationSlug,
+      name,
+    }: {
+      organizationSlug: string;
+      name: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Team> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/teams/`,
+      {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      },
+      opts,
+    );
+    return TeamSchema.parse(body);
+  }
+
+  /**
+   * Lists projects within an organization.
+   *
+   * @param organizationSlug Organization identifier
+   * @param params Query parameters
+   * @param params.query Search query to filter projects by name/slug
+   * @param opts Request options
+   * @returns Array of projects in the organization (limited to 25 results)
+   */
+  async listProjects(
+    organizationSlug: string,
+    params?: { query?: string },
+    opts?: RequestOptions,
+  ): Promise<ProjectList> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("per_page", "25");
+    if (params?.query) {
+      queryParams.set("query", params.query);
+    }
+    const queryString = queryParams.toString();
+    const path = `/organizations/${organizationSlug}/projects/?${queryString}`;
+
+    const body = await this.requestJSON(path, undefined, opts);
+    return ProjectListSchema.parse(body);
+  }
+
+  async listDashboards(
+    {
+      organizationSlug,
+      query,
+      sortBy,
+      limit = 10,
+      cursor,
+    }: {
+      organizationSlug: string;
+      query?: string | null;
+      sortBy?: "title" | "-title" | "dateCreated" | "-dateCreated";
+      limit?: number;
+      cursor?: string | null;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ dashboards: DashboardListItem[]; nextCursor: string | null }> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("per_page", String(limit));
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (sortBy) {
+      queryParams.set("sort", sortBy);
+    }
+    if (cursor) {
+      queryParams.set("cursor", cursor);
+    }
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/dashboards/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+
+    return {
+      dashboards: DashboardListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async getDashboard(
+    {
+      organizationSlug,
+      dashboardId,
+    }: {
+      organizationSlug: string;
+      dashboardId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Dashboard> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/dashboards/${dashboardId}/`,
+      undefined,
+      opts,
+    );
+    return DashboardSchema.parse(body);
+  }
+
+  /**
+   * Gets a single project by slug or ID.
+   *
+   * @param params Project fetch parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlugOrId Project slug or numeric ID
+   * @param opts Request options
+   * @returns Project data
+   */
+  async getProject(
+    {
+      organizationSlug,
+      projectSlugOrId,
+    }: {
+      organizationSlug: string;
+      projectSlugOrId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Project> {
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlugOrId}/`,
+      undefined,
+      opts,
+    );
+    return ProjectSchema.parse(body);
+  }
+
+  /**
+   * Creates a new project within a team.
+   *
+   * @param params Project creation parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.teamSlug Team identifier
+   * @param params.name Project name
+   * @param params.platform Platform identifier (e.g., "javascript", "python")
+   * @param opts Request options
+   * @returns Created project data
+   */
+  async createProject(
+    {
+      organizationSlug,
+      teamSlug,
+      name,
+      platform,
+    }: {
+      organizationSlug: string;
+      teamSlug: string;
+      name: string;
+      platform?: string | null;
+    },
+    opts?: RequestOptions,
+  ): Promise<Project> {
+    const createData: Record<string, any> = { name };
+    // Only include platform if it has a meaningful value (not null, undefined, or empty)
+    if (platform) {
+      createData.platform = platform;
+    }
+
+    const body = await this.requestJSON(
+      `/teams/${organizationSlug}/${teamSlug}/projects/`,
+      {
+        method: "POST",
+        body: JSON.stringify(createData),
+      },
+      opts,
+    );
+    return ProjectSchema.parse(body);
+  }
+
+  /**
+   * Updates an existing project's configuration.
+   *
+   * @param params Project update parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Current project identifier
+   * @param params.name New project name (optional)
+   * @param params.slug New project slug (optional)
+   * @param params.platform New platform identifier (optional)
+   * @param opts Request options
+   * @returns Updated project data
+   */
+  async updateProject(
+    {
+      organizationSlug,
+      projectSlug,
+      name,
+      slug,
+      platform,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      name?: string | null;
+      slug?: string | null;
+      platform?: string | null;
+    },
+    opts?: RequestOptions,
+  ): Promise<Project> {
+    const updateData: Record<string, any> = {};
+    // Only include fields that have meaningful values (truthy strings)
+    if (name) updateData.name = name;
+    if (slug) updateData.slug = slug;
+    if (platform) updateData.platform = platform;
+
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      },
+      opts,
+    );
+    return ProjectSchema.parse(body);
+  }
+
+  async listRepos(
+    {
+      organizationSlug,
+      query,
+    }: {
+      organizationSlug: string;
+      query?: string;
+    },
+    opts?: RequestOptions,
+  ) {
+    const params = new URLSearchParams();
+    if (query) {
+      params.set("query", query);
+    }
+    const qs = params.toString();
+    const url = `/organizations/${organizationSlug}/repos/${qs ? `?${qs}` : ""}`;
+    const body = await this.requestJSON(url, { method: "GET" }, opts);
+    return RepositoryListSchema.parse(body);
+  }
+
+  async linkProjectRepo(
+    {
+      organizationSlug,
+      projectSlug,
+      repositoryId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      repositoryId: number | string;
+    },
+    opts?: RequestOptions,
+  ) {
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/repo/`,
+      {
+        method: "POST",
+        body: JSON.stringify({ repositoryId }),
+      },
+      opts,
+    );
+    return ProjectRepoLinkSchema.parse(body);
+  }
+
+  async listIssueAlertRules(
+    params: {
+      organizationSlug: string;
+      projectSlug: string;
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRuleList> {
+    const page = await this.listIssueAlertRulesPage(params, opts);
+    return page.rules;
+  }
+
+  async listIssueAlertRulesPage(
+    {
+      organizationSlug,
+      projectSlug,
+      query,
+      cursor,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ rules: IssueAlertRuleList; nextCursor: string | null }> {
+    const rules: IssueAlertRuleList = [];
+    const targetLimit = limit ?? 100;
+    let currentCursor: string | null | undefined = cursor;
+    let nextCursor: string | null = null;
+
+    do {
+      const searchQuery = new URLSearchParams();
+      searchQuery.append("projectSlug", projectSlug);
+      searchQuery.set("sortBy", "-id");
+      if (query) {
+        searchQuery.set("query", formatWorkflowNameQuery(query));
+      }
+      if (currentCursor) {
+        searchQuery.set("cursor", currentCursor);
+      }
+      if (limit !== undefined) {
+        searchQuery.set("per_page", String(targetLimit - rules.length));
+      }
+
+      const response = await this.request(
+        `/organizations/${organizationSlug}/workflows/?${searchQuery.toString()}`,
+        undefined,
+        opts,
+      );
+      const body = await this.parseJsonResponse(response);
+      const attachedRules = filterAttachedIssueAlertRules(
+        IssueAlertRuleListSchema.parse(body),
+      );
+      const remaining = targetLimit - rules.length;
+      if (attachedRules.length > remaining) {
+        rules.push(...attachedRules.slice(0, remaining));
+        nextCursor = null;
+        break;
+      }
+
+      rules.push(...attachedRules);
+      nextCursor = getNextCursor(response.headers.get("link"));
+      currentCursor = nextCursor;
+    } while (rules.length < targetLimit && nextCursor);
+
+    return { rules, nextCursor };
+  }
+
+  async getIssueAlertRule(
+    {
+      organizationSlug,
+      projectSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      ruleId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const searchQuery = new URLSearchParams();
+    searchQuery.append("projectSlug", projectSlug);
+    searchQuery.append("id", String(ruleId));
+    searchQuery.set("per_page", "1");
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/workflows/?${searchQuery.toString()}`,
+      undefined,
+      opts,
+    );
+    const rules = filterAttachedIssueAlertRules(
+      IssueAlertRuleListSchema.parse(await this.parseJsonResponse(response)),
+    );
+    const rule = rules[0];
+    if (!rule) {
+      throw new ApiNotFoundError(
+        "Workflow not found",
+        undefined,
+        undefined,
+        "workflow",
+        String(ruleId),
+      );
+    }
+    return rule;
+  }
+
+  async listMetricAlertRules(
+    params: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MetricAlertRuleList> {
+    const page = await this.listMetricAlertRulesPage(params, opts);
+    return page.rules;
+  }
+
+  async listMetricAlertRulesPage(
+    {
+      organizationSlug,
+      projectSlug,
+      query,
+      cursor,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ rules: MetricAlertRuleList; nextCursor: string | null }> {
+    if (query) {
+      const project = projectSlug
+        ? await this.getProject(
+            {
+              organizationSlug,
+              projectSlugOrId: projectSlug,
+            },
+            opts,
+          )
+        : undefined;
+      const body = await this.listCombinedAlertRules(
+        {
+          organizationSlug,
+          name: query,
+          alertType: "alert_rule",
+          projectId: project?.id,
+          cursor,
+          limit,
+        },
+        opts,
+      );
+      return {
+        rules: MetricAlertRuleListSchema.parse(body.data),
+        nextCursor: body.nextCursor,
+      };
+    }
+
+    const searchQuery = new URLSearchParams();
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const queryString = searchQuery.toString();
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/alert-rules/`
+      : `/organizations/${organizationSlug}/alert-rules/`;
+    const response = await this.request(
+      `${path}${queryString ? `?${queryString}` : ""}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+    return {
+      rules: MetricAlertRuleListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async getMetricAlertRule(
+    {
+      organizationSlug,
+      projectSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      ruleId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MetricAlertRule> {
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/alert-rules/${encodeURIComponent(String(ruleId))}/`
+      : `/organizations/${organizationSlug}/alert-rules/${encodeURIComponent(String(ruleId))}/`;
+    const body = await this.requestJSON(path, undefined, opts);
+    return MetricAlertRuleSchema.parse(body);
+  }
+
+  /**
+   * Uses Sentry's combined-rules endpoint for metric alert name search.
+   */
+  private async listCombinedAlertRules(
+    {
+      organizationSlug,
+      name,
+      alertType,
+      projectId,
+      cursor,
+      limit,
+    }: {
+      organizationSlug: string;
+      name: string;
+      alertType: "alert_rule";
+      projectId?: string | number;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ data: unknown; nextCursor: string | null }> {
+    const searchQuery = new URLSearchParams();
+    searchQuery.set("name", name);
+    searchQuery.append("alertType", alertType);
+    if (projectId !== undefined) {
+      searchQuery.append("project", String(projectId));
+    }
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/combined-rules/?${searchQuery.toString()}`,
+      undefined,
+      opts,
+    );
+    return {
+      data: await this.parseJsonResponse(response),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  /**
+   * Assigns a team to a project.
+   *
+   * @param params Assignment parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.teamSlug Team identifier to assign
+   * @param opts Request options
+   */
+  async addTeamToProject(
+    {
+      organizationSlug,
+      projectSlug,
+      teamSlug,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      teamSlug: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/teams/${teamSlug}/`,
+      {
+        method: "POST",
+        body: JSON.stringify({}),
+      },
+      opts,
+    );
+  }
+
+  /**
+   * Creates a new client key (DSN) for a project.
+   *
+   * Client keys are used to identify and authenticate SDK requests to Sentry.
+   *
+   * @param params Key creation parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.name Human-readable name for the key (optional)
+   * @param opts Request options
+   * @returns Created client key with DSN information
+   *
+   * @example
+   * ```typescript
+   * const key = await apiService.createClientKey({
+   *   organizationSlug: "my-org",
+   *   projectSlug: "my-project",
+   *   name: "Production"
+   * });
+   * console.log(`DSN: ${key.dsn.public}`);
+   * ```
+   */
+  async createClientKey(
+    {
+      organizationSlug,
+      projectSlug,
+      name,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      name?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ClientKey> {
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/keys/`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+        }),
+      },
+      opts,
+    );
+    return ClientKeySchema.parse(body);
+  }
+
+  /**
+   * Updates a client key (DSN) for a project.
+   *
+   * @param params Key update parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.keyId The ID of the key to update
+   * @param params.name Human-readable name for the key (optional)
+   * @param params.isActive Activate or deactivate the client key (optional)
+   * @param params.rateLimit Applies a rate limit to cap the number of errors accepted during a given time window (optional, null to disable)
+   * @param params.browserSdkVersion Sentry Javascript SDK version to use (optional)
+   * @param params.dynamicSdkLoaderOptions Configures options for the Javascript Loader Script (optional)
+   * @param opts Request options
+   * @returns Updated client key with DSN information
+   */
+  async updateClientKey(
+    {
+      organizationSlug,
+      projectSlug,
+      keyId,
+      name,
+      isActive,
+      rateLimit,
+      browserSdkVersion,
+      dynamicSdkLoaderOptions,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      keyId: string | number;
+    } & UpdateClientKeyRequest,
+    opts?: RequestOptions,
+  ): Promise<ClientKey> {
+    const updateData: UpdateClientKeyRequest = {};
+    if (name !== undefined) {
+      updateData.name = name;
+    }
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
+    }
+    if (rateLimit !== undefined) {
+      updateData.rateLimit = rateLimit;
+    }
+    if (browserSdkVersion !== undefined) {
+      updateData.browserSdkVersion = browserSdkVersion;
+    }
+    if (dynamicSdkLoaderOptions !== undefined) {
+      updateData.dynamicSdkLoaderOptions = dynamicSdkLoaderOptions;
+    }
+
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/keys/${keyId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      },
+      opts,
+    );
+    return ClientKeySchema.parse(body);
+  }
+
+  /**
+   * Lists all client keys (DSNs) for a project.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param opts Request options
+   * @returns Array of client keys with DSN information
+   */
+  async listClientKeys(
+    {
+      organizationSlug,
+      projectSlug,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ClientKeyList> {
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/keys/`,
+      undefined,
+      opts,
+    );
+    return ClientKeyListSchema.parse(body);
+  }
+
+  /**
+   * Lists releases for an organization or specific project.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier (optional, scopes to specific project)
+   * @param params.query Search query for filtering releases
+   * @param opts Request options
+   * @returns Array of releases with deployment and commit information
+   *
+   * @example
+   * ```typescript
+   * // All releases for organization
+   * const releases = await apiService.listReleases({
+   *   organizationSlug: "my-org"
+   * });
+   *
+   * // Search for specific version
+   * const filtered = await apiService.listReleases({
+   *   organizationSlug: "my-org",
+   *   query: "v1.2.3"
+   * });
+   * ```
+   */
+  async listReleases(
+    {
+      organizationSlug,
+      projectSlug,
+      query,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReleaseList> {
+    const searchQuery = new URLSearchParams();
+    if (query) {
+      searchQuery.set("query", query);
+    }
+
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/releases/`
+      : `/organizations/${organizationSlug}/releases/`;
+
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return ReleaseListSchema.parse(body);
+  }
+
+  async getReleaseDetails(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlugOrId,
+      includeHealth,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlugOrId?: string;
+      includeHealth?: boolean;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReleaseDetails> {
+    const searchQuery = new URLSearchParams();
+    if (includeHealth) {
+      searchQuery.set("health", "1");
+    }
+
+    const encodedVersion = encodeURIComponent(releaseVersion);
+    const path = projectSlugOrId
+      ? `/projects/${organizationSlug}/${projectSlugOrId}/releases/${encodedVersion}/`
+      : `/organizations/${organizationSlug}/releases/${encodedVersion}/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return ReleaseDetailsSchema.parse(body);
+  }
+
+  async listReleaseDeploys(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlugOrId,
+      limit,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlugOrId?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<DeployList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlugOrId) {
+      searchQuery.set(
+        isNumericId(projectSlugOrId) ? "project" : "projectSlug",
+        projectSlugOrId,
+      );
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const encodedVersion = encodeURIComponent(releaseVersion);
+    const path = `/organizations/${organizationSlug}/releases/${encodedVersion}/deploys/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return DeployListSchema.parse(body);
+  }
+
+  async listReleaseCommits(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlugOrId,
+      limit,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlugOrId?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<CommitList> {
+    const searchQuery = new URLSearchParams();
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const encodedVersion = encodeURIComponent(releaseVersion);
+    const path = projectSlugOrId
+      ? `/projects/${organizationSlug}/${projectSlugOrId}/releases/${encodedVersion}/commits/`
+      : `/organizations/${organizationSlug}/releases/${encodedVersion}/commits/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return CommitListSchema.parse(body);
+  }
+
+  async listMonitors(
+    {
+      organizationSlug,
+      projectSlug,
+      environment,
+      owner,
+      query,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      environment?: string;
+      owner?: string;
+      query?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MonitorList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlug) {
+      searchQuery.append("projectSlug", projectSlug);
+    }
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    if (owner) {
+      searchQuery.append("owner", owner);
+    }
+    if (query) {
+      searchQuery.set("query", query);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const body = await this.requestJSON(
+      searchQuery.toString()
+        ? `/organizations/${organizationSlug}/monitors/?${searchQuery.toString()}`
+        : `/organizations/${organizationSlug}/monitors/`,
+      undefined,
+      opts,
+    );
+    return MonitorListSchema.parse(body);
+  }
+
+  async getMonitorDetails(
+    {
+      organizationSlug,
+      projectSlug,
+      monitorSlug,
+      environment,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      monitorSlug: string;
+      environment?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Monitor> {
+    const searchQuery = new URLSearchParams();
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+
+    const encodedMonitor = encodeURIComponent(monitorSlug);
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/monitors/${encodedMonitor}/`
+      : `/organizations/${organizationSlug}/monitors/${encodedMonitor}/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return MonitorSchema.parse(body);
+  }
+
+  async listMonitorCheckIns(
+    {
+      organizationSlug,
+      projectSlug,
+      monitorSlug,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      monitorSlug: string;
+      environment?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MonitorCheckInList> {
+    const searchQuery = new URLSearchParams();
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+    const normalizedStatsPeriod = normalizeStatsPeriod(statsPeriod);
+    const effectiveStatsPeriod =
+      start || end ? normalizedStatsPeriod : (normalizedStatsPeriod ?? "24h");
+    if (effectiveStatsPeriod) {
+      parseStatsPeriod(effectiveStatsPeriod);
+    }
+    this.applyTimeParams(searchQuery, effectiveStatsPeriod, start, end);
+
+    const encodedMonitor = encodeURIComponent(monitorSlug);
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/monitors/${encodedMonitor}/checkins/`
+      : `/organizations/${organizationSlug}/monitors/${encodedMonitor}/checkins/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return MonitorCheckInListSchema.parse(body);
+  }
+
+  async getMonitorStats(
+    {
+      organizationSlug,
+      projectSlug,
+      monitorSlug,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      rollup,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      monitorSlug: string;
+      environment?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      rollup?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MonitorStats> {
+    const searchQuery = new URLSearchParams();
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    const normalizedStatsPeriod = normalizeStatsPeriod(statsPeriod);
+    const effectiveStatsPeriod =
+      start || end ? normalizedStatsPeriod : (normalizedStatsPeriod ?? "24h");
+    this.applyStatsMixinTimeParams(
+      searchQuery,
+      effectiveStatsPeriod,
+      start,
+      end,
+      rollup,
+    );
+
+    const encodedMonitor = encodeURIComponent(monitorSlug);
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/monitors/${encodedMonitor}/stats/`
+      : `/organizations/${organizationSlug}/monitors/${encodedMonitor}/stats/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return MonitorStatsSchema.parse(body);
+  }
+
+  /**
+   * Lists available tags for search queries.
+   *
+   * Tags represent indexed fields that can be used in Sentry search queries.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.dataset Dataset to query tags for ("events", "errors", "replays", or "search_issues")
+   * @param params.project Numeric project ID to filter tags
+   * @param params.statsPeriod Time range for tag statistics (e.g., "24h", "7d")
+   * @param params.useCache Whether to use cached results
+   * @param params.useFlagsBackend Whether to use flags backend features
+   * @param opts Request options
+   * @returns Array of available tags with metadata
+   *
+   * @example
+   * ```typescript
+   * const tags = await apiService.listTags({
+   *   organizationSlug: "my-org",
+   *   dataset: "events",
+   *   project: "123456",
+   *   statsPeriod: "24h",
+   *   useCache: true
+   * });
+   * tags.forEach(tag => console.log(`${tag.key}: ${tag.name}`));
+   * ```
+   */
+  async listTags(
+    {
+      organizationSlug,
+      dataset,
+      project,
+      statsPeriod,
+      start,
+      end,
+      useCache,
+      useFlagsBackend,
+    }: {
+      organizationSlug: string;
+      dataset?: "events" | "errors" | "replays" | "search_issues";
+      project?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      useCache?: boolean;
+      useFlagsBackend?: boolean;
+    },
+    opts?: RequestOptions,
+  ): Promise<TagList> {
+    const searchQuery = new URLSearchParams();
+    if (dataset) {
+      searchQuery.set("dataset", dataset);
+    }
+    if (project) {
+      searchQuery.set("project", project);
+    }
+    this.applyTimeParams(searchQuery, statsPeriod, start, end);
+    if (useCache !== undefined) {
+      searchQuery.set("useCache", useCache ? "1" : "0");
+    }
+    if (useFlagsBackend !== undefined) {
+      searchQuery.set("useFlagsBackend", useFlagsBackend ? "1" : "0");
+    }
+
+    const body = await this.requestJSON(
+      searchQuery.toString()
+        ? `/organizations/${organizationSlug}/tags/?${searchQuery.toString()}`
+        : `/organizations/${organizationSlug}/tags/`,
+      undefined,
+      opts,
+    );
+    return TagListSchema.parse(body);
+  }
+
+  async searchReplays(
+    {
+      organizationSlug,
+      query,
+      limit,
+      projectId,
+      sort,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      fields,
+    }: {
+      organizationSlug: string;
+      query?: string;
+      limit?: number;
+      projectId?: string;
+      sort?: string;
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      fields?: string[];
+    },
+    opts?: RequestOptions,
+  ): Promise<ReplayList> {
+    const searchQuery = new URLSearchParams();
+
+    if (query) {
+      searchQuery.set("query", query);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+    if (projectId) {
+      searchQuery.append("project", projectId);
+    }
+    if (sort) {
+      searchQuery.set("sort", sort);
+    }
+    if (environment) {
+      const environments = Array.isArray(environment)
+        ? environment
+        : [environment];
+      for (const value of environments) {
+        searchQuery.append("environment", value);
+      }
+    }
+    if (fields && fields.length > 0) {
+      for (const field of fields) {
+        searchQuery.append("field", field);
+      }
+    }
+    this.applyTimeParams(searchQuery, statsPeriod, start, end);
+
+    const body = await this.requestJSON(
+      searchQuery.toString()
+        ? `/organizations/${organizationSlug}/replays/?${searchQuery.toString()}`
+        : `/organizations/${organizationSlug}/replays/`,
+      undefined,
+      opts,
+    );
+
+    return ReplayListResponseSchema.parse(body).data;
+  }
+
+  /**
+   * Lists trace item attributes available for search queries.
+   *
+   * Returns all available fields/attributes that can be used in event searches,
+   * including both built-in fields and custom tags.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.itemType Item type to query attributes for ("spans", "logs", or "tracemetrics")
+   * @param params.project Numeric project ID to filter attributes
+   * @param params.statsPeriod Time range for attribute statistics (e.g., "24h", "7d")
+   * @param params.attributeTypes Optional attribute types to keep in the response
+   * @param opts Request options
+   * @returns Array of available attributes with metadata including type
+   */
+  async listTraceItemAttributes(
+    {
+      organizationSlug,
+      itemType = "spans",
+      project,
+      statsPeriod,
+      start,
+      end,
+      attributeTypes,
+      substringMatch,
+      query,
+    }: {
+      organizationSlug: string;
+      itemType?: TraceItemType;
+      project?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      attributeTypes?: TraceItemAttributeType[];
+      substringMatch?: string;
+      query?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<TraceItemAttribute[]> {
+    const attributes = await this.fetchTraceItemAttributes(
+      organizationSlug,
+      itemType,
+      project,
+      statsPeriod,
+      start,
+      end,
+      substringMatch,
+      query,
+      opts,
+    );
+
+    if (!attributeTypes || attributeTypes.length === 0) {
+      return attributes;
+    }
+
+    const allowedTypes = new Set(attributeTypes);
+    return attributes.filter((attribute) => allowedTypes.has(attribute.type));
+  }
+
+  async validateEvents(
+    {
+      organizationSlug,
+      dataset = "spans",
+      fields,
+      query,
+      orderby,
+      project,
+      environment,
+      statsPeriod,
+      start,
+      end,
+    }: {
+      organizationSlug: string;
+      dataset?: EventsDataset;
+      fields?: string[];
+      query?: string;
+      orderby?: string[];
+      project?: string;
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<EventsValidationResult> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("dataset", normalizeEventsDataset(dataset));
+    if (project) {
+      queryParams.set("project", project);
+    }
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (environment) {
+      const environments = Array.isArray(environment)
+        ? environment
+        : [environment];
+      for (const value of environments) {
+        queryParams.append("environment", value);
+      }
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
+    for (const field of fields ?? []) {
+      queryParams.append("field", field);
+    }
+    for (const value of orderby ?? []) {
+      queryParams.append("orderby", value);
+    }
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/events/validate/?${queryParams.toString()}`,
+      undefined,
+      { ...opts, allowStatuses: [400] },
+    );
+    const body = await this.parseJsonResponse(response);
+    return parseEventsValidationResponse(body);
+  }
+
+  private async fetchTraceItemAttributes(
+    organizationSlug: string,
+    itemType: TraceItemType,
+    project?: string,
+    statsPeriod?: string,
+    start?: string,
+    end?: string,
+    substringMatch?: string,
+    query?: string,
+    opts?: RequestOptions,
+  ): Promise<TraceItemAttribute[]> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("itemType", itemType);
+    if (project) {
+      queryParams.set("project", project);
+    }
+    if (substringMatch) {
+      queryParams.set("substringMatch", substringMatch);
+    }
+    if (query) {
+      queryParams.set("query", query);
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
+
+    const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
+
+    const body = await this.requestJSON(url, undefined, opts);
+    return parseTraceItemAttributes(body, "string");
+  }
+
+  /**
+   * Lists issues within an organization or project.
+   *
+   * Issues represent groups of similar errors or problems in your application.
+   * Supports Sentry's powerful query syntax for filtering and sorting.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier (optional, scopes to specific project)
+   * @param params.query Sentry search query (e.g., "is:unresolved browser:chrome")
+   * @param params.sortBy Sort order ("user", "freq", "date", "new")
+   * @param opts Request options
+   * @returns Array of issues with metadata and statistics
+   *
+   * @example
+   * ```typescript
+   * // Recent unresolved issues
+   * const issues = await apiService.listIssues({
+   *   organizationSlug: "my-org",
+   *   query: "is:unresolved",
+   *   sortBy: "date"
+   * });
+   *
+   * // High-frequency errors in specific project
+   * const critical = await apiService.listIssues({
+   *   organizationSlug: "my-org",
+   *   projectSlug: "backend",
+   *   query: "level:error",
+   *   sortBy: "freq"
+   * });
+   * ```
+   */
+  async listIssues(
+    {
+      organizationSlug,
+      projectSlug,
+      query,
+      sortBy,
+      limit = 10,
+      statsPeriod = "30d",
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string | null;
+      sortBy?: "user" | "freq" | "date" | "new";
+      limit?: number;
+      /**
+       * Controls the search time window - which issues are included in results.
+       * Note: this is NOT the sparkline/stats period (that would be groupStatsPeriod).
+       * The Sentry API accepts any Nh/Nd/Nw format and defaults to 90d when omitted,
+       * but large windows risk timeouts on busy orgs.
+       */
+      statsPeriod?: "24h" | "7d" | "14d" | "30d" | "90d";
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueList> {
+    const sentryQuery: string[] = [];
+    if (query) {
+      sentryQuery.push(query);
+    }
+
+    const queryParams = new URLSearchParams();
+    queryParams.set("limit", String(limit));
+    if (sortBy) queryParams.set("sort", sortBy);
+    queryParams.set("statsPeriod", statsPeriod ?? "30d");
+    queryParams.set("query", sentryQuery.join(" "));
+
+    queryParams.append("collapse", "unhandled");
+
+    const apiUrl = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/issues/?${queryParams.toString()}`
+      : `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
+
+    const body = await this.requestJSON(apiUrl, undefined, opts);
+    return IssueListSchema.parse(body);
+  }
+
+  async getIssue(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Issue> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/`,
+      undefined,
+      opts,
+    );
+    return IssueSchema.parse(body);
+  }
+
+  /**
+   * Retrieves tag value distribution for a specific issue.
+   *
+   * Returns aggregate counts of unique tag values, useful for understanding
+   * how an issue is distributed across different tag values (e.g., URLs,
+   * browsers, environments).
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.issueId Issue identifier (short ID or numeric ID)
+   * @param params.tagKey Tag key to get values for (e.g., "url", "browser", "environment")
+   * @param opts Request options
+   * @returns Tag value distribution with counts and percentages
+   *
+   * @example
+   * ```typescript
+   * const tagValues = await apiService.getIssueTagValues({
+   *   organizationSlug: "my-org",
+   *   issueId: "PROJECT-123",
+   *   tagKey: "url"
+   * });
+   * console.log(`Total unique values: ${tagValues.totalValues}`);
+   * tagValues.topValues.forEach(v => console.log(`${v.value}: ${v.count}`));
+   * ```
+   */
+  async getIssueTagValues(
+    {
+      organizationSlug,
+      issueId,
+      tagKey,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      tagKey: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueTagValues> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/tags/${tagKey}/`,
+      undefined,
+      opts,
+    );
+    return IssueTagValuesSchema.parse(body);
+  }
+
+  /**
+   * Retrieves external issue links for a specific issue.
+   *
+   * Returns links to external issue tracking systems (Jira, GitHub Issues,
+   * GitLab, etc.) that have been associated with this Sentry issue.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.issueId Issue identifier (short ID or numeric ID)
+   * @param opts Request options
+   * @returns Array of external issue links with service type and URL
+   */
+  async getIssueExternalLinks(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ExternalIssueList> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/external-issues/`,
+      undefined,
+      opts,
+    );
+    return ExternalIssueListSchema.parse(body);
+  }
+
+  async getEventForIssue(
+    {
+      organizationSlug,
+      issueId,
+      eventId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      eventId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Event> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/events/${eventId}/`,
+      undefined,
+      opts,
+    );
+
+    // Try to parse with known event schemas first
+    const parseResult = EventSchema.safeParse(body);
+
+    if (parseResult.success) {
+      const rawEvent = parseResult.data;
+
+      // Return known event types with proper type discrimination
+      // "default" type represents error events without exception data
+      if (rawEvent.type === "error" || rawEvent.type === "default") {
+        return rawEvent;
+      }
+      if (rawEvent.type === "transaction") {
+        return rawEvent;
+      }
+      // "generic" type represents performance regression events and other metric-based issues
+      if (rawEvent.type === "generic") {
+        return rawEvent;
+      }
+      // "csp" type represents Content Security Policy violations
+      if (rawEvent.type === "csp") {
+        return rawEvent;
+      }
+
+      // Unknown event type that passed schema validation
+      // This means Sentry added a new event type we don't support yet
+      const eventType =
+        typeof rawEvent.type === "string"
+          ? rawEvent.type
+          : String(rawEvent.type);
+
+      // Log to Sentry so we can track new event types and add support
+      logIssue(`Unsupported event type: ${eventType}`, {
+        extra: {
+          eventType,
+          eventId: rawEvent.id,
+        },
+      });
+
+      return rawEvent; // Return as UnknownEvent
+    }
+
+    // Schema validation failed - this is a serious problem
+    // The API response doesn't match our expected structure at all
+    const bodyObj = body as Record<string, unknown>;
+    const eventType =
+      typeof bodyObj.type === "string" ? bodyObj.type : String(bodyObj.type);
+
+    logIssue(`Event failed schema validation: ${eventType}`, {
+      extra: {
+        eventType,
+        eventId: bodyObj.id,
+        validationError: parseResult.error.message,
+        validationIssues: parseResult.error.errors,
+      },
+    });
+
+    // Throw error - schema failures mean broken API contract
+    throw new ApiValidationError(
+      `Event failed schema validation: ${parseResult.error.message}`,
+      undefined,
+      undefined,
+      body,
+    );
+  }
+
+  async getLatestEventForIssue(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Event> {
+    return this.getEventForIssue(
+      {
+        organizationSlug,
+        issueId,
+        eventId: "latest",
+      },
+      opts,
+    );
+  }
+
+  /**
+   * Lists events for a specific issue.
+   * Uses the issue-specific endpoint which already filters by issue ID.
+   *
+   * @see https://docs.sentry.io/api/events/list-an-issues-events/
+   */
+  async listEventsForIssue(
+    {
+      organizationSlug,
+      issueId,
+      query,
+      limit = 50,
+      sort,
+      statsPeriod,
+      start,
+      end,
+      full = false,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      query?: string;
+      limit?: number;
+      sort?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      full?: boolean;
+    },
+    opts?: RequestOptions,
+  ) {
+    const params = new URLSearchParams();
+
+    if (query) {
+      params.append("query", query);
+    }
+
+    params.append("per_page", String(limit));
+
+    if (sort) {
+      params.append("sort", sort);
+    }
+
+    if (statsPeriod) {
+      params.append("statsPeriod", statsPeriod);
+    } else if (start && end) {
+      params.append("start", start);
+      params.append("end", end);
+    }
+
+    if (full) {
+      params.append("full", "true");
+    }
+
+    const apiUrl = `/organizations/${organizationSlug}/issues/${issueId}/events/?${params.toString()}`;
+    return await this.requestJSON(apiUrl, undefined, opts);
+  }
+
+  async listEventAttachments(
+    {
+      organizationSlug,
+      projectSlug,
+      eventId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      eventId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<EventAttachmentList> {
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
+      undefined,
+      opts,
+    );
+    return EventAttachmentListSchema.parse(body);
+  }
+
+  async getEventAttachment(
+    {
+      organizationSlug,
+      projectSlug,
+      eventId,
+      attachmentId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      eventId: string;
+      attachmentId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<{
+    attachment: EventAttachment;
+    downloadUrl: string;
+    filename: string;
+    blob: Blob;
+    contentType: string;
+  }> {
+    // Get the attachment metadata first
+    const attachmentsData = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
+      undefined,
+      opts,
+    );
+
+    const attachments = EventAttachmentListSchema.parse(attachmentsData);
+    const attachment = attachments.find((att) => att.id === attachmentId);
+
+    if (!attachment) {
+      throw new ApiNotFoundError(
+        `Attachment with ID ${attachmentId} not found for event ${eventId}`,
+      );
+    }
+
+    // Download the actual file content
+    const downloadUrl = `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/${attachmentId}/?download=1`;
+    const downloadResponse = await this.request(
+      downloadUrl,
+      { method: "GET" },
+      opts,
+    );
+
+    // Prefer Content-Type from the download response over the metadata mimetype:
+    // the two share the same DB source but the download header reflects any
+    // server-side correction (getsentry/sentry#115977) applied at request time.
+    const contentType =
+      downloadResponse.headers.get("content-type")?.split(";")[0].trim() ||
+      attachment.mimetype ||
+      "application/octet-stream";
+
+    return {
+      attachment,
+      downloadUrl: downloadResponse.url,
+      filename: attachment.name,
+      blob: await downloadResponse.blob(),
+      contentType,
+    };
+  }
+
+  async getReplayDetails(
+    {
+      organizationSlug,
+      replayId,
+    }: {
+      organizationSlug: string;
+      replayId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReplayDetails> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/replays/${replayId}/`,
+      undefined,
+      opts,
+    );
+    return z.object({ data: ReplayDetailsSchema }).parse(body).data;
+  }
+
+  async listReplayIdsForIssue(
+    {
+      organizationSlug,
+      issueId,
+      dataSource,
+    }: {
+      organizationSlug: string;
+      issueId: string | number;
+      dataSource: "discover" | "search_issues";
+    },
+    opts?: RequestOptions,
+  ): Promise<string[]> {
+    const normalizedIssueId = String(issueId);
+    const queryParams = new URLSearchParams();
+    queryParams.set("returnIds", "true");
+    queryParams.set("query", `issue.id:[${normalizedIssueId}]`);
+    queryParams.set("data_source", dataSource);
+    queryParams.set("statsPeriod", "90d");
+    queryParams.append("project", "-1");
+
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/replay-count/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+
+    const replayIdsByResource = ReplayIdsByResourceSchema.parse(body);
+    return replayIdsByResource[normalizedIssueId] ?? [];
+  }
+
+  async getReplayRecordingSegments(
+    {
+      organizationSlug,
+      projectSlugOrId,
+      replayId,
+    }: {
+      organizationSlug: string;
+      projectSlugOrId: string;
+      replayId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReplayRecordingSegments> {
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlugOrId}/replays/${replayId}/recording-segments/?download=true`,
+      undefined,
+      opts,
+    );
+    return ReplayRecordingSegmentsSchema.parse(body);
+  }
+
+  async updateIssue(
+    {
+      organizationSlug,
+      issueId,
+      status,
+      assignedTo,
+      substatus,
+      ignoreDuration,
+      ignoreCount,
+      ignoreWindow,
+      ignoreUserCount,
+      ignoreUserWindow,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      status?: string;
+      assignedTo?: string;
+      substatus?: string;
+      ignoreDuration?: number;
+      ignoreCount?: number;
+      ignoreWindow?: number;
+      ignoreUserCount?: number;
+      ignoreUserWindow?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<Issue> {
+    const updateData: {
+      status?: string;
+      assignedTo?: string;
+      substatus?: string;
+      ignoreDuration?: number;
+      ignoreCount?: number;
+      ignoreWindow?: number;
+      ignoreUserCount?: number;
+      ignoreUserWindow?: number;
+    } = {};
+    if (status !== undefined) updateData.status = status;
+    if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
+    if (substatus !== undefined) updateData.substatus = substatus;
+    if (ignoreDuration !== undefined)
+      updateData.ignoreDuration = ignoreDuration;
+    if (ignoreCount !== undefined) updateData.ignoreCount = ignoreCount;
+    if (ignoreWindow !== undefined) updateData.ignoreWindow = ignoreWindow;
+    if (ignoreUserCount !== undefined) {
+      updateData.ignoreUserCount = ignoreUserCount;
+    }
+    if (ignoreUserWindow !== undefined) {
+      updateData.ignoreUserWindow = ignoreUserWindow;
+    }
+
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      },
+      opts,
+    );
+    return IssueSchema.parse(body);
+  }
+
+  async createIssueComment(
+    {
+      organizationSlug,
+      issueId,
+      text,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      text: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueComment> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/notes/`,
+      {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      },
+      opts,
+    );
+    return IssueCommentSchema.parse(body);
+  }
+
+  async getIssueActivity(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueActivityList> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/activities/`,
+      undefined,
+      opts,
+    );
+    return IssueActivityListResponseSchema.parse(body).activity;
+  }
+
+  async listIssueComments(
+    {
+      organizationSlug,
+      issueId,
+      limit,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueCommentList> {
+    const searchQuery = new URLSearchParams();
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const path = `/organizations/${organizationSlug}/issues/${issueId}/notes/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return IssueCommentListSchema.parse(body);
+  }
+
+  // TODO: Sentry is not yet exposing a reasonable API to fetch trace data
+  // async getTrace({
+  //   organizationSlug,
+  //   traceId,
+  // }: {
+  //   organizationSlug: string;
+  //   traceId: string;
+  // }): Promise<z.infer<typeof SentryIssueSchema>> {
+  //   const response = await this.request(
+  //     `/organizations/${organizationSlug}/issues/${traceId}/`,
+  //   );
+
+  //   const body = await response.json();
+  //   return SentryIssueSchema.parse(body);
+  // }
+
+  async searchErrors(
+    {
+      organizationSlug,
+      projectSlug,
+      filename,
+      transaction,
+      query,
+      sortBy = "last_seen",
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      filename?: string;
+      transaction?: string;
+      query?: string;
+      sortBy?: "last_seen" | "count";
+    },
+    opts?: RequestOptions,
+  ) {
+    const sentryQuery: string[] = [];
+    if (filename) {
+      sentryQuery.push(`stack.filename:"*${filename.replace(/"/g, '\\"')}"`);
+    }
+    if (transaction) {
+      sentryQuery.push(`transaction:"${transaction.replace(/"/g, '\\"')}"`);
+    }
+    if (query) {
+      sentryQuery.push(query);
+    }
+    if (projectSlug) {
+      sentryQuery.push(`project:${projectSlug}`);
+    }
+
+    const queryParams = new URLSearchParams();
+    queryParams.set("dataset", "errors");
+    queryParams.set("per_page", "10");
+    queryParams.set(
+      "sort",
+      `-${sortBy === "last_seen" ? "last_seen" : "count"}`,
+    );
+    queryParams.set("statsPeriod", "24h");
+    queryParams.append("field", "issue");
+    queryParams.append("field", "title");
+    queryParams.append("field", "project");
+    queryParams.append("field", "last_seen()");
+    queryParams.append("field", "count()");
+    queryParams.set("query", sentryQuery.join(" "));
+    // if (projectSlug) queryParams.set("project", projectSlug);
+
+    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
+
+    const body = await this.requestJSON(apiUrl, undefined, opts);
+    // TODO(dcramer): If you're using an older version of Sentry this API had a breaking change
+    // meaning this endpoint will error.
+    return ErrorsSearchResponseSchema.parse(body).data;
+  }
+
+  async searchSpans(
+    {
+      organizationSlug,
+      projectSlug,
+      transaction,
+      query,
+      sortBy = "timestamp",
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      transaction?: string;
+      query?: string;
+      sortBy?: "timestamp" | "duration";
+    },
+    opts?: RequestOptions,
+  ) {
+    const sentryQuery: string[] = ["is_transaction:true"];
+    if (transaction) {
+      sentryQuery.push(`transaction:"${transaction.replace(/"/g, '\\"')}"`);
+    }
+    if (query) {
+      sentryQuery.push(query);
+    }
+    if (projectSlug) {
+      sentryQuery.push(`project:${projectSlug}`);
+    }
+
+    const queryParams = new URLSearchParams();
+    queryParams.set("dataset", "spans");
+    queryParams.set("per_page", "10");
+    queryParams.set(
+      "sort",
+      `-${sortBy === "timestamp" ? "timestamp" : "span.duration"}`,
+    );
+    queryParams.set("allowAggregateConditions", "0");
+    queryParams.set("useRpc", "1");
+    queryParams.append("field", "id");
+    queryParams.append("field", "trace");
+    queryParams.append("field", "span.op");
+    queryParams.append("field", "span.description");
+    queryParams.append("field", "span.duration");
+    queryParams.append("field", "transaction");
+    queryParams.append("field", "project");
+    queryParams.append("field", "timestamp");
+    queryParams.set("query", sentryQuery.join(" "));
+    // if (projectSlug) queryParams.set("project", projectSlug);
+
+    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
+
+    const body = await this.requestJSON(apiUrl, undefined, opts);
+    return SpansSearchResponseSchema.parse(body).data;
+  }
+
+  // ================================================================================
+  // API QUERY BUILDERS FOR DIFFERENT SENTRY APIS
+  // ================================================================================
+
+  /**
+   * Builds query parameters for the legacy Discover API (primarily used by errors dataset).
+   *
+   * Note: While the API endpoint is the same for all datasets, we maintain separate
+   * builders to make future divergence easier and to keep the code organized.
+   */
+  private buildDiscoverApiQuery(params: {
+    query: string;
+    fields: string[];
+    limit: number;
+    projectId?: string;
+    dataset?: "errors" | "tracemetrics" | "profiles";
+    statsPeriod?: string;
+    start?: string;
+    end?: string;
+    sort: string;
+  }): URLSearchParams {
+    const queryParams = new URLSearchParams();
+
+    // Basic parameters
+    queryParams.set("per_page", params.limit.toString());
+    queryParams.set("query", params.query);
+    queryParams.set("dataset", params.dataset ?? "errors");
+
+    this.applyTimeParams(
+      queryParams,
+      params.statsPeriod,
+      params.start,
+      params.end,
+    );
+
+    if (params.projectId) {
+      queryParams.set("project", params.projectId);
+    }
+
+    queryParams.set("sort", params.sort);
+
+    // Add fields
+    for (const field of params.fields) {
+      queryParams.append("field", field);
+    }
+
+    queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);
+
+    return queryParams;
+  }
+
+  /**
+   * Builds query parameters for the modern EAP API (used by spans/logs datasets).
+   *
+   * Includes dataset-specific parameters like sampling for spans.
+   */
+  private buildEapApiQuery(params: {
+    query: string;
+    fields: string[];
+    limit: number;
+    projectId?: string;
+    dataset: "spans" | "logs";
+    statsPeriod?: string;
+    start?: string;
+    end?: string;
+    sort: string;
+  }): URLSearchParams {
+    const queryParams = new URLSearchParams();
+
+    // Basic parameters
+    queryParams.set("per_page", params.limit.toString());
+    queryParams.set("query", params.query);
+    queryParams.set("dataset", params.dataset);
+
+    this.applyTimeParams(
+      queryParams,
+      params.statsPeriod,
+      params.start,
+      params.end,
+    );
+
+    if (params.projectId) {
+      queryParams.set("project", params.projectId);
+    }
+
+    // Dataset-specific parameters
+    if (params.dataset === "spans") {
+      queryParams.set("sampling", "NORMAL");
+    }
+
+    queryParams.set("sort", params.sort);
+
+    // Add fields
+    for (const field of params.fields) {
+      queryParams.append("field", field);
+    }
+
+    queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);
+
+    return queryParams;
+  }
+
+  /**
+   * Searches for events in Sentry using the unified events API.
+   * This method is used by the search_events tool for semantic search.
+   *
+   * Routes to the appropriate query builder based on dataset, even though
+   * the underlying API endpoint is the same. This separation makes the code
+   * cleaner and allows for future API divergence.
+   */
+  async searchEvents(
+    {
+      organizationSlug,
+      query,
+      fields,
+      limit = 10,
+      projectId,
+      dataset = "spans",
+      statsPeriod,
+      start,
+      end,
+      sort = "-timestamp",
+    }: {
+      organizationSlug: string;
+      query: string;
+      fields: string[];
+      limit?: number;
+      projectId?: string;
+      dataset?: EventsDataset;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      sort?: string;
+    },
+    opts?: RequestOptions,
+  ) {
+    let queryParams: URLSearchParams;
+    const normalizedDataset = normalizeEventsDataset(dataset);
+
+    if (
+      normalizedDataset === "errors" ||
+      normalizedDataset === "tracemetrics" ||
+      normalizedDataset === "profiles"
+    ) {
+      // Use Discover API query builder
+      queryParams = this.buildDiscoverApiQuery({
+        query,
+        fields,
+        limit,
+        projectId,
+        dataset: normalizedDataset,
+        statsPeriod,
+        start,
+        end,
+        sort,
+      });
+    } else {
+      // Use EAP API query builder for spans and logs
+      queryParams = this.buildEapApiQuery({
+        query,
+        fields,
+        limit,
+        projectId,
+        dataset: normalizedDataset,
+        statsPeriod,
+        start,
+        end,
+        sort,
+      });
+    }
+
+    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
+    return await this.requestJSON(apiUrl, undefined, opts);
+  }
+
+  // POST https://us.sentry.io/api/0/issues/5485083130/autofix/
+  async startAutofix(
+    {
+      organizationSlug,
+      issueId,
+      eventId,
+      instruction = "",
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      eventId?: string;
+      instruction?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<AutofixRun> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          event_id: eventId,
+          instruction,
+        }),
+      },
+      opts,
+    );
+    return AutofixRunSchema.parse(body);
+  }
+
+  // GET https://us.sentry.io/api/0/issues/5485083130/autofix/
+  async getAutofixState(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<AutofixRunState> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
+      undefined,
+      opts,
+    );
+    return AutofixRunStateSchema.parse(body);
+  }
+
+  /**
+   * Retrieves high-level metadata about a trace.
+   *
+   * Returns statistics including span counts, error counts, transaction
+   * breakdown, and operation type distribution for the specified trace.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.traceId Trace identifier (32-character hex string)
+   * @param params.statsPeriod Optional stats period (e.g., "14d", "7d")
+   * @param opts Request options
+   * @returns Trace metadata with statistics
+   *
+   * @example
+   * ```typescript
+   * const traceMeta = await apiService.getTraceMeta({
+   *   organizationSlug: "my-org",
+   *   traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a"
+   * });
+   * console.log(`Trace has ${traceMeta.span_count} spans`);
+   * ```
+   */
+  async getTraceMeta(
+    {
+      organizationSlug,
+      traceId,
+      statsPeriod = "14d",
+    }: {
+      organizationSlug: string;
+      traceId: string;
+      statsPeriod?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<TraceMeta> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("statsPeriod", statsPeriod);
+
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/trace-meta/${traceId}/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    return TraceMetaSchema.parse(body);
+  }
+
+  /**
+   * Retrieves the complete trace structure with all spans.
+   *
+   * Returns the hierarchical trace data including all spans, their timing
+   * information, operation details, and nested relationships.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.traceId Trace identifier (32-character hex string)
+   * @param params.limit Requested span-count hint (default: 1000). The server currently paginates trace data internally and may ignore this value.
+   * @param params.project Project filter hint (-1 for all projects). The current organization trace endpoint ignores this value server-side.
+   * @param params.statsPeriod Optional stats period (e.g., "14d", "7d")
+   * @param opts Request options
+   * @returns Complete trace tree structure
+   *
+   * @example
+   * ```typescript
+   * const trace = await apiService.getTrace({
+   *   organizationSlug: "my-org",
+   *   traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+   *   limit: 1000
+   * });
+   * console.log(`Root spans: ${trace.length}`);
+   * ```
+   */
+  async getTrace(
+    {
+      organizationSlug,
+      traceId,
+      limit = 1000,
+      project = "-1",
+      statsPeriod = "14d",
+    }: {
+      organizationSlug: string;
+      traceId: string;
+      limit?: number;
+      project?: string;
+      statsPeriod?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Trace> {
+    const queryParams = new URLSearchParams();
+    // Keep sending the endpoint's declared query parameters even though the
+    // current server implementation ignores `project` and paginates internally.
+    queryParams.set("limit", String(limit));
+    queryParams.set("project", project);
+    queryParams.set("statsPeriod", statsPeriod);
+
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/trace/${traceId}/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    return TraceSchema.parse(body);
+  }
+
+  /**
+   * Fetches all spans for one AI conversation within a relative or absolute time window.
+   */
+  async getAIConversation(
+    {
+      organizationSlug,
+      conversationId,
+      project = "-1",
+      statsPeriod = "30d",
+      start,
+      end,
+      perPage = 1000,
+      maxPages = 10,
+    }: {
+      organizationSlug: string;
+      conversationId: string;
+      project?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      perPage?: number;
+      maxPages?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<AIConversationSpanList> {
+    const spans: AIConversationSpanList = [];
+    let cursor: string | null = null;
+
+    for (let page = 0; page < maxPages; page++) {
+      const queryParams = new URLSearchParams();
+      queryParams.set("per_page", String(perPage));
+      this.applyTimeParams(
+        queryParams,
+        start || end ? undefined : statsPeriod,
+        start,
+        end,
+      );
+      const projects = Array.isArray(project) ? project : [project];
+      for (const projectId of projects) {
+        queryParams.append("project", projectId);
+      }
+      if (cursor) {
+        queryParams.set("cursor", cursor);
+      }
+
+      const response = await this.request(
+        `/organizations/${organizationSlug}/ai-conversations/${encodeURIComponent(conversationId)}/?${queryParams.toString()}`,
+        undefined,
+        opts,
+      );
+      const body = await this.parseJsonResponse(response);
+      spans.push(...AIConversationSpanListSchema.parse(body));
+
+      cursor = getNextCursor(response.headers.get("link"));
+      if (!cursor) {
+        break;
+      }
+    }
+
+    return spans;
+  }
+
+  /**
+   * Searches Sentry AI Conversations using the conversation list endpoint and
+   * returns the current page plus cursor metadata from the response headers.
+   */
+  async searchAIConversations(
+    {
+      organizationSlug,
+      query,
+      project,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      limit,
+      cursor,
+    }: {
+      organizationSlug: string;
+      query?: string;
+      project?: string | string[];
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+      cursor?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<{
+    conversations: AIConversationSummary[];
+    nextCursor: string | null;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (project) {
+      const projects = Array.isArray(project) ? project : [project];
+      for (const projectId of projects) {
+        queryParams.append("project", projectId);
+      }
+    }
+    if (environment) {
+      const environments = Array.isArray(environment)
+        ? environment
+        : [environment];
+      for (const environmentName of environments) {
+        queryParams.append("environment", environmentName);
+      }
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
+    if (limit !== undefined) {
+      queryParams.set("per_page", String(limit));
+    }
+    if (cursor) {
+      queryParams.set("cursor", cursor);
+    }
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/ai-conversations/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+
+    return {
+      conversations: AIConversationSummaryListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  /**
+   * Retrieves flamegraph data for a transaction.
+   *
+   * Flamegraphs provide pre-aggregated CPU profiling data including:
+   * - Unique call stack patterns (samples)
+   * - Performance statistics (counts, durations, percentiles)
+   * - Frame metadata (file, function, is_application)
+   *
+   * This is the primary data source for profile analysis as it includes
+   * aggregated hot paths and percentile calculations (p75, p95, p99).
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectId Project ID or slug
+   * @param params.transactionName Transaction name to analyze (e.g., "/api/users")
+   * @param params.statsPeriod Time period for analysis (e.g., "7d", "14d", "30d")
+   * @param opts Request options
+   * @returns Flamegraph with pre-aggregated profiling data
+   *
+   * @example
+   * ```typescript
+   * const flamegraph = await apiService.getFlamegraph({
+   *   organizationSlug: "my-org",
+   *   projectId: 1,
+   *   transactionName: "/api/users",
+   *   statsPeriod: "7d"
+   * });
+   * console.log(`Analyzed ${flamegraph.profiles.length} profiles`);
+   * ```
+   */
+  async getFlamegraph(
+    {
+      organizationSlug,
+      projectId,
+      transactionName,
+      statsPeriod = "7d",
+    }: {
+      organizationSlug: string;
+      projectId: string | number;
+      transactionName: string;
+      statsPeriod?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Flamegraph> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("project", projectId.toString());
+    // Escape backslashes first, then quotes for proper string escaping
+    const escapedTransaction = transactionName
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"');
+    queryParams.set(
+      "query",
+      `event.type:transaction transaction:"${escapedTransaction}"`,
+    );
+    queryParams.set("statsPeriod", statsPeriod);
+
+    const path = `/organizations/${organizationSlug}/profiling/flamegraph/?${queryParams.toString()}`;
+    const body = await this.requestJSON(path, undefined, opts);
+    return FlamegraphSchema.parse(body);
+  }
+
+  async getTransactionProfile(
+    {
+      organizationSlug,
+      projectSlugOrId,
+      profileId,
+    }: {
+      organizationSlug: string;
+      projectSlugOrId: string | number;
+      profileId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<TransactionProfile> {
+    const path = `/projects/${organizationSlug}/${projectSlugOrId}/profiling/profiles/${profileId}/`;
+    const body = await this.requestJSON(path, undefined, opts);
+    return TransactionProfileSchema.parse(body);
+  }
+
+  /**
+   * Retrieves raw profile chunk data for detailed analysis.
+   *
+   * Profile chunks contain:
+   * - frames: All unique stack frames
+   * - samples: Individual sample points with timestamps
+   * - stacks: Arrays of frame indices forming call stacks
+   * - thread_metadata: Information about profiled threads
+   *
+   * This is used for deep-dive analysis when flamegraph data isn't sufficient.
+   * Most use cases should use getFlamegraph() instead, as it provides
+   * pre-aggregated data that's easier to work with.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.profilerId Profiler ID from flamegraph output
+   * @param params.projectId Project ID or slug
+   * @param params.start Start time (ISO format)
+   * @param params.end End time (ISO format)
+   * @param opts Request options
+   * @returns Raw profile chunk data
+   * @throws ApiNotFoundError if no profile chunk is found
+   *
+   * @example
+   * ```typescript
+   * const chunk = await apiService.getProfileChunk({
+   *   organizationSlug: "my-org",
+   *   profilerId: "041bde57b9844e36b8b7e5734efae5f7",
+   *   projectId: 1,
+   *   start: "2024-01-01T00:00:00Z",
+   *   end: "2024-01-01T01:00:00Z"
+   * });
+   * console.log(`Chunk has ${chunk.profile.samples.length} samples`);
+   * ```
+   */
+  async getProfileChunk(
+    {
+      organizationSlug,
+      profilerId,
+      projectId,
+      start,
+      end,
+    }: {
+      organizationSlug: string;
+      profilerId: string;
+      projectId: string | number;
+      start: string;
+      end: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ProfileChunk> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("profiler_id", profilerId);
+    queryParams.set("project", projectId.toString());
+    queryParams.set("start", start);
+    queryParams.set("end", end);
+
+    const path = `/organizations/${organizationSlug}/profiling/chunks/?${queryParams.toString()}`;
+    const body = await this.requestJSON(path, undefined, opts);
+
+    // Normalize the Sentry {chunk: ...} wrapper to the internal chunks array.
+    const response = ProfileChunkResponseSchema.parse(body);
+    if (response.chunks.length === 0) {
+      throw new ApiNotFoundError(
+        `No profile chunk found for profiler_id ${profilerId}`,
+        undefined,
+        body,
+      );
+    }
+
+    return {
+      ...response.chunks[0],
+      // Sentry's frontend does the same query-param backfill for continuous
+      // profile chunks because profiling-service may omit profiler_id.
+      profiler_id: response.chunks[0].profiler_id ?? profilerId,
+    };
+  }
+
+  getPreprodSnapshotUrl(organizationSlug: string, snapshotId: string): string {
+    return getPreprodSnapshotUrlUtil(
+      this.host,
+      organizationSlug,
+      snapshotId,
+      this.protocol,
+    );
+  }
+
+  async getSnapshotDetails({
+    organizationSlug,
+    snapshotId,
+    compactMetadata = true,
+  }: {
+    organizationSlug: string;
+    snapshotId: string;
+    compactMetadata?: boolean;
+  }): Promise<unknown> {
+    const params = new URLSearchParams();
+    if (compactMetadata) {
+      params.set("compact_metadata", "true");
+    }
+    const path = `/organizations/${encodeURIComponent(organizationSlug)}/preprodartifacts/snapshots/${encodeURIComponent(snapshotId)}/?${params.toString()}`;
+    return this.requestJSON(path);
+  }
+
+  async getSnapshotImageDetail({
+    organizationSlug,
+    snapshotId,
+    imageIdentifier,
+  }: {
+    organizationSlug: string;
+    snapshotId: string;
+    imageIdentifier: string;
+  }): Promise<unknown> {
+    const path = `/organizations/${encodeURIComponent(organizationSlug)}/preprodartifacts/snapshots/${encodeURIComponent(snapshotId)}/images/${encodeURIComponent(imageIdentifier)}/`;
+    return this.requestJSON(path);
+  }
+
+  async fetchImageByUrl(
+    imageUrl: string,
+  ): Promise<{ blob: Blob; contentType: string }> {
+    const response = imageUrl.startsWith("https://")
+      ? await fetch(imageUrl)
+      : await this.request(
+          imageUrl.startsWith("/api/0")
+            ? imageUrl.slice("/api/0".length)
+            : imageUrl,
+        );
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch image: ${response.status} ${response.statusText}`,
+      );
+    }
+    const blob = await response.blob();
+    let contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("image/")) {
+      const { detectImageMimeType } = await import("../internal/blob-utils.js");
+      contentType = (await detectImageMimeType(blob)) ?? contentType;
+    }
+    return { blob, contentType };
+  }
+
+  async getLatestBaseSnapshot({
+    organizationSlug,
+    appId,
+    branch,
+    project,
+    projectSlug,
+    compactMetadata = true,
+  }: {
+    organizationSlug: string;
+    appId: string;
+    branch?: string;
+    project?: string;
+    projectSlug?: string;
+    compactMetadata?: boolean;
+  }): Promise<unknown> {
+    const params = new URLSearchParams();
+    params.set("app_id", appId);
+    if (branch) params.set("branch", branch);
+    if (project) params.set("project", project);
+    if (projectSlug) params.set("projectSlug", projectSlug);
+    if (compactMetadata) params.set("compact_metadata", "true");
+    const path = `/organizations/${encodeURIComponent(organizationSlug)}/preprodartifacts/snapshots/latest-base/?${params.toString()}`;
+    return this.requestJSON(path);
+  }
+}

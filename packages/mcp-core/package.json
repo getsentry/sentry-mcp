@@ -1,0 +1,174 @@
+{
+  "name": "@sentry/mcp-core",
+  "version": "0.36.0",
+  "type": "module",
+  "private": true,
+  "packageManager": "pnpm@11.8.0",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "FSL-1.1-ALv2",
+  "author": "Sentry",
+  "description": "Sentry MCP Core - Shared code for MCP transports",
+  "homepage": "https://github.com/getsentry/sentry-mcp",
+  "keywords": ["sentry"],
+  "bugs": {
+    "url": "https://github.com/getsentry/sentry-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:getsentry/sentry-mcp.git"
+  },
+  "files": ["./dist/*"],
+  "exports": {
+    "./api-client": {
+      "types": "./dist/api-client/index.d.ts",
+      "default": "./dist/api-client/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "default": "./dist/constants.js"
+    },
+    "./telem": {
+      "types": "./dist/telem/index.d.ts",
+      "default": "./dist/telem/index.js"
+    },
+    "./telem/logging": {
+      "types": "./dist/telem/logging.d.ts",
+      "default": "./dist/telem/logging.js"
+    },
+    "./telem/sentry": {
+      "types": "./dist/telem/sentry.d.ts",
+      "default": "./dist/telem/sentry.js"
+    },
+    "./permissions": {
+      "types": "./dist/permissions.d.ts",
+      "default": "./dist/permissions.js"
+    },
+    "./skills": {
+      "types": "./dist/skills.d.ts",
+      "default": "./dist/skills.js"
+    },
+    "./tools": {
+      "types": "./dist/tools/index.d.ts",
+      "default": "./dist/tools/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./toolDefinitions": {
+      "types": "./dist/toolDefinitions.d.ts",
+      "default": "./dist/toolDefinitions.js"
+    },
+    "./skillDefinitions": {
+      "types": "./dist/skillDefinitions.d.ts",
+      "default": "./dist/skillDefinitions.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    },
+    "./version": {
+      "types": "./dist/version.d.ts",
+      "default": "./dist/version.js"
+    },
+    "./tools/search-events": {
+      "types": "./dist/tools/search-events/index.d.ts",
+      "default": "./dist/tools/search-events/index.js"
+    },
+    "./tools/search-issues": {
+      "types": "./dist/tools/search-issues/index.d.ts",
+      "default": "./dist/tools/search-issues/index.js"
+    },
+    "./tools/search-issue-events": {
+      "types": "./dist/tools/search-issue-events/index.d.ts",
+      "default": "./dist/tools/search-issue-events/index.js"
+    },
+    "./tools/search-events/agent": {
+      "types": "./dist/tools/search-events/agent.d.ts",
+      "default": "./dist/tools/search-events/agent.js"
+    },
+    "./tools/search-issues/agent": {
+      "types": "./dist/tools/search-issues/agent.d.ts",
+      "default": "./dist/tools/search-issues/agent.js"
+    },
+    "./tools/search-issue-events/agent": {
+      "types": "./dist/tools/search-issue-events/agent.d.ts",
+      "default": "./dist/tools/search-issue-events/agent.js"
+    },
+    "./tools/agent-tools": {
+      "types": "./dist/tools/agent-tools.d.ts",
+      "default": "./dist/tools/agent-tools.js"
+    },
+    "./internal/agents/callEmbeddedAgent": {
+      "types": "./dist/internal/agents/callEmbeddedAgent.d.ts",
+      "default": "./dist/internal/agents/callEmbeddedAgent.js"
+    },
+    "./internal/agents/openai-provider": {
+      "types": "./dist/internal/agents/openai-provider.d.ts",
+      "default": "./dist/internal/agents/openai-provider.js"
+    },
+    "./internal/agents/azure-openai-provider": {
+      "types": "./dist/internal/agents/azure-openai-provider.d.ts",
+      "default": "./dist/internal/agents/azure-openai-provider.js"
+    },
+    "./internal/agents/anthropic-provider": {
+      "types": "./dist/internal/agents/anthropic-provider.d.ts",
+      "default": "./dist/internal/agents/anthropic-provider.js"
+    },
+    "./internal/agents/provider-factory": {
+      "types": "./dist/internal/agents/provider-factory.d.ts",
+      "default": "./dist/internal/agents/provider-factory.js"
+    },
+    "./internal/agents/types": {
+      "types": "./dist/internal/agents/types.d.ts",
+      "default": "./dist/internal/agents/types.js"
+    },
+    "./utils/url-utils": {
+      "types": "./dist/utils/url-utils.d.ts",
+      "default": "./dist/utils/url-utils.js"
+    },
+    "./scopes": {
+      "types": "./dist/scopes.d.ts",
+      "default": "./dist/scopes.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "pnpm run generate-definitions",
+    "build": "tsdown",
+    "pretest": "pnpm run generate-definitions",
+    "test": "pnpm run validate-skills && vitest run",
+    "test:ci": "pnpm run generate-definitions && pnpm run validate-skills && vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test:watch": "pnpm run generate-definitions && vitest",
+    "tsc": "tsc --noEmit",
+    "generate-definitions": "tsx scripts/generate-definitions.ts && biome format --write src/toolDefinitions.json src/skillDefinitions.json",
+    "generate-otel-namespaces": "tsx scripts/generate-otel-namespaces.ts",
+    "measure-tokens": "tsx scripts/measure-token-cost.ts",
+    "validate-skills": "tsx scripts/validate-skills-mapping.ts"
+  },
+  "devDependencies": {
+    "@ai-sdk/provider": "^3.0.6",
+    "@ai-sdk/provider-utils": "^4.0.11",
+    "@sentry/mcp-server-mocks": "workspace:*",
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "msw": "catalog:",
+    "tiktoken": "^1.0.18",
+    "yaml": "^2.8.3",
+    "zod-to-json-schema": "catalog:"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "catalog:",
+    "@ai-sdk/mcp": "catalog:",
+    "@ai-sdk/openai": "catalog:",
+    "@logtape/logtape": "^1.1.1",
+    "@logtape/sentry": "^1.1.1",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@sentry/core": "catalog:",
+    "ai": "catalog:",
+    "dotenv": "catalog:",
+    "fast-png": "^8.0.0",
+    "jpeg-js": "^0.4.4",
+    "zod": "catalog:"
+  }
+}

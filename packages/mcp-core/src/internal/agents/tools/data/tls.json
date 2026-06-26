@@ -1,0 +1,188 @@
+{
+  "namespace": "tls",
+  "description": "This document defines semantic convention attributes in the TLS namespace.",
+  "attributes": {
+    "tls.cipher": {
+      "description": "String indicating the [cipher](https://datatracker.ietf.org/doc/html/rfc5246#appendix-A.5) used during the current connection.\n",
+      "type": "string",
+      "note": "The values allowed for `tls.cipher` MUST be one of the `Descriptions` of the [registered TLS Cipher Suits](https://www.iana.org/assignments/tls-parameters/tls-parameters.xhtml#table-tls-parameters-4).\n",
+      "stability": "development",
+      "examples": [
+        "TLS_RSA_WITH_3DES_EDE_CBC_SHA",
+        "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"
+      ]
+    },
+    "tls.client.certificate": {
+      "description": "PEM-encoded stand-alone certificate offered by the client. This is usually mutually-exclusive of `client.certificate_chain` since this value also exists in that list.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["MII..."]
+    },
+    "tls.client.certificate_chain": {
+      "description": "Array of PEM-encoded certificates that make up the certificate chain offered by the client. This is usually mutually-exclusive of `client.certificate` since that value should be the first certificate in the chain.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["[\"MII...\",\"MI...\"]"]
+    },
+    "tls.client.hash.md5": {
+      "description": "Certificate fingerprint using the MD5 digest of DER-encoded version of certificate offered by the client. For consistency with other hash values, this value should be formatted as an uppercase hash.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["0F76C7F2C55BFD7D8E8B8F4BFBF0C9EC"]
+    },
+    "tls.client.hash.sha1": {
+      "description": "Certificate fingerprint using the SHA1 digest of DER-encoded version of certificate offered by the client. For consistency with other hash values, this value should be formatted as an uppercase hash.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["9E393D93138888D288266C2D915214D1D1CCEB2A"]
+    },
+    "tls.client.hash.sha256": {
+      "description": "Certificate fingerprint using the SHA256 digest of DER-encoded version of certificate offered by the client. For consistency with other hash values, this value should be formatted as an uppercase hash.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "0687F666A054EF17A08E2F2162EAB4CBC0D265E1D7875BE74BF3C712CA92DAF0"
+      ]
+    },
+    "tls.client.issuer": {
+      "description": "Distinguished name of [subject](https://datatracker.ietf.org/doc/html/rfc5280#section-4.1.2.6) of the issuer of the x.509 certificate presented by the client.",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "CN=Example Root CA, OU=Infrastructure Team, DC=example, DC=com"
+      ]
+    },
+    "tls.client.ja3": {
+      "description": "A hash that identifies clients based on how they perform an SSL/TLS handshake.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["d4e5b18d6b55c71272893221c96ba240"]
+    },
+    "tls.client.not_after": {
+      "description": "Date/Time indicating when client certificate is no longer considered valid.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["2021-01-01T00:00:00.000Z"]
+    },
+    "tls.client.not_before": {
+      "description": "Date/Time indicating when client certificate is first considered valid.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["1970-01-01T00:00:00.000Z"]
+    },
+    "tls.client.subject": {
+      "description": "Distinguished name of subject of the x.509 certificate presented by the client.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["CN=myclient, OU=Documentation Team, DC=example, DC=com"]
+    },
+    "tls.client.supported_ciphers": {
+      "description": "Array of ciphers offered by the client during the client hello.",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "[\"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384\",\"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384\"]"
+      ]
+    },
+    "tls.curve": {
+      "description": "String indicating the curve used for the given cipher, when applicable",
+      "type": "string",
+      "stability": "development",
+      "examples": ["secp256r1"]
+    },
+    "tls.established": {
+      "description": "Boolean flag indicating if the TLS negotiation was successful and transitioned to an encrypted tunnel.",
+      "type": "boolean",
+      "stability": "development",
+      "examples": ["true"]
+    },
+    "tls.next_protocol": {
+      "description": "String indicating the protocol being tunneled. Per the values in the [IANA registry](https://www.iana.org/assignments/tls-extensiontype-values/tls-extensiontype-values.xhtml#alpn-protocol-ids), this string should be lower case.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["http/1.1"]
+    },
+    "tls.protocol.name": {
+      "description": "Normalized lowercase protocol name parsed from original string of the negotiated [SSL/TLS protocol version](https://docs.openssl.org/1.1.1/man3/SSL_get_version/#return-values)\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["ssl", "tls"]
+    },
+    "tls.protocol.version": {
+      "description": "Numeric part of the version parsed from the original string of the negotiated [SSL/TLS protocol version](https://docs.openssl.org/1.1.1/man3/SSL_get_version/#return-values)\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["1.2", "3"]
+    },
+    "tls.resumed": {
+      "description": "Boolean flag indicating if this TLS connection was resumed from an existing TLS negotiation.",
+      "type": "boolean",
+      "stability": "development",
+      "examples": ["true"]
+    },
+    "tls.server.certificate": {
+      "description": "PEM-encoded stand-alone certificate offered by the server. This is usually mutually-exclusive of `server.certificate_chain` since this value also exists in that list.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["MII..."]
+    },
+    "tls.server.certificate_chain": {
+      "description": "Array of PEM-encoded certificates that make up the certificate chain offered by the server. This is usually mutually-exclusive of `server.certificate` since that value should be the first certificate in the chain.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["[\"MII...\",\"MI...\"]"]
+    },
+    "tls.server.hash.md5": {
+      "description": "Certificate fingerprint using the MD5 digest of DER-encoded version of certificate offered by the server. For consistency with other hash values, this value should be formatted as an uppercase hash.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["0F76C7F2C55BFD7D8E8B8F4BFBF0C9EC"]
+    },
+    "tls.server.hash.sha1": {
+      "description": "Certificate fingerprint using the SHA1 digest of DER-encoded version of certificate offered by the server. For consistency with other hash values, this value should be formatted as an uppercase hash.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["9E393D93138888D288266C2D915214D1D1CCEB2A"]
+    },
+    "tls.server.hash.sha256": {
+      "description": "Certificate fingerprint using the SHA256 digest of DER-encoded version of certificate offered by the server. For consistency with other hash values, this value should be formatted as an uppercase hash.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "0687F666A054EF17A08E2F2162EAB4CBC0D265E1D7875BE74BF3C712CA92DAF0"
+      ]
+    },
+    "tls.server.issuer": {
+      "description": "Distinguished name of [subject](https://datatracker.ietf.org/doc/html/rfc5280#section-4.1.2.6) of the issuer of the x.509 certificate presented by the client.",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "CN=Example Root CA, OU=Infrastructure Team, DC=example, DC=com"
+      ]
+    },
+    "tls.server.ja3s": {
+      "description": "A hash that identifies servers based on how they perform an SSL/TLS handshake.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["d4e5b18d6b55c71272893221c96ba240"]
+    },
+    "tls.server.not_after": {
+      "description": "Date/Time indicating when server certificate is no longer considered valid.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["2021-01-01T00:00:00.000Z"]
+    },
+    "tls.server.not_before": {
+      "description": "Date/Time indicating when server certificate is first considered valid.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["1970-01-01T00:00:00.000Z"]
+    },
+    "tls.server.subject": {
+      "description": "Distinguished name of subject of the x.509 certificate presented by the server.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["CN=myserver, OU=Documentation Team, DC=example, DC=com"]
+    }
+  }
+}

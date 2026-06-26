@@ -1,0 +1,127 @@
+{
+  "namespace": "vcs",
+  "description": "This group defines the attributes for [Version Control Systems (VCS)](https://wikipedia.org/wiki/Version_control).\n",
+  "attributes": {
+    "vcs.repository.url.full": {
+      "description": "The [canonical URL](https://support.google.com/webmasters/answer/10347851?hl=en#:~:text=A%20canonical%20URL%20is%20the,Google%20chooses%20one%20as%20canonical.) of the repository providing the complete HTTP(S) address in order to locate and identify the repository through a browser.\n",
+      "type": "string",
+      "note": "In Git Version Control Systems, the canonical URL SHOULD NOT include\nthe `.git` extension.\n",
+      "stability": "development",
+      "examples": [
+        "https://github.com/opentelemetry/open-telemetry-collector-contrib",
+        "https://gitlab.com/my-org/my-project/my-projects-project/repo"
+      ]
+    },
+    "vcs.repository.name": {
+      "description": "The human readable name of the repository. It SHOULD NOT include any additional identifier like Group/SubGroup in GitLab or organization in GitHub.\n",
+      "type": "string",
+      "note": "Due to it only being the name, it can clash with forks of the same\nrepository if collecting telemetry across multiple orgs or groups in\nthe same backends.\n",
+      "stability": "development",
+      "examples": ["semantic-conventions", "my-cool-repo"]
+    },
+    "vcs.ref.base.name": {
+      "description": "The name of the [reference](https://git-scm.com/docs/gitglossary#def_ref) such as **branch** or **tag** in the repository.\n",
+      "type": "string",
+      "note": "`base` refers to the starting point of a change. For example, `main`\nwould be the base reference of type branch if you've created a new\nreference of type branch from it and created new commits.\n",
+      "stability": "development",
+      "examples": ["my-feature-branch", "tag-1-test"]
+    },
+    "vcs.ref.base.type": {
+      "description": "The type of the [reference](https://git-scm.com/docs/gitglossary#def_ref) in the repository.\n",
+      "type": "string",
+      "note": "`base` refers to the starting point of a change. For example, `main`\nwould be the base reference of type branch if you've created a new\nreference of type branch from it and created new commits.\n",
+      "stability": "development",
+      "examples": ["branch", "tag"]
+    },
+    "vcs.ref.base.revision": {
+      "description": "The revision, literally [revised version](https://www.merriam-webster.com/dictionary/revision), The revision most often refers to a commit object in Git, or a revision number in SVN.\n",
+      "type": "string",
+      "note": "`base` refers to the starting point of a change. For example, `main`\nwould be the base reference of type branch if you've created a new\nreference of type branch from it and created new commits. The\nrevision can be a full [hash value (see\nglossary)](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf),\nof the recorded change to a ref within a repository pointing to a\ncommit [commit](https://git-scm.com/docs/git-commit) object. It does\nnot necessarily have to be a hash; it can simply define a [revision\nnumber](https://svnbook.red-bean.com/en/1.7/svn.tour.revs.specifiers.html)\nwhich is an integer that is monotonically increasing. In cases where\nit is identical to the `ref.base.name`, it SHOULD still be included.\nIt is up to the implementer to decide which value to set as the\nrevision based on the VCS system and situational context.\n",
+      "stability": "development",
+      "examples": [
+        "9d59409acf479dfa0df1aa568182e43e43df8bbe28d60fcf2bc52e30068802cc",
+        "main",
+        "123",
+        "HEAD"
+      ]
+    },
+    "vcs.ref.head.name": {
+      "description": "The name of the [reference](https://git-scm.com/docs/gitglossary#def_ref) such as **branch** or **tag** in the repository.\n",
+      "type": "string",
+      "note": "`head` refers to where you are right now; the current reference at a\ngiven time.\n",
+      "stability": "development",
+      "examples": ["my-feature-branch", "tag-1-test"]
+    },
+    "vcs.ref.head.type": {
+      "description": "The type of the [reference](https://git-scm.com/docs/gitglossary#def_ref) in the repository.\n",
+      "type": "string",
+      "note": "`head` refers to where you are right now; the current reference at a\ngiven time.\n",
+      "stability": "development",
+      "examples": ["branch", "tag"]
+    },
+    "vcs.ref.head.revision": {
+      "description": "The revision, literally [revised version](https://www.merriam-webster.com/dictionary/revision), The revision most often refers to a commit object in Git, or a revision number in SVN.\n",
+      "type": "string",
+      "note": "`head` refers to where you are right now; the current reference at a\ngiven time.The revision can be a full [hash value (see\nglossary)](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf),\nof the recorded change to a ref within a repository pointing to a\ncommit [commit](https://git-scm.com/docs/git-commit) object. It does\nnot necessarily have to be a hash; it can simply define a [revision\nnumber](https://svnbook.red-bean.com/en/1.7/svn.tour.revs.specifiers.html)\nwhich is an integer that is monotonically increasing. In cases where\nit is identical to the `ref.head.name`, it SHOULD still be included.\nIt is up to the implementer to decide which value to set as the\nrevision based on the VCS system and situational context.\n",
+      "stability": "development",
+      "examples": [
+        "9d59409acf479dfa0df1aa568182e43e43df8bbe28d60fcf2bc52e30068802cc",
+        "main",
+        "123",
+        "HEAD"
+      ]
+    },
+    "vcs.ref.type": {
+      "description": "The type of the [reference](https://git-scm.com/docs/gitglossary#def_ref) in the repository.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["branch", "tag"]
+    },
+    "vcs.revision_delta.direction": {
+      "description": "The type of revision comparison.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["behind", "ahead"]
+    },
+    "vcs.line_change.type": {
+      "description": "The type of line change being measured on a branch or change.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["added", "removed"]
+    },
+    "vcs.change.title": {
+      "description": "The human readable title of the change (pull request/merge request/changelist). This title is often a brief summary of the change and may get merged in to a ref as the commit summary.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "Fixes broken thing",
+        "feat: add my new feature",
+        "[chore] update dependency"
+      ]
+    },
+    "vcs.change.id": {
+      "description": "The ID of the change (pull request/merge request/changelist) if applicable. This is usually a unique (within repository) identifier generated by the VCS system.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["123"]
+    },
+    "vcs.change.state": {
+      "description": "The state of the change (pull request/merge request/changelist).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["open", "wip", "closed", "merged"]
+    },
+    "vcs.owner.name": {
+      "description": "The group owner within the version control system.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["my-org", "myteam", "business-unit"]
+    },
+    "vcs.provider.name": {
+      "description": "The name of the version control system provider.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["github", "gitlab", "gittea", "gitea", "bitbucket"]
+    }
+  }
+}

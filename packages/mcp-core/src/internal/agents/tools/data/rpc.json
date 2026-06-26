@@ -1,0 +1,153 @@
+{
+  "namespace": "rpc",
+  "description": "This document defines attributes for remote procedure calls.",
+  "attributes": {
+    "rpc.connect_rpc.error_code": {
+      "description": "The [error codes](https://connectrpc.com//docs/protocol/#error-codes) of the Connect request. Error codes are always string values.",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "cancelled",
+        "unknown",
+        "invalid_argument",
+        "deadline_exceeded",
+        "not_found",
+        "already_exists",
+        "permission_denied",
+        "resource_exhausted",
+        "failed_precondition",
+        "aborted",
+        "out_of_range",
+        "unimplemented",
+        "internal",
+        "unavailable",
+        "data_loss",
+        "unauthenticated"
+      ]
+    },
+    "rpc.connect_rpc.request.metadata": {
+      "description": "Connect request metadata, `<key>` being the normalized Connect Metadata key (lowercase), the value being the metadata values.\n",
+      "type": "string",
+      "note": "Instrumentations SHOULD require an explicit configuration of which metadata values are to be captured.\nIncluding all request metadata values can be a security risk - explicit configuration helps avoid leaking sensitive information.\n\nFor example, a property `my-custom-key` with value `[\"1.2.3.4\", \"1.2.3.5\"]` SHOULD be recorded as\nthe `rpc.connect_rpc.request.metadata.my-custom-key` attribute with value `[\"1.2.3.4\", \"1.2.3.5\"]`\n",
+      "stability": "development",
+      "examples": ["[\"1.2.3.4\",\"1.2.3.5\"]"]
+    },
+    "rpc.connect_rpc.response.metadata": {
+      "description": "Connect response metadata, `<key>` being the normalized Connect Metadata key (lowercase), the value being the metadata values.\n",
+      "type": "string",
+      "note": "Instrumentations SHOULD require an explicit configuration of which metadata values are to be captured.\nIncluding all response metadata values can be a security risk - explicit configuration helps avoid leaking sensitive information.\n\nFor example, a property `my-custom-key` with value `\"attribute_value\"` SHOULD be recorded as\nthe `rpc.connect_rpc.response.metadata.my-custom-key` attribute with value `[\"attribute_value\"]`\n",
+      "stability": "development",
+      "examples": ["[\"attribute_value\"]"]
+    },
+    "rpc.grpc.status_code": {
+      "description": "The [numeric status code](https://github.com/grpc/grpc/blob/v1.33.2/doc/statuscodes.md) of the gRPC request.",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16"
+      ]
+    },
+    "rpc.grpc.request.metadata": {
+      "description": "gRPC request metadata, `<key>` being the normalized gRPC Metadata key (lowercase), the value being the metadata values.\n",
+      "type": "string",
+      "note": "Instrumentations SHOULD require an explicit configuration of which metadata values are to be captured.\nIncluding all request metadata values can be a security risk - explicit configuration helps avoid leaking sensitive information.\n\nFor example, a property `my-custom-key` with value `[\"1.2.3.4\", \"1.2.3.5\"]` SHOULD be recorded as\n`rpc.grpc.request.metadata.my-custom-key` attribute with value `[\"1.2.3.4\", \"1.2.3.5\"]`\n",
+      "stability": "development",
+      "examples": ["[\"1.2.3.4\",\"1.2.3.5\"]"]
+    },
+    "rpc.grpc.response.metadata": {
+      "description": "gRPC response metadata, `<key>` being the normalized gRPC Metadata key (lowercase), the value being the metadata values.\n",
+      "type": "string",
+      "note": "Instrumentations SHOULD require an explicit configuration of which metadata values are to be captured.\nIncluding all response metadata values can be a security risk - explicit configuration helps avoid leaking sensitive information.\n\nFor example, a property `my-custom-key` with value `[\"attribute_value\"]` SHOULD be recorded as\nthe `rpc.grpc.response.metadata.my-custom-key` attribute with value `[\"attribute_value\"]`\n",
+      "stability": "development",
+      "examples": ["[\"attribute_value\"]"]
+    },
+    "rpc.jsonrpc.error_code": {
+      "description": "`error.code` property of response if it is an error response.",
+      "type": "number",
+      "stability": "development",
+      "examples": ["-32700", "100"]
+    },
+    "rpc.jsonrpc.error_message": {
+      "description": "`error.message` property of response if it is an error response.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["Parse error", "User already exists"]
+    },
+    "rpc.jsonrpc.request_id": {
+      "description": "`id` property of request or response. Since protocol allows id to be int, string, `null` or missing (for notifications), value is expected to be cast to string for simplicity. Use empty string in case of `null` value. Omit entirely if this is a notification.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["10", "request-7", ""]
+    },
+    "rpc.jsonrpc.version": {
+      "description": "Protocol version as in `jsonrpc` property of request/response. Since JSON-RPC 1.0 doesn't specify this, the value can be omitted.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["2.0", "1.0"]
+    },
+    "rpc.method": {
+      "description": "The name of the (logical) method being called, must be equal to the $method part in the span name.",
+      "type": "string",
+      "note": "This is the logical name of the method from the RPC interface perspective, which can be different from the name of any implementing method/function. The `code.function.name` attribute may be used to store the latter (e.g., method actually executing the call on the server side, RPC client stub method on the client side).\n",
+      "stability": "development",
+      "examples": ["exampleMethod"]
+    },
+    "rpc.service": {
+      "description": "The full (logical) name of the service being called, including its package name, if applicable.",
+      "type": "string",
+      "note": "This is the logical name of the service from the RPC interface perspective, which can be different from the name of any implementing class. The `code.namespace` attribute may be used to store the latter (despite the attribute name, it may include a class name; e.g., class with method actually executing the call on the server side, RPC client stub class on the client side).\n",
+      "stability": "development",
+      "examples": ["myservice.EchoService"]
+    },
+    "rpc.system": {
+      "description": "A string identifying the remoting system. See below for a list of well-known identifiers.",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "grpc",
+        "java_rmi",
+        "dotnet_wcf",
+        "apache_dubbo",
+        "connect_rpc"
+      ]
+    },
+    "rpc.message.type": {
+      "description": "Whether this is a received or sent message.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["SENT", "RECEIVED"]
+    },
+    "rpc.message.id": {
+      "description": "MUST be calculated as two different counters starting from `1` one for sent messages and one for received message.",
+      "type": "number",
+      "note": "This way we guarantee that the values will be consistent between different implementations.",
+      "stability": "development"
+    },
+    "rpc.message.compressed_size": {
+      "description": "Compressed size of the message in bytes.",
+      "type": "number",
+      "stability": "development"
+    },
+    "rpc.message.uncompressed_size": {
+      "description": "Uncompressed size of the message in bytes.",
+      "type": "number",
+      "stability": "development"
+    }
+  }
+}

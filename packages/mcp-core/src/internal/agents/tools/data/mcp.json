@@ -1,0 +1,29 @@
+{
+  "namespace": "mcp",
+  "description": "Model Context Protocol semantic convention attributes",
+  "attributes": {
+    "mcp.method.name": {
+      "description": "The name of the request or notification method.",
+      "type": "string",
+      "examples": ["initialize", "tools/call", "resources/read"]
+    },
+    "mcp.protocol.version": {
+      "description": "The version of the Model Context Protocol used.",
+      "type": "string",
+      "examples": ["2025-06-18"]
+    },
+    "mcp.resource.uri": {
+      "description": "The value of the resource URI.",
+      "type": "string",
+      "examples": [
+        "postgres://database/customers/schema",
+        "file:///home/user/documents/report.pdf"
+      ]
+    },
+    "mcp.session.id": {
+      "description": "Identifies an MCP session.",
+      "type": "string",
+      "examples": ["191c4850af6c49e08843a3f6c80e5046"]
+    }
+  }
+}

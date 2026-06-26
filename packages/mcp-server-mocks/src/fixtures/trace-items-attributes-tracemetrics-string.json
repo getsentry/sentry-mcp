@@ -1,0 +1,26 @@
+[
+  {
+    "key": "metric.name",
+    "name": "Metric Name"
+  },
+  {
+    "key": "metric.type",
+    "name": "Metric Type"
+  },
+  {
+    "key": "metric.unit",
+    "name": "Metric Unit"
+  },
+  {
+    "key": "transaction",
+    "name": "transaction"
+  },
+  {
+    "key": "project",
+    "name": "project"
+  },
+  {
+    "key": "environment",
+    "name": "environment"
+  }
+]

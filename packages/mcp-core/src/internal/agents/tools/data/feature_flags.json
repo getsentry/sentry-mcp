@@ -1,0 +1,66 @@
+{
+  "namespace": "feature_flags",
+  "description": "This document defines attributes for Feature Flags.\n",
+  "attributes": {
+    "feature_flag.key": {
+      "description": "The lookup key of the feature flag.",
+      "type": "string",
+      "stability": "release_candidate",
+      "examples": ["logo-color"]
+    },
+    "feature_flag.provider.name": {
+      "description": "Identifies the feature flag provider.",
+      "type": "string",
+      "stability": "release_candidate",
+      "examples": ["Flag Manager"]
+    },
+    "feature_flag.result.variant": {
+      "description": "A semantic identifier for an evaluated flag value.\n",
+      "type": "string",
+      "note": "A semantic identifier, commonly referred to as a variant, provides a means\nfor referring to a value without including the value itself. This can\nprovide additional context for understanding the meaning behind a value.\nFor example, the variant `red` maybe be used for the value `#c05543`.",
+      "stability": "release_candidate",
+      "examples": ["red", "true", "on"]
+    },
+    "feature_flag.context.id": {
+      "description": "The unique identifier for the flag evaluation context. For example, the targeting key.\n",
+      "type": "string",
+      "stability": "release_candidate",
+      "examples": ["5157782b-2203-4c80-a857-dbbd5e7761db"]
+    },
+    "feature_flag.version": {
+      "description": "The version of the ruleset used during the evaluation. This may be any stable value which uniquely identifies the ruleset.\n",
+      "type": "string",
+      "stability": "release_candidate",
+      "examples": ["1", "01ABCDEF"]
+    },
+    "feature_flag.set.id": {
+      "description": "The identifier of the [flag set](https://openfeature.dev/specification/glossary/#flag-set) to which the feature flag belongs.\n",
+      "type": "string",
+      "stability": "release_candidate",
+      "examples": ["proj-1", "ab98sgs", "service1/dev"]
+    },
+    "feature_flag.result.reason": {
+      "description": "The reason code which shows how a feature flag value was determined.\n",
+      "type": "string",
+      "stability": "release_candidate",
+      "examples": [
+        "static",
+        "default",
+        "targeting_match",
+        "split",
+        "cached",
+        "disabled",
+        "unknown",
+        "stale",
+        "error"
+      ]
+    },
+    "feature_flag.result.value": {
+      "description": "The evaluated value of the feature flag.",
+      "type": "string",
+      "note": "With some feature flag providers, feature flag results can be quite large or contain private or sensitive details.\nBecause of this, `feature_flag.result.variant` is often the preferred attribute if it is available.\n\nIt may be desirable to redact or otherwise limit the size and scope of `feature_flag.result.value` if possible.\nBecause the evaluated flag value is unstructured and may be any type, it is left to the instrumentation author to determine how best to achieve this.\n",
+      "stability": "release_candidate",
+      "examples": ["#ff0000", "true", "3"]
+    }
+  }
+}

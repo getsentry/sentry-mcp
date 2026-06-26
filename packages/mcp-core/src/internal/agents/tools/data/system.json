@@ -1,0 +1,12 @@
+{
+  "namespace": "system",
+  "description": "Describes System attributes",
+  "attributes": {
+    "system.device": {
+      "description": "The device identifier",
+      "type": "string",
+      "stability": "development",
+      "examples": ["(identifier)"]
+    }
+  }
+}

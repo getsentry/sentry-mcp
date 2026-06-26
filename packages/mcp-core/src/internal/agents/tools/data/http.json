@@ -1,0 +1,94 @@
+{
+  "namespace": "http",
+  "description": "This document defines semantic convention attributes in the HTTP namespace.",
+  "attributes": {
+    "http.request.body.size": {
+      "description": "The size of the request payload body in bytes. This is the number of bytes transferred excluding headers and is often, but not always, present as the [Content-Length](https://www.rfc-editor.org/rfc/rfc9110.html#field.content-length) header. For requests using transport encoding, this should be the compressed size.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["3495"]
+    },
+    "http.request.header": {
+      "description": "HTTP request headers, `<key>` being the normalized HTTP Header name (lowercase), the value being the header values.\n",
+      "type": "string",
+      "note": "Instrumentations SHOULD require an explicit configuration of which headers are to be captured.\nIncluding all request headers can be a security risk - explicit configuration helps avoid leaking sensitive information.\n\nThe `User-Agent` header is already captured in the `user_agent.original` attribute.\nUsers MAY explicitly configure instrumentations to capture them even though it is not recommended.\n\nThe attribute value MUST consist of either multiple header values as an array of strings\nor a single-item array containing a possibly comma-concatenated string, depending on the way\nthe HTTP library provides access to headers.\n\nExamples:\n\n- A header `Content-Type: application/json` SHOULD be recorded as the `http.request.header.content-type`\n  attribute with value `[\"application/json\"]`.\n- A header `X-Forwarded-For: 1.2.3.4, 1.2.3.5` SHOULD be recorded as the `http.request.header.x-forwarded-for`\n  attribute with value `[\"1.2.3.4\", \"1.2.3.5\"]` or `[\"1.2.3.4, 1.2.3.5\"]` depending on the HTTP library.\n",
+      "stability": "stable",
+      "examples": ["[\"application/json\"]", "[\"1.2.3.4\",\"1.2.3.5\"]"]
+    },
+    "http.request.method": {
+      "description": "HTTP request method.",
+      "type": "string",
+      "note": "HTTP request method value SHOULD be \"known\" to the instrumentation.\nBy default, this convention defines \"known\" methods as the ones listed in [RFC9110](https://www.rfc-editor.org/rfc/rfc9110.html#name-methods)\nand the PATCH method defined in [RFC5789](https://www.rfc-editor.org/rfc/rfc5789.html).\n\nIf the HTTP request method is not known to instrumentation, it MUST set the `http.request.method` attribute to `_OTHER`.\n\nIf the HTTP instrumentation could end up converting valid HTTP request methods to `_OTHER`, then it MUST provide a way to override\nthe list of known HTTP methods. If this override is done via environment variable, then the environment variable MUST be named\nOTEL_INSTRUMENTATION_HTTP_KNOWN_METHODS and support a comma-separated list of case-sensitive known HTTP methods\n(this list MUST be a full override of the default known method, it is not a list of known methods in addition to the defaults).\n\nHTTP method names are case-sensitive and `http.request.method` attribute value MUST match a known HTTP method name exactly.\nInstrumentations for specific web frameworks that consider HTTP methods to be case insensitive, SHOULD populate a canonical equivalent.\nTracing instrumentations that do so, MUST also set `http.request.method_original` to the original value.\n",
+      "stability": "stable",
+      "examples": [
+        "CONNECT",
+        "DELETE",
+        "GET",
+        "HEAD",
+        "OPTIONS",
+        "PATCH",
+        "POST",
+        "PUT",
+        "TRACE",
+        "_OTHER"
+      ]
+    },
+    "http.request.method_original": {
+      "description": "Original HTTP method sent by the client in the request line.",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["GeT", "ACL", "foo"]
+    },
+    "http.request.resend_count": {
+      "description": "The ordinal number of request resending attempt (for any reason, including redirects).\n",
+      "type": "number",
+      "note": "The resend count SHOULD be updated each time an HTTP request gets resent by the client, regardless of what was the cause of the resending (e.g. redirection, authorization failure, 503 Server Unavailable, network issues, or any other).\n",
+      "stability": "stable",
+      "examples": ["3"]
+    },
+    "http.request.size": {
+      "description": "The total size of the request in bytes. This should be the total number of bytes sent over the wire, including the request line (HTTP/1.1), framing (HTTP/2 and HTTP/3), headers, and request body if any.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["1437"]
+    },
+    "http.response.body.size": {
+      "description": "The size of the response payload body in bytes. This is the number of bytes transferred excluding headers and is often, but not always, present as the [Content-Length](https://www.rfc-editor.org/rfc/rfc9110.html#field.content-length) header. For requests using transport encoding, this should be the compressed size.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["3495"]
+    },
+    "http.response.header": {
+      "description": "HTTP response headers, `<key>` being the normalized HTTP Header name (lowercase), the value being the header values.\n",
+      "type": "string",
+      "note": "Instrumentations SHOULD require an explicit configuration of which headers are to be captured.\nIncluding all response headers can be a security risk - explicit configuration helps avoid leaking sensitive information.\n\nUsers MAY explicitly configure instrumentations to capture them even though it is not recommended.\n\nThe attribute value MUST consist of either multiple header values as an array of strings\nor a single-item array containing a possibly comma-concatenated string, depending on the way\nthe HTTP library provides access to headers.\n\nExamples:\n\n- A header `Content-Type: application/json` header SHOULD be recorded as the `http.request.response.content-type`\n  attribute with value `[\"application/json\"]`.\n- A header `My-custom-header: abc, def` header SHOULD be recorded as the `http.response.header.my-custom-header`\n  attribute with value `[\"abc\", \"def\"]` or `[\"abc, def\"]` depending on the HTTP library.\n",
+      "stability": "stable",
+      "examples": ["[\"application/json\"]", "[\"abc\",\"def\"]"]
+    },
+    "http.response.size": {
+      "description": "The total size of the response in bytes. This should be the total number of bytes sent over the wire, including the status line (HTTP/1.1), framing (HTTP/2 and HTTP/3), headers, and response body and trailers if any.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["1437"]
+    },
+    "http.response.status_code": {
+      "description": "[HTTP response status code](https://tools.ietf.org/html/rfc7231#section-6).",
+      "type": "number",
+      "stability": "stable",
+      "examples": ["200"]
+    },
+    "http.route": {
+      "description": "The matched route, that is, the path template in the format used by the respective server framework.\n",
+      "type": "string",
+      "note": "MUST NOT be populated when this is not supported by the HTTP server framework as the route attribute should have low-cardinality and the URI path can NOT substitute it.\nSHOULD include the [application root](/docs/http/http-spans.md#http-server-definitions) if there is one.\n",
+      "stability": "stable",
+      "examples": ["/users/:userID?", "{controller}/{action}/{id?}"]
+    },
+    "http.connection.state": {
+      "description": "State of the HTTP connection in the HTTP connection pool.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["active", "idle"]
+    }
+  }
+}

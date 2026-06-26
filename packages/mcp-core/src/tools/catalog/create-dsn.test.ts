@@ -1,0 +1,35 @@
+import { describe, it, expect } from "vitest";
+import createDsn from "./create-dsn.js";
+
+describe("create_dsn", () => {
+  it("serializes", async () => {
+    const result = await createDsn.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        name: "Default",
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          projectSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# New DSN in **sentry-mcp-evals/cloudflare-mcp**
+
+      **DSN**: https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945
+      **Name**: Default
+
+      ## Response Notes
+
+      - Please tell the user the DSN.
+      - The \`SENTRY_DSN\` value is a URL used to initialize Sentry SDKs.
+      "
+    `);
+  });
+});

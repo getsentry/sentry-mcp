@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "sentry": {
+      "url": "https://mcp.sentry.dev/mcp/sentry/mcp-server?experimental=1"
+    },
+    "sentry-dev": {
+      "url": "http://localhost:5173/mcp/sentry/mcp-server?experimental=1"
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "data": [
+    {
+      "id": "07752c6aeb027c8f",
+      "span.op": "http.server",
+      "span.description": "GET /trpc/bottleList",
+      "span.duration": 12.0,
+      "transaction": "GET /trpc/bottleList",
+      "timestamp": "2025-04-13T14:19:18+00:00",
+      "is_transaction": true,
+      "project": "peated",
+      "trace": "6a477f5b0f31ef7b6b9b5e1dea66c91d",
+      "transaction.span_id": "07752c6aeb027c8f",
+      "project.name": "peated"
+    },
+    {
+      "id": "7ab5edf5b3ba42c9",
+      "span.op": "http.server",
+      "span.description": "GET /trpc/bottleList",
+      "span.duration": 18.0,
+      "transaction": "GET /trpc/bottleList",
+      "timestamp": "2025-04-13T14:19:17+00:00",
+      "is_transaction": true,
+      "project": "peated",
+      "trace": "54177131c7b192a446124daba3136045",
+      "transaction.span_id": "7ab5edf5b3ba42c9",
+      "project.name": "peated"
+    }
+  ],
+  "meta": {
+    "fields": {
+      "id": "string",
+      "span.op": "string",
+      "span.description": "string",
+      "span.duration": "duration",
+      "transaction": "string",
+      "timestamp": "string",
+      "is_transaction": "boolean",
+      "project": "string",
+      "trace": "string",
+      "transaction.span_id": "string",
+      "project.name": "string"
+    },
+    "units": {
+      "id": null,
+      "span.op": null,
+      "span.description": null,
+      "span.duration": "millisecond",
+      "transaction": null,
+      "timestamp": null,
+      "is_transaction": null,
+      "project": null,
+      "trace": null,
+      "transaction.span_id": null,
+      "project.name": null
+    },
+    "isMetricsData": false,
+    "isMetricsExtractedData": false,
+    "tips": {},
+    "datasetReason": "unchanged",
+    "dataset": "spans",
+    "dataScanned": "full",
+    "accuracy": {
+      "confidence": [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}]
+    }
+  },
+  "confidence": [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}]
+}

@@ -1,0 +1,108 @@
+{
+  "namespace": "faas",
+  "description": "FaaS attributes",
+  "attributes": {
+    "faas.name": {
+      "description": "The name of the single function that this runtime instance executes.\n",
+      "type": "string",
+      "note": "This is the name of the function as configured/deployed on the FaaS\nplatform and is usually different from the name of the callback\nfunction (which may be stored in the\n[`code.namespace`/`code.function.name`](/docs/general/attributes.md#source-code-attributes)\nspan attributes).\n\nFor some cloud providers, the above definition is ambiguous. The following\ndefinition of function name MUST be used for this attribute\n(and consequently the span name) for the listed cloud providers/products:\n\n- **Azure:**  The full name `<FUNCAPP>/<FUNC>`, i.e., function app name\n  followed by a forward slash followed by the function name (this form\n  can also be seen in the resource JSON for the function).\n  This means that a span attribute MUST be used, as an Azure function\n  app can host multiple functions that would usually share\n  a TracerProvider (see also the `cloud.resource_id` attribute).\n",
+      "stability": "development",
+      "examples": ["my-function", "myazurefunctionapp/some-function-name"]
+    },
+    "faas.version": {
+      "description": "The immutable version of the function being executed.",
+      "type": "string",
+      "note": "Depending on the cloud provider and platform, use:\n\n- **AWS Lambda:** The [function version](https://docs.aws.amazon.com/lambda/latest/dg/configuration-versions.html)\n  (an integer represented as a decimal string).\n- **Google Cloud Run (Services):** The [revision](https://cloud.google.com/run/docs/managing/revisions)\n  (i.e., the function name plus the revision suffix).\n- **Google Cloud Functions:** The value of the\n  [`K_REVISION` environment variable](https://cloud.google.com/functions/docs/env-var#runtime_environment_variables_set_automatically).\n- **Azure Functions:** Not applicable. Do not set this attribute.\n",
+      "stability": "development",
+      "examples": ["26", "pinkfroid-00002"]
+    },
+    "faas.instance": {
+      "description": "The execution environment ID as a string, that will be potentially reused for other invocations to the same function/function version.\n",
+      "type": "string",
+      "note": "- **AWS Lambda:** Use the (full) log stream name.\n",
+      "stability": "development",
+      "examples": ["2021/06/28/[$LATEST]2f399eb14537447da05ab2a2e39309de"]
+    },
+    "faas.max_memory": {
+      "description": "The amount of memory available to the serverless function converted to Bytes.\n",
+      "type": "number",
+      "note": "It's recommended to set this attribute since e.g. too little memory can easily stop a Java AWS Lambda function from working correctly. On AWS Lambda, the environment variable `AWS_LAMBDA_FUNCTION_MEMORY_SIZE` provides this information (which must be multiplied by 1,048,576).\n",
+      "stability": "development",
+      "examples": ["134217728"]
+    },
+    "faas.trigger": {
+      "description": "Type of the trigger which caused this function invocation.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["datasource", "http", "pubsub", "timer", "other"]
+    },
+    "faas.invoked_name": {
+      "description": "The name of the invoked function.\n",
+      "type": "string",
+      "note": "SHOULD be equal to the `faas.name` resource attribute of the invoked function.\n",
+      "stability": "development",
+      "examples": ["my-function"]
+    },
+    "faas.invoked_provider": {
+      "description": "The cloud provider of the invoked function.\n",
+      "type": "string",
+      "note": "SHOULD be equal to the `cloud.provider` resource attribute of the invoked function.\n",
+      "stability": "development",
+      "examples": ["alibaba_cloud", "aws", "azure", "gcp", "tencent_cloud"]
+    },
+    "faas.invoked_region": {
+      "description": "The cloud region of the invoked function.\n",
+      "type": "string",
+      "note": "SHOULD be equal to the `cloud.region` resource attribute of the invoked function.\n",
+      "stability": "development",
+      "examples": ["eu-central-1"]
+    },
+    "faas.invocation_id": {
+      "description": "The invocation ID of the current function invocation.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["af9d5aa4-a685-4c5f-a22b-444f80b3cc28"]
+    },
+    "faas.time": {
+      "description": "A string containing the function invocation time in the [ISO 8601](https://www.iso.org/iso-8601-date-and-time-format.html) format expressed in [UTC](https://www.w3.org/TR/NOTE-datetime).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["2020-01-23T13:47:06Z"]
+    },
+    "faas.cron": {
+      "description": "A string containing the schedule period as [Cron Expression](https://docs.oracle.com/cd/E12058_01/doc/doc.1014/e12030/cron_expressions.htm).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["0/5 * * * ? *"]
+    },
+    "faas.coldstart": {
+      "description": "A boolean that is true if the serverless function is executed for the first time (aka cold-start).\n",
+      "type": "boolean",
+      "stability": "development"
+    },
+    "faas.document.collection": {
+      "description": "The name of the source on which the triggering operation was performed. For example, in Cloud Storage or S3 corresponds to the bucket name, and in Cosmos DB to the database name.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["myBucketName", "myDbName"]
+    },
+    "faas.document.operation": {
+      "description": "Describes the type of the operation that was performed on the data.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["insert", "edit", "delete"]
+    },
+    "faas.document.time": {
+      "description": "A string containing the time when the data was accessed in the [ISO 8601](https://www.iso.org/iso-8601-date-and-time-format.html) format expressed in [UTC](https://www.w3.org/TR/NOTE-datetime).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["2020-01-23T13:47:06Z"]
+    },
+    "faas.document.name": {
+      "description": "The document name/table subjected to the operation. For example, in Cloud Storage or S3 is the name of the file, and in Cosmos DB the table name.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["myFile.txt", "myTableName"]
+    }
+  }
+}

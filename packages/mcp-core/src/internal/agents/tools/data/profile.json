@@ -1,0 +1,25 @@
+{
+  "namespace": "profile",
+  "description": "Describes the origin of a single frame in a Profile.\n",
+  "attributes": {
+    "profile.frame.type": {
+      "description": "Describes the interpreter or compiler of a single frame.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "dotnet",
+        "jvm",
+        "kernel",
+        "native",
+        "perl",
+        "php",
+        "cpython",
+        "ruby",
+        "v8js",
+        "beam",
+        "go",
+        "rust"
+      ]
+    }
+  }
+}
