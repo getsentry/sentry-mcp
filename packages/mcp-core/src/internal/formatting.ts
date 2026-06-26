@@ -1658,6 +1658,134 @@ function formatPerformanceIssueOutput(
   return parts.length > 0 ? `${parts.join("\n")}\n` : "";
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getMetricAlertSnubaQuery(
+  evidenceData: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const dataSources = evidenceData.data_sources;
+  if (!Array.isArray(dataSources)) {
+    return undefined;
+  }
+
+  for (const dataSource of dataSources) {
+    if (!isRecord(dataSource)) {
+      continue;
+    }
+    const queryObj = dataSource.query_obj;
+    if (!isRecord(queryObj)) {
+      continue;
+    }
+    const snubaQuery = queryObj.snuba_query;
+    if (isRecord(snubaQuery)) {
+      return snubaQuery;
+    }
+  }
+
+  return undefined;
+}
+
+function isMetricAlertEvidence(
+  evidenceData: Record<string, unknown> | undefined,
+): boolean {
+  if (!evidenceData) {
+    return false;
+  }
+
+  return (
+    getMetricAlertSnubaQuery(evidenceData) !== undefined ||
+    evidenceData.alert_id != null
+  );
+}
+
+function isRegressionEvidence(
+  evidenceData: Record<string, unknown> | undefined,
+): boolean {
+  if (!evidenceData) {
+    return false;
+  }
+
+  return (
+    evidenceData.change === "regression" ||
+    typeof evidenceData.transaction === "string"
+  );
+}
+
+function formatMetricAlertCondition(
+  condition: Record<string, unknown>,
+): string | undefined {
+  const comparison = condition.comparison;
+  if (comparison == null) {
+    return undefined;
+  }
+
+  const type = condition.type;
+  const typeLabel =
+    type === 0 || type === "0"
+      ? "above"
+      : type === 1 || type === "1"
+        ? "below"
+        : type != null
+          ? String(type)
+          : undefined;
+
+  if (typeLabel && typeLabel !== String(type)) {
+    return `${typeLabel} ${comparison}`;
+  }
+
+  return String(comparison);
+}
+
+function formatMetricAlertDetails(
+  evidenceData: Record<string, unknown>,
+): string {
+  const parts: string[] = ["### Metric Alert Details", ""];
+
+  const snubaQuery = getMetricAlertSnubaQuery(evidenceData);
+  if (snubaQuery) {
+    if (snubaQuery.dataset != null) {
+      parts.push(`**Dataset**: ${String(snubaQuery.dataset)}`);
+    }
+    if (snubaQuery.aggregate != null) {
+      parts.push(`**Aggregate**: ${String(snubaQuery.aggregate)}`);
+    }
+    if (snubaQuery.query != null && String(snubaQuery.query).length > 0) {
+      parts.push(`**Query**: \`${String(snubaQuery.query)}\``);
+    }
+    if (snubaQuery.time_window != null) {
+      parts.push(`**Interval**: ${String(snubaQuery.time_window)} second(s)`);
+    }
+    if (snubaQuery.environment != null) {
+      parts.push(`**Environment**: ${String(snubaQuery.environment)}`);
+    }
+    parts.push("");
+  }
+
+  if (evidenceData.value != null) {
+    parts.push(`**Evaluated Value**: ${String(evidenceData.value)}`);
+  }
+
+  const conditions = evidenceData.conditions;
+  if (Array.isArray(conditions)) {
+    const formattedConditions = conditions
+      .filter(isRecord)
+      .map(formatMetricAlertCondition)
+      .filter((condition): condition is string => condition != null);
+    if (formattedConditions.length > 0) {
+      parts.push(`**Threshold**: ${formattedConditions.join(", ")}`);
+    }
+  }
+
+  if (evidenceData.alert_id != null) {
+    parts.push(`**Alert Rule ID**: ${String(evidenceData.alert_id)}`);
+  }
+
+  parts.push("");
+  return `${parts.join("\n")}\n`;
+}
+
 /**
  * Formats generic event output (performance regressions, metric-based issues).
  * Generic events don't have traditional error entries, but have occurrence data
@@ -1678,8 +1806,15 @@ function formatGenericEventOutput(event: Event): string {
     return "";
   }
 
-  // Add a section header for performance regression details
   const evidenceData = occurrence.evidenceData;
+  if (
+    isMetricAlertEvidence(evidenceData) &&
+    !isRegressionEvidence(evidenceData)
+  ) {
+    return formatMetricAlertDetails(evidenceData!);
+  }
+
+  // Add a section header for performance regression details
   if (evidenceData) {
     parts.push("### Performance Regression Details");
     parts.push("");
