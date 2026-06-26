@@ -1,4 +1,9 @@
-import { autofixStateFixture, createRegressedIssue, mswServer } from "@sentry/mcp-server-mocks";
+import {
+  autofixStateFixture,
+  createRegressedIssue,
+  createUnsupportedIssue,
+  mswServer,
+} from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import analyzeIssueWithSeer from "./analyze-issue-with-seer.js";
@@ -6,6 +11,15 @@ import analyzeIssueWithSeer from "./analyze-issue-with-seer.js";
 describe("analyze_issue_with_seer", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    mswServer.use(
+      http.get("*/api/0/organizations/:org/issues/:issueId/", ({ params }) =>
+        HttpResponse.json(
+          createUnsupportedIssue({
+            shortId: String(params.issueId),
+          }),
+        ),
+      ),
+    );
   });
 
   afterEach(() => {
@@ -81,8 +95,7 @@ describe("analyze_issue_with_seer", () => {
                         steps: [
                           {
                             title: "Share canonical ID",
-                            description:
-                              "Pass the same ID to both procedures.",
+                            description: "Pass the same ID to both procedures.",
                           },
                           {
                             title: "Add regression coverage",
