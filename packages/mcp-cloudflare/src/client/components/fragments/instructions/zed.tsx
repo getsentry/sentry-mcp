@@ -1,6 +1,5 @@
 import CodeSnippet from "../../ui/code-snippet";
 import { KeyIcon } from "../../ui/key-icon";
-import { NPM_REMOTE_NAME } from "../../../../constants";
 
 interface ZedInstructionsProps {
   transport: "cloud" | "stdio";
@@ -11,14 +10,12 @@ export function ZedInstructions({ transport }: ZedInstructionsProps) {
 
   if (transport === "cloud") {
     const endpoint = new URL("/mcp", window.location.href).href;
-    const coreConfig = {
-      command: "npx",
-      args: ["-y", `${NPM_REMOTE_NAME}@latest`, endpoint],
-    };
     const zedInstructions = JSON.stringify(
       {
         context_servers: {
-          [mcpServerName]: coreConfig,
+          [mcpServerName]: {
+            url: endpoint,
+          },
           settings: {},
         },
       },
