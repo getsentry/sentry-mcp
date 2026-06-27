@@ -1,29 +1,20 @@
-import { describeEval } from "vitest-evals";
-import { FIXTURES, NoOpTaskRunner, ToolPredictionScorer } from "./utils";
+import { FIXTURES, defineToolPredictionEval } from "./utils";
 
-describeEval("list-projects", {
-  data: async () => {
-    return [
+defineToolPredictionEval("list-projects", [
+  {
+    input: `What projects do I have access to in Sentry for '${FIXTURES.organizationSlug}'`,
+    expectedTools: [
       {
-        input: `What projects do I have access to in Sentry for '${FIXTURES.organizationSlug}'`,
-        expectedTools: [
-          {
-            name: "find_organizations",
-            arguments: {},
-          },
-          {
-            name: "find_projects",
-            arguments: {
-              organizationSlug: FIXTURES.organizationSlug,
-              regionUrl: "https://us.sentry.io",
-            },
-          },
-        ],
+        name: "find_organizations",
+        arguments: {},
       },
-    ];
+      {
+        name: "find_projects",
+        arguments: {
+          organizationSlug: FIXTURES.organizationSlug,
+          regionUrl: "https://us.sentry.io",
+        },
+      },
+    ],
   },
-  task: NoOpTaskRunner(),
-  scorers: [ToolPredictionScorer()],
-  threshold: 0.6,
-  timeout: 30000,
-});
+]);

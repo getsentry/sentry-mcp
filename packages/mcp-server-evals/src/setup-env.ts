@@ -17,4 +17,4 @@ config({ path: path.join(rootDir, ".env") });
 // Start the shared MSW server for all eval tests
 import { startMockServer } from "@sentry/mcp-server-mocks/utils";
 
-startMockServer({ ignoreOpenAI: true });
+startMockServer({ ignoreLLMProviderRequests: true });

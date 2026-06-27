@@ -1,9 +1,7 @@
 import { experimental_createMCPClient } from "@ai-sdk/mcp";
-import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
-import { openai } from "@ai-sdk/openai";
-import { generateText, stepCountIs, type LanguageModel } from "ai";
-
-const defaultModel = openai("gpt-4o");
+import { generateText, stepCountIs } from "ai";
+import { getEvalModelConfig } from "./model";
+import { createMockMcpTransport } from "./mcpTransport";
 
 function toToolCall(call: { toolName: string; input: unknown }) {
   const input =
@@ -17,31 +15,25 @@ function toToolCall(call: { toolName: string; input: unknown }) {
   };
 }
 
-export function McpToolCallTaskRunner(
-  model: LanguageModel = defaultModel,
-  maxSteps = 6,
-) {
+/** Creates the MCP-backed task runner used by catalog tool-call evals. */
+export function McpToolCallTaskRunner(maxSteps = 6) {
   return async function McpToolCallTaskRunner(input: string) {
-    const transport = new Experimental_StdioMCPTransport({
-      command: "pnpm",
-      args: ["--filter", "@sentry/mcp-server-evals", "start"],
-      env: {
-        ...process.env,
-        SENTRY_ACCESS_TOKEN: "mocked-access-token",
-        SENTRY_HOST: "sentry.io",
-      },
+    const modelConfig = getEvalModelConfig();
+
+    const client = await experimental_createMCPClient({
+      transport: createMockMcpTransport(),
     });
-    const client = await experimental_createMCPClient({ transport });
 
     try {
       const tools = await client.tools();
       const result = await generateText({
-        model,
+        model: modelConfig.model,
         tools,
         system: [
           "You are a Sentry assistant with access to Sentry MCP tools.",
-          "Use search_sentry_tools only when you need to discover the right Sentry operation or inspect its schema.",
-          "When you already know the right Sentry tool name, use that tool directly through the available MCP tools.",
+          "Use the available MCP tools to answer the user request.",
+          "When a request needs a catalog operation that is not directly exposed, discover the appropriate catalog tool and then execute it.",
+          "When a directly exposed tool satisfies the request, call it directly.",
         ].join("\n"),
         prompt: input,
         stopWhen: stepCountIs(maxSteps),
@@ -49,6 +41,7 @@ export function McpToolCallTaskRunner(
           isEnabled: true,
           functionId: "catalog_tool_behavior_eval",
         },
+        providerOptions: modelConfig.providerOptions,
       });
 
       return {

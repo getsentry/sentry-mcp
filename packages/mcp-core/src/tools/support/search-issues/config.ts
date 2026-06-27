@@ -25,9 +25,11 @@ BEHAVIOR:
 
 SYNTAX:
 - Time ranges use relative notation: -24h, -7d, -30d
+- For "last 24 hours", use lastSeen:-24h. Do not use lastSeen:>-24h.
 - Comparisons: >, <, >=, <=
 - Boolean operators: AND, OR, NOT (or !)
 - Field values with spaces need quotes: environment:"dev server"
+- Do not quote simple values that contain only letters, numbers, underscores, hyphens, dots, @, or colons. Use kafka.consumer.group:orders-processor, NOT kafka.consumer.group:"orders-processor".
 
 BUILT-IN FIELDS:
 - is: Issue status and inbox/substatus filters
@@ -42,6 +44,8 @@ BUILT-IN FIELDS:
   Never use API response property names such as issueCategory in search queries.
 - issue.type: Specific issue type slug, such as performance_n_plus_one_db_queries
 - issue.priority: Issue priority (high, medium, low)
+- error.handled: Whether the error was handled. Use error.handled:false for unhandled errors.
+- error.unhandled: Whether the error was unhandled. Prefer error.handled:false when translating "unhandled errors".
 - environment: Deployment environment (production, staging, development)
 - release: Version/release identifier. release:latest is a magic value that resolves to the latest release for the selected project/environment.
 - release.stage: Release stage filter
@@ -57,6 +61,7 @@ BUILT-IN FIELDS:
 - bookmarks: Issues bookmarked by a user
 - subscribed: Issues subscribed to by a user
 - has: Issues with a tag present
+  For natural-language tag presence requests, use has:<tag_name> directly without calling issueFields.
 - userCount: Number of unique users affected
 - timesSeen: Total number of events
 - issue.seer_actionability: Seer's AI-assessed fix difficulty (super_high, high, medium, low, super_low)
@@ -69,6 +74,9 @@ SORTING RULES:
 - freq: Event frequency
 - new: First seen
 - user: User count
+- Always return a sort value. Never return null.
+- If the input is already valid Sentry issue syntax and does not request a sort, return sort "date".
+- Use date unless the user asks for a different sort.
 - If the user asks to sort/rank by users or impact, set sort to user.
 - If the user asks for most frequent/noisy issues, set sort to freq.
 - Never put sort syntax inside query.
@@ -80,6 +88,7 @@ ME REFERENCES:
 COMMON TRANSLATIONS:
 - unresolved issues -> query "is:unresolved", sort "date"
 - critical/important issues -> query "is:unresolved", sort "freq" or "user"
+- unhandled errors -> query "is:unresolved issue.category:error error.handled:false", sort "date"
 - user feedback -> query "issue.category:feedback", sort "date"
 - easy to fix or quick wins -> query "is:unresolved issue.seer_actionability:[high,super_high]", sort "date"
 
@@ -90,4 +99,5 @@ All tools return responses in this format: {error?: string, result?: data}
 - Always check for errors before using results
 
 Use issueFields only when a requested field is not in the built-in fields list.
+For custom-looking fields such as kafka.consumer.group, payment.failed, or other dotted tags not listed above, call issueFields before comparing a value on the field.
 Use whoami only for natural-language me references.`;

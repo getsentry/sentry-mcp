@@ -184,11 +184,10 @@ datasets: errors, logs, and spans.
 Co-Authored-By: Codex CLI Agent <noreply@openai.com>"
 
 # Bug fix
-git commit -m "fix(evals): update search-events eval to use available exports
+git commit -m "fix(evals): update search-events eval to use suite helpers
 
-Replace missing TaskRunner and Factuality imports with NoOpTaskRunner 
-and ToolPredictionScorer to resolve CI build failures after factuality 
-checker removal.
+Replace stale eval imports with the shared vitest-evals harness helpers
+so the eval compiles against the current judge API.
 
 Co-Authored-By: Codex CLI Agent <noreply@openai.com>"
 
