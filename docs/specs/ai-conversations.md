@@ -230,6 +230,19 @@ Current expected behavior:
 - Each timeline event includes enough trace context to debug it, including
   `spanId`, `traceId`, timestamp, status or duration when available, and compact
   tool input/argument fields when useful.
+- Timeline events expose a stable `genAi` block for relevant GenAI attributes,
+  including operation type, agent name, request/response model, token totals,
+  raw message attributes, response fields, and tool definitions when available.
+  Tool call timeline events expose their payloads through the event-level
+  `arguments` and `input` fields; exact `gen_ai.tool.*` attribute names remain
+  available on span summaries.
+- Large raw GenAI message and tool payload attributes are truncated in the MCP
+  response. Truncated `genAi` fields are listed in `genAi.truncatedFields`; use
+  the event or span summary `spanId` and `traceId` to query the underlying span
+  when the full value is needed.
+- Output includes chronological span summaries with `spanId`, `traceId`,
+  parent span ID, project, timestamp, duration, span name/op/description/status,
+  transaction, and the same stable `genAi` attribute projection.
 - Conversation-level context includes trace IDs, projects, token totals, and
   summary counts.
 - A structured JSON artifact is included.

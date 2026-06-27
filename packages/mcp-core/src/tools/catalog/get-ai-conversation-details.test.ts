@@ -16,6 +16,23 @@ const baseContext = {
   userId: "1",
 };
 
+type ConversationDetailsForTest = {
+  timeline: Array<{
+    type: string;
+    spanId: string;
+    traceId: string;
+    genAi?: Record<string, unknown>;
+  }>;
+  spanSummaries: Array<{
+    spanId: string;
+    traceId: string;
+    spanOp?: string;
+    spanDescription?: string;
+    transaction?: string;
+    genAi?: Record<string, unknown>;
+  }>;
+} & Record<string, unknown>;
+
 const conversationSpans: Array<Record<string, unknown>> = [
   {
     "gen_ai.conversation.id": "conv-123",
@@ -25,9 +42,12 @@ const conversationSpans: Array<Record<string, unknown>> = [
     project: "mcp-server",
     "project.id": 4509109107622913,
     "span.name": "gen_ai.chat",
+    "span.op": "gen_ai.chat",
+    "span.description": "chat completion",
     "span.status": "ok",
     span_id: "1111111111111111",
     trace: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    transaction: "POST /api/internal/agent/continue",
     "gen_ai.operation.type": "ai_client",
     "gen_ai.input.messages": JSON.stringify([
       { role: "system", content: "You are a helpful assistant." },
@@ -36,6 +56,8 @@ const conversationSpans: Array<Record<string, unknown>> = [
     "gen_ai.output.messages": JSON.stringify([
       { role: "assistant", content: "The checkout worker is timing out." },
     ]),
+    "gen_ai.system_instructions": "Respond with concise diagnostics.",
+    "gen_ai.cost.total_tokens": 42,
     "gen_ai.request.model": "gpt-5-mini",
     "gen_ai.response.model": "gpt-5-mini-2026-05-01",
     "gen_ai.usage.total_tokens": 42,
@@ -50,9 +72,12 @@ const conversationSpans: Array<Record<string, unknown>> = [
     project: "mcp-server",
     "project.id": 4509109107622913,
     "span.name": "gen_ai.execute_tool",
+    "span.op": "gen_ai.execute_tool",
+    "span.description": "search_events",
     "span.status": "ok",
     span_id: "2222222222222222",
     trace: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    transaction: "POST /api/internal/agent/continue",
     "gen_ai.operation.type": "tool",
     "gen_ai.tool.name": "search_events",
     "gen_ai.tool.call.arguments": JSON.stringify({
@@ -68,6 +93,8 @@ const conversationSpans: Array<Record<string, unknown>> = [
     project: "mcp-server",
     "project.id": 4509109107622913,
     "span.name": "gen_ai.chat",
+    "span.op": "gen_ai.chat",
+    "span.description": "chat completion",
     "span.status": "ok",
     span_id: "3333333333333333",
     trace: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -112,11 +139,47 @@ describe("get_ai_conversation_details", () => {
     );
 
     assertStructuredOnlyResult(result);
-    const structuredContent = getStructuredContent(result);
+    const structuredContent =
+      getStructuredContent<ConversationDetailsForTest>(result);
     expect(structuredContent).not.toHaveProperty("focusedSpanId");
     expect(structuredContent).not.toHaveProperty("focusedSpanPresent");
     expect(structuredContent).not.toHaveProperty("messages");
     expect(structuredContent).not.toHaveProperty("spanIds");
+    expect(structuredContent.timeline[0].genAi).toMatchObject({
+      operationType: "ai_client",
+      requestModel: "gpt-5-mini",
+      responseModel: "gpt-5-mini-2026-05-01",
+      usageTotalTokens: 42,
+      costTotalTokens: 42,
+      agentName: "triage-agent",
+    });
+    expect(structuredContent.timeline[2].genAi).toMatchObject({
+      operationType: "tool",
+    });
+    expect(structuredContent.timeline[2].genAi).not.toHaveProperty("toolName");
+    expect(structuredContent.timeline[2].genAi).not.toHaveProperty(
+      "toolCallArguments",
+    );
+    expect(structuredContent.timeline[2].genAi).not.toHaveProperty("toolInput");
+    expect(structuredContent.spanSummaries[0]).toMatchObject({
+      spanId: "1111111111111111",
+      spanOp: "gen_ai.chat",
+      spanDescription: "chat completion",
+      transaction: "POST /api/internal/agent/continue",
+      genAi: expect.objectContaining({
+        operationType: "ai_client",
+        inputMessages: JSON.stringify([
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: "What failed in production?" },
+        ]),
+        outputMessages: JSON.stringify([
+          {
+            role: "assistant",
+            content: "The checkout worker is timing out.",
+          },
+        ]),
+      }),
+    });
     expect(structuredContent).toMatchInlineSnapshot(`
       {
         "aiCallCount": 2,
@@ -131,10 +194,87 @@ describe("get_ai_conversation_details", () => {
           "mcp-server",
         ],
         "spanCount": 3,
+        "spanSummaries": [
+          {
+            "durationMs": 1500,
+            "genAi": {
+              "agentName": "triage-agent",
+              "costTotalTokens": 42,
+              "inputMessages": "[{"role":"system","content":"You are a helpful assistant."},{"role":"user","content":"What failed in production?"}]",
+              "operationType": "ai_client",
+              "outputMessages": "[{"role":"assistant","content":"The checkout worker is timing out."}]",
+              "requestModel": "gpt-5-mini",
+              "responseModel": "gpt-5-mini-2026-05-01",
+              "systemInstructions": "Respond with concise diagnostics.",
+              "usageTotalTokens": 42,
+            },
+            "parentSpanId": null,
+            "project": "mcp-server",
+            "projectId": 4509109107622913,
+            "spanDescription": "chat completion",
+            "spanId": "1111111111111111",
+            "spanName": "gen_ai.chat",
+            "spanOp": "gen_ai.chat",
+            "spanStatus": "ok",
+            "timestamp": 1713805400000,
+            "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "transaction": "POST /api/internal/agent/continue",
+          },
+          {
+            "durationMs": 300,
+            "genAi": {
+              "operationType": "tool",
+              "toolCallArguments": "{"query":"level:error"}",
+              "toolInput": "{"organizationSlug":"test-org"}",
+              "toolName": "search_events",
+            },
+            "parentSpanId": "1111111111111111",
+            "project": "mcp-server",
+            "projectId": 4509109107622913,
+            "spanDescription": "search_events",
+            "spanId": "2222222222222222",
+            "spanName": "gen_ai.execute_tool",
+            "spanOp": "gen_ai.execute_tool",
+            "spanStatus": "ok",
+            "timestamp": 1713805401700,
+            "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "transaction": "POST /api/internal/agent/continue",
+          },
+          {
+            "durationMs": 1000,
+            "genAi": {
+              "inputMessages": "[{"role":"user","content":"Can you inspect the failing event?"}]",
+              "operationType": "ai_client",
+              "responseText": "I found the timeout stack trace.",
+              "usageTotalTokens": 58,
+            },
+            "parentSpanId": null,
+            "project": "mcp-server",
+            "projectId": 4509109107622913,
+            "spanDescription": "chat completion",
+            "spanId": "3333333333333333",
+            "spanName": "gen_ai.chat",
+            "spanOp": "gen_ai.chat",
+            "spanStatus": "ok",
+            "timestamp": 1713805404000,
+            "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          },
+        ],
         "startTimestamp": 1713805400000,
         "timeline": [
           {
             "content": "What failed in production?",
+            "genAi": {
+              "agentName": "triage-agent",
+              "costTotalTokens": 42,
+              "inputMessages": "[{"role":"system","content":"You are a helpful assistant."},{"role":"user","content":"What failed in production?"}]",
+              "operationType": "ai_client",
+              "outputMessages": "[{"role":"assistant","content":"The checkout worker is timing out."}]",
+              "requestModel": "gpt-5-mini",
+              "responseModel": "gpt-5-mini-2026-05-01",
+              "systemInstructions": "Respond with concise diagnostics.",
+              "usageTotalTokens": 42,
+            },
             "role": "user",
             "spanId": "1111111111111111",
             "timestamp": 1713805400000,
@@ -144,6 +284,17 @@ describe("get_ai_conversation_details", () => {
           },
           {
             "content": "The checkout worker is timing out.",
+            "genAi": {
+              "agentName": "triage-agent",
+              "costTotalTokens": 42,
+              "inputMessages": "[{"role":"system","content":"You are a helpful assistant."},{"role":"user","content":"What failed in production?"}]",
+              "operationType": "ai_client",
+              "outputMessages": "[{"role":"assistant","content":"The checkout worker is timing out."}]",
+              "requestModel": "gpt-5-mini",
+              "responseModel": "gpt-5-mini-2026-05-01",
+              "systemInstructions": "Respond with concise diagnostics.",
+              "usageTotalTokens": 42,
+            },
             "metadata": {
               "agentName": "triage-agent",
               "durationMs": 1500,
@@ -160,6 +311,9 @@ describe("get_ai_conversation_details", () => {
           {
             "arguments": "{"query":"level:error"}",
             "durationMs": 300,
+            "genAi": {
+              "operationType": "tool",
+            },
             "input": "{"organizationSlug":"test-org"}",
             "name": "search_events",
             "spanId": "2222222222222222",
@@ -170,6 +324,12 @@ describe("get_ai_conversation_details", () => {
           },
           {
             "content": "Can you inspect the failing event?",
+            "genAi": {
+              "inputMessages": "[{"role":"user","content":"Can you inspect the failing event?"}]",
+              "operationType": "ai_client",
+              "responseText": "I found the timeout stack trace.",
+              "usageTotalTokens": 58,
+            },
             "role": "user",
             "spanId": "3333333333333333",
             "timestamp": 1713805404000,
@@ -178,6 +338,12 @@ describe("get_ai_conversation_details", () => {
           },
           {
             "content": "I found the timeout stack trace.",
+            "genAi": {
+              "inputMessages": "[{"role":"user","content":"Can you inspect the failing event?"}]",
+              "operationType": "ai_client",
+              "responseText": "I found the timeout stack trace.",
+              "usageTotalTokens": 58,
+            },
             "metadata": {
               "durationMs": 1000,
               "status": "ok",
@@ -229,6 +395,112 @@ describe("get_ai_conversation_details", () => {
     for (const message of userMessages) {
       expect(message).not.toHaveProperty("userEmail");
     }
+  });
+
+  it("truncates large GenAI message and tool payload attributes while preserving span IDs", async () => {
+    const longValue = "x".repeat(4100);
+    mockConversationEndpoint("test-org", "conv-large-attrs", [
+      {
+        ...conversationSpans[0],
+        "gen_ai.conversation.id": "conv-large-attrs",
+        span_id: "large-ai-1",
+        "gen_ai.input.messages": longValue,
+      },
+      {
+        ...conversationSpans[1],
+        "gen_ai.conversation.id": "conv-large-attrs",
+        span_id: "large-tool-1",
+        "gen_ai.tool.call.arguments": longValue,
+        "gen_ai.tool.input": longValue,
+      },
+    ]);
+
+    const result = await getAIConversationDetails.handler(
+      {
+        organizationSlug: "test-org",
+        conversationId: "conv-large-attrs",
+      },
+      baseContext,
+    );
+
+    const structuredContent =
+      getStructuredContent<ConversationDetailsForTest>(result);
+    expect(structuredContent.timeline).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "message",
+          spanId: "large-ai-1",
+          traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          genAi: expect.objectContaining({
+            inputMessages: expect.stringMatching(/\.\.\. \[truncated\]$/),
+            truncatedFields: ["inputMessages"],
+          }),
+        }),
+        expect.objectContaining({
+          type: "tool_call",
+          spanId: "large-tool-1",
+          traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          arguments: expect.stringMatching(/\.\.\. \[truncated\]$/),
+          input: expect.stringMatching(/\.\.\. \[truncated\]$/),
+          genAi: expect.objectContaining({
+            operationType: "tool",
+          }),
+        }),
+      ]),
+    );
+    expect(structuredContent.spanSummaries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          spanId: "large-ai-1",
+          traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          genAi: expect.objectContaining({
+            inputMessages: expect.stringMatching(/\.\.\. \[truncated\]$/),
+            truncatedFields: ["inputMessages"],
+          }),
+        }),
+        expect.objectContaining({
+          spanId: "large-tool-1",
+          traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          genAi: expect.objectContaining({
+            toolCallArguments: expect.stringMatching(/\.\.\. \[truncated\]$/),
+            toolInput: expect.stringMatching(/\.\.\. \[truncated\]$/),
+            truncatedFields: ["toolCallArguments", "toolInput"],
+          }),
+        }),
+      ]),
+    );
+  });
+
+  it("omits empty GenAI projections from span summaries", async () => {
+    mockConversationEndpoint("test-org", "conv-no-gen-ai-attrs", [
+      {
+        "gen_ai.conversation.id": "conv-no-gen-ai-attrs",
+        parent_span: null,
+        "precise.finish_ts": 1713805401,
+        "precise.start_ts": 1713805400,
+        project: "mcp-server",
+        "project.id": 4509109107622913,
+        span_id: "no-gen-ai-attrs-1",
+        trace: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      },
+    ]);
+
+    const result = await getAIConversationDetails.handler(
+      {
+        organizationSlug: "test-org",
+        conversationId: "conv-no-gen-ai-attrs",
+      },
+      baseContext,
+    );
+
+    const structuredContent =
+      getStructuredContent<ConversationDetailsForTest>(result);
+    expect(structuredContent.timeline).toEqual([]);
+    expect(structuredContent.spanSummaries[0]).toMatchObject({
+      spanId: "no-gen-ai-attrs-1",
+      traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    });
+    expect(structuredContent.spanSummaries[0]).not.toHaveProperty("genAi");
   });
 
   it("resolves an Explore conversation URL through get_sentry_resource", async () => {

@@ -810,6 +810,122 @@
         "totalTokens": {
           "type": "number"
         },
+        "spanSummaries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "spanId": {
+                "type": "string"
+              },
+              "traceId": {
+                "type": "string"
+              },
+              "parentSpanId": {
+                "type": ["string", "null"]
+              },
+              "project": {
+                "type": "string"
+              },
+              "projectId": {
+                "type": ["string", "number"]
+              },
+              "timestamp": {
+                "type": "number"
+              },
+              "durationMs": {
+                "type": "number"
+              },
+              "spanName": {
+                "type": "string"
+              },
+              "spanOp": {
+                "type": "string"
+              },
+              "spanDescription": {
+                "type": "string"
+              },
+              "spanStatus": {
+                "type": "string"
+              },
+              "transaction": {
+                "type": "string"
+              },
+              "isTransaction": {
+                "type": "boolean"
+              },
+              "genAi": {
+                "type": "object",
+                "properties": {
+                  "operationType": {
+                    "type": "string"
+                  },
+                  "agentName": {
+                    "type": "string"
+                  },
+                  "requestModel": {
+                    "type": "string"
+                  },
+                  "responseModel": {
+                    "type": "string"
+                  },
+                  "usageTotalTokens": {
+                    "type": "number"
+                  },
+                  "costTotalTokens": {
+                    "type": "number"
+                  },
+                  "systemInstructions": {
+                    "type": "string"
+                  },
+                  "inputMessages": {
+                    "type": "string"
+                  },
+                  "outputMessages": {
+                    "type": "string"
+                  },
+                  "requestMessages": {
+                    "type": "string"
+                  },
+                  "responseText": {
+                    "type": "string"
+                  },
+                  "responseObject": {
+                    "type": "string"
+                  },
+                  "toolDefinitions": {
+                    "type": "string"
+                  },
+                  "toolName": {
+                    "type": "string"
+                  },
+                  "toolCallArguments": {
+                    "type": "string"
+                  },
+                  "toolInput": {
+                    "type": "string"
+                  },
+                  "truncatedFields": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "spanId",
+              "traceId",
+              "project",
+              "projectId",
+              "timestamp",
+              "durationMs"
+            ],
+            "additionalProperties": false
+          }
+        },
         "timeline": {
           "type": "array",
           "items": {
@@ -861,6 +977,66 @@
                     },
                     "required": ["totalTokens", "durationMs"],
                     "additionalProperties": false
+                  },
+                  "genAi": {
+                    "type": "object",
+                    "properties": {
+                      "operationType": {
+                        "type": "string"
+                      },
+                      "agentName": {
+                        "type": "string"
+                      },
+                      "requestModel": {
+                        "type": "string"
+                      },
+                      "responseModel": {
+                        "type": "string"
+                      },
+                      "usageTotalTokens": {
+                        "type": "number"
+                      },
+                      "costTotalTokens": {
+                        "type": "number"
+                      },
+                      "systemInstructions": {
+                        "type": "string"
+                      },
+                      "inputMessages": {
+                        "type": "string"
+                      },
+                      "outputMessages": {
+                        "type": "string"
+                      },
+                      "requestMessages": {
+                        "type": "string"
+                      },
+                      "responseText": {
+                        "type": "string"
+                      },
+                      "responseObject": {
+                        "type": "string"
+                      },
+                      "toolDefinitions": {
+                        "type": "string"
+                      },
+                      "toolName": {
+                        "type": "string"
+                      },
+                      "toolCallArguments": {
+                        "type": "string"
+                      },
+                      "toolInput": {
+                        "type": "string"
+                      },
+                      "truncatedFields": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -903,6 +1079,51 @@
                   },
                   "input": {
                     "type": "string"
+                  },
+                  "genAi": {
+                    "type": "object",
+                    "properties": {
+                      "operationType": {
+                        "type": "string"
+                      },
+                      "agentName": {
+                        "type": "string"
+                      },
+                      "requestModel": {
+                        "type": "string"
+                      },
+                      "responseModel": {
+                        "type": "string"
+                      },
+                      "usageTotalTokens": {
+                        "type": "number"
+                      },
+                      "costTotalTokens": {
+                        "type": "number"
+                      },
+                      "systemInstructions": {
+                        "type": "string"
+                      },
+                      "inputMessages": {
+                        "type": "string"
+                      },
+                      "outputMessages": {
+                        "type": "string"
+                      },
+                      "requestMessages": {
+                        "type": "string"
+                      },
+                      "responseText": {
+                        "type": "string"
+                      },
+                      "responseObject": {
+                        "type": "string"
+                      },
+                      "toolDefinitions": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -933,6 +1154,7 @@
         "messageCount",
         "toolCallCount",
         "totalTokens",
+        "spanSummaries",
         "timeline"
       ],
       "additionalProperties": false,
