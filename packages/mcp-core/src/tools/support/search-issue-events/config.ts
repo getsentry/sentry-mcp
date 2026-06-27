@@ -93,7 +93,7 @@ HANDLING "ME" REFERENCES:
 - If query contains "me", "my errors", "assigned to me", use whoami tool
 - Replace "me" with actual user.id or user.email value
 - Do not quote simple email or ID values in Sentry search tokens. Use user.email:alice@example.com, NOT user.email:"alice@example.com".
-- Example: "my errors" + whoami returns user.email:"alice@example.com"
+- Example: "my errors" + whoami returns alice@example.com
   → query: "user.email:alice@example.com"
 
 YOUR RESPONSE FORMAT:
