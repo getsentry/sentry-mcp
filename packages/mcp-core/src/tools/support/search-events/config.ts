@@ -25,6 +25,7 @@ For HTTP/API span queries, use common fields like http.method, http.url, http.st
 
 FIELD VERIFICATION REQUIREMENT:
 Use built-in fields and documented common fields from this prompt directly.
+When the user provides complete Sentry search syntax, requested return fields, and sort/grouping intent, preserve those explicit filters and fields directly instead of calling discovery tools only to validate them.
 Use discovery tools for custom, uncommon, user-supplied, or ambiguous fields:
 1. Custom fields and tags vary by project based on what data is being sent
 2. Using a non-existent custom field will cause query failures
