@@ -83,16 +83,18 @@ export interface SearchEventsAgentOptions {
   projectId?: string;
 }
 
+type SearchEventsAgentResult = {
+  result: z.output<typeof searchEventsAgentOutputSchema>;
+  toolCalls: any[];
+};
+
 /**
  * Search events agent - single entry point for translating natural language queries to Sentry search syntax
  * This returns both the translated query result AND the tool calls made by the agent
  */
 export async function searchEventsAgent(
   options: SearchEventsAgentOptions,
-): Promise<{
-  result: z.output<typeof searchEventsAgentOutputSchema>;
-  toolCalls: any[];
-}> {
+): Promise<SearchEventsAgentResult> {
   // Provider check happens in callEmbeddedAgent via getAgentProvider()
   // Create tools pre-bound with the provided API service and organization
   const datasetAttributesTool = createDatasetAttributesTool({

@@ -80,7 +80,7 @@ EMBEDDED_AGENT_PROVIDER=     # Required when multiple provider keys are set: 'op
 OPENAI_API_KEY=              # Required if using OpenAI
 ANTHROPIC_API_KEY=           # Required if using Anthropic
 OPENROUTER_API_KEY=          # Required if using OpenRouter
-OPENROUTER_MODEL=            # Optional OpenRouter model, defaults to 'openai/gpt-5'
+# OPENROUTER_MODEL=openai/gpt-5  # Optional OpenRouter model, defaults to 'openai/gpt-5'
 
 # Optional overrides
 SENTRY_HOST=                 # For self-hosted deployments
@@ -200,8 +200,9 @@ pnpm test
 
 ```shell
 # .env (in project root)
-OPENAI_API_KEY=      # Use OpenAI-backed AI-powered tools
-OPENROUTER_API_KEY=  # Or use OpenRouter-backed AI-powered tools
+EMBEDDED_AGENT_PROVIDER=openrouter
+OPENROUTER_API_KEY=  # Use OpenRouter-backed AI-powered tools and evals
+# OPENROUTER_MODEL=openai/gpt-5  # Optional, defaults to openai/gpt-5
 ```
 
 Note: The root `.env` file provides defaults for all packages. Individual packages can have their own `.env` files to override these defaults during development.

@@ -11,14 +11,18 @@ export function setupMockServer(handlers: Array<any> = []): SetupServer {
  * This helper ensures consistent configuration across all test suites
  */
 export function startMockServer(options?: {
-  ignoreOpenAI?: boolean;
+  ignoreLLMProviderRequests?: boolean;
 }): void {
-  const { ignoreOpenAI = true } = options || {};
+  const { ignoreLLMProviderRequests = true } = options || {};
 
   mswServer.listen({
     onUnhandledRequest: (req: any, print: any) => {
-      // Ignore OpenAI requests if specified (default behavior for AI agent tests)
-      if (ignoreOpenAI && req.url.startsWith("https://api.openai.com/")) {
+      // Ignore LLM provider calls while still failing on unmocked Sentry/API requests.
+      if (
+        ignoreLLMProviderRequests &&
+        (req.url.startsWith("https://api.openai.com/") ||
+          req.url.startsWith("https://openrouter.ai/api/v1/"))
+      ) {
         return;
       }
 

@@ -707,38 +707,16 @@ export function createDatasetAttributesTool(options: {
   projectId?: string;
 }) {
   const { apiService, organizationSlug, projectId } = options;
-  const traceItemAttributeTypeSchema = z.enum(["string", "number", "boolean"]);
 
   return agentTool({
     description:
-      "Query and filter available attributes and fields for a specific Sentry dataset to understand what data is available",
+      "Discover custom, uncommon, or ambiguous attributes for a specific Sentry dataset. Do not use this to confirm built-in or common fields already documented in the prompt.",
     parameters: z.object({
       dataset: z
         .enum(PUBLIC_EVENTS_DATASETS)
         .describe("The dataset to query attributes for"),
-      substringMatch: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe("Optional substring to find matching attribute names"),
-      query: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          "Optional Sentry search query to list attributes available for that filtered result set",
-        ),
-      attributeTypes: z
-        .array(traceItemAttributeTypeSchema)
-        .min(1)
-        .optional()
-        .describe(
-          "Optional attribute types to list. Use ['string','number','boolean'] when unsure.",
-        ),
     }),
-    execute: async ({ dataset, substringMatch, query, attributeTypes }) => {
+    execute: async ({ dataset }) => {
       const {
         BASE_COMMON_FIELDS,
         DATASET_FIELDS,
@@ -760,11 +738,6 @@ export function createDatasetAttributesTool(options: {
           dataset,
           projectId,
           attributeTimeParams,
-          {
-            attributeTypes,
-            substringMatch,
-            query,
-          },
         );
 
       // Combine all available fields

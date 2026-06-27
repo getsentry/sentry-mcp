@@ -1,8 +1,14 @@
-import { openai } from "@ai-sdk/openai";
-import { generateObject, type LanguageModel } from "ai";
+import { generateObject } from "ai";
 import { z } from "zod";
 import { experimental_createMCPClient } from "@ai-sdk/mcp";
-import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
+import {
+  createJudge,
+  toJsonValue,
+  type Judge,
+  type JudgeContext,
+} from "vitest-evals";
+import { getEvalModelConfig } from "./model";
+import { createMockMcpTransport } from "./mcpTransport";
 
 // Cache for available tools to avoid reconnecting for each test
 let cachedTools: string[] | null = null;
@@ -16,24 +22,8 @@ async function getAvailableTools(): Promise<string[]> {
     return cachedTools;
   }
 
-  // Use pnpm exec to run the binary from the workspace
-  const transport = new Experimental_StdioMCPTransport({
-    command: "pnpm",
-    args: [
-      "exec",
-      "sentry-mcp",
-      "--access-token=mocked-access-token",
-      "--all-scopes",
-    ],
-    env: {
-      ...process.env,
-      SENTRY_ACCESS_TOKEN: "mocked-access-token",
-      SENTRY_HOST: "sentry.io",
-    },
-  });
-
   const client = await experimental_createMCPClient({
-    transport,
+    transport: createMockMcpTransport(),
   });
 
   // Discover available tools
@@ -54,17 +44,14 @@ async function getAvailableTools(): Promise<string[]> {
 
 export interface ExpectedToolCall {
   name: string;
-  arguments: Record<string, any>;
+  arguments: Record<string, unknown>;
 }
 
-interface ToolPredictionScorerOptions {
+interface ToolPredictionJudgeOptions extends JudgeContext<string, string> {
   input: string;
   output: string;
-  expectedTools?: ExpectedToolCall[];
-  result?: any;
+  expectedTools: ExpectedToolCall[];
 }
-
-const defaultModel = openai("gpt-4o");
 
 const predictionSchema = z.object({
   score: z.number().min(0).max(1).describe("Score from 0 to 1"),
@@ -126,35 +113,34 @@ CRITICAL: The expected tools represent the actual realistic behavior for this sp
 }
 
 /**
- * A scorer that uses AI to predict what tools would be called without executing them.
+ * A judge that uses AI to predict what tools would be called without executing them.
  * This is much faster than actually running the tools and checking what was called.
  *
- * @param model - Optional language model to use for predictions (defaults to gpt-4o)
- * @returns A scorer function that compares predicted vs expected tool calls
+ * @returns A judge that compares predicted vs expected tool calls
  *
  * @example
  * ```typescript
- * import { ToolPredictionScorer } from './utils/toolPredictionScorer';
- * import { NoOpTaskRunner } from './utils/runner';
- * import { describeEval } from 'vitest-evals';
+ * import { expect } from "vitest";
+ * import { describeEval } from "vitest-evals";
+ * import { ToolPredictionJudge, createTaskHarness } from "./utils";
  *
  * describeEval("Sentry issue search", {
- *   data: async () => [
- *     {
- *       input: "Find the newest issues in my-org",
+ *   harness: createTaskHarness("tool-prediction", NoOpTaskRunner()),
+ * }, (it) => {
+ *   it("predicts issue search tools", async ({ run }) => {
+ *     const result = await run("Find the newest issues in my-org");
+ *     await expect(result).toSatisfyJudge(ToolPredictionJudge(), {
  *       expectedTools: [
  *         { name: "find_organizations", arguments: {} },
- *         { name: "find_issues", arguments: { organizationSlug: "my-org", sortBy: "first_seen" } }
- *       ]
- *     }
- *   ],
- *   task: NoOpTaskRunner(), // Don't execute tools, just predict them
- *   scorers: [ToolPredictionScorer()],
- *   threshold: 0.8
+ *         { name: "find_issues", arguments: { organizationSlug: "my-org", sortBy: "first_seen" } },
+ *       ],
+ *       threshold: 0.8,
+ *     });
+ *   });
  * });
  * ```
  *
- * The scorer works by:
+ * The judge works by:
  * 1. Connecting to the MCP server to get available tools and their descriptions
  * 2. Using AI to predict what tools would be called for the given task
  * 3. Comparing predictions against the expectedTools array
@@ -167,57 +153,45 @@ CRITICAL: The expected tools represent the actual realistic behavior for this sp
  * - 0.3: Some expected tools predicted but significant issues
  * - 0.0: Wrong tools or critical tools missing
  *
- * If `expectedTools` is not provided in test data, the scorer is automatically skipped
- * and returns `{ score: null }` to allow other scorers to run without interference.
  */
-export function ToolPredictionScorer(model: LanguageModel = defaultModel) {
-  return async function ToolPredictionScorer(
-    opts: ToolPredictionScorerOptions,
-  ) {
-    // If expectedTools is not defined, skip this scorer
-    if (!opts.expectedTools) {
+export function ToolPredictionJudge(): Judge<ToolPredictionJudgeOptions> {
+  return createJudge<ToolPredictionJudgeOptions>(
+    "ToolPredictionJudge",
+    async (opts) => {
+      const modelConfig = getEvalModelConfig();
+
+      const expectedTools = opts.expectedTools;
+      const AVAILABLE_TOOLS = await getAvailableTools();
+      const expectedDescription = expectedTools
+        .map(
+          (tool) =>
+            `- ${tool.name} with arguments: ${JSON.stringify(tool.arguments)}`,
+        )
+        .join("\n");
+
+      const { object } = await generateObject({
+        model: modelConfig.model,
+        prompt: generateSystemPrompt(
+          AVAILABLE_TOOLS,
+          opts.input,
+          expectedDescription,
+        ),
+        schema: predictionSchema,
+        experimental_telemetry: {
+          isEnabled: true,
+          functionId: "tool_prediction_judge",
+        },
+        providerOptions: modelConfig.providerOptions,
+      });
+
       return {
-        score: null,
+        score: object.score,
         metadata: {
-          rationale: "Skipped: No expectedTools defined for this test case",
+          rationale: object.rationale,
+          predictedTools: toJsonValue(object.predictedTools),
+          expectedTools: toJsonValue(expectedTools),
         },
       };
-    }
-
-    const expectedTools = opts.expectedTools;
-
-    // Get available tools from the MCP server
-    const AVAILABLE_TOOLS = await getAvailableTools();
-
-    // Generate a description of the expected tools for the prompt
-    const expectedDescription = expectedTools
-      .map(
-        (tool) =>
-          `- ${tool.name} with arguments: ${JSON.stringify(tool.arguments)}`,
-      )
-      .join("\n");
-
-    const { object } = await generateObject({
-      model,
-      prompt: generateSystemPrompt(
-        AVAILABLE_TOOLS,
-        opts.input,
-        expectedDescription,
-      ),
-      schema: predictionSchema,
-      experimental_telemetry: {
-        isEnabled: true,
-        functionId: "tool_prediction_scorer",
-      },
-    });
-
-    return {
-      score: object.score,
-      metadata: {
-        rationale: object.rationale,
-        predictedTools: object.predictedTools,
-        expectedTools: expectedTools,
-      },
-    };
-  };
+    },
+  );
 }

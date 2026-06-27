@@ -1,55 +1,36 @@
-import { describeEval, ToolCallScorer } from "vitest-evals";
-import { FIXTURES, McpToolCallTaskRunner } from "./utils";
+import { FIXTURES, defineMcpToolCallEval } from "./utils";
 
-describeEval("get-trace-details", {
-  data: async () => {
-    return [
-      {
-        input: `Show me trace ${FIXTURES.traceId} from Sentry in ${FIXTURES.organizationSlug}.`,
-        expectedTools: [
-          {
-            name: "search_sentry_tools",
-            arguments: {
-              query: "trace",
-            },
+defineMcpToolCallEval(
+  "get-trace-details",
+  [
+    {
+      input: `Show me trace ${FIXTURES.traceId} from Sentry in ${FIXTURES.organizationSlug}.`,
+      expectedTools: [
+        {
+          name: "get_sentry_resource",
+          arguments: {
+            resourceType: "trace",
+            organizationSlug: FIXTURES.organizationSlug,
+            resourceId: FIXTURES.traceId,
           },
-          {
-            name: "execute_sentry_tool",
-            arguments: {
-              name: "get_trace_details",
-              arguments: {
-                organizationSlug: FIXTURES.organizationSlug,
-                traceId: FIXTURES.traceId,
-              },
-            },
+        },
+      ],
+    },
+    {
+      input: `Explain trace ${FIXTURES.traceId} in ${FIXTURES.organizationSlug}.`,
+      expectedTools: [
+        {
+          name: "get_sentry_resource",
+          arguments: {
+            resourceType: "trace",
+            organizationSlug: FIXTURES.organizationSlug,
+            resourceId: FIXTURES.traceId,
           },
-        ],
-      },
-      {
-        input: `Explain trace ${FIXTURES.traceId} in ${FIXTURES.organizationSlug}.`,
-        expectedTools: [
-          {
-            name: "search_sentry_tools",
-            arguments: {
-              query: "trace",
-            },
-          },
-          {
-            name: "execute_sentry_tool",
-            arguments: {
-              name: "get_trace_details",
-              arguments: {
-                organizationSlug: FIXTURES.organizationSlug,
-                traceId: FIXTURES.traceId,
-              },
-            },
-          },
-        ],
-      },
-    ];
+        },
+      ],
+    },
+  ],
+  {
+    toolCall: { ordered: true, params: "fuzzy" },
   },
-  task: McpToolCallTaskRunner(),
-  scorers: [ToolCallScorer({ ordered: true, params: "fuzzy" })],
-  threshold: 0.6,
-  timeout: 90000,
-});
+);

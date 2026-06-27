@@ -300,7 +300,7 @@ function buildSearchRepairPrompt(params: {
     "The query may be natural language or already-valid Sentry search syntax.",
     "Preserve valid explicit parameters, but correct dataset, query syntax, fields, sort, and time range when they conflict or would fail.",
     "If the user query already uses Sentry search syntax, treat its filters as authoritative unless the search validation step proves a field is invalid.",
-    "For spans, logs, and metrics, use datasetAttributes to discover likely fields with substringMatch, query, and attributeTypes before dropping or renaming explicit fields.",
+    "For spans, logs, and metrics, use datasetAttributes to discover likely fields before dropping or renaming explicit fields.",
     "A broad datasetAttributes result may be truncated, so absence from that preview does not prove an explicit field is invalid.",
     "For non-replay datasets, convert environment parameters into query filters. For replays, keep environment in the separate environment parameter.",
     "",
