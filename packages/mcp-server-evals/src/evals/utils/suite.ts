@@ -89,7 +89,7 @@ export function defineAgentEval(
   task: EvalTaskRunner,
   options: EvalOptions & { toolCall?: ToolCallJudgeConfig } = {},
 ) {
-  const threshold = options.threshold;
+  const threshold = options.threshold ?? 0.6;
   const toolCallJudge = ToolCallJudge(options.toolCall);
   const structuredOutputJudge = StructuredOutputJudge();
 
