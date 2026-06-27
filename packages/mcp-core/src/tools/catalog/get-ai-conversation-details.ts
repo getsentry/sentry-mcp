@@ -21,6 +21,7 @@ type ToolCall = {
   status?: string;
   arguments?: string;
   input?: string;
+  genAi?: GenAIAttributes;
 };
 
 type ConversationMessage = {
@@ -38,6 +39,7 @@ type ConversationMessage = {
     status?: string;
     durationMs: number;
   };
+  genAi?: GenAIAttributes;
 };
 
 type TimelineEvent = ConversationMessage | ToolCall;
@@ -46,12 +48,78 @@ type LookupWindow = {
   start?: string;
   end?: string;
 };
+type GenAIAttributes = {
+  operationType?: string;
+  agentName?: string;
+  requestModel?: string;
+  responseModel?: string;
+  usageTotalTokens?: number;
+  costTotalTokens?: number;
+  systemInstructions?: string;
+  inputMessages?: string;
+  outputMessages?: string;
+  requestMessages?: string;
+  responseText?: string;
+  responseObject?: string;
+  toolDefinitions?: string;
+  toolName?: string;
+  toolCallArguments?: string;
+  toolInput?: string;
+  truncatedFields?: string[];
+};
+type ToolCallGenAIAttributes = Omit<
+  GenAIAttributes,
+  "toolName" | "toolCallArguments" | "toolInput" | "truncatedFields"
+>;
+type SpanSummary = {
+  spanId: string;
+  traceId: string;
+  parentSpanId?: string | null;
+  project: string;
+  projectId: string | number;
+  timestamp: number;
+  durationMs: number;
+  spanName?: string;
+  spanOp?: string;
+  spanDescription?: string;
+  spanStatus?: string;
+  transaction?: string;
+  isTransaction?: boolean;
+  genAi?: GenAIAttributes;
+};
 
 function withoutUndefined<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(
     Object.entries(value).filter(([, item]) => item !== undefined),
   ) as T;
 }
+
+const genAiAttributesSchema = z.object({
+  operationType: z.string().optional(),
+  agentName: z.string().optional(),
+  requestModel: z.string().optional(),
+  responseModel: z.string().optional(),
+  usageTotalTokens: z.number().optional(),
+  costTotalTokens: z.number().optional(),
+  systemInstructions: z.string().optional(),
+  inputMessages: z.string().optional(),
+  outputMessages: z.string().optional(),
+  requestMessages: z.string().optional(),
+  responseText: z.string().optional(),
+  responseObject: z.string().optional(),
+  toolDefinitions: z.string().optional(),
+  toolName: z.string().optional(),
+  toolCallArguments: z.string().optional(),
+  toolInput: z.string().optional(),
+  truncatedFields: z.array(z.string()).optional(),
+});
+
+const toolCallGenAiAttributesSchema = genAiAttributesSchema.omit({
+  toolName: true,
+  toolCallArguments: true,
+  toolInput: true,
+  truncatedFields: true,
+});
 
 const toolCallSchema = z.object({
   type: z.literal("tool_call"),
@@ -63,6 +131,7 @@ const toolCallSchema = z.object({
   status: z.string().optional(),
   arguments: z.string().optional(),
   input: z.string().optional(),
+  genAi: toolCallGenAiAttributesSchema.optional(),
 });
 
 const conversationMessageSchema = z.object({
@@ -82,6 +151,7 @@ const conversationMessageSchema = z.object({
       durationMs: z.number(),
     })
     .optional(),
+  genAi: genAiAttributesSchema.optional(),
 });
 
 const timelineEventSchema = z.discriminatedUnion("type", [
@@ -93,6 +163,23 @@ const lookupWindowSchema = z.object({
   statsPeriod: z.string().optional(),
   start: z.string().optional(),
   end: z.string().optional(),
+});
+
+const spanSummarySchema = z.object({
+  spanId: z.string(),
+  traceId: z.string(),
+  parentSpanId: z.string().nullable().optional(),
+  project: z.string(),
+  projectId: z.union([z.string(), z.number()]),
+  timestamp: z.number(),
+  durationMs: z.number(),
+  spanName: z.string().optional(),
+  spanOp: z.string().optional(),
+  spanDescription: z.string().optional(),
+  spanStatus: z.string().optional(),
+  transaction: z.string().optional(),
+  isTransaction: z.boolean().optional(),
+  genAi: genAiAttributesSchema.optional(),
 });
 
 export const aiConversationDetailsOutputSchema = z.object({
@@ -109,6 +196,7 @@ export const aiConversationDetailsOutputSchema = z.object({
   messageCount: z.number(),
   toolCallCount: z.number(),
   totalTokens: z.number(),
+  spanSummaries: z.array(spanSummarySchema),
   timeline: z.array(timelineEventSchema),
 });
 
@@ -127,8 +215,42 @@ function numeric(value: string | number | null | undefined): number {
   return 0;
 }
 
+function optionalNumeric(
+  value: string | number | null | undefined,
+): number | undefined {
+  if (typeof value === "number") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
 function timestampMs(value: number): number {
   return Math.round(value * 1000);
+}
+
+function durationMs(span: AIConversationSpan): number {
+  return Math.round(
+    (span["precise.finish_ts"] - span["precise.start_ts"]) * 1000,
+  );
+}
+
+const MAX_RAW_GEN_AI_ATTRIBUTE_LENGTH = 4000;
+
+function truncateAttribute(
+  field: string,
+  value: string | undefined,
+  truncatedFields: string[],
+): string | undefined {
+  if (value === undefined || value.length <= MAX_RAW_GEN_AI_ATTRIBUTE_LENGTH) {
+    return value;
+  }
+
+  truncatedFields.push(field);
+  return `${value.slice(0, MAX_RAW_GEN_AI_ATTRIBUTE_LENGTH)}... [truncated]`;
 }
 
 function getOperationType(span: AIConversationSpan): string | undefined {
@@ -273,11 +395,116 @@ function extractAssistantContent(span: AIConversationSpan): string | null {
   return span["gen_ai.response.text"] ?? span["gen_ai.response.object"] ?? null;
 }
 
+/** Projects documented GenAI fields into the MCP contract and marks truncated raw payloads. */
+function buildGenAIAttributes(
+  span: AIConversationSpan,
+): GenAIAttributes | undefined {
+  const truncatedFields: string[] = [];
+
+  const attributes = withoutUndefined({
+    operationType: getOperationType(span),
+    agentName: span["gen_ai.agent.name"],
+    requestModel: span["gen_ai.request.model"],
+    responseModel: span["gen_ai.response.model"],
+    usageTotalTokens: optionalNumeric(span["gen_ai.usage.total_tokens"]),
+    costTotalTokens: optionalNumeric(span["gen_ai.cost.total_tokens"]),
+    systemInstructions: truncateAttribute(
+      "systemInstructions",
+      span["gen_ai.system_instructions"],
+      truncatedFields,
+    ),
+    inputMessages: truncateAttribute(
+      "inputMessages",
+      span["gen_ai.input.messages"],
+      truncatedFields,
+    ),
+    outputMessages: truncateAttribute(
+      "outputMessages",
+      span["gen_ai.output.messages"],
+      truncatedFields,
+    ),
+    requestMessages: truncateAttribute(
+      "requestMessages",
+      span["gen_ai.request.messages"],
+      truncatedFields,
+    ),
+    responseText: truncateAttribute(
+      "responseText",
+      span["gen_ai.response.text"],
+      truncatedFields,
+    ),
+    responseObject: truncateAttribute(
+      "responseObject",
+      span["gen_ai.response.object"],
+      truncatedFields,
+    ),
+    toolDefinitions: truncateAttribute(
+      "toolDefinitions",
+      span["gen_ai.tool.definitions"],
+      truncatedFields,
+    ),
+    toolName: span["gen_ai.tool.name"],
+    toolCallArguments: truncateAttribute(
+      "toolCallArguments",
+      span["gen_ai.tool.call.arguments"],
+      truncatedFields,
+    ),
+    toolInput: truncateAttribute(
+      "toolInput",
+      span["gen_ai.tool.input"],
+      truncatedFields,
+    ),
+    truncatedFields:
+      truncatedFields.length > 0 ? truncatedFields.sort() : undefined,
+  });
+  return Object.keys(attributes).length > 0 ? attributes : undefined;
+}
+
+/** Builds the MCP-facing span summary with IDs for raw span follow-up. */
+function buildSpanSummary(span: AIConversationSpan): SpanSummary {
+  return withoutUndefined({
+    spanId: span.span_id,
+    traceId: span.trace,
+    parentSpanId: span.parent_span,
+    project: span.project,
+    projectId: span["project.id"],
+    timestamp: timestampMs(span["precise.start_ts"]),
+    durationMs: durationMs(span),
+    spanName: span["span.name"],
+    spanOp: span["span.op"],
+    spanDescription: span["span.description"],
+    spanStatus: span["span.status"],
+    transaction: span.transaction,
+    isTransaction: span.is_transaction,
+    genAi: buildGenAIAttributes(span),
+  });
+}
+
+function buildToolCallGenAIAttributes(
+  attributes: GenAIAttributes | undefined,
+): ToolCallGenAIAttributes | undefined {
+  if (!attributes) {
+    return undefined;
+  }
+
+  const {
+    toolName: _toolName,
+    toolCallArguments: _toolCallArguments,
+    toolInput: _toolInput,
+    truncatedFields: _truncatedFields,
+    ...timelineAttributes
+  } = attributes;
+  return Object.keys(timelineAttributes).length > 0
+    ? timelineAttributes
+    : undefined;
+}
+
 function buildToolCall(span: AIConversationSpan): ToolCall | null {
   const name = span["gen_ai.tool.name"];
   if (!name) {
     return null;
   }
+  const genAi = buildGenAIAttributes(span);
 
   return withoutUndefined({
     type: "tool_call" as const,
@@ -285,25 +512,23 @@ function buildToolCall(span: AIConversationSpan): ToolCall | null {
     spanId: span.span_id,
     traceId: span.trace,
     timestamp: timestampMs(span["precise.start_ts"]),
-    durationMs: Math.round(
-      (span["precise.finish_ts"] - span["precise.start_ts"]) * 1000,
-    ),
+    durationMs: durationMs(span),
     status: span["span.status"],
-    arguments: span["gen_ai.tool.call.arguments"],
-    input: span["gen_ai.tool.input"],
+    arguments: genAi?.toolCallArguments,
+    input: genAi?.toolInput,
+    genAi: buildToolCallGenAIAttributes(genAi),
   });
 }
 
 function buildMessageEvents(span: AIConversationSpan): ConversationMessage[] {
-  const durationMs = Math.round(
-    (span["precise.finish_ts"] - span["precise.start_ts"]) * 1000,
-  );
+  const spanDurationMs = durationMs(span);
+  const genAi = buildGenAIAttributes(span);
   const metadata = withoutUndefined({
     agentName: span["gen_ai.agent.name"],
     model: span["gen_ai.response.model"] ?? span["gen_ai.request.model"],
     totalTokens: numeric(span["gen_ai.usage.total_tokens"]),
     status: span["span.status"],
-    durationMs,
+    durationMs: spanDurationMs,
   });
   const events: ConversationMessage[] = [];
   const userContent = extractUserContent(span);
@@ -318,6 +543,7 @@ function buildMessageEvents(span: AIConversationSpan): ConversationMessage[] {
         traceId: span.trace,
         userEmail: span["user.email"],
         metadata: undefined,
+        genAi,
       }),
     );
   }
@@ -332,11 +558,13 @@ function buildMessageEvents(span: AIConversationSpan): ConversationMessage[] {
       spanId: span.span_id,
       traceId: span.trace,
       metadata,
+      genAi,
     });
   } else if (events.length > 0) {
     events[events.length - 1] = {
       ...events[events.length - 1]!,
       metadata,
+      genAi,
     };
   }
 
@@ -385,6 +613,13 @@ function buildConversationArtifact(
   lookupWindow: LookupWindow,
 ): AIConversationDetailsOutput {
   const timeline = extractTimeline(spans);
+  const spanSummaries = spans.map(buildSpanSummary).sort((a, b) => {
+    const timestampDiff = a.timestamp - b.timestamp;
+    if (timestampDiff !== 0) {
+      return timestampDiff;
+    }
+    return a.spanId.localeCompare(b.spanId);
+  });
   const traceIds = [...new Set(spans.map((span) => span.trace))].sort();
   const projects = [...new Set(spans.map((span) => span.project))].sort();
   const startTimestamp =
@@ -415,6 +650,7 @@ function buildConversationArtifact(
       (sum, span) => sum + numeric(span["gen_ai.usage.total_tokens"]),
       0,
     ),
+    spanSummaries,
     timeline,
   });
 }
