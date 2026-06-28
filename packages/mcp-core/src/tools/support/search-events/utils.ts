@@ -707,16 +707,40 @@ export function createDatasetAttributesTool(options: {
   projectId?: string;
 }) {
   const { apiService, organizationSlug, projectId } = options;
+  const traceItemAttributeTypeSchema = z.enum(["string", "number", "boolean"]);
 
   return agentTool({
     description:
-      "Discover custom, uncommon, or ambiguous attributes for a specific Sentry dataset. Do not use this to confirm built-in or common fields already documented in the prompt.",
+      "Discover custom, uncommon, or ambiguous attributes for a specific Sentry dataset. Use targeted filters when checking a specific custom field. Do not use this to confirm built-in or common fields already documented in the prompt.",
     parameters: z.object({
       dataset: z
         .enum(PUBLIC_EVENTS_DATASETS)
         .describe("The dataset to query attributes for"),
+      substringMatch: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          "Optional substring to find matching attribute names for a specific custom or ambiguous field",
+        ),
+      query: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          "Optional Sentry search query to list attributes available for that filtered result set",
+        ),
+      attributeTypes: z
+        .array(traceItemAttributeTypeSchema)
+        .min(1)
+        .optional()
+        .describe(
+          "Optional attribute types to list when the requested operation requires a string, number, or boolean field",
+        ),
     }),
-    execute: async ({ dataset }) => {
+    execute: async ({ dataset, substringMatch, query, attributeTypes }) => {
       const {
         BASE_COMMON_FIELDS,
         DATASET_FIELDS,
@@ -738,6 +762,11 @@ export function createDatasetAttributesTool(options: {
           dataset,
           projectId,
           attributeTimeParams,
+          {
+            attributeTypes,
+            substringMatch,
+            query,
+          },
         );
 
       // Combine all available fields

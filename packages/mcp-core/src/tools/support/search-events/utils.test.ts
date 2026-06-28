@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import {
+  createDatasetAttributesTool,
   fetchCustomAttributes,
   formatEventValue,
   formatEventsValidationResults,
@@ -555,6 +556,55 @@ describe("fetchCustomAttributes", () => {
           "tags[enabled,boolean]": "boolean",
         },
       });
+    });
+
+    it("should expose targeted trace item filters through the agent tool", async () => {
+      const requests: URLSearchParams[] = [];
+
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            requests.push(url.searchParams);
+
+            return HttpResponse.json([
+              {
+                key: "custom.db.pool_size",
+                name: "Custom DB Pool Size",
+                attributeType: "number",
+              },
+            ]);
+          },
+        ),
+      );
+
+      const tool = createDatasetAttributesTool({
+        apiService,
+        organizationSlug: "test-org",
+        projectId: "123",
+      });
+
+      const result = await tool.execute?.(
+        {
+          dataset: "spans",
+          substringMatch: "custom.db.pool_size",
+          query: "custom.db.pool_size:>50",
+          attributeTypes: ["number"],
+        },
+        {
+          toolCallId: "test-tool-call",
+          messages: [],
+        },
+      );
+
+      expect(result?.error).toBeUndefined();
+      expect(result?.result).toContain("custom.db.pool_size");
+      expect(requests).toHaveLength(1);
+      expect(requests[0]!.get("itemType")).toBe("spans");
+      expect(requests[0]!.get("project")).toBe("123");
+      expect(requests[0]!.get("substringMatch")).toBe("custom.db.pool_size");
+      expect(requests[0]!.get("query")).toBe("custom.db.pool_size:>50");
     });
   });
 });
