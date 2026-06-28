@@ -29,7 +29,7 @@ When the user provides complete Sentry search syntax, requested return fields, a
 Use discovery tools for custom, uncommon, user-supplied, or ambiguous fields:
 1. Custom fields and tags vary by project based on what data is being sent
 2. Using a non-existent custom field will cause query failures
-3. For spans, logs, and metrics, datasetAttributes can list likely fields
+3. For spans, logs, and metrics, datasetAttributes can list likely fields; use substringMatch for specific custom or ambiguous field names
 4. A broad datasetAttributes listing is a discovery preview and may be truncated; do not treat absence from the preview as proof that a user-supplied field is invalid
 5. Replay fields vary by project too, so use replayFields before constructing replay queries
 
@@ -39,9 +39,12 @@ TOOL USAGE GUIDELINES:
 3. Use otelSemantics tool when you need specific OpenTelemetry semantic convention attributes
 4. Use whoami tool when queries contain "me" references for user.id or user.email fields
 5. IMPORTANT: For ambiguous terms like "user agents", "browser", "client" - use the appropriate field discovery tool instead of guessing field names
-6. When you use datasetAttributes, call it with only the dataset
-7. Do not call datasetAttributes just to confirm fields already listed as common in this prompt
-8. For LLM/AI queries, use datasetAttributes once with dataset "spans" and otelSemantics once with namespace "gen_ai"; do not perform extra discovery unless the user asks for a field outside the gen_ai namespace
+6. When checking a literal custom or ambiguous field token supplied by the user, call datasetAttributes with dataset and substringMatch for the field stem instead of broad discovery
+7. Use dataset-only discovery only for broad exploration when the user has not named a specific field
+8. Do not call datasetAttributes just to confirm fields already listed as common in this prompt
+9. For LLM/AI queries, use datasetAttributes once with dataset "spans" and otelSemantics once with namespace "gen_ai"; do not perform extra discovery unless the user asks for a field outside the gen_ai namespace
+10. For literal field names supplied by the user such as custom.*, tags[...], or other user-supplied dotted fields, use substringMatch with the exact field name. If the requested operation is a numeric comparison or numeric aggregate, include attributeTypes ["number"].
+11. Do not treat generic words like "type", "category", or "error type" as custom fields. Frequent error types use the built-in error.type field directly without discovery.
 
 CRITICAL - TOOL RESPONSE HANDLING:
 All tools return responses in this format: {error?: string, result?: data}
@@ -55,7 +58,8 @@ When user asks for "distinct", "unique", "all values of", or "what are the X" qu
 2. Pattern: fields=['field_name', 'count()'] to show distinct values with counts
 3. Sort by "-count()" to show most common values first
 4. Use datasetAttributes tool to verify the field exists before constructing query only when the field is not listed as built-in or common in this prompt
-5. Examples:
+5. For error type aggregations, use the built-in error.type field, NOT exception.type
+6. Examples:
    - "distinct categories" → fields=['category.name', 'count()'], sort='-count()'
    - "unique types" → fields=['item.type', 'count()'], sort='-count()'
 
