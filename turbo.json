@@ -37,12 +37,20 @@
     },
     "lint": {
       "dependsOn": ["^build"],
-      "inputs": ["**/*.{ts,tsx,js,jsx}", "biome.json", "package.json"],
+      "inputs": [
+        "**/*.{ts,tsx,js,jsx}",
+        "ast-grep-rule-tests/**/*.yml",
+        "ast-grep-rules/**/*.yml",
+        "biome.json",
+        "package.json",
+        "sgconfig.yml"
+      ],
       "cache": true
     },
     "test": {
       "dependsOn": ["^build"],
       "inputs": [
+        "scripts/**/*.ts",
         "src/**/*.ts",
         "**/*.test.ts",
         "**/*.spec.ts",
@@ -86,7 +94,10 @@
   "globalPassThroughEnv": [
     "NODE_ENV",
     "CI",
+    "EMBEDDED_AGENT_PROVIDER",
     "OPENAI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "OPENROUTER_MODEL",
     "COOKIE_SECRET",
     "SENTRY_CLIENT_ID",
     "SENTRY_CLIENT_SECRET",

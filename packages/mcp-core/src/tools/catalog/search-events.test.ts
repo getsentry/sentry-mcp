@@ -1,9 +1,10 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
+import searchEvents from "./search-events";
+import { MAX_EVENTS_VALIDATION_ATTEMPTS } from "../support/search-events/utils";
 import { generateText } from "ai";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UserInputError } from "../../errors";
-import searchEvents from "./search-events";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -99,10 +100,31 @@ describe("search_events", () => {
     } as any;
   };
 
+  const validEventsValidationResponse = {
+    valid: true,
+    projects: [],
+    dataset: [],
+    environment: [],
+    field: [],
+    query: { valid: true, error: null, fields: [] },
+    orderby: [],
+  };
+
+  const mockValidEventsValidation = () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/:orgSlug/events/validate/",
+        () => HttpResponse.json(validEventsValidationResponse),
+      ),
+    );
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OPENAI_API_KEY = "test-key";
+    process.env.OPENROUTER_API_KEY = "";
     mockGenerateText.mockResolvedValue(mockAIResponse("errors"));
+    mockValidEventsValidation();
   });
 
   it("should handle spans dataset queries", async () => {
@@ -145,7 +167,7 @@ describe("search_events", () => {
         dataset: "errors",
         fields: null,
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -184,7 +206,7 @@ describe("search_events", () => {
           expect(url.searchParams.get("dataset")).toBe("spans");
           expect(url.searchParams.get("query")).toBe(query);
           expect(url.searchParams.getAll("field")).toEqual(fields);
-          expect(url.searchParams.get("sort")).toBe("-count");
+          expect(url.searchParams.get("sort")).toBe("-count()");
           expect(url.searchParams.get("statsPeriod")).toBe("7d");
 
           return HttpResponse.json({
@@ -211,7 +233,7 @@ describe("search_events", () => {
         dataset: "spans",
         fields,
         sort: "-count()",
-        statsPeriod: "7d",
+        period: "7d",
         limit: 10,
         includeExplanation: false,
       },
@@ -234,6 +256,61 @@ describe("search_events", () => {
     expect(result).toContain(
       "- Fields: `tags[type]`, `tags[sequence]`, `span.status`, `tags[reason]`, `count()`",
     );
+  });
+
+  it("should link directly to AI conversation details for a single conversation id filter", async () => {
+    const query = 'gen_ai.conversation.id:"14365297"';
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("spans");
+          expect(url.searchParams.get("query")).toBe(query);
+
+          return HttpResponse.json({
+            data: [
+              {
+                id: "span1",
+                "span.op": "ai.pipeline",
+                "span.description": "AI conversation",
+                "span.duration": 120,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query,
+        dataset: "spans",
+        fields: ["span.op", "span.description", "span.duration"],
+        sort: "-span.duration",
+        period: "14d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain(
+      "https://test-org.sentry.io/explore/conversations/14365297/",
+    );
+    expect(result).not.toContain("https://test-org.sentry.io/explore/traces/");
   });
 
   it("should append environment filters for structured trace searches", async () => {
@@ -273,7 +350,7 @@ describe("search_events", () => {
         dataset: "spans",
         fields,
         sort: "-count()",
-        statsPeriod: "7d",
+        period: "7d",
         environment: "production",
         limit: 10,
         includeExplanation: false,
@@ -338,7 +415,7 @@ describe("search_events", () => {
         dataset: "spans",
         fields: ["span.op", "span.duration"],
         sort: "-span.duration",
-        statsPeriod: "24h",
+        period: "24h",
         limit: 10,
         includeExplanation: false,
       },
@@ -380,7 +457,7 @@ describe("search_events", () => {
           expect(url.searchParams.get("dataset")).toBe("spans");
           expect(url.searchParams.get("query")).toBe(query);
           expect(url.searchParams.getAll("field")).toEqual(fields);
-          expect(url.searchParams.get("sort")).toBe("-count");
+          expect(url.searchParams.get("sort")).toBe("-count()");
           expect(url.searchParams.get("statsPeriod")).toBe("7d");
 
           return HttpResponse.json({
@@ -405,7 +482,7 @@ describe("search_events", () => {
         dataset: "spans",
         fields,
         sort: null,
-        statsPeriod: "7d",
+        period: "7d",
         limit: 10,
         includeExplanation: false,
       },
@@ -462,7 +539,7 @@ describe("search_events", () => {
         dataset: "errors",
         fields: ["title", "issue", "message"],
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -509,7 +586,7 @@ describe("search_events", () => {
         dataset: "spans",
         fields: ["span.op", "count()"],
         sort: "-timestamp",
-        statsPeriod: "7d",
+        period: "7d",
         limit: 10,
         includeExplanation: false,
       },
@@ -556,7 +633,7 @@ describe("search_events", () => {
         dataset: "spans",
         fields: ["span.op", "count()"],
         sort: "-count_unique(user.id)",
-        statsPeriod: "7d",
+        period: "7d",
         limit: 10,
         includeExplanation: false,
       },
@@ -572,9 +649,7 @@ describe("search_events", () => {
     );
 
     expect(mockGenerateText).not.toHaveBeenCalled();
-    // The API client normalizes aggregate sort params: count_unique(user.id)
-    // becomes count_unique_user_id. Fields keep their original form.
-    expect(capturedSort).toBe("-count_unique_user_id");
+    expect(capturedSort).toBe("-count_unique(user.id)");
     expect(capturedFields).toEqual([
       "span.op",
       "count()",
@@ -629,7 +704,7 @@ describe("search_events", () => {
         dataset: "spans",
         fields,
         sort: null,
-        statsPeriod: "7d",
+        period: "7d",
         environment: "production",
         limit: 10,
         includeExplanation: false,
@@ -696,7 +771,7 @@ describe("search_events", () => {
         dataset: "spans",
         fields,
         sort: null,
-        statsPeriod: "7d",
+        period: "7d",
         limit: 10,
         includeExplanation: false,
       },
@@ -760,7 +835,7 @@ describe("search_events", () => {
         dataset: "spans",
         fields,
         sort: null,
-        statsPeriod: "7d",
+        period: "7d",
         limit: 10,
         includeExplanation: false,
       },
@@ -825,7 +900,7 @@ describe("search_events", () => {
         dataset: "spans",
         fields,
         sort: null,
-        statsPeriod: "7d",
+        period: "7d",
         limit: 10,
         includeExplanation: false,
       },
@@ -1437,7 +1512,7 @@ describe("search_events", () => {
     expect(result).toContain("2 errors");
   });
 
-  it("should not add default statsPeriod to replay absolute time ranges", async () => {
+  it("should not add default period to replay absolute time ranges", async () => {
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse(
         "replays",
@@ -1510,6 +1585,12 @@ describe("search_events", () => {
         ({ request }) => {
           const url = new URL(request.url);
           expect(url.searchParams.get("dataset")).toBe("errors");
+          expect(url.searchParams.getAll("field")).toEqual([
+            "issue",
+            "title",
+            "level",
+            "timestamp",
+          ]);
           return HttpResponse.json({
             data: [
               {
@@ -1534,7 +1615,7 @@ describe("search_events", () => {
         dataset: "errors",
         fields: null,
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -1552,6 +1633,63 @@ describe("search_events", () => {
     expect(mockGenerateText).toHaveBeenCalled();
     expect(result).toContain("Database Connection Error");
     expect(result).toContain("PROJ-123");
+  });
+
+  it("includes user identity in default error search fields", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("errors", "level:error", []),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("errors");
+          expect(url.searchParams.getAll("field")).toEqual(
+            expect.arrayContaining(["user.email", "user.id"]),
+          );
+          return HttpResponse.json({
+            data: [
+              {
+                id: "error1",
+                issue: "PROJ-123",
+                title: "Database Connection Error",
+                "user.email": "dev@example.com",
+                "user.id": "123",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query: "database errors",
+        dataset: "errors",
+        fields: null,
+        sort: "-timestamp",
+        period: "14d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain("dev@example.com");
+    expect(result).toContain("user.id");
   });
 
   it("should format object fields without [object Object] output", async () => {
@@ -1601,7 +1739,7 @@ describe("search_events", () => {
         dataset: "errors",
         fields: null,
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -1832,7 +1970,7 @@ describe("search_events", () => {
         dataset: "errors",
         fields: null,
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -1891,7 +2029,7 @@ describe("search_events", () => {
         dataset: "errors",
         fields: ["timestamp", "message", "level"],
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -1927,7 +2065,7 @@ describe("search_events", () => {
         dataset: "errors",
         fields: null,
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -1966,7 +2104,7 @@ describe("search_events", () => {
         dataset: "errors",
         fields: null,
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -2005,7 +2143,7 @@ describe("search_events", () => {
         dataset: "errors",
         fields: null,
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -2055,7 +2193,7 @@ describe("search_events", () => {
           dataset: "errors",
           fields: null,
           sort: "-timestamp",
-          statsPeriod: "14d",
+          period: "14d",
           limit: 10,
           includeExplanation: false,
         },
@@ -2098,7 +2236,7 @@ describe("search_events", () => {
           dataset: "errors",
           fields: null,
           sort: "-timestamp",
-          statsPeriod: "14d",
+          period: "14d",
           limit: 10,
           includeExplanation: false,
         },
@@ -2159,7 +2297,7 @@ describe("search_events", () => {
         dataset: "errors",
         fields: null,
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -2202,7 +2340,7 @@ describe("search_events", () => {
           expect(url.searchParams.get("query")).toBe(
             "has:gen_ai.tool.name AND has:user_agent.original",
           );
-          expect(url.searchParams.get("sort")).toBe("-count"); // API transforms count() to count
+          expect(url.searchParams.get("sort")).toBe("-count()");
           expect(url.searchParams.get("statsPeriod")).toBe("24h");
           // Verify it's using user_agent.original, not user.id
           expect(url.searchParams.getAll("field")).toContain(
@@ -2236,7 +2374,7 @@ describe("search_events", () => {
         dataset: "errors",
         fields: null,
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -2262,6 +2400,7 @@ describe("search_events", () => {
   it("should search events with direct query syntax (no agent)", async () => {
     process.env.OPENAI_API_KEY = "";
     process.env.ANTHROPIC_API_KEY = "";
+    process.env.OPENROUTER_API_KEY = "";
 
     mswServer.use(
       http.get(
@@ -2295,7 +2434,7 @@ describe("search_events", () => {
         query: "level:error",
         fields: ["issue", "title", "level", "timestamp"],
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -2313,5 +2452,504 @@ describe("search_events", () => {
     // Should NOT have called the AI agent
     expect(mockGenerateText).not.toHaveBeenCalled();
     expect(result).toContain("Database Error");
+  });
+
+  it("repairs invalid search params and calls events with updated parameters after validation fails", async () => {
+    let validateCalls = 0;
+    let eventsRequestUrl: URL | undefined;
+
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "spans",
+        "span.duration:>100 span.op:db",
+        ["span.op", "span.duration"],
+        undefined,
+        "-span.duration",
+        { statsPeriod: "7d" },
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () => {
+          validateCalls += 1;
+          if (validateCalls === 1) {
+            return HttpResponse.json({
+              valid: false,
+              projects: [],
+              dataset: [],
+              environment: [],
+              field: [
+                {
+                  name: "spon.duration",
+                  valid: false,
+                  error: "Unknown attribute",
+                },
+              ],
+              query: {
+                valid: false,
+                error: "Invalid syntax",
+                fields: [
+                  {
+                    name: "spon.duration",
+                    valid: false,
+                    error: "Unknown attribute",
+                  },
+                ],
+              },
+              orderby: [
+                {
+                  name: "-spon.duration",
+                  valid: false,
+                  error: "Orderby must also be a selected field",
+                },
+              ],
+            });
+          }
+
+          return HttpResponse.json(validEventsValidationResponse);
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          eventsRequestUrl = new URL(request.url);
+          return HttpResponse.json({
+            data: [
+              {
+                id: "span1",
+                "span.op": "db",
+                "span.duration": 42,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "spans",
+        query: "spon.duration:>100 span.op:db",
+        fields: ["spon.duration"],
+        sort: "-spon.duration",
+        period: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(validateCalls).toBe(2);
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(eventsRequestUrl).toBeDefined();
+    expect(eventsRequestUrl!.searchParams.get("dataset")).toBe("spans");
+    expect(eventsRequestUrl!.searchParams.get("query")).toBe(
+      "span.duration:>100 span.op:db",
+    );
+    expect(eventsRequestUrl!.searchParams.get("query")).not.toContain(
+      "spon.duration",
+    );
+    expect(eventsRequestUrl!.searchParams.getAll("field")).toEqual([
+      "span.op",
+      "span.duration",
+    ]);
+    expect(eventsRequestUrl!.searchParams.getAll("field")).not.toContain(
+      "spon.duration",
+    );
+    expect(eventsRequestUrl!.searchParams.get("sort")).toBe("-span.duration");
+    expect(eventsRequestUrl!.searchParams.get("statsPeriod")).toBe("7d");
+    expect(result).toContain("span1");
+  });
+
+  it("repairs invalid query syntax with the agent after validation fails", async () => {
+    let validateCalls = 0;
+
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("spans", "span.op:db", ["span.op", "span.duration"]),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () => {
+          validateCalls += 1;
+          if (validateCalls === 1) {
+            return HttpResponse.json({
+              valid: false,
+              projects: [],
+              dataset: [],
+              environment: [],
+              field: [],
+              query: {
+                valid: false,
+                error: "Invalid syntax",
+                fields: [],
+              },
+              orderby: [],
+            });
+          }
+
+          return HttpResponse.json(validEventsValidationResponse);
+        },
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+        HttpResponse.json({
+          data: [
+            {
+              id: "span1",
+              "span.op": "db",
+              "span.duration": 42,
+            },
+          ],
+        }),
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "spans",
+        query: "span.op:db AND",
+        fields: ["span.duration"],
+        sort: "-span.duration",
+        period: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(validateCalls).toBe(2);
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(result).toContain("span1");
+  });
+
+  it("keeps prior fields when validation repair returns an empty fields array", async () => {
+    let validateCalls = 0;
+    let eventsRequestUrl: URL | undefined;
+
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "spans",
+        "span.duration:>100",
+        [],
+        undefined,
+        "-span.duration",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () => {
+          validateCalls += 1;
+          if (validateCalls === 1) {
+            return HttpResponse.json({
+              valid: false,
+              projects: [],
+              dataset: [],
+              environment: [],
+              field: [
+                {
+                  name: "spon.duration",
+                  valid: false,
+                  error: "Unknown attribute",
+                },
+              ],
+              query: {
+                valid: false,
+                error: "Invalid syntax",
+                fields: [],
+              },
+              orderby: [],
+            });
+          }
+
+          return HttpResponse.json(validEventsValidationResponse);
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          eventsRequestUrl = new URL(request.url);
+          return HttpResponse.json({
+            data: [{ id: "span1", "span.duration": 42 }],
+          });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "spans",
+        query: "spon.duration:>100",
+        fields: ["span.duration"],
+        sort: "-span.duration",
+        period: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(eventsRequestUrl).toBeDefined();
+    expect(eventsRequestUrl!.searchParams.getAll("field")).toEqual([
+      "span.duration",
+    ]);
+  });
+
+  it("merges repaired environment into the events search query for non-replay datasets", async () => {
+    let validateCalls = 0;
+    let eventsRequestUrl: URL | undefined;
+
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "spans",
+        "span.duration:>100",
+        ["span.duration"],
+        undefined,
+        "-span.duration",
+        undefined,
+        "production",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () => {
+          validateCalls += 1;
+          if (validateCalls === 1) {
+            return HttpResponse.json({
+              valid: false,
+              projects: [],
+              dataset: [],
+              environment: [],
+              field: [],
+              query: {
+                valid: false,
+                error: "Invalid syntax",
+                fields: [],
+              },
+              orderby: [],
+            });
+          }
+
+          return HttpResponse.json(validEventsValidationResponse);
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          eventsRequestUrl = new URL(request.url);
+          return HttpResponse.json({
+            data: [{ id: "span1", "span.duration": 42 }],
+          });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "spans",
+        query: "spon.duration:>100",
+        fields: ["span.duration"],
+        sort: "-span.duration",
+        period: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(eventsRequestUrl).toBeDefined();
+    expect(eventsRequestUrl!.searchParams.get("query")).toContain(
+      "environment:production",
+    );
+  });
+
+  it("rejects search after MAX_EVENTS_VALIDATION_ATTEMPTS without calling events", async () => {
+    let validateCalls = 0;
+
+    mockGenerateText.mockResolvedValue(
+      mockAIResponse("spans", "tags[missing]:true", ["span.duration"]),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () => {
+          validateCalls += 1;
+          return HttpResponse.json({
+            valid: false,
+            projects: [],
+            dataset: [],
+            environment: [],
+            field: [],
+            query: {
+              valid: false,
+              error: "Invalid syntax",
+              fields: [
+                {
+                  name: "tags[missing]",
+                  valid: false,
+                  attrType: null,
+                  error: "Unknown attribute",
+                },
+              ],
+            },
+            orderby: [],
+          });
+        },
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () => {
+        throw new Error("searchEvents should not be called");
+      }),
+    );
+
+    await expect(
+      searchEvents.handler(
+        {
+          organizationSlug: "test-org",
+          regionUrl: null,
+          projectSlug: null,
+          dataset: "spans",
+          query: "tags[missing]:true",
+          fields: ["span.duration"],
+          sort: "-span.duration",
+          period: "24h",
+          limit: 10,
+          includeExplanation: false,
+        },
+        {
+          constraints: {
+            organizationSlug: null,
+            regionUrl: null,
+            projectSlug: null,
+          },
+          accessToken: "test-token",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow(/Search validation failed after repair attempts/);
+
+    expect(validateCalls).toBe(1 + MAX_EVENTS_VALIDATION_ATTEMPTS);
+    expect(mockGenerateText).toHaveBeenCalledTimes(
+      MAX_EVENTS_VALIDATION_ATTEMPTS,
+    );
+  });
+
+  it("rejects search immediately when validation fails without an agent provider", async () => {
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
+    process.env.OPENROUTER_API_KEY = "";
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () =>
+          HttpResponse.json({
+            valid: false,
+            projects: [],
+            dataset: [],
+            environment: [],
+            field: [
+              {
+                name: "spon.duration",
+                valid: false,
+                error: "Unknown attribute",
+              },
+            ],
+            query: {
+              valid: false,
+              error: "Invalid syntax",
+              fields: [
+                {
+                  name: "spon.duration",
+                  valid: false,
+                  error: "Unknown attribute",
+                },
+              ],
+            },
+            orderby: [],
+          }),
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () => {
+        throw new Error("searchEvents should not be called");
+      }),
+    );
+
+    await expect(
+      searchEvents.handler(
+        {
+          organizationSlug: "test-org",
+          regionUrl: null,
+          projectSlug: null,
+          dataset: "spans",
+          query: "spon.duration:>100",
+          fields: ["spon.duration"],
+          sort: "-spon.duration",
+          period: "24h",
+          limit: 10,
+          includeExplanation: false,
+        },
+        {
+          constraints: {
+            organizationSlug: null,
+            regionUrl: null,
+            projectSlug: null,
+          },
+          accessToken: "test-token",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow(/Search validation failed:/);
+
+    expect(mockGenerateText).not.toHaveBeenCalled();
   });
 });

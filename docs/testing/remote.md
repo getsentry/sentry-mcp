@@ -21,7 +21,7 @@ The remote MCP server runs on Cloudflare Workers and provides HTTP-based access 
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22.13+
 - pnpm installed
 - Wrangler CLI (for Cloudflare deployment)
 - Sentry OAuth application credentials
@@ -369,9 +369,9 @@ pnpm -w run cli "list organizations"
 ### 2. Test Skills Permissions
 
 **In OAuth approval screen, test:**
-- Minimal skills (inspect, docs only)
-- Default skills (inspect, seer)
-- All skills (inspect, seer, docs, triage, project-management)
+- Default selection: all active skills (inspect, seer, triage, project-management)
+- Minimal custom selection (inspect only)
+- Write-capable custom selection (triage, project-management)
 
 **Verify tools reflect the current session grant:**
 ```bash

@@ -3,9 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.15.1",
+  "packageManager": "pnpm@11.8.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "license": "FSL-1.1-ALv2",
   "author": "Sentry",
@@ -24,13 +24,15 @@
     "dev": "dotenv -e .env -e .env.local -- turbo dev --filter=!@sentry/mcp-server",
     "dev:stdio": "dotenv -e .env -e .env.local -- turbo dev --filter=!@sentry/mcp-cloudflare",
     "build": "turbo build after-build",
+    "check:generated": "pnpm --filter @sentry/mcp-core generate-definitions && git diff --exit-code -- packages/mcp-core/src/toolDefinitions.json packages/mcp-core/src/skillDefinitions.json plugins/sentry-mcp/agents/sentry-mcp.md plugins/sentry-mcp-experimental/agents/sentry-mcp.md",
     "deploy": "turbo deploy",
     "eval": "dotenv -e .env -e .env.local -- turbo eval",
     "eval:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run eval:ci",
-    "flue:issue-triage": "flue run issue-triage --target node",
     "format": "biome format --write",
-    "lint": "biome lint",
+    "lint": "biome lint && pnpm run lint:ast-grep",
+    "lint:ast-grep": "ast-grep scan && ast-grep test --skip-snapshot-tests",
     "lint:fix": "biome lint --fix",
+    "pre-commit:generated": "node scripts/pre-commit-generated.mjs",
     "inspector": "pnpx @modelcontextprotocol/inspector@latest",
     "inspector:stdio": "pnpx @modelcontextprotocol/inspector@latest -- tsx packages/mcp-server/src/index.ts",
     "measure-tokens": "pnpm run --filter ./packages/mcp-core measure-tokens",
@@ -44,8 +46,8 @@
     "tsc": "turbo tsc"
   },
   "dependencies": {
+    "@ast-grep/cli": "catalog:",
     "@biomejs/biome": "catalog:",
-    "@flue/sdk": "catalog:",
     "@types/node": "catalog:",
     "dotenv": "catalog:",
     "dotenv-cli": "catalog:",
@@ -60,7 +62,7 @@
     "vitest-evals": "catalog:"
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm exec lint-staged --concurrent false"
+    "pre-commit": "pnpm run pre-commit:generated && pnpm exec lint-staged --concurrent false"
   },
   "lint-staged": {
     "*": [
@@ -68,23 +70,7 @@
       "biome lint --fix --no-errors-on-unmatched --files-ignore-unknown=true"
     ]
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@biomejs/biome",
-      "better-sqlite3",
-      "esbuild",
-      "sharp",
-      "simple-git-hooks",
-      "workerd"
-    ],
-    "overrides": {
-      "@modelcontextprotocol/sdk": "^1.26.0",
-      "fast-xml-parser": "5.7.2",
-      "undici": "^7.24.4"
-    }
-  },
   "devDependencies": {
-    "@flue/cli": "catalog:",
     "@types/json-schema": "^7.0.15"
   }
 }

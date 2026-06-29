@@ -1,3 +1,4 @@
+import { DEFAULT_SEARCH_ISSUES_PERIOD } from "../constants";
 import {
   parseSentryLinkHeader,
   addProjectTeam as sdkAddATeamToAProject,
@@ -5,7 +6,6 @@ import {
   createTeamProject as sdkCreateANewProject,
   createOrganizationTeam as sdkCreateANewTeam,
   listProjectKeys as sdkListAProjectSClientKeys,
-  listProjectIssues as sdkListAProjectSIssues,
   listProjectReleases as sdkListAProjectSReleases,
   listProjectEventAttachments as sdkListAnEventSAttachments,
   listOrganizationIssueEvents as sdkListAnIssueSEvents,
@@ -51,6 +51,7 @@ import {
   type DashboardUrlOptions,
   type TraceMetricIdentifier,
   getContinuousProfileUrl as getContinuousProfileUrlUtil,
+  getAIConversationsUrl as getAIConversationsUrlUtil,
   getAIConversationUrl as getAIConversationUrlUtil,
   getDashboardUrl as getDashboardUrlUtil,
   getIssueUrl as getIssueUrlUtil,
@@ -119,6 +120,7 @@ import {
   TransactionProfileSchema,
   UserRegionsSchema,
   UserSchema,
+  AIConversationSummaryListSchema,
 } from "./schema";
 import type {
   AIConversationSpanList,
@@ -165,10 +167,13 @@ import type {
   TraceMeta,
   TransactionProfile,
   User,
+  AIConversationSummary,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
 // import { logger } from "@sentry/node";
+
+const SENTRY_MCP_SEARCH_EVENTS_REFERRER = "api.mcp.search-events";
 
 /**
  * Mapping of common network error codes to user-friendly messages.
@@ -244,6 +249,27 @@ type RequestOptions = {
 };
 
 export type TraceItemType = "spans" | "logs" | "tracemetrics";
+
+type ClientKeyRateLimit = {
+  window: number;
+  count: number;
+};
+
+type ClientKeyDynamicSdkLoaderOptions = {
+  hasReplay?: boolean;
+  hasPerformance?: boolean;
+  hasDebug?: boolean;
+  hasFeedback?: boolean;
+  hasLogsAndMetrics?: boolean;
+};
+
+type UpdateClientKeyRequest = {
+  name?: string;
+  isActive?: boolean;
+  rateLimit?: ClientKeyRateLimit | null;
+  browserSdkVersion?: string;
+  dynamicSdkLoaderOptions?: ClientKeyDynamicSdkLoaderOptions;
+};
 export type TraceItemAttributeType = "string" | "number" | "boolean";
 export type TraceItemAttributeSourceType = "sentry" | "user";
 
@@ -265,6 +291,165 @@ export type TraceItemAttributeValidationResult = {
   type?: TraceItemAttributeType;
   error?: string;
 };
+
+export type EventsValidationIssue = {
+  valid: boolean;
+  error?: string;
+};
+
+export type EventsNamedValidationIssue = {
+  name: string;
+  valid: boolean;
+  error?: string;
+};
+
+export type EventsAttributeValidationResult = {
+  name: string;
+  valid: boolean;
+  type?: TraceItemAttributeType;
+  error?: string;
+};
+
+export type EventsQueryValidation = {
+  valid: boolean;
+  error?: string;
+  fields: EventsAttributeValidationResult[];
+};
+
+export type EventsValidationResult = {
+  valid: boolean;
+  projects: EventsValidationIssue[];
+  dataset: EventsNamedValidationIssue[];
+  environment: EventsValidationIssue[];
+  field: EventsAttributeValidationResult[];
+  query: EventsQueryValidation;
+  orderby: EventsAttributeValidationResult[];
+};
+
+function parseEventsValidationIssue(
+  value: unknown,
+): EventsValidationIssue | null {
+  if (!isRecord(value) || typeof value.valid !== "boolean") {
+    return null;
+  }
+  const issue: EventsValidationIssue = { valid: value.valid };
+  if (typeof value.error === "string" && value.error.length > 0) {
+    issue.error = value.error;
+  }
+  return issue;
+}
+
+function parseEventsAttributeValidation(
+  value: unknown,
+): EventsAttributeValidationResult | null {
+  if (
+    !isRecord(value) ||
+    typeof value.name !== "string" ||
+    typeof value.valid !== "boolean"
+  ) {
+    return null;
+  }
+  const result: EventsAttributeValidationResult = {
+    name: value.name,
+    valid: value.valid,
+  };
+  if (isTraceItemAttributeType(value.attrType)) {
+    result.type = value.attrType;
+  }
+  if (typeof value.error === "string" && value.error.length > 0) {
+    result.error = value.error;
+  }
+  return result;
+}
+
+function parseEventsValidationIssues(value: unknown): EventsValidationIssue[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map(parseEventsValidationIssue)
+    .filter((issue): issue is EventsValidationIssue => issue !== null);
+}
+
+function parseEventsAttributeValidations(
+  value: unknown,
+): EventsAttributeValidationResult[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map(parseEventsAttributeValidation)
+    .filter((item): item is EventsAttributeValidationResult => item !== null);
+}
+
+function parseEventsNamedValidationIssue(
+  value: unknown,
+): EventsNamedValidationIssue | null {
+  if (
+    !isRecord(value) ||
+    typeof value.name !== "string" ||
+    typeof value.valid !== "boolean"
+  ) {
+    return null;
+  }
+  const issue: EventsNamedValidationIssue = {
+    name: value.name,
+    valid: value.valid,
+  };
+  if (typeof value.error === "string" && value.error.length > 0) {
+    issue.error = value.error;
+  }
+  return issue;
+}
+
+function parseEventsNamedValidationIssues(
+  value: unknown,
+): EventsNamedValidationIssue[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map(parseEventsNamedValidationIssue)
+    .filter((issue): issue is EventsNamedValidationIssue => issue !== null);
+}
+
+function parseEventsQueryValidation(value: unknown): EventsQueryValidation {
+  if (!isRecord(value) || typeof value.valid !== "boolean") {
+    return { valid: false, fields: [] };
+  }
+  const query: EventsQueryValidation = {
+    valid: value.valid,
+    fields: parseEventsAttributeValidations(value.fields),
+  };
+  if (typeof value.error === "string" && value.error.length > 0) {
+    query.error = value.error;
+  }
+  return query;
+}
+
+function parseEventsValidationResponse(body: unknown): EventsValidationResult {
+  if (!isRecord(body)) {
+    return {
+      valid: false,
+      projects: [],
+      dataset: [],
+      environment: [],
+      field: [],
+      query: { valid: false, fields: [] },
+      orderby: [],
+    };
+  }
+
+  return {
+    valid: typeof body.valid === "boolean" ? body.valid : false,
+    projects: parseEventsValidationIssues(body.projects),
+    dataset: parseEventsNamedValidationIssues(body.dataset),
+    environment: parseEventsValidationIssues(body.environment),
+    field: parseEventsAttributeValidations(body.field),
+    query: parseEventsQueryValidation(body.query),
+    orderby: parseEventsAttributeValidations(body.orderby),
+  };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -653,7 +838,7 @@ export class SentryApiService {
   private async request(
     path: string,
     options: RequestInit = {},
-    { host }: { host?: string } = {},
+    { host, allowStatuses }: { host?: string; allowStatuses?: number[] } = {},
   ): Promise<Response> {
     const url = host
       ? `${this.protocol}://${host}/api/0${path}`
@@ -729,6 +914,9 @@ export class SentryApiService {
 
     // Handle error responses generically
     if (!response.ok) {
+      if (allowStatuses?.includes(response.status)) {
+        return response;
+      }
       const errorText = await response.text();
       let parsed: unknown | undefined;
       try {
@@ -944,6 +1132,26 @@ export class SentryApiService {
       this.host,
       organizationSlug,
       conversationId,
+      this.protocol,
+    );
+  }
+
+  /** Builds the Sentry UI URL for the AI Conversations list with optional filters. */
+  getAIConversationsUrl(
+    organizationSlug: string,
+    options?: {
+      query?: string;
+      project?: string[];
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+    },
+  ): string {
+    return getAIConversationsUrlUtil(
+      this.host,
+      organizationSlug,
+      options,
       this.protocol,
     );
   }
@@ -2175,6 +2383,66 @@ export class SentryApiService {
   }
 
   /**
+   * Updates a client key (DSN) for a project.
+   *
+   * @param params Key update parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.keyId The ID of the key to update
+   * @param params.name Human-readable name for the key (optional)
+   * @param params.isActive Activate or deactivate the client key (optional)
+   * @param params.rateLimit Applies a rate limit to cap the number of errors accepted during a given time window (optional, null to disable)
+   * @param params.browserSdkVersion Sentry Javascript SDK version to use (optional)
+   * @param params.dynamicSdkLoaderOptions Configures options for the Javascript Loader Script (optional)
+   * @param opts Request options
+   * @returns Updated client key with DSN information
+   */
+  async updateClientKey(
+    {
+      organizationSlug,
+      projectSlug,
+      keyId,
+      name,
+      isActive,
+      rateLimit,
+      browserSdkVersion,
+      dynamicSdkLoaderOptions,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      keyId: string | number;
+    } & UpdateClientKeyRequest,
+    opts?: RequestOptions,
+  ): Promise<ClientKey> {
+    const updateData: UpdateClientKeyRequest = {};
+    if (name !== undefined) {
+      updateData.name = name;
+    }
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
+    }
+    if (rateLimit !== undefined) {
+      updateData.rateLimit = rateLimit;
+    }
+    if (browserSdkVersion !== undefined) {
+      updateData.browserSdkVersion = browserSdkVersion;
+    }
+    if (dynamicSdkLoaderOptions !== undefined) {
+      updateData.dynamicSdkLoaderOptions = dynamicSdkLoaderOptions;
+    }
+
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/keys/${keyId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      },
+      opts,
+    );
+    return ClientKeySchema.parse(body);
+  }
+
+  /**
    * Lists all client keys (DSNs) for a project.
    *
    * @param params Query parameters
@@ -2676,6 +2944,7 @@ export class SentryApiService {
    * @param params.itemType Item type to query attributes for ("spans", "logs", or "tracemetrics")
    * @param params.project Numeric project ID to filter attributes
    * @param params.statsPeriod Time range for attribute statistics (e.g., "24h", "7d")
+   * @param params.attributeTypes Optional attribute types to keep in the response
    * @param opts Request options
    * @returns Array of available attributes with metadata including type
    */
@@ -2687,7 +2956,7 @@ export class SentryApiService {
       statsPeriod,
       start,
       end,
-      attributeTypes = ["string", "number"],
+      attributeTypes,
       substringMatch,
       query,
     }: {
@@ -2703,90 +2972,88 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<TraceItemAttribute[]> {
-    const uniqueAttributeTypes = Array.from(new Set(attributeTypes));
-    const attributeResponses = await Promise.all(
-      uniqueAttributeTypes.map((attributeType) =>
-        this.fetchTraceItemAttributesByType(
-          organizationSlug,
-          itemType,
-          attributeType,
-          project,
-          statsPeriod,
-          start,
-          end,
-          substringMatch,
-          query,
-          opts,
-        ),
-      ),
+    const attributes = await this.fetchTraceItemAttributes(
+      organizationSlug,
+      itemType,
+      project,
+      statsPeriod,
+      start,
+      end,
+      substringMatch,
+      query,
+      opts,
     );
 
-    return attributeResponses.flat();
+    if (!attributeTypes || attributeTypes.length === 0) {
+      return attributes;
+    }
+
+    const allowedTypes = new Set(attributeTypes);
+    return attributes.filter((attribute) => allowedTypes.has(attribute.type));
   }
 
-  async validateTraceItemAttributes(
+  async validateEvents(
     {
       organizationSlug,
-      itemType = "spans",
-      attributes,
+      dataset = "spans",
+      fields,
+      query,
+      orderby,
       project,
+      environment,
       statsPeriod,
       start,
       end,
     }: {
       organizationSlug: string;
-      itemType?: TraceItemType;
-      attributes: string[];
+      dataset?: EventsDataset;
+      fields?: string[];
+      query?: string;
+      orderby?: string[];
       project?: string;
+      environment?: string | string[];
       statsPeriod?: string;
       start?: string;
       end?: string;
     },
     opts?: RequestOptions,
-  ): Promise<Record<string, TraceItemAttributeValidationResult>> {
+  ): Promise<EventsValidationResult> {
     const queryParams = new URLSearchParams();
-    queryParams.set("itemType", itemType);
+    queryParams.set("dataset", normalizeEventsDataset(dataset));
     if (project) {
       queryParams.set("project", project);
     }
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (environment) {
+      const environments = Array.isArray(environment)
+        ? environment
+        : [environment];
+      for (const value of environments) {
+        queryParams.append("environment", value);
+      }
+    }
     this.applyTimeParams(queryParams, statsPeriod, start, end);
+    for (const field of fields ?? []) {
+      queryParams.append("field", field);
+    }
+    for (const value of orderby ?? []) {
+      queryParams.append("orderby", value);
+    }
 
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/trace-items/attributes/validate/?${queryParams.toString()}`,
-      {
-        method: "POST",
-        body: JSON.stringify({ attributes }),
-      },
-      opts,
+    const response = await this.request(
+      `/organizations/${organizationSlug}/events/validate/?${queryParams.toString()}`,
+      undefined,
+      { ...opts, allowStatuses: [400] },
     );
-
-    if (!isRecord(body) || !isRecord(body.attributes)) {
-      return {};
-    }
-
-    const results: Record<string, TraceItemAttributeValidationResult> = {};
-    for (const [attribute, value] of Object.entries(body.attributes)) {
-      if (!isRecord(value) || typeof value.valid !== "boolean") {
-        continue;
-      }
-      const validationResult: TraceItemAttributeValidationResult = {
-        valid: value.valid,
-      };
-      if (isTraceItemAttributeType(value.type)) {
-        validationResult.type = value.type;
-      }
-      if (typeof value.error === "string") {
-        validationResult.error = value.error;
-      }
-      results[attribute] = validationResult;
-    }
-    return results;
+    const body = await this.parseJsonResponse(response);
+    return parseEventsValidationResponse(body);
   }
 
-  private async fetchTraceItemAttributesByType(
+  private async fetchTraceItemAttributes(
     organizationSlug: string,
     itemType: TraceItemType,
-    attributeType: TraceItemAttributeType,
     project?: string,
     statsPeriod?: string,
     start?: string,
@@ -2797,7 +3064,6 @@ export class SentryApiService {
   ): Promise<TraceItemAttribute[]> {
     const queryParams: Record<string, unknown> = {
       itemType,
-      attributeType: [attributeType],
     };
     if (project) {
       queryParams.project = project;
@@ -2820,11 +3086,8 @@ export class SentryApiService {
       path: { organization_id_or_slug: organizationSlug },
       query: queryParams,
     } as Parameters<typeof sdkListTraceItemAttributes>[0]);
-    const data = this.unwrapSdkResult(
-      result,
-      `listTraceItemAttributes(${attributeType})`,
-    );
-    return parseTraceItemAttributes(data, attributeType);
+    const data = this.unwrapSdkResult(result, "listTraceItemAttributes");
+    return parseTraceItemAttributes(data, "string");
   }
 
   /**
@@ -2835,9 +3098,10 @@ export class SentryApiService {
    *
    * @param params Query parameters
    * @param params.organizationSlug Organization identifier
-   * @param params.projectSlug Project identifier (optional, scopes to specific project)
+   * @param params.projectId Project ID (optional, filters to a specific project)
    * @param params.query Sentry search query (e.g., "is:unresolved browser:chrome")
    * @param params.sortBy Sort order ("user", "freq", "date", "new")
+   * @param params.statsPeriod Search time window (e.g., "24h", "30d")
    * @param opts Request options
    * @returns Array of issues with metadata and statistics
    *
@@ -2853,7 +3117,7 @@ export class SentryApiService {
    * // High-frequency errors in specific project
    * const critical = await apiService.listIssues({
    *   organizationSlug: "my-org",
-   *   projectSlug: "backend",
+   *   projectId: "123456",
    *   query: "level:error",
    *   sortBy: "freq"
    * });
@@ -2862,16 +3126,24 @@ export class SentryApiService {
   async listIssues(
     {
       organizationSlug,
-      projectSlug,
+      projectId,
       query,
       sortBy,
       limit = 10,
+      statsPeriod = DEFAULT_SEARCH_ISSUES_PERIOD,
     }: {
       organizationSlug: string;
-      projectSlug?: string;
+      projectId?: string;
       query?: string | null;
       sortBy?: "user" | "freq" | "date" | "new";
       limit?: number;
+      /**
+       * Controls the search time window - which issues are included in results.
+       * Note: this is NOT the sparkline/stats period (that would be groupStatsPeriod).
+       * The Sentry API accepts any Nh/Nd/Nw format and defaults to 90d when omitted,
+       * but large windows risk timeouts on busy orgs.
+       */
+      statsPeriod?: string;
     },
     opts?: RequestOptions,
   ): Promise<IssueList> {
@@ -2880,38 +3152,21 @@ export class SentryApiService {
       sentryQuery.push(query);
     }
 
-    if (projectSlug) {
-      // The SDK type doesn't include per_page, sort, or collapse query params,
-      // so we pass them via cast.
-      const result = await sdkListAProjectSIssues({
-        ...this.getSdkConfig(opts),
-        path: {
-          organization_id_or_slug: organizationSlug,
-          project_id_or_slug: projectSlug,
-        },
-        query: {
-          per_page: limit,
-          sort: sortBy,
-          statsPeriod: "24h",
-          query: sentryQuery.join(" "),
-          collapse: ["unhandled"],
-        },
-      } as Parameters<typeof sdkListAProjectSIssues>[0]);
-      const data = this.unwrapSdkResult(result, "listIssues(project)");
-      return IssueListSchema.parse(data);
-    }
-
+    // Filter by project via the org-issues `project` query param (project IDs).
+    // The SDK type doesn't include sort/collapse/project for this op, so we
+    // pass the query via cast.
     const result = await sdkListAnOrganizationSIssues({
       ...this.getSdkConfig(opts),
       path: { organization_id_or_slug: organizationSlug },
       query: {
         limit,
         sort: sortBy,
-        statsPeriod: "24h",
+        statsPeriod,
         query: sentryQuery.join(" "),
         collapse: ["unhandled"],
+        ...(projectId ? { project: [projectId] } : {}),
       },
-    });
+    } as Parameters<typeof sdkListAnOrganizationSIssues>[0]);
     const data = this.unwrapSdkResult(result, "listIssues");
     return IssueListSchema.parse(data);
   }
@@ -3630,34 +3885,14 @@ export class SentryApiService {
       queryParams.set("project", params.projectId);
     }
 
-    // Sort parameter transformation for API compatibility
-    let apiSort = params.sort;
-    // Skip transformation for equation fields - they should be passed as-is
-    if (
-      params.dataset !== "tracemetrics" &&
-      params.sort?.includes("(") &&
-      !params.sort?.includes("equation|")
-    ) {
-      // Transform: count(field) -> count_field, count() -> count
-      // Use safer string manipulation to avoid ReDoS
-      const parenStart = params.sort.indexOf("(");
-      const parenEnd = params.sort.indexOf(")", parenStart);
-      if (parenStart !== -1 && parenEnd !== -1) {
-        const beforeParen = params.sort.substring(0, parenStart);
-        const insideParen = params.sort.substring(parenStart + 1, parenEnd);
-        const afterParen = params.sort.substring(parenEnd + 1);
-        const transformedInside = insideParen
-          ? `_${insideParen.replace(/\./g, "_")}`
-          : "";
-        apiSort = beforeParen + transformedInside + afterParen;
-      }
-    }
-    queryParams.set("sort", apiSort);
+    queryParams.set("sort", params.sort);
 
     // Add fields
     for (const field of params.fields) {
       queryParams.append("field", field);
     }
+
+    queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);
 
     return queryParams;
   }
@@ -3701,30 +3936,14 @@ export class SentryApiService {
       queryParams.set("sampling", "NORMAL");
     }
 
-    // Sort parameter transformation for API compatibility
-    let apiSort = params.sort;
-    // Skip transformation for equation fields - they should be passed as-is
-    if (params.sort?.includes("(") && !params.sort?.includes("equation|")) {
-      // Transform: count(field) -> count_field, count() -> count
-      // Use safer string manipulation to avoid ReDoS
-      const parenStart = params.sort.indexOf("(");
-      const parenEnd = params.sort.indexOf(")", parenStart);
-      if (parenStart !== -1 && parenEnd !== -1) {
-        const beforeParen = params.sort.substring(0, parenStart);
-        const insideParen = params.sort.substring(parenStart + 1, parenEnd);
-        const afterParen = params.sort.substring(parenEnd + 1);
-        const transformedInside = insideParen
-          ? `_${insideParen.replace(/\./g, "_")}`
-          : "";
-        apiSort = beforeParen + transformedInside + afterParen;
-      }
-    }
-    queryParams.set("sort", apiSort);
+    queryParams.set("sort", params.sort);
 
     // Add fields
     for (const field of params.fields) {
       queryParams.append("field", field);
     }
+
+    queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);
 
     return queryParams;
   }
@@ -3975,12 +4194,17 @@ export class SentryApiService {
     return TraceSchema.parse(data);
   }
 
+  /**
+   * Fetches all spans for one AI conversation within a relative or absolute time window.
+   */
   async getAIConversation(
     {
       organizationSlug,
       conversationId,
       project = "-1",
       statsPeriod = "30d",
+      start,
+      end,
       perPage = 1000,
       maxPages = 10,
     }: {
@@ -3988,6 +4212,8 @@ export class SentryApiService {
       conversationId: string;
       project?: string | string[];
       statsPeriod?: string;
+      start?: string;
+      end?: string;
       perPage?: number;
       maxPages?: number;
     },
@@ -3999,7 +4225,12 @@ export class SentryApiService {
     for (let page = 0; page < maxPages; page++) {
       const queryParams = new URLSearchParams();
       queryParams.set("per_page", String(perPage));
-      queryParams.set("statsPeriod", statsPeriod);
+      this.applyTimeParams(
+        queryParams,
+        start || end ? undefined : statsPeriod,
+        start,
+        end,
+      );
       const projects = Array.isArray(project) ? project : [project];
       for (const projectId of projects) {
         queryParams.append("project", projectId);
@@ -4023,6 +4254,76 @@ export class SentryApiService {
     }
 
     return spans;
+  }
+
+  /**
+   * Searches Sentry AI Conversations using the conversation list endpoint and
+   * returns the current page plus cursor metadata from the response headers.
+   */
+  async searchAIConversations(
+    {
+      organizationSlug,
+      query,
+      project,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      limit,
+      cursor,
+    }: {
+      organizationSlug: string;
+      query?: string;
+      project?: string | string[];
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+      cursor?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<{
+    conversations: AIConversationSummary[];
+    nextCursor: string | null;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (project) {
+      const projects = Array.isArray(project) ? project : [project];
+      for (const projectId of projects) {
+        queryParams.append("project", projectId);
+      }
+    }
+    if (environment) {
+      const environments = Array.isArray(environment)
+        ? environment
+        : [environment];
+      for (const environmentName of environments) {
+        queryParams.append("environment", environmentName);
+      }
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
+    if (limit !== undefined) {
+      queryParams.set("per_page", String(limit));
+    }
+    if (cursor) {
+      queryParams.set("cursor", cursor);
+    }
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/ai-conversations/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+
+    return {
+      conversations: AIConversationSummaryListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   /**
@@ -4178,9 +4479,9 @@ export class SentryApiService {
     });
     const body = this.unwrapSdkResult(result, "getProfileChunk");
 
-    // Response wraps chunks in {chunks: []}
+    // Normalize the Sentry {chunk: ...} wrapper to the internal chunks array.
     const response = ProfileChunkResponseSchema.parse(body);
-    if (!response.chunks || response.chunks.length === 0) {
+    if (response.chunks.length === 0) {
       throw new ApiNotFoundError(
         `No profile chunk found for profiler_id ${profilerId}`,
         undefined,
@@ -4188,7 +4489,12 @@ export class SentryApiService {
       );
     }
 
-    return response.chunks[0];
+    return {
+      ...response.chunks[0],
+      // Sentry's frontend does the same query-param backfill for continuous
+      // profile chunks because profiling-service may omit profiler_id.
+      profiler_id: response.chunks[0].profiler_id ?? profilerId,
+    };
   }
 
   getPreprodSnapshotUrl(organizationSlug: string, snapshotId: string): string {

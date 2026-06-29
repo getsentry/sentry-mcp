@@ -7,7 +7,7 @@ This package is primarily for running the `stdio` MCP server. If you do not know
 <https://mcp.sentry.dev>
 
 **Note:** Some tools require additional configuration:
-- **AI-powered search tools** (`search_events` and `search_issues`): These tools use OpenAI to translate natural language queries into Sentry's query syntax. They require an `OPENAI_API_KEY` environment variable. Without this key, these specific tools will be unavailable, but all other tools will function normally.
+- **AI-powered search tools** (`search_events` and `search_issues`): These tools use a configured LLM provider to translate natural language queries into Sentry's query syntax. Set one provider key, such as `OPENAI_API_KEY` or `OPENROUTER_API_KEY`. Without a provider key, these specific tools will be unavailable, but all other tools will function normally.
 
 ## Authorization
 
@@ -75,9 +75,11 @@ MCP_SKILLS=inspect,docs,triage         # Limit to specific skills
 MCP_SCOPES=org:read,event:read         # Override default scopes (replaces defaults) - DEPRECATED, use MCP_SKILLS
 MCP_ADD_SCOPES=event:write             # Add to default scopes (keeps defaults) - DEPRECATED, use MCP_SKILLS
 
-# OpenAI configuration for AI-powered search tools
-OPENAI_API_KEY=your-openai-key         # Required for AI-powered search tools (search_events, search_issues)
+# LLM provider configuration for AI-powered search tools
+OPENAI_API_KEY=your-openai-key         # Use OpenAI for AI-powered search tools
 OPENAI_MODEL=gpt-5                     # OpenAI model to use (default: "gpt-5")
+OPENROUTER_API_KEY=your-openrouter-key # Or use OpenRouter for AI-powered search tools
+OPENROUTER_MODEL=openai/gpt-5          # OpenRouter model to use (default: "openai/gpt-5")
 OPENAI_REASONING_EFFORT=low            # Reasoning effort for o1 models: "low", "medium", "high", or "" to disable (default: "low")
 
 # No environment variable exists for the OpenAI base URL override; use --openai-base-url instead.

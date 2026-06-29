@@ -73,6 +73,7 @@ type DefinitionTool = {
         directToolNames?: ReadonlySet<string>;
       }) => string);
   inputSchema: Record<string, ZodTypeAny>;
+  outputSchema?: ZodTypeAny;
   skills: string[];
   requiredScopes: string[];
   experimental?: boolean;
@@ -81,7 +82,7 @@ type DefinitionTool = {
 
 type ToolSurface = "direct" | "catalog";
 
-function isEnabledByDefaultSkills(tool: DefinitionTool): boolean {
+function isEnabledByDefaultSkills(tool: { skills: string[] }): boolean {
   const defaultSkills = skillsModule.DEFAULT_SKILLS as readonly string[];
   return (
     Array.isArray(tool.skills) &&
@@ -159,6 +160,9 @@ function generateToolDefinitions({
       }),
       // Export full JSON Schema under inputSchema for external docs
       inputSchema: jsonSchema,
+      outputSchema: t.outputSchema
+        ? zodToJsonSchema(t.outputSchema, { $refStrategy: "none" })
+        : undefined,
       // Preserve tool access requirements for UIs/docs
       requiredScopes: t.requiredScopes,
       // Preserve skill catalog membership and call surface for UIs/docs.

@@ -82,6 +82,7 @@ describe("search_issue_events", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OPENAI_API_KEY = "test-key";
+    process.env.OPENROUTER_API_KEY = "";
     mockGenerateText.mockResolvedValue(mockAIResponse());
   });
 
@@ -114,7 +115,7 @@ describe("search_issue_events", () => {
         issueId: "MCP-41",
         query: "from last hour",
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -249,7 +250,7 @@ describe("search_issue_events", () => {
         issueUrl: "https://sentry.io/organizations/my-org/issues/123/",
         query: "all events",
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -310,7 +311,7 @@ describe("search_issue_events", () => {
         issueId: "MCP-41",
         query: "production with release v1.0",
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -320,7 +321,7 @@ describe("search_issue_events", () => {
     );
   });
 
-  it("should handle time range with statsPeriod", async () => {
+  it("should handle time range with period", async () => {
     mockGenerateText.mockResolvedValue(
       mockAIResponse("", ["id", "timestamp", "title"], "-timestamp", {
         statsPeriod: "1h",
@@ -341,7 +342,7 @@ describe("search_issue_events", () => {
         issueId: "MCP-41",
         query: "from last hour",
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -374,7 +375,7 @@ describe("search_issue_events", () => {
         issueId: "MCP-41",
         query: "from Jan 15 2025",
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -403,7 +404,7 @@ describe("search_issue_events", () => {
         issueId: "MCP-41",
         query: "all events",
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -426,7 +427,7 @@ describe("search_issue_events", () => {
           issueId: "MCP-41",
           query: "test query",
           sort: "-timestamp",
-          statsPeriod: "14d",
+          period: "14d",
           projectSlug: null,
           regionUrl: null,
           limit: 50,
@@ -452,7 +453,7 @@ describe("search_issue_events", () => {
         issueId: "MCP-41",
         query: "from last hour",
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -471,7 +472,7 @@ describe("search_issue_events", () => {
           organizationSlug: "test-org",
           query: "test",
           sort: "-timestamp",
-          statsPeriod: "14d",
+          period: "14d",
           projectSlug: null,
           regionUrl: null,
           limit: 50,
@@ -490,7 +491,7 @@ describe("search_issue_events", () => {
           issueId: "MCP-41",
           query: "test",
           sort: "-timestamp",
-          statsPeriod: "14d",
+          period: "14d",
           projectSlug: null,
           regionUrl: null,
           limit: 50,
@@ -509,7 +510,7 @@ describe("search_issue_events", () => {
           issueUrl: "https://invalid-url.com",
           query: "test",
           sort: "-timestamp",
-          statsPeriod: "14d",
+          period: "14d",
           projectSlug: null,
           regionUrl: null,
           limit: 50,
@@ -546,7 +547,7 @@ describe("search_issue_events", () => {
         issueId: "MCP-41",
         query: "production events",
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -573,7 +574,7 @@ describe("search_issue_events", () => {
         issueId: "MCP-41",
         query: "test",
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 25,
@@ -605,7 +606,7 @@ describe("search_issue_events", () => {
         issueId: "MCP-41",
         query: "production events",
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -636,7 +637,7 @@ describe("search_issue_events", () => {
         issueUrl: "https://my-org.sentry.io/issues/456/",
         query: "test",
         sort: "-timestamp",
-        statsPeriod: "14d",
+        period: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -649,6 +650,7 @@ describe("search_issue_events", () => {
   it("should search events with direct query syntax (no agent)", async () => {
     process.env.OPENAI_API_KEY = "";
     process.env.ANTHROPIC_API_KEY = "";
+    process.env.OPENROUTER_API_KEY = "";
 
     mswServer.use(
       http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
@@ -679,7 +681,7 @@ describe("search_issue_events", () => {
         issueId: "MCP-41",
         query: "environment:production",
         sort: "-timestamp",
-        statsPeriod: "7d",
+        period: "7d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,

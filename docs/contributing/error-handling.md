@@ -100,10 +100,14 @@ In our system, we ONLY return trusted error messages from:
 - **ApiClientError** → Log to `console.warn()` in wrapAgentToolExecute (for Sentry logging, not as exception)
 - **ApiServerError/System errors (5xx)** → Let bubble up to be captured with `captureException()`
 
-When using Cloudflare with Sentry's `consoleLoggingIntegration`:
-- `console.warn()` and `console.log()` → Recorded and sent to Sentry as logs
-- `console.error()` → Also recorded, but use `console.warn()` for expected errors
-- `captureException()` → Creates Sentry issue immediately
+On Cloudflare, use the shared LogTape helpers instead of raw `console.*`.
+LogTape sends records to Sentry Logs directly; enabling Sentry's
+`consoleLoggingIntegration` in the Worker duplicates those records by also
+capturing the JSON console sink.
+
+- `logWarn()` / `logInfo()` → Recorded and sent to Sentry Logs
+- `logError()` → Recorded and sent to Sentry Logs without creating an issue
+- `logIssue()` / `captureException()` → Creates a Sentry issue immediately
 
 ## Error Handling Patterns
 
@@ -273,10 +277,12 @@ createApiError Factory
 
 ## Console Logging
 
-When using Cloudflare Workers with Sentry integration:
-- `console.error()` is captured as breadcrumbs (not as issues)
-- Use for debugging information that should be attached to real errors
-- Don't use for expected error conditions
+When running in Cloudflare Workers:
+
+- Use `logInfo()` / `logWarn()` / `logError()` for operational logs
+- Do not rely on Sentry console capture; the Worker does not enable
+  `consoleLoggingIntegration`
+- Don't use raw `console.*` for expected error conditions
 
 ## Implementation Checklist
 

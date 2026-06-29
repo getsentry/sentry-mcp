@@ -1,8 +1,11 @@
 import { z } from "zod";
+import { getActiveSpan } from "@sentry/core";
+import { UserInputError } from "../../../errors";
 import type {
   SentryApiService,
   TraceItemAttributeType,
-  TraceItemAttributeValidationResult,
+  EventsQueryValidation,
+  EventsValidationResult,
   TraceItemType,
 } from "../../../api-client";
 import {
@@ -423,24 +426,275 @@ function getTraceItemType(dataset: EventsDataset): TraceItemType | null {
   return null;
 }
 
-function formatValidationResults(
-  validationResults: Record<string, TraceItemAttributeValidationResult>,
+function formatValidationStatusLine({
+  valid,
+  name,
+  type,
+  error,
+  indent = 0,
+}: {
+  valid: boolean;
+  name?: string;
+  type?: string;
+  error?: string;
+  indent?: number;
+}): string {
+  const status = valid ? "OK" : "INVALID";
+  const label = name ? ` ${name}` : "";
+  const prefix = `${" ".repeat(indent)}- ${status}${label}`;
+
+  if (valid && type) {
+    return `${prefix} — type: ${type}`;
+  }
+  if (error) {
+    return `${prefix} — ${error}`;
+  }
+  return prefix;
+}
+
+function formatQueryValidation(
+  query: EventsQueryValidation,
+  failuresOnly: boolean,
+): string[] {
+  const invalidFields = query.fields.filter((field) => !field.valid);
+  const visibleFields = failuresOnly ? invalidFields : query.fields;
+  const showQueryLine = failuresOnly
+    ? !query.valid || invalidFields.length > 0
+    : !query.valid || query.fields.length > 0;
+
+  if (!showQueryLine) {
+    return [];
+  }
+
+  const lines: string[] = [];
+  if (!query.valid) {
+    lines.push(
+      formatValidationStatusLine({
+        valid: false,
+        name: "query",
+        error: query.error,
+      }),
+    );
+  } else {
+    lines.push(formatValidationStatusLine({ valid: true, name: "query" }));
+  }
+
+  lines.push(
+    ...visibleFields.map((field) =>
+      formatValidationStatusLine({ ...field, indent: 2 }),
+    ),
+  );
+  return lines;
+}
+
+function pushValidationSection(
+  sections: string[],
+  title: string,
+  items: ReadonlyArray<{
+    valid: boolean;
+    name?: string;
+    type?: string;
+    error?: string;
+  }>,
+  failuresOnly: boolean,
+): void {
+  const visibleItems = failuresOnly
+    ? items.filter((item) => !item.valid)
+    : items;
+  if (visibleItems.length === 0) {
+    return;
+  }
+
+  sections.push(
+    `Validated ${title}:\n${visibleItems.map((item) => formatValidationStatusLine(item)).join("\n")}`,
+  );
+}
+
+export function formatEventsValidationResults(
+  validationResults: EventsValidationResult,
 ): string {
-  const entries = Object.entries(validationResults);
-  if (entries.length === 0) {
+  const failuresOnly = !validationResults.valid;
+  const sections: string[] = [];
+
+  pushValidationSection(
+    sections,
+    "Projects",
+    validationResults.projects,
+    failuresOnly,
+  );
+  pushValidationSection(
+    sections,
+    "Dataset",
+    validationResults.dataset,
+    failuresOnly,
+  );
+  pushValidationSection(
+    sections,
+    "Environment",
+    validationResults.environment,
+    failuresOnly,
+  );
+  pushValidationSection(
+    sections,
+    "Fields",
+    validationResults.field,
+    failuresOnly,
+  );
+
+  const queryLines = formatQueryValidation(
+    validationResults.query,
+    failuresOnly,
+  );
+  if (queryLines.length > 0) {
+    sections.push(`Validated Query:\n${queryLines.join("\n")}`);
+  }
+
+  pushValidationSection(
+    sections,
+    "Order By",
+    validationResults.orderby,
+    failuresOnly,
+  );
+
+  if (sections.length === 0) {
     return "";
   }
 
-  return `Validated Attributes:
-${entries
-  .map(([attribute, result]) => {
-    if (result.valid) {
-      return `- ${attribute}: valid${result.type ? ` (${result.type})` : ""}`;
-    }
-    return `- ${attribute}: invalid${result.error ? ` (${result.error})` : ""}`;
-  })
-  .join("\n")}
-`;
+  const overall = validationResults.valid ? "valid" : "invalid";
+  const details = sections.join("\n\n");
+  return `Validation Result: ${overall}\n${details}\n`;
+}
+
+const VALIDATION_OUTPUT_MAX_LENGTH = 1024;
+
+function truncateValidationOutput(output: string): string {
+  if (output.length <= VALIDATION_OUTPUT_MAX_LENGTH) {
+    return output;
+  }
+  return `${output.slice(0, VALIDATION_OUTPUT_MAX_LENGTH)}…`;
+}
+
+export function recordEventsSearchValidationTelemetry({
+  attempt,
+  repairIteration,
+  validation,
+}: {
+  attempt: number;
+  repairIteration?: number;
+  validation: EventsValidationResult;
+}): void {
+  const span = getActiveSpan();
+  if (!span) {
+    return;
+  }
+
+  span.setAttribute("app.search_events.validation.attempt", attempt);
+  span.setAttribute("app.search_events.validation.valid", validation.valid);
+  if (repairIteration !== undefined) {
+    span.setAttribute(
+      "app.search_events.validation.repair_iteration",
+      repairIteration,
+    );
+  }
+
+  const formatted = formatEventsValidationResults(validation);
+  if (formatted) {
+    span.setAttribute(
+      "app.search_events.validation.output",
+      truncateValidationOutput(formatted),
+    );
+  }
+}
+
+export const MAX_EVENTS_VALIDATION_ATTEMPTS = 3;
+
+export async function validateEventsSearch(
+  apiService: SentryApiService,
+  {
+    organizationSlug,
+    dataset,
+    fields,
+    query,
+    sort,
+    projectId,
+    environment,
+    statsPeriod,
+    start,
+    end,
+  }: {
+    organizationSlug: string;
+    dataset: EventsDataset;
+    fields: string[];
+    query: string;
+    sort: string;
+    projectId?: string;
+    environment?: string | string[];
+    statsPeriod?: string;
+    start?: string;
+    end?: string;
+  },
+): Promise<EventsValidationResult> {
+  return apiService.validateEvents({
+    organizationSlug,
+    dataset,
+    fields,
+    query,
+    orderby: [sort],
+    project: projectId,
+    environment,
+    statsPeriod,
+    start,
+    end,
+  });
+}
+
+export async function assertEventsSearchIsValid(
+  apiService: SentryApiService,
+  {
+    organizationSlug,
+    dataset,
+    fields,
+    query,
+    sort,
+    projectId,
+    environment,
+    statsPeriod,
+    start,
+    end,
+  }: {
+    organizationSlug: string;
+    dataset: EventsDataset;
+    fields: string[];
+    query: string;
+    sort: string;
+    projectId?: string;
+    environment?: string | string[];
+    statsPeriod?: string;
+    start?: string;
+    end?: string;
+  },
+): Promise<void> {
+  const validationResults = await validateEventsSearch(apiService, {
+    organizationSlug,
+    dataset,
+    fields,
+    query,
+    sort,
+    projectId,
+    environment,
+    statsPeriod,
+    start,
+    end,
+  });
+
+  if (!validationResults.valid) {
+    const formatted = formatEventsValidationResults(validationResults);
+    throw new UserInputError(
+      formatted
+        ? `Search validation failed:\n${formatted}`
+        : "Search validation failed.",
+    );
+  }
 }
 
 /**
@@ -457,7 +711,7 @@ export function createDatasetAttributesTool(options: {
 
   return agentTool({
     description:
-      "Query, filter, and validate available attributes and fields for a specific Sentry dataset to understand what data is available",
+      "Query and filter available attributes and fields for a specific Sentry dataset to understand what data is available",
     parameters: z.object({
       dataset: z
         .enum(PUBLIC_EVENTS_DATASETS)
@@ -483,21 +737,8 @@ export function createDatasetAttributesTool(options: {
         .describe(
           "Optional attribute types to list. Use ['string','number','boolean'] when unsure.",
         ),
-      attributes: z
-        .array(z.string().trim().min(1))
-        .min(1)
-        .optional()
-        .describe(
-          "Optional exact attribute keys to validate, such as ['tags[type]', 'span.duration']",
-        ),
     }),
-    execute: async ({
-      dataset,
-      substringMatch,
-      query,
-      attributeTypes,
-      attributes,
-    }) => {
+    execute: async ({ dataset, substringMatch, query, attributeTypes }) => {
       const {
         BASE_COMMON_FIELDS,
         DATASET_FIELDS,
@@ -511,18 +752,7 @@ export function createDatasetAttributesTool(options: {
       // UserInputError will be converted to error string for the AI agent
       // Other errors will bubble up to be captured by Sentry
       const normalizedDataset = normalizeEventsDataset(dataset);
-      const traceItemType = getTraceItemType(normalizedDataset);
       const attributeTimeParams = { statsPeriod: "14d" };
-      const validationResults =
-        traceItemType && attributes?.length
-          ? await apiService.validateTraceItemAttributes({
-              organizationSlug,
-              itemType: traceItemType,
-              attributes,
-              project: projectId,
-              ...attributeTimeParams,
-            })
-          : {};
       const { attributes: customAttributes, fieldTypes } =
         await fetchCustomAttributes(
           apiService,
@@ -560,7 +790,6 @@ export function createDatasetAttributesTool(options: {
       recordAgentToolResultCount(fieldCount);
 
       return `Dataset: ${dataset}
-${formatValidationResults(validationResults)}
 
 Available Fields (${fieldCount} total):
 ${Object.entries(allFields)
@@ -574,7 +803,7 @@ ${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}
 
 Field Types (CRITICAL for aggregate functions):
 ${Object.entries(allFieldTypes)
-  .slice(0, 30) // Show more field types since this is critical for validation
+  .slice(0, 30) // Show more field types since this is critical for aggregate functions
   .map(([key, type]) => `- ${key}: ${type}`)
   .join("\n")}
 ${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldTypes).length - 30} more fields` : ""}

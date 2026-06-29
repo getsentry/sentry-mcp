@@ -3,9 +3,9 @@
   "mcpName": "io.github.getsentry/sentry-mcp",
   "version": "0.36.0",
   "type": "module",
-  "packageManager": "pnpm@10.8.1",
+  "packageManager": "pnpm@11.8.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "publishConfig": {
     "access": "public"

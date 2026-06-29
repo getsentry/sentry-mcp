@@ -1,17 +1,28 @@
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import * as Sentry from "@sentry/cloudflare";
+import { logWarn } from "@sentry/mcp-core/telem/logging";
 import { SCOPES } from "../constants";
 import app from "./app";
+import {
+  UTM_SOURCE_ATTRIBUTE,
+  resolveUtmSourceFromUrl,
+} from "./lib/attribution";
 import { resolveClientFamily } from "./lib/client-family";
+import { redirectUriHasUserInfo } from "./lib/html-utils";
 import sentryMcpHandler from "./lib/mcp-handler";
 import {
   type RateLimitScope,
-  annotateMcpRequestSpan,
+  annotateTrackedRequestSpan,
   extractResponseMetricOptions,
   recordResponseMetric,
   stripResponseMetricHeaders,
 } from "./metrics";
 import { tokenExchangeCallback } from "./oauth";
+import {
+  bucketOAuthErrorCode,
+  bucketOAuthErrorDescription,
+  getOAuthErrorTelemetry,
+} from "./oauth/telemetry";
 import getSentryConfig from "./sentry.config";
 import type { Env } from "./types";
 import { getClientIp } from "./utils/client-ip";
@@ -78,7 +89,7 @@ function patchWwwAuthenticate(response: Response, url: URL): Response {
   return newResponse;
 }
 
-function finalizeResponse(
+async function finalizeResponse(
   request: Request,
   url: URL,
   response: Response,
@@ -86,17 +97,27 @@ function finalizeResponse(
     rateLimitScope?: RateLimitScope;
     responseReason?: "local_rate_limit";
   },
-): Response {
+): Promise<Response> {
   const responseMetricOptions = extractResponseMetricOptions(response);
   const responseWithoutMetricHeaders = stripResponseMetricHeaders(response);
+  const oauthErrorTelemetry =
+    response.status >= 400 &&
+    (url.pathname.startsWith("/mcp") || url.pathname.startsWith("/oauth"))
+      ? await getOAuthErrorTelemetry(request, responseWithoutMetricHeaders)
+      : {};
   const finalized = isPublicMetadataEndpoint(url.pathname)
     ? addCorsHeaders(responseWithoutMetricHeaders)
     : stripCorsHeaders(responseWithoutMetricHeaders);
 
-  annotateMcpRequestSpan(request, url);
-  recordResponseMetric(request, finalized, {
+  const metricOptions = {
     ...responseMetricOptions,
+    ...oauthErrorTelemetry,
     ...options,
+  };
+
+  annotateTrackedRequestSpan(request, url, finalized, metricOptions);
+  recordResponseMetric(request, finalized, {
+    ...metricOptions,
   });
   return finalized;
 }
@@ -172,7 +193,52 @@ const wrappedOAuthProvider = {
     }
 
     const clientFamily = resolveClientFamily(request.headers.get("user-agent"));
-    Sentry.getActiveSpan()?.setAttribute("app.client.family", clientFamily);
+    const activeSpan = Sentry.getActiveSpan();
+    activeSpan?.setAttribute("app.client.family", clientFamily);
+    // Set utm_source early on /mcp requests so the attribute is present even
+    // if the request is rejected before reaching mcp-handler.ts.
+    if (url.pathname.startsWith("/mcp")) {
+      const utmSource = resolveUtmSourceFromUrl(url);
+      if (utmSource) {
+        activeSpan?.setAttribute(UTM_SOURCE_ATTRIBUTE, utmSource);
+      }
+    }
+
+    // Reject registrations with userinfo-spoofed redirect URIs before the
+    // library stores the client (e.g. host@example.io).
+    if (request.method === "POST" && url.pathname === "/oauth/register") {
+      try {
+        const body = (await request.clone().json()) as {
+          redirect_uris?: unknown;
+        };
+        const redirectUris = Array.isArray(body.redirect_uris)
+          ? body.redirect_uris
+          : [];
+        if (
+          redirectUris.some(
+            (uri) => typeof uri === "string" && redirectUriHasUserInfo(uri),
+          )
+        ) {
+          return finalizeResponse(
+            request,
+            url,
+            new Response(
+              JSON.stringify({
+                error: "invalid_redirect_uri",
+                error_description:
+                  "redirect_uris must not contain a userinfo component",
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+              },
+            ),
+          );
+        }
+      } catch {
+        // Malformed body — let the library produce its own error.
+      }
+    }
 
     // --- Phase 2: Let the OAuth library handle the request ---
     // We normalize any CORS headers it returns in the response handling below.
@@ -192,6 +258,18 @@ const wrappedOAuthProvider = {
       // Sentry access tokens also have a 30-day lifetime, so re-auth is
       // required after this window regardless.
       refreshTokenTTL: 30 * 24 * 60 * 60,
+      onError: ({ status, code, description }) => {
+        logWarn(`OAuth error response: ${status} ${code} - ${description}`, {
+          loggerScope: ["cloudflare", "oauth", "provider"],
+          extra: {
+            "http.response.status_code": status,
+            "app.oauth.error": bucketOAuthErrorCode(code),
+            "app.oauth.error_description":
+              bucketOAuthErrorDescription(description),
+            "app.client.family": clientFamily,
+          },
+        });
+      },
     });
 
     const response = await oAuthProvider.fetch(request, env, ctx);

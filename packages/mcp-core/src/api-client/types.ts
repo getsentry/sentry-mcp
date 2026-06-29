@@ -41,8 +41,11 @@
 import type { z } from "zod";
 import type {
   AssignedToSchema,
+  AIConversationSummaryListSchema,
+  AIConversationSummarySchema,
   AIConversationSpanListSchema,
   AIConversationSpanSchema,
+  AIConversationUserSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
   ClientKeyListSchema,
@@ -191,6 +194,11 @@ export type Trace = z.infer<typeof TraceSchema>;
 export type AIConversationSpan = z.infer<typeof AIConversationSpanSchema>;
 export type AIConversationSpanList = z.infer<
   typeof AIConversationSpanListSchema
+>;
+export type AIConversationUser = z.infer<typeof AIConversationUserSchema>;
+export type AIConversationSummary = z.infer<typeof AIConversationSummarySchema>;
+export type AIConversationSummaryList = z.infer<
+  typeof AIConversationSummaryListSchema
 >;
 
 // Profile types

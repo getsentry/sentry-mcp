@@ -10,8 +10,13 @@ import {
 } from "@sentry/mcp-server-mocks";
 import { encode as encodePng } from "fast-png";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import getSentryResource from "./get-sentry-resource.js";
+
+const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
+const originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
+const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
+const originalEmbeddedAgentProvider = process.env.EMBEDDED_AGENT_PROVIDER;
 
 const baseContext = {
   constraints: {
@@ -110,6 +115,39 @@ function mockMonitorResource({
 }
 
 describe("get_sentry_resource", () => {
+  beforeEach(() => {
+    Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
+    Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
+    Reflect.deleteProperty(process.env, "OPENROUTER_API_KEY");
+    Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
+  });
+
+  afterAll(() => {
+    if (originalOpenAIApiKey === undefined) {
+      Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
+    } else {
+      process.env.OPENAI_API_KEY = originalOpenAIApiKey;
+    }
+
+    if (originalAnthropicApiKey === undefined) {
+      Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
+    } else {
+      process.env.ANTHROPIC_API_KEY = originalAnthropicApiKey;
+    }
+
+    if (originalOpenRouterApiKey === undefined) {
+      Reflect.deleteProperty(process.env, "OPENROUTER_API_KEY");
+    } else {
+      process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey;
+    }
+
+    if (originalEmbeddedAgentProvider === undefined) {
+      Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
+    } else {
+      process.env.EMBEDDED_AGENT_PROVIDER = originalEmbeddedAgentProvider;
+    }
+  });
+
   // ─── URL mode: issue URLs ──────────────────────────────────────────────────
   describe("URL mode — issue URLs", () => {
     it("resolves issue from subdomain URL (my-org.sentry.io)", async () => {

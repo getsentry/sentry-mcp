@@ -73,12 +73,12 @@ Returns grouped and aggregated data, similar to SQL GROUP BY queries.
 
 Single groupBy field:
 ```
-https://us.sentry.io/api/0/organizations/sentry/events/?dataset=spans&field=ai.model.id&field=count()&per_page=50&query=&sort=-count&statsPeriod=24h
+https://us.sentry.io/api/0/organizations/sentry/events/?dataset=spans&field=ai.model.id&field=count()&per_page=50&query=&sort=-count()&statsPeriod=24h
 ```
 
 Multiple groupBy fields:
 ```
-https://us.sentry.io/api/0/organizations/sentry/events/?dataset=spans&field=ai.model.id&field=ai.model.provider&field=sum(span.duration)&per_page=50&query=&sort=-sum_span_duration&statsPeriod=24h
+https://us.sentry.io/api/0/organizations/sentry/events/?dataset=spans&field=ai.model.id&field=ai.model.provider&field=sum(span.duration)&per_page=50&query=&sort=-sum(span.duration)&statsPeriod=24h
 ```
 
 ## Query Parameters
@@ -228,7 +228,6 @@ Dataset: spans
 2. **Wrong sort field**: The field you sort by must be included in the fields array
 3. **Timestamp filters on logs**: Use `statsPeriod` parameter instead of query filters
 4. **Using project slugs**: API requires numeric project IDs, not slugs
-5. **Tracemetrics sort mangling**: Do not rewrite `-p95(value,...)` into Discover-style aliases; the raw aggregate expression must be preserved
 
 ## Web UI URL Generation
 
@@ -373,7 +372,7 @@ https://us.sentry.io/api/0/organizations/sentry/tags/?dataset=events&project=450
 
 **Parameters**:
 - `itemType`: Either `spans` or `logs` (plural!)
-- `attributeType`: Either `string` or `number`
+- `attributeType`: Optional filter for `string`, `number`, or `boolean`. Omit to return all types.
 - `project`: Numeric project ID (optional)
 - `statsPeriod`: Time range
 
@@ -412,10 +411,10 @@ https://us.sentry.io/api/0/organizations/sentry/trace-items/attributes/?attribut
 
 ### Implementation Strategy
 
-The tool makes parallel requests to fetch attributes efficiently:
+The tool fetches attributes with a single request per dataset:
 
 1. **For errors**: Single request to tags endpoint with optimized parameters
-2. **For spans/logs**: Single request that internally fetches both string + number attributes
+2. **For spans/logs/metrics**: Single request to trace-items attributes without `attributeType` (Sentry returns all types)
 
 ```typescript
 // For errors dataset
@@ -435,7 +434,7 @@ const attributesResponse = await apiService.listTraceItemAttributes({
 });
 ```
 
-Note: The `listTraceItemAttributes` method internally makes parallel requests for string and number attributes.
+When callers pass `attributeTypes`, `listTraceItemAttributes` filters the combined response client-side.
 
 ### Custom Attributes Integration
 

@@ -11,6 +11,7 @@ import getMonitorDetails from "./get-monitor-details";
 import findAlertRules from "./find-alert-rules";
 import getAlertRule from "./get-alert-rule";
 import getIssueDetails from "./get-issue-details";
+import getEventStacktrace from "./get-event-stacktrace";
 import getIssueActivity from "./get-issue-activity";
 import getIssueTagValues from "./get-issue-tag-values";
 import getTraceDetails from "./get-trace-details";
@@ -23,6 +24,7 @@ import createProject from "./create-project";
 import updateProject from "./update-project";
 import createDsn from "./create-dsn";
 import findDsns from "./find-dsns";
+import updateDsn from "./update-dsn";
 import analyzeIssueWithSeer from "./analyze-issue-with-seer";
 import searchDocs from "./search-docs";
 import getDoc from "./get-doc";
@@ -35,6 +37,7 @@ import getSnapshot from "./get-snapshot";
 import getSnapshotImage from "./get-snapshot-image";
 import getLatestBaseSnapshot from "./get-latest-base-snapshot";
 import getAIConversationDetails from "./get-ai-conversation-details";
+import searchAIConversations from "./search-ai-conversations";
 import addIssueNote from "./add-issue-note";
 import type { ToolConfig } from "../types";
 
@@ -61,6 +64,7 @@ const catalogTools = {
   find_alert_rules: findAlertRules,
   get_alert_rule: getAlertRule,
   get_issue_details: getIssueDetails,
+  get_event_stacktrace: getEventStacktrace,
   get_issue_activity: getIssueActivity,
   get_issue_tag_values: getIssueTagValues,
   get_trace_details: getTraceDetails,
@@ -73,6 +77,7 @@ const catalogTools = {
   update_project: updateProject,
   create_dsn: createDsn,
   find_dsns: findDsns,
+  update_dsn: updateDsn,
   analyze_issue_with_seer: analyzeIssueWithSeer,
   search_docs: searchDocs,
   get_doc: getDoc,
@@ -85,6 +90,7 @@ const catalogTools = {
   get_snapshot_image: getSnapshotImage,
   get_latest_base_snapshot: getLatestBaseSnapshot,
   get_ai_conversation_details: getAIConversationDetails,
+  search_ai_conversations: searchAIConversations,
   add_issue_note: addIssueNote,
 } as const satisfies Record<string, ToolConfig<any>>;
 

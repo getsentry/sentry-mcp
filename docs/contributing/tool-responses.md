@@ -8,7 +8,7 @@ Use this policy when adding a tool, changing formatted handler output, updating
 snapshots, or QAing MCP behavior. For the full tool implementation flow, see
 [adding-tools.md](adding-tools.md). For snapshot requirements, see
 [../testing/overview.md](../testing/overview.md). For end-to-end MCP
-validation, see [.agents/skills/qa/SKILL.md](../../.agents/skills/qa/SKILL.md).
+validation, see [.agents/skills/mcp-qa/SKILL.md](../../.agents/skills/mcp-qa/SKILL.md).
 
 ## Response Contract
 
@@ -115,6 +115,41 @@ When changing Sentry API endpoint usage, validate the upstream behavior in
 should model what Sentry returns, but tool responses should model what users
 need.
 
+## Structured Content
+
+MCP tools may expose `structuredContent` alongside generated text `content`.
+Use it when clients need a typed result, pagination token, stable follow-up
+handle, or machine-readable projection of the same result. The current MCP spec
+defines `structuredContent` as a JSON object on `CallToolResult`, and
+`outputSchema` as the schema for that object:
+
+- Choose one response contract per tool: handwritten markdown or
+  `structuredContent`. Do not hand-write markdown and also return
+  `structuredContent` from the handler.
+- If a tool declares `outputSchema`, every successful `structuredContent` result
+  must conform to that schema.
+- Return structured results with `structuredResult(payload)`. The server
+  generates `content` as a compatibility fallback from the same payload.
+- Do not duplicate a large structured payload into a markdown artifact block.
+- Treat `structuredContent` as a stable product contract, not a raw upstream API
+  passthrough. Map only documented fields that callers should depend on.
+- Do not spread `.passthrough()` API schema objects directly into
+  `structuredContent`; backend-only fields can leak into the public MCP
+  interface.
+- Keep names, nullability, arrays, cursors, and URLs aligned between
+  `outputSchema`, tests, and generated definitions.
+- Snapshot `structuredContent` for structured tools, similar to handwritten
+  content snapshots for markdown tools. Include a regression assertion for
+  fields that must not leak when the upstream response schema is passthrough.
+- Test generated compatibility text at the server boundary, not inside
+  structured tool handler tests.
+- Use tool execution errors with `isError: true` for recoverable tool failures.
+  Do not return partial success-shaped `structuredContent` for errors unless the
+  error shape is explicitly modeled.
+
+Reference: MCP 2025-11-25 Tools specification, sections "Structured Content"
+and "Output Schema".
+
 ## Response Notes
 
 Use response notes for narrow, operational guidance:
@@ -156,7 +191,7 @@ For output-format changes:
 
 - Run the normal quality gate from [quality-checks.md](quality-checks.md).
 - Use the stdio MCP QA path in
-  [.agents/skills/qa/SKILL.md](../../.agents/skills/qa/SKILL.md).
+  [.agents/skills/mcp-qa/SKILL.md](../../.agents/skills/mcp-qa/SKILL.md).
 - Inspect the raw MCP tool result when possible, not only the LLM's final
   answer. The test client's final answer can add model-specific phrasing that is
   not part of the tool response.

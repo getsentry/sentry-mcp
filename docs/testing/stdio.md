@@ -20,7 +20,7 @@ The stdio transport runs the MCP server as a subprocess that communicates via st
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22.13+
 - pnpm installed
 - Sentry access token with appropriate scopes
 

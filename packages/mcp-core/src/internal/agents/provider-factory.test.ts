@@ -8,13 +8,52 @@ import { setAzureOpenAIBaseUrl } from "./azure-openai-provider.js";
 import { ConfigurationError } from "../../errors.js";
 
 describe("provider-factory", () => {
+  const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
+  const originalOpenAIKey = process.env.OPENAI_API_KEY;
+  const originalOpenRouterKey = process.env.OPENROUTER_API_KEY;
+  const originalProviderEnv = process.env.EMBEDDED_AGENT_PROVIDER;
+
   beforeEach(() => {
     // Reset module state
     setAgentProvider(undefined);
     setAzureOpenAIBaseUrl(undefined);
+    // Clear environment variables
+    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+    delete process.env.ANTHROPIC_API_KEY;
+    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+    delete process.env.OPENAI_API_KEY;
+    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+    delete process.env.OPENROUTER_API_KEY;
+    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+    delete process.env.EMBEDDED_AGENT_PROVIDER;
   });
 
   afterEach(() => {
+    // Restore original environment
+    if (originalAnthropicKey === undefined) {
+      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+      delete process.env.ANTHROPIC_API_KEY;
+    } else {
+      process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
+    }
+    if (originalOpenAIKey === undefined) {
+      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+      delete process.env.OPENAI_API_KEY;
+    } else {
+      process.env.OPENAI_API_KEY = originalOpenAIKey;
+    }
+    if (originalOpenRouterKey === undefined) {
+      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = originalOpenRouterKey;
+    }
+    if (originalProviderEnv === undefined) {
+      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+      delete process.env.EMBEDDED_AGENT_PROVIDER;
+    } else {
+      process.env.EMBEDDED_AGENT_PROVIDER = originalProviderEnv;
+    }
     setAgentProvider(undefined);
     setAzureOpenAIBaseUrl(undefined);
   });
@@ -32,6 +71,13 @@ describe("provider-factory", () => {
 
       const provider = getAgentProvider();
       expect(provider.type).toBe("openai");
+    });
+
+    it("detects openrouter when only OPENROUTER_API_KEY is set", () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-test";
+
+      const provider = getAgentProvider();
+      expect(provider.type).toBe("openrouter");
     });
 
     it("returns undefined from getResolvedProviderType when no API keys", () => {
@@ -76,6 +122,16 @@ describe("provider-factory", () => {
       expect(provider.type).toBe("azure-openai");
     });
 
+    it("uses openrouter when multiple keys are present and EMBEDDED_AGENT_PROVIDER=openrouter", () => {
+      process.env.ANTHROPIC_API_KEY = "sk-ant-test";
+      process.env.OPENAI_API_KEY = "sk-test";
+      process.env.OPENROUTER_API_KEY = "sk-or-test";
+      process.env.EMBEDDED_AGENT_PROVIDER = "openrouter";
+
+      const provider = getAgentProvider();
+      expect(provider.type).toBe("openrouter");
+    });
+
     it("uses openai when both keys present and setAgentProvider called", () => {
       process.env.ANTHROPIC_API_KEY = "sk-ant-test";
       process.env.OPENAI_API_KEY = "sk-test";
@@ -107,14 +163,12 @@ describe("provider-factory", () => {
       process.env.ANTHROPIC_API_KEY = "sk-ant-test";
       process.env.OPENAI_API_KEY = "sk-test";
 
-      expect(() => getAgentProvider()).toThrow(
-        /Both ANTHROPIC_API_KEY and OPENAI_API_KEY are set/,
-      );
+      expect(() => getAgentProvider()).toThrow(/Multiple LLM API keys are set/);
       expect(() => getAgentProvider()).toThrow(
         /EMBEDDED_AGENT_PROVIDER environment variable/,
       );
       expect(() => getAgentProvider()).toThrow(
-        /'openai', 'azure-openai', or 'anthropic'/,
+        /'openai', 'azure-openai', 'anthropic', or 'openrouter'/,
       );
     });
 
@@ -142,6 +196,13 @@ describe("provider-factory", () => {
 
       const providerType = getResolvedProviderType();
       expect(providerType).toBeUndefined();
+    });
+
+    it("throws ConfigurationError when explicit openrouter lacks API key", () => {
+      process.env.EMBEDDED_AGENT_PROVIDER = "openrouter";
+
+      expect(() => getAgentProvider()).toThrow(ConfigurationError);
+      expect(() => getAgentProvider()).toThrow(/OPENROUTER_API_KEY is not set/);
     });
 
     it("throws ConfigurationError when azure-openai lacks a supported base URL", () => {
@@ -215,6 +276,13 @@ describe("provider-factory", () => {
 
       const provider = getAgentProvider();
       expect(provider.label).toBe("azure-openai chat completions API");
+    });
+
+    it("labels openrouter", () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-test";
+
+      const provider = getAgentProvider();
+      expect(provider.label).toBe("openrouter");
     });
   });
 });

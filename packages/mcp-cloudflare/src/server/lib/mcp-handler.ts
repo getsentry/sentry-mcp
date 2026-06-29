@@ -17,6 +17,10 @@ import { logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ServerContext } from "@sentry/mcp-core/types";
 import { createMcpHandler } from "agents/mcp";
 import { annotateResponseMetric } from "../metrics";
+import {
+  getOAuthGrantLifecycleTelemetry,
+  getOAuthGrantTelemetry,
+} from "../oauth/telemetry";
 import type { WorkerProps } from "../types";
 import type { Env } from "../types";
 import {
@@ -24,6 +28,7 @@ import {
   checkRateLimit,
 } from "../utils/rate-limiter";
 import { setSentryUserFromRequest } from "../utils/sentry-user";
+import { UTM_SOURCE_ATTRIBUTE, resolveUtmSourceFromUrl } from "./attribution";
 import { resolveClientFamily } from "./client-family";
 import { verifyConstraintsAccess } from "./constraint-utils";
 
@@ -62,6 +67,32 @@ export function getRequestGrantId(request: Request): string | null {
   return parts[1] || null;
 }
 
+type GrantRevokedReason =
+  | "stale_props_no_refresh"
+  | "upstream_rejected"
+  | "upstream_rejected_in_use";
+
+function logGrantReauthorization(
+  reason: GrantRevokedReason,
+  userId: string,
+  clientId: string,
+  clientFamily: string,
+  grantId: string | null,
+  lifecycleTelemetry: Record<string, string>,
+): void {
+  logWarn("OAuth grant rejected for reauthorization", {
+    loggerScope: ["cloudflare", "mcp-handler"],
+    extra: {
+      "app.oauth.grant_revoked.reason": reason,
+      "app.client.family": clientFamily,
+      userId,
+      clientId,
+      ...getOAuthGrantTelemetry(grantId),
+      ...lifecycleTelemetry,
+    },
+  });
+}
+
 /**
  * Revokes the OAuth grant for the current request in the background, then
  * returns a 401 response prompting re-authorization.
@@ -73,8 +104,30 @@ function revokeStaleGrant(
   clientId: string,
   grantId: string | null,
   logLabel: string,
+  revokeReason: Exclude<GrantRevokedReason, "upstream_rejected_in_use">,
+  clientFamily: string,
+  lifecycleTelemetry: Record<string, string>,
   errorDescription = "Token requires re-authorization",
 ): Response {
+  if (grantId) {
+    Sentry.metrics.count("app.oauth.grant_revoked", 1, {
+      attributes: {
+        "app.oauth.grant_revoked.reason": revokeReason,
+        "app.client.family": clientFamily,
+        ...lifecycleTelemetry,
+      },
+    });
+  }
+
+  logGrantReauthorization(
+    revokeReason,
+    userId,
+    clientId,
+    clientFamily,
+    grantId,
+    lifecycleTelemetry,
+  );
+
   ctx.waitUntil(
     (async () => {
       if (!grantId) {
@@ -93,7 +146,12 @@ function revokeStaleGrant(
       } catch (err) {
         logWarn(`Failed to revoke ${logLabel}`, {
           loggerScope: ["cloudflare", "mcp-handler"],
-          extra: { error: String(err), clientId, userId, grantId },
+          extra: {
+            error: String(err),
+            clientId,
+            userId,
+            ...getOAuthGrantTelemetry(grantId),
+          },
         });
       }
     })(),
@@ -145,6 +203,9 @@ const mcpHandler: ExportedHandler<Env> = {
     // Check for experimental mode query parameter
     const isExperimentalMode = url.searchParams.get("experimental") === "1";
 
+    // Read utm_source for attribution tracking
+    const utmSource = resolveUtmSourceFromUrl(url);
+
     // Extract OAuth props from ExecutionContext (set by OAuth provider)
     const oauthCtx = ctx as OAuthExecutionContext;
 
@@ -161,6 +222,7 @@ const mcpHandler: ExportedHandler<Env> = {
     const sentryHost = env.SENTRY_HOST || "sentry.io";
     const clientFamily = resolveClientFamily(request.headers.get("user-agent"));
     const requestGrantId = getRequestGrantId(request);
+    const lifecycleTelemetry = getOAuthGrantLifecycleTelemetry(rawProps);
     const { ip_address: userIpAddress } = setSentryUserFromRequest(
       request,
       userId,
@@ -174,6 +236,9 @@ const mcpHandler: ExportedHandler<Env> = {
       "app.server.mode.experimental",
       isExperimentalMode,
     );
+    if (utmSource) {
+      activeSpan?.setAttribute(UTM_SOURCE_ATTRIBUTE, utmSource);
+    }
 
     // Parse and validate granted skills (primary authorization method)
     // Legacy tokens without grantedSkills are no longer supported
@@ -189,20 +254,15 @@ const mcpHandler: ExportedHandler<Env> = {
         clientId,
         requestGrantId,
         "legacy grant",
+        "stale_props_no_refresh",
+        clientFamily,
+        lifecycleTelemetry,
       );
     }
 
     // Attribute values avoid the substring "token" so Sentry's default PII
     // scrubber doesn't replace them with "[Filtered]" on ingest.
     if (!rawProps.refreshToken) {
-      if (requestGrantId) {
-        Sentry.metrics.count("app.oauth.grant_revoked", 1, {
-          attributes: {
-            "app.oauth.grant_revoked.reason": "stale_props_no_refresh",
-            "app.client.family": clientFamily,
-          },
-        });
-      }
       return revokeStaleGrant(
         ctx,
         env,
@@ -210,18 +270,13 @@ const mcpHandler: ExportedHandler<Env> = {
         clientId,
         requestGrantId,
         "stale grant (missing refresh token)",
+        "stale_props_no_refresh",
+        clientFamily,
+        lifecycleTelemetry,
       );
     }
 
     if (rawProps.upstreamTokenInvalid) {
-      if (requestGrantId) {
-        Sentry.metrics.count("app.oauth.grant_revoked", 1, {
-          attributes: {
-            "app.oauth.grant_revoked.reason": "upstream_rejected",
-            "app.client.family": clientFamily,
-          },
-        });
-      }
       return revokeStaleGrant(
         ctx,
         env,
@@ -229,6 +284,9 @@ const mcpHandler: ExportedHandler<Env> = {
         clientId,
         requestGrantId,
         "stale grant (invalid upstream token)",
+        "upstream_rejected",
+        clientFamily,
+        lifecycleTelemetry,
         "Upstream authorization is no longer valid",
       );
     }
@@ -361,8 +419,17 @@ const mcpHandler: ExportedHandler<Env> = {
           attributes: {
             "app.oauth.grant_revoked.reason": "upstream_rejected_in_use",
             "app.client.family": clientFamily,
+            ...lifecycleTelemetry,
           },
         });
+        logGrantReauthorization(
+          "upstream_rejected_in_use",
+          userId,
+          clientId,
+          clientFamily,
+          requestGrantId,
+          lifecycleTelemetry,
+        );
         ctx.waitUntil(
           (async () => {
             try {
@@ -374,7 +441,7 @@ const mcpHandler: ExportedHandler<Env> = {
                   error: String(err),
                   clientId,
                   userId,
-                  grantId: requestGrantId,
+                  ...getOAuthGrantTelemetry(requestGrantId),
                 },
               });
             }

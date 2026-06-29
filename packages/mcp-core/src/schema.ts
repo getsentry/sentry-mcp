@@ -117,6 +117,26 @@ export const ParamQuery = z
   );
 
 /**
+ * Relative time window parameter for Sentry API queries.
+ *
+ * Maps to the `statsPeriod` URL parameter in Sentry's API, which controls the
+ * search time window (i.e., which records are returned). This is distinct from
+ * `groupStatsPeriod`, which only affects sparkline data in the serializer.
+ *
+ * Tools apply their own `.default()`, `.optional()`, or `.nullable()` on top.
+ */
+export const ParamPeriod = z
+  .string()
+  .trim()
+  .regex(
+    /^\d+[hdw]$/,
+    "Period must be a relative time window like `24h`, `7d`, `14d`, `30d`, or `90d`.",
+  )
+  .describe(
+    "Relative time window, such as `24h`, `7d`, `14d`, `30d`, or `90d`. Controls which records fall within the search window.",
+  );
+
+/**
  * Region URL parameter for Sentry API requests.
  *
  * Handles region-specific URLs for Sentry's Cloud Service while gracefully

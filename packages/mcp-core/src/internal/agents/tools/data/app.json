@@ -1,5 +1,6 @@
 {
   "namespace": "app",
+  "custom": true,
   "description": "Describes attributes related to client-side applications (e.g. web apps or mobile apps), plus Sentry MCP application-owned telemetry attributes.\n",
   "attributes": {
     "app.client.family": {
@@ -41,6 +42,11 @@
       "type": "string",
       "examples": ["refreshable"]
     },
+    "app.oauth.grant.id_hash": {
+      "description": "Deterministic non-secret fingerprint of a Sentry MCP OAuth grant ID used to correlate grant lifecycle logs.",
+      "type": "string",
+      "examples": ["a1b2c3d4"]
+    },
     "app.oauth.grant_revoked.reason": {
       "description": "Reason a Sentry MCP OAuth wrapper grant was revoked.",
       "type": "string",
@@ -55,17 +61,36 @@
       "type": "string",
       "examples": ["rate_limit", "server_error", "unknown"]
     },
+    "app.oauth.error": {
+      "description": "OAuth error code returned by Sentry MCP or the OAuth provider.",
+      "type": "string",
+      "examples": ["invalid_token", "invalid_grant", "invalid_client"]
+    },
+    "app.oauth.error_description": {
+      "description": "Low-cardinality bucket for an OAuth error description returned by Sentry MCP or the OAuth provider.",
+      "type": "string",
+      "examples": [
+        "missing_or_invalid_access_token",
+        "invalid_access_token",
+        "grant_not_found"
+      ]
+    },
     "app.oauth.probe.status_code": {
       "description": "HTTP status returned by the upstream Sentry token-validity probe.",
       "type": "string",
       "examples": ["200", "401", "429", "500"]
+    },
+    "app.oauth.request.token_shape": {
+      "description": "Low-cardinality shape of the bearer token supplied to an OAuth-protected request.",
+      "type": "string",
+      "examples": ["missing", "wrapper", "malformed"]
     },
     "app.oauth.token_exchange.outcome": {
       "description": "Outcome bucket for a Sentry MCP OAuth token exchange or refresh.",
       "type": "string",
       "examples": [
         "cached_valid_local",
-        "refreshed",
+        "cached_valid_probed",
         "upstream_rejected",
         "verification_indeterminate"
       ]

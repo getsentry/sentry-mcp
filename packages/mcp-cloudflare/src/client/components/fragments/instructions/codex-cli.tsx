@@ -1,5 +1,4 @@
 import CodeSnippet from "../../ui/code-snippet";
-import { NPM_REMOTE_NAME } from "../../../../constants";
 
 interface CodexCLIInstructionsProps {
   transport: "cloud" | "stdio";
@@ -8,14 +7,9 @@ interface CodexCLIInstructionsProps {
 export function CodexCLIInstructions({ transport }: CodexCLIInstructionsProps) {
   if (transport === "cloud") {
     const endpoint = new URL("/mcp", window.location.href).href;
-    const coreConfig = {
-      command: "npx",
-      args: ["-y", `${NPM_REMOTE_NAME}@latest`, endpoint],
-    };
     const codexRemoteConfigToml = [
       "[mcp_servers.sentry]",
-      'command = "npx"',
-      `args = ["-y", "${NPM_REMOTE_NAME}@latest", "${endpoint}"]`,
+      `url = "${endpoint}"`,
     ].join("\n");
 
     return (
@@ -25,9 +19,7 @@ export function CodexCLIInstructions({ transport }: CodexCLIInstructionsProps) {
           <li>
             <CodeSnippet
               noMargin
-              snippet={`codex mcp add sentry -- ${
-                coreConfig.command
-              } ${coreConfig.args.join(" ")}`}
+              snippet={`codex mcp add sentry --url ${endpoint}`}
             />
           </li>
           <li>

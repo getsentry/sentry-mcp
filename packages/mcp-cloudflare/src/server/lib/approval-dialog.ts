@@ -3,7 +3,7 @@ import type {
   ClientInfo,
 } from "@cloudflare/workers-oauth-provider";
 import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
-import { sanitizeHtml, sanitizeHrefUrl } from "./html-utils";
+import { getUrlHost, sanitizeHtml, sanitizeHrefUrl } from "./html-utils";
 import skillDefinitions, {
   type SkillDefinition,
 } from "@sentry/mcp-core/skillDefinitions";
@@ -14,7 +14,9 @@ import {
 } from "../oauth/state";
 
 const COOKIE_NAME = "mcp-approved-clients";
+export const SKILL_PREFERENCES_COOKIE_NAME = "mcp-skill-preferences";
 const ONE_YEAR_IN_SECONDS = 31536000;
+const MAX_SKILL_PREFERENCE_CLIENTS = 10;
 // Hosted OAuth approvals only mint active skills. Deprecated skills may still
 // work for existing grants or explicit stdio use, but not through this form.
 const APPROVABLE_SKILLS = (skillDefinitions as SkillDefinition[]).filter(
@@ -23,6 +25,10 @@ const APPROVABLE_SKILLS = (skillDefinitions as SkillDefinition[]).filter(
 const APPROVABLE_SKILL_IDS = new Set(
   APPROVABLE_SKILLS.map((skill) => skill.id),
 );
+
+type SkillPreferencesCookie = {
+  clients: Array<[clientId: string, skills: string[]]>;
+};
 /**
  * Imports a secret key string for HMAC-SHA256 signing.
  * @param secret - The raw secret key string.
@@ -98,6 +104,73 @@ async function verifySignature(
   }
 }
 
+function getCookieValue(
+  cookieHeader: string | null,
+  cookieName: string,
+): string | null {
+  if (!cookieHeader) return null;
+
+  const cookies = cookieHeader.split(";").map((c) => c.trim());
+  const targetCookie = cookies.find((c) => c.startsWith(`${cookieName}=`));
+
+  if (!targetCookie) return null;
+
+  return targetCookie.substring(cookieName.length + 1);
+}
+
+async function getSignedCookiePayload(
+  cookieHeader: string | null,
+  cookieName: string,
+  secret: string,
+): Promise<string | null> {
+  const cookieValue = getCookieValue(cookieHeader, cookieName);
+  if (!cookieValue) return null;
+
+  const parts = cookieValue.split(".");
+
+  if (parts.length !== 2) {
+    logWarn("Invalid signed cookie format", {
+      loggerScope: ["cloudflare", "approval-dialog"],
+      extra: { cookieName },
+    });
+    return null;
+  }
+
+  const [signatureHex, base64Payload] = parts;
+  let payload: string;
+  try {
+    payload = atob(base64Payload);
+  } catch {
+    logWarn("Invalid signed cookie payload encoding", {
+      loggerScope: ["cloudflare", "approval-dialog"],
+      extra: { cookieName },
+    });
+    return null;
+  }
+
+  const key = await importKey(secret);
+  const isValid = await verifySignature(key, signatureHex, payload);
+
+  if (!isValid) {
+    logWarn("Signed cookie signature verification failed", {
+      loggerScope: ["cloudflare", "approval-dialog"],
+      extra: { cookieName },
+    });
+    return null;
+  }
+
+  return payload;
+}
+
+async function createSignedCookieValue(
+  payload: string,
+  secret: string,
+): Promise<string> {
+  const key = await importKey(secret);
+  const signature = await signData(key, payload);
+  return `${signature}.${btoa(payload)}`;
+}
+
 /**
  * Parses the signed cookie and verifies its integrity.
  * @param cookieHeader - The value of the Cookie header from the request.
@@ -108,35 +181,12 @@ async function getApprovedClientsFromCookie(
   cookieHeader: string | null,
   secret: string,
 ): Promise<string[] | null> {
-  if (!cookieHeader) return null;
-
-  const cookies = cookieHeader.split(";").map((c) => c.trim());
-  const targetCookie = cookies.find((c) => c.startsWith(`${COOKIE_NAME}=`));
-
-  if (!targetCookie) return null;
-
-  const cookieValue = targetCookie.substring(COOKIE_NAME.length + 1);
-  const parts = cookieValue.split(".");
-
-  if (parts.length !== 2) {
-    logWarn("Invalid approval cookie format", {
-      loggerScope: ["cloudflare", "approval-dialog"],
-    });
-    return null; // Invalid format
-  }
-
-  const [signatureHex, base64Payload] = parts;
-  const payload = atob(base64Payload); // Assuming payload is base64 encoded JSON string
-
-  const key = await importKey(secret);
-  const isValid = await verifySignature(key, signatureHex, payload);
-
-  if (!isValid) {
-    logWarn("Approval cookie signature verification failed", {
-      loggerScope: ["cloudflare", "approval-dialog"],
-    });
-    return null; // Signature invalid
-  }
+  const payload = await getSignedCookiePayload(
+    cookieHeader,
+    COOKIE_NAME,
+    secret,
+  );
+  if (!payload) return null;
 
   try {
     const approvedClients = JSON.parse(payload);
@@ -158,6 +208,117 @@ async function getApprovedClientsFromCookie(
     logIssue(new Error(`Error parsing cookie payload: ${e}`, { cause: e }));
     return null; // JSON parsing failed
   }
+}
+
+function filterApprovableSkillIds(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+
+  return Array.from(
+    new Set(
+      input.filter(
+        (skill): skill is string =>
+          typeof skill === "string" && APPROVABLE_SKILL_IDS.has(skill),
+      ),
+    ),
+  );
+}
+
+/**
+ * Parses the signed skill preference cookie format and drops invalid entries.
+ */
+function parseSkillPreferencesPayload(
+  payload: string,
+): SkillPreferencesCookie | null {
+  try {
+    const parsed = JSON.parse(payload) as unknown;
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      !Array.isArray((parsed as { clients?: unknown }).clients)
+    ) {
+      return null;
+    }
+
+    const clients: SkillPreferencesCookie["clients"] = [];
+    for (const entry of (parsed as { clients: unknown[] }).clients) {
+      if (!Array.isArray(entry) || entry.length !== 2) {
+        continue;
+      }
+      const [clientId, skills] = entry;
+      if (typeof clientId !== "string" || !clientId) {
+        continue;
+      }
+      const filteredSkills = filterApprovableSkillIds(skills);
+      if (filteredSkills.length === 0) {
+        continue;
+      }
+      clients.push([clientId, filteredSkills]);
+    }
+
+    return { clients };
+  } catch {
+    return null;
+  }
+}
+
+async function getSkillPreferencesFromCookie(
+  cookieHeader: string | null,
+  secret: string,
+): Promise<SkillPreferencesCookie> {
+  const payload = await getSignedCookiePayload(
+    cookieHeader,
+    SKILL_PREFERENCES_COOKIE_NAME,
+    secret,
+  );
+  if (!payload) return { clients: [] };
+
+  return parseSkillPreferencesPayload(payload) ?? { clients: [] };
+}
+
+/**
+ * Returns signed remembered skills for preselecting the consent form only.
+ */
+export async function getRememberedSkillsForClient(
+  cookieHeader: string | null,
+  clientId: string,
+  cookieSecret: string,
+): Promise<string[] | undefined> {
+  if (!clientId) return undefined;
+
+  const preferences = await getSkillPreferencesFromCookie(
+    cookieHeader,
+    cookieSecret,
+  );
+  const entry = preferences.clients.find(([id]) => id === clientId);
+
+  return entry?.[1];
+}
+
+/**
+ * Updates the skill preference cookie as a newest-last, ten-client LRU.
+ */
+async function createSkillPreferencesSetCookie(
+  request: Request,
+  clientId: string,
+  skills: string[],
+  cookieSecret: string,
+): Promise<string> {
+  const preferences = await getSkillPreferencesFromCookie(
+    request.headers.get("Cookie"),
+    cookieSecret,
+  );
+  const filteredSkills = filterApprovableSkillIds(skills);
+  const clients = preferences.clients.filter(([id]) => id !== clientId);
+
+  if (filteredSkills.length > 0) {
+    clients.push([clientId, filteredSkills]);
+  }
+
+  const payload = JSON.stringify({
+    clients: clients.slice(-MAX_SKILL_PREFERENCE_CLIENTS),
+  } satisfies SkillPreferencesCookie);
+  const cookieValue = await createSignedCookieValue(payload, cookieSecret);
+  return `${SKILL_PREFERENCES_COOKIE_NAME}=${cookieValue}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${ONE_YEAR_IN_SECONDS}`;
 }
 
 /**
@@ -220,6 +381,10 @@ export interface ApprovalDialogOptions {
    * HMAC secret key for signing state parameters
    */
   cookieSecret: string;
+  /**
+   * Skill IDs to preselect. When omitted, all approvable skills are selected.
+   */
+  defaultSkills?: string[];
 }
 
 /**
@@ -287,14 +452,26 @@ export async function renderApprovalDialog(
   request: Request,
   options: ApprovalDialogOptions,
 ): Promise<Response> {
-  const { client, server, scope, redirectUri, state, cookieSecret } = options;
+  const {
+    client,
+    server,
+    scope,
+    redirectUri,
+    state,
+    cookieSecret,
+    defaultSkills,
+  } = options;
+  const defaultSkillIds =
+    defaultSkills === undefined
+      ? new Set(APPROVABLE_SKILLS.map((skill) => skill.id))
+      : new Set(filterApprovableSkillIds(defaultSkills));
 
   // Use static skill definitions bundled at build time
-  // Generate HTML for all skills (checked if defaultEnabled)
+  // Generate HTML for all approvable skills.
   const skillsHtml = APPROVABLE_SKILLS.map(
     (skill) => `
     <label class="permission-item">
-      <input type="checkbox" name="skill" value="${sanitizeHtml(skill.id)}"${skill.defaultEnabled ? " checked" : ""}>
+      <input type="checkbox" name="skill" value="${sanitizeHtml(skill.id)}"${defaultSkillIds.has(skill.id) ? " checked" : ""}>
       <span class="permission-checkbox"></span>
       <div class="permission-content">
         <div class="permission-header">
@@ -325,19 +502,27 @@ export async function renderApprovalDialog(
     ? sanitizeHtml(sanitizeHrefUrl(client.tosUri))
     : "";
 
-  const redirectWarningUri =
+  const rawRedirectUri =
     typeof redirectUri === "string" && redirectUri.length > 0
-      ? sanitizeHtml(redirectUri)
+      ? redirectUri
       : client?.redirectUris?.length === 1
-        ? sanitizeHtml(client.redirectUris[0])
+        ? client.redirectUris[0]
         : null;
+
+  const redirectWarningUri = rawRedirectUri
+    ? sanitizeHtml(rawRedirectUri)
+    : null;
+  const redirectHost = rawRedirectUri ? getUrlHost(rawRedirectUri) : "";
+  const redirectDestination = redirectHost
+    ? `<strong>${sanitizeHtml(redirectHost)}</strong>`
+    : "this URL";
 
   const redirectWarningsHtml = redirectWarningUri
     ? `
         <div class="redirect-warning">
           <div class="redirect-uri-display">${redirectWarningUri}</div>
           <div class="redirect-warning-text">
-            After approval, you will be redirected to this URL. Only approve if you recognize and trust this destination.
+            After approval, you will be redirected to ${redirectDestination}. Only approve if you recognize and trust this destination.
           </div>
         </div>
       `
@@ -853,7 +1038,7 @@ export interface ParsedApprovalResult {
   /** The original state object passed through the form. */
   state: any;
   /** Headers to set on the redirect response, including the Set-Cookie header. */
-  headers: Record<string, string>;
+  headers: Headers;
   /** Selected skills */
   skills: string[];
 }
@@ -898,12 +1083,7 @@ export async function parseRedirectApproval(
     }
 
     // Extract skill selections from checkboxes - collect all 'skill' field values
-    skills = formData
-      .getAll("skill")
-      .filter(
-        (s): s is string =>
-          typeof s === "string" && APPROVABLE_SKILL_IDS.has(s),
-      );
+    skills = filterApprovableSkillIds(formData.getAll("skill"));
   } catch (error) {
     logError(error, {
       loggerScope: ["cloudflare", "approval-dialog"],
@@ -926,16 +1106,24 @@ export async function parseRedirectApproval(
     new Set([...existingApprovedClients, clientId]),
   );
 
-  // Sign the updated list
+  // Sign the updated approval list
   const payload = JSON.stringify(updatedApprovedClients);
-  const key = await importKey(cookieSecret);
-  const signature = await signData(key, payload);
-  const newCookieValue = `${signature}.${btoa(payload)}`; // signature.base64(payload)
+  const newCookieValue = await createSignedCookieValue(payload, cookieSecret);
 
-  // Generate Set-Cookie header
-  const headers: Record<string, string> = {
-    "Set-Cookie": `${COOKIE_NAME}=${newCookieValue}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${ONE_YEAR_IN_SECONDS}`,
-  };
+  const headers = new Headers();
+  headers.append(
+    "Set-Cookie",
+    `${COOKIE_NAME}=${newCookieValue}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${ONE_YEAR_IN_SECONDS}`,
+  );
+  headers.append(
+    "Set-Cookie",
+    await createSkillPreferencesSetCookie(
+      request,
+      clientId,
+      skills,
+      cookieSecret,
+    ),
+  );
 
   return { state, headers, skills };
 }

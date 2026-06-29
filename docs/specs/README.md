@@ -3,7 +3,6 @@
 This directory contains detailed specifications for features in the Sentry MCP
 server. Each spec should live in a single Markdown file under `docs/specs/`.
 
-
 ## Purpose
 
 Feature specifications serve to:
@@ -25,8 +24,8 @@ When adding a new feature specification:
    - Interface definitions (with code examples)
    - Key constraints and requirements
    - Migration/compatibility concerns
-3. Update this README with a brief description
-4. Link to the spec from relevant documentation
+3. Link to the spec from relevant documentation when there is a natural place
+   to reference it
 
 **Important Guidelines**:
 - Keep specs in a single file under `docs/specs/`
@@ -35,21 +34,6 @@ When adding a new feature specification:
 - Document constraints and meta concerns
 - Avoid implementation details (no function internals, prompts, etc.)
 - Think "contract" not "blueprint"
-
-## Current Specifications
-
-### [embedded-agent-openai-routing](./embedded-agent-openai-routing.md)
-A spec for splitting generic `openai` from explicit `azure-openai` embedded
-agent behavior so Azure compatibility no longer depends on hidden heuristics.
-
-- **Status**: 📝 Proposed
-- **Key Benefits**: Preserves Azure compatibility, keeps unknown OpenAI-compatible providers predictable, and removes alias-based footguns
-
-### [search-events](./search-events.md)
-A unified event search tool that uses OpenAI GPT-5 to translate natural language queries into Sentry's search syntax. Replaced the separate `find_errors` and `find_transactions` tools with a single, more powerful interface.
-
-- **Status**: ✅ Complete
-- **Key Benefits**: Reduces tool count (20→19), improves UX, accessible to non-technical users
 
 ## Specification Template
 

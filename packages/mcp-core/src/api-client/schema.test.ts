@@ -15,6 +15,7 @@ import {
   FlamegraphSchema,
   IssueSchema,
   IssueTagValuesSchema,
+  ProfileChunkResponseSchema,
   ProfileChunkSampleSchema,
   ProfileChunkSchema,
   ProfileFrameSchema,
@@ -750,6 +751,107 @@ describe("FlamegraphSchema", () => {
     expect(flamegraph.profiles[0]?.sample_durations_ns).toEqual([]);
     expect(flamegraph.profiles[0]?.sample_counts).toEqual([]);
   });
+
+  it("parses sparse empty flamegraph responses so tools can return no-data output", () => {
+    const flamegraph = FlamegraphSchema.parse({
+      metadata: {
+        platform: "javascript",
+        projectID: 1,
+        transactionName: "POST /checkout",
+      },
+    });
+
+    expect(flamegraph.platform).toBe("javascript");
+    expect(flamegraph.projectID).toBe(1);
+    expect(flamegraph.transactionName).toBe("POST /checkout");
+    expect(flamegraph.profiles).toEqual([]);
+    expect(flamegraph.shared.frames).toEqual([]);
+    expect(flamegraph.shared.frame_infos).toEqual([]);
+    expect(flamegraph.shared.profiles).toEqual([]);
+  });
+
+  it("parses continuous profile references returned in aggregate flamegraphs", () => {
+    const flamegraph = FlamegraphSchema.parse({
+      platform: "javascript",
+      projectID: 1,
+      profiles: [],
+      shared: {
+        frames: [],
+        profiles: [
+          {
+            project_id: 1,
+            profiler_id: "041bde57b9844e36b8b7e5734efae5f7",
+            chunk_id: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+            thread_id: "12345",
+            start: "1710958503629000000",
+            end: "1710958504629000000",
+            transaction_id: null,
+          },
+        ],
+      },
+    });
+
+    expect(flamegraph.shared.profiles).toHaveLength(1);
+    expect(flamegraph.shared.profiles[0]).toMatchObject({
+      project_id: 1,
+      profiler_id: "041bde57b9844e36b8b7e5734efae5f7",
+      chunk_id: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+      thread_id: "12345",
+      start: "1710958503629000000",
+      end: "1710958504629000000",
+      transaction_id: null,
+    });
+  });
+
+  it("parses fallback continuous profile references without optional timing or thread fields", () => {
+    const flamegraph = FlamegraphSchema.parse({
+      platform: "javascript",
+      projectID: 1,
+      profiles: [],
+      shared: {
+        frames: [],
+        profiles: [
+          {
+            project_id: 1,
+            profiler_id: "041bde57b9844e36b8b7e5734efae5f7",
+            chunk_id: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+          },
+        ],
+      },
+    });
+
+    expect(flamegraph.shared.profiles).toHaveLength(1);
+    expect(flamegraph.shared.profiles[0]).toMatchObject({
+      project_id: 1,
+      profiler_id: "041bde57b9844e36b8b7e5734efae5f7",
+      chunk_id: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+    });
+  });
+
+  it("parses upstream frame infos without weight and string profile references", () => {
+    const flamegraph = FlamegraphSchema.parse({
+      platform: "javascript",
+      projectID: 1,
+      profiles: [],
+      shared: {
+        frames: [],
+        frame_infos: [
+          {
+            count: 3,
+            sumDuration: 42,
+            sumSelfTime: 12,
+            p75Duration: 20,
+            p95Duration: 30,
+            p99Duration: 40,
+          },
+        ],
+        profiles: ["transaction-profile-id"],
+      },
+    });
+
+    expect(flamegraph.shared.frame_infos[0]?.weight).toBe(42);
+    expect(flamegraph.shared.profiles[0]).toBe("transaction-profile-id");
+  });
 });
 
 describe("ProfileChunkSampleSchema", () => {
@@ -867,7 +969,7 @@ describe("profile fixtures", () => {
     // profile-chunk.json mirrors the continuous profiler output: string
     // thread_id, absolute timestamp per sample, no transaction block.
     const chunk = ProfileChunkSchema.parse(
-      structuredClone(profileChunkFixture.chunks[0]),
+      structuredClone(profileChunkFixture.chunk),
     );
 
     expect(
@@ -880,6 +982,42 @@ describe("profile fixtures", () => {
         (sample) => typeof sample.timestamp === "number",
       ),
     ).toBe(true);
+  });
+
+  it("parses continuous profile thread metadata entries without names", () => {
+    const chunk = ProfileChunkSchema.parse({
+      ...structuredClone(profileChunkFixture.chunk),
+      profile: {
+        ...structuredClone(profileChunkFixture.chunk.profile),
+        thread_metadata: {
+          "1": { priority: 10 },
+        },
+      },
+    });
+
+    expect(chunk.profile.thread_metadata["1"]?.priority).toBe(10);
+  });
+
+  it("parses Sentry's singular profile chunk response wrapper", () => {
+    const response = ProfileChunkResponseSchema.parse(
+      structuredClone(profileChunkFixture),
+    );
+
+    expect(response.chunks).toHaveLength(1);
+    expect(response.chunks[0]?.chunk_id).toBe(
+      profileChunkFixture.chunk.chunk_id,
+    );
+  });
+
+  it("still parses the legacy plural profile chunk response wrapper", () => {
+    const response = ProfileChunkResponseSchema.parse({
+      chunks: [structuredClone(profileChunkFixture.chunk)],
+    });
+
+    expect(response.chunks).toHaveLength(1);
+    expect(response.chunks[0]?.chunk_id).toBe(
+      profileChunkFixture.chunk.chunk_id,
+    );
   });
 });
 

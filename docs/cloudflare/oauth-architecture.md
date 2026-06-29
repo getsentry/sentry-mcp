@@ -190,7 +190,9 @@ interface WorkerProps {
   id: string;                    // Sentry user ID
   accessToken: string;            // Sentry access token
   refreshToken?: string;          // Sentry refresh token
-  accessTokenExpiresAt?: number;  // Sentry token expiry timestamp
+  accessTokenExpiresAt?: number;  // Cached validity deadline; extended after probes
+  sessionStartedAt?: number;      // MCP grant creation timestamp
+  upstreamExpiresAt?: number;     // Original Sentry expiry timestamp
   clientId: string;               // MCP client ID
   scope: string;                  // MCP permissions granted
   grantedSkills?: string[];       // Skills granted (primary authorization)
@@ -241,6 +243,8 @@ const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
     accessToken: payload.access_token,       // Sentry's access token
     refreshToken: payload.refresh_token,     // Sentry's refresh token
     accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
+    sessionStartedAt: Date.now(),
+    upstreamExpiresAt: Date.now() + payload.expires_in * 1000,
     clientId: oauthReqInfo.clientId,         // MCP client ID
     scope: oauthReqInfo.scope.join(" "),     // MCP scopes
     grantedSkills: Array.from(validSkills),  // Skills granted (primary authorization)

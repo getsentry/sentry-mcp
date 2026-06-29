@@ -1,4 +1,9 @@
-import { autofixStateFixture, mswServer } from "@sentry/mcp-server-mocks";
+import {
+  autofixStateFixture,
+  createRegressedIssue,
+  createUnsupportedIssue,
+  mswServer,
+} from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import analyzeIssueWithSeer from "./analyze-issue-with-seer.js";
@@ -6,6 +11,15 @@ import analyzeIssueWithSeer from "./analyze-issue-with-seer.js";
 describe("analyze_issue_with_seer", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    mswServer.use(
+      http.get("*/api/0/organizations/:org/issues/:issueId/", ({ params }) =>
+        HttpResponse.json(
+          createUnsupportedIssue({
+            shortId: String(params.issueId),
+          }),
+        ),
+      ),
+    );
   });
 
   afterEach(() => {
@@ -408,6 +422,45 @@ describe("analyze_issue_with_seer", () => {
     expect(result).toContain("Starting new analysis...");
     expect(result).toContain("Analysis started with Run ID: 123");
     expect(result).toContain("## Analysis Complete");
+  });
+
+  it("returns unsupported message for metric issues without calling Seer", async () => {
+    let autofixRequests = 0;
+
+    mswServer.use(
+      http.get(
+        "*/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/",
+        () => HttpResponse.json(createRegressedIssue()),
+      ),
+      http.get(
+        "*/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/autofix/",
+        () => {
+          autofixRequests++;
+          return HttpResponse.json({ autofix: null });
+        },
+      ),
+    );
+
+    const result = await analyzeIssueWithSeer.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        issueId: "MCP-SERVER-EQE",
+        instruction: undefined,
+      },
+      {
+        constraints: {
+          organizationSlug: undefined,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    expect(autofixRequests).toBe(0);
+    expect(result).toContain("Seer Analysis Not Available");
+    expect(result).toContain("metric");
+    expect(result).toContain("search_events");
   });
 
   it("rejects issues outside the active project constraint", async () => {

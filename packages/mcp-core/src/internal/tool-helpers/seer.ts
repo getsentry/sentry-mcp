@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AutofixRunState } from "../../api-client/index";
+import type { Issue } from "../../api-client/types";
 
 type AutofixRun = NonNullable<AutofixRunState["autofix"]>;
 
@@ -7,6 +8,43 @@ export const SEER_POLLING_INTERVAL = 5000; // 5 seconds
 export const SEER_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 export const SEER_MAX_RETRIES = 3; // Maximum retries for transient failures
 export const SEER_INITIAL_RETRY_DELAY = 1000; // 1 second initial retry delay
+
+/**
+ * Seer Autofix only supports error-style issues today. Metric alert issues
+ * (issueCategory "metric" / issueType "metric_issue") are not supported.
+ */
+export function isSeerSupportedIssue(
+  issue: Pick<Issue, "issueCategory" | "issueType">,
+): boolean {
+  if (issue.issueCategory === "metric") {
+    return false;
+  }
+  if (issue.issueType === "metric_issue") {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Format user-facing guidance when Seer cannot analyze the issue type.
+ */
+export function getSeerUnsupportedIssueMessage(
+  issue: Pick<Issue, "shortId" | "issueCategory" | "issueType">,
+): string {
+  const category = issue.issueCategory ?? "metric";
+  const typeLabel = issue.issueType ?? category;
+
+  return [
+    `# Seer Analysis Not Available for Issue ${issue.shortId}`,
+    "",
+    `Seer Autofix does not support **${typeLabel}** issues (${category} category).`,
+    "",
+    "**Suggested alternatives:**",
+    "- Use `get_issue_details` or `get_sentry_resource` to inspect the metric alert rule and threshold details",
+    "- Use `search_issues` to find related error issues that may explain the metric spike",
+    "- Use `search_events` to query the underlying metric data",
+  ].join("\n");
+}
 
 export function getStatusDisplayName(status: string): string {
   switch (status) {
@@ -148,7 +186,9 @@ function formatSolutionArtifact(data: unknown): string | null {
   }
   if (steps.length > 0) {
     sections.push(
-      steps.map((step) => `- **${step.title}**: ${step.description}`).join("\n"),
+      steps
+        .map((step) => `- **${step.title}**: ${step.description}`)
+        .join("\n"),
     );
   }
   return sections.length > 0 ? sections.join("\n\n") : null;
@@ -207,9 +247,7 @@ export function getAutofixArtifactSummaries(autofix: AutofixRun): {
   solution: string | null;
 } {
   const artifacts = getAutofixArtifacts(autofix);
-  const rootCause = RootCauseArtifactDataSchema.safeParse(
-    artifacts.root_cause,
-  );
+  const rootCause = RootCauseArtifactDataSchema.safeParse(artifacts.root_cause);
   const solution = SolutionArtifactDataSchema.safeParse(artifacts.solution);
   return {
     rootCause:

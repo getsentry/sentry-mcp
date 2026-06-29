@@ -9,7 +9,11 @@ import type {
   MonitorStat,
 } from "../../api-client/types";
 import type { ServerContext } from "../../types";
-import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+import {
+  ParamOrganizationSlug,
+  ParamPeriod,
+  ParamRegionUrl,
+} from "../../schema";
 import { isNumericId, validateSlugOrId } from "../../utils/slug-validation";
 import {
   compactLines,
@@ -81,7 +85,7 @@ export default defineTool({
     "",
     "<examples>",
     "get_monitor_details(organizationSlug='my-organization', monitorSlug='nightly-import')",
-    "get_monitor_details(organizationSlug='my-organization', monitorSlug='nightly-import', projectSlugOrId='backend', environment='production', statsPeriod='7d')",
+    "get_monitor_details(organizationSlug='my-organization', monitorSlug='nightly-import', projectSlugOrId='backend', environment='production', period='7d')",
     "</examples>",
   ].join("\n"),
   inputSchema: {
@@ -106,19 +110,16 @@ export default defineTool({
       )
       .nullable()
       .default(null),
-    statsPeriod: z
-      .string()
-      .trim()
-      .describe(
-        "Relative time range, such as `24h`, `7d`, or `14d`. Defaults to `24h` when `start` and `end` are omitted.",
-      )
+    period: ParamPeriod.describe(
+      "Relative time range. Defaults to `24h` when `start` and `end` are omitted.",
+    )
       .nullable()
       .default(null),
     start: z
       .string()
       .datetime()
       .describe(
-        "Absolute start time. Must be provided with `end`; do not combine with `statsPeriod`.",
+        "Absolute start time. Must be provided with `end`; do not combine with `period`.",
       )
       .nullable()
       .default(null),
@@ -126,7 +127,7 @@ export default defineTool({
       .string()
       .datetime()
       .describe(
-        "Absolute end time. Must be provided with `start`; do not combine with `statsPeriod`.",
+        "Absolute end time. Must be provided with `start`; do not combine with `period`.",
       )
       .nullable()
       .default(null),
@@ -200,15 +201,15 @@ export default defineTool({
       throw new UserInputError("`start` and `end` must be provided together.");
     }
     const hasAbsoluteTimeRange = start !== undefined || end !== undefined;
-    const requestedStatsPeriod = params.statsPeriod?.trim() || undefined;
-    if (hasAbsoluteTimeRange && requestedStatsPeriod) {
+    const requestedPeriod = params.period?.trim() || undefined;
+    if (hasAbsoluteTimeRange && requestedPeriod) {
       throw new UserInputError(
-        "`statsPeriod` cannot be combined with `start` and `end`.",
+        "`period` cannot be combined with `start` and `end`.",
       );
     }
     const statsPeriod = hasAbsoluteTimeRange
       ? undefined
-      : (requestedStatsPeriod ?? "24h");
+      : (requestedPeriod ?? "24h");
 
     const monitor = await apiService.getMonitorDetails({
       organizationSlug,
