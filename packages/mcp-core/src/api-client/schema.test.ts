@@ -656,10 +656,14 @@ describe("TraceMetaSchema", () => {
 });
 
 describe("AutofixRunSchema", () => {
-  it("accepts the numeric run_id returned by the autofix POST endpoint", () => {
-    const run = AutofixRunSchema.parse({ run_id: 123 });
+  it("accepts the run_id + sentry_run_id returned by the autofix POST endpoint", () => {
+    const run = AutofixRunSchema.parse({
+      run_id: 123,
+      sentry_run_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    });
 
     expect(run.run_id).toBe(123);
+    expect(run.sentry_run_id).toBe("f47ac10b-58cc-4372-a567-0e02b2c3d479");
   });
 });
 

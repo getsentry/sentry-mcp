@@ -259,7 +259,7 @@ describe("fetchCustomAttributes", () => {
         ),
       );
 
-      // Should throw ApiPermissionError with the improved error message
+      // Should throw ApiPermissionError with the improved error message.
       await expect(
         fetchCustomAttributes(apiService, "test-org", "spans"),
       ).rejects.toThrow(
@@ -282,7 +282,7 @@ describe("fetchCustomAttributes", () => {
         ),
       );
 
-      // Should throw ApiPermissionError with the raw error message
+      // Should throw ApiPermissionError with the API detail message.
       await expect(
         fetchCustomAttributes(apiService, "test-org", "logs", "project-123"),
       ).rejects.toThrow("Permission denied");
@@ -360,9 +360,11 @@ describe("fetchCustomAttributes", () => {
         ),
       );
 
+      // The SDK wraps network errors — the context prefix is added by unwrapSdkResult.
+      // Attributes are fetched in a single request, so the context has no type suffix.
       await expect(
         fetchCustomAttributes(apiService, "test-org", "spans"),
-      ).rejects.toThrow("Network error: ETIMEDOUT");
+      ).rejects.toThrow("listTraceItemAttributes:");
     });
   });
 

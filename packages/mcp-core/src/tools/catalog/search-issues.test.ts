@@ -444,6 +444,7 @@ describe("search_issues", () => {
     mswServer.use(
       http.get("*/api/0/organizations/*/issues/", ({ request }) => {
         const url = new URL(request.url);
+        // The SDK sends `limit` (not `per_page`) for this endpoint
         const limit = url.searchParams.get("limit");
         expect(limit).toBe("25");
         return HttpResponse.json([]);
