@@ -40,28 +40,6 @@ export default function Footer({ isChatOpen }: { isChatOpen: boolean }) {
             </div>
           </a>
           <a
-            href="https://docs.sentry.io/product/sentry-mcp/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="relative hover:underline opacity-80 hover:opacity-100 group/link"
-          >
-            <div className="absolute inset-0 size-full text-violet-500 group-hover/link:opacity-50 group-hover/link:delay-0 delay-300">
-              Sentry Docs
-            </div>
-            <div
-              className="absolute inset-0 size-full group-hover/link:opacity-50 group-hover/link:delay-0 duration-300 motion-safe:group-hover/link:translate-y-1"
-              aria-hidden="true"
-            >
-              Sentry Docs
-            </div>
-            <div
-              className="perspective-distant transform-3d duration-300 motion-safe:group-hover/link:translate-y-2"
-              role="presentation"
-            >
-              Sentry Docs
-            </div>
-          </a>
-          <a
             href="https://discord.com/invite/sentry"
             target="_blank"
             rel="noopener noreferrer"
