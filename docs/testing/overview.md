@@ -267,27 +267,21 @@ expect(result.timestamp).toMatchInlineSnapshot(); // ❌
 ### Eval Test Structure
 
 ```typescript
-import { describeEval } from "vitest-evals";
-import { TaskRunner, Factuality } from "./utils";
+import { defineMcpToolCallEval } from "./utils";
 
-describeEval("tool-name", {
-  data: async () => [
-    {
-      input: "Natural language request",
-      expected: "Expected response content"
-    }
-  ],
-  task: TaskRunner(),      // Uses AI to call tools
-  scorers: [Factuality()], // Validates output
-  threshold: 0.6,
-  timeout: 30000
-});
+defineMcpToolCallEval("tool-name", [
+  {
+    input: "Natural language request",
+    expectedTools: [{ name: "find_organizations", arguments: {} }],
+  },
+]);
 ```
 
 ### Running Evals
 
 ```bash
-# Requires OPENAI_API_KEY in .env
+# Requires an embedded-agent provider in .env, such as
+# EMBEDDED_AGENT_PROVIDER=openrouter and OPENROUTER_API_KEY
 pnpm eval
 
 # Run specific eval
@@ -327,12 +321,12 @@ function createTestIssues(count: number) {
 ### Timeout Configuration
 
 ```typescript
-it("handles large datasets", async () => {
-  const largeDataset = createTestIssues(1000);
-  
-  const result = await handler(mockContext, params);
-  expect(result).toBeDefined();
-}, { timeout: 10000 }); // 10 second timeout
+// vitest.config.ts
+export default defineConfig({
+  test: {
+    testTimeout: 10000,
+  },
+});
 ```
 
 ### Memory Testing

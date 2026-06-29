@@ -676,12 +676,12 @@ sentry-mcp --access-token=TOKEN
 
 ```bash
 # Using nvm
-nvm install 20
-nvm use 20
+nvm install 22.13
+nvm use 22.13
 pnpm start --access-token=TOKEN
 
-nvm install 22
-nvm use 22
+nvm install 24
+nvm use 24
 pnpm start --access-token=TOKEN
 ```
 

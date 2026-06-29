@@ -3,7 +3,9 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["**/*.eval.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+    include: ["src/**/*.eval.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+    fileParallelism: false,
+    testTimeout: 60000,
     reporters: ["vitest-evals/reporter"],
     coverage: {
       provider: "v8",

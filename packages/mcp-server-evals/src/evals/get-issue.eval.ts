@@ -1,55 +1,36 @@
-import { describeEval, ToolCallScorer } from "vitest-evals";
-import { FIXTURES, McpToolCallTaskRunner } from "./utils";
+import { FIXTURES, defineMcpToolCallEval } from "./utils";
 
-describeEval("get-issue", {
-  data: async () => {
-    return [
-      {
-        input: `Explain CLOUDFLARE-MCP-41 from Sentry in ${FIXTURES.organizationSlug}.`,
-        expectedTools: [
-          {
-            name: "search_sentry_tools",
-            arguments: {
-              query: "issue",
-            },
+defineMcpToolCallEval(
+  "get-issue",
+  [
+    {
+      input: `Explain CLOUDFLARE-MCP-41 from Sentry in ${FIXTURES.organizationSlug}.`,
+      expectedTools: [
+        {
+          name: "get_sentry_resource",
+          arguments: {
+            resourceType: "issue",
+            organizationSlug: FIXTURES.organizationSlug,
+            resourceId: "CLOUDFLARE-MCP-41",
           },
-          {
-            name: "execute_sentry_tool",
-            arguments: {
-              name: "get_issue_details",
-              arguments: {
-                organizationSlug: FIXTURES.organizationSlug,
-                issueId: "CLOUDFLARE-MCP-41",
-              },
-            },
+        },
+      ],
+    },
+    {
+      input: `Explain the event with ID 7ca573c0f4814912aaa9bdc77d1a7d51 from Sentry in ${FIXTURES.organizationSlug}.`,
+      expectedTools: [
+        {
+          name: "get_sentry_resource",
+          arguments: {
+            resourceType: "event",
+            organizationSlug: FIXTURES.organizationSlug,
+            resourceId: "7ca573c0f4814912aaa9bdc77d1a7d51",
           },
-        ],
-      },
-      {
-        input: `Explain the event with ID 7ca573c0f4814912aaa9bdc77d1a7d51 from Sentry in ${FIXTURES.organizationSlug}.`,
-        expectedTools: [
-          {
-            name: "search_sentry_tools",
-            arguments: {
-              query: "issue",
-            },
-          },
-          {
-            name: "execute_sentry_tool",
-            arguments: {
-              name: "get_issue_details",
-              arguments: {
-                organizationSlug: FIXTURES.organizationSlug,
-                eventId: "7ca573c0f4814912aaa9bdc77d1a7d51",
-              },
-            },
-          },
-        ],
-      },
-    ];
+        },
+      ],
+    },
+  ],
+  {
+    toolCall: { ordered: true, params: "fuzzy" },
   },
-  task: McpToolCallTaskRunner(),
-  scorers: [ToolCallScorer({ ordered: true, params: "fuzzy" })],
-  threshold: 0.6,
-  timeout: 90000,
-});
+);

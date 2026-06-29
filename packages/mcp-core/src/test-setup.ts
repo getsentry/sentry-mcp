@@ -16,7 +16,7 @@ config({ path: path.resolve(__dirname, "../.env") });
 // Load root .env second (for shared defaults - won't override local or shell vars)
 config({ path: path.join(rootDir, ".env") });
 
-startMockServer({ ignoreOpenAI: true });
+startMockServer({ ignoreLLMProviderRequests: true });
 
 /**
  * Creates a ServerContext for testing with default values and optional overrides.

@@ -271,18 +271,20 @@ See [api-patterns.md](api-patterns.md#mock-patterns) for validation examples.
 **⚠️ Each eval costs time and API credits. Only test core functionality!**
 
 ```typescript
-describeEval("your-tool", {
-  data: async () => [
-    {
-      input: `Primary use case in ${FIXTURES.organizationSlug}`,
-      expected: "Expected response"
-    },
-    // Maximum 2-3 scenarios!
-  ],
-  task: TaskRunner(),
-  scorers: [Factuality()],
-  threshold: 0.6,
-});
+import { FIXTURES, defineToolPredictionEval } from "./utils";
+
+defineToolPredictionEval("your-tool", [
+  {
+    input: `Primary use case in ${FIXTURES.organizationSlug}`,
+    expectedTools: [
+      {
+        name: "your_sentry_tool",
+        arguments: { organizationSlug: FIXTURES.organizationSlug },
+      },
+    ],
+  },
+  // Maximum 2-3 scenarios!
+]);
 ```
 
 ## Testing Workflow
