@@ -78,11 +78,16 @@ program
         dsn: sentryDsn,
         sendDefaultPii: true,
         tracesSampleRate: 1,
+        traceLifecycle: "stream",
         beforeSend: sentryBeforeSend,
         initialScope: {
           tags: {
             "gen_ai.agent.name": "sentry-mcp-agent",
             "gen_ai.provider.name": agentProvider ?? "unknown",
+          },
+          attributes: {
+            "gen_ai.agent.name": "sentry-mcp-agent",
+            "gen_ai.provider.name": "openai",
           },
         },
         release: process.env.SENTRY_RELEASE,

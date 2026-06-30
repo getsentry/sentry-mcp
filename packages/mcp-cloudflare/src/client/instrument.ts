@@ -9,7 +9,10 @@ Sentry.init({
   beforeSend: sentryBeforeSend,
   environment:
     import.meta.env.VITE_SENTRY_ENVIRONMENT ?? import.meta.env.NODE_ENV,
-  integrations: [Sentry.browserTracingIntegration()],
+  integrations: [
+    Sentry.spanStreamingIntegration(),
+    Sentry.browserTracingIntegration(),
+  ],
 });
 
 resolveAttribution();

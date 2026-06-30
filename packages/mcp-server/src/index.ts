@@ -280,9 +280,18 @@ async function main() {
     dsn: cfg.sentryDsn,
     sendDefaultPii: true,
     tracesSampleRate: 1,
+    traceLifecycle: "stream",
     beforeSend: sentryBeforeSend,
     initialScope: {
       tags: {
+        "app.server.version": LIB_VERSION,
+        "app.transport": "stdio",
+        "app.server.mode.agent": cli.agent ? "true" : "false",
+        "app.server.mode.experimental": cli.experimental ? "true" : "false",
+        "app.upstream.host": cfg.sentryHost,
+        "app.url.full": cfg.mcpUrl,
+      },
+      attributes: {
         "app.server.version": LIB_VERSION,
         "app.transport": "stdio",
         "app.server.mode.agent": cli.agent ? "true" : "false",
