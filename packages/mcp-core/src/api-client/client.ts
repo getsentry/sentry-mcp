@@ -79,6 +79,7 @@ import {
   ReplayRecordingSegmentsSchema,
   AIConversationSummaryListSchema,
   AIConversationSpanListSchema,
+  UserReportListSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
 import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
@@ -130,6 +131,7 @@ import type {
   ReplayRecordingSegments,
   AIConversationSummary,
   AIConversationSpanList,
+  UserReportList,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
@@ -3138,6 +3140,24 @@ export class SentryApiService {
       opts,
     );
     return ExternalIssueListSchema.parse(body);
+  }
+
+  async getIssueUserReports(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<UserReportList> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/user-reports/`,
+      undefined,
+      opts,
+    );
+    return UserReportListSchema.parse(body);
   }
 
   async getEventForIssue(

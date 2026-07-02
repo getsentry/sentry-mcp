@@ -114,6 +114,7 @@ import type {
   TransactionProfileSchema,
   UnknownEventSchema,
   UserSchema,
+  UserReportListSchema,
 } from "./schema";
 
 export type User = z.infer<typeof UserSchema>;
@@ -224,3 +225,6 @@ export type IssueTagValues = z.infer<typeof IssueTagValuesSchema>;
 // External issue links (Jira, GitHub, etc.)
 export type ExternalIssue = z.infer<typeof ExternalIssueSchema>;
 export type ExternalIssueList = z.infer<typeof ExternalIssueListSchema>;
+
+// User Report
+export type UserReportList = z.infer<typeof UserReportListSchema>;
