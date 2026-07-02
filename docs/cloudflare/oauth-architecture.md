@@ -86,6 +86,7 @@ sequenceDiagram
 | **MCP Refresh Token** | MCP OAuth Provider | MCP Clients | Grant reference | Refresh MCP access tokens |
 | **Sentry Access Token** | Sentry OAuth | MCP Server | User credentials | Call Sentry API |
 | **Sentry Refresh Token** | Sentry OAuth | MCP OAuth Provider | Refresh credentials | Refresh Sentry tokens |
+| **Explicit Sentry API Token** | External client or provider | MCP Server | Opaque Sentry API token | Direct remote auth with `Sentry-Bearer` |
 
 ### Not a Simple Proxy
 
@@ -370,6 +371,29 @@ When a constrained OAuth request includes `resource=/mcp/{org}` or
 user as a "Session scope" banner before permissions are granted.
 
 Note: These describe the MCP OAuth server, not Sentry's OAuth endpoints.
+
+## Direct Sentry-Bearer Mode
+
+Cloudflare `/mcp` also supports an explicit upstream Sentry API token:
+
+```http
+Authorization: Sentry-Bearer <sentry_api_token>
+```
+
+This is not part of the dual OAuth flow. The worker handles the request before
+the MCP OAuth provider, builds `ServerContext` with the provided token, and uses
+the same Sentry API client calls as OAuth-backed sessions.
+
+Direct mode intentionally does not:
+
+- validate the token before initializing the MCP server
+- store the token in KV
+- mint or refresh MCP OAuth tokens
+- refresh upstream Sentry tokens
+- revoke MCP grants when Sentry rejects the upstream token
+
+The caller owns token lifetime and refresh. `Authorization: Bearer ...` remains
+reserved for MCP OAuth access tokens.
 
 ## Integration Between MCP OAuth and MCP Server
 

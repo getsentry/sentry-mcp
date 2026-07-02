@@ -30,13 +30,33 @@ import {
 } from "@sentry/mcp-server-mocks/payloads";
 
 // Sentry hosts to mock
-const SENTRY_HOSTS = ["https://sentry.io", "https://us.sentry.io"];
+const SENTRY_HOSTS = [
+  "https://sentry.io",
+  "https://us.sentry.io",
+  "https://direct-token.test",
+];
+
+export const DIRECT_AUTH_ASSERTION_TOKEN = "sntryu_assert-direct-token";
 
 // Standard JSON response headers
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 function normalizeQuery(query: string | null): string | null {
   return query ? query.split(" ").sort().join(" ") : query;
+}
+
+function getMockRequestHeader(
+  headers: Headers | Record<string, string> | undefined,
+  name: string,
+): string | null {
+  if (!headers) {
+    return null;
+  }
+  if ("get" in headers && typeof headers.get === "function") {
+    return headers.get(name);
+  }
+
+  return headers[name] ?? headers[name.toLowerCase()] ?? null;
 }
 
 const VALID_ERROR_EVENT_QUERIES = new Set<string | null>(
@@ -103,6 +123,31 @@ export function registerFetchMockInterceptors(fetchMock: FetchMockLike) {
           { regions: [{ name: "us", url: "https://us.sentry.io" }] },
           { headers: JSON_HEADERS },
         )
+        .persist();
+    }
+
+    if (host === "https://direct-token.test") {
+      pool
+        .intercept({ path: "/api/0/auth/" })
+        .reply((req) => {
+          const authorization = getMockRequestHeader(
+            req.headers,
+            "authorization",
+          );
+          if (authorization !== `Bearer ${DIRECT_AUTH_ASSERTION_TOKEN}`) {
+            return {
+              statusCode: 401,
+              data: { detail: "Unexpected direct-token Authorization header" },
+              responseOptions: { headers: JSON_HEADERS },
+            };
+          }
+
+          return {
+            statusCode: 200,
+            data: userFixture,
+            responseOptions: { headers: JSON_HEADERS },
+          };
+        })
         .persist();
     }
 

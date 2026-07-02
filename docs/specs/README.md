@@ -3,6 +3,15 @@
 This directory contains detailed specifications for features in the Sentry MCP
 server. Each spec should live in a single Markdown file under `docs/specs/`.
 
+## Specs
+
+- [AI Conversations](ai-conversations.md)
+- [Embedded Agent OpenAI Routing](embedded-agent-openai-routing.md)
+- [Remembered OAuth Skill Defaults](remembered-oauth-skills.md)
+- [Search Events](search-events.md)
+- [Sentry-Bearer Cloudflare Auth](sentry-bearer-cloudflare-auth.md)
+- [Subpath Constraints](subpath-constraints.md)
+
 ## Purpose
 
 Feature specifications serve to:

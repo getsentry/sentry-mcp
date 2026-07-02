@@ -6,7 +6,7 @@ import {
 import { resolveClientFamily } from "./lib/client-family";
 import type { OAuthErrorTelemetry } from "./oauth/telemetry";
 
-export type RateLimitScope = "ip" | "user";
+export type RateLimitScope = "ip" | "user" | "sentry-token";
 type ResponseReason = "local_rate_limit";
 
 type TrackedRoute = {
@@ -261,7 +261,9 @@ export function extractResponseMetricOptions(
     responseReason:
       responseReason === "local_rate_limit" ? responseReason : undefined,
     rateLimitScope:
-      rateLimitScope === "ip" || rateLimitScope === "user"
+      rateLimitScope === "ip" ||
+      rateLimitScope === "user" ||
+      rateLimitScope === "sentry-token"
         ? rateLimitScope
         : undefined,
   };

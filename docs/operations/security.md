@@ -4,7 +4,7 @@ Authentication and security patterns for the Sentry MCP server.
 
 ## Remote HTTP Auth Model
 
-The remote HTTP deployment uses two separate authorization layers:
+The default remote HTTP deployment uses two separate authorization layers:
 
 ```
 MCP Client → MCP OAuth (our server) → Sentry OAuth → Sentry API
@@ -14,7 +14,20 @@ This is not just "OAuth to Sentry, then proxy requests back." The Cloudflare
 deployment issues its own MCP access token to the client, and that token wraps
 the upstream Sentry credentials the server needs to make API calls.
 
+There is also an explicit direct-token mode for trusted clients that already
+manage an upstream Sentry API token:
+
+```http
+Authorization: Sentry-Bearer <sentry_api_token>
+```
+
+That mode bypasses MCP OAuth. The token is not stored, exchanged, refreshed, or
+pre-validated by the worker; it is passed through as the upstream Sentry API
+token for the request.
+
 ### Two Distinct Tokens
+
+For OAuth-backed remote sessions, there are two distinct tokens:
 
 1. **Upstream Sentry token**
    - Issued by Sentry's OAuth server
@@ -92,6 +105,10 @@ Today, runtime authorization for remote HTTP sessions is driven primarily by:
 `grantedScopes` still exists on tokens for backward compatibility with older
 clients, but it is transitional. Skills are the primary authorization model.
 
+Direct `Sentry-Bearer` sessions default to all active skills and can be narrowed
+with `skills` or `disable-skills` query parameters. They do not get OAuth
+consent-screen skill selection.
+
 ## Security Model
 
 The remote deployment intentionally separates trust boundaries:
@@ -119,6 +136,11 @@ The remote deployment intentionally separates trust boundaries:
 3. **Each session can be path-scoped**: `/mcp/:org` and `/mcp/:org/:project` produce tokens that only work for that scoped MCP URL.
 4. **Refresh does not widen access**: MCP refresh reuses the same stored grant props and does not ask Sentry for broader permissions.
 5. **Stale or invalid grants fail closed**: missing props, invalid skills, or rejected upstream tokens are revoked or require re-authentication. Already-issued Cloudflare grants with the old `preprod` skill are treated as `inspect`.
+
+For direct `Sentry-Bearer` sessions, the client intentionally provides the raw
+Sentry token. The worker still enforces MCP tool exposure and passes URL
+constraints into tool context, but token lifetime, refresh, and revocation are
+owned by the caller and upstream Sentry API behavior.
 
 ## OAuth Architecture
 

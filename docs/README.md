@@ -61,6 +61,7 @@ canonical workflow and required docs live in [../AGENTS.md](../AGENTS.md)
 - [specs/embedded-agent-openai-routing.md](specs/embedded-agent-openai-routing.md) - Embedded agent OpenAI routing spec
 - [specs/remembered-oauth-skills.md](specs/remembered-oauth-skills.md) - Remembered OAuth skill defaults spec
 - [specs/search-events.md](specs/search-events.md) - Search Events spec
+- [specs/sentry-bearer-cloudflare-auth.md](specs/sentry-bearer-cloudflare-auth.md) - Direct Sentry token auth for the Cloudflare transport
 - [specs/subpath-constraints.md](specs/subpath-constraints.md) - Subpath constraints spec
 
 ### Releases
