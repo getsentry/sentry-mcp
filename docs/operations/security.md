@@ -226,6 +226,34 @@ if (!issueUrl.includes('sentry.io')) {
 const validatedHost = validateRegionUrl(regionUrl, baseHost);
 ```
 
+### Indirect Prompt Injection (Agentic Surfaces)
+
+The mitigations above address *direct* injection through tool inputs. A separate
+risk is *indirect* injection: an LLM reads attacker-influenceable Sentry content
+(issue titles, exception values, culprits, comments, metadata) and, in the same
+loop, holds tools that can act. Injected text in that content can steer the model
+into taking actions the user never requested. A system prompt is not a boundary
+here; treat all tool output as untrusted data.
+
+The affected surfaces are the `use_sentry` embedded agent and the Cloudflare
+`/chat` demo. The enforced controls are:
+
+1. **Read-only by default (code-enforced, not prompt-based).** Both surfaces
+   expose only tools annotated `readOnlyHint: true`. `use_sentry` filters its
+   toolset in the handler; `/chat` filters via `getReadOnlyToolNames()`. Because
+   write tools are never loaded, injected content cannot call them.
+2. **Gate on `readOnlyHint`, not `destructiveHint`.** Additive creates
+   (`add_issue_note`, `create_dsn`, ...) are writes but declare
+   `destructiveHint: false`, so a read-only allowlist is the correct gate. Hint
+   accuracy is enforced by the required `annotations` type and `tools.test.ts`.
+3. **Writes require a trusted-caller opt-in.** `use_sentry` enables write tools
+   only when `ServerContext.allowEmbeddedAgentWrites` is set by the transport/host,
+   never via a model-supplied parameter. This prevents an injected
+   `use_sentry(...)` call in `/chat` from re-opening the write path.
+
+When adding any new agent or demo surface, keep it read-only by default and gate
+writes behind an out-of-band trusted signal.
+
 ### State Parameter Protection
 
 The OAuth `state` is a compact HMAC-signed payload with a 10‑minute expiry:

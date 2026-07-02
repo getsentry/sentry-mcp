@@ -10,6 +10,7 @@ import { experimental_createMCPClient } from "@ai-sdk/mcp";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Env } from "../types";
 import { logInfo, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
+import { getReadOnlyToolNames } from "@sentry/mcp-core/tools";
 import {
   AuthDataSchema,
   TokenResponseSchema,
@@ -21,6 +22,18 @@ import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
 import { annotateResponseMetric } from "../metrics";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
+
+// Keep the demo read-only: drop non-read-only tools (use_sentry stays; it
+// defaults to read-only). Names come from mcp-core, not the MCP transport.
+function applyReadOnlyToolPolicy(toolSet: ToolSet): void {
+  const readOnly = getReadOnlyToolNames();
+  const keepAnyway = new Set<string>(["use_sentry"]);
+  for (const name of Object.keys(toolSet)) {
+    if (!readOnly.has(name) && !keepAnyway.has(name)) {
+      delete toolSet[name];
+    }
+  }
+}
 
 async function refreshTokenIfNeeded(
   c: Context<{ Bindings: Env }>,
@@ -229,6 +242,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
 
       // Get available tools from MCP server
       Object.assign(tools, await mcpClient.tools());
+      applyReadOnlyToolPolicy(tools);
       logInfo(`Connected to ${mcpUrl}`, {
         loggerScope: ["cloudflare", "chat", "connection"],
         extra: {
@@ -268,6 +282,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             });
 
             Object.assign(tools, await mcpClient.tools());
+            applyReadOnlyToolPolicy(tools);
             logInfo(`Connected to ${mcpUrl} (after refresh)`, {
               loggerScope: ["cloudflare", "chat", "connection"],
               extra: {

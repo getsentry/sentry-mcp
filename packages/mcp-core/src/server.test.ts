@@ -147,7 +147,11 @@ describe("buildServer", () => {
     inputSchema: {},
     skills: ["inspect"],
     requiredScopes: [],
-    annotations: {},
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
     handler: async () => "result",
     ...options,
   });
@@ -197,7 +201,11 @@ describe("buildServer", () => {
         },
         tools: {
           example_tool: createMockTool("example_tool", {
-            annotations: { readOnlyHint: true },
+            annotations: {
+              readOnlyHint: true,
+              destructiveHint: false,
+              openWorldHint: true,
+            },
           }),
         },
       });

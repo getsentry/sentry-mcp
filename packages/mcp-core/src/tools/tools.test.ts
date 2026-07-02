@@ -50,28 +50,43 @@ test(`all tool descriptions under maximum length`, () => {
   }
 });
 
-test("all tools declare required MCP safety annotations", () => {
+test("all tools declare complete MCP safety annotations", () => {
   for (const tool of Object.values(tools.default)) {
+    // Every tool must declare readOnlyHint, destructiveHint, and openWorldHint
+    // explicitly (true or false, never undefined). Filters and confirmation
+    // gates rely on these, so an absent hint is a silent gap.
     assert(
       typeof tool.annotations.readOnlyHint === "boolean",
-      `${tool.name} must define readOnlyHint`,
+      `${tool.name} must define readOnlyHint (true or false, not undefined)`,
+    );
+    assert(
+      typeof tool.annotations.destructiveHint === "boolean",
+      `${tool.name} must define destructiveHint (true or false, not undefined)`,
     );
     assert(
       typeof tool.annotations.openWorldHint === "boolean",
-      `${tool.name} must define openWorldHint`,
+      `${tool.name} must define openWorldHint (true or false, not undefined)`,
     );
+    assert(
+      !(
+        tool.annotations.readOnlyHint === true &&
+        tool.annotations.destructiveHint === true
+      ),
+      `${tool.name} cannot be both read-only and destructive`,
+    );
+  }
+});
 
-    if (tool.annotations.readOnlyHint === false) {
-      assert(
-        typeof tool.annotations.destructiveHint === "boolean",
-        `${tool.name} must define destructiveHint because it mutates upstream state`,
-      );
-    } else {
-      assert(
-        tool.annotations.destructiveHint !== true,
-        `${tool.name} cannot be read-only and destructive`,
-      );
-    }
+test("getReadOnlyToolNames returns exactly the readOnlyHint tools", () => {
+  // This set is the allowlist the /chat demo uses to strip write tools, so it
+  // must track annotations exactly: no write tool may leak in, and every
+  // read-only tool must be present.
+  const readOnly = tools.getReadOnlyToolNames();
+  for (const [name, tool] of Object.entries(tools.default)) {
+    assert(
+      readOnly.has(name) === (tool.annotations.readOnlyHint === true),
+      `${name} read-only allowlist membership must match readOnlyHint`,
+    );
   }
 });
 

@@ -60,6 +60,13 @@ export type ServerContext = {
   constraints: Constraints;
   /** Whether agent mode is enabled (only use_sentry tool exposed) */
   agentMode?: boolean;
+  /**
+   * Whether the embedded agent (use_sentry) may call write/destructive tools.
+   * Defaults to read-only. This is a trusted-caller control set by the
+   * transport/host, never a model-supplied tool parameter, so attacker content
+   * read inside the agent loop cannot escalate to writes (indirect injection).
+   */
+  allowEmbeddedAgentWrites?: boolean;
   /** Whether experimental tools are enabled */
   experimentalMode?: boolean;
   /** Tool names available after mode, skill, constraint, and capability filters */

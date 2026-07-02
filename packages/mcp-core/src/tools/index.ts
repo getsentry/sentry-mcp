@@ -22,3 +22,12 @@ export default allTools;
 
 // Type export
 export type ToolName = keyof typeof allTools;
+
+/** Names of tools annotated read-only (readOnlyHint=true). */
+export function getReadOnlyToolNames(): Set<string> {
+  return new Set(
+    Object.entries(allTools)
+      .filter(([, tool]) => tool.annotations.readOnlyHint === true)
+      .map(([name]) => name),
+  );
+}
