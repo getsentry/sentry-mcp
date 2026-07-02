@@ -543,6 +543,54 @@ describe("parseSentryUrl", () => {
     });
   });
 
+  describe("dashboard URLs", () => {
+    it("parses dashboard URL with numeric ID (subdomain)", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/dashboard/542438/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "dashboardId": "542438",
+          "organizationSlug": "my-org",
+          "type": "dashboard",
+        }
+      `);
+    });
+
+    it("parses dashboard URL with organizations path", () => {
+      expect(
+        parseSentryUrl("https://sentry.io/organizations/my-org/dashboard/101/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "dashboardId": "101",
+          "organizationSlug": "my-org",
+          "type": "dashboard",
+        }
+      `);
+    });
+
+    it("parses dashboard URL with path-based org", () => {
+      expect(
+        parseSentryUrl("https://sentry.io/my-org/dashboard/101/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "dashboardId": "101",
+          "organizationSlug": "my-org",
+          "type": "dashboard",
+        }
+      `);
+    });
+
+    it("returns unknown for /dashboard/new/ (non-numeric ID)", () => {
+      const result = parseSentryUrl("https://my-org.sentry.io/dashboard/new/");
+      expect(result.type).toBe("unknown");
+    });
+
+    it("returns unknown for /dashboards/ list URL (plural, no ID)", () => {
+      const result = parseSentryUrl("https://my-org.sentry.io/dashboards/");
+      expect(result.type).toBe("unknown");
+    });
+  });
+
   describe("performance summary URLs", () => {
     it("extracts transaction from performance summary URL", () => {
       expect(
