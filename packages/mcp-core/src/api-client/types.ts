@@ -41,8 +41,11 @@
 import type { z } from "zod";
 import type {
   AssignedToSchema,
+  AIConversationSummaryListSchema,
+  AIConversationSummarySchema,
   AIConversationSpanListSchema,
   AIConversationSpanSchema,
+  AIConversationUserSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
   ClientKeyListSchema,
@@ -111,6 +114,7 @@ import type {
   TransactionProfileSchema,
   UnknownEventSchema,
   UserSchema,
+  UserReportListSchema,
 } from "./schema";
 
 export type User = z.infer<typeof UserSchema>;
@@ -192,6 +196,11 @@ export type AIConversationSpan = z.infer<typeof AIConversationSpanSchema>;
 export type AIConversationSpanList = z.infer<
   typeof AIConversationSpanListSchema
 >;
+export type AIConversationUser = z.infer<typeof AIConversationUserSchema>;
+export type AIConversationSummary = z.infer<typeof AIConversationSummarySchema>;
+export type AIConversationSummaryList = z.infer<
+  typeof AIConversationSummaryListSchema
+>;
 
 // Profile types
 export type Flamegraph = z.infer<typeof FlamegraphSchema>;
@@ -216,3 +225,6 @@ export type IssueTagValues = z.infer<typeof IssueTagValuesSchema>;
 // External issue links (Jira, GitHub, etc.)
 export type ExternalIssue = z.infer<typeof ExternalIssueSchema>;
 export type ExternalIssueList = z.infer<typeof ExternalIssueListSchema>;
+
+// User Report
+export type UserReportList = z.infer<typeof UserReportListSchema>;

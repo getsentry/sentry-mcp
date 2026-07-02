@@ -11,6 +11,7 @@ import getTraceDetails from "./get-trace-details.js";
 
 const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
 const originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
+const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
 const originalEmbeddedAgentProvider = process.env.EMBEDDED_AGENT_PROVIDER;
 
 /** Register the same handler on sentry.io and us.sentry.io (org fixture resolves region). */
@@ -106,6 +107,7 @@ describe("get_trace_details", () => {
   beforeEach(() => {
     process.env.OPENAI_API_KEY = "test-key";
     Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
+    Reflect.deleteProperty(process.env, "OPENROUTER_API_KEY");
     Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
   });
 
@@ -120,6 +122,12 @@ describe("get_trace_details", () => {
       Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
     } else {
       process.env.ANTHROPIC_API_KEY = originalAnthropicApiKey;
+    }
+
+    if (originalOpenRouterApiKey === undefined) {
+      Reflect.deleteProperty(process.env, "OPENROUTER_API_KEY");
+    } else {
+      process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey;
     }
 
     if (originalEmbeddedAgentProvider === undefined) {
@@ -242,6 +250,7 @@ describe("get_trace_details", () => {
   it("falls back to direct search_events guidance when agent search is unavailable", async () => {
     Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
     Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
+    Reflect.deleteProperty(process.env, "OPENROUTER_API_KEY");
     Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
 
     const result = await getTraceDetails.handler(
@@ -267,6 +276,7 @@ describe("get_trace_details", () => {
   it("does not show trace next-step tool calls when search_events is unavailable", async () => {
     Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
     Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
+    Reflect.deleteProperty(process.env, "OPENROUTER_API_KEY");
     Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
 
     const result = await getTraceDetails.handler(

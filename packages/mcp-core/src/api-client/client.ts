@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { DEFAULT_SEARCH_ISSUES_PERIOD } from "../constants";
 import {
   getContinuousProfileUrl as getContinuousProfileUrlUtil,
+  getAIConversationsUrl as getAIConversationsUrlUtil,
   getAIConversationUrl as getAIConversationUrlUtil,
   getDashboardUrl as getDashboardUrlUtil,
   getIssueUrl as getIssueUrlUtil,
@@ -75,7 +77,9 @@ import {
   ReplayListResponseSchema,
   ReplayIdsByResourceSchema,
   ReplayRecordingSegmentsSchema,
+  AIConversationSummaryListSchema,
   AIConversationSpanListSchema,
+  UserReportListSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
 import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
@@ -125,7 +129,9 @@ import type {
   ReplayDetails,
   ReplayList,
   ReplayRecordingSegments,
+  AIConversationSummary,
   AIConversationSpanList,
+  UserReportList,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
@@ -1021,6 +1027,26 @@ export class SentryApiService {
       this.host,
       organizationSlug,
       conversationId,
+      this.protocol,
+    );
+  }
+
+  /** Builds the Sentry UI URL for the AI Conversations list with optional filters. */
+  getAIConversationsUrl(
+    organizationSlug: string,
+    options?: {
+      query?: string;
+      project?: string[];
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+    },
+  ): string {
+    return getAIConversationsUrlUtil(
+      this.host,
+      organizationSlug,
+      options,
       this.protocol,
     );
   }
@@ -2971,7 +2997,7 @@ export class SentryApiService {
    * // High-frequency errors in specific project
    * const critical = await apiService.listIssues({
    *   organizationSlug: "my-org",
-   *   projectSlug: "backend",
+   *   projectId: "123456",
    *   query: "level:error",
    *   sortBy: "freq"
    * });
@@ -2980,16 +3006,24 @@ export class SentryApiService {
   async listIssues(
     {
       organizationSlug,
-      projectSlug,
+      projectId,
       query,
       sortBy,
       limit = 10,
+      statsPeriod = DEFAULT_SEARCH_ISSUES_PERIOD,
     }: {
       organizationSlug: string;
-      projectSlug?: string;
+      projectId?: string;
       query?: string | null;
       sortBy?: "user" | "freq" | "date" | "new";
       limit?: number;
+      /**
+       * Controls the search time window - which issues are included in results.
+       * Note: this is NOT the sparkline/stats period (that would be groupStatsPeriod).
+       * The Sentry API accepts any Nh/Nd/Nw format and defaults to 90d when omitted,
+       * but large windows risk timeouts on busy orgs.
+       */
+      statsPeriod?: string;
     },
     opts?: RequestOptions,
   ): Promise<IssueList> {
@@ -3001,14 +3035,15 @@ export class SentryApiService {
     const queryParams = new URLSearchParams();
     queryParams.set("limit", String(limit));
     if (sortBy) queryParams.set("sort", sortBy);
-    queryParams.set("statsPeriod", "24h");
+    queryParams.set("statsPeriod", statsPeriod ?? DEFAULT_SEARCH_ISSUES_PERIOD);
     queryParams.set("query", sentryQuery.join(" "));
 
+    if (projectId) {
+      queryParams.append("project", projectId);
+    }
     queryParams.append("collapse", "unhandled");
 
-    const apiUrl = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/issues/?${queryParams.toString()}`
-      : `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
+    const apiUrl = `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
 
     const body = await this.requestJSON(apiUrl, undefined, opts);
     return IssueListSchema.parse(body);
@@ -3105,6 +3140,44 @@ export class SentryApiService {
       opts,
     );
     return ExternalIssueListSchema.parse(body);
+  }
+
+  /**
+   * Retrieves issue user reports and returns the next Sentry cursor when another page exists.
+   */
+  async getIssueUserReports(
+    {
+      organizationSlug,
+      issueId,
+      cursor,
+      limit,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      cursor?: string | null;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ reports: UserReportList; nextCursor: string | null }> {
+    const searchQuery = new URLSearchParams();
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const path = `/organizations/${organizationSlug}/issues/${issueId}/user-reports/`;
+    const response = await this.request(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+    return {
+      reports: UserReportListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   async getEventForIssue(
@@ -3708,29 +3781,7 @@ export class SentryApiService {
       queryParams.set("project", params.projectId);
     }
 
-    // Sort parameter transformation for API compatibility
-    let apiSort = params.sort;
-    // Skip transformation for equation fields - they should be passed as-is
-    if (
-      params.dataset !== "tracemetrics" &&
-      params.sort?.includes("(") &&
-      !params.sort?.includes("equation|")
-    ) {
-      // Transform: count(field) -> count_field, count() -> count
-      // Use safer string manipulation to avoid ReDoS
-      const parenStart = params.sort.indexOf("(");
-      const parenEnd = params.sort.indexOf(")", parenStart);
-      if (parenStart !== -1 && parenEnd !== -1) {
-        const beforeParen = params.sort.substring(0, parenStart);
-        const insideParen = params.sort.substring(parenStart + 1, parenEnd);
-        const afterParen = params.sort.substring(parenEnd + 1);
-        const transformedInside = insideParen
-          ? `_${insideParen.replace(/\./g, "_")}`
-          : "";
-        apiSort = beforeParen + transformedInside + afterParen;
-      }
-    }
-    queryParams.set("sort", apiSort);
+    queryParams.set("sort", params.sort);
 
     // Add fields
     for (const field of params.fields) {
@@ -3781,25 +3832,7 @@ export class SentryApiService {
       queryParams.set("sampling", "NORMAL");
     }
 
-    // Sort parameter transformation for API compatibility
-    let apiSort = params.sort;
-    // Skip transformation for equation fields - they should be passed as-is
-    if (params.sort?.includes("(") && !params.sort?.includes("equation|")) {
-      // Transform: count(field) -> count_field, count() -> count
-      // Use safer string manipulation to avoid ReDoS
-      const parenStart = params.sort.indexOf("(");
-      const parenEnd = params.sort.indexOf(")", parenStart);
-      if (parenStart !== -1 && parenEnd !== -1) {
-        const beforeParen = params.sort.substring(0, parenStart);
-        const insideParen = params.sort.substring(parenStart + 1, parenEnd);
-        const afterParen = params.sort.substring(parenEnd + 1);
-        const transformedInside = insideParen
-          ? `_${insideParen.replace(/\./g, "_")}`
-          : "";
-        apiSort = beforeParen + transformedInside + afterParen;
-      }
-    }
-    queryParams.set("sort", apiSort);
+    queryParams.set("sort", params.sort);
 
     // Add fields
     for (const field of params.fields) {
@@ -4033,12 +4066,17 @@ export class SentryApiService {
     return TraceSchema.parse(body);
   }
 
+  /**
+   * Fetches all spans for one AI conversation within a relative or absolute time window.
+   */
   async getAIConversation(
     {
       organizationSlug,
       conversationId,
       project = "-1",
       statsPeriod = "30d",
+      start,
+      end,
       perPage = 1000,
       maxPages = 10,
     }: {
@@ -4046,6 +4084,8 @@ export class SentryApiService {
       conversationId: string;
       project?: string | string[];
       statsPeriod?: string;
+      start?: string;
+      end?: string;
       perPage?: number;
       maxPages?: number;
     },
@@ -4057,7 +4097,12 @@ export class SentryApiService {
     for (let page = 0; page < maxPages; page++) {
       const queryParams = new URLSearchParams();
       queryParams.set("per_page", String(perPage));
-      queryParams.set("statsPeriod", statsPeriod);
+      this.applyTimeParams(
+        queryParams,
+        start || end ? undefined : statsPeriod,
+        start,
+        end,
+      );
       const projects = Array.isArray(project) ? project : [project];
       for (const projectId of projects) {
         queryParams.append("project", projectId);
@@ -4081,6 +4126,76 @@ export class SentryApiService {
     }
 
     return spans;
+  }
+
+  /**
+   * Searches Sentry AI Conversations using the conversation list endpoint and
+   * returns the current page plus cursor metadata from the response headers.
+   */
+  async searchAIConversations(
+    {
+      organizationSlug,
+      query,
+      project,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      limit,
+      cursor,
+    }: {
+      organizationSlug: string;
+      query?: string;
+      project?: string | string[];
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+      cursor?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<{
+    conversations: AIConversationSummary[];
+    nextCursor: string | null;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (project) {
+      const projects = Array.isArray(project) ? project : [project];
+      for (const projectId of projects) {
+        queryParams.append("project", projectId);
+      }
+    }
+    if (environment) {
+      const environments = Array.isArray(environment)
+        ? environment
+        : [environment];
+      for (const environmentName of environments) {
+        queryParams.append("environment", environmentName);
+      }
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
+    if (limit !== undefined) {
+      queryParams.set("per_page", String(limit));
+    }
+    if (cursor) {
+      queryParams.set("cursor", cursor);
+    }
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/ai-conversations/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+
+    return {
+      conversations: AIConversationSummaryListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   /**

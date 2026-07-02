@@ -1,6 +1,6 @@
 {
   "name": "@sentry/mcp-core",
-  "version": "0.36.0",
+  "version": "0.37.0",
   "type": "module",
   "private": true,
   "packageManager": "pnpm@11.8.0",
@@ -116,6 +116,10 @@
     "./internal/agents/anthropic-provider": {
       "types": "./dist/internal/agents/anthropic-provider.d.ts",
       "default": "./dist/internal/agents/anthropic-provider.js"
+    },
+    "./internal/agents/openrouter-provider": {
+      "types": "./dist/internal/agents/openrouter-provider.d.ts",
+      "default": "./dist/internal/agents/openrouter-provider.js"
     },
     "./internal/agents/provider-factory": {
       "types": "./dist/internal/agents/provider-factory.d.ts",

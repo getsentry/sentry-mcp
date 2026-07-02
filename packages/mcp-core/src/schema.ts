@@ -2,16 +2,17 @@
  * Reusable Zod parameter schemas for MCP tools.
  *
  * Shared validation schemas used across tool definitions to ensure consistent
- * parameter handling and validation. Each schema includes transformation
- * (e.g., toLowerCase, trim) and LLM-friendly descriptions.
+ * parameter handling and validation. Schemas apply minimal normalization
+ * (e.g., trim) and LLM-friendly descriptions.
  */
 import { z } from "zod";
 import { SENTRY_GUIDES } from "./constants";
 import { validateSlug } from "./utils/slug-validation";
 
+// Sentry slug lookups can be exact and case-sensitive on legacy instances.
+// Preserve caller casing for resource slugs; only trim and validate shape.
 export const ParamOrganizationSlug = z
   .string()
-  .toLowerCase()
   .trim()
   .superRefine(validateSlug)
   .describe(
@@ -20,7 +21,6 @@ export const ParamOrganizationSlug = z
 
 export const ParamTeamSlug = z
   .string()
-  .toLowerCase()
   .trim()
   .superRefine(validateSlug)
   .describe(
@@ -29,7 +29,6 @@ export const ParamTeamSlug = z
 
 export const ParamProjectSlug = z
   .string()
-  .toLowerCase()
   .trim()
   .superRefine(validateSlug)
   .describe(
@@ -38,11 +37,10 @@ export const ParamProjectSlug = z
 
 export const ParamProjectSlugOrAll = z
   .string()
-  .toLowerCase()
   .trim()
   .superRefine(validateSlug)
   .describe(
-    "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible.",
+    "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug.",
   );
 
 export const ParamSearchQuery = z
@@ -114,6 +112,26 @@ export const ParamQuery = z
   .trim()
   .describe(
     `The search query to apply. Use the \`help(subject="query_syntax")\` tool to get more information about the query syntax rather than guessing.`,
+  );
+
+/**
+ * Relative time window parameter for Sentry API queries.
+ *
+ * Maps to the `statsPeriod` URL parameter in Sentry's API, which controls the
+ * search time window (i.e., which records are returned). This is distinct from
+ * `groupStatsPeriod`, which only affects sparkline data in the serializer.
+ *
+ * Tools apply their own `.default()`, `.optional()`, or `.nullable()` on top.
+ */
+export const ParamPeriod = z
+  .string()
+  .trim()
+  .regex(
+    /^\d+[hdw]$/,
+    "Period must be a relative time window like `24h`, `7d`, `14d`, `30d`, or `90d`.",
+  )
+  .describe(
+    "Relative time window, such as `24h`, `7d`, `14d`, `30d`, or `90d`. Controls which records fall within the search window.",
   );
 
 /**

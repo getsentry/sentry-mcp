@@ -101,7 +101,6 @@ export default defineTool({
     releaseVersion: z.string().trim().min(1).describe("Exact release version."),
     projectSlugOrId: z
       .string()
-      .toLowerCase()
       .trim()
       .superRefine(validateSlugOrId)
       .describe(

@@ -3,8 +3,8 @@ import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import {
-  ensureIssueWithinProjectConstraint,
   parseIssueParams,
+  assertIssueWithinProjectConstraint,
 } from "../../internal/tool-helpers/issue";
 import {
   getStatusDisplayName,
@@ -12,6 +12,8 @@ import {
   getHumanInterventionGuidance,
   getOutputForAutofixRun,
   getActiveAutofixTodo,
+  getSeerUnsupportedIssueMessage,
+  isSeerSupportedIssue,
   SEER_POLLING_INTERVAL,
   SEER_TIMEOUT,
   SEER_MAX_RETRIES,
@@ -67,6 +69,7 @@ export default defineTool({
     "",
     "<hints>",
     "- Only use when the user explicitly requests analysis or you cannot determine the root cause from issue details alone",
+    "- Seer Autofix does not support metric alert issues (issueCategory: metric); use get_issue_details and search_events instead",
     "- If the user provides an issueUrl, extract it and use that parameter alone",
     "- The analysis includes actual code snippets and fixes, not just error descriptions",
     "- Results are cached - subsequent calls return instantly",
@@ -100,12 +103,19 @@ export default defineTool({
 
     setTag("organization.slug", orgSlug);
 
-    await ensureIssueWithinProjectConstraint({
-      apiService,
+    const issue = await apiService.getIssue({
       organizationSlug: orgSlug,
       issueId: parsedIssueId!,
+    });
+
+    assertIssueWithinProjectConstraint({
+      issue,
       projectSlug: context.constraints.projectSlug,
     });
+
+    if (!isSeerSupportedIssue(issue)) {
+      return getSeerUnsupportedIssueMessage(issue);
+    }
 
     let output = `# Seer Analysis for Issue ${parsedIssueId}\n\n`;
 

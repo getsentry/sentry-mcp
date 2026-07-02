@@ -4,6 +4,23 @@ Sentry API client usage, mocking, and testing patterns.
 
 ## API Client Usage
 
+### Verify Endpoint Contracts
+
+When adding or changing Sentry API endpoint usage in MCP tools, validate the
+request parameters and response shape against the Sentry source tree in
+`~/src/sentry` before implementing schemas or handlers. Treat API docs,
+frontend call sites, and existing MCP types as helpful context, not authority.
+
+Check the relevant Sentry endpoint, serializer, URL registration, and tests.
+For example:
+
+```bash
+rg -n "class OrganizationAIConversations|ai-conversations" ~/src/sentry/src ~/src/sentry/tests
+```
+
+Use the verified source contract to define Zod schemas, query parameters,
+pagination behavior, feature-gate handling, and test fixtures.
+
 ### Client Creation
 
 ```typescript

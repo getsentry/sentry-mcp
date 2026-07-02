@@ -3,6 +3,7 @@ import { generateText } from "ai";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import searchIssues from "./search-issues";
+import { prepareToolParams } from "../catalog-runtime/availability";
 import type { ServerContext } from "../../types";
 
 // Mock the AI SDK
@@ -67,6 +68,7 @@ describe("search_issues", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OPENAI_API_KEY = "test-key";
+    process.env.OPENROUTER_API_KEY = "";
     mockGenerateText.mockResolvedValue(mockAIResponse());
   });
 
@@ -108,6 +110,7 @@ describe("search_issues", () => {
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
+        period: "30d",
         includeExplanation: false,
       },
       mockContext,
@@ -147,6 +150,7 @@ describe("search_issues", () => {
   it("should search issues with direct query syntax (no agent)", async () => {
     process.env.OPENAI_API_KEY = "";
     process.env.ANTHROPIC_API_KEY = "";
+    process.env.OPENROUTER_API_KEY = "";
 
     mswServer.use(
       http.get("*/api/0/organizations/*/issues/", ({ request }) => {
@@ -185,6 +189,7 @@ describe("search_issues", () => {
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
+        period: "30d",
         includeExplanation: false,
       },
       mockContext,
@@ -199,6 +204,7 @@ describe("search_issues", () => {
   it("omits update_issue guidance when update_issue is unavailable in the session", async () => {
     process.env.OPENAI_API_KEY = "";
     process.env.ANTHROPIC_API_KEY = "";
+    process.env.OPENROUTER_API_KEY = "";
 
     mswServer.use(
       http.get("*/api/0/organizations/*/issues/", ({ request }) => {
@@ -234,6 +240,7 @@ describe("search_issues", () => {
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
+        period: "30d",
         includeExplanation: false,
       },
       {
@@ -304,6 +311,7 @@ describe("search_issues", () => {
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
+        period: "30d",
         includeExplanation: false,
       },
       mockContext,
@@ -315,34 +323,48 @@ describe("search_issues", () => {
   });
 
   it("should handle project slug parameter", async () => {
-    mockGenerateText.mockResolvedValue(mockAIResponse("", "date"));
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
+    process.env.OPENROUTER_API_KEY = "";
 
     mswServer.use(
-      http.get("*/api/0/projects/*/my-project/", () => {
+      http.get("*/api/0/projects/*/*/", ({ request }) => {
+        expect(new URL(request.url).pathname).toBe(
+          "/api/0/projects/MyOrg/MyProject/",
+        );
         return HttpResponse.json({
           id: "789",
-          slug: "my-project",
+          slug: "MyProject",
           name: "My Project",
         });
       }),
-      http.get("*/api/0/projects/*/my-project/issues/*", () => {
+      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.pathname).toBe("/api/0/organizations/MyOrg/issues/");
+        expect(url.searchParams.get("project")).toBe("789");
+        expect(url.searchParams.get("statsPeriod")).toBe("30d");
         return HttpResponse.json([]);
       }),
     );
 
-    const result = await searchIssues.handler(
-      {
-        organizationSlug: "test-org",
+    const params = prepareToolParams({
+      tool: searchIssues,
+      params: {
+        organizationSlug: " MyOrg ",
         query: "all issues",
         sort: "date",
-        projectSlugOrId: "my-project",
+        projectSlugOrId: " MyProject ",
         regionUrl: null,
         limit: 10,
+        period: "30d",
         includeExplanation: false,
       },
-      mockContext,
-    );
+      context: mockContext,
+    }) as Parameters<typeof searchIssues.handler>[0];
 
+    const result = await searchIssues.handler(params, mockContext);
+
+    expect(mockGenerateText).not.toHaveBeenCalled();
     expect(result).toContain("No issues found");
   });
 
@@ -350,7 +372,10 @@ describe("search_issues", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse("", "date"));
 
     mswServer.use(
-      http.get("*/api/0/projects/*/123456/issues/*", () => {
+      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("project")).toBe("123456");
+        expect(url.searchParams.get("statsPeriod")).toBe("30d");
         return HttpResponse.json([]);
       }),
     );
@@ -363,6 +388,7 @@ describe("search_issues", () => {
         projectSlugOrId: "123456",
         regionUrl: null,
         limit: 10,
+        period: "30d",
         includeExplanation: false,
       },
       mockContext,
@@ -389,6 +415,7 @@ describe("search_issues", () => {
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
+        period: "30d",
         includeExplanation: false,
       },
       mockContext,
@@ -415,6 +442,7 @@ describe("search_issues", () => {
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
+        period: "30d",
         includeExplanation: false,
       },
       mockContext,
@@ -441,6 +469,7 @@ describe("search_issues", () => {
         projectSlugOrId: null,
         regionUrl: null,
         limit: 25,
+        period: "30d",
         includeExplanation: false,
       },
       mockContext,
@@ -464,6 +493,7 @@ describe("search_issues", () => {
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
+        period: "30d",
         includeExplanation: true,
       },
       mockContext,
@@ -490,6 +520,7 @@ describe("search_issues", () => {
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
+        period: "30d",
         includeExplanation: false,
       },
       mockContext,
@@ -520,6 +551,7 @@ describe("search_issues", () => {
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
+        period: "30d",
         includeExplanation: false,
       },
       mockContext,
@@ -554,6 +586,7 @@ describe("search_issues", () => {
           projectSlugOrId: null,
           regionUrl: null,
           limit: 10,
+          period: "30d",
           includeExplanation: false,
         },
         mockContext,
@@ -597,6 +630,7 @@ describe("search_issues", () => {
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
+        period: "30d",
         includeExplanation: false,
       },
       mockContext,
@@ -618,6 +652,7 @@ describe("search_issues", () => {
           projectSlugOrId: "invalid@slug",
           regionUrl: null,
           limit: 10,
+          period: "30d",
           includeExplanation: false,
         },
         mockContext,
@@ -646,6 +681,7 @@ describe("search_issues", () => {
           projectSlugOrId: null,
           regionUrl: null,
           limit: 10,
+          period: "30d",
           includeExplanation: false,
         },
         mockContext,

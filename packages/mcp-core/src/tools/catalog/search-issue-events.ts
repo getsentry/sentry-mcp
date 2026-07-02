@@ -6,6 +6,7 @@ import { ensureIssueWithinProjectConstraint } from "../../internal/tool-helpers/
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,
+  ParamPeriod,
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
@@ -61,7 +62,7 @@ export default defineTool({
     "<examples>",
     "search_issue_events(issueId='MCP-41', organizationSlug='my-org', query='from last hour')",
     "search_issue_events(issueId='MCP-41', organizationSlug='my-org', query='environment:production')",
-    "search_issue_events(issueUrl='https://sentry.io/.../issues/123/', query='release:v1.0.0', statsPeriod='7d')",
+    "search_issue_events(issueUrl='https://sentry.io/.../issues/123/', query='release:v1.0.0', period='7d')",
     "</examples>",
   ].join("\n"),
   inputSchema: {
@@ -98,10 +99,7 @@ export default defineTool({
       .describe(
         "Sort field (prefix with - for descending). Default: -timestamp",
       ),
-    statsPeriod: z
-      .string()
-      .optional()
-      .describe("Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."),
+    period: ParamPeriod.optional(),
 
     // Optional context parameters
     projectSlug: ParamProjectSlug.nullable()
@@ -182,7 +180,7 @@ export default defineTool({
         query: buildIssueEventSearchRepairPrompt({
           query: params.query,
           sort: params.sort,
-          statsPeriod: params.statsPeriod,
+          statsPeriod: params.period,
         }),
         organizationSlug,
         apiService,
@@ -213,7 +211,7 @@ export default defineTool({
       query = params.query ?? "";
       fields = RECOMMENDED_FIELDS;
       sortParam = params.sort ?? "-timestamp";
-      timeParams = { statsPeriod: params.statsPeriod ?? "14d" };
+      timeParams = { statsPeriod: params.period ?? "14d" };
     }
 
     // Execute search using issue-specific endpoint
@@ -260,7 +258,10 @@ export default defineTool({
       );
     }
 
-    getActiveSpan()?.setAttribute("gen_ai.tool.call.result.count", eventsResponse.length);
+    getActiveSpan()?.setAttribute(
+      "gen_ai.tool.call.result.count",
+      eventsResponse.length,
+    );
 
     const naturalLanguageContext = params.query
       ? `Events in issue ${issueId}: ${params.query}`

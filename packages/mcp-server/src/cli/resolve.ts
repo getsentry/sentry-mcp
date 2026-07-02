@@ -115,17 +115,22 @@ export function finalize(input: MergedArgs): PartiallyResolvedConfig {
     : undefined;
 
   // Validate agent provider if explicitly set
-  let agentProvider: "openai" | "azure-openai" | "anthropic" | undefined =
-    undefined;
+  let agentProvider:
+    | "openai"
+    | "azure-openai"
+    | "anthropic"
+    | "openrouter"
+    | undefined = undefined;
   if (input.agentProvider) {
     const provider = input.agentProvider.toLowerCase();
     if (
       provider !== "openai" &&
       provider !== "azure-openai" &&
-      provider !== "anthropic"
+      provider !== "anthropic" &&
+      provider !== "openrouter"
     ) {
       throw new Error(
-        `Error: Invalid agent provider "${input.agentProvider}". Must be "openai", "azure-openai", or "anthropic".`,
+        `Error: Invalid agent provider "${input.agentProvider}". Must be "openai", "azure-openai", "anthropic", or "openrouter".`,
       );
     }
     agentProvider = provider;

@@ -9,7 +9,9 @@ import {
 } from "./lib/attribution";
 import { resolveClientFamily } from "./lib/client-family";
 import { redirectUriHasUserInfo } from "./lib/html-utils";
-import sentryMcpHandler from "./lib/mcp-handler";
+import sentryMcpHandler, {
+  handleSentryBearerMcpRequest,
+} from "./lib/mcp-handler";
 import {
   type RateLimitScope,
   annotateTrackedRequestSpan,
@@ -40,6 +42,35 @@ import { setSentryUserFromRequest } from "./utils/sentry-user";
 const AUTH_PARAM_SEPARATOR = /,\s*(?=[A-Za-z_][A-Za-z0-9_-]*\s*=)/;
 const AUTH_CHALLENGE = /^(\S+)(?:\s+(.+))?$/;
 const RESOURCE_METADATA_PARAM = /^resource_metadata\s*=/i;
+const SENTRY_BEARER_SCHEME = /^Sentry-Bearer\b/i;
+const SENTRY_BEARER_AUTH = /^Sentry-Bearer\s+(\S+)$/i;
+
+type SentryBearerAuth = { matched: false } | { matched: true; token?: string };
+
+/**
+ * Detects the direct-token Authorization scheme without consuming normal
+ * OAuth `Bearer` tokens. Malformed Sentry-Bearer headers still return
+ * `matched: true` without a token so callers can fail directly before OAuth.
+ */
+function parseSentryBearerAuthorization(
+  header: string | null,
+): SentryBearerAuth {
+  if (!header) {
+    return { matched: false };
+  }
+
+  const trimmedHeader = header.trim();
+  if (!SENTRY_BEARER_SCHEME.test(trimmedHeader)) {
+    return { matched: false };
+  }
+
+  const match = SENTRY_BEARER_AUTH.exec(trimmedHeader);
+  if (!match) {
+    return { matched: true };
+  }
+
+  return match[1] ? { matched: true, token: match[1] } : { matched: true };
+}
 
 function replaceResourceMetadataParam(
   headerValue: string,
@@ -127,8 +158,9 @@ async function finalizeResponse(
 // The OAuth provider manages several routes directly and may attach its own
 // CORS headers to the responses it handles. We wrap it to:
 //   1. Intercept OPTIONS before the library — return our own preflight response.
-//   2. Let the library handle the actual request normally.
-//   3. On the way out, apply our CORS policy:
+//   2. Route explicit Sentry-Bearer `/mcp` requests before OAuth.
+//   3. Let the library handle the remaining request normally.
+//   4. On the way out, apply our CORS policy:
 //      - Public metadata endpoints → restrictive read-only CORS (`*`, GET only)
 //      - Everything else → strip all CORS headers the library added
 const wrappedOAuthProvider = {
@@ -201,6 +233,38 @@ const wrappedOAuthProvider = {
       const utmSource = resolveUtmSourceFromUrl(url);
       if (utmSource) {
         activeSpan?.setAttribute(UTM_SOURCE_ATTRIBUTE, utmSource);
+      }
+    }
+
+    if (url.pathname.startsWith("/mcp")) {
+      const sentryBearerAuth = parseSentryBearerAuthorization(
+        request.headers.get("Authorization"),
+      );
+
+      if (sentryBearerAuth.matched) {
+        activeSpan?.setAttribute("app.auth.kind", "sentry-bearer");
+
+        if (!sentryBearerAuth.token) {
+          return finalizeResponse(
+            request,
+            url,
+            new Response("Missing or invalid Sentry-Bearer token", {
+              status: 401,
+              headers: {
+                "WWW-Authenticate":
+                  'Sentry-Bearer realm="Sentry MCP", error="invalid_token", error_description="Missing or invalid Sentry-Bearer token"',
+              },
+            }),
+          );
+        }
+
+        const response = await handleSentryBearerMcpRequest(
+          request,
+          env,
+          ctx,
+          sentryBearerAuth.token,
+        );
+        return finalizeResponse(request, url, response);
       }
     }
 

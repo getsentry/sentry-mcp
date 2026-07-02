@@ -1,10 +1,18 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { type Span, setUser, startSpan } from "@sentry/core";
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mswServer } from "@sentry/mcp-server-mocks";
 import { z } from "zod";
 import { buildServer } from "./server";
+import { structuredResult } from "./internal/tool-helpers/results";
 import type { Skill } from "./skills";
+import {
+  getGeneratedTextFromStructuredContent,
+  getStructuredContent,
+  getTextContent,
+} from "./test-utils/structured-content";
 import { createExecuteTool } from "./tools/special/execute-tool";
 import type { ToolConfig } from "./tools/types";
 import type { ServerContext } from "./types";
@@ -15,6 +23,14 @@ vi.mock("@sentry/core", () => ({
   setUser: vi.fn(),
   getActiveSpan: vi.fn(),
   startSpan: vi.fn(),
+  withScope: vi.fn((callback) =>
+    callback({
+      addAttachment: vi.fn(),
+      setContext: vi.fn(),
+    }),
+  ),
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
   wrapMcpServerWithSentry: vi.fn((server) => server),
 }));
 
@@ -86,27 +102,6 @@ async function callRegisteredTool(
   }
 }
 
-function getTextContent(result: unknown): string {
-  const content = (result as { content?: Array<{ text?: string }> }).content;
-  return content?.find((item) => typeof item.text === "string")?.text ?? "";
-}
-
-function getStructuredContent<T extends Record<string, unknown>>(
-  result: unknown,
-): T {
-  const structuredContent = (result as { structuredContent?: unknown })
-    .structuredContent;
-  if (
-    !structuredContent ||
-    typeof structuredContent !== "object" ||
-    Array.isArray(structuredContent)
-  ) {
-    throw new Error(`No structured content found: ${JSON.stringify(result)}`);
-  }
-
-  return structuredContent as T;
-}
-
 const DEFAULT_DIRECT_TOOL_NAMES = [
   "analyze_issue_with_seer",
   "execute_sentry_tool",
@@ -158,6 +153,41 @@ describe("buildServer", () => {
   });
 
   describe("telemetry context", () => {
+    it("generates compatibility text for structured-only tool output", async () => {
+      const server = buildServer({
+        context: baseContext,
+        tools: {
+          structured_tool: createMockTool("structured_tool", {
+            outputSchema: z.object({
+              status: z.string(),
+              count: z.number(),
+            }),
+            handler: async () =>
+              structuredResult({
+                status: "ok",
+                count: 2,
+              }),
+          }),
+        },
+      });
+
+      const result = await callRegisteredTool(server, "structured_tool", {});
+      const payload = getStructuredContent<{
+        status: string;
+        count: number;
+      }>(result);
+
+      expect(payload).toMatchInlineSnapshot(`
+        {
+          "count": 2,
+          "status": "ok",
+        }
+      `);
+      expect(getTextContent(result)).toBe(
+        getGeneratedTextFromStructuredContent(result),
+      );
+    });
+
     it("sets user ID and IP address together for tool calls", async () => {
       const server = buildServer({
         context: {
@@ -1001,7 +1031,9 @@ describe("buildServer", () => {
       const firstResult = payload.results[0];
 
       expect(payload.query).toBe("replay");
-      expect(getTextContent(result)).toBe(JSON.stringify(payload, null, 2));
+      expect(getTextContent(result)).toBe(
+        getGeneratedTextFromStructuredContent(result),
+      );
       expect(getTextContent(result)).not.toContain("# Tool Search Results");
       expect(getTextContent(result)).not.toContain("```json");
       expect(firstResult?.name).toBe("get_replay_details");
@@ -1280,6 +1312,27 @@ describe("buildServer", () => {
       );
     });
 
+    it("execute_sentry_tool dispatches to catalog-only issue user reports", async () => {
+      const server = buildServer({
+        context: baseContext,
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      expect(toolNames).not.toContain("get_issue_user_reports");
+
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
+        name: "get_issue_user_reports",
+        arguments: {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+        },
+      });
+
+      expect(getTextContent(result)).toContain(
+        "# Issue User Reports for Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
+      );
+    });
+
     it("execute_sentry_tool dispatches to catalog-only update_dsn", async () => {
       const server = buildServer({
         context: baseContext,
@@ -1322,6 +1375,77 @@ describe("buildServer", () => {
       });
 
       expect(getTextContent(result)).toContain("You are authenticated as");
+    });
+
+    it("execute_sentry_tool dispatches structured catalog results", async () => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            expect(url.searchParams.get("query")).toBe("checkout");
+            expect(url.searchParams.get("statsPeriod")).toBe("7d");
+            expect(url.searchParams.get("per_page")).toBe("10");
+            return HttpResponse.json([
+              {
+                conversationId: "conv-123",
+                flow: ["triage-agent"],
+                errors: 1,
+                llmCalls: 2,
+                toolCalls: 1,
+                toolErrors: 0,
+                totalTokens: 1200,
+                totalCost: 0.012,
+                startTimestamp: 1713805400000,
+                endTimestamp: 1713805415000,
+                traceCount: 1,
+                traceIds: ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+                firstInput: "What failed in checkout?",
+                lastOutput: "The checkout worker is timing out.",
+                user: {
+                  id: "1",
+                  email: "dev@example.com",
+                  username: "dev",
+                  ip_address: "127.0.0.1",
+                },
+                toolNames: ["search_events"],
+              },
+            ]);
+          },
+        ),
+      );
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["inspect"]),
+        },
+      });
+
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
+        name: "search_ai_conversations",
+        arguments: {
+          organizationSlug: "test-org",
+          query: "checkout",
+          period: "7d",
+          limit: 10,
+        },
+      });
+      const payload = getStructuredContent<{
+        conversations: Array<{
+          conversationId: string;
+          sampleTraceIds: string[];
+        }>;
+      }>(result);
+
+      expect(payload.conversations).toMatchObject([
+        {
+          conversationId: "conv-123",
+          sampleTraceIds: ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+        },
+      ]);
+      expect(getTextContent(result)).toBe(
+        getGeneratedTextFromStructuredContent(result),
+      );
     });
 
     it("execute_sentry_tool passes effective arguments to a catalog tool", async () => {

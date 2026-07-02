@@ -853,6 +853,8 @@ export const RECOMMENDED_FIELDS = {
       "message",
       "error.type",
       "culprit",
+      "user.email",
+      "user.id",
     ],
     description:
       "Basic error information including issue ID, title, timestamp, severity, and location",

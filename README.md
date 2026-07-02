@@ -33,7 +33,7 @@ claude plugin install sentry-mcp@sentry-mcp-experimental
 
 While this repository is focused on acting as an MCP service, we also support a `stdio` transport. This is still a work in progress, but is the easiest way to adapt run the MCP against a self-hosted Sentry install.
 
-**Note:** The AI-powered search tools (`search_events`, `search_issues`, etc.) require an LLM provider (OpenAI or Anthropic). These tools use natural language processing to translate queries into Sentry's query syntax. Without a configured provider, these specific tools will be unavailable, but all other tools will function normally.
+**Note:** The AI-powered search tools (`search_events`, `search_issues`, etc.) require an LLM provider (OpenAI, Azure OpenAI, Anthropic, or OpenRouter). These tools use natural language processing to translate queries into Sentry's query syntax. Without a configured provider, these specific tools will be unavailable, but all other tools will function normally.
 
 To utilize the `stdio` transport, you'll need to create an User Auth Token in Sentry with the necessary scopes. As of writing this is:
 
@@ -70,15 +70,44 @@ For self-hosted instances without TLS:
 npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.internal:9000 --insecure-http
 ```
 
+#### Remote with an Explicit Sentry Token
+
+Remote clients that support custom HTTP headers can pass an upstream Sentry API
+token directly to the Cloudflare transport:
+
+```json
+{
+  "mcpServers": {
+    "sentry": {
+      "url": "https://mcp.sentry.dev/mcp",
+      "headers": {
+        "Authorization": "Sentry-Bearer ${SENTRY_ACCESS_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+`Sentry-Bearer` is intentionally separate from `Bearer`: `Bearer` is reserved
+for MCP OAuth access tokens. With `Sentry-Bearer`, the worker does not store,
+validate, exchange, or refresh the upstream token. It forwards the token through
+the same Sentry API calls used by OAuth-backed sessions, and the client or
+upstream provider remains responsible for token lifetime and refresh.
+
+Direct remote auth defaults to all active MCP skills. You can narrow the exposed
+tools with `?skills=inspect,triage` or `?disable-skills=seer`.
+
 #### Environment Variables
 
 ```shell
 SENTRY_ACCESS_TOKEN=         # Required: Your Sentry auth token
 
 # LLM Provider Configuration (required for AI-powered search tools)
-EMBEDDED_AGENT_PROVIDER=     # Required: 'openai' or 'anthropic'
+EMBEDDED_AGENT_PROVIDER=     # Required when multiple provider keys are set: 'openai', 'azure-openai', 'anthropic', or 'openrouter'
 OPENAI_API_KEY=              # Required if using OpenAI
 ANTHROPIC_API_KEY=           # Required if using Anthropic
+OPENROUTER_API_KEY=          # Required if using OpenRouter
+OPENROUTER_MODEL=            # Optional OpenRouter model, defaults to 'openai/gpt-5'
 
 # Optional overrides
 SENTRY_HOST=                 # For self-hosted deployments
@@ -162,7 +191,7 @@ To contribute changes, you'll need to set up your local environment:
 
 3. **Configure your credentials:**
 
-   - Edit `.env` in the root directory and add your `OPENAI_API_KEY`
+   - Edit `.env` in the root directory and add either `OPENAI_API_KEY` or `OPENROUTER_API_KEY`
    - Edit `packages/mcp-cloudflare/.env` and add:
      - `SENTRY_CLIENT_ID=your_development_sentry_client_id`
      - `SENTRY_CLIENT_SECRET=your_development_sentry_client_secret`
@@ -198,7 +227,8 @@ pnpm test
 
 ```shell
 # .env (in project root)
-OPENAI_API_KEY=  # Also required for AI-powered search tools in production
+OPENAI_API_KEY=      # Use OpenAI-backed AI-powered tools
+OPENROUTER_API_KEY=  # Or use OpenRouter-backed AI-powered tools
 ```
 
 Note: The root `.env` file provides defaults for all packages. Individual packages can have their own `.env` files to override these defaults during development.

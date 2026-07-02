@@ -6,6 +6,7 @@ import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import {
   ParamOrganizationSlug,
+  ParamPeriod,
   ParamProjectSlug,
   ParamRegionUrl,
 } from "../../schema";
@@ -16,6 +17,7 @@ import {
   isMetricsDataset,
   normalizeEventsDataset,
 } from "../../utils/events-datasets";
+import { extractConversationIdFromSearchQuery } from "../../utils/url-utils";
 import {
   searchEventsAgent,
   type searchEventsAgentOutputSchema,
@@ -436,10 +438,7 @@ export default defineTool({
       .describe(
         "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead.",
       ),
-    statsPeriod: z
-      .string()
-      .optional()
-      .describe("Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."),
+    period: ParamPeriod.optional(),
     regionUrl: ParamRegionUrl.nullable().default(null),
     limit: z
       .number()
@@ -506,7 +505,7 @@ export default defineTool({
     const hasExplicitDataset = params.dataset !== undefined;
     const hasExplicitFields = hasFields(params.fields);
     const hasExplicitSort = explicitSort !== undefined;
-    const hasExplicitStatsPeriod = params.statsPeriod !== undefined;
+    const hasExplicitPeriod = params.period !== undefined;
     const hasExplicitTraceItemDataset =
       hasExplicitDataset && isTraceItemDataset(inputDataset);
     const shouldTrustStructuredTraceSearch =
@@ -525,7 +524,7 @@ export default defineTool({
           dataset: inputDataset,
           fields: params.fields,
           sort: params.sort,
-          statsPeriod: params.statsPeriod,
+          statsPeriod: params.period,
           environment: params.environment,
         }),
         organizationSlug,
@@ -565,8 +564,8 @@ export default defineTool({
       environment = params.environment ?? parsed.environment;
 
       timeParams =
-        shouldTrustExplicitSearchParams && hasExplicitStatsPeriod
-          ? { statsPeriod: params.statsPeriod }
+        shouldTrustExplicitSearchParams && hasExplicitPeriod
+          ? { statsPeriod: params.period }
           : (parseAgentTimeRange(parsed.timeRange) ?? { statsPeriod: "14d" });
 
       if (dataset === "replays") {
@@ -585,7 +584,7 @@ export default defineTool({
         ? explicitStructuredTraceQuery
         : (params.query ?? "");
       sortParam = explicitSort || defaultSortForDataset(dataset);
-      timeParams = { statsPeriod: params.statsPeriod ?? "14d" };
+      timeParams = { statsPeriod: params.period ?? "14d" };
       fields =
         dataset === "replays"
           ? []
@@ -671,10 +670,7 @@ export default defineTool({
     // changes the GROUP BY and silently corrupts the result. Better to let
     // Sentry's 400 propagate so the caller can fix the request explicitly.
     //
-    // Note: fields remain in function form (e.g. "count_unique(user.id)") and
-    // sortParam is also pre-normalization here. The API client normalizes
-    // aggregate sort params to underscore form (e.g. "count_unique_user_id")
-    // later, so an exact string match against fields is correct at this stage.
+    // Note: fields and sortParam use the same function syntax sent to the API.
     fields = augmentFieldsWithSort(fields, sortParam);
 
     const requestFields = buildRequestFields(dataset, fields);
@@ -861,20 +857,23 @@ export default defineTool({
       eventData.length,
     );
 
-    const explorerUrl = apiService.getEventsExplorerUrl(
-      organizationSlug,
-      sentryQuery,
-      projectId,
-      dataset,
-      fields,
-      sortParam,
-      aggregateFunctions,
-      groupByFields,
-      timeParams.statsPeriod,
-      timeParams.start,
-      timeParams.end,
-      eventData,
-    );
+    const conversationId = extractConversationIdFromSearchQuery(sentryQuery);
+    const explorerUrl = conversationId
+      ? apiService.getAIConversationUrl(organizationSlug, conversationId)
+      : apiService.getEventsExplorerUrl(
+          organizationSlug,
+          sentryQuery,
+          projectId,
+          dataset,
+          fields,
+          sortParam,
+          aggregateFunctions,
+          groupByFields,
+          timeParams.statsPeriod,
+          timeParams.start,
+          timeParams.end,
+          eventData,
+        );
 
     const formatParams = {
       eventData,

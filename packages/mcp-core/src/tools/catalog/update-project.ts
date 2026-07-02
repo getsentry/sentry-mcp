@@ -66,11 +66,9 @@ export default defineTool({
       .describe("The new name for the project")
       .nullable()
       .default(null),
-    slug: z
-      .string()
-      .toLowerCase()
-      .trim()
-      .describe("The new slug for the project (must be unique)")
+    slug: ParamProjectSlug.describe(
+      "The new slug for the project (must be unique)",
+    )
       .nullable()
       .default(null),
     platform: ParamPlatform.nullable().default(null),

@@ -4,7 +4,7 @@ A simple CLI tool to test the Sentry MCP server using stdio transport with an AI
 
 ## Features
 
-- 🤖 AI-powered interaction with Sentry MCP tools using GPT-4
+- 🤖 AI-powered interaction with Sentry MCP tools using OpenAI or OpenRouter
 - 🔧 Full access to all MCP server tools
 - 💬 Interactive mode by default when no prompt provided
 - 🎨 Colorized output for better readability
@@ -16,7 +16,7 @@ A simple CLI tool to test the Sentry MCP server using stdio transport with an AI
 
 - Node.js >= 22.13
 - pnpm package manager
-- OpenAI API key for prompt/agent mode
+- OpenAI or OpenRouter API key for prompt/agent mode
 - Sentry access token with appropriate permissions for token-based stdio mode
 
 ## Installation
@@ -51,8 +51,9 @@ The OAuth flow uses PKCE (Proof Key for Code Exchange) and doesn't require a cli
 Create a `.env` file in the package directory:
 
 ```env
-# Required
+# Required for prompt/agent mode; set exactly one provider key
 OPENAI_API_KEY=your_openai_api_key
+OPENROUTER_API_KEY=your_openrouter_api_key
 
 # Required - Sentry access token with appropriate permissions
 SENTRY_ACCESS_TOKEN=your_sentry_access_token
@@ -61,7 +62,7 @@ SENTRY_ACCESS_TOKEN=your_sentry_access_token
 # Leave unset to target the SaaS host
 SENTRY_HOST=sentry.example.com  # Hostname only
 MCP_URL=https://mcp.sentry.dev  # MCP server host (defaults to production)
-MCP_MODEL=gpt-4o  # Override default model (GPT-4)
+MCP_MODEL=openai/gpt-5  # Override default model
 
 # Optional - Error tracking
 SENTRY_DSN=your_sentry_dsn  # Error tracking for the client itself
@@ -121,7 +122,7 @@ Use the local stdio transport explicitly:
 # Test stdio with an explicit token
 SENTRY_ACCESS_TOKEN=your_token pnpm mcp-test-client --transport stdio
 
-# Test stdio auth/tool discovery without OPENAI_API_KEY
+# Test stdio auth/tool discovery without an LLM provider key
 pnpm mcp-test-client --transport stdio --list-tools
 ```
 
@@ -209,13 +210,13 @@ If you see "Failed to connect to MCP server":
 
 If you get authentication errors:
 
-1. Verify your OPENAI_API_KEY is set correctly
+1. Verify your `OPENAI_API_KEY` or `OPENROUTER_API_KEY` is set correctly
 2. Check that your SENTRY_ACCESS_TOKEN has the required permissions
 3. For self-hosted Sentry, ensure SENTRY_HOST is set
 
 ### Testing Auth Without an LLM
 
-To verify stdio auth behavior without `OPENAI_API_KEY`, use:
+To verify stdio auth behavior without an LLM provider key, use:
 
 ```bash
 pnpm mcp-test-client --transport stdio --list-tools
@@ -277,8 +278,8 @@ After installation, you can verify everything is working:
 # Check CLI is installed
 pnpm mcp-test-client --help
 
-# Test basic functionality (no API keys required)
-SENTRY_ACCESS_TOKEN=dummy OPENAI_API_KEY=dummy pnpm mcp-test-client --help
+# Test basic functionality (no real API keys required)
+SENTRY_ACCESS_TOKEN=dummy OPENROUTER_API_KEY=dummy pnpm mcp-test-client --help
 
 # Run the test script (requires valid credentials)
 ./examples/test-connection.sh

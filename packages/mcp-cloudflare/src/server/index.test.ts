@@ -5,6 +5,7 @@ import type { Env } from "./types";
 const {
   MockOAuthProvider,
   mockOAuthProviderFetch,
+  mockHandleSentryBearerMcpRequest,
   mockGetClientIp,
   mockCheckRateLimit,
   mockActiveSpan,
@@ -21,6 +22,7 @@ const {
   return {
     MockOAuthProvider,
     mockOAuthProviderFetch,
+    mockHandleSentryBearerMcpRequest: vi.fn(),
     mockGetClientIp,
     mockCheckRateLimit: vi.fn(),
     mockActiveSpan: {
@@ -49,6 +51,7 @@ vi.mock("./app", () => ({
 
 vi.mock("./lib/mcp-handler", () => ({
   default: { fetch: vi.fn() },
+  handleSentryBearerMcpRequest: mockHandleSentryBearerMcpRequest,
 }));
 
 vi.mock("./oauth", () => ({
@@ -183,6 +186,68 @@ describe("worker entrypoint", () => {
     );
 
     expect(response.status).toBe(200);
+  });
+
+  it("routes Sentry-Bearer MCP requests directly without OAuth", async () => {
+    mockHandleSentryBearerMcpRequest.mockResolvedValueOnce(new Response("ok"));
+
+    const request = new Request("https://mcp.sentry.dev/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: "Sentry-Bearer sntryu_test-token",
+        "User-Agent": "Claude-Code/1.0",
+      },
+    });
+
+    const response = await handler.fetch!(request, env, ctx);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("ok");
+    expect(mockHandleSentryBearerMcpRequest).toHaveBeenCalledWith(
+      request,
+      env,
+      ctx,
+      "sntryu_test-token",
+    );
+    expect(MockOAuthProvider).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed Sentry-Bearer MCP authorization without OAuth", async () => {
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp", {
+        method: "POST",
+        headers: {
+          Authorization: "Sentry-Bearer",
+        },
+      }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.text()).toContain("Missing or invalid");
+    expect(response.headers.get("WWW-Authenticate")).toContain("Sentry-Bearer");
+    expect(mockHandleSentryBearerMcpRequest).not.toHaveBeenCalled();
+    expect(MockOAuthProvider).not.toHaveBeenCalled();
+  });
+
+  it("rejects Sentry-Bearer MCP authorization with extra credentials without OAuth", async () => {
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp", {
+        method: "POST",
+        headers: {
+          Authorization: "Sentry-Bearer sntryu_test-token extra",
+        },
+      }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.text()).toContain("Missing or invalid");
+    expect(response.headers.get("WWW-Authenticate")).toContain("Sentry-Bearer");
+    expect(mockHandleSentryBearerMcpRequest).not.toHaveBeenCalled();
+    expect(MockOAuthProvider).not.toHaveBeenCalled();
   });
 
   it("returns 429 when MCP/OAuth IP limiting blocks the request", async () => {

@@ -14,6 +14,7 @@ import getIssueDetails from "./get-issue-details";
 import getEventStacktrace from "./get-event-stacktrace";
 import getIssueActivity from "./get-issue-activity";
 import getIssueTagValues from "./get-issue-tag-values";
+import getIssueUserReports from "./get-issue-user-reports";
 import getTraceDetails from "./get-trace-details";
 import getReplayDetails from "./get-replay-details";
 import getEventAttachment from "./get-event-attachment";
@@ -37,6 +38,7 @@ import getSnapshot from "./get-snapshot";
 import getSnapshotImage from "./get-snapshot-image";
 import getLatestBaseSnapshot from "./get-latest-base-snapshot";
 import getAIConversationDetails from "./get-ai-conversation-details";
+import searchAIConversations from "./search-ai-conversations";
 import addIssueNote from "./add-issue-note";
 import type { ToolConfig } from "../types";
 
@@ -65,6 +67,7 @@ const catalogTools = {
   get_issue_details: getIssueDetails,
   get_event_stacktrace: getEventStacktrace,
   get_issue_activity: getIssueActivity,
+  get_issue_user_reports: getIssueUserReports,
   get_issue_tag_values: getIssueTagValues,
   get_trace_details: getTraceDetails,
   get_replay_details: getReplayDetails,
@@ -89,6 +92,7 @@ const catalogTools = {
   get_snapshot_image: getSnapshotImage,
   get_latest_base_snapshot: getLatestBaseSnapshot,
   get_ai_conversation_details: getAIConversationDetails,
+  search_ai_conversations: searchAIConversations,
   add_issue_note: addIssueNote,
 } as const satisfies Record<string, ToolConfig<any>>;
 
