@@ -83,6 +83,9 @@ import issueActivityFixture from "./fixtures/issue-activity.json" with {
 import issueCommentsFixture from "./fixtures/issue-comments.json" with {
   type: "json",
 };
+import issueUserReportsFixture from "./fixtures/issue-user-reports.json" with {
+  type: "json",
+};
 import issueFixture from "./fixtures/issue.json" with { type: "json" };
 import issueNullCulpritFixture from "./fixtures/issue-null-culprit.json" with {
   type: "json",
@@ -1263,6 +1266,12 @@ export const restHandlers = buildHandlers([
     method: "get",
     path: "/api/0/organizations/:org/issues/:issueId/external-issues/",
     fetch: () => HttpResponse.json([]),
+  },
+  // User reports endpoints
+  {
+    method: "get",
+    path: "/api/0/organizations/:org/issues/:issueId/user-reports/",
+    fetch: () => HttpResponse.json(issueUserReportsFixture),
   },
   // Issue tag values endpoints
   {

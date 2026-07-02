@@ -79,6 +79,7 @@ import {
   ReplayRecordingSegmentsSchema,
   AIConversationSummaryListSchema,
   AIConversationSpanListSchema,
+  UserReportListSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
 import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
@@ -130,6 +131,7 @@ import type {
   ReplayRecordingSegments,
   AIConversationSummary,
   AIConversationSpanList,
+  UserReportList,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
@@ -3138,6 +3140,44 @@ export class SentryApiService {
       opts,
     );
     return ExternalIssueListSchema.parse(body);
+  }
+
+  /**
+   * Retrieves issue user reports and returns the next Sentry cursor when another page exists.
+   */
+  async getIssueUserReports(
+    {
+      organizationSlug,
+      issueId,
+      cursor,
+      limit,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      cursor?: string | null;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ reports: UserReportList; nextCursor: string | null }> {
+    const searchQuery = new URLSearchParams();
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const path = `/organizations/${organizationSlug}/issues/${issueId}/user-reports/`;
+    const response = await this.request(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+    return {
+      reports: UserReportListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   async getEventForIssue(

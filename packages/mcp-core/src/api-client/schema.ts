@@ -1255,6 +1255,31 @@ export const ExternalIssueSchema = z.object({
   webUrl: z.string(),
 });
 
+export const UserReportSchema = z.object({
+  id: z.string(),
+  eventID: z.string(),
+  name: z.string().nullable(),
+  email: z.string().nullable(),
+  comments: z.string(),
+  dateCreated: z.string(),
+  user: z
+    .object({
+      id: z.string(),
+      username: z.string().nullable(),
+      email: z.string().nullable(),
+      name: z.string().nullable(),
+      ipAddress: z.string().nullable(),
+      avatarUrl: z.string().nullable(),
+    })
+    .nullable(),
+  event: z.object({
+    id: z.string(),
+    eventID: z.string(),
+  }),
+});
+
+export const UserReportListSchema = z.array(UserReportSchema);
+
 export const ExternalIssueListSchema = z.array(ExternalIssueSchema);
 
 /**

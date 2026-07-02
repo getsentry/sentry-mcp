@@ -14,6 +14,7 @@ import getIssueDetails from "./get-issue-details";
 import getEventStacktrace from "./get-event-stacktrace";
 import getIssueActivity from "./get-issue-activity";
 import getIssueTagValues from "./get-issue-tag-values";
+import getIssueUserReports from "./get-issue-user-reports";
 import getTraceDetails from "./get-trace-details";
 import getReplayDetails from "./get-replay-details";
 import getEventAttachment from "./get-event-attachment";
@@ -66,6 +67,7 @@ const catalogTools = {
   get_issue_details: getIssueDetails,
   get_event_stacktrace: getEventStacktrace,
   get_issue_activity: getIssueActivity,
+  get_issue_user_reports: getIssueUserReports,
   get_issue_tag_values: getIssueTagValues,
   get_trace_details: getTraceDetails,
   get_replay_details: getReplayDetails,
