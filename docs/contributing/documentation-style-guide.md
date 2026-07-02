@@ -81,7 +81,6 @@ Link to reusable patterns: See "Error Handling" in [Common Patterns](common-patt
 // Tool parameter pattern used throughout the codebase
 export const ParamOrganizationSlug = z
   .string()
-  .toLowerCase()
   .trim()
   .describe("The organization's slug. Find using `find_organizations()` tool.");
 ```
@@ -93,10 +92,9 @@ import { z } from "zod";
 
 // Define a schema for the organization slug parameter
 // This schema will validate that the input is a string
-// It will also convert to lowercase and trim whitespace
+// It will also trim whitespace
 export const ParamOrganizationSlug = z
   .string() // Ensures the value is a string
-  .toLowerCase() // Converts to lowercase
   .trim() // Removes whitespace
   .describe("The organization's slug..."); // Adds description
 ```

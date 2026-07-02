@@ -290,13 +290,13 @@
           "anyOf": [
             {
               "type": "string",
-              "description": "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible."
+              "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug."
             },
             {
               "type": "null"
             }
           ],
-          "description": "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible.",
+          "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug.",
           "default": null
         },
         "query": {
@@ -475,13 +475,13 @@
           "anyOf": [
             {
               "type": "string",
-              "description": "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible."
+              "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug."
             },
             {
               "type": "null"
             }
           ],
-          "description": "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible.",
+          "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug.",
           "default": null
         },
         "environment": {
@@ -638,13 +638,13 @@
           "anyOf": [
             {
               "type": "string",
-              "description": "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible."
+              "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug."
             },
             {
               "type": "null"
             }
           ],
-          "description": "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible.",
+          "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug.",
           "default": null
         },
         "query": {
@@ -1197,13 +1197,13 @@
           "anyOf": [
             {
               "type": "string",
-              "description": "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible."
+              "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug."
             },
             {
               "type": "null"
             }
           ],
-          "description": "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible.",
+          "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug.",
           "default": null
         },
         "ruleIdOrName": {

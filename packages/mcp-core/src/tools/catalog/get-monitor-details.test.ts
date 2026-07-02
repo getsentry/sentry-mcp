@@ -2,6 +2,7 @@ import { mswServer } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import getMonitorDetails from "./get-monitor-details.js";
+import { prepareToolParams } from "../catalog-runtime/availability";
 
 const context = {
   constraints: {
@@ -180,6 +181,69 @@ describe("get_monitor_details", () => {
       "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/monitors/nightly-import/",
       "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/monitors/nightly-import/checkins/",
       "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/monitors/nightly-import/stats/",
+    ]);
+  });
+
+  it("preserves mixed-case project slug in monitor detail endpoints", async () => {
+    const paths: string[] = [];
+    const monitorResponse = {
+      id: "4509100000000001",
+      slug: "nightly-import",
+      name: "Nightly Import",
+      status: "ok",
+      owner: null,
+      project: {
+        id: "4509109104082945",
+        slug: "MyProject",
+        name: "My Project",
+      },
+      config: {
+        schedule_type: "crontab",
+        schedule: ["crontab", "0 2 * * *"],
+      },
+      environments: [],
+    };
+    mswServer.use(
+      http.get(
+        "*/api/0/projects/*/*/monitors/nightly-import/",
+        ({ request }) => {
+          paths.push(new URL(request.url).pathname);
+          return HttpResponse.json(monitorResponse);
+        },
+      ),
+      http.get(
+        "*/api/0/projects/*/*/monitors/nightly-import/checkins/",
+        ({ request }) => {
+          paths.push(new URL(request.url).pathname);
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const params = prepareToolParams({
+      tool: getMonitorDetails,
+      params: {
+        organizationSlug: " MyOrg ",
+        regionUrl: null,
+        projectSlugOrId: " MyProject ",
+        monitorSlug: "nightly-import",
+        environment: null,
+        period: "24h",
+        start: null,
+        end: null,
+        checkInLimit: 10,
+        includeStats: false,
+        rollupSeconds: null,
+      },
+      context,
+    }) as Parameters<typeof getMonitorDetails.handler>[0];
+
+    const result = await getMonitorDetails.handler(params, context);
+
+    expect(result).toContain("# Monitor Nightly Import in **MyOrg**");
+    expect(paths).toEqual([
+      "/api/0/projects/MyOrg/MyProject/monitors/nightly-import/",
+      "/api/0/projects/MyOrg/MyProject/monitors/nightly-import/checkins/",
     ]);
   });
 

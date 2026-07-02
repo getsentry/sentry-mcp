@@ -37,13 +37,11 @@ const VALID_SLUG_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
  * @example
  * ```typescript
  * const OrganizationSlug = z.string()
- *   .toLowerCase()
  *   .trim()
  *   .superRefine(validateSlug)
  *   .describe("Organization slug");
  *
  * const TeamSlug = z.string()
- *   .toLowerCase()
  *   .trim()
  *   .superRefine(validateSlug)
  *   .describe("Team slug");
@@ -85,7 +83,6 @@ export function validateSlug(val: string, ctx: z.RefinementCtx): void {
  * @example
  * ```typescript
  * const ProjectSlugOrId = z.string()
- *   .toLowerCase()
  *   .trim()
  *   .superRefine(validateSlugOrId)
  *   .describe("Project slug or numeric ID");
