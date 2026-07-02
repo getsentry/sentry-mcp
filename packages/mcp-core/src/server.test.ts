@@ -1312,6 +1312,27 @@ describe("buildServer", () => {
       );
     });
 
+    it("execute_sentry_tool dispatches to catalog-only issue user reports", async () => {
+      const server = buildServer({
+        context: baseContext,
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      expect(toolNames).not.toContain("get_issue_user_reports");
+
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
+        name: "get_issue_user_reports",
+        arguments: {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+        },
+      });
+
+      expect(getTextContent(result)).toContain(
+        "# Issue User Reports for Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
+      );
+    });
+
     it("execute_sentry_tool dispatches to catalog-only update_dsn", async () => {
       const server = buildServer({
         context: baseContext,

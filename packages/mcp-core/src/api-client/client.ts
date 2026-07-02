@@ -3142,22 +3142,42 @@ export class SentryApiService {
     return ExternalIssueListSchema.parse(body);
   }
 
+  /**
+   * Retrieves issue user reports and returns the next Sentry cursor when another page exists.
+   */
   async getIssueUserReports(
     {
       organizationSlug,
       issueId,
+      cursor,
+      limit,
     }: {
       organizationSlug: string;
       issueId: string;
+      cursor?: string | null;
+      limit?: number;
     },
     opts?: RequestOptions,
-  ): Promise<UserReportList> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/user-reports/`,
+  ): Promise<{ reports: UserReportList; nextCursor: string | null }> {
+    const searchQuery = new URLSearchParams();
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const path = `/organizations/${organizationSlug}/issues/${issueId}/user-reports/`;
+    const response = await this.request(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,
       opts,
     );
-    return UserReportListSchema.parse(body);
+    const body = await this.parseJsonResponse(response);
+    return {
+      reports: UserReportListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   async getEventForIssue(

@@ -1256,20 +1256,22 @@ export const ExternalIssueSchema = z.object({
 });
 
 export const UserReportSchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  eventID: z.union([z.string(), z.number()]),
+  id: z.string(),
+  eventID: z.string(),
   name: z.string().nullable(),
   email: z.string().nullable(),
   comments: z.string(),
   dateCreated: z.string(),
-  user: z.object({
-    id: z.string().nullable(),
-    username: z.string().nullable(),
-    email: z.string().nullable(),
-    name: z.string().nullable(),
-    ipAddress: z.string().nullable(),
-    avatarUrl: z.string().nullable(),
-  }),
+  user: z
+    .object({
+      id: z.string(),
+      username: z.string().nullable(),
+      email: z.string().nullable(),
+      name: z.string().nullable(),
+      ipAddress: z.string().nullable(),
+      avatarUrl: z.string().nullable(),
+    })
+    .nullable(),
   event: z.object({
     id: z.string(),
     eventID: z.string(),

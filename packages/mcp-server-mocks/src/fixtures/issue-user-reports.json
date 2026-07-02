@@ -2,21 +2,54 @@
   {
     "id": "11974227",
     "eventID": "957c1ee8f31e4e68a57b637dad557b32",
-    "name": "Pragyan Patidar",
-    "email": "appupatidar14@gmail.com",
+    "name": "Example Reporter",
+    "email": "reporter@example.com",
     "comments": "i am currently testing it",
     "dateCreated": "2026-06-22T02:37:27.878947Z",
+    "user": {
+      "id": "user-123",
+      "username": "example-reporter",
+      "email": "reporter@example.com",
+      "name": "Example Reporter",
+      "ipAddress": "203.0.113.10",
+      "avatarUrl": "https://example.com/avatar.png"
+    },
+    "event": {
+      "id": "957c1ee8f31e4e68a57b637dad557b32",
+      "eventID": "957c1ee8f31e4e68a57b637dad557b32"
+    }
+  },
+  {
+    "id": "11974228",
+    "eventID": "057c1ee8f31e4e68a57b637dad557b33",
+    "name": "",
+    "email": "",
+    "comments": "anonymous report with no event user",
+    "dateCreated": "2026-06-22T03:10:11.123456Z",
+    "user": null,
+    "event": {
+      "id": "057c1ee8f31e4e68a57b637dad557b33",
+      "eventID": "057c1ee8f31e4e68a57b637dad557b33"
+    }
+  },
+  {
+    "id": "11974229",
+    "eventID": "157c1ee8f31e4e68a57b637dad557b34",
+    "name": "",
+    "email": "",
+    "comments": "event user shell without identity",
+    "dateCreated": "2026-06-22T03:45:12.456789Z",
     "user": {
       "id": "None",
       "username": null,
       "email": null,
       "name": null,
-      "ipAddress": "2405:201:303a:49bc:68a7:36c0:3c3:c16d",
-      "avatarUrl": "https://gravatar.com/avatar/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855?s=32&d=mm"
+      "ipAddress": null,
+      "avatarUrl": null
     },
     "event": {
-      "id": "957c1ee8f31e4e68a57b637dad557b32",
-      "eventID": "957c1ee8f31e4e68a57b637dad557b32"
+      "id": "157c1ee8f31e4e68a57b637dad557b34",
+      "eventID": "157c1ee8f31e4e68a57b637dad557b34"
     }
   }
 ]
