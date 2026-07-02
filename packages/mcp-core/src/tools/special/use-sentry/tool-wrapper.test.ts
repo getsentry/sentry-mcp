@@ -28,6 +28,7 @@ const mockTool: ToolConfig<{
   requiredScopes: [],
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
   handler: async (params, context) => {
@@ -166,6 +167,7 @@ describe("wrapToolForAgent", () => {
       requiredScopes: [],
       annotations: {
         readOnlyHint: true,
+        destructiveHint: false,
         openWorldHint: true,
       },
       handler: async () => {

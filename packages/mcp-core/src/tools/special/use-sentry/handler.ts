@@ -8,6 +8,7 @@ import { buildServer } from "../../../server";
 import tools from "../../index";
 import { CATALOG_INFRASTRUCTURE_TOOL_NAMES } from "../../surfaces";
 import type { ToolCall } from "../../../internal/agents/callEmbeddedAgent";
+import { logInfo } from "../../../telem/logging";
 
 /**
  * Format tool calls into a readable trace
@@ -100,8 +101,16 @@ export default defineTool({
       "use_sentry",
       ...CATALOG_INFRASTRUCTURE_TOOL_NAMES,
     ]);
+    // Read-only by default: exclude write tools unless the trusted caller opts
+    // in via context. Writes are never enabled by a model-supplied parameter,
+    // so attacker content read mid-loop can't escalate (indirect injection).
+    const allowWrites = context.allowEmbeddedAgentWrites === true;
     const toolsForAgent = Object.fromEntries(
-      Object.entries(tools).filter(([key]) => !toolsToExclude.has(key)),
+      Object.entries(tools).filter(([key, tool]) => {
+        if (toolsToExclude.has(key)) return false;
+        if (allowWrites) return true;
+        return tool.annotations.readOnlyHint === true;
+      }),
     );
 
     // Build internal MCP server with the provided context.
@@ -134,6 +143,27 @@ export default defineTool({
         request: params.request,
         tools: mcpTools,
       });
+
+      // Audit any write the embedded agent performed (only possible when writes
+      // are enabled). Log tool name + arg keys, not values, to avoid logging
+      // untrusted content.
+      for (const call of agentResult.toolCalls) {
+        const isWrite =
+          tools[call.toolName as keyof typeof tools]?.annotations
+            .readOnlyHint !== true;
+        if (isWrite) {
+          logInfo("embedded agent performed write", {
+            loggerScope: ["agents", "use-sentry", "write-audit"],
+            extra: {
+              toolName: call.toolName,
+              argKeys: Object.keys(
+                (call.args ?? {}) as Record<string, unknown>,
+              ),
+              userId: context.userId ?? null,
+            },
+          });
+        }
+      }
 
       let output = agentResult.result.result;
 

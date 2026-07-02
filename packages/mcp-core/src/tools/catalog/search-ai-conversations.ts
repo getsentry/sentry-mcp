@@ -235,6 +235,7 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
   outputSchema: searchAIConversationsOutputSchema,

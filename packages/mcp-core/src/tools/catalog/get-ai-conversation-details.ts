@@ -692,7 +692,11 @@ export default defineTool({
     regionUrl: ParamRegionUrl.optional(),
   },
 
-  annotations: { readOnlyHint: true, openWorldHint: true },
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true,
+  },
   outputSchema: aiConversationDetailsOutputSchema,
 
   async handler(params, context: ServerContext) {

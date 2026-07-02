@@ -4,7 +4,7 @@ Sentry MCP is a Model Context Protocol server that exposes Sentry's error tracki
 ## Principles
 
 - **Type Safety**: Prefer strict types over `any` - they catch bugs and improve tooling. Use `unknown` for truly unknown types.
-- **Security**: Never log secrets. Validate external input. See docs/operations/security.md.
+- **Security**: Never log secrets. Validate external input. Treat tool output as untrusted; agentic surfaces (embedded agent, `/chat`) are read-only by default and writes require a trusted-caller opt-in. Every tool must declare complete safety annotations (`readOnlyHint`/`destructiveHint`/`openWorldHint`). See docs/operations/security.md.
 - **Simplicity**: Follow existing patterns. Check neighboring files before inventing new approaches.
 
 ## Constraints
