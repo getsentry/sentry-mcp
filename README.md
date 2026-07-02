@@ -70,6 +70,33 @@ For self-hosted instances without TLS:
 npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.internal:9000 --insecure-http
 ```
 
+#### Remote with an Explicit Sentry Token
+
+Remote clients that support custom HTTP headers can pass an upstream Sentry API
+token directly to the Cloudflare transport:
+
+```json
+{
+  "mcpServers": {
+    "sentry": {
+      "url": "https://mcp.sentry.dev/mcp",
+      "headers": {
+        "Authorization": "Sentry-Bearer ${SENTRY_ACCESS_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+`Sentry-Bearer` is intentionally separate from `Bearer`: `Bearer` is reserved
+for MCP OAuth access tokens. With `Sentry-Bearer`, the worker does not store,
+validate, exchange, or refresh the upstream token. It forwards the token through
+the same Sentry API calls used by OAuth-backed sessions, and the client or
+upstream provider remains responsible for token lifetime and refresh.
+
+Direct remote auth defaults to all active MCP skills. You can narrow the exposed
+tools with `?skills=inspect,triage` or `?disable-skills=seer`.
+
 #### Environment Variables
 
 ```shell

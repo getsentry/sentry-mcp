@@ -1,5 +1,6 @@
 import type { ExecutionContext, RateLimit } from "@cloudflare/workers-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DIRECT_AUTH_ASSERTION_TOKEN } from "../../test-utils/fetch-mock-setup";
 import type { Env } from "../types";
 
 const { sentryMetricsCount, sentrySetUser } = vi.hoisted(() => ({
@@ -15,7 +16,7 @@ vi.mock("@sentry/cloudflare", () => ({
   setUser: sentrySetUser,
 }));
 
-import mcpHandler from "./mcp-handler";
+import mcpHandler, { handleSentryBearerMcpRequest } from "./mcp-handler";
 
 interface OAuthProps {
   id: string;
@@ -311,6 +312,213 @@ describe("MCP Handler", () => {
       expect(response.status).toBe(429);
       expect(await response.text()).toContain("Rate limit exceeded");
     });
+
+    it("accepts Sentry-Bearer direct tokens without OAuth props or refresh tokens", async () => {
+      const request = createMcpRequest("tools/list");
+      const ctx = {
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn(),
+      } as unknown as ExecutionContext;
+
+      const response = await handleSentryBearerMcpRequest(
+        request,
+        createTestEnv(),
+        ctx,
+        "sntryu_test-token",
+      );
+
+      expect(response.status).toBe(200);
+      const body = await parseSSEResponse<{
+        result?: { tools: Array<{ name: string }> };
+      }>(response);
+      const toolNames = body.result?.tools.map((tool) => tool.name) ?? [];
+
+      expect(toolNames).toContain("search_events");
+      expect(toolNames).toContain("update_issue");
+    });
+
+    it("passes Sentry-Bearer direct tokens to upstream Sentry API calls", async () => {
+      const request = createMcpRequest("tools/call", {
+        name: "execute_sentry_tool",
+        arguments: {
+          name: "whoami",
+          arguments: {},
+        },
+      });
+      const ctx = {
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn(),
+      } as unknown as ExecutionContext;
+      const env = createTestEnv();
+      env.SENTRY_HOST = "direct-token.test";
+
+      const response = await handleSentryBearerMcpRequest(
+        request,
+        env,
+        ctx,
+        DIRECT_AUTH_ASSERTION_TOKEN,
+      );
+
+      expect(response.status).toBe(200);
+      const body = await parseSSEResponse<{
+        result?: { content?: Array<{ text?: string }> };
+      }>(response);
+      const text = body.result?.content?.map((item) => item.text).join("\n");
+
+      expect(text).toContain("You are authenticated as");
+    });
+
+    it("applies the Sentry-Bearer MCP rate limit per token", async () => {
+      const mockTokenRateLimiter = {
+        limit: vi.fn().mockResolvedValue({ success: true }),
+      } as unknown as RateLimit;
+      const request = createMcpRequest("tools/list");
+      const ctx = {
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn(),
+      } as unknown as ExecutionContext;
+      const env = createTestEnv();
+      env.MCP_USER_RATE_LIMITER = mockTokenRateLimiter;
+
+      const response = await handleSentryBearerMcpRequest(
+        request,
+        env,
+        ctx,
+        "sntryu_test-token",
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockTokenRateLimiter.limit).toHaveBeenCalledWith({
+        key: expect.stringMatching(/^mcp:sentry-token:[0-9a-f]{16}$/),
+      });
+    });
+
+    it("returns 429 with Sentry-Bearer scope when a direct token exceeds the MCP rate limit", async () => {
+      const request = createMcpRequest("tools/list");
+      const ctx = {
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn(),
+      } as unknown as ExecutionContext;
+      const env = createTestEnv();
+      env.MCP_USER_RATE_LIMITER = {
+        limit: vi.fn().mockResolvedValue({ success: false }),
+      } as unknown as RateLimit;
+
+      const response = await handleSentryBearerMcpRequest(
+        request,
+        env,
+        ctx,
+        "sntryu_test-token",
+      );
+
+      expect(response.status).toBe(429);
+      expect(await response.text()).toContain("Rate limit exceeded");
+      expect(response.headers.get("x-sentry-rate-limit-scope")).toBe(
+        "sentry-token",
+      );
+    });
+
+    it("narrows Sentry-Bearer tools with direct skills query params", async () => {
+      const request = createMcpRequest(
+        "tools/list",
+        {},
+        { path: "/mcp?skills=inspect" },
+      );
+      const ctx = {
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn(),
+      } as unknown as ExecutionContext;
+
+      const response = await handleSentryBearerMcpRequest(
+        request,
+        createTestEnv(),
+        ctx,
+        "sntryu_test-token",
+      );
+
+      expect(response.status).toBe(200);
+      const body = await parseSSEResponse<{
+        result?: { tools: Array<{ name: string }> };
+      }>(response);
+      const toolNames = body.result?.tools.map((tool) => tool.name) ?? [];
+
+      expect(toolNames).toContain("search_events");
+      expect(toolNames).not.toContain("update_issue");
+    });
+
+    it("removes Sentry-Bearer tools with direct disable-skills query params", async () => {
+      const request = createMcpRequest(
+        "tools/list",
+        {},
+        { path: "/mcp?disable-skills=triage" },
+      );
+      const ctx = {
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn(),
+      } as unknown as ExecutionContext;
+
+      const response = await handleSentryBearerMcpRequest(
+        request,
+        createTestEnv(),
+        ctx,
+        "sntryu_test-token",
+      );
+
+      expect(response.status).toBe(200);
+      const body = await parseSSEResponse<{
+        result?: { tools: Array<{ name: string }> };
+      }>(response);
+      const toolNames = body.result?.tools.map((tool) => tool.name) ?? [];
+
+      expect(toolNames).toContain("search_events");
+      expect(toolNames).not.toContain("update_issue");
+    });
+
+    it("rejects invalid Sentry-Bearer skills query params", async () => {
+      const request = createMcpRequest(
+        "tools/list",
+        {},
+        { path: "/mcp?skills=bogus" },
+      );
+      const ctx = {
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn(),
+      } as unknown as ExecutionContext;
+
+      const response = await handleSentryBearerMcpRequest(
+        request,
+        createTestEnv(),
+        ctx,
+        "sntryu_test-token",
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toContain("invalid skills");
+    });
+
+    it("rejects empty Sentry-Bearer skills query params", async () => {
+      const request = createMcpRequest(
+        "tools/list",
+        {},
+        { path: "/mcp?skills=" },
+      );
+      const ctx = {
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn(),
+      } as unknown as ExecutionContext;
+
+      const response = await handleSentryBearerMcpRequest(
+        request,
+        createTestEnv(),
+        ctx,
+        "sntryu_test-token",
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toContain(
+        "skills must include at least one valid skill",
+      );
+    });
   });
 
   describe("URL constraints", () => {
@@ -381,6 +589,35 @@ describe("MCP Handler", () => {
 
       expect(response.status).toBe(404);
       expect(await response.text()).toContain("not found");
+    });
+
+    it("does not pre-verify Sentry-Bearer URL constraints", async () => {
+      const request = createMcpRequest(
+        "initialize",
+        {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "1.0.0" },
+        },
+        { path: "/mcp/nonexistent-org" },
+      );
+      const ctx = {
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn(),
+      } as unknown as ExecutionContext;
+
+      const response = await handleSentryBearerMcpRequest(
+        request,
+        createTestEnv(),
+        ctx,
+        "sntryu_test-token",
+      );
+
+      expect(response.status).toBe(200);
+      const body = await parseSSEResponse<{
+        result?: { protocolVersion: string };
+      }>(response);
+      expect(body.result?.protocolVersion).toBeDefined();
     });
 
     it("returns 403 when the token is org-scoped but the MCP URL uses a different organization", async () => {

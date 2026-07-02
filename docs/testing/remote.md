@@ -8,15 +8,15 @@ The remote MCP server runs on Cloudflare Workers and provides HTTP-based access 
 
 **When to use remote:**
 - Testing OAuth flows
+- Testing explicit Sentry API token auth over HTTP
 - Testing constraint-based access control (org/project filtering)
 - Testing the web chat interface
 - Production-like environment testing
 - Multi-user scenarios
 
 **When to use stdio instead:**
-- Self-hosted Sentry without OAuth
+- Self-hosted Sentry without a Cloudflare deployment
 - IDE integration testing
-- Direct API token authentication
 - Local development without network
 
 ## Prerequisites
@@ -194,6 +194,42 @@ pnpm -w run cli "who am I?"
 - Tokens stored in `~/.sentry-mcp-tokens.json`
 - Automatically refreshed when expired
 - To force re-auth: delete the token file
+
+### Direct Sentry Token Testing
+
+Remote `/mcp` also accepts explicit upstream Sentry API tokens with a separate
+authorization scheme:
+
+```bash
+curl http://localhost:5173/mcp \
+  -H "Authorization: Sentry-Bearer $SENTRY_ACCESS_TOKEN" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+Use this path when the client or an upstream provider already owns the Sentry
+token lifecycle. The worker does not use MCP OAuth, store the token, validate it
+up front, refresh it, or revoke a grant when Sentry later rejects it.
+
+`Authorization: Bearer ...` remains the MCP OAuth token format. A malformed
+`Sentry-Bearer` header returns `401` directly instead of falling back to OAuth.
+
+Direct-token sessions default to all active skills. Narrow the exposed tools
+with query parameters:
+
+```bash
+curl "http://localhost:5173/mcp?skills=inspect,triage" \
+  -H "Authorization: Sentry-Bearer $SENTRY_ACCESS_TOKEN" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+Constrained URLs still set MCP org/project constraints, for example
+`/mcp/sentry/javascript`, but direct-token mode does not pre-verify those
+constraints during initialization. Tool calls rely on the upstream Sentry API to
+accept or reject the provided token for the requested org/project.
 
 ### Testing with Constraints
 
@@ -641,11 +677,11 @@ Key differences to verify:
 
 | Feature | Stdio | Remote |
 |---------|-------|--------|
-| Authentication | Access token | OAuth |
+| Authentication | Access token | OAuth, or `Sentry-Bearer` access token |
 | Constraints | Via CLI flags | Via URL path |
 | Transport | stdin/stdout | HTTP/SSE |
 | Multi-user | No | Yes |
-| Token refresh | N/A | Automatic |
+| Token refresh | N/A | OAuth only; direct tokens are caller-managed |
 | Web UI | No | Yes |
 | Performance | Faster (no network) | Network latency |
 
