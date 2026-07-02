@@ -83,6 +83,12 @@ export default defineTool({
       .describe(
         "Enable tracing to see all tool calls made by the agent. Useful for debugging.",
       ),
+    allowWrites: z
+      .boolean()
+      .optional()
+      .describe(
+        "Allow write/destructive tools. Defaults to false (read-only).",
+      ),
   },
   annotations: {
     readOnlyHint: false,
@@ -100,8 +106,14 @@ export default defineTool({
       "use_sentry",
       ...CATALOG_INFRASTRUCTURE_TOOL_NAMES,
     ]);
+    // Read-only by default: exclude write tools unless the caller opts in, so
+    // attacker content read mid-loop can't trigger writes (indirect injection).
     const toolsForAgent = Object.fromEntries(
-      Object.entries(tools).filter(([key]) => !toolsToExclude.has(key)),
+      Object.entries(tools).filter(([key, tool]) => {
+        if (toolsToExclude.has(key)) return false;
+        if (params.allowWrites) return true;
+        return tool.annotations.readOnlyHint === true;
+      }),
     );
 
     // Build internal MCP server with the provided context.

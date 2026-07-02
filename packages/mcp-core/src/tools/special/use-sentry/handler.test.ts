@@ -33,13 +33,20 @@ const mockContext: ServerContext = {
   grantedSkills: new Set(ALL_SKILLS),
 };
 
-function getExpectedAgentToolNames(context: ServerContext): string[] {
+function getExpectedAgentToolNames(
+  context: ServerContext,
+  allowWrites = false,
+): string[] {
   const toolsToExclude = new Set<string>([
     "use_sentry",
     ...CATALOG_INFRASTRUCTURE_TOOL_NAMES,
   ]);
   const toolsForAgent = Object.fromEntries(
-    Object.entries(tools).filter(([key]) => !toolsToExclude.has(key)),
+    Object.entries(tools).filter(([key, tool]) => {
+      if (toolsToExclude.has(key)) return false;
+      if (allowWrites) return true;
+      return tool.annotations.readOnlyHint === true;
+    }),
   );
 
   return getToolsForMcpRegistration({
@@ -55,11 +62,24 @@ function getExpectedAgentToolNames(context: ServerContext): string[] {
 function expectAgentToolNames(
   toolsArg: Record<string, unknown>,
   context: ServerContext,
+  allowWrites = false,
 ) {
   expect(Object.keys(toolsArg).sort()).toEqual(
-    getExpectedAgentToolNames(context),
+    getExpectedAgentToolNames(context, allowWrites),
   );
 }
+
+// Tools that mutate upstream state; must never reach the agent unless the
+// caller explicitly opts into writes.
+const WRITE_TOOL_NAMES = [
+  "update_issue",
+  "add_issue_note",
+  "create_dsn",
+  "update_dsn",
+  "create_project",
+  "update_project",
+  "create_team",
+] as const;
 
 describe("use_sentry handler", () => {
   beforeEach(() => {
@@ -242,5 +262,52 @@ describe("use_sentry handler", () => {
     // Verify both find tools are filtered
     expect(toolsArg.find_organizations).toBeUndefined();
     expect(toolsArg.find_projects).toBeUndefined();
+  });
+
+  it("excludes write/destructive tools by default (read-only)", async () => {
+    mockUseSentryAgent.mockResolvedValue({
+      result: { result: "Success" },
+      toolCalls: [],
+    });
+
+    await useSentry.handler(
+      { request: "triage PROJ-1", trace: null },
+      mockContext,
+    );
+
+    const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
+
+    // No write tool should be reachable without an explicit opt-in, even
+    // though the context grants triage + project-management skills.
+    for (const name of WRITE_TOOL_NAMES) {
+      expect(
+        toolsArg[name],
+        `${name} must be excluded by default`,
+      ).toBeUndefined();
+    }
+    // Read tools remain available.
+    expect(toolsArg.get_issue_details).toBeDefined();
+    expect(toolsArg.search_issues).toBeDefined();
+    expectAgentToolNames(toolsArg, mockContext, false);
+  });
+
+  it("exposes write tools only when allowWrites is true", async () => {
+    mockUseSentryAgent.mockResolvedValue({
+      result: { result: "Success" },
+      toolCalls: [],
+    });
+
+    await useSentry.handler(
+      { request: "resolve PROJ-1", trace: null, allowWrites: true },
+      mockContext,
+    );
+
+    const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
+
+    // With the opt-in and the granted skills, write tools become available.
+    expect(toolsArg.update_issue).toBeDefined();
+    expect(toolsArg.add_issue_note).toBeDefined();
+    expect(toolsArg.create_dsn).toBeDefined();
+    expectAgentToolNames(toolsArg, mockContext, true);
   });
 });
