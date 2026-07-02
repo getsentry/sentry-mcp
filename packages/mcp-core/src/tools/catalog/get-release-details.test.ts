@@ -2,6 +2,7 @@ import { mswServer, releaseFixture } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import getReleaseDetails from "./get-release-details.js";
+import { prepareToolParams } from "../catalog-runtime/availability";
 
 const context = {
   constraints: {
@@ -242,6 +243,80 @@ describe("get_release_details", () => {
     );
     expect(new URL(commitsRequest!.url).pathname).toBe(
       `/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/${releaseVersion}/commits/`,
+    );
+  });
+
+  it("preserves mixed-case project slug in release detail endpoints", async () => {
+    const requests: Array<{
+      kind: "details" | "deploys" | "commits";
+      url: string;
+    }> = [];
+    const releaseVersion = "8ce89484-0fec-4913-a2cd-e8e2d41dee36";
+    mswServer.use(
+      http.get(
+        `https://sentry.io/api/0/projects/MyOrg/MyProject/releases/${releaseVersion}/`,
+        ({ request }) => {
+          requests.push({ kind: "details", url: request.url });
+          return HttpResponse.json(releaseFixture);
+        },
+      ),
+      http.get(
+        `https://sentry.io/api/0/organizations/MyOrg/releases/${releaseVersion}/deploys/`,
+        ({ request }) => {
+          requests.push({ kind: "deploys", url: request.url });
+          return HttpResponse.json([]);
+        },
+      ),
+      http.get(
+        `https://sentry.io/api/0/projects/MyOrg/MyProject/releases/${releaseVersion}/commits/`,
+        ({ request }) => {
+          requests.push({ kind: "commits", url: request.url });
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const params = prepareToolParams({
+      tool: getReleaseDetails,
+      params: {
+        organizationSlug: " MyOrg ",
+        regionUrl: null,
+        releaseVersion,
+        projectSlugOrId: " MyProject ",
+        includeHealth: false,
+        includeDeploys: true,
+        includeCommits: true,
+        limit: 10,
+      },
+      context,
+    }) as Parameters<typeof getReleaseDetails.handler>[0];
+
+    await getReleaseDetails.handler(params, context);
+
+    expect(requests).toHaveLength(3);
+    const detailsRequest = requests.find(
+      (request) => request.kind === "details",
+    );
+    const deploysRequest = requests.find(
+      (request) => request.kind === "deploys",
+    );
+    const commitsRequest = requests.find(
+      (request) => request.kind === "commits",
+    );
+    expect(detailsRequest).toBeDefined();
+    expect(deploysRequest).toBeDefined();
+    expect(commitsRequest).toBeDefined();
+    expect(new URL(detailsRequest!.url).pathname).toBe(
+      `/api/0/projects/MyOrg/MyProject/releases/${releaseVersion}/`,
+    );
+    expect(new URL(deploysRequest!.url).pathname).toBe(
+      `/api/0/organizations/MyOrg/releases/${releaseVersion}/deploys/`,
+    );
+    expect(new URL(deploysRequest!.url).searchParams.get("projectSlug")).toBe(
+      "MyProject",
+    );
+    expect(new URL(commitsRequest!.url).pathname).toBe(
+      `/api/0/projects/MyOrg/MyProject/releases/${releaseVersion}/commits/`,
     );
   });
 

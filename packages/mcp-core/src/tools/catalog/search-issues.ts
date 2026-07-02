@@ -13,11 +13,7 @@ import {
   formatExplanation,
 } from "../support/search-issues/formatters";
 
-const ProjectSlugOrIdSchema = z
-  .string()
-  .toLowerCase()
-  .trim()
-  .superRefine(validateSlugOrId);
+const ProjectSlugOrIdSchema = z.string().trim().superRefine(validateSlugOrId);
 
 function buildIssueSearchRepairPrompt(params: {
   query: string;

@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
+import {
+  ParamOrganizationSlug,
+  ParamProjectSlug,
+  ParamProjectSlugOrAll,
+  ParamTeamSlug,
+} from "../schema";
 import { validateSlug, validateSlugOrId, isNumericId } from "./slug-validation";
 
 describe("slug-validation", () => {
@@ -12,6 +18,8 @@ describe("slug-validation", () => {
         "my.project",
         "project123",
         "123project",
+        "MyOrg",
+        "My.Project_123",
         "a",
         "a-b-c-d-e-f",
         "test_123.abc-def",
@@ -151,6 +159,7 @@ describe("slug-validation", () => {
         "my_project",
         "myproject",
         "project123",
+        "MyProject",
       ];
 
       for (const slug of validSlugs) {
@@ -172,19 +181,12 @@ describe("slug-validation", () => {
   });
 
   describe("integration with ParamOrganizationSlug", () => {
-    it("should validate organization slugs with transformations", () => {
-      // Import the actual param schema to test integration
-      const ParamOrganizationSlug = z
-        .string()
-        .toLowerCase()
-        .trim()
-        .superRefine(validateSlug);
+    it("should preserve case for resource slugs", () => {
+      expect(ParamOrganizationSlug.parse("  MyOrg  ")).toBe("MyOrg");
+      expect(ParamTeamSlug.parse("MyTeam")).toBe("MyTeam");
+      expect(ParamProjectSlug.parse("My_Project")).toBe("My_Project");
+      expect(ParamProjectSlugOrAll.parse("My.Project")).toBe("My.Project");
 
-      // Should transform and validate
-      expect(ParamOrganizationSlug.parse("  MY-ORG  ")).toBe("my-org");
-      expect(ParamOrganizationSlug.parse("MY_ORG")).toBe("my_org");
-
-      // Should reject dangerous patterns after transformation
       expect(() => ParamOrganizationSlug.parse("  ../MY-ORG  ")).toThrow(
         /alphanumeric/i,
       );
@@ -219,10 +221,9 @@ describe("slug-validation", () => {
       expect(() => schema.parse("\0")).toThrow(/alphanumeric/i);
     });
 
-    it("should handle case sensitivity correctly", () => {
-      const schema = z.string().toLowerCase().trim().superRefine(validateSlug);
+    it("should reject dangerous patterns without case coercion", () => {
+      const schema = z.string().trim().superRefine(validateSlug);
 
-      // Should normalize and then validate
       expect(() => schema.parse("..AUTH")).toThrow(/alphanumeric/i);
       expect(() => schema.parse("../AUTH")).toThrow(/alphanumeric/i);
       expect(() => schema.parse("%2E%2E")).toThrow(/alphanumeric/i);

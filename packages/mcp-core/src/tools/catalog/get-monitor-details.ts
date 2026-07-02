@@ -93,7 +93,6 @@ export default defineTool({
     regionUrl: ParamRegionUrl.nullable().default(null),
     projectSlugOrId: z
       .string()
-      .toLowerCase()
       .trim()
       .superRefine(validateSlugOrId)
       .nullable()
