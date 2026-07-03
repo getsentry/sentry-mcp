@@ -23,13 +23,13 @@ import { annotateResponseMetric } from "../metrics";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
 
-// Keep the demo read-only: drop non-read-only tools (use_sentry stays; it
-// defaults to read-only). Names come from mcp-core, not the MCP transport.
+// Keep the demo read-only: drop any tool that isn't annotated read-only
+// (including use_sentry, which may perform writes). Names come from mcp-core,
+// not the MCP transport.
 function applyReadOnlyToolPolicy(toolSet: ToolSet): void {
   const readOnly = getReadOnlyToolNames();
-  const keepAnyway = new Set<string>(["use_sentry"]);
   for (const name of Object.keys(toolSet)) {
-    if (!readOnly.has(name) && !keepAnyway.has(name)) {
+    if (!readOnly.has(name)) {
       delete toolSet[name];
     }
   }

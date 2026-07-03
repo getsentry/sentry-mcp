@@ -101,16 +101,11 @@ export default defineTool({
       "use_sentry",
       ...CATALOG_INFRASTRUCTURE_TOOL_NAMES,
     ]);
-    // Read-only by default: exclude write tools unless the trusted caller opts
-    // in via context. Writes are never enabled by a model-supplied parameter,
-    // so attacker content read mid-loop can't escalate (indirect injection).
-    const allowWrites = context.allowEmbeddedAgentWrites === true;
+    // The agent exposes exactly the tools the user's granted skills permit
+    // (skill filtering happens in buildServer). use_sentry is annotated
+    // destructiveHint: true, so callers are told it may perform writes.
     const toolsForAgent = Object.fromEntries(
-      Object.entries(tools).filter(([key, tool]) => {
-        if (toolsToExclude.has(key)) return false;
-        if (allowWrites) return true;
-        return tool.annotations.readOnlyHint === true;
-      }),
+      Object.entries(tools).filter(([key]) => !toolsToExclude.has(key)),
     );
 
     // Build internal MCP server with the provided context.
