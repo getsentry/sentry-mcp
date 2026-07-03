@@ -69,7 +69,7 @@ export default defineTool({
   annotations: {
     readOnlyHint: false,
     destructiveHint: true,
-    idempotentHint: true,
+    idempotentHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {

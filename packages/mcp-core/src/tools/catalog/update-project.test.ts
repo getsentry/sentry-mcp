@@ -162,4 +162,8 @@ describe("update_project", () => {
     expect(updateProject.inputSchema).not.toHaveProperty("teamSlug");
     expect(updateProject.description).not.toContain("teamSlug");
   });
+
+  it("does not claim idempotency because slug renames invalidate the old slug", () => {
+    expect(updateProject.annotations.idempotentHint).toBe(false);
+  });
 });
