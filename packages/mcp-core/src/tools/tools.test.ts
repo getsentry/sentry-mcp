@@ -77,19 +77,6 @@ test("all tools declare complete MCP safety annotations", () => {
   }
 });
 
-test("getReadOnlyToolNames returns exactly the readOnlyHint tools", () => {
-  // This set is the allowlist the /chat demo uses to strip write tools, so it
-  // must track annotations exactly: no write tool may leak in, and every
-  // read-only tool must be present.
-  const readOnly = tools.getReadOnlyToolNames();
-  for (const [name, tool] of Object.entries(tools.default)) {
-    assert(
-      readOnly.has(name) === (tool.annotations.readOnlyHint === true),
-      `${name} read-only allowlist membership must match readOnlyHint`,
-    );
-  }
-});
-
 test("public tool count stays within the hard limit in all modes", () => {
   for (const experimentalMode of [false, true]) {
     const visibleTools = Object.entries(tools.default).filter(

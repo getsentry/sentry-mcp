@@ -139,28 +139,6 @@ annotations: {
 }
 ```
 
-Accurate `readOnlyHint` values are load-bearing for security, not just
-directory metadata: agentic surfaces gate on them (see below).
-
-### Agentic Surfaces Are Read-Only By Default
-
-Surfaces where an LLM reads Sentry data and calls tools in the same loop (the
-`use_sentry` embedded agent and the Cloudflare `/chat` demo) are an indirect
-prompt-injection sink: attacker-influenceable content (issue titles, exception
-values, comments) can steer the model into calling write tools the user never
-requested. To contain this:
-
-- These surfaces expose only `readOnlyHint: true` tools by default. `use_sentry`
-  filters its toolset to read-only tools; `/chat` strips non-read-only tools via
-  `getReadOnlyToolNames()`.
-- Writes are enabled only by a trusted-caller control (`ServerContext.allowEmbeddedAgentWrites`),
-  never by a model-supplied tool parameter, so injected content read mid-loop
-  cannot escalate.
-
-If you add a new embedded-agent or demo surface, keep it read-only by default and
-gate any write path behind an out-of-band trusted signal. Do not rely on a system
-prompt to keep the agent from writing. See `docs/operations/security.md`.
-
 ### Writing LLM-Friendly Descriptions
 
 Critical for LLM success:
