@@ -312,6 +312,60 @@ describe("create_project", () => {
     expect(result).not.toContain("Repository Link ID");
   });
 
+  it("prefers an exact repository name over suffix matches", async () => {
+    let mappingBody: unknown;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/repos/",
+        ({ request }) => {
+          expect(new URL(request.url).searchParams.get("query")).toBeNull();
+          return HttpResponse.json([
+            {
+              id: "101",
+              name: "mirror/getsentry/sentry",
+              provider: { id: "integrations:github", name: "GitHub" },
+              status: "active",
+            },
+            {
+              id: "102",
+              name: "getsentry/sentry",
+              provider: { id: "integrations:github", name: "GitHub" },
+              status: "active",
+            },
+          ]);
+        },
+      ),
+      http.post(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/code-mappings/bulk/",
+        async ({ request }) => {
+          mappingBody = await request.json();
+          return HttpResponse.json({
+            created: 1,
+            updated: 0,
+            errors: 0,
+            mappings: [{ stackRoot: "", sourceRoot: "", status: "created" }],
+          });
+        },
+      ),
+    );
+
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: "the-goats",
+        name: "cloudflare-mcp",
+        slug: null,
+        platform: "node",
+        regionUrl: null,
+        repository: "getsentry/sentry",
+      },
+      context,
+    );
+
+    expect(mappingBody).toMatchObject({ repository: "getsentry/sentry" });
+    expect(result).toContain("**Repository**: getsentry/sentry (linked)");
+  });
+
   it("returns project setup details when repository linking fails after creation", async () => {
     mswServer.use(
       http.post(
@@ -345,7 +399,10 @@ describe("create_project", () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/repos/",
-        () => HttpResponse.json([]),
+        ({ request }) => {
+          expect(new URL(request.url).searchParams.get("query")).toBeNull();
+          return HttpResponse.json([]);
+        },
       ),
       http.post(
         "https://sentry.io/api/0/teams/sentry-mcp-evals/the-goats/projects/",
@@ -381,8 +438,9 @@ describe("create_project", () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/repos/",
-        () =>
-          HttpResponse.json([
+        ({ request }) => {
+          expect(new URL(request.url).searchParams.get("query")).toBeNull();
+          return HttpResponse.json([
             {
               id: "101",
               name: "getsentry/sentry",
@@ -395,7 +453,8 @@ describe("create_project", () => {
               provider: { id: "integrations:github", name: "GitHub" },
               status: "active",
             },
-          ]),
+          ]);
+        },
       ),
       http.post(
         "https://sentry.io/api/0/teams/sentry-mcp-evals/the-goats/projects/",

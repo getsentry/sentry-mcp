@@ -1866,6 +1866,55 @@ describe("API query builders", () => {
       expect(repos[0].name).toBe("getsentry/sentry");
     });
 
+    it("should paginate repos", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          headers: new Headers({
+            "content-type": "application/json",
+            link: '<https://sentry.io/api/0/organizations/test-org/repos/?cursor=cursor-2>; rel="next"; results="true"; cursor="cursor-2"',
+          }),
+          json: () =>
+            Promise.resolve([
+              {
+                id: "101",
+                name: "getsentry/sentry",
+                provider: { id: "integrations:github", name: "GitHub" },
+                status: "active",
+              },
+            ]),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          headers: new Headers({
+            "content-type": "application/json",
+          }),
+          json: () =>
+            Promise.resolve([
+              {
+                id: "102",
+                name: "getsentry/sentry-javascript",
+                provider: { id: "integrations:github", name: "GitHub" },
+                status: "active",
+              },
+            ]),
+        });
+      globalThis.fetch = fetchMock;
+
+      const repos = await apiService.listRepos({
+        organizationSlug: "test-org",
+      });
+
+      expect(repos.map((repo) => repo.name)).toEqual([
+        "getsentry/sentry",
+        "getsentry/sentry-javascript",
+      ]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[0][0]).toContain("per_page=100");
+      expect(fetchMock.mock.calls[1][0]).toContain("cursor=cursor-2");
+    });
+
     it("should include query parameter when provided", async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,

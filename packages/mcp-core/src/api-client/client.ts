@@ -1923,14 +1923,30 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ) {
-    const params = new URLSearchParams();
-    if (query) {
-      params.set("query", query);
-    }
-    const qs = params.toString();
-    const url = `/organizations/${organizationSlug}/repos/${qs ? `?${qs}` : ""}`;
-    const body = await this.requestJSON(url, { method: "GET" }, opts);
-    return RepositoryListSchema.parse(body);
+    let cursor: string | null = null;
+    const repos: z.infer<typeof RepositoryListSchema> = [];
+
+    do {
+      const params = new URLSearchParams();
+      params.set("per_page", "100");
+      if (query) {
+        params.set("query", query);
+      }
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
+
+      const response = await this.request(
+        `/organizations/${organizationSlug}/repos/?${params.toString()}`,
+        { method: "GET" },
+        opts,
+      );
+      const body = await this.parseJsonResponse(response);
+      repos.push(...RepositoryListSchema.parse(body));
+      cursor = getNextCursor(response.headers.get("link"));
+    } while (cursor);
+
+    return repos;
   }
 
   async linkProjectRepository(

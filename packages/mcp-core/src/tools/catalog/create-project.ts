@@ -33,11 +33,15 @@ function findRepositoryMatch(
   repositories: RepositoryMatch[],
   repository: string,
 ): RepositoryMatch {
-  const matches = repositories.filter(
-    (candidate) =>
-      candidate.name === repository ||
-      candidate.name.endsWith(`/${repository}`),
+  const exactMatches = repositories.filter(
+    (candidate) => candidate.name === repository,
   );
+  const matches =
+    exactMatches.length > 0 || repository.includes("/")
+      ? exactMatches
+      : repositories.filter((candidate) =>
+          candidate.name.endsWith(`/${repository}`),
+        );
 
   if (matches.length === 0) {
     throw new UserInputError(
@@ -178,7 +182,6 @@ export default defineTool({
       ? findRepositoryMatch(
           await apiService.listRepos({
             organizationSlug,
-            query: params.repository,
           }),
           params.repository,
         )
