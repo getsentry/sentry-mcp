@@ -22,11 +22,11 @@ import { setAgentProvider } from "./provider-factory";
 // Mock Sentry API server - intercepts Sentry calls but bypasses OpenAI
 const mswServer = setupServer(
   // Mock the issue search fields endpoint (called by issueFields tool)
-  http.get("*/api/0/organizations/*/issues/", () => {
+  http.get("https://sentry.io/api/0/organizations/*/issues/", () => {
     return HttpResponse.json([]);
   }),
   // Mock the tags endpoint for field discovery
-  http.get("*/api/0/organizations/*/tags/", () => {
+  http.get("https://sentry.io/api/0/organizations/*/tags/", () => {
     return HttpResponse.json([
       { key: "environment", name: "Environment" },
       { key: "level", name: "Level" },
@@ -35,7 +35,7 @@ const mswServer = setupServer(
     ]);
   }),
   // Mock whoami endpoint (called by whoami tool)
-  http.get("*/api/0/users/me/", () => {
+  http.get("https://sentry.io/api/0/users/me/", () => {
     return HttpResponse.json({
       id: "12345",
       email: "test@example.com",

@@ -371,8 +371,13 @@
     "description": "Create and modify projects, teams, and DSNs",
     "defaultEnabled": false,
     "order": 5,
-    "toolCount": 10,
+    "toolCount": 12,
     "tools": [
+      {
+        "name": "add_team_to_project",
+        "description": "Grant a team access to an existing Sentry project.\n\nUse this tool when you need to:\n- Add another team to a project\n- Grant a team access without changing project metadata\n- Check whether a team already has project access before adding it\n\n<examples>\nadd_team_to_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- Team access changes are separate from project metadata updates.\n- If the team is already assigned, this tool returns the current team list without making another change.\n</hints>",
+        "requiredScopes": ["project:write", "team:read", "org:read"]
+      },
       {
         "name": "create_dsn",
         "description": "Create an additional DSN for an EXISTING project.\n\nUSE THIS TOOL WHEN:\n- Project already exists and needs additional DSN\n- 'Create another DSN for project X'\n- 'I need a production DSN for existing project'\n\nDO NOT USE for new projects (use create_project instead)\n\nBe careful when using this tool!\n\n<examples>\n### Create additional DSN for existing project\n```\ncreate_dsn(organizationSlug='my-organization', projectSlug='my-project', name='Production')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n</hints>",
@@ -380,7 +385,7 @@
       },
       {
         "name": "create_project",
-        "description": "Create a new project in Sentry (includes DSN automatically).\n\nUSE THIS TOOL WHEN USERS WANT TO:\n- 'Create a new project'\n- 'Set up a project for [app/service] with team [X]'\n- 'I need a new Sentry project'\n- Create project AND need DSN in one step\n- 'Create a project for my-repo'\n\nDO NOT USE create_dsn after this - DSN is included in output.\n\nBe careful when using this tool!\n\n<examples>\n### Create new project with team\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')\n```\n### Create project and link to a repository\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript', repository='getsentry/sentry')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<teamSlug>.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- The repository parameter accepts a repo name (e.g. 'getsentry/sentry'). The repo must already be connected to the org via a VCS integration.\n</hints>",
+        "description": "Create a new project in Sentry (provisions DSN automatically).\n\nUSE THIS TOOL WHEN USERS WANT TO:\n- 'Create a new project'\n- 'Set up a project for [app/service] with team [X]'\n- 'I need a new Sentry project'\n- Create project AND need DSN in one step\n- Create project and link an existing repository\n\nReturns the created project slug and a usable SENTRY_DSN when key setup succeeds.\n\nBe careful when using this tool!\n\n<examples>\n### Create new project with team\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')\n```\n### Create project with an explicit slug\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='My Project', slug='my-project', platform='javascript')\n```\n### Create project and link to a repository\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript', repository='getsentry/sentry')\n```\n</examples>",
         "requiredScopes": ["project:write", "team:read", "org:read"]
       },
       {
@@ -409,13 +414,18 @@
         "requiredScopes": ["team:read"]
       },
       {
+        "name": "remove_team_from_project",
+        "description": "Revoke a team's access to an existing Sentry project.\n\nUse this tool when you need to:\n- Remove a team from a project\n- Revoke team access without changing project metadata\n- Check project team assignments before removing access\n\nBe careful when using this tool because it revokes project access.\n\n<examples>\nremove_team_from_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- The team must already be assigned to the project.\n- This tool will not remove the last team assigned to a project.\n</hints>",
+        "requiredScopes": ["project:write", "team:read", "org:read"]
+      },
+      {
         "name": "update_dsn",
         "description": "Update settings for an existing DSN (client key) in a project, such as name, active status, rate limit, and loader script options.\n\nUSE THIS TOOL WHEN:\n- Deactivating or activating a DSN/client key\n- Setting or removing DSN rate limits ('set rate limit of 1000 per hour on DSN X')\n- Renaming a DSN ('rename DSN X to Production')\n- Configuring Javascript SDK loader script options (session replay, performance, debug, feedback, etc.)\n\nBe careful when using this tool!\n\n<examples>\n### Rename DSN and set rate limit\n```\nupdate_dsn(organizationSlug='my-organization', projectSlug='my-project', keyId='d20df0a1ab5031c7f3c7edca9c02814d', name='Production Key', rateLimitWindow=3600, rateLimitCount=500)\n```\n\n### Deactivate a DSN\n```\nupdate_dsn(organizationSlug='my-organization', projectSlug='my-project', keyId='d20df0a1ab5031c7f3c7edca9c02814d', isActive=false)\n```\n\n### Disable rate limit entirely\n```\nupdate_dsn(organizationSlug='my-organization', projectSlug='my-project', keyId='d20df0a1ab5031c7f3c7edca9c02814d', disableRateLimit=true)\n```\n</examples>\n\n<hints>\n- Use `find_dsns()` first to find the `keyId` for the DSN you want to update.\n- Both `rateLimitWindow` (seconds) and `rateLimitCount` (error cap) must be provided together to set a rate limit.\n</hints>",
         "requiredScopes": ["project:write"]
       },
       {
         "name": "update_project",
-        "description": "Update project settings in Sentry, such as name, slug, platform, and team assignment.\n\nBe careful when using this tool!\n\nUse this tool when you need to:\n- Update a project's name or slug to fix onboarding mistakes\n- Change the platform assigned to a project\n- Update team assignment for a project\n\n<examples>\n### Update a project's name and slug\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')\n```\n\n### Assign a project to a different team\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='backend-team')\n```\n\n### Update platform\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', platform='python')\n```\n\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Team assignment is handled separately from other project settings\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- When updating the slug, the project will be accessible at the new slug after the update\n</hints>",
+        "description": "Update project metadata in Sentry, such as name, slug, and platform.\n\nBe careful when using this tool!\n\nUse this tool when you need to:\n- Update a project's name or slug to fix onboarding mistakes\n- Change the platform assigned to a project\n\n<examples>\n### Update a project's name and slug\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')\n```\n\n### Update platform\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', platform='python')\n```\n\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Team access changes are handled by separate project-management tools.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- When updating the slug, the project will be accessible at the new slug after the update\n- Do not update the slug from a project-scoped session; reconnect with an organization-scoped or unconstrained session first.\n</hints>",
         "requiredScopes": ["project:write"]
       },
       {

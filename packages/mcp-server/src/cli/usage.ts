@@ -37,9 +37,10 @@ Session constraints:
 
 Skill controls:
   --skills <list>           Specify which skills to grant (default: active, non-deprecated skills)
+  --all-skills              Grant all active, non-deprecated skills
   --disable-skills <list>   Remove specific skills (e.g. --disable-skills=seer)
 
-All skills: ${allSkills.join(", ")}
+Available skills: ${allSkills.join(", ")}
 
 Environment variables:
   SENTRY_ACCESS_TOKEN     Sentry auth token (alternative to --access-token)
@@ -54,6 +55,7 @@ Environment variables:
 Examples:
   ${packageName}                                        # device code auth (sentry.io only)
   ${packageName} --access-token=TOKEN
+  ${packageName} --access-token=TOKEN --all-skills
   ${packageName} --access-token=TOKEN --skills=inspect,triage
   ${packageName} --access-token=TOKEN --host=sentry.example.com
   ${packageName} --access-token=TOKEN --host=sentry.internal:9000 --insecure-http

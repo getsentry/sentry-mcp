@@ -27,18 +27,21 @@ describe("find_projects", () => {
     const context = getServerContext();
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/projects/", ({ request }) => {
-        expect(new URL(request.url).pathname).toBe(
-          "/api/0/organizations/MyOrg/projects/",
-        );
-        return HttpResponse.json([
-          {
-            id: "1",
-            slug: "MyProject",
-            name: "My Project",
-          },
-        ]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/projects/",
+        ({ request }) => {
+          expect(new URL(request.url).pathname).toBe(
+            "/api/0/organizations/MyOrg/projects/",
+          );
+          return HttpResponse.json([
+            {
+              id: "1",
+              slug: "MyProject",
+              name: "My Project",
+            },
+          ]);
+        },
+      ),
     );
 
     const params = prepareToolParams({

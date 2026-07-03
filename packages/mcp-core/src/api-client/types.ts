@@ -94,6 +94,7 @@ import type {
   ProfileChunkSchema,
   ProfileFrameSchema,
   ProjectListSchema,
+  ProjectRepositoryMappingSchema,
   ProjectSchema,
   ReleaseDetailsSchema,
   ReleaseListSchema,
@@ -121,6 +122,9 @@ export type User = z.infer<typeof UserSchema>;
 export type Organization = z.infer<typeof OrganizationSchema>;
 export type Team = z.infer<typeof TeamSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
+export type ProjectRepositoryMapping = z.infer<
+  typeof ProjectRepositoryMappingSchema
+>;
 export type IssueAlertRule = z.infer<typeof IssueAlertRuleSchema>;
 export type MetricAlertRule = z.infer<typeof MetricAlertRuleSchema>;
 export type ClientKey = z.infer<typeof ClientKeySchema>;

@@ -12,12 +12,14 @@ describe("analyze_issue_with_seer", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mswServer.use(
-      http.get("*/api/0/organizations/:org/issues/:issueId/", ({ params }) =>
-        HttpResponse.json(
-          createUnsupportedIssue({
-            shortId: String(params.issueId),
-          }),
-        ),
+      http.get(
+        "https://sentry.io/api/0/organizations/:org/issues/:issueId/",
+        ({ params }) =>
+          HttpResponse.json(
+            createUnsupportedIssue({
+              shortId: String(params.issueId),
+            }),
+          ),
       ),
     );
   });
@@ -58,7 +60,7 @@ describe("analyze_issue_with_seer", () => {
   it("wraps completed Seer-authored sections with provenance tags", async () => {
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-TAGS/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-TAGS/autofix/",
         () =>
           HttpResponse.json({
             autofix: {
@@ -166,7 +168,7 @@ describe("analyze_issue_with_seer", () => {
     let attempts = 0;
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-99/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-99/autofix/",
         () => {
           attempts++;
           if (attempts < 3) {
@@ -209,7 +211,7 @@ describe("analyze_issue_with_seer", () => {
     let attempts = 0;
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-500/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-500/autofix/",
         () => {
           attempts++;
           if (attempts < 2) {
@@ -273,7 +275,7 @@ describe("analyze_issue_with_seer", () => {
 
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-TIMEOUT/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-TIMEOUT/autofix/",
         () => {
           // Always return in progress
           return HttpResponse.json(inProgressState);
@@ -321,7 +323,7 @@ describe("analyze_issue_with_seer", () => {
 
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-ERRORS/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-ERRORS/autofix/",
         () => {
           pollAttempts++;
           if (pollAttempts === 1) {
@@ -371,7 +373,7 @@ describe("analyze_issue_with_seer", () => {
 
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-NEW/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-NEW/autofix/",
         () => {
           getCallCount++;
           if (getCallCount === 1) {
@@ -383,7 +385,7 @@ describe("analyze_issue_with_seer", () => {
         },
       ),
       http.post(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-NEW/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-NEW/autofix/",
         async ({ request }) => {
           const body = await request.json();
           expect(body).toEqual({
@@ -428,11 +430,11 @@ describe("analyze_issue_with_seer", () => {
 
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/",
         () => HttpResponse.json(createRegressedIssue()),
       ),
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/autofix/",
         () => {
           autofixRequests++;
           return HttpResponse.json({ autofix: null });

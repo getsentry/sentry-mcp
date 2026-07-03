@@ -23,7 +23,7 @@ async function getAvailableTools(): Promise<string[]> {
       "exec",
       "sentry-mcp",
       "--access-token=mocked-access-token",
-      "--all-scopes",
+      "--all-skills",
     ],
     env: {
       ...process.env,

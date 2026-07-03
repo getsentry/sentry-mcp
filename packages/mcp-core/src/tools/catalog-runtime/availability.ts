@@ -118,7 +118,8 @@ function isHiddenByConstraints({
 }): boolean {
   return (
     (key === "find_organizations" && !!context.constraints.organizationSlug) ||
-    (key === "find_projects" && !!context.constraints.projectSlug)
+    (key === "find_projects" && !!context.constraints.projectSlug) ||
+    (key === "create_project" && !!context.constraints.projectSlug)
   );
 }
 

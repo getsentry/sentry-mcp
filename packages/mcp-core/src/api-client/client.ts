@@ -34,7 +34,7 @@ import {
   TeamListSchema,
   TeamSchema,
   ProjectListSchema,
-  ProjectRepoLinkSchema,
+  ProjectRepositoryMappingSchema,
   ProjectSchema,
   CommitListSchema,
   DeployListSchema,
@@ -238,6 +238,18 @@ type ClientKeyDynamicSdkLoaderOptions = {
   hasDebug?: boolean;
   hasFeedback?: boolean;
   hasLogsAndMetrics?: boolean;
+};
+
+type CreateProjectRequest = {
+  name: string;
+  slug?: string;
+  platform?: string;
+};
+
+type UpdateProjectRequest = {
+  name?: string;
+  slug?: string;
+  platform?: string;
 };
 
 type UpdateClientKeyRequest = {
@@ -1815,6 +1827,7 @@ export class SentryApiService {
    * @param params.organizationSlug Organization identifier
    * @param params.teamSlug Team identifier
    * @param params.name Project name
+   * @param params.slug Optional project slug
    * @param params.platform Platform identifier (e.g., "javascript", "python")
    * @param opts Request options
    * @returns Created project data
@@ -1824,17 +1837,22 @@ export class SentryApiService {
       organizationSlug,
       teamSlug,
       name,
+      slug,
       platform,
     }: {
       organizationSlug: string;
       teamSlug: string;
       name: string;
+      slug?: string | null;
       platform?: string | null;
     },
     opts?: RequestOptions,
   ): Promise<Project> {
-    const createData: Record<string, any> = { name };
-    // Only include platform if it has a meaningful value (not null, undefined, or empty)
+    const createData: CreateProjectRequest = { name };
+    // Only include optional fields when they have meaningful values.
+    if (slug) {
+      createData.slug = slug;
+    }
     if (platform) {
       createData.platform = platform;
     }
@@ -1878,7 +1896,7 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Project> {
-    const updateData: Record<string, any> = {};
+    const updateData: UpdateProjectRequest = {};
     // Only include fields that have meaningful values (truthy strings)
     if (name) updateData.name = name;
     if (slug) updateData.slug = slug;
@@ -1905,37 +1923,65 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ) {
-    const params = new URLSearchParams();
-    if (query) {
-      params.set("query", query);
-    }
-    const qs = params.toString();
-    const url = `/organizations/${organizationSlug}/repos/${qs ? `?${qs}` : ""}`;
-    const body = await this.requestJSON(url, { method: "GET" }, opts);
-    return RepositoryListSchema.parse(body);
+    let cursor: string | null = null;
+    const repos: z.infer<typeof RepositoryListSchema> = [];
+
+    do {
+      const params = new URLSearchParams();
+      params.set("per_page", "100");
+      if (query) {
+        params.set("query", query);
+      }
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
+
+      const response = await this.request(
+        `/organizations/${organizationSlug}/repos/?${params.toString()}`,
+        { method: "GET" },
+        opts,
+      );
+      const body = await this.parseJsonResponse(response);
+      repos.push(...RepositoryListSchema.parse(body));
+      cursor = getNextCursor(response.headers.get("link"));
+    } while (cursor);
+
+    return repos;
   }
 
-  async linkProjectRepo(
+  async linkProjectRepository(
     {
       organizationSlug,
       projectSlug,
-      repositoryId,
+      repository,
+      provider,
     }: {
       organizationSlug: string;
       projectSlug: string;
-      repositoryId: number | string;
+      repository: string;
+      provider?: string | null;
     },
     opts?: RequestOptions,
   ) {
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/repo/`,
+      `/organizations/${organizationSlug}/code-mappings/bulk/`,
       {
         method: "POST",
-        body: JSON.stringify({ repositoryId }),
+        body: JSON.stringify({
+          project: projectSlug,
+          repository,
+          provider,
+          mappings: [
+            {
+              stackRoot: "",
+              sourceRoot: "",
+            },
+          ],
+        }),
       },
       opts,
     );
-    return ProjectRepoLinkSchema.parse(body);
+    return ProjectRepositoryMappingSchema.parse(body);
   }
 
   async listIssueAlertRules(
@@ -2195,6 +2241,48 @@ export class SentryApiService {
   }
 
   /**
+   * Lists teams assigned to a project.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param opts Request options
+   * @returns Array of teams assigned to the project
+   */
+  async listProjectTeams(
+    {
+      organizationSlug,
+      projectSlug,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<TeamList> {
+    const teams: TeamList = [];
+    let cursor: string | null = null;
+
+    do {
+      const queryParams = new URLSearchParams();
+      queryParams.set("per_page", "100");
+      if (cursor) {
+        queryParams.set("cursor", cursor);
+      }
+
+      const response = await this.request(
+        `/projects/${organizationSlug}/${projectSlug}/teams/?${queryParams.toString()}`,
+        undefined,
+        opts,
+      );
+      const body = await this.parseJsonResponse(response);
+      teams.push(...TeamListSchema.parse(body));
+      cursor = getNextCursor(response.headers.get("link"));
+    } while (cursor);
+
+    return teams;
+  }
+
+  /**
    * Assigns a team to a project.
    *
    * @param params Assignment parameters
@@ -2220,6 +2308,36 @@ export class SentryApiService {
       {
         method: "POST",
         body: JSON.stringify({}),
+      },
+      opts,
+    );
+  }
+
+  /**
+   * Removes a team from a project.
+   *
+   * @param params Assignment parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.teamSlug Team identifier to remove
+   * @param opts Request options
+   */
+  async removeTeamFromProject(
+    {
+      organizationSlug,
+      projectSlug,
+      teamSlug,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      teamSlug: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/teams/${teamSlug}/`,
+      {
+        method: "DELETE",
       },
       opts,
     );

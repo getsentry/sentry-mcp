@@ -1659,14 +1659,17 @@ describe("get_issue_details", () => {
     mswServer.use(
       // More specific pattern for events (must come first to match before the issue pattern)
       http.get(
-        "*/api/0/organizations/*/issues/FUTURE-TYPE-001/events/latest/",
+        "https://sentry.io/api/0/organizations/*/issues/FUTURE-TYPE-001/events/latest/",
         () => {
           return HttpResponse.json(unsupportedEventFixture);
         },
       ),
-      http.get("*/api/0/organizations/*/issues/FUTURE-TYPE-001", () => {
-        return HttpResponse.json(unsupportedIssueFixture);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/FUTURE-TYPE-001",
+        () => {
+          return HttpResponse.json(unsupportedIssueFixture);
+        },
+      ),
     );
 
     const result = await getIssueDetails.handler(

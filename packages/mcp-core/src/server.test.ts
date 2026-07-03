@@ -1148,6 +1148,8 @@ describe("buildServer", () => {
         ["create_project", ["project-management"]],
         ["create_team", ["project-management"]],
         ["update_project", ["project-management"]],
+        ["add_team_to_project", ["project-management"]],
+        ["remove_team_from_project", ["project-management"]],
         ["create_dsn", ["project-management"]],
         ["find_dsns", ["project-management"]],
       ] as const) {

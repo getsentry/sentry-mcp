@@ -533,6 +533,20 @@ export const restHandlers = buildHandlers([
     },
   },
   {
+    method: "get",
+    path: "/api/0/projects/:organizationSlug/:projectSlug/teams/",
+    fetch: () => {
+      return HttpResponse.json([teamFixture]);
+    },
+  },
+  {
+    method: "delete",
+    path: "/api/0/projects/:organizationSlug/:projectSlug/teams/:teamSlug/",
+    fetch: () => {
+      return new HttpResponse(null, { status: 204 });
+    },
+  },
+  {
     method: "put",
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/:keyId/",
     fetch: async ({ request, params }) => {
@@ -1489,15 +1503,21 @@ export const restHandlers = buildHandlers([
   },
   {
     method: "post",
-    path: "/api/0/projects/:organizationSlug/:projectSlug/repo/",
+    path: "/api/0/organizations/:organizationSlug/code-mappings/bulk/",
     fetch: async ({ request }) => {
-      const body = (await request.json()) as Record<string, unknown>;
+      const body = (await request.json()) as {
+        mappings?: Array<{ stackRoot?: string; sourceRoot?: string }>;
+      };
+      const mappings = body.mappings ?? [{ stackRoot: "", sourceRoot: "" }];
       return HttpResponse.json({
-        id: "1",
-        projectId: "4509109104082945",
-        repositoryId: String((body?.repositoryId as string | number) || "101"),
-        source: "scm_onboarding",
-        created: true,
+        created: mappings.length,
+        updated: 0,
+        errors: 0,
+        mappings: mappings.map((mapping) => ({
+          stackRoot: mapping.stackRoot ?? "",
+          sourceRoot: mapping.sourceRoot ?? "",
+          status: "created",
+        })),
       });
     },
   },

@@ -11,7 +11,6 @@ import {
   ParamRegionUrl,
   ParamProjectSlug,
   ParamPlatform,
-  ParamTeamSlug,
 } from "../../schema";
 
 export default defineTool({
@@ -19,26 +18,19 @@ export default defineTool({
   skills: ["project-management"], // Only available in project-management skill
   requiredScopes: ["project:write"],
   description: [
-    "Update project settings in Sentry, such as name, slug, platform, and team assignment.",
+    "Update project metadata in Sentry, such as name, slug, and platform.",
     "",
     "Be careful when using this tool!",
     "",
     "Use this tool when you need to:",
     "- Update a project's name or slug to fix onboarding mistakes",
     "- Change the platform assigned to a project",
-    "- Update team assignment for a project",
     "",
     "<examples>",
     "### Update a project's name and slug",
     "",
     "```",
     "update_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')",
-    "```",
-    "",
-    "### Assign a project to a different team",
-    "",
-    "```",
-    "update_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='backend-team')",
     "```",
     "",
     "### Update platform",
@@ -51,9 +43,10 @@ export default defineTool({
     "",
     "<hints>",
     "- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.",
-    "- Team assignment is handled separately from other project settings",
+    "- Team access changes are handled by separate project-management tools.",
     "- If any parameter is ambiguous, you should clarify with the user what they meant.",
     "- When updating the slug, the project will be accessible at the new slug after the update",
+    "- Do not update the slug from a project-scoped session; reconnect with an organization-scoped or unconstrained session first.",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -72,16 +65,11 @@ export default defineTool({
       .nullable()
       .default(null),
     platform: ParamPlatform.nullable().default(null),
-    teamSlug: ParamTeamSlug.nullable()
-      .default(null)
-      .describe(
-        "The team to assign this project to. Note: this will replace the current team assignment.",
-      ),
   },
   annotations: {
     readOnlyHint: false,
     destructiveHint: true,
-    idempotentHint: true,
+    idempotentHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
@@ -93,51 +81,34 @@ export default defineTool({
     setTag("organization.slug", organizationSlug);
     setTag("project.slug", params.projectSlug);
 
-    // Handle team assignment separately if provided
-    if (params.teamSlug) {
-      setTag("team.slug", params.teamSlug);
-      try {
-        await apiService.addTeamToProject({
-          organizationSlug,
-          projectSlug: params.projectSlug,
-          teamSlug: params.teamSlug,
-        });
-      } catch (err) {
-        logIssue(err);
-        throw new Error(
-          `Failed to assign team ${params.teamSlug} to project ${params.projectSlug}: ${err instanceof Error ? err.message : "Unknown error"}`,
-          { cause: err },
-        );
-      }
+    const hasProjectUpdates = params.name || params.slug || params.platform;
+    if (!hasProjectUpdates) {
+      throw new UserInputError(
+        "At least one project metadata field is required: `name`, `slug`, or `platform`.",
+      );
     }
 
-    // Update project settings if any are provided
-    const hasProjectUpdates = params.name || params.slug || params.platform;
+    if (params.slug && context.constraints.projectSlug) {
+      throw new UserInputError(
+        "Project slug changes require an organization-scoped or unconstrained session. Reconnect without a project constraint before renaming the project slug.",
+      );
+    }
 
-    let project: Project | undefined;
-    if (hasProjectUpdates) {
-      try {
-        project = await apiService.updateProject({
-          organizationSlug,
-          projectSlug: params.projectSlug,
-          name: params.name,
-          slug: params.slug,
-          platform: params.platform,
-        });
-      } catch (err) {
-        logIssue(err);
-        throw new Error(
-          `Failed to update project ${params.projectSlug}: ${err instanceof Error ? err.message : "Unknown error"}`,
-          { cause: err },
-        );
-      }
-    } else {
-      // If only team assignment, fetch current project data for display
-      const projects = await apiService.listProjects(organizationSlug);
-      project = projects.find((p) => p.slug === params.projectSlug);
-      if (!project) {
-        throw new UserInputError(`Project ${params.projectSlug} not found`);
-      }
+    let project: Project;
+    try {
+      project = await apiService.updateProject({
+        organizationSlug,
+        projectSlug: params.projectSlug,
+        name: params.name,
+        slug: params.slug,
+        platform: params.platform,
+      });
+    } catch (err) {
+      logIssue(err);
+      throw new Error(
+        `Failed to update project ${params.projectSlug}: ${err instanceof Error ? err.message : "Unknown error"}`,
+        { cause: err },
+      );
     }
 
     let output = `# Updated Project in **${organizationSlug}**\n\n`;
@@ -153,8 +124,6 @@ export default defineTool({
     if (params.name) updates.push(`name to "${params.name}"`);
     if (params.slug) updates.push(`slug to "${params.slug}"`);
     if (params.platform) updates.push(`platform to "${params.platform}"`);
-    if (params.teamSlug)
-      updates.push(`team assignment to "${params.teamSlug}"`);
 
     if (updates.length > 0) {
       output += `\n## Updates Applied\n`;
@@ -164,9 +133,6 @@ export default defineTool({
 
     output += "\n## Response Notes\n\n";
     output += `- Project slug for later requests: \`${project.slug}\`\n`;
-    if (params.teamSlug) {
-      output += `- Team assignment: \`${params.teamSlug}\`\n`;
-    }
     return output;
   },
 });

@@ -47,6 +47,46 @@
     "surface": "catalog"
   },
   {
+    "name": "add_team_to_project",
+    "description": "Grant a team access to an existing Sentry project.\n\nUse this tool when you need to:\n- Add another team to a project\n- Grant a team access without changing project metadata\n- Check whether a team already has project access before adding it\n\n<examples>\nadd_team_to_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- Team access changes are separate from project metadata updates.\n- If the team is already assigned, this tool returns the current team list without making another change.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "teamSlug": {
+          "type": "string",
+          "description": "The team's slug. You can find a list of existing teams in an organization with the Sentry tool `find_teams`."
+        }
+      },
+      "required": ["organizationSlug", "projectSlug", "teamSlug"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["project:write", "team:read", "org:read"],
+    "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
     "name": "analyze_issue_with_seer",
     "description": "Use Seer to analyze production errors and get detailed root cause analysis with specific code fixes.\n\nUse this tool when:\n- The user explicitly asks for root cause analysis, Seer analysis, or help fixing/debugging an issue\n- You are unable to accurately determine the root cause from the issue details alone\n\nDo NOT call this tool as an automatic follow-up to get_sentry_resource.\n\nWhat this tool provides:\n- Root cause analysis with code-level explanations\n- Specific file locations and line numbers where errors occur\n- Concrete code fixes you can apply\n- Step-by-step implementation guidance\n\nThis tool automatically:\n1. Checks if analysis already exists (instant results)\n2. Starts new AI analysis if needed (~2-5 minutes)\n3. Returns complete fix recommendations\n\n<examples>\n### User: \"Run Seer on this issue\"\n\n```\nanalyze_issue_with_seer(issueUrl='https://my-org.sentry.io/issues/PROJECT-1Z43')\n```\n\n### User: \"Analyze this issue and suggest a fix\"\n\n```\nanalyze_issue_with_seer(organizationSlug='my-organization', issueId='ERROR-456')\n```\n</examples>\n\n<hints>\n- Only use when the user explicitly requests analysis or you cannot determine the root cause from issue details alone\n- Seer Autofix does not support metric alert issues (issueCategory: metric); use get_issue_details and search_events instead\n- If the user provides an issueUrl, extract it and use that parameter alone\n- The analysis includes actual code snippets and fixes, not just error descriptions\n- Results are cached - subsequent calls return instantly\n</hints>",
     "inputSchema": {
@@ -132,7 +172,7 @@
   },
   {
     "name": "create_project",
-    "description": "Create a new project in Sentry (includes DSN automatically).\n\nUSE THIS TOOL WHEN USERS WANT TO:\n- 'Create a new project'\n- 'Set up a project for [app/service] with team [X]'\n- 'I need a new Sentry project'\n- Create project AND need DSN in one step\n- 'Create a project for my-repo'\n\nDO NOT USE create_dsn after this - DSN is included in output.\n\nBe careful when using this tool!\n\n<examples>\n### Create new project with team\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')\n```\n### Create project and link to a repository\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript', repository='getsentry/sentry')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<teamSlug>.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- The repository parameter accepts a repo name (e.g. 'getsentry/sentry'). The repo must already be connected to the org via a VCS integration.\n</hints>",
+    "description": "Create a new project in Sentry (provisions DSN automatically).\n\nUSE THIS TOOL WHEN USERS WANT TO:\n- 'Create a new project'\n- 'Set up a project for [app/service] with team [X]'\n- 'I need a new Sentry project'\n- Create project AND need DSN in one step\n- Create project and link an existing repository\n\nReturns the created project slug and a usable SENTRY_DSN when key setup succeeds.\n\nBe careful when using this tool!\n\n<examples>\n### Create new project with team\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')\n```\n### Create project with an explicit slug\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='My Project', slug='my-project', platform='javascript')\n```\n### Create project and link to a repository\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript', repository='getsentry/sentry')\n```\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -159,7 +199,20 @@
         },
         "name": {
           "type": "string",
-          "description": "The name of the project to create. Typically this is commonly the name of the repository or service. It is only used as a visual label in Sentry."
+          "description": "The name of the project to create. Typically this is the name of the application or service. It is only used as a visual label in Sentry."
+        },
+        "slug": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Optional project slug to create."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional project slug to create.",
+          "default": null
         },
         "platform": {
           "anyOf": [
@@ -2189,6 +2242,46 @@
     "surface": "catalog"
   },
   {
+    "name": "remove_team_from_project",
+    "description": "Revoke a team's access to an existing Sentry project.\n\nUse this tool when you need to:\n- Remove a team from a project\n- Revoke team access without changing project metadata\n- Check project team assignments before removing access\n\nBe careful when using this tool because it revokes project access.\n\n<examples>\nremove_team_from_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- The team must already be assigned to the project.\n- This tool will not remove the last team assigned to a project.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "teamSlug": {
+          "type": "string",
+          "description": "The team's slug. You can find a list of existing teams in an organization with the Sentry tool `find_teams`."
+        }
+      },
+      "required": ["organizationSlug", "projectSlug", "teamSlug"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["project:write", "team:read", "org:read"],
+    "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
     "name": "search_ai_conversations",
     "description": "Search Sentry AI Conversations and return one summary row per conversation.\n\nUse this tool to find or list AI Conversations. Results are conversation summaries, not raw span rows.\nUse get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_ai_conversations(organizationSlug='my-org', query='failed conversations', period='7d')\nsearch_ai_conversations(organizationSlug='my-org', query='checkout', project='backend')\n</examples>",
     "inputSchema": {
@@ -3130,7 +3223,7 @@
   },
   {
     "name": "update_project",
-    "description": "Update project settings in Sentry, such as name, slug, platform, and team assignment.\n\nBe careful when using this tool!\n\nUse this tool when you need to:\n- Update a project's name or slug to fix onboarding mistakes\n- Change the platform assigned to a project\n- Update team assignment for a project\n\n<examples>\n### Update a project's name and slug\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')\n```\n\n### Assign a project to a different team\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='backend-team')\n```\n\n### Update platform\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', platform='python')\n```\n\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Team assignment is handled separately from other project settings\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- When updating the slug, the project will be accessible at the new slug after the update\n</hints>",
+    "description": "Update project metadata in Sentry, such as name, slug, and platform.\n\nBe careful when using this tool!\n\nUse this tool when you need to:\n- Update a project's name or slug to fix onboarding mistakes\n- Change the platform assigned to a project\n\n<examples>\n### Update a project's name and slug\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')\n```\n\n### Update platform\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', platform='python')\n```\n\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Team access changes are handled by separate project-management tools.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- When updating the slug, the project will be accessible at the new slug after the update\n- Do not update the slug from a project-scoped session; reconnect with an organization-scoped or unconstrained session first.\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3192,19 +3285,6 @@
             }
           ],
           "description": "The platform for the project. e.g., python, javascript, react, etc.",
-          "default": null
-        },
-        "teamSlug": {
-          "anyOf": [
-            {
-              "type": "string",
-              "description": "The team's slug. You can find a list of existing teams in an organization with the Sentry tool `find_teams`."
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The team to assign this project to. Note: this will replace the current team assignment.",
           "default": null
         }
       },

@@ -23,6 +23,8 @@ import searchEvents from "./search-events";
 import createTeam from "./create-team";
 import createProject from "./create-project";
 import updateProject from "./update-project";
+import addTeamToProject from "./add-team-to-project";
+import removeTeamFromProject from "./remove-team-from-project";
 import createDsn from "./create-dsn";
 import findDsns from "./find-dsns";
 import updateDsn from "./update-dsn";
@@ -77,6 +79,8 @@ const catalogTools = {
   create_team: createTeam,
   create_project: createProject,
   update_project: updateProject,
+  add_team_to_project: addTeamToProject,
+  remove_team_from_project: removeTeamFromProject,
   create_dsn: createDsn,
   find_dsns: findDsns,
   update_dsn: updateDsn,

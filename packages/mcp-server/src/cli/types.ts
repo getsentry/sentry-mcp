@@ -14,6 +14,7 @@ export type CliArgs = {
   anthropicModel?: string;
   agentProvider?: string;
   skills?: string;
+  allSkills?: boolean;
   disableSkills?: string;
   agent?: boolean;
   experimental?: boolean;
@@ -52,6 +53,7 @@ export type MergedArgs = {
   agentProvider?: string;
   clientId?: string; // env-only, carried from EnvArgs
   skills?: string;
+  allSkills?: boolean;
   disableSkills?: string;
   agent?: boolean;
   experimental?: boolean;

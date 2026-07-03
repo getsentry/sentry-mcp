@@ -205,14 +205,14 @@ describe("get_monitor_details", () => {
     };
     mswServer.use(
       http.get(
-        "*/api/0/projects/*/*/monitors/nightly-import/",
+        "https://sentry.io/api/0/projects/*/*/monitors/nightly-import/",
         ({ request }) => {
           paths.push(new URL(request.url).pathname);
           return HttpResponse.json(monitorResponse);
         },
       ),
       http.get(
-        "*/api/0/projects/*/*/monitors/nightly-import/checkins/",
+        "https://sentry.io/api/0/projects/*/*/monitors/nightly-import/checkins/",
         ({ request }) => {
           paths.push(new URL(request.url).pathname);
           return HttpResponse.json([]);
