@@ -240,6 +240,18 @@ type ClientKeyDynamicSdkLoaderOptions = {
   hasLogsAndMetrics?: boolean;
 };
 
+type CreateProjectRequest = {
+  name: string;
+  slug?: string;
+  platform?: string;
+};
+
+type UpdateProjectRequest = {
+  name?: string;
+  slug?: string;
+  platform?: string;
+};
+
 type UpdateClientKeyRequest = {
   name?: string;
   isActive?: boolean;
@@ -1815,6 +1827,7 @@ export class SentryApiService {
    * @param params.organizationSlug Organization identifier
    * @param params.teamSlug Team identifier
    * @param params.name Project name
+   * @param params.slug Optional project slug
    * @param params.platform Platform identifier (e.g., "javascript", "python")
    * @param opts Request options
    * @returns Created project data
@@ -1824,17 +1837,22 @@ export class SentryApiService {
       organizationSlug,
       teamSlug,
       name,
+      slug,
       platform,
     }: {
       organizationSlug: string;
       teamSlug: string;
       name: string;
+      slug?: string | null;
       platform?: string | null;
     },
     opts?: RequestOptions,
   ): Promise<Project> {
-    const createData: Record<string, any> = { name };
-    // Only include platform if it has a meaningful value (not null, undefined, or empty)
+    const createData: CreateProjectRequest = { name };
+    // Only include optional fields when they have meaningful values.
+    if (slug) {
+      createData.slug = slug;
+    }
     if (platform) {
       createData.platform = platform;
     }
@@ -1878,7 +1896,7 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Project> {
-    const updateData: Record<string, any> = {};
+    const updateData: UpdateProjectRequest = {};
     // Only include fields that have meaningful values (truthy strings)
     if (name) updateData.name = name;
     if (slug) updateData.slug = slug;
@@ -2195,6 +2213,33 @@ export class SentryApiService {
   }
 
   /**
+   * Lists teams assigned to a project.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param opts Request options
+   * @returns Array of teams assigned to the project
+   */
+  async listProjectTeams(
+    {
+      organizationSlug,
+      projectSlug,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<TeamList> {
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/teams/`,
+      undefined,
+      opts,
+    );
+    return TeamListSchema.parse(body);
+  }
+
+  /**
    * Assigns a team to a project.
    *
    * @param params Assignment parameters
@@ -2220,6 +2265,36 @@ export class SentryApiService {
       {
         method: "POST",
         body: JSON.stringify({}),
+      },
+      opts,
+    );
+  }
+
+  /**
+   * Removes a team from a project.
+   *
+   * @param params Assignment parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.teamSlug Team identifier to remove
+   * @param opts Request options
+   */
+  async removeTeamFromProject(
+    {
+      organizationSlug,
+      projectSlug,
+      teamSlug,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      teamSlug: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/teams/${teamSlug}/`,
+      {
+        method: "DELETE",
       },
       opts,
     );

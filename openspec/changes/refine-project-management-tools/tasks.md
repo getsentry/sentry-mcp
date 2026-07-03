@@ -1,9 +1,9 @@
 ## 1. API Client Support
 
-- [ ] 1.1 Re-verify project creation, project details update, project teams, project team details, and project keys endpoint contracts against `~/src/sentry`.
-- [ ] 1.2 Extend `createProject` to accept and send optional `slug`.
-- [ ] 1.3 Add or update API client methods for listing a project's teams and removing a team from a project.
-- [ ] 1.4 Adjust API client return schemas/types only as needed, preserving strict parsing and avoiding `any`.
+- [x] 1.1 Re-verify project creation, project details update, project teams, project team details, and project keys endpoint contracts against `~/src/sentry`.
+- [x] 1.2 Extend `createProject` to accept and send optional `slug`.
+- [x] 1.3 Add or update API client methods for listing a project's teams and removing a team from a project.
+- [x] 1.4 Adjust API client return schemas/types only as needed, preserving strict parsing and avoiding `any`.
 
 ## 2. Project Tool Changes
 
