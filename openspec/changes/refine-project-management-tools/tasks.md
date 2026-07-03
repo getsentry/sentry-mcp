@@ -7,12 +7,12 @@
 
 ## 2. Project Tool Changes
 
-- [ ] 2.1 Update `create_project` schema and description to remove repository linking and add optional `slug`.
-- [ ] 2.2 Change `create_project` DSN handling to list existing keys first, return an existing default/active DSN when available, and create a `Default` key only when no key exists.
-- [ ] 2.3 Update `create_project` output and tests so the response always includes project identity and `SENTRY_DSN`.
-- [ ] 2.4 Update `update_project` schema and description to remove `teamSlug`.
-- [ ] 2.5 Add `update_project` validation requiring at least one metadata field.
-- [ ] 2.6 Add `update_project` validation rejecting slug updates in project-scoped sessions.
+- [x] 2.1 Update `create_project` schema and description to remove repository linking and add optional `slug`.
+- [x] 2.2 Change `create_project` DSN handling to list existing keys first, return an existing default/active DSN when available, and create a `Default` key only when no key exists.
+- [x] 2.3 Update `create_project` output and tests so the response always includes project identity and `SENTRY_DSN`.
+- [x] 2.4 Update `update_project` schema and description to remove `teamSlug`.
+- [x] 2.5 Add `update_project` validation requiring at least one metadata field.
+- [x] 2.6 Add `update_project` validation rejecting slug updates in project-scoped sessions.
 
 ## 3. Team Access Tools
 
@@ -27,13 +27,13 @@
 - [ ] 4.1 Hide or reject `create_project` in project-scoped sessions.
 - [ ] 4.2 Verify organization constraints are injected for project-management tools and explicit conflicting org inputs are filtered.
 - [ ] 4.3 Verify project constraints are injected for `update_project`, `add_team_to_project`, and `remove_team_from_project`.
-- [ ] 4.4 Add tests for project-scoped slug update rejection.
+- [x] 4.4 Add tests for project-scoped slug update rejection.
 
 ## 5. Tests
 
-- [ ] 5.1 Update `create-project.test.ts` snapshots for the narrowed schema and DSN-first behavior.
-- [ ] 5.2 Add `create_project` tests for existing default DSN, fallback DSN creation, optional slug, and no repository linking.
-- [ ] 5.3 Update `update-project.test.ts` snapshots and remove team assignment cases.
+- [x] 5.1 Update `create-project.test.ts` snapshots for the narrowed schema and DSN-first behavior.
+- [x] 5.2 Add `create_project` tests for existing default DSN, fallback DSN creation, optional slug, and no repository linking.
+- [x] 5.3 Update `update-project.test.ts` snapshots and remove team assignment cases.
 - [ ] 5.4 Add `add-team-to-project.test.ts` coverage for add, already-assigned no-op, mixed-case slug preservation, and constraint injection.
 - [ ] 5.5 Add `remove-team-from-project.test.ts` coverage for remove, not assigned, last team guard, mixed-case slug preservation, and constraint injection.
 - [ ] 5.6 Update registry, tool count, skill gating, and generated-definition tests as needed.

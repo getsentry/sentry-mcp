@@ -1,10 +1,24 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
+import { UserInputError } from "../../errors.js";
 import updateProject from "./update-project.js";
 import { prepareToolParams } from "../catalog-runtime/availability";
 
+const context = {
+  constraints: {
+    organizationSlug: null,
+    projectSlug: null,
+  },
+  accessToken: "access-token",
+  userId: "1",
+};
+
 describe("update_project", () => {
+  afterEach(() => {
+    mswServer.resetHandlers();
+  });
+
   it("updates name and platform", async () => {
     const result = await updateProject.handler(
       {
@@ -13,16 +27,9 @@ describe("update_project", () => {
         name: "New Project Name",
         slug: null,
         platform: "python",
-        teamSlug: null,
         regionUrl: null,
       },
-      {
-        constraints: {
-          organizationSlug: null,
-        },
-        accessToken: "access-token",
-        userId: "1",
-      },
+      context,
     );
     expect(result).toMatchInlineSnapshot(`
       "# Updated Project in **sentry-mcp-evals**
@@ -43,52 +50,10 @@ describe("update_project", () => {
     `);
   });
 
-  it("assigns project to new team", async () => {
-    const result = await updateProject.handler(
-      {
-        organizationSlug: "sentry-mcp-evals",
-        projectSlug: "cloudflare-mcp",
-        name: null,
-        slug: null,
-        platform: null,
-        teamSlug: "backend-team",
-        regionUrl: null,
-      },
-      {
-        constraints: {
-          organizationSlug: null,
-        },
-        accessToken: "access-token",
-        userId: "1",
-      },
-    );
-    expect(result).toMatchInlineSnapshot(`
-      "# Updated Project in **sentry-mcp-evals**
-
-      **ID**: 4509106749636608
-      **Slug**: cloudflare-mcp
-      **Name**: cloudflare-mcp
-      **Platform**: node
-
-      ## Updates Applied
-      - Updated team assignment to "backend-team"
-
-      ## Response Notes
-
-      - Project slug for later requests: \`cloudflare-mcp\`
-      - Team assignment: \`backend-team\`
-      "
-    `);
-  });
-
-  it("preserves mixed-case slugs in team and project update requests", async () => {
+  it("preserves mixed-case slugs in project update requests", async () => {
     const paths: string[] = [];
     let updateBody: unknown;
     mswServer.use(
-      http.post("*/api/0/projects/*/*/teams/*/", ({ request }) => {
-        paths.push(new URL(request.url).pathname);
-        return new HttpResponse(null, { status: 204 });
-      }),
       http.put("*/api/0/projects/*/*/", async ({ request }) => {
         paths.push(new URL(request.url).pathname);
         updateBody = await request.json();
@@ -101,13 +66,6 @@ describe("update_project", () => {
       }),
     );
 
-    const context = {
-      constraints: {
-        organizationSlug: null,
-      },
-      accessToken: "access-token",
-      userId: "1",
-    };
     const params = prepareToolParams({
       tool: updateProject,
       params: {
@@ -117,19 +75,91 @@ describe("update_project", () => {
         name: null,
         slug: " NewProject ",
         platform: null,
-        teamSlug: " MyTeam ",
       },
       context,
     }) as Parameters<typeof updateProject.handler>[0];
 
     const result = await updateProject.handler(params, context);
 
-    expect(paths).toEqual([
-      "/api/0/projects/MyOrg/OldProject/teams/MyTeam/",
-      "/api/0/projects/MyOrg/OldProject/",
-    ]);
+    expect(paths).toEqual(["/api/0/projects/MyOrg/OldProject/"]);
     expect(updateBody).toEqual({ slug: "NewProject" });
     expect(result).toContain("**Slug**: NewProject");
-    expect(result).toContain('- Updated team assignment to "MyTeam"');
+  });
+
+  it("rejects calls without metadata fields", async () => {
+    await expect(
+      updateProject.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          name: null,
+          slug: null,
+          platform: null,
+          regionUrl: null,
+        },
+        context,
+      ),
+    ).rejects.toThrow(UserInputError);
+
+    await expect(
+      updateProject.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          name: null,
+          slug: null,
+          platform: null,
+          regionUrl: null,
+        },
+        context,
+      ),
+    ).rejects.toThrow("At least one project metadata field is required");
+  });
+
+  it("rejects slug updates from project-scoped sessions", async () => {
+    await expect(
+      updateProject.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          name: null,
+          slug: "new-project-slug",
+          platform: null,
+          regionUrl: null,
+        },
+        {
+          ...context,
+          constraints: {
+            organizationSlug: null,
+            projectSlug: "cloudflare-mcp",
+          },
+        },
+      ),
+    ).rejects.toThrow(UserInputError);
+
+    await expect(
+      updateProject.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          name: null,
+          slug: "new-project-slug",
+          platform: null,
+          regionUrl: null,
+        },
+        {
+          ...context,
+          constraints: {
+            organizationSlug: null,
+            projectSlug: "cloudflare-mcp",
+          },
+        },
+      ),
+    ).rejects.toThrow("organization-scoped or unconstrained session");
+  });
+
+  it("does not expose team assignment parameters", () => {
+    expect(updateProject.inputSchema).not.toHaveProperty("teamSlug");
+    expect(updateProject.description).not.toContain("teamSlug");
   });
 });

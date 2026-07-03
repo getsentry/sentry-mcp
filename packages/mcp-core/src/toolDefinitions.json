@@ -132,7 +132,7 @@
   },
   {
     "name": "create_project",
-    "description": "Create a new project in Sentry (includes DSN automatically).\n\nUSE THIS TOOL WHEN USERS WANT TO:\n- 'Create a new project'\n- 'Set up a project for [app/service] with team [X]'\n- 'I need a new Sentry project'\n- Create project AND need DSN in one step\n- 'Create a project for my-repo'\n\nDO NOT USE create_dsn after this - DSN is included in output.\n\nBe careful when using this tool!\n\n<examples>\n### Create new project with team\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')\n```\n### Create project and link to a repository\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript', repository='getsentry/sentry')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<teamSlug>.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- The repository parameter accepts a repo name (e.g. 'getsentry/sentry'). The repo must already be connected to the org via a VCS integration.\n</hints>",
+    "description": "Create a new project in Sentry (includes DSN automatically).\n\nUSE THIS TOOL WHEN USERS WANT TO:\n- 'Create a new project'\n- 'Set up a project for [app/service] with team [X]'\n- 'I need a new Sentry project'\n- Create project AND need DSN in one step\n\nDO NOT USE create_dsn after this - DSN is included in output.\n\nBe careful when using this tool!\n\n<examples>\n### Create new project with team\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')\n```\n### Create project with an explicit slug\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='My Project', slug='my-project', platform='javascript')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<teamSlug>.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -159,7 +159,20 @@
         },
         "name": {
           "type": "string",
-          "description": "The name of the project to create. Typically this is commonly the name of the repository or service. It is only used as a visual label in Sentry."
+          "description": "The name of the project to create. Typically this is the name of the application or service. It is only used as a visual label in Sentry."
+        },
+        "slug": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Optional project slug to create."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional project slug to create.",
+          "default": null
         },
         "platform": {
           "anyOf": [
@@ -173,18 +186,6 @@
           ],
           "description": "The platform for the project. e.g., python, javascript, react, etc.",
           "default": null
-        },
-        "repository": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional repository name to link to the project (e.g. 'getsentry/sentry'). The repo must already be connected to the organization via a VCS integration."
         }
       },
       "required": ["organizationSlug", "teamSlug", "name"],
@@ -3130,7 +3131,7 @@
   },
   {
     "name": "update_project",
-    "description": "Update project settings in Sentry, such as name, slug, platform, and team assignment.\n\nBe careful when using this tool!\n\nUse this tool when you need to:\n- Update a project's name or slug to fix onboarding mistakes\n- Change the platform assigned to a project\n- Update team assignment for a project\n\n<examples>\n### Update a project's name and slug\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')\n```\n\n### Assign a project to a different team\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='backend-team')\n```\n\n### Update platform\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', platform='python')\n```\n\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Team assignment is handled separately from other project settings\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- When updating the slug, the project will be accessible at the new slug after the update\n</hints>",
+    "description": "Update project metadata in Sentry, such as name, slug, and platform.\n\nBe careful when using this tool!\n\nUse this tool when you need to:\n- Update a project's name or slug to fix onboarding mistakes\n- Change the platform assigned to a project\n\n<examples>\n### Update a project's name and slug\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')\n```\n\n### Update platform\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', platform='python')\n```\n\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Team access changes are handled by separate project-management tools.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- When updating the slug, the project will be accessible at the new slug after the update\n- Do not update the slug from a project-scoped session; reconnect with an organization-scoped or unconstrained session first.\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3192,19 +3193,6 @@
             }
           ],
           "description": "The platform for the project. e.g., python, javascript, react, etc.",
-          "default": null
-        },
-        "teamSlug": {
-          "anyOf": [
-            {
-              "type": "string",
-              "description": "The team's slug. You can find a list of existing teams in an organization with the Sentry tool `find_teams`."
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The team to assign this project to. Note: this will replace the current team assignment.",
           "default": null
         }
       },

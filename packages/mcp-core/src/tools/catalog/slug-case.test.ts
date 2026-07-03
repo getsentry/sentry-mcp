@@ -67,14 +67,12 @@ describe("slug parameter case preservation", () => {
         name: null,
         slug: " NewProject ",
         platform: null,
-        teamSlug: " MyTeam ",
         regionUrl: null,
       }),
     ).toMatchObject({
       organizationSlug: "MyOrg",
       projectSlug: "OldProject",
       slug: "NewProject",
-      teamSlug: "MyTeam",
     });
   });
 });

@@ -2,15 +2,26 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import { logIssue } from "../../telem/logging";
 import type { ServerContext } from "../../types";
-import type { ClientKey } from "../../api-client/index";
 import {
   ParamOrganizationSlug,
+  ParamProjectSlug,
   ParamRegionUrl,
   ParamTeamSlug,
   ParamPlatform,
 } from "../../schema";
+import type { ClientKey } from "../../api-client/index";
+
+function getUsableClientKey(clientKeys: ClientKey[]): ClientKey | undefined {
+  return (
+    clientKeys.find(
+      (key) => key.name === "Default" && key.isActive && key.dsn.public,
+    ) ??
+    clientKeys.find((key) => key.isActive && key.dsn.public) ??
+    clientKeys.find((key) => key.name === "Default" && key.dsn.public) ??
+    clientKeys.find((key) => key.dsn.public)
+  );
+}
 
 export default defineTool({
   name: "create_project",
@@ -24,7 +35,6 @@ export default defineTool({
     "- 'Set up a project for [app/service] with team [X]'",
     "- 'I need a new Sentry project'",
     "- Create project AND need DSN in one step",
-    "- 'Create a project for my-repo'",
     "",
     "DO NOT USE create_dsn after this - DSN is included in output.",
     "",
@@ -35,16 +45,15 @@ export default defineTool({
     "```",
     "create_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')",
     "```",
-    "### Create project and link to a repository",
+    "### Create project with an explicit slug",
     "```",
-    "create_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript', repository='getsentry/sentry')",
+    "create_project(organizationSlug='my-organization', teamSlug='my-team', name='My Project', slug='my-project', platform='javascript')",
     "```",
     "</examples>",
     "",
     "<hints>",
     "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<teamSlug>.",
     "- If any parameter is ambiguous, you should clarify with the user what they meant.",
-    "- The repository parameter accepts a repo name (e.g. 'getsentry/sentry'). The repo must already be connected to the org via a VCS integration.",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -55,17 +64,12 @@ export default defineTool({
       .string()
       .trim()
       .describe(
-        "The name of the project to create. Typically this is commonly the name of the repository or service. It is only used as a visual label in Sentry.",
+        "The name of the project to create. Typically this is the name of the application or service. It is only used as a visual label in Sentry.",
       ),
-    platform: ParamPlatform.nullable().default(null),
-    repository: z
-      .string()
-      .trim()
+    slug: ParamProjectSlug.describe("Optional project slug to create.")
       .nullable()
-      .default(null)
-      .describe(
-        "Optional repository name to link to the project (e.g. 'getsentry/sentry'). The repo must already be connected to the organization via a VCS integration.",
-      ),
+      .default(null),
+    platform: ParamPlatform.nullable().default(null),
   },
   annotations: {
     readOnlyHint: false,
@@ -85,70 +89,29 @@ export default defineTool({
       organizationSlug,
       teamSlug: params.teamSlug,
       name: params.name,
+      slug: params.slug,
       platform: params.platform,
     });
-    let clientKey: ClientKey | null = null;
-    try {
+
+    const clientKeys = await apiService.listClientKeys({
+      organizationSlug,
+      projectSlug: project.slug,
+    });
+    let clientKey = getUsableClientKey(clientKeys);
+
+    if (!clientKey) {
       clientKey = await apiService.createClientKey({
         organizationSlug,
         projectSlug: project.slug,
         name: "Default",
       });
-    } catch (err) {
-      logIssue(err);
-    }
-
-    let repoStatus: "linked" | "not_found" | "link_failed" | null = null;
-    let repoName: string | null = null;
-    if (params.repository) {
-      try {
-        const repos = await apiService.listRepos({
-          organizationSlug,
-          query: params.repository,
-        });
-        const match = repos.find(
-          (r) =>
-            r.name === params.repository ||
-            r.name.endsWith(`/${params.repository}`),
-        );
-        if (match) {
-          repoName = match.name;
-          try {
-            await apiService.linkProjectRepo({
-              organizationSlug,
-              projectSlug: project.slug,
-              repositoryId: match.id,
-            });
-            repoStatus = "linked";
-          } catch (err) {
-            logIssue(err);
-            repoStatus = "link_failed";
-          }
-        } else {
-          repoStatus = "not_found";
-        }
-      } catch (err) {
-        logIssue(err);
-        repoStatus = "not_found";
-      }
     }
 
     let output = `# New Project in **${organizationSlug}**\n\n`;
     output += `**ID**: ${project.id}\n`;
     output += `**Slug**: ${project.slug}\n`;
     output += `**Name**: ${project.name}\n`;
-    if (clientKey) {
-      output += `**SENTRY_DSN**: ${clientKey?.dsn.public}\n\n`;
-    } else {
-      output += "**SENTRY_DSN**: There was an error fetching this value.\n\n";
-    }
-    if (repoStatus === "linked" && repoName) {
-      output += `**Repository**: ${repoName} (linked)\n\n`;
-    } else if (repoStatus === "link_failed" && repoName) {
-      output += `**Repository**: Found ${repoName} but failed to link it to the project. Check permissions and try linking manually.\n\n`;
-    } else if (repoStatus === "not_found") {
-      output += `**Repository**: Could not find repository "${params.repository}" in the organization. Make sure it's connected via a VCS integration.\n\n`;
-    }
+    output += `**SENTRY_DSN**: ${clientKey.dsn.public}\n\n`;
     output += "## Response Notes\n\n";
     output += `- Please tell the user the project slug and **SENTRY_DSN**.\n`;
     output += `- The **SENTRY_DSN** value is used to initialize Sentry SDKs.\n`;
