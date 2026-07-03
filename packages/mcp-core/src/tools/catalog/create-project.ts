@@ -3,7 +3,7 @@ import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { UserInputError } from "../../errors";
-import { logIssue } from "../../telem/logging";
+import { logWarn } from "../../telem/logging";
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,
@@ -12,7 +12,7 @@ import {
   ParamTeamSlug,
   ParamPlatform,
 } from "../../schema";
-import type { ClientKey } from "../../api-client/index";
+import type { ClientKey, SentryApiService } from "../../api-client/index";
 
 type RepositoryMatch = {
   name: string;
@@ -58,12 +58,56 @@ function getRepositoryProvider(repository: RepositoryMatch): string | null {
   return repository.provider.id.replace(/^integrations:/, "") || null;
 }
 
+async function getOrCreateClientKey({
+  apiService,
+  organizationSlug,
+  projectSlug,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  projectSlug: string;
+}): Promise<ClientKey | null> {
+  let clientKey: ClientKey | undefined;
+
+  try {
+    clientKey = getUsableClientKey(
+      await apiService.listClientKeys({
+        organizationSlug,
+        projectSlug,
+      }),
+    );
+  } catch (err) {
+    logWarn(err, {
+      loggerScope: ["runtime", "project-management"],
+      extra: { action: "list_project_client_keys" },
+    });
+  }
+
+  if (clientKey) {
+    return clientKey;
+  }
+
+  try {
+    return await apiService.createClientKey({
+      organizationSlug,
+      projectSlug,
+      name: "Default",
+    });
+  } catch (err) {
+    logWarn(err, {
+      loggerScope: ["runtime", "project-management"],
+      extra: { action: "create_project_client_key" },
+    });
+    return null;
+  }
+}
+
 export default defineTool({
   name: "create_project",
   skills: ["project-management"], // Only available in project-management skill
   requiredScopes: ["project:write", "team:read", "org:read"],
   description: [
-    "Create a new project in Sentry (includes DSN automatically).",
+    "Create a new project in Sentry (provisions DSN automatically).",
     "",
     "USE THIS TOOL WHEN USERS WANT TO:",
     "- 'Create a new project'",
@@ -72,7 +116,7 @@ export default defineTool({
     "- Create project AND need DSN in one step",
     "- Create project and link an existing repository",
     "",
-    "Returns the created project slug and a usable SENTRY_DSN.",
+    "Returns the created project slug and a usable SENTRY_DSN when key setup succeeds.",
     "",
     "Be careful when using this tool!",
     "",
@@ -167,30 +211,26 @@ export default defineTool({
       } catch (err) {
         // Repository linking happens after project creation; preserve the
         // project + DSN response and report the link failure in the output.
-        logIssue(err);
+        logWarn(err, {
+          loggerScope: ["runtime", "project-management"],
+          extra: { action: "link_project_repository" },
+        });
         repositoryLinkFailed = true;
       }
     }
 
-    const clientKeys = await apiService.listClientKeys({
+    const clientKey = await getOrCreateClientKey({
+      apiService,
       organizationSlug,
       projectSlug: project.slug,
     });
-    let clientKey = getUsableClientKey(clientKeys);
-
-    if (!clientKey) {
-      clientKey = await apiService.createClientKey({
-        organizationSlug,
-        projectSlug: project.slug,
-        name: "Default",
-      });
-    }
+    const sentryDsn = clientKey?.dsn.public ?? null;
 
     let output = `# New Project in **${organizationSlug}**\n\n`;
     output += `**ID**: ${project.id}\n`;
     output += `**Slug**: ${project.slug}\n`;
     output += `**Name**: ${project.name}\n`;
-    output += `**SENTRY_DSN**: ${clientKey.dsn.public}\n\n`;
+    output += `**SENTRY_DSN**: ${sentryDsn ?? "unavailable"}\n\n`;
     if (repositoryMatch && repositoryLinked) {
       output += `**Repository**: ${repositoryMatch.name} (linked)\n`;
       output += "**Code Mapping**: `/` -> `/`\n\n";
@@ -198,9 +238,15 @@ export default defineTool({
       output += `**Repository**: Found ${repositoryMatch.name} but failed to link it to the project. Check permissions and try linking manually.\n\n`;
     }
     output += "## Response Notes\n\n";
-    output += `- Please tell the user the project slug and **SENTRY_DSN**.\n`;
-    output += `- No additional DSN creation step is needed.\n`;
-    output += `- The **SENTRY_DSN** value is used to initialize Sentry SDKs.\n`;
+    if (sentryDsn) {
+      output += `- Please tell the user the project slug and **SENTRY_DSN**.\n`;
+      output += `- No additional DSN creation step is needed.\n`;
+      output += `- The **SENTRY_DSN** value is used to initialize Sentry SDKs.\n`;
+    } else {
+      output += `- Please tell the user the project slug.\n`;
+      output += `- Project creation succeeded, but SENTRY_DSN could not be retrieved or created.\n`;
+      output += `- Use create_dsn for this project before initializing Sentry SDKs.\n`;
+    }
     if (repositoryMatch && repositoryLinked) {
       output += `- Repository linked to project with a root code mapping: ${repositoryMatch.name}\n`;
     } else if (repositoryMatch && repositoryLinkFailed) {

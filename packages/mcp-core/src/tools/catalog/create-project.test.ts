@@ -179,6 +179,78 @@ describe("create_project", () => {
     expect(result).toContain("**SENTRY_DSN**: https://fallback@example.com/1");
   });
 
+  it("creates a fallback default DSN when key listing fails after creation", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+        () => HttpResponse.json({ detail: "lookup failed" }, { status: 500 }),
+      ),
+      http.post(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+        () =>
+          HttpResponse.json({
+            ...clientKeyFixture,
+            name: "Default",
+            dsn: {
+              public: "https://fallback@example.com/1",
+            },
+          }),
+      ),
+    );
+
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: "the-goats",
+        name: "cloudflare-mcp",
+        slug: null,
+        platform: "node",
+        regionUrl: null,
+        repository: null,
+      },
+      context,
+    );
+
+    expect(result).toContain("**SENTRY_DSN**: https://fallback@example.com/1");
+    expect(result).toContain("No additional DSN creation step is needed");
+  });
+
+  it("returns project details when DSN setup fails after creation", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+        () => HttpResponse.json({ detail: "lookup failed" }, { status: 500 }),
+      ),
+      http.post(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+        () => HttpResponse.json({ detail: "create failed" }, { status: 500 }),
+      ),
+    );
+
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: "the-goats",
+        name: "cloudflare-mcp",
+        slug: null,
+        platform: "node",
+        regionUrl: null,
+        repository: null,
+      },
+      context,
+    );
+
+    expect(result).toContain("**Slug**: cloudflare-mcp");
+    expect(result).toContain("**SENTRY_DSN**: unavailable");
+    expect(result).toContain(
+      "Project creation succeeded, but SENTRY_DSN could not be retrieved or created",
+    );
+    expect(result).toContain(
+      "Use create_dsn for this project before initializing Sentry SDKs",
+    );
+    expect(result).not.toContain("No additional DSN creation step is needed");
+  });
+
   it("passes an optional slug through project creation", async () => {
     let createBody: unknown;
     mswServer.use(
