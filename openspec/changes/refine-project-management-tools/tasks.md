@@ -24,9 +24,9 @@
 
 ## 4. Constraint and Availability Behavior
 
-- [ ] 4.1 Hide or reject `create_project` in project-scoped sessions.
-- [ ] 4.2 Verify organization constraints are injected for project-management tools and explicit conflicting org inputs are filtered.
-- [ ] 4.3 Verify project constraints are injected for `update_project`, `add_team_to_project`, and `remove_team_from_project`.
+- [x] 4.1 Hide or reject `create_project` in project-scoped sessions.
+- [x] 4.2 Verify organization constraints are injected for project-management tools and explicit conflicting org inputs are filtered.
+- [x] 4.3 Verify project constraints are injected for `update_project`, `add_team_to_project`, and `remove_team_from_project`.
 - [x] 4.4 Add tests for project-scoped slug update rejection.
 
 ## 5. Tests
@@ -36,7 +36,7 @@
 - [x] 5.3 Update `update-project.test.ts` snapshots and remove team assignment cases.
 - [x] 5.4 Add `add-team-to-project.test.ts` coverage for add, already-assigned no-op, mixed-case slug preservation, and constraint injection.
 - [x] 5.5 Add `remove-team-from-project.test.ts` coverage for remove, not assigned, last team guard, mixed-case slug preservation, and constraint injection.
-- [ ] 5.6 Update registry, tool count, skill gating, and generated-definition tests as needed.
+- [x] 5.6 Update registry, tool count, skill gating, and generated-definition tests as needed.
 
 ## 6. Documentation and Generated Definitions
 
