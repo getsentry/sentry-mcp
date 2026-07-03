@@ -40,15 +40,15 @@
 
 ## 6. Documentation and Generated Definitions
 
-- [ ] 6.1 Add `docs/specs/project-management.md` covering the durable project-management contract.
-- [ ] 6.2 Link the new spec from `docs/specs/README.md`.
-- [ ] 6.3 Update any docs that mention `update_project` team assignment or `create_project` repository linking.
-- [ ] 6.4 Run `pnpm run --filter @sentry/mcp-core generate-definitions` after tool changes.
+- [x] 6.1 Add `docs/specs/project-management.md` covering the durable project-management contract.
+- [x] 6.2 Link the new spec from `docs/specs/README.md`.
+- [x] 6.3 Update any docs that mention `update_project` team assignment or `create_project` repository linking.
+- [x] 6.4 Run `pnpm run --filter @sentry/mcp-core generate-definitions` after tool changes.
 
 ## 7. Verification
 
 - [x] 7.1 Run targeted unit tests for project-management tools and catalog availability.
-- [ ] 7.2 Run `pnpm run tsc`.
-- [ ] 7.3 Run `pnpm run lint`.
-- [ ] 7.4 Run `pnpm run test`.
-- [ ] 7.5 Run `pnpm run measure-tokens` if generated tool definitions materially change the catalog text size.
+- [x] 7.2 Run `pnpm run tsc`.
+- [x] 7.3 Run `pnpm run lint`.
+- [x] 7.4 Run `pnpm run test`.
+- [x] 7.5 Run `pnpm run measure-tokens` if generated tool definitions materially change the catalog text size.

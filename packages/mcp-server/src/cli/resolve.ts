@@ -72,7 +72,13 @@ export function finalize(input: MergedArgs): PartiallyResolvedConfig {
   // packages/mcp-cloudflare/src/server/oauth/routes/callback.ts (lines 234-248)
   //
   let finalSkills: Set<Skill>;
-  if (input.skills) {
+  if (input.skills && input.allSkills) {
+    throw new Error("Error: --all-skills cannot be combined with --skills.");
+  }
+
+  if (input.allSkills) {
+    finalSkills = new Set<Skill>(ACTIVE_SKILLS);
+  } else if (input.skills) {
     // Override: use only the specified skills
     const { valid, invalid } = parseSkills(input.skills);
     if (invalid.length > 0) {

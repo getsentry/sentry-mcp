@@ -412,10 +412,10 @@ pnpm -w run cli "list organizations"
 **Verify tools reflect the current session grant:**
 ```bash
 # With read-only grants: no write tools
-pnpm -w run cli "list tools" | grep "create_"
+pnpm -w run cli "search Sentry tools for create project"
 
-# With all grants: includes write tools
-# Should see: create_project, create_team, update_issue, etc.
+# With all grants: catalog search includes write-capable tools
+# Should find: create_project, create_team, update_issue, etc.
 ```
 
 ### 3. Test Multi-Organization Access
@@ -547,8 +547,9 @@ pnpm -w run cli "who am I?"
 # Check tool list
 pnpm -w run cli "list tools" | jq '.tools[] | .name'
 
-# Verify the session grant includes the capability for the tool you need
-# Example: create_project is only available with project-management capabilities
+# Verify the session grant includes the capability for the tool you need.
+# Project-management tools are catalog-only; find them with search_sentry_tools.
+# Example: create_project requires project-management and is hidden in project-scoped sessions.
 
 # Rebuild and restart
 pnpm -w run build && pnpm dev

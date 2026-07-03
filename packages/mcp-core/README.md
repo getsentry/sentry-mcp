@@ -56,10 +56,11 @@ as an opaque model identifier.
 
 ### Constraint-Based Tool Exclusion
 
-When a session is scoped to a specific organization or project (tenant-bound context), certain list tools are automatically excluded since they cannot query other resources:
+When a session is scoped to a specific organization or project (tenant-bound context), certain tools are automatically excluded when they would escape or duplicate that scope:
 
 - **`find_organizations`** is hidden when the session is constrained to a specific organization (`organizationSlug` constraint)
 - **`find_projects`** is hidden when the session is constrained to a specific project (`projectSlug` constraint)
+- **`create_project`** is hidden when the session is constrained to a specific project (`projectSlug` constraint)
 
 This ensures that only relevant tools are available in constrained contexts. When constraints are not set, all tools are available based on your granted skills.
 

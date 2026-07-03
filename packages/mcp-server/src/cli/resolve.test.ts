@@ -211,6 +211,32 @@ describe("cli/finalize", () => {
     expect(cfg.finalSkills.has("preprod")).toBe(false);
   });
 
+  it("grants all active skills with --all-skills", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      allSkills: true,
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills.size).toBe(4);
+    expect(cfg.finalSkills.has("inspect")).toBe(true);
+    expect(cfg.finalSkills.has("triage")).toBe(true);
+    expect(cfg.finalSkills.has("project-management")).toBe(true);
+    expect(cfg.finalSkills.has("seer")).toBe(true);
+    expect(cfg.finalSkills.has("docs")).toBe(false);
+    expect(cfg.finalSkills.has("preprod")).toBe(false);
+  });
+
+  it("rejects combining --all-skills with --skills", () => {
+    expect(() =>
+      finalize({
+        accessToken: "tok",
+        allSkills: true,
+        skills: "inspect",
+        unknownArgs: [],
+      }),
+    ).toThrow(/--all-skills cannot be combined with --skills/);
+  });
+
   // --disable-skills tests
   it("removes disabled skills from default active-skills set", () => {
     const cfg = finalize({

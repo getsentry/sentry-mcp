@@ -12,6 +12,7 @@ describe("cli/parseArgv", () => {
       "--sentry-dsn=dsn",
       "--openai-base-url=https://api.example.com/v1",
       "--skills=inspect,triage",
+      "--all-skills",
       "-h",
       "-v",
     ]);
@@ -23,6 +24,7 @@ describe("cli/parseArgv", () => {
     expect(parsed.sentryDsn).toBe("dsn");
     expect(parsed.openaiBaseUrl).toBe("https://api.example.com/v1");
     expect(parsed.skills).toBe("inspect,triage");
+    expect(parsed.allSkills).toBe(true);
     expect(parsed.help).toBe(true);
     expect(parsed.version).toBe(true);
     expect(parsed.unknownArgs).toEqual([]);
@@ -37,6 +39,12 @@ describe("cli/parseArgv", () => {
   it("parses --disable-skills", () => {
     const parsed = parseArgv(["--access-token=tok", "--disable-skills=seer"]);
     expect(parsed.disableSkills).toBe("seer");
+  });
+
+  it("parses --all-skills", () => {
+    const parsed = parseArgv(["--access-token=tok", "--all-skills"]);
+    expect(parsed.accessToken).toBe("tok");
+    expect(parsed.allSkills).toBe(true);
   });
 
   it("parses --insecure-http", () => {
@@ -139,6 +147,17 @@ describe("cli/merge", () => {
     const cli = parseArgv(["--access-token=clitok"]);
     const merged = merge(cli, env);
     expect(merged.skills).toBe("inspect,triage");
+  });
+
+  it("lets CLI allSkills override env skills", () => {
+    const env = parseEnv({
+      SENTRY_ACCESS_TOKEN: "envtok",
+      MCP_SKILLS: "inspect",
+    } as any);
+    const cli = parseArgv(["--access-token=clitok", "--all-skills"]);
+    const merged = merge(cli, env);
+    expect(merged.allSkills).toBe(true);
+    expect(merged.skills).toBeUndefined();
   });
 
   it("applies precedence for disableSkills: CLI over env", () => {
