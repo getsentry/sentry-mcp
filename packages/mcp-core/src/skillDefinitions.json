@@ -371,8 +371,13 @@
     "description": "Create and modify projects, teams, and DSNs",
     "defaultEnabled": false,
     "order": 5,
-    "toolCount": 10,
+    "toolCount": 12,
     "tools": [
+      {
+        "name": "add_team_to_project",
+        "description": "Grant a team access to an existing Sentry project.\n\nUse this tool when you need to:\n- Add another team to a project\n- Grant a team access without changing project metadata\n- Check whether a team already has project access before adding it\n\n<examples>\nadd_team_to_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- Team access changes are separate from project metadata updates.\n- If the team is already assigned, this tool returns the current team list without making another change.\n</hints>",
+        "requiredScopes": ["project:write", "team:read", "org:read"]
+      },
       {
         "name": "create_dsn",
         "description": "Create an additional DSN for an EXISTING project.\n\nUSE THIS TOOL WHEN:\n- Project already exists and needs additional DSN\n- 'Create another DSN for project X'\n- 'I need a production DSN for existing project'\n\nDO NOT USE for new projects (use create_project instead)\n\nBe careful when using this tool!\n\n<examples>\n### Create additional DSN for existing project\n```\ncreate_dsn(organizationSlug='my-organization', projectSlug='my-project', name='Production')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n</hints>",
@@ -407,6 +412,11 @@
         "name": "find_teams",
         "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
         "requiredScopes": ["team:read"]
+      },
+      {
+        "name": "remove_team_from_project",
+        "description": "Revoke a team's access to an existing Sentry project.\n\nUse this tool when you need to:\n- Remove a team from a project\n- Revoke team access without changing project metadata\n- Check project team assignments before removing access\n\nBe careful when using this tool because it revokes project access.\n\n<examples>\nremove_team_from_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- The team must already be assigned to the project.\n- This tool will not remove the last team assigned to a project.\n</hints>",
+        "requiredScopes": ["project:write", "team:read", "org:read"]
       },
       {
         "name": "update_dsn",

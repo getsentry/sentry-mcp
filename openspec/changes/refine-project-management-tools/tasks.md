@@ -16,11 +16,11 @@
 
 ## 3. Team Access Tools
 
-- [ ] 3.1 Add `add_team_to_project` as a catalog-only `project-management` tool.
-- [ ] 3.2 Implement `add_team_to_project` as idempotent from the user perspective by returning current teams when the team is already assigned.
-- [ ] 3.3 Add `remove_team_from_project` as a catalog-only `project-management` tool with destructive safety annotation.
-- [ ] 3.4 Implement `remove_team_from_project` preflight checks for team-not-assigned and last-team removal before calling DELETE.
-- [ ] 3.5 Register the new tools in the catalog and confirm they are not added to the direct top-level surface.
+- [x] 3.1 Add `add_team_to_project` as a catalog-only `project-management` tool.
+- [x] 3.2 Implement `add_team_to_project` as idempotent from the user perspective by returning current teams when the team is already assigned.
+- [x] 3.3 Add `remove_team_from_project` as a catalog-only `project-management` tool with destructive safety annotation.
+- [x] 3.4 Implement `remove_team_from_project` preflight checks for team-not-assigned and last-team removal before calling DELETE.
+- [x] 3.5 Register the new tools in the catalog and confirm they are not added to the direct top-level surface.
 
 ## 4. Constraint and Availability Behavior
 
@@ -34,8 +34,8 @@
 - [x] 5.1 Update `create-project.test.ts` snapshots for the narrowed schema and DSN-first behavior.
 - [x] 5.2 Add `create_project` tests for existing default DSN, fallback DSN creation, optional slug, and no repository linking.
 - [x] 5.3 Update `update-project.test.ts` snapshots and remove team assignment cases.
-- [ ] 5.4 Add `add-team-to-project.test.ts` coverage for add, already-assigned no-op, mixed-case slug preservation, and constraint injection.
-- [ ] 5.5 Add `remove-team-from-project.test.ts` coverage for remove, not assigned, last team guard, mixed-case slug preservation, and constraint injection.
+- [x] 5.4 Add `add-team-to-project.test.ts` coverage for add, already-assigned no-op, mixed-case slug preservation, and constraint injection.
+- [x] 5.5 Add `remove-team-from-project.test.ts` coverage for remove, not assigned, last team guard, mixed-case slug preservation, and constraint injection.
 - [ ] 5.6 Update registry, tool count, skill gating, and generated-definition tests as needed.
 
 ## 6. Documentation and Generated Definitions
@@ -47,7 +47,7 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Run targeted unit tests for project-management tools and catalog availability.
+- [x] 7.1 Run targeted unit tests for project-management tools and catalog availability.
 - [ ] 7.2 Run `pnpm run tsc`.
 - [ ] 7.3 Run `pnpm run lint`.
 - [ ] 7.4 Run `pnpm run test`.
