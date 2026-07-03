@@ -38,7 +38,7 @@ describe("remove_team_from_project", () => {
     let deleteCalls = 0;
     mswServer.use(
       http.get(
-        "*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/",
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/",
         () => {
           listCalls += 1;
           return HttpResponse.json(
@@ -47,7 +47,7 @@ describe("remove_team_from_project", () => {
         },
       ),
       http.delete(
-        "*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/the-goats/",
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/the-goats/",
         () => {
           deleteCalls += 1;
           return new HttpResponse(null, { status: 204 });
@@ -89,11 +89,12 @@ describe("remove_team_from_project", () => {
   it("rejects removal when the team is not assigned", async () => {
     let deleteCalls = 0;
     mswServer.use(
-      http.get("*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/", () =>
-        HttpResponse.json([teamFixture]),
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/",
+        () => HttpResponse.json([teamFixture]),
       ),
       http.delete(
-        "*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/backend/",
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/backend/",
         () => {
           deleteCalls += 1;
           return HttpResponse.json(
@@ -122,11 +123,12 @@ describe("remove_team_from_project", () => {
   it("rejects removal when the team is the last assigned team", async () => {
     let deleteCalls = 0;
     mswServer.use(
-      http.get("*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/", () =>
-        HttpResponse.json([teamFixture]),
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/",
+        () => HttpResponse.json([teamFixture]),
       ),
       http.delete(
-        "*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/the-goats/",
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/the-goats/",
         () => {
           deleteCalls += 1;
           return HttpResponse.json(
@@ -162,7 +164,7 @@ describe("remove_team_from_project", () => {
     let listCalls = 0;
     mswServer.use(
       http.get(
-        "*/api/0/projects/:organizationSlug/:projectSlug/teams/",
+        "https://sentry.io/api/0/projects/:organizationSlug/:projectSlug/teams/",
         ({ request }) => {
           paths.push(new URL(request.url).pathname);
           listCalls += 1;
@@ -181,7 +183,7 @@ describe("remove_team_from_project", () => {
         },
       ),
       http.delete(
-        "*/api/0/projects/:organizationSlug/:projectSlug/teams/:teamSlug/",
+        "https://sentry.io/api/0/projects/:organizationSlug/:projectSlug/teams/:teamSlug/",
         ({ request }) => {
           paths.push(new URL(request.url).pathname);
           return new HttpResponse(null, { status: 204 });

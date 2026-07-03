@@ -142,13 +142,21 @@ export const RepositorySchema = z
 
 export const RepositoryListSchema = z.array(RepositorySchema);
 
-export const ProjectRepoLinkSchema = z
+export const ProjectRepositoryMappingSchema = z
   .object({
-    id: z.union([z.string(), z.number()]),
-    projectId: z.union([z.string(), z.number()]),
-    repositoryId: z.union([z.string(), z.number()]),
-    source: z.string(),
-    created: z.boolean(),
+    created: z.number(),
+    updated: z.number(),
+    errors: z.number(),
+    mappings: z.array(
+      z
+        .object({
+          stackRoot: z.string(),
+          sourceRoot: z.string(),
+          status: z.string(),
+          detail: z.string().optional(),
+        })
+        .passthrough(),
+    ),
   })
   .passthrough();
 

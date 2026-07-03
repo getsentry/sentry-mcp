@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
-import { mswServer } from "@sentry/mcp-server-mocks";
+import { mswServer, teamFixture } from "@sentry/mcp-server-mocks";
 import { SentryApiService } from "./client";
 import { ConfigurationError } from "../errors";
 
@@ -1913,7 +1913,7 @@ describe("API query builders", () => {
     });
   });
 
-  describe("linkProjectRepo", () => {
+  describe("linkProjectRepository", () => {
     let apiService: SentryApiService;
 
     beforeEach(() => {
@@ -1927,7 +1927,7 @@ describe("API query builders", () => {
       vi.restoreAllMocks();
     });
 
-    it("should POST to the repo endpoint with repositoryId", async () => {
+    it("should POST to the code mappings bulk endpoint", async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         headers: {
@@ -1936,32 +1936,48 @@ describe("API query builders", () => {
         },
         json: () =>
           Promise.resolve({
-            id: "1",
-            projectId: "456",
-            repositoryId: "101",
-            source: "scm_onboarding",
-            created: true,
+            created: 1,
+            updated: 0,
+            errors: 0,
+            mappings: [
+              {
+                stackRoot: "",
+                sourceRoot: "",
+                status: "created",
+              },
+            ],
           }),
       });
 
-      const result = await apiService.linkProjectRepo({
+      const result = await apiService.linkProjectRepository({
         organizationSlug: "test-org",
         projectSlug: "my-project",
-        repositoryId: 101,
+        repository: "getsentry/sentry",
+        provider: "github",
       });
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("/projects/test-org/my-project/repo/"),
+        expect.stringContaining("/organizations/test-org/code-mappings/bulk/"),
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify({ repositoryId: 101 }),
+          body: JSON.stringify({
+            project: "my-project",
+            repository: "getsentry/sentry",
+            provider: "github",
+            mappings: [
+              {
+                stackRoot: "",
+                sourceRoot: "",
+              },
+            ],
+          }),
         }),
       );
-      expect(result.created).toBe(true);
-      expect(result.repositoryId).toBe("101");
+      expect(result.created).toBe(1);
+      expect(result.mappings[0]!.status).toBe("created");
     });
 
-    it("should handle idempotent response", async () => {
+    it("should handle updated mappings response", async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         headers: {
@@ -1970,22 +1986,80 @@ describe("API query builders", () => {
         },
         json: () =>
           Promise.resolve({
-            id: "1",
-            projectId: "456",
-            repositoryId: "101",
-            source: "manual",
-            created: false,
+            created: 0,
+            updated: 1,
+            errors: 0,
+            mappings: [
+              {
+                stackRoot: "",
+                sourceRoot: "",
+                status: "updated",
+              },
+            ],
           }),
       });
 
-      const result = await apiService.linkProjectRepo({
+      const result = await apiService.linkProjectRepository({
         organizationSlug: "test-org",
         projectSlug: "my-project",
-        repositoryId: 101,
+        repository: "getsentry/sentry",
       });
 
-      expect(result.created).toBe(false);
-      expect(result.source).toBe("manual");
+      expect(result.updated).toBe(1);
+      expect(result.mappings[0]!.status).toBe("updated");
+    });
+  });
+
+  describe("listProjectTeams", () => {
+    let apiService: SentryApiService;
+
+    beforeEach(() => {
+      apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("follows pagination cursors", async () => {
+      const backendTeam = {
+        ...teamFixture,
+        id: "4509109078196224",
+        slug: "backend",
+        name: "Backend",
+      };
+      globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+        const parsedUrl = new URL(url);
+        const isNextPage =
+          parsedUrl.searchParams.get("cursor") === "team-cursor";
+
+        return Promise.resolve({
+          ok: true,
+          headers: {
+            get: (key: string) => {
+              if (key === "content-type") {
+                return "application/json";
+              }
+              if (key === "link" && !isNextPage) {
+                return '<https://sentry.io/api/0/projects/test-org/my-project/teams/?cursor=team-cursor>; rel="next"; results="true"; cursor="team-cursor"';
+              }
+              return null;
+            },
+          },
+          json: () =>
+            Promise.resolve(isNextPage ? [backendTeam] : [teamFixture]),
+        });
+      });
+
+      const teams = await apiService.listProjectTeams({
+        organizationSlug: "test-org",
+        projectSlug: "my-project",
+      });
+
+      expect(teams.map((team) => team.slug)).toEqual(["the-goats", "backend"]);
     });
   });
 

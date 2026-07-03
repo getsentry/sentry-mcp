@@ -54,7 +54,7 @@ describe("update_project", () => {
     const paths: string[] = [];
     let updateBody: unknown;
     mswServer.use(
-      http.put("*/api/0/projects/*/*/", async ({ request }) => {
+      http.put("https://sentry.io/api/0/projects/*/*/", async ({ request }) => {
         paths.push(new URL(request.url).pathname);
         updateBody = await request.json();
         return HttpResponse.json({

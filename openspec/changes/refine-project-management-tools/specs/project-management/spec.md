@@ -30,16 +30,21 @@ The `create_project` tool SHALL create a Sentry project and return a usable `SEN
 - **WHEN** `create_project` succeeds
 - **THEN** the response includes the project ID, project slug, project name, and `SENTRY_DSN`
 
-### Requirement: Project creation accepts only core setup fields
-The `create_project` tool SHALL accept only core project setup fields and SHALL NOT perform repository linking.
+### Requirement: Project creation accepts core setup fields
+The `create_project` tool SHALL accept core project setup fields and optional repository linking.
 
 #### Scenario: Caller provides core project fields
 - **WHEN** a caller provides `organizationSlug`, `teamSlug`, `name`, and optional `slug` or `platform`
 - **THEN** the tool sends the supported project creation fields to Sentry
 
 #### Scenario: Caller wants repository linking
-- **WHEN** a caller asks `create_project` to link a repository
-- **THEN** the tool schema does not accept repository linking parameters
+- **WHEN** a caller provides a `repository`
+- **THEN** the tool resolves the repository before creating the project
+- **AND** creates a root code mapping for the created project and repository after project creation
+
+#### Scenario: Requested repository does not resolve
+- **WHEN** a caller provides a `repository` that cannot be found or resolves ambiguously
+- **THEN** the tool returns a user input error before creating the project
 
 ### Requirement: Project creation respects active constraints
 The system SHALL prevent project creation from escaping the active MCP constraints.

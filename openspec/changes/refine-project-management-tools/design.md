@@ -8,6 +8,10 @@ The MCP catalog already includes `create_project`, `update_project`, `create_tea
 
 Sentry's upstream project creation endpoint creates the project under a team and emits normal project creation side effects, including default key creation through Sentry's project post-save hook. Agents still need the DSN in the tool response because creating a Sentry project is usually followed immediately by SDK setup.
 
+Endpoint validation:
+- `~/src/sentry/src/sentry/core/endpoints/project_teams.py` lists project teams through `ProjectTeamsEndpoint.get`, backed by `OffsetPaginator` and cursor `Link` headers, so MCP must page through cursors before applying team-access safety checks.
+- `~/src/sentry/src/sentry/integrations/api/endpoints/organization_code_mappings_bulk.py` persists repository/project associations through `OrganizationCodeMappingsBulkEndpoint.post` at `/organizations/{org}/code-mappings/bulk/`; it resolves the project by slug, resolves the repository by name/provider, infers the default branch when possible, and creates or updates `RepositoryProjectPathConfig` rows.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -21,7 +25,7 @@ Sentry's upstream project creation endpoint creates the project under a team and
 
 **Non-Goals:**
 
-- Repository linking during project creation.
+- Repository linking as a metadata update or team access concern.
 - Project deletion, transfer, ownership rule management, alert rule management, or broader project settings.
 - Direct top-level MCP exposure for project-management tools.
 - Changing Sentry's upstream API semantics.
@@ -30,9 +34,11 @@ Sentry's upstream project creation endpoint creates the project under a team and
 
 ### Keep `create_project` focused on project setup
 
-`create_project` will call Sentry's team project creation endpoint with only core fields: organization, team, name, optional slug, and optional platform. It will not expose the upstream `default_rules` flag in the first iteration; Sentry's default behavior remains active.
+`create_project` will call Sentry's team project creation endpoint with core fields: organization, team, name, optional slug, and optional platform. It will not expose the upstream `default_rules` flag in the first iteration; Sentry's default behavior remains active.
 
-Alternative considered: keep repository linking in `create_project`. This was rejected because repository linking has separate permissions, integration dependencies, and failure modes. Project creation should not partially succeed with unrelated VCS work hidden in the same tool.
+Repository linking stays first-class in `create_project` because project setup often includes connecting the new project to its source repository. When requested, the tool resolves the repository before creating the project so missing or ambiguous repositories fail without creating a project. Linking creates a root code mapping through Sentry's organization code-mappings endpoint after project creation because it requires the created project slug; link failures are reported in the response with the DSN so the user can retry manually.
+
+Alternative considered: move repository linking to a separate tool only. This was rejected because repository linking is part of the primary project setup workflow and is useful to keep alongside creation while team access remains separate.
 
 ### Guarantee a DSN without creating duplicates in the normal path
 
@@ -73,13 +79,14 @@ Alternative considered: expose `create_project` directly. This was rejected beca
 ## Risks / Trade-offs
 
 - Duplicate DSN fallback could still create a key if key listing races with Sentry's default key hook. Mitigation: list first, create only when the list is empty, and keep the fallback explicit in tests.
+- Repository linking can fail after project creation because code mapping creation needs the created project. Mitigation: preflight repository resolution before project creation and report post-create link failures without hiding the project slug or DSN.
 - Last-team removal guard may reject a backend operation that Sentry technically allows. Mitigation: prefer safe MCP behavior; users can use Sentry directly for exceptional cases until a deliberate override is designed.
-- Slug updates can make project-scoped sessions confusing after the mutation. Mitigation: document and test constraint behavior; consider rejecting slug changes in project-scoped sessions if implementation reveals ambiguous constraint state.
+- Slug updates can make project-scoped sessions confusing after the mutation. Mitigation: reject and test slug changes in project-scoped sessions.
 - Adding team access tools increases catalog size. Mitigation: keep them catalog-only and behind the existing `project-management` skill.
 
 ## Migration Plan
 
-1. Update API client support for project creation slug and project team access reads/deletes.
+1. Update API client support for project creation slug, repository linking, and project team access reads/deletes.
 2. Tighten `create_project` and `update_project` schemas and descriptions.
 3. Add `add_team_to_project` and `remove_team_from_project`.
 4. Add tests covering old behavior removal and new contracts.

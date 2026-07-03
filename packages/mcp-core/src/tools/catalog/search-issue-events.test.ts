@@ -92,21 +92,24 @@ describe("search_issue_events", () => {
     );
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
-        const url = new URL(request.url);
-        // Endpoint is already scoped to the issue, no issue: in query needed
-        const query = url.searchParams.get("query");
-        // Query param can be null or empty string when no filters
-        expect(query === null || query === "").toBe(true);
-        // Return array directly, not wrapped in {data: [...]}
-        return HttpResponse.json([
-          {
-            id: "event1",
-            timestamp: "2025-01-15T10:00:00Z",
-            title: "Test Error",
-          },
-        ]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          // Endpoint is already scoped to the issue, no issue: in query needed
+          const query = url.searchParams.get("query");
+          // Query param can be null or empty string when no filters
+          expect(query === null || query === "").toBe(true);
+          // Return array directly, not wrapped in {data: [...]}
+          return HttpResponse.json([
+            {
+              id: "event1",
+              timestamp: "2025-01-15T10:00:00Z",
+              title: "Test Error",
+            },
+          ]);
+        },
+      ),
     );
 
     const result = await searchIssueEvents.handler(
@@ -155,7 +158,7 @@ describe("search_issue_events", () => {
     );
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", () =>
+      http.get("https://sentry.io/api/0/organizations/*/issues/*/events/", () =>
         HttpResponse.json([
           {
             id: "event1",
@@ -196,7 +199,7 @@ describe("search_issue_events", () => {
     );
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", () =>
+      http.get("https://sentry.io/api/0/organizations/*/issues/*/events/", () =>
         HttpResponse.json([
           {
             id: "event1",
@@ -235,13 +238,16 @@ describe("search_issue_events", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse());
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
-        const url = new URL(request.url);
-        // Endpoint is scoped to issue, query param can be null or empty
-        const query = url.searchParams.get("query");
-        expect(query === null || query === "").toBe(true);
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          // Endpoint is scoped to issue, query param can be null or empty
+          const query = url.searchParams.get("query");
+          expect(query === null || query === "").toBe(true);
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     const result = await searchIssueEvents.handler(
@@ -296,13 +302,16 @@ describe("search_issue_events", () => {
     );
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
-        const url = new URL(request.url);
-        const query = url.searchParams.get("query");
-        // Endpoint is scoped to issue, so only user filters in query
-        expect(query).toBe("environment:production release:v1.0");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          const query = url.searchParams.get("query");
+          // Endpoint is scoped to issue, so only user filters in query
+          expect(query).toBe("environment:production release:v1.0");
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     await searchIssueEvents.handler(
@@ -329,11 +338,14 @@ describe("search_issue_events", () => {
     );
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.searchParams.get("statsPeriod")).toBe("1h");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("statsPeriod")).toBe("1h");
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     await searchIssueEvents.handler(
@@ -361,12 +373,15 @@ describe("search_issue_events", () => {
     );
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.searchParams.get("start")).toBe("2025-01-15T00:00:00Z");
-        expect(url.searchParams.get("end")).toBe("2025-01-16T00:00:00Z");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("start")).toBe("2025-01-15T00:00:00Z");
+          expect(url.searchParams.get("end")).toBe("2025-01-16T00:00:00Z");
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     await searchIssueEvents.handler(
@@ -391,11 +406,14 @@ describe("search_issue_events", () => {
     );
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.searchParams.get("statsPeriod")).toBe("14d");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("statsPeriod")).toBe("14d");
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     await searchIssueEvents.handler(
@@ -442,9 +460,12 @@ describe("search_issue_events", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse());
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", () => {
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        () => {
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     const result = await searchIssueEvents.handler(
@@ -532,13 +553,16 @@ describe("search_issue_events", () => {
     );
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
-        const url = new URL(request.url);
-        const query = url.searchParams.get("query");
-        // No issue: prefix needed - endpoint handles it
-        expect(query).toBe("environment:production");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          const query = url.searchParams.get("query");
+          // No issue: prefix needed - endpoint handles it
+          expect(query).toBe("environment:production");
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     await searchIssueEvents.handler(
@@ -561,11 +585,14 @@ describe("search_issue_events", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse());
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.searchParams.get("per_page")).toBe("25");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("per_page")).toBe("25");
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     await searchIssueEvents.handler(
@@ -595,9 +622,12 @@ describe("search_issue_events", () => {
     );
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", () => {
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        () => {
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     const result = await searchIssueEvents.handler(
@@ -622,13 +652,16 @@ describe("search_issue_events", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse());
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
-        const url = new URL(request.url);
-        // Endpoint is scoped to issue, query param can be null or empty
-        const query = url.searchParams.get("query");
-        expect(query === null || query === "").toBe(true);
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          // Endpoint is scoped to issue, query param can be null or empty
+          const query = url.searchParams.get("query");
+          expect(query === null || query === "").toBe(true);
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     await searchIssueEvents.handler(
@@ -653,26 +686,29 @@ describe("search_issue_events", () => {
     process.env.OPENROUTER_API_KEY = "";
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.searchParams.get("query")).toBe("environment:production");
-        expect(url.searchParams.get("sort")).toBe("-timestamp");
-        expect(url.searchParams.get("statsPeriod")).toBe("7d");
-        return HttpResponse.json([
-          {
-            id: "event1",
-            timestamp: "2025-01-15T10:00:00Z",
-            title: "Test Error",
-            message: "Something went wrong",
-            level: "error",
-            environment: "production",
-            release: "v1.0",
-            "user.display": "alice",
-            trace: "abc123",
-            url: "/api/endpoint",
-          },
-        ]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe("environment:production");
+          expect(url.searchParams.get("sort")).toBe("-timestamp");
+          expect(url.searchParams.get("statsPeriod")).toBe("7d");
+          return HttpResponse.json([
+            {
+              id: "event1",
+              timestamp: "2025-01-15T10:00:00Z",
+              title: "Test Error",
+              message: "Something went wrong",
+              level: "error",
+              environment: "production",
+              release: "v1.0",
+              "user.display": "alice",
+              trace: "abc123",
+              url: "/api/endpoint",
+            },
+          ]);
+        },
+      ),
     );
 
     const result = await searchIssueEvents.handler(

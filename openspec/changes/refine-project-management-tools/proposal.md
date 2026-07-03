@@ -6,9 +6,9 @@ Project management is already partially exposed through catalog tools, but the c
 
 - Tighten `create_project` to focus on project creation and immediate SDK setup:
   - Accept organization, team, project name, optional project slug, and optional platform.
+  - Optionally link an existing organization repository as a first-class setup step.
   - Return the created project identity and a usable `SENTRY_DSN`.
   - Prefer the default DSN created by Sentry; create a `Default` DSN only as a fallback when no key exists.
-  - Remove repository linking from this tool.
 - Tighten `update_project` to metadata-only updates:
   - Allow project name, slug, and platform changes.
   - Reject slug changes from project-scoped sessions so the active project constraint does not become stale.

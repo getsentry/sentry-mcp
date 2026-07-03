@@ -7,7 +7,7 @@
 
 ## 2. Project Tool Changes
 
-- [x] 2.1 Update `create_project` schema and description to remove repository linking and add optional `slug`.
+- [x] 2.1 Update `create_project` schema and description to keep repository linking first-class and add optional `slug`.
 - [x] 2.2 Change `create_project` DSN handling to list existing keys first, return an existing default/active DSN when available, and create a `Default` key only when no key exists.
 - [x] 2.3 Update `create_project` output and tests so the response always includes project identity and `SENTRY_DSN`.
 - [x] 2.4 Update `update_project` schema and description to remove `teamSlug`.
@@ -32,7 +32,7 @@
 ## 5. Tests
 
 - [x] 5.1 Update `create-project.test.ts` snapshots for the narrowed schema and DSN-first behavior.
-- [x] 5.2 Add `create_project` tests for existing default DSN, fallback DSN creation, optional slug, and no repository linking.
+- [x] 5.2 Add `create_project` tests for existing default DSN, fallback DSN creation, optional slug, and repository linking.
 - [x] 5.3 Update `update-project.test.ts` snapshots and remove team assignment cases.
 - [x] 5.4 Add `add-team-to-project.test.ts` coverage for add, already-assigned no-op, mixed-case slug preservation, and constraint injection.
 - [x] 5.5 Add `remove-team-from-project.test.ts` coverage for remove, not assigned, last team guard, mixed-case slug preservation, and constraint injection.

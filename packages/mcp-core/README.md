@@ -35,6 +35,9 @@ npx @sentry/mcp-server@latest --access-token=sentry-user-token
 # Limit to specific skills only
 npx @sentry/mcp-server@latest --access-token=TOKEN --skills=inspect,docs
 
+# Grant all active, non-deprecated skills, overriding MCP_SKILLS
+npx @sentry/mcp-server@latest --access-token=TOKEN --all-skills
+
 # Self-hosted Sentry
 npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.example.com
 

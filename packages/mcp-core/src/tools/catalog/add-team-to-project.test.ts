@@ -37,7 +37,7 @@ describe("add_team_to_project", () => {
     let postCalls = 0;
     mswServer.use(
       http.get(
-        "*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/",
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/",
         () => {
           listCalls += 1;
           return HttpResponse.json(
@@ -46,7 +46,7 @@ describe("add_team_to_project", () => {
         },
       ),
       http.post(
-        "*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/backend/",
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/backend/",
         () => {
           postCalls += 1;
           return new HttpResponse(null, { status: 201 });
@@ -94,11 +94,12 @@ describe("add_team_to_project", () => {
     });
     let postCalls = 0;
     mswServer.use(
-      http.get("*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/", () =>
-        HttpResponse.json([teamFixture, backendTeam]),
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/",
+        () => HttpResponse.json([teamFixture, backendTeam]),
       ),
       http.post(
-        "*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/backend/",
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/backend/",
         () => {
           postCalls += 1;
           return HttpResponse.json(
@@ -132,7 +133,7 @@ describe("add_team_to_project", () => {
     let listCalls = 0;
     mswServer.use(
       http.get(
-        "*/api/0/projects/:organizationSlug/:projectSlug/teams/",
+        "https://sentry.io/api/0/projects/:organizationSlug/:projectSlug/teams/",
         ({ request }) => {
           paths.push(new URL(request.url).pathname);
           listCalls += 1;
@@ -150,7 +151,7 @@ describe("add_team_to_project", () => {
         },
       ),
       http.post(
-        "*/api/0/projects/:organizationSlug/:projectSlug/teams/:teamSlug/",
+        "https://sentry.io/api/0/projects/:organizationSlug/:projectSlug/teams/:teamSlug/",
         ({ request }) => {
           paths.push(new URL(request.url).pathname);
           return new HttpResponse(null, { status: 201 });

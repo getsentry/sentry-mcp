@@ -76,30 +76,33 @@ describe("search_issues", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse("is:unresolved", "date"));
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
-        const url = new URL(request.url);
-        const query = url.searchParams.get("query");
-        expect(query).toBe("is:unresolved");
-        return HttpResponse.json([
-          {
-            id: "123",
-            shortId: "PROJ-123",
-            title: "Test Error",
-            status: "unresolved",
-            count: "100",
-            userCount: 50,
-            firstSeen: "2025-01-15T10:00:00Z",
-            lastSeen: "2025-01-15T12:00:00Z",
-            permalink: "https://sentry.io/issues/123/",
-            project: {
-              id: "456",
-              slug: "test-project",
-              name: "Test Project",
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          const query = url.searchParams.get("query");
+          expect(query).toBe("is:unresolved");
+          return HttpResponse.json([
+            {
+              id: "123",
+              shortId: "PROJ-123",
+              title: "Test Error",
+              status: "unresolved",
+              count: "100",
+              userCount: 50,
+              firstSeen: "2025-01-15T10:00:00Z",
+              lastSeen: "2025-01-15T12:00:00Z",
+              permalink: "https://sentry.io/issues/123/",
+              project: {
+                id: "456",
+                slug: "test-project",
+                name: "Test Project",
+              },
+              culprit: "test.function",
             },
-            culprit: "test.function",
-          },
-        ]);
-      }),
+          ]);
+        },
+      ),
     );
 
     const result = await searchIssues.handler(
@@ -153,32 +156,35 @@ describe("search_issues", () => {
     process.env.OPENROUTER_API_KEY = "";
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.searchParams.get("query")).toBe(
-          "is:unresolved is:unassigned",
-        );
-        expect(url.searchParams.get("sort")).toBe("freq");
-        return HttpResponse.json([
-          {
-            id: "123",
-            shortId: "PROJ-123",
-            title: "Test Error",
-            status: "unresolved",
-            count: "100",
-            userCount: 50,
-            firstSeen: "2025-01-15T10:00:00Z",
-            lastSeen: "2025-01-15T12:00:00Z",
-            permalink: "https://sentry.io/issues/123/",
-            project: {
-              id: "456",
-              slug: "test-project",
-              name: "Test Project",
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe(
+            "is:unresolved is:unassigned",
+          );
+          expect(url.searchParams.get("sort")).toBe("freq");
+          return HttpResponse.json([
+            {
+              id: "123",
+              shortId: "PROJ-123",
+              title: "Test Error",
+              status: "unresolved",
+              count: "100",
+              userCount: 50,
+              firstSeen: "2025-01-15T10:00:00Z",
+              lastSeen: "2025-01-15T12:00:00Z",
+              permalink: "https://sentry.io/issues/123/",
+              project: {
+                id: "456",
+                slug: "test-project",
+                name: "Test Project",
+              },
+              culprit: "test.function",
             },
-            culprit: "test.function",
-          },
-        ]);
-      }),
+          ]);
+        },
+      ),
     );
 
     const result = await searchIssues.handler(
@@ -207,29 +213,32 @@ describe("search_issues", () => {
     process.env.OPENROUTER_API_KEY = "";
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.searchParams.get("query")).toBe("is:unresolved");
-        return HttpResponse.json([
-          {
-            id: "123",
-            shortId: "PROJ-123",
-            title: "Test Error",
-            status: "unresolved",
-            count: "100",
-            userCount: 50,
-            firstSeen: "2025-01-15T10:00:00Z",
-            lastSeen: "2025-01-15T12:00:00Z",
-            permalink: "https://sentry.io/issues/123/",
-            project: {
-              id: "456",
-              slug: "test-project",
-              name: "Test Project",
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe("is:unresolved");
+          return HttpResponse.json([
+            {
+              id: "123",
+              shortId: "PROJ-123",
+              title: "Test Error",
+              status: "unresolved",
+              count: "100",
+              userCount: 50,
+              firstSeen: "2025-01-15T10:00:00Z",
+              lastSeen: "2025-01-15T12:00:00Z",
+              permalink: "https://sentry.io/issues/123/",
+              project: {
+                id: "456",
+                slug: "test-project",
+                name: "Test Project",
+              },
+              culprit: "test.function",
             },
-            culprit: "test.function",
-          },
-        ]);
-      }),
+          ]);
+        },
+      ),
     );
 
     const result = await searchIssues.handler(
@@ -277,30 +286,33 @@ describe("search_issues", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse(explicitQuery, "date"));
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.searchParams.get("query")).toBe(explicitQuery);
-        expect(url.searchParams.get("sort")).toBe("date");
-        return HttpResponse.json([
-          {
-            id: "123",
-            shortId: "PROJ-123",
-            title: "Needs Review",
-            status: "unresolved",
-            count: "5",
-            userCount: 2,
-            firstSeen: "2025-01-15T10:00:00Z",
-            lastSeen: "2025-01-15T12:00:00Z",
-            permalink: "https://sentry.io/issues/123/",
-            culprit: "test.function",
-            project: {
-              id: "456",
-              slug: "test-project",
-              name: "Test Project",
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe(explicitQuery);
+          expect(url.searchParams.get("sort")).toBe("date");
+          return HttpResponse.json([
+            {
+              id: "123",
+              shortId: "PROJ-123",
+              title: "Needs Review",
+              status: "unresolved",
+              count: "5",
+              userCount: 2,
+              firstSeen: "2025-01-15T10:00:00Z",
+              lastSeen: "2025-01-15T12:00:00Z",
+              permalink: "https://sentry.io/issues/123/",
+              culprit: "test.function",
+              project: {
+                id: "456",
+                slug: "test-project",
+                name: "Test Project",
+              },
             },
-          },
-        ]);
-      }),
+          ]);
+        },
+      ),
     );
 
     const result = await searchIssues.handler(
@@ -328,7 +340,7 @@ describe("search_issues", () => {
     process.env.OPENROUTER_API_KEY = "";
 
     mswServer.use(
-      http.get("*/api/0/projects/*/*/", ({ request }) => {
+      http.get("https://sentry.io/api/0/projects/*/*/", ({ request }) => {
         expect(new URL(request.url).pathname).toBe(
           "/api/0/projects/MyOrg/MyProject/",
         );
@@ -338,13 +350,16 @@ describe("search_issues", () => {
           name: "My Project",
         });
       }),
-      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.pathname).toBe("/api/0/organizations/MyOrg/issues/");
-        expect(url.searchParams.get("project")).toBe("789");
-        expect(url.searchParams.get("statsPeriod")).toBe("30d");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.pathname).toBe("/api/0/organizations/MyOrg/issues/");
+          expect(url.searchParams.get("project")).toBe("789");
+          expect(url.searchParams.get("statsPeriod")).toBe("30d");
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     const params = prepareToolParams({
@@ -372,12 +387,15 @@ describe("search_issues", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse("", "date"));
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.searchParams.get("project")).toBe("123456");
-        expect(url.searchParams.get("statsPeriod")).toBe("30d");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("project")).toBe("123456");
+          expect(url.searchParams.get("statsPeriod")).toBe("30d");
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     await searchIssues.handler(
@@ -399,12 +417,15 @@ describe("search_issues", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse("", "freq"));
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
-        const url = new URL(request.url);
-        const sort = url.searchParams.get("sort");
-        expect(sort).toBe("freq");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          const sort = url.searchParams.get("sort");
+          expect(sort).toBe("freq");
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     await searchIssues.handler(
@@ -426,12 +447,15 @@ describe("search_issues", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse("", null));
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
-        const url = new URL(request.url);
-        const sort = url.searchParams.get("sort");
-        expect(sort).toBe("date");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          const sort = url.searchParams.get("sort");
+          expect(sort).toBe("date");
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     await searchIssues.handler(
@@ -453,12 +477,15 @@ describe("search_issues", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse());
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
-        const url = new URL(request.url);
-        const limit = url.searchParams.get("limit");
-        expect(limit).toBe("25");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          const limit = url.searchParams.get("limit");
+          expect(limit).toBe("25");
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     await searchIssues.handler(
@@ -480,7 +507,7 @@ describe("search_issues", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse("is:unresolved", "date"));
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", () => {
+      http.get("https://sentry.io/api/0/organizations/*/issues/", () => {
         return HttpResponse.json([]);
       }),
     );
@@ -507,7 +534,7 @@ describe("search_issues", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse());
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", () => {
+      http.get("https://sentry.io/api/0/organizations/*/issues/", () => {
         return HttpResponse.json([]);
       }),
     );
@@ -535,12 +562,15 @@ describe("search_issues", () => {
     );
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
-        const url = new URL(request.url);
-        const query = url.searchParams.get("query");
-        expect(query).toBe("is:unresolved level:error");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          const query = url.searchParams.get("query");
+          expect(query).toBe("is:unresolved level:error");
+          return HttpResponse.json([]);
+        },
+      ),
     );
 
     await searchIssues.handler(
@@ -570,12 +600,15 @@ describe("search_issues", () => {
       mockGenerateText.mockResolvedValue(mockAIResponse("", sortOption));
 
       mswServer.use(
-        http.get("*/api/0/organizations/*/issues/", ({ request }) => {
-          const url = new URL(request.url);
-          const sort = url.searchParams.get("sort");
-          expect(sort).toBe(sortOption);
-          return HttpResponse.json([]);
-        }),
+        http.get(
+          "https://sentry.io/api/0/organizations/*/issues/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            const sort = url.searchParams.get("sort");
+            expect(sort).toBe(sortOption);
+            return HttpResponse.json([]);
+          },
+        ),
       );
 
       await searchIssues.handler(
@@ -598,7 +631,7 @@ describe("search_issues", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse("", "date"));
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", () => {
+      http.get("https://sentry.io/api/0/organizations/*/issues/", () => {
         return HttpResponse.json([
           {
             id: "123",
@@ -664,7 +697,7 @@ describe("search_issues", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse());
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", () => {
+      http.get("https://sentry.io/api/0/organizations/*/issues/", () => {
         return HttpResponse.json(
           { detail: "Organization not found" },
           { status: 404 },

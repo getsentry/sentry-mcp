@@ -23,8 +23,10 @@ describe("create_project", () => {
 
   it("serializes with the existing default DSN", async () => {
     mswServer.use(
-      http.post("*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/", () =>
-        HttpResponse.json({ detail: "unexpected fallback" }, { status: 500 }),
+      http.post(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+        () =>
+          HttpResponse.json({ detail: "unexpected fallback" }, { status: 500 }),
       ),
     );
 
@@ -36,6 +38,7 @@ describe("create_project", () => {
         slug: null,
         platform: "node",
         regionUrl: null,
+        repository: null,
       },
       context,
     );
@@ -50,6 +53,7 @@ describe("create_project", () => {
       ## Response Notes
 
       - Please tell the user the project slug and **SENTRY_DSN**.
+      - No additional DSN creation step is needed.
       - The **SENTRY_DSN** value is used to initialize Sentry SDKs.
       "
     `);
@@ -57,19 +61,23 @@ describe("create_project", () => {
 
   it("uses an existing non-default DSN when no default key exists", async () => {
     mswServer.use(
-      http.get("*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/", () =>
-        HttpResponse.json([
-          {
-            ...clientKeyFixture,
-            name: "Production",
-            dsn: {
-              public: "https://production@example.com/1",
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+        () =>
+          HttpResponse.json([
+            {
+              ...clientKeyFixture,
+              name: "Production",
+              dsn: {
+                public: "https://production@example.com/1",
+              },
             },
-          },
-        ]),
+          ]),
       ),
-      http.post("*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/", () =>
-        HttpResponse.json({ detail: "unexpected fallback" }, { status: 500 }),
+      http.post(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+        () =>
+          HttpResponse.json({ detail: "unexpected fallback" }, { status: 500 }),
       ),
     );
 
@@ -81,6 +89,7 @@ describe("create_project", () => {
         slug: null,
         platform: "node",
         regionUrl: null,
+        repository: null,
       },
       context,
     );
@@ -90,19 +99,31 @@ describe("create_project", () => {
     );
   });
 
-  it("creates a fallback default DSN when no key exists", async () => {
+  it("creates a fallback default DSN when only inactive keys exist", async () => {
     mswServer.use(
-      http.get("*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/", () =>
-        HttpResponse.json([]),
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+        () =>
+          HttpResponse.json([
+            {
+              ...clientKeyFixture,
+              isActive: false,
+              dsn: {
+                public: "https://inactive@example.com/1",
+              },
+            },
+          ]),
       ),
-      http.post("*/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/", () =>
-        HttpResponse.json({
-          ...clientKeyFixture,
-          name: "Default",
-          dsn: {
-            public: "https://fallback@example.com/1",
-          },
-        }),
+      http.post(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+        () =>
+          HttpResponse.json({
+            ...clientKeyFixture,
+            name: "Default",
+            dsn: {
+              public: "https://fallback@example.com/1",
+            },
+          }),
       ),
     );
 
@@ -114,6 +135,43 @@ describe("create_project", () => {
         slug: null,
         platform: "node",
         regionUrl: null,
+        repository: null,
+      },
+      context,
+    );
+
+    expect(result).toContain("**SENTRY_DSN**: https://fallback@example.com/1");
+    expect(result).not.toContain("https://inactive@example.com/1");
+  });
+
+  it("creates a fallback default DSN when no key exists", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+        () => HttpResponse.json([]),
+      ),
+      http.post(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+        () =>
+          HttpResponse.json({
+            ...clientKeyFixture,
+            name: "Default",
+            dsn: {
+              public: "https://fallback@example.com/1",
+            },
+          }),
+      ),
+    );
+
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: "the-goats",
+        name: "cloudflare-mcp",
+        slug: null,
+        platform: "node",
+        regionUrl: null,
+        repository: null,
       },
       context,
     );
@@ -125,7 +183,7 @@ describe("create_project", () => {
     let createBody: unknown;
     mswServer.use(
       http.post(
-        "*/api/0/teams/sentry-mcp-evals/the-goats/projects/",
+        "https://sentry.io/api/0/teams/sentry-mcp-evals/the-goats/projects/",
         async ({ request }) => {
           createBody = await request.json();
           return HttpResponse.json({
@@ -136,8 +194,9 @@ describe("create_project", () => {
           });
         },
       ),
-      http.get("*/api/0/projects/sentry-mcp-evals/my-project/keys/", () =>
-        HttpResponse.json([clientKeyFixture]),
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/my-project/keys/",
+        () => HttpResponse.json([clientKeyFixture]),
       ),
     );
 
@@ -149,6 +208,7 @@ describe("create_project", () => {
         slug: "my-project",
         platform: "node",
         regionUrl: null,
+        repository: null,
       },
       context,
     );
@@ -161,9 +221,142 @@ describe("create_project", () => {
     expect(result).toContain("**Slug**: my-project");
   });
 
-  it("accepts slug but no repository linking parameter", () => {
+  it("links a matching repository when provided", async () => {
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: "the-goats",
+        name: "cloudflare-mcp",
+        slug: null,
+        platform: "node",
+        regionUrl: null,
+        repository: "getsentry/sentry",
+      },
+      context,
+    );
+
+    expect(result).toContain("**Repository**: getsentry/sentry (linked)");
+    expect(result).toContain("**Code Mapping**: `/` -> `/`");
+    expect(result).not.toContain("Repository Link ID");
+  });
+
+  it("returns project setup details when repository linking fails after creation", async () => {
+    mswServer.use(
+      http.post(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/code-mappings/bulk/",
+        () => HttpResponse.json({ detail: "link failed" }, { status: 500 }),
+      ),
+    );
+
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: "the-goats",
+        name: "cloudflare-mcp",
+        slug: null,
+        platform: "node",
+        regionUrl: null,
+        repository: "getsentry/sentry",
+      },
+      context,
+    );
+
+    expect(result).toContain("**Slug**: cloudflare-mcp");
+    expect(result).toContain("**SENTRY_DSN**:");
+    expect(result).toContain(
+      "Found getsentry/sentry but failed to link it to the project",
+    );
+  });
+
+  it("rejects an unknown repository before creating the project", async () => {
+    let createCalls = 0;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/repos/",
+        () => HttpResponse.json([]),
+      ),
+      http.post(
+        "https://sentry.io/api/0/teams/sentry-mcp-evals/the-goats/projects/",
+        () => {
+          createCalls += 1;
+          return HttpResponse.json(
+            { detail: "unexpected create" },
+            { status: 500 },
+          );
+        },
+      ),
+    );
+
+    await expect(
+      createProject.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          teamSlug: "the-goats",
+          name: "cloudflare-mcp",
+          slug: null,
+          platform: "node",
+          regionUrl: null,
+          repository: "missing/repo",
+        },
+        context,
+      ),
+    ).rejects.toThrow('Could not find repository "missing/repo"');
+    expect(createCalls).toBe(0);
+  });
+
+  it("rejects an ambiguous repository before creating the project", async () => {
+    let createCalls = 0;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/repos/",
+        () =>
+          HttpResponse.json([
+            {
+              id: "101",
+              name: "getsentry/sentry",
+              provider: { id: "integrations:github", name: "GitHub" },
+              status: "active",
+            },
+            {
+              id: "102",
+              name: "other/sentry",
+              provider: { id: "integrations:github", name: "GitHub" },
+              status: "active",
+            },
+          ]),
+      ),
+      http.post(
+        "https://sentry.io/api/0/teams/sentry-mcp-evals/the-goats/projects/",
+        () => {
+          createCalls += 1;
+          return HttpResponse.json(
+            { detail: "unexpected create" },
+            { status: 500 },
+          );
+        },
+      ),
+    );
+
+    await expect(
+      createProject.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          teamSlug: "the-goats",
+          name: "cloudflare-mcp",
+          slug: null,
+          platform: "node",
+          regionUrl: null,
+          repository: "sentry",
+        },
+        context,
+      ),
+    ).rejects.toThrow('Repository "sentry" matched multiple repositories');
+    expect(createCalls).toBe(0);
+  });
+
+  it("accepts slug and repository linking parameters", () => {
     expect(createProject.inputSchema).toHaveProperty("slug");
-    expect(createProject.inputSchema).not.toHaveProperty("repository");
-    expect(createProject.description).not.toContain("repository");
+    expect(createProject.inputSchema).toHaveProperty("repository");
+    expect(createProject.description).toContain("repository");
   });
 });

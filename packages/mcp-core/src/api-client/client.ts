@@ -34,7 +34,7 @@ import {
   TeamListSchema,
   TeamSchema,
   ProjectListSchema,
-  ProjectRepoLinkSchema,
+  ProjectRepositoryMappingSchema,
   ProjectSchema,
   CommitListSchema,
   DeployListSchema,
@@ -1933,27 +1933,39 @@ export class SentryApiService {
     return RepositoryListSchema.parse(body);
   }
 
-  async linkProjectRepo(
+  async linkProjectRepository(
     {
       organizationSlug,
       projectSlug,
-      repositoryId,
+      repository,
+      provider,
     }: {
       organizationSlug: string;
       projectSlug: string;
-      repositoryId: number | string;
+      repository: string;
+      provider?: string | null;
     },
     opts?: RequestOptions,
   ) {
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/repo/`,
+      `/organizations/${organizationSlug}/code-mappings/bulk/`,
       {
         method: "POST",
-        body: JSON.stringify({ repositoryId }),
+        body: JSON.stringify({
+          project: projectSlug,
+          repository,
+          provider,
+          mappings: [
+            {
+              stackRoot: "",
+              sourceRoot: "",
+            },
+          ],
+        }),
       },
       opts,
     );
-    return ProjectRepoLinkSchema.parse(body);
+    return ProjectRepositoryMappingSchema.parse(body);
   }
 
   async listIssueAlertRules(
@@ -2231,12 +2243,27 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<TeamList> {
-    const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/teams/`,
-      undefined,
-      opts,
-    );
-    return TeamListSchema.parse(body);
+    const teams: TeamList = [];
+    let cursor: string | null = null;
+
+    do {
+      const queryParams = new URLSearchParams();
+      queryParams.set("per_page", "100");
+      if (cursor) {
+        queryParams.set("cursor", cursor);
+      }
+
+      const response = await this.request(
+        `/projects/${organizationSlug}/${projectSlug}/teams/?${queryParams.toString()}`,
+        undefined,
+        opts,
+      );
+      const body = await this.parseJsonResponse(response);
+      teams.push(...TeamListSchema.parse(body));
+      cursor = getNextCursor(response.headers.get("link"));
+    } while (cursor);
+
+    return teams;
   }
 
   /**

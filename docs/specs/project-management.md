@@ -29,6 +29,7 @@ create_project({
   name: "My Project",
   slug: "my-project",      // optional
   platform: "javascript",  // optional
+  repository: "acme/app",  // optional, must already be connected
 })
 
 update_project({
@@ -54,15 +55,16 @@ remove_team_from_project({
 
 ## Creation Contract
 
-`create_project` accepts only core setup fields:
+`create_project` accepts core setup fields:
 - `organizationSlug`
 - `teamSlug`
 - `name`
 - optional `slug`
 - optional `platform`
+- optional `repository`
 
-It does not expose repository linking, ownership rules, alert rule setup,
-`defaultRules`, or broader project settings.
+It does not expose ownership rules, alert rule setup, `defaultRules`, or broader
+project settings.
 
 Successful responses must include:
 - Project ID
@@ -74,6 +76,13 @@ The DSN contract is strict because SDK setup normally follows project creation.
 After creating the project, the tool lists project client keys and returns an
 existing usable DSN, preferring an active `Default` key. It creates a `Default`
 client key only when no usable key exists.
+
+When `repository` is provided, `create_project` resolves the repository before
+creating the project. Unknown or ambiguous repositories fail before the project
+is created. After creation, the tool links the repository by creating a root
+code mapping (`/` to `/`) through Sentry's organization code-mappings endpoint.
+If linking fails after project creation, the response still includes the project
+slug and DSN and notes that the repository must be linked manually.
 
 ## Metadata Updates
 
@@ -120,12 +129,11 @@ are filtered before handler execution.
 ## Migration
 
 Previous behavior mixed unrelated operations into project tools:
-- `create_project` could attempt repository linking.
 - `update_project` could grant team access through `teamSlug`.
 
 Use these replacements:
-- Repository linking: not supported by project creation; use Sentry directly
-  until a dedicated tool exists.
+- Repository linking: use `create_project(..., repository: "owner/repo")` during
+  creation.
 - Team grant: `add_team_to_project`
 - Team revoke: `remove_team_from_project`
 

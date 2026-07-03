@@ -44,7 +44,7 @@ describe("get_issue_user_reports", () => {
   it("returns pagination guidance when more reports are available", async () => {
     mswServer.use(
       http.get(
-        "*/api/0/organizations/:org/issues/:issueId/user-reports/",
+        "https://sentry.io/api/0/organizations/:org/issues/:issueId/user-reports/",
         ({ request }) => {
           const url = new URL(request.url);
           expect(url.searchParams.get("per_page")).toBe("1");
