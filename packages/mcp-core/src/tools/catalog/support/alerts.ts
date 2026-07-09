@@ -408,27 +408,6 @@ async function findExactMetricAlertRuleMatches(
   );
 }
 
-export async function getMetricAlertRuleWithOrgFallback(
-  apiService: SentryApiService,
-  params: {
-    organizationSlug: string;
-    projectSlug?: string;
-    ruleId: string | number;
-  },
-): Promise<MetricAlertRule> {
-  try {
-    return await apiService.getMetricAlertRule(params);
-  } catch (error) {
-    if (!(error instanceof ApiNotFoundError) || !params.projectSlug) {
-      throw error;
-    }
-  }
-  return apiService.getMetricAlertRule({
-    organizationSlug: params.organizationSlug,
-    ruleId: params.ruleId,
-  });
-}
-
 export async function resolveIssueAlertRule(
   apiService: SentryApiService,
   params: {
@@ -484,9 +463,8 @@ export async function resolveMetricAlertRule(
 ): Promise<MetricAlertRule> {
   if (isNumericAlertRuleId(params.ruleIdOrName)) {
     try {
-      return await getMetricAlertRuleWithOrgFallback(apiService, {
+      return await apiService.getMetricAlertRule({
         organizationSlug: params.organizationSlug,
-        projectSlug: params.projectSlug,
         ruleId: params.ruleIdOrName,
       });
     } catch (error) {
@@ -503,9 +481,8 @@ export async function resolveMetricAlertRule(
   });
 
   if (matches.length === 1) {
-    return getMetricAlertRuleWithOrgFallback(apiService, {
+    return apiService.getMetricAlertRule({
       organizationSlug: params.organizationSlug,
-      projectSlug: params.projectSlug,
       ruleId: matches[0].id,
     });
   }

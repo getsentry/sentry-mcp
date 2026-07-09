@@ -105,10 +105,6 @@ function useAlertRuleHandlers() {
       () => HttpResponse.json([issueAlertRule]),
     ),
     http.get(
-      "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/alert-rules/",
-      () => HttpResponse.json([metricAlertRule]),
-    ),
-    http.get(
       "https://sentry.io/api/0/organizations/sentry-mcp-evals/alert-rules/456/",
       () => HttpResponse.json(metricAlertRule),
     ),
@@ -207,12 +203,12 @@ describe("get_alert_rule", () => {
     `);
   });
 
-  it("falls back to organization metric alert details after a project ID miss", async () => {
+  it("uses organization metric alert details for a project-scoped ID", async () => {
     useAlertRuleHandlers();
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/alert-rules/456/",
-        () => HttpResponse.json({}, { status: 404 }),
+        () => HttpResponse.json({}, { status: 500 }),
       ),
     );
 
@@ -232,13 +228,9 @@ describe("get_alert_rule", () => {
     expect(result).toContain("### Triggers");
   });
 
-  it("rejects organization metric alert fallback outside the active project constraint", async () => {
+  it("rejects organization metric alert details outside the active project constraint", async () => {
     useAlertRuleHandlers();
     mswServer.use(
-      http.get(
-        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/alert-rules/456/",
-        () => HttpResponse.json({}, { status: 404 }),
-      ),
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/alert-rules/456/",
         () =>
@@ -263,7 +255,7 @@ describe("get_alert_rule", () => {
     ).rejects.toThrow('Metric alert rule is outside project "cloudflare-mcp"');
   });
 
-  it("falls back to organization metric alert details after resolving an exact name", async () => {
+  it("uses organization metric alert details after resolving an exact name", async () => {
     useAlertRuleHandlers();
     mswServer.use(
       http.get(
@@ -284,7 +276,7 @@ describe("get_alert_rule", () => {
       ),
       http.get(
         "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/alert-rules/456/",
-        () => HttpResponse.json({}, { status: 404 }),
+        () => HttpResponse.json({}, { status: 500 }),
       ),
     );
 
@@ -499,7 +491,7 @@ describe("get_alert_rule", () => {
       ),
       http.get(
         "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/alert-rules/789/",
-        () => HttpResponse.json({}, { status: 404 }),
+        () => HttpResponse.json({}, { status: 500 }),
       ),
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/alert-rules/789/",
@@ -521,6 +513,44 @@ describe("get_alert_rule", () => {
     expect(result).toContain("## 123");
     expect(result).toContain("**Kind**: Metric Alert");
     expect(result).toContain("**ID**: 789");
+  });
+
+  it("rejects exact-name metric matches outside the active project constraint", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
+        () => HttpResponse.json(project),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
+        () => HttpResponse.json([]),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/combined-rules/",
+        () => HttpResponse.json([metricAlertRule]),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/alert-rules/456/",
+        () =>
+          HttpResponse.json({
+            ...metricAlertRule,
+            projects: ["frontend"],
+          }),
+      ),
+    );
+
+    await expect(
+      getAlertRule.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          regionUrl: null,
+          kind: "all",
+          projectSlug: null,
+          ruleIdOrName: "P95 latency",
+        },
+        projectConstrainedContext,
+      ),
+    ).rejects.toThrow('Metric alert rule is outside project "cloudflare-mcp"');
   });
 
   it("rejects ambiguous exact-name lookups", async () => {

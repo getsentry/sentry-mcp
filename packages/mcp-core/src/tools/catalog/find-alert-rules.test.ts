@@ -100,10 +100,6 @@ function useAlertRuleHandlers() {
       "https://sentry.io/api/0/organizations/sentry-mcp-evals/alert-rules/",
       () => HttpResponse.json([metricAlertRule]),
     ),
-    http.get(
-      "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/alert-rules/",
-      () => HttpResponse.json([metricAlertRule]),
-    ),
   );
 }
 
@@ -121,7 +117,7 @@ describe("find_alert_rules", () => {
         },
       ),
       http.get(
-        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/alert-rules/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/alert-rules/",
         ({ request }) => {
           metricRequestUrl = request.url;
           return HttpResponse.json([metricAlertRule]);
@@ -147,6 +143,9 @@ describe("find_alert_rules", () => {
       "cloudflare-mcp",
     );
     expect(metricRequestUrl).not.toBeNull();
+    expect(new URL(metricRequestUrl ?? "").searchParams.get("project")).toBe(
+      project.id,
+    );
     expect(result).toMatchInlineSnapshot(`
       "# Alert Rules in **sentry-mcp-evals/cloudflare-mcp**
 
@@ -210,6 +209,41 @@ describe("find_alert_rules", () => {
     expect(result).not.toContain("## Issue Alert Rules");
     expect(result).toContain(
       "Issue alert rules are project-scoped; pass `projectSlug` to include them.",
+    );
+  });
+
+  it("resolves project redirects before listing metric alerts", async () => {
+    let metricRequestUrl: string | null = null;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/legacy-cloudflare-mcp/",
+        () => HttpResponse.json(project),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/alert-rules/",
+        ({ request }) => {
+          metricRequestUrl = request.url;
+          return HttpResponse.json([metricAlertRule]);
+        },
+      ),
+    );
+
+    await findAlertRules.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        kind: "metric",
+        projectSlug: "legacy-cloudflare-mcp",
+        query: null,
+        cursor: null,
+        limit: 10,
+      },
+      context,
+    );
+
+    expect(metricRequestUrl).not.toBeNull();
+    expect(new URL(metricRequestUrl ?? "").searchParams.get("project")).toBe(
+      project.id,
     );
   });
 
