@@ -14,7 +14,6 @@ import { assertProjectRefWithinConstraint } from "./support/project-constraints"
 import {
   formatIssueAlertRule,
   formatMetricAlertRule,
-  getMetricAlertRuleWithOrgFallback,
   resolveIssueAlertRule,
   resolveMetricAlertRule,
 } from "./support/alerts";
@@ -207,9 +206,8 @@ export default defineTool({
             }
           : {
               ...found,
-              rule: await getMetricAlertRuleWithOrgFallback(apiService, {
+              rule: await apiService.getMetricAlertRule({
                 organizationSlug,
-                projectSlug: found.projectSlug,
                 ruleId: found.rule.id,
               }),
             };

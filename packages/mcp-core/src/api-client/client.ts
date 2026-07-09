@@ -2125,16 +2125,17 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<{ rules: MetricAlertRuleList; nextCursor: string | null }> {
+    const project = projectSlug
+      ? await this.getProject(
+          {
+            organizationSlug,
+            projectSlugOrId: projectSlug,
+          },
+          opts,
+        )
+      : undefined;
+
     if (query) {
-      const project = projectSlug
-        ? await this.getProject(
-            {
-              organizationSlug,
-              projectSlugOrId: projectSlug,
-            },
-            opts,
-          )
-        : undefined;
       const body = await this.listCombinedAlertRules(
         {
           organizationSlug,
@@ -2159,11 +2160,12 @@ export class SentryApiService {
     if (limit !== undefined) {
       searchQuery.set("per_page", String(limit));
     }
+    if (project) {
+      searchQuery.set("projectSlug", project.slug);
+    }
 
     const queryString = searchQuery.toString();
-    const path = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/alert-rules/`
-      : `/organizations/${organizationSlug}/alert-rules/`;
+    const path = `/organizations/${organizationSlug}/alert-rules/`;
     const response = await this.request(
       `${path}${queryString ? `?${queryString}` : ""}`,
       undefined,
@@ -2179,18 +2181,14 @@ export class SentryApiService {
   async getMetricAlertRule(
     {
       organizationSlug,
-      projectSlug,
       ruleId,
     }: {
       organizationSlug: string;
-      projectSlug?: string;
       ruleId: string | number;
     },
     opts?: RequestOptions,
   ): Promise<MetricAlertRule> {
-    const path = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/alert-rules/${encodeURIComponent(String(ruleId))}/`
-      : `/organizations/${organizationSlug}/alert-rules/${encodeURIComponent(String(ruleId))}/`;
+    const path = `/organizations/${organizationSlug}/alert-rules/${encodeURIComponent(String(ruleId))}/`;
     const body = await this.requestJSON(path, undefined, opts);
     return MetricAlertRuleSchema.parse(body);
   }
