@@ -143,9 +143,9 @@ describe("find_alert_rules", () => {
       "cloudflare-mcp",
     );
     expect(metricRequestUrl).not.toBeNull();
-    expect(
-      new URL(metricRequestUrl ?? "").searchParams.get("projectSlug"),
-    ).toBe("cloudflare-mcp");
+    expect(new URL(metricRequestUrl ?? "").searchParams.get("project")).toBe(
+      project.id,
+    );
     expect(result).toMatchInlineSnapshot(`
       "# Alert Rules in **sentry-mcp-evals/cloudflare-mcp**
 
@@ -242,9 +242,9 @@ describe("find_alert_rules", () => {
     );
 
     expect(metricRequestUrl).not.toBeNull();
-    expect(
-      new URL(metricRequestUrl ?? "").searchParams.get("projectSlug"),
-    ).toBe("cloudflare-mcp");
+    expect(new URL(metricRequestUrl ?? "").searchParams.get("project")).toBe(
+      project.id,
+    );
   });
 
   it("returns next cursors for direct alert rule list endpoints", async () => {

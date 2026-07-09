@@ -2161,7 +2161,7 @@ export class SentryApiService {
       searchQuery.set("per_page", String(limit));
     }
     if (project) {
-      searchQuery.set("projectSlug", project.slug);
+      searchQuery.set("project", String(project.id));
     }
 
     const queryString = searchQuery.toString();
