@@ -35,6 +35,7 @@ import {
   isTerminalStatus,
 } from "./tool-helpers/seer";
 import { formatToolCallInstruction } from "./tool-helpers/tool-call-formatting";
+import type { AIConversationReference } from "./tool-helpers/ai-conversation-actions";
 import { formatUserGeoSummary } from "./user-formatting";
 
 /**
@@ -958,11 +959,6 @@ interface N1EvidenceData {
 interface SlowDbEvidenceData {
   parentSpan?: string;
   [key: string]: unknown;
-}
-
-interface AIConversationReference {
-  conversationId: string;
-  spanId?: string;
 }
 
 function normalizeSpanId(value: unknown): string | undefined {

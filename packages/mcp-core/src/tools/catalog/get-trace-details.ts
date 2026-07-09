@@ -3,6 +3,10 @@ import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
+import {
+  addAIConversationSuggestedActions,
+  type AIConversationReference,
+} from "../../internal/tool-helpers/ai-conversation-actions";
 import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/resolve-region-url";
 import type { SentryApiService, Trace, TraceSpan } from "../../api-client";
 import { UserInputError } from "../../errors";
@@ -52,11 +56,6 @@ interface SpanExpansionCandidate {
   parent: SelectedSpan;
   level: number;
   score: number;
-}
-
-interface AIConversationReference {
-  conversationId: string;
-  spanId?: string;
 }
 
 export default defineTool({
@@ -176,7 +175,8 @@ export default defineTool({
       totalSpanCount: traceMeta.span_count,
     });
 
-    return formatTraceOutput({
+    const aiConversations = collectAIConversationReferencesFromTrace(trace);
+    const markdown = formatTraceOutput({
       organizationSlug: params.organizationSlug,
       traceId: params.traceId,
       spanId: params.spanId,
@@ -185,6 +185,15 @@ export default defineTool({
       traceFetchState,
       apiService,
       experimentalMode: context.experimentalMode,
+      availableToolNames: context.availableToolNames,
+      directToolNames: context.directToolNames,
+      aiConversations,
+    });
+    return addAIConversationSuggestedActions({
+      markdown,
+      organizationSlug: params.organizationSlug,
+      aiConversations,
+      experimentalMode: context.experimentalMode ?? false,
       availableToolNames: context.availableToolNames,
       directToolNames: context.directToolNames,
     });
@@ -690,6 +699,7 @@ function formatTraceOutput({
   experimentalMode,
   availableToolNames,
   directToolNames,
+  aiConversations,
 }: {
   organizationSlug: string;
   traceId: string;
@@ -701,6 +711,7 @@ function formatTraceOutput({
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
+  aiConversations: AIConversationReference[];
 }): string {
   if (spanId) {
     return formatFocusedSpanOutput({
@@ -714,6 +725,7 @@ function formatTraceOutput({
       experimentalMode,
       availableToolNames,
       directToolNames,
+      aiConversations,
     });
   }
 
@@ -726,6 +738,7 @@ function formatTraceOutput({
     experimentalMode,
     availableToolNames,
     directToolNames,
+    aiConversations,
   });
 }
 
@@ -738,6 +751,7 @@ function formatTraceOverviewOutput({
   experimentalMode,
   availableToolNames,
   directToolNames,
+  aiConversations,
 }: {
   organizationSlug: string;
   traceId: string;
@@ -747,6 +761,7 @@ function formatTraceOverviewOutput({
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
+  aiConversations: AIConversationReference[];
 }): string {
   const sections: string[] = [];
 
@@ -814,7 +829,7 @@ function formatTraceOverviewOutput({
 
   sections.push(
     ...formatAIConversationSection({
-      aiConversations: collectAIConversationReferencesFromTrace(trace),
+      aiConversations,
       organizationSlug,
       experimentalMode: experimentalMode ?? false,
       availableToolNames,
@@ -848,6 +863,7 @@ function formatFocusedSpanOutput({
   experimentalMode,
   availableToolNames,
   directToolNames,
+  aiConversations,
 }: {
   organizationSlug: string;
   traceId: string;
@@ -859,6 +875,7 @@ function formatFocusedSpanOutput({
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
+  aiConversations: AIConversationReference[];
 }): string {
   const focusedSpan = findTraceSpan(trace, spanId);
   if (!focusedSpan) {
@@ -928,7 +945,7 @@ function formatFocusedSpanOutput({
   sections.push(...formatSpanAttributeSections(focusedSpan, traceId));
   sections.push(
     ...formatAIConversationSection({
-      aiConversations: collectAIConversationReferencesFromTrace(trace),
+      aiConversations,
       organizationSlug,
       experimentalMode: experimentalMode ?? false,
       availableToolNames,

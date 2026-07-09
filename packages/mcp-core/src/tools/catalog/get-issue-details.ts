@@ -24,6 +24,10 @@ import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
 import { logError } from "../../telem/logging";
 import {
+  addAIConversationSuggestedActions,
+  type AIConversationReference,
+} from "../../internal/tool-helpers/ai-conversation-actions";
+import {
   ParamOrganizationSlug,
   ParamRegionUrl,
   ParamIssueShortId,
@@ -32,11 +36,7 @@ import {
 
 const MAX_AI_CONVERSATION_MATCHES = 3;
 const AI_CONVERSATION_LOOKUP_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-interface AIConversationReference {
-  conversationId: string;
-  spanId?: string;
-}
+const TRACE_ID_PATTERN = /^[0-9a-fA-F]{32}$/;
 
 export default defineTool({
   name: "get_issue_details",
@@ -166,17 +166,24 @@ export default defineTool({
         }),
       ]);
 
-      return formatIssueOutput({
+      return addAIConversationSuggestedActions({
+        markdown: formatIssueOutput({
+          organizationSlug: orgSlug,
+          issue,
+          event,
+          apiService,
+          autofixState,
+          performanceTrace,
+          externalIssues,
+          relatedReplayIds,
+          aiConversations,
+          experimentalMode: context.experimentalMode,
+          availableToolNames: context.availableToolNames,
+          directToolNames: context.directToolNames,
+        }),
         organizationSlug: orgSlug,
-        issue,
-        event,
-        apiService,
-        autofixState,
-        performanceTrace,
-        externalIssues,
-        relatedReplayIds,
         aiConversations,
-        experimentalMode: context.experimentalMode,
+        experimentalMode: context.experimentalMode ?? false,
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
       });
@@ -249,17 +256,24 @@ export default defineTool({
       }),
     ]);
 
-    return formatIssueOutput({
+    return addAIConversationSuggestedActions({
+      markdown: formatIssueOutput({
+        organizationSlug: orgSlug,
+        issue,
+        event,
+        apiService,
+        autofixState,
+        performanceTrace,
+        externalIssues,
+        relatedReplayIds,
+        aiConversations,
+        experimentalMode: context.experimentalMode,
+        availableToolNames: context.availableToolNames,
+        directToolNames: context.directToolNames,
+      }),
       organizationSlug: orgSlug,
-      issue,
-      event,
-      apiService,
-      autofixState,
-      performanceTrace,
-      externalIssues,
-      relatedReplayIds,
       aiConversations,
-      experimentalMode: context.experimentalMode,
+      experimentalMode: context.experimentalMode ?? false,
       availableToolNames: context.availableToolNames,
       directToolNames: context.directToolNames,
     });
@@ -368,7 +382,7 @@ async function maybeFindAIConversationsForIssueEvent({
   event: Event;
 }): Promise<AIConversationReference[]> {
   const traceId = getEventTraceId(event);
-  if (!traceId) {
+  if (!traceId || !TRACE_ID_PATTERN.test(traceId)) {
     return [];
   }
 

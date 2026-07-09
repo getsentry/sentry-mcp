@@ -13,6 +13,10 @@ import {
 } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
+import {
+  getStructuredContent,
+  getTextContent,
+} from "../../test-utils/structured-content";
 import getIssueDetails from "./get-issue-details.js";
 
 const baseContext = {
@@ -355,10 +359,36 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    expect(result).toContain(
+    const text = getTextContent(result);
+    expect(text).toContain(
       "- AI conversation found in this trace: `conv-123`. Matching span: `span-123`. Use the Sentry tool `get_ai_conversation_details` to fetch the full transcript.",
     );
-    expect(result).toMatchInlineSnapshot(`
+    expect(
+      getStructuredContent<{
+        suggestedActions: Array<{
+          type: string;
+          toolName: string;
+          arguments: Record<string, string>;
+          reason: string;
+        }>;
+      }>(result),
+    ).toEqual({
+      suggestedActions: [
+        {
+          type: "tool_call",
+          toolName: "execute_sentry_tool",
+          arguments: {
+            name: "get_ai_conversation_details",
+            arguments: {
+              organizationSlug: "sentry-mcp-evals",
+              conversationId: "conv-123",
+            },
+          },
+          reason: "Fetch the full transcript for this AI conversation.",
+        },
+      ],
+    });
+    expect(text).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
 
       **Description**: Error: Tool list_organizations is already registered
@@ -454,6 +484,47 @@ describe("get_issue_details", () => {
 
     expect(result).not.toContain("AI conversation found");
     expect(result).not.toContain("get_ai_conversation_details");
+  });
+
+  it("does not query spans for an invalid event trace ID", async () => {
+    const event = createDefaultEvent({
+      contexts: {
+        trace: {
+          type: "trace",
+          trace_id: "invalid trace:has:gen_ai.conversation.id",
+          span_id: "error-span",
+        },
+      },
+    });
+    let spanLookupAttempts = 0;
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () => HttpResponse.json(event),
+        { once: true },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/events/",
+        () => {
+          spanLookupAttempts += 1;
+          return HttpResponse.json({ data: [] });
+        },
+      ),
+    );
+
+    await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(spanLookupAttempts).toBe(0);
   });
 
   it("displays team assignment correctly", async () => {
@@ -591,8 +662,9 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    const threadSection = result
-      .slice(result.indexOf("### Threads"), result.indexOf("### Tags"))
+    const text = typeof result === "string" ? result : getTextContent(result);
+    const threadSection = text
+      .slice(text.indexOf("### Threads"), text.indexOf("### Tags"))
       .trim();
     expect(threadSection).toMatchInlineSnapshot(`
       "### Threads
@@ -604,7 +676,7 @@ describe("get_issue_details", () => {
       | 11 | worker | WAITING | - | 1 |
       | 259 | main | RUNNABLE | crashed, current | 2 |"
     `);
-    expect(result).toContain(
+    expect(text).toContain(
       "- Thread stacktrace lookup: Use the Sentry tool `get_event_stacktrace` to fetch a full thread stacktrace by numeric Thread ID or exact thread Name. Omit `thread` to use Sentry's default selected thread",
     );
   });
