@@ -124,12 +124,18 @@ defines `structuredContent` as a JSON object on `CallToolResult`, and
 `outputSchema` as the schema for that object:
 
 - Choose one response contract per tool: handwritten markdown or
-  `structuredContent`. Do not hand-write markdown and also return
-  `structuredContent` from the handler.
+  `structuredContent`. Do not hand-write markdown and also return a large
+  structured projection from the handler.
+- Exception: markdown tools may include a small `structuredContent` object for
+  documented continuation hints, such as `suggestedActions`, when the markdown
+  remains the canonical human-readable result.
 - If a tool declares `outputSchema`, every successful `structuredContent` result
   must conform to that schema.
 - Return structured results with `structuredResult(payload)`. The server
   generates `content` as a compatibility fallback from the same payload.
+- When a markdown tool also returns hint-only `structuredContent`, return a full
+  `CallToolResult` with both handwritten `content` and the hint object. Do not
+  use `structuredResult(payload)` for that mixed response.
 - Do not duplicate a large structured payload into a markdown artifact block.
 - Treat `structuredContent` as a stable product contract, not a raw upstream API
   passthrough. Map only documented fields that callers should depend on.
@@ -149,6 +155,42 @@ defines `structuredContent` as a JSON object on `CallToolResult`, and
 
 Reference: MCP 2025-11-25 Tools specification, sections "Structured Content"
 and "Output Schema".
+
+## Suggested Actions
+
+Use `suggestedActions` when a tool result reveals a concrete follow-up tool call
+that a client or agent could offer as a continuation. This is the
+machine-readable counterpart to a narrow `## Response Notes` hint.
+
+```typescript
+interface SuggestedToolAction {
+  type: "tool_call";
+  toolName: string;
+  arguments: Record<string, unknown>;
+  reason: string;
+}
+
+interface SuggestedActionsContent {
+  suggestedActions: SuggestedToolAction[];
+}
+```
+
+Guidelines:
+
+- Include only actions that are directly supported by the current result. Do not
+  include broad investigation plans or generic next steps.
+- Arguments must be complete enough to call the tool without reparsing markdown.
+- Use public MCP parameter names and values, not upstream API field names.
+- Respect tool availability in the current session. Omit actions for unavailable
+  tools.
+- Keep the list small and ordered by likely usefulness. Prefer one action; use a
+  hard cap of three.
+- Keep `reason` concise and descriptive. It should explain why the action is
+  useful, not instruct the model how to behave.
+- Mirror the action in `## Response Notes` for clients that do not read
+  `structuredContent`.
+- Do not include secrets, auth tokens, raw payloads, or sensitive user data in
+  action arguments or reasons.
 
 ## Response Notes
 

@@ -129,6 +129,14 @@ small number, and route transcript follow-up through
 endpoints, which select `gen_ai.conversation.id` from spans, and existing
 trace-scoped spans queries that use `trace:<trace_id>`.
 
+When issue or trace detail output identifies AI conversation IDs, it should
+surface a `suggestedActions` structured-content hint for
+`get_ai_conversation_details` when that tool is available in the current
+session. The markdown `Response Notes` or `AI Conversations` section remains
+the compatibility path for clients that do not read `structuredContent`. Follow
+the shared suggested action contract in
+[Tool Responses](../contributing/tool-responses.md#suggested-actions).
+
 Expected query parameters:
 
 - `query`
