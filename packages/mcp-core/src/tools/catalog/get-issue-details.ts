@@ -24,11 +24,19 @@ import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
 import { logError } from "../../telem/logging";
 import {
+  addAIConversationSuggestedActions,
+  type AIConversationReference,
+} from "../../internal/tool-helpers/ai-conversation-actions";
+import {
   ParamOrganizationSlug,
   ParamRegionUrl,
   ParamIssueShortId,
   ParamIssueUrl,
 } from "../../schema";
+
+const MAX_AI_CONVERSATION_MATCHES = 3;
+const AI_CONVERSATION_LOOKUP_WINDOW_MS = 24 * 60 * 60 * 1000;
+const TRACE_ID_PATTERN = /^[0-9a-fA-F]{32}$/;
 
 export default defineTool({
   name: "get_issue_details",
@@ -123,7 +131,7 @@ export default defineTool({
       });
       // For this call, we might want to provide context if it fails
       const [
-        { event, performanceTrace },
+        { event, performanceTrace, aiConversations },
         { autofixState, externalIssues, relatedReplayIds },
       ] = await Promise.all([
         apiService
@@ -145,11 +153,11 @@ export default defineTool({
           })
           .then(async (event) => ({
             event,
-            performanceTrace: await maybeFetchPerformanceTrace({
+            ...(await fetchEventTraceEnrichment({
               apiService,
               organizationSlug: orgSlug,
               event,
-            }),
+            })),
           })),
         fetchIssueEnrichmentData({
           apiService,
@@ -158,16 +166,24 @@ export default defineTool({
         }),
       ]);
 
-      return formatIssueOutput({
+      return addAIConversationSuggestedActions({
+        markdown: formatIssueOutput({
+          organizationSlug: orgSlug,
+          issue,
+          event,
+          apiService,
+          autofixState,
+          performanceTrace,
+          externalIssues,
+          relatedReplayIds,
+          aiConversations,
+          experimentalMode: context.experimentalMode,
+          availableToolNames: context.availableToolNames,
+          directToolNames: context.directToolNames,
+        }),
         organizationSlug: orgSlug,
-        issue,
-        event,
-        apiService,
-        autofixState,
-        performanceTrace,
-        externalIssues,
-        relatedReplayIds,
-        experimentalMode: context.experimentalMode,
+        aiConversations,
+        experimentalMode: context.experimentalMode ?? false,
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
       });
@@ -217,7 +233,7 @@ export default defineTool({
     });
 
     const [
-      { event, performanceTrace },
+      { event, performanceTrace, aiConversations },
       { autofixState, externalIssues, relatedReplayIds },
     ] = await Promise.all([
       apiService
@@ -227,11 +243,11 @@ export default defineTool({
         })
         .then(async (event) => ({
           event,
-          performanceTrace: await maybeFetchPerformanceTrace({
+          ...(await fetchEventTraceEnrichment({
             apiService,
             organizationSlug: orgSlug,
             event,
-          }),
+          })),
         })),
       fetchIssueEnrichmentData({
         apiService,
@@ -240,21 +256,57 @@ export default defineTool({
       }),
     ]);
 
-    return formatIssueOutput({
+    return addAIConversationSuggestedActions({
+      markdown: formatIssueOutput({
+        organizationSlug: orgSlug,
+        issue,
+        event,
+        apiService,
+        autofixState,
+        performanceTrace,
+        externalIssues,
+        relatedReplayIds,
+        aiConversations,
+        experimentalMode: context.experimentalMode,
+        availableToolNames: context.availableToolNames,
+        directToolNames: context.directToolNames,
+      }),
       organizationSlug: orgSlug,
-      issue,
-      event,
-      apiService,
-      autofixState,
-      performanceTrace,
-      externalIssues,
-      relatedReplayIds,
-      experimentalMode: context.experimentalMode,
+      aiConversations,
+      experimentalMode: context.experimentalMode ?? false,
       availableToolNames: context.availableToolNames,
       directToolNames: context.directToolNames,
     });
   },
 });
+
+async function fetchEventTraceEnrichment({
+  apiService,
+  organizationSlug,
+  event,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  event: Event;
+}): Promise<{
+  performanceTrace: Trace | undefined;
+  aiConversations: AIConversationReference[];
+}> {
+  const [performanceTrace, aiConversations] = await Promise.all([
+    maybeFetchPerformanceTrace({
+      apiService,
+      organizationSlug,
+      event,
+    }),
+    maybeFindAIConversationsForIssueEvent({
+      apiService,
+      organizationSlug,
+      event,
+    }),
+  ]);
+
+  return { performanceTrace, aiConversations };
+}
 
 /**
  * Fetches supplementary data for an issue in parallel: Seer analysis and external links.
@@ -318,6 +370,131 @@ async function maybeFetchPerformanceTrace({
     logError(error);
     return undefined;
   }
+}
+
+async function maybeFindAIConversationsForIssueEvent({
+  apiService,
+  organizationSlug,
+  event,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  event: Event;
+}): Promise<AIConversationReference[]> {
+  const traceId = getEventTraceId(event);
+  if (!traceId || !TRACE_ID_PATTERN.test(traceId)) {
+    return [];
+  }
+
+  try {
+    return await findAIConversationsForTrace({
+      apiService,
+      organizationSlug,
+      traceId,
+      event,
+    });
+  } catch (error) {
+    logError(error);
+    return [];
+  }
+}
+
+/**
+ * Conversation IDs live on spans, not issue events. Keep this as a bounded
+ * opportunistic span match so issue details never fetch the full trace.
+ */
+async function findAIConversationsForTrace({
+  apiService,
+  organizationSlug,
+  traceId,
+  event,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  traceId: string;
+  event: Event;
+}): Promise<AIConversationReference[]> {
+  const response = await apiService.searchEvents({
+    organizationSlug,
+    dataset: "spans",
+    query: `trace:${traceId} has:gen_ai.conversation.id`,
+    fields: ["gen_ai.conversation.id", "span_id", "timestamp"],
+    limit: MAX_AI_CONVERSATION_MATCHES,
+    sort: "-timestamp",
+    ...buildConversationLookupTimeParams(event),
+  });
+
+  if (
+    !response ||
+    typeof response !== "object" ||
+    !Array.isArray((response as { data?: unknown }).data)
+  ) {
+    return [];
+  }
+
+  const references = new Map<string, AIConversationReference>();
+  for (const row of (response as { data: unknown[] }).data) {
+    if (!row || typeof row !== "object") {
+      continue;
+    }
+    const record = row as Record<string, unknown>;
+    const conversationId = getString(record["gen_ai.conversation.id"]);
+    if (!conversationId || references.has(conversationId)) {
+      continue;
+    }
+
+    references.set(conversationId, {
+      conversationId,
+      spanId: getString(record.span_id),
+    });
+
+    if (references.size >= MAX_AI_CONVERSATION_MATCHES) {
+      break;
+    }
+  }
+
+  return [...references.values()];
+}
+
+function buildConversationLookupTimeParams(event: Event): {
+  statsPeriod?: string;
+  start?: string;
+  end?: string;
+} {
+  const eventTimestamp = getEventTimestamp(event);
+  if (!eventTimestamp) {
+    return { statsPeriod: "14d" };
+  }
+
+  return {
+    start: new Date(
+      eventTimestamp.getTime() - AI_CONVERSATION_LOOKUP_WINDOW_MS,
+    ).toISOString(),
+    end: new Date(
+      eventTimestamp.getTime() + AI_CONVERSATION_LOOKUP_WINDOW_MS,
+    ).toISOString(),
+  };
+}
+
+function getEventTimestamp(event: Event): Date | null {
+  const timestamp =
+    getString((event as { dateCreated?: unknown }).dateCreated) ??
+    getString(event.dateReceived);
+  if (!timestamp) {
+    return null;
+  }
+
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getEventTraceId(event: Event): string | undefined {
+  const traceId = event.contexts?.trace?.trace_id;
+  return getString(traceId);
+}
+
+function getString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function isErrorEvent(event: Event): event is ErrorEvent | DefaultEvent {

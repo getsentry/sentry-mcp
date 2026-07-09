@@ -3,6 +3,11 @@ import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
+import {
+  addAIConversationSuggestedActions,
+  formatAIConversationActionInstructions,
+  type AIConversationReference,
+} from "../../internal/tool-helpers/ai-conversation-actions";
 import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/resolve-region-url";
 import type { SentryApiService, Trace, TraceSpan } from "../../api-client";
 import { UserInputError } from "../../errors";
@@ -26,6 +31,7 @@ const MAX_FOCUSED_CHILD_SPANS = 40;
 const MAX_QUEUED_CHILDREN_PER_PARENT = 24;
 const MINIMUM_DURATION_THRESHOLD_MS = 10;
 const MIN_AVG_DURATION_MS = 5;
+const MAX_AI_CONVERSATION_REFERENCES = 3;
 
 interface TraceSummary {
   spanCount: number;
@@ -170,7 +176,8 @@ export default defineTool({
       totalSpanCount: traceMeta.span_count,
     });
 
-    return formatTraceOutput({
+    const aiConversations = collectAIConversationReferencesFromTrace(trace);
+    const markdown = formatTraceOutput({
       organizationSlug: params.organizationSlug,
       traceId: params.traceId,
       spanId: params.spanId,
@@ -179,6 +186,15 @@ export default defineTool({
       traceFetchState,
       apiService,
       experimentalMode: context.experimentalMode,
+      availableToolNames: context.availableToolNames,
+      directToolNames: context.directToolNames,
+      aiConversations,
+    });
+    return addAIConversationSuggestedActions({
+      markdown,
+      organizationSlug: params.organizationSlug,
+      aiConversations,
+      experimentalMode: context.experimentalMode ?? false,
       availableToolNames: context.availableToolNames,
       directToolNames: context.directToolNames,
     });
@@ -684,6 +700,7 @@ function formatTraceOutput({
   experimentalMode,
   availableToolNames,
   directToolNames,
+  aiConversations,
 }: {
   organizationSlug: string;
   traceId: string;
@@ -695,6 +712,7 @@ function formatTraceOutput({
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
+  aiConversations: AIConversationReference[];
 }): string {
   if (spanId) {
     return formatFocusedSpanOutput({
@@ -708,6 +726,7 @@ function formatTraceOutput({
       experimentalMode,
       availableToolNames,
       directToolNames,
+      aiConversations,
     });
   }
 
@@ -720,6 +739,7 @@ function formatTraceOutput({
     experimentalMode,
     availableToolNames,
     directToolNames,
+    aiConversations,
   });
 }
 
@@ -732,6 +752,7 @@ function formatTraceOverviewOutput({
   experimentalMode,
   availableToolNames,
   directToolNames,
+  aiConversations,
 }: {
   organizationSlug: string;
   traceId: string;
@@ -741,6 +762,7 @@ function formatTraceOverviewOutput({
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
+  aiConversations: AIConversationReference[];
 }): string {
   const sections: string[] = [];
 
@@ -805,6 +827,17 @@ function formatTraceOverviewOutput({
   sections.push("");
   sections.push(`**Sentry URL**: ${traceUrl}`);
   sections.push("");
+
+  sections.push(
+    ...formatAIConversationSection({
+      aiConversations,
+      organizationSlug,
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+    }),
+  );
+
   sections.push("## Next Steps");
   sections.push("");
   sections.push(
@@ -831,6 +864,7 @@ function formatFocusedSpanOutput({
   experimentalMode,
   availableToolNames,
   directToolNames,
+  aiConversations,
 }: {
   organizationSlug: string;
   traceId: string;
@@ -842,6 +876,7 @@ function formatFocusedSpanOutput({
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
+  aiConversations: AIConversationReference[];
 }): string {
   const focusedSpan = findTraceSpan(trace, spanId);
   if (!focusedSpan) {
@@ -909,6 +944,15 @@ function formatFocusedSpanOutput({
   sections.push("## Attributes");
   sections.push("");
   sections.push(...formatSpanAttributeSections(focusedSpan, traceId));
+  sections.push(
+    ...formatAIConversationSection({
+      aiConversations,
+      organizationSlug,
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+    }),
+  );
   sections.push("## Next Steps");
   sections.push("");
   sections.push(
@@ -1080,6 +1124,117 @@ function stripUndefined(
   return Object.fromEntries(
     Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
   );
+}
+
+function collectAIConversationReferencesFromTrace(
+  trace: Trace,
+): AIConversationReference[] {
+  const references = new Map<string, AIConversationReference>();
+
+  // Known gap: trace details only expose conversation IDs already present in
+  // the trace payload; unlike issue details, this path does not run a spans
+  // search enrichment lookup.
+  for (const span of getTraceSpans(trace)) {
+    collectAIConversationReferences(span, references);
+    if (references.size >= MAX_AI_CONVERSATION_REFERENCES) {
+      break;
+    }
+  }
+
+  return [...references.values()];
+}
+
+function collectAIConversationReferences(
+  span: TraceSpan,
+  references: Map<string, AIConversationReference>,
+): void {
+  const conversationId = getAIConversationIdFromSpan(span);
+  if (conversationId && !references.has(conversationId)) {
+    references.set(conversationId, {
+      conversationId,
+      spanId: getTraceSpanId(span),
+    });
+  }
+
+  if (references.size >= MAX_AI_CONVERSATION_REFERENCES) {
+    return;
+  }
+
+  for (const child of getTraceSpanChildren(span)) {
+    collectAIConversationReferences(child, references);
+    if (references.size >= MAX_AI_CONVERSATION_REFERENCES) {
+      return;
+    }
+  }
+}
+
+function getAIConversationIdFromSpan(span: TraceSpan): string | undefined {
+  return (
+    getStringRecordValue(
+      span.additional_attributes,
+      "gen_ai.conversation.id",
+    ) ??
+    getStringRecordValue(span.data, "gen_ai.conversation.id") ??
+    getStringRecordValue(span.tags, "gen_ai.conversation.id")
+  );
+}
+
+function getStringRecordValue(
+  record: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
+  const value = record?.[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function formatAIConversationSection({
+  aiConversations,
+  organizationSlug,
+  experimentalMode,
+  availableToolNames,
+  directToolNames,
+}: {
+  aiConversations: AIConversationReference[];
+  organizationSlug: string;
+  experimentalMode: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
+}): string[] {
+  if (aiConversations.length === 0) {
+    return [];
+  }
+
+  const instructions = formatAIConversationActionInstructions({
+    organizationSlug,
+    aiConversations,
+    experimentalMode,
+    availableToolNames,
+    directToolNames,
+  });
+
+  const lines = ["## AI Conversations", ""];
+  if (aiConversations.length === 1) {
+    const [conversation] = aiConversations;
+    lines.push(`**Conversation ID**: \`${conversation.conversationId}\``);
+    if (conversation.spanId) {
+      lines.push(`**Matching Span**: \`${conversation.spanId}\``);
+    }
+    lines.push("");
+    lines.push(...instructions);
+    lines.push("");
+    return lines;
+  }
+
+  for (const conversation of aiConversations) {
+    const spanSuffix = conversation.spanId
+      ? ` (matching span: \`${conversation.spanId}\`)`
+      : "";
+    lines.push(`- \`${conversation.conversationId}\`${spanSuffix}`);
+  }
+  lines.push("");
+  lines.push(...instructions.map((instruction) => `- ${instruction}`));
+  lines.push("");
+  return lines;
 }
 
 function buildTraceNextSteps({

@@ -119,6 +119,28 @@ GET /api/0/organizations/{organizationSlug}/ai-conversations/
 Do not implement conversation search through
 `search_events(dataset="spans")`.
 
+Issue and trace detail enrichment may still perform a bounded opportunistic
+span lookup when the caller already has a trace ID. That lookup must stay scoped
+to the trace, request only the fields needed to identify conversation IDs and
+matching spans plus any field required for result ordering, cap results to a
+small number, and route transcript follow-up through
+`get_ai_conversation_details`. It is not a replacement for
+`search_ai_conversations`. This follows Sentry's Spans-backed AI conversation
+endpoints, which select `gen_ai.conversation.id` from spans, and existing
+trace-scoped spans queries that use `trace:<trace_id>`.
+
+When issue or trace detail output identifies AI conversation IDs, it should
+surface a `suggestedActions` structured-content hint when the required follow-up
+is callable in the current session. If `get_ai_conversation_details` is only
+available through the catalog, the action must call `execute_sentry_tool` with
+`name: "get_ai_conversation_details"` and the target arguments; only use the
+catalog tool name directly when it is exposed through `tools/list`. Emit either
+action only when its direct tool surface is available. The markdown `Response
+Notes` or `AI Conversations` section must mirror the same callable action and
+arguments for clients that do not read `structuredContent`. Follow the shared
+suggested action contract in
+[Tool Responses](../contributing/tool-responses.md#suggested-actions).
+
 Expected query parameters:
 
 - `query`

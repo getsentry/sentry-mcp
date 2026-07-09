@@ -35,6 +35,10 @@ import {
   isTerminalStatus,
 } from "./tool-helpers/seer";
 import { formatToolCallInstruction } from "./tool-helpers/tool-call-formatting";
+import {
+  formatAIConversationActionInstructions,
+  type AIConversationReference,
+} from "./tool-helpers/ai-conversation-actions";
 import { formatUserGeoSummary } from "./user-formatting";
 
 /**
@@ -1977,6 +1981,7 @@ export function formatIssueOutput({
   performanceTrace,
   externalIssues,
   relatedReplayIds,
+  aiConversations,
   experimentalMode,
   availableToolNames,
   directToolNames,
@@ -1989,6 +1994,7 @@ export function formatIssueOutput({
   performanceTrace?: Trace;
   externalIssues?: ExternalIssueList;
   relatedReplayIds?: string[];
+  aiConversations?: AIConversationReference[];
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
@@ -2105,6 +2111,17 @@ export function formatIssueOutput({
     }
     output += " to help us add support for this event type.\n";
 
+    if (aiConversations && aiConversations.length > 0) {
+      output += "\n## Response Notes\n\n";
+      output += formatAIConversationResponseNote({
+        aiConversations,
+        organizationSlug,
+        experimentalMode: experimentalMode ?? false,
+        availableToolNames,
+        directToolNames,
+      });
+    }
+
     // For unsupported event types, return early without trying to render event details
     return output;
   }
@@ -2169,6 +2186,15 @@ export function formatIssueOutput({
   output += `- Commit message issue reference: \`Fixes ${issue.shortId}\` automatically closes the issue when the commit is merged.\n`;
   output +=
     "- The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.\n";
+  if (aiConversations && aiConversations.length > 0) {
+    output += formatAIConversationResponseNote({
+      aiConversations,
+      organizationSlug,
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+    });
+  }
   const issueEventSearchInstruction = formatToolCallInstruction({
     toolName: "search_issue_events",
     arguments: {
@@ -2257,6 +2283,41 @@ export function formatIssueOutput({
     output += `- Breadcrumb trail leading up to this error: \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
   }
   return output;
+}
+
+function formatAIConversationResponseNote({
+  aiConversations,
+  organizationSlug,
+  experimentalMode,
+  availableToolNames,
+  directToolNames,
+}: {
+  aiConversations: AIConversationReference[];
+  organizationSlug: string;
+  experimentalMode: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
+}): string {
+  const instructions = formatAIConversationActionInstructions({
+    organizationSlug,
+    aiConversations,
+    experimentalMode,
+    availableToolNames,
+    directToolNames,
+  });
+
+  if (aiConversations.length === 1) {
+    const [conversation] = aiConversations;
+    const spanSuffix = conversation.spanId
+      ? ` Matching span: \`${conversation.spanId}\`.`
+      : "";
+    return `- AI conversation found in this trace: \`${conversation.conversationId}\`.${spanSuffix}\n${instructions.map((instruction) => `- ${instruction}`).join("\n")}\n`;
+  }
+
+  const conversationIds = aiConversations
+    .map((conversation) => `\`${conversation.conversationId}\``)
+    .join(", ");
+  return `- Multiple AI conversations were found in this trace: ${conversationIds}.\n${instructions.map((instruction) => `- ${instruction}`).join("\n")}\n`;
 }
 
 const MAX_DISPLAY_REPLAYS = 5;

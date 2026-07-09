@@ -7,6 +7,10 @@ import {
   traceFixture,
   traceMixedFixture,
 } from "@sentry/mcp-server-mocks";
+import {
+  getStructuredContent,
+  getTextContent,
+} from "../../test-utils/structured-content";
 import getTraceDetails from "./get-trace-details.js";
 
 const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
@@ -651,6 +655,120 @@ describe("get_trace_details", () => {
     `);
   });
 
+  it("snapshots AI conversations found in loaded trace spans", async () => {
+    const traceId = "c4d1aae7216b47ff8117cf4e09ce9d0c";
+    const rootSpan = buildTraceSpanNode({
+      duration: 123,
+      eventId: "c4d1aae7216b47ff8117cf4e09ce9d0c",
+      name: "ai.generate",
+      op: "gen_ai.invoke_agent",
+      parentSpanId: null,
+      spanId: "c4d1aae7216b47ff",
+      data: {
+        "gen_ai.conversation.id": "conv-trace-snapshot",
+      },
+    });
+
+    mswServer.use(
+      ...httpGetRegional(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace-meta/${traceId}/`,
+        () =>
+          HttpResponse.json({
+            logs: 0,
+            errors: 0,
+            performance_issues: 0,
+            span_count: 1,
+            transaction_child_count_map: [],
+            span_count_map: {},
+          }),
+      ),
+      ...httpGetRegional(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/${traceId}/`,
+        () => HttpResponse.json([rootSpan]),
+      ),
+    );
+
+    const result = await getTraceDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        traceId,
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    const text = getTextContent(result);
+    expect(
+      getStructuredContent<{
+        suggestedActions: Array<{
+          type: string;
+          toolName: string;
+          arguments: Record<string, unknown>;
+          reason: string;
+        }>;
+      }>(result),
+    ).toEqual({
+      suggestedActions: [
+        {
+          type: "tool_call",
+          toolName: "execute_sentry_tool",
+          arguments: {
+            name: "get_ai_conversation_details",
+            arguments: {
+              organizationSlug: "sentry-mcp-evals",
+              conversationId: "conv-trace-snapshot",
+            },
+          },
+          reason: "Fetch the full transcript for this AI conversation.",
+        },
+      ],
+    });
+    expect(text).toMatchInlineSnapshot(`
+      "# Trace \`c4d1aae7216b47ff8117cf4e09ce9d0c\` in **sentry-mcp-evals**
+
+      ## Summary
+
+      **Total Spans**: 1
+      **Errors**: 0
+      **Performance Issues**: 0
+      **Logs**: 0
+
+      ## Operation Breakdown
+
+      - **gen_ai.invoke_agent**: 1 spans (avg: 123ms, p95: 123ms)
+
+      ## Overview
+
+      trace
+         └─ ai.generate [gen_ai.invoke_agent · 123ms · c4d1aae7216b47ff]
+
+      *Overview shows 1 of 1 spans.*
+
+      ## View Full Trace
+
+      **Sentry URL**: https://sentry-mcp-evals.sentry.io/explore/traces/trace/c4d1aae7216b47ff8117cf4e09ce9d0c
+
+      ## AI Conversations
+
+      **Conversation ID**: \`conv-trace-snapshot\`
+      **Matching Span**: \`c4d1aae7216b47ff\`
+
+      Use the Sentry tool \`execute_sentry_tool(name='get_ai_conversation_details', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-trace-snapshot"})\` to fetch the full transcript.
+
+      ## Next Steps
+
+      - **Search spans**: Use the Sentry tool \`search_events\`
+      - **Search errors**: Use the Sentry tool \`search_events\`
+      - **Search logs**: Use the Sentry tool \`search_events\`"
+    `);
+  });
+
   it("renders semantic labels for common OpenTelemetry span attributes", async () => {
     const traceId = "e4d1aae7216b47ff8117cf4e09ce9d0e";
     const processSpan = buildTraceSpanNode({
@@ -750,6 +868,7 @@ describe("get_trace_details", () => {
       parentSpanId: "1111111111111111",
       spanId: "2222222222222222",
       data: {
+        "gen_ai.conversation.id": "conv-trace-123",
         "gen_ai.operation.name": "invoke_agent",
         "gen_ai.provider.name": "anthropic",
         "gen_ai.request.model": "claude-haiku-unused",
@@ -1041,77 +1160,84 @@ describe("get_trace_details", () => {
       },
     );
 
-    expect(result).toContain(
+    const text = getTextContent(result);
+    expect(text).toContain(
       "POST /api/internal/turn-resume [http.server · 201 · 3ms · 1111111111111111]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "invoke_agent anthropic/claude-opus-4.6 [gen_ai.invoke_agent · 123419ms · 2222222222222222]",
     );
-    expect(result).toContain(
+    expect(text).toContain("## AI Conversations");
+    expect(text).toContain("**Conversation ID**: `conv-trace-123`");
+    expect(text).toContain("**Matching Span**: `2222222222222222`");
+    expect(text).toContain(
+      'Use the Sentry tool `execute_sentry_tool(name=\'get_ai_conversation_details\', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-trace-123"})` to fetch the full transcript.',
+    );
+    expect(text).toContain(
       "POST api.anthropic.com/v1/messages [http.client · 200 · 21455ms · 3333333333333333]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "POST [http.client · 204 · 16ms · 1313131313131313]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "PROPFIND [http.client · 207 · 15ms · 1919191919191919]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "GET api.example.com:443 [http.client · 17ms · 1414141414141414]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "GET /api/v200/resources [http.client · 200 · 18ms · 1616161616161616]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "execute_tool search_events [gen_ai.execute_tool · 4107ms · 4444444444444444]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "git [process.exec · exit:0 · 4050ms · 5555555555555555]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "SELECT issues [db.query · postgresql · OK · 44ms · 6666666666666666]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "SELECT db.internal [db.query · postgresql · 41ms · 1515151515151515]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "sentry.trace.v1.TraceService/FetchTrace [rpc.client · grpc · OK · 65ms · 7777777777777777]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "bookings_workflow/Run [rpc.client · temporal · OK · 24ms · 1717171717171717]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "publish trace-events [messaging.publish · kafka · 37ms · 8888888888888888]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "tools/call search_events [mcp.request · OK · 28ms · 9999999999999999]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "query TraceDetails [graphql.execute · 31ms · aaaaaaaaaaaaaaaa]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "timer trace-worker [faas.invoke · aws · us-west-2 · coldstart · 52ms · bbbbbbbbbbbbbbbb]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "PutObject trace-artifacts/runs/abc.json [aws.s3 · us-west-2 · 73ms · cccccccccccccccc]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "com.sentry.trace.created trace/e4d1 [event.process · cloudevents:1.0 · 19ms · dddddddddddddddd]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "BUILD mcp-core [cicd.pipeline · success · 88ms · eeeeeeeeeeeeeeee]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "semantic-trace-rendering on [feature_flag.evaluate · flagsmith · targeting_match · 12ms · ffffffffffffffff]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "DynamoDB.GetItem [aws.sdk · aws-api · us-east-1 · 21ms · abababababababab]",
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "job failed [exception · ValueError · 13ms · acacacacacacacac]",
     );
-    expect(result).toContain("TypeError [exception · 14ms · 1818181818181818]");
-    expect(result).toContain(
+    expect(text).toContain("TypeError [exception · 14ms · 1818181818181818]");
+    expect(text).toContain(
       "background job [internal · timeout · 11ms · 1212121212121212]",
     );
   });
