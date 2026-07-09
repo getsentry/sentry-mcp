@@ -292,6 +292,170 @@ describe("get_issue_details", () => {
     expect(result).not.toContain("**Culprit**: null");
   });
 
+  it("surfaces AI conversation IDs found by bounded span lookup", async () => {
+    const traceId = "11112222333344445555666677778888";
+    const event = createDefaultEvent({
+      contexts: {
+        trace: {
+          type: "trace",
+          trace_id: traceId,
+          span_id: "error-span",
+        },
+      },
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () => HttpResponse.json(event),
+        { once: true },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("spans");
+          expect(url.searchParams.get("query")).toBe(
+            `trace:${traceId} has:gen_ai.conversation.id`,
+          );
+          expect(url.searchParams.get("per_page")).toBe("3");
+          expect(url.searchParams.getAll("field")).toEqual([
+            "gen_ai.conversation.id",
+            "trace.span_id",
+            "timestamp",
+          ]);
+
+          return HttpResponse.json({
+            data: [
+              {
+                "gen_ai.conversation.id": "conv-123",
+                "trace.span_id": "span-123",
+                timestamp: "2025-04-08T21:15:04+00:00",
+              },
+              {
+                "gen_ai.conversation.id": "conv-123",
+                "trace.span_id": "span-456",
+                timestamp: "2025-04-08T21:15:05+00:00",
+              },
+            ],
+          });
+        },
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(result).toContain(
+      "- AI conversation found in this trace: `conv-123`. Matching span: `span-123`. Use the Sentry tool `get_ai_conversation_details` to fetch the full transcript.",
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
+
+      **Description**: Error: Tool list_organizations is already registered
+      **Culprit**: Object.fetch(index)
+      **First Seen**: 2025-04-03T22:51:19.403Z
+      **Last Seen**: 2025-04-12T11:34:11.000Z
+      **Occurrences**: 25
+      **Users Impacted**: 1
+      **Status**: unresolved
+      **Substatus**: ongoing
+      **Assigned To**: Jane Developer (User)
+      **Issue Type**: error
+      **Issue Category**: error
+      **Platform**: javascript
+      **Project**: CLOUDFLARE-MCP
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
+
+      ## Event Details
+
+      **Event ID**: abc123def456
+      **Type**: default
+      **Occurred At**: 2025-10-02T12:00:00.000Z
+      **Message**:
+      Something went wrong
+
+      ### Error
+
+      \`\`\`
+      Something went wrong
+      \`\`\`
+
+      ### Tags
+
+      **level**: error
+      **environment**: production
+
+      ### Additional Context
+
+      These are additional context provided by the user when they're instrumenting their application.
+
+      **trace**
+      trace_id: "11112222333344445555666677778888"
+      span_id: "error-span"
+
+      ## Response Notes
+
+      - Commit message issue reference: \`Fixes CLOUDFLARE-MCP-41\` automatically closes the issue when the commit is merged.
+      - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
+      - AI conversation found in this trace: \`conv-123\`. Matching span: \`span-123\`. Use the Sentry tool \`get_ai_conversation_details\` to fetch the full transcript.
+      - Issue event search: Use the Sentry tool \`search_issue_events\`
+      - Full distributed trace and span tree: Use the Sentry tool \`get_sentry_resource\`
+      - Related span search: Use the Sentry tool \`search_events\`
+      - Related log search: Use the Sentry tool \`search_events\`
+      "
+    `);
+  });
+
+  it("omits AI conversation guidance when bounded span lookup finds no match", async () => {
+    const traceId = "99992222333344445555666677778888";
+    const event = createDefaultEvent({
+      contexts: {
+        trace: {
+          type: "trace",
+          trace_id: traceId,
+          span_id: "error-span",
+        },
+      },
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () => HttpResponse.json(event),
+        { once: true },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/events/",
+        () => HttpResponse.json({ data: [] }),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(result).not.toContain("AI conversation found");
+    expect(result).not.toContain("get_ai_conversation_details");
+  });
+
   it("displays team assignment correctly", async () => {
     // Override the issue fixture with a team assignment
     mswServer.use(

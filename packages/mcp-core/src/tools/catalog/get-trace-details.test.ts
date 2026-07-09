@@ -651,6 +651,94 @@ describe("get_trace_details", () => {
     `);
   });
 
+  it("snapshots AI conversations found in loaded trace spans", async () => {
+    const traceId = "c4d1aae7216b47ff8117cf4e09ce9d0c";
+    const rootSpan = buildTraceSpanNode({
+      duration: 123,
+      eventId: "c4d1aae7216b47ff8117cf4e09ce9d0c",
+      name: "ai.generate",
+      op: "gen_ai.invoke_agent",
+      parentSpanId: null,
+      spanId: "c4d1aae7216b47ff",
+      data: {
+        "gen_ai.conversation.id": "conv-trace-snapshot",
+      },
+    });
+
+    mswServer.use(
+      ...httpGetRegional(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace-meta/${traceId}/`,
+        () =>
+          HttpResponse.json({
+            logs: 0,
+            errors: 0,
+            performance_issues: 0,
+            span_count: 1,
+            transaction_child_count_map: [],
+            span_count_map: {},
+          }),
+      ),
+      ...httpGetRegional(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/${traceId}/`,
+        () => HttpResponse.json([rootSpan]),
+      ),
+    );
+
+    const result = await getTraceDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        traceId,
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toMatchInlineSnapshot(`
+      "# Trace \`c4d1aae7216b47ff8117cf4e09ce9d0c\` in **sentry-mcp-evals**
+
+      ## Summary
+
+      **Total Spans**: 1
+      **Errors**: 0
+      **Performance Issues**: 0
+      **Logs**: 0
+
+      ## Operation Breakdown
+
+      - **gen_ai.invoke_agent**: 1 spans (avg: 123ms, p95: 123ms)
+
+      ## Overview
+
+      trace
+         └─ ai.generate [gen_ai.invoke_agent · 123ms · c4d1aae7216b47ff]
+
+      *Overview shows 1 of 1 spans.*
+
+      ## View Full Trace
+
+      **Sentry URL**: https://sentry-mcp-evals.sentry.io/explore/traces/trace/c4d1aae7216b47ff8117cf4e09ce9d0c
+
+      ## AI Conversations
+
+      **Conversation ID**: \`conv-trace-snapshot\`
+      **Matching Span**: \`c4d1aae7216b47ff\`
+
+      Use the Sentry tool \`get_ai_conversation_details\` to fetch the full transcript.
+
+      ## Next Steps
+
+      - **Search spans**: Use the Sentry tool \`search_events\`
+      - **Search errors**: Use the Sentry tool \`search_events\`
+      - **Search logs**: Use the Sentry tool \`search_events\`"
+    `);
+  });
+
   it("renders semantic labels for common OpenTelemetry span attributes", async () => {
     const traceId = "e4d1aae7216b47ff8117cf4e09ce9d0e";
     const processSpan = buildTraceSpanNode({
@@ -750,6 +838,7 @@ describe("get_trace_details", () => {
       parentSpanId: "1111111111111111",
       spanId: "2222222222222222",
       data: {
+        "gen_ai.conversation.id": "conv-trace-123",
         "gen_ai.operation.name": "invoke_agent",
         "gen_ai.provider.name": "anthropic",
         "gen_ai.request.model": "claude-haiku-unused",
@@ -1046,6 +1135,12 @@ describe("get_trace_details", () => {
     );
     expect(result).toContain(
       "invoke_agent anthropic/claude-opus-4.6 [gen_ai.invoke_agent · 123419ms · 2222222222222222]",
+    );
+    expect(result).toContain("## AI Conversations");
+    expect(result).toContain("**Conversation ID**: `conv-trace-123`");
+    expect(result).toContain("**Matching Span**: `2222222222222222`");
+    expect(result).toContain(
+      "Use the Sentry tool `get_ai_conversation_details` to fetch the full transcript.",
     );
     expect(result).toContain(
       "POST api.anthropic.com/v1/messages [http.client · 200 · 21455ms · 3333333333333333]",

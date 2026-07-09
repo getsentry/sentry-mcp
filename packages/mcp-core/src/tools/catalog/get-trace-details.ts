@@ -26,6 +26,7 @@ const MAX_FOCUSED_CHILD_SPANS = 40;
 const MAX_QUEUED_CHILDREN_PER_PARENT = 24;
 const MINIMUM_DURATION_THRESHOLD_MS = 10;
 const MIN_AVG_DURATION_MS = 5;
+const MAX_AI_CONVERSATION_REFERENCES = 3;
 
 interface TraceSummary {
   spanCount: number;
@@ -51,6 +52,11 @@ interface SpanExpansionCandidate {
   parent: SelectedSpan;
   level: number;
   score: number;
+}
+
+interface AIConversationReference {
+  conversationId: string;
+  spanId?: string;
 }
 
 export default defineTool({
@@ -805,6 +811,17 @@ function formatTraceOverviewOutput({
   sections.push("");
   sections.push(`**Sentry URL**: ${traceUrl}`);
   sections.push("");
+
+  sections.push(
+    ...formatAIConversationSection({
+      aiConversations: collectAIConversationReferencesFromTrace(trace),
+      organizationSlug,
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+    }),
+  );
+
   sections.push("## Next Steps");
   sections.push("");
   sections.push(
@@ -909,6 +926,15 @@ function formatFocusedSpanOutput({
   sections.push("## Attributes");
   sections.push("");
   sections.push(...formatSpanAttributeSections(focusedSpan, traceId));
+  sections.push(
+    ...formatAIConversationSection({
+      aiConversations: collectAIConversationReferencesFromTrace(trace),
+      organizationSlug,
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+    }),
+  );
   sections.push("## Next Steps");
   sections.push("");
   sections.push(
@@ -1080,6 +1106,132 @@ function stripUndefined(
   return Object.fromEntries(
     Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
   );
+}
+
+function collectAIConversationReferencesFromTrace(
+  trace: Trace,
+): AIConversationReference[] {
+  const references = new Map<string, AIConversationReference>();
+
+  // Known gap: trace details only expose conversation IDs already present in
+  // the trace payload; unlike issue details, this path does not run a spans
+  // search enrichment lookup.
+  for (const span of getTraceSpans(trace)) {
+    collectAIConversationReferences(span, references);
+    if (references.size >= MAX_AI_CONVERSATION_REFERENCES) {
+      break;
+    }
+  }
+
+  return [...references.values()];
+}
+
+function collectAIConversationReferences(
+  span: TraceSpan,
+  references: Map<string, AIConversationReference>,
+): void {
+  const conversationId = getAIConversationIdFromSpan(span);
+  if (conversationId && !references.has(conversationId)) {
+    references.set(conversationId, {
+      conversationId,
+      spanId: getTraceSpanId(span),
+    });
+  }
+
+  if (references.size >= MAX_AI_CONVERSATION_REFERENCES) {
+    return;
+  }
+
+  for (const child of getTraceSpanChildren(span)) {
+    collectAIConversationReferences(child, references);
+    if (references.size >= MAX_AI_CONVERSATION_REFERENCES) {
+      return;
+    }
+  }
+}
+
+function getAIConversationIdFromSpan(span: TraceSpan): string | undefined {
+  return (
+    getStringRecordValue(
+      span.additional_attributes,
+      "gen_ai.conversation.id",
+    ) ??
+    getStringRecordValue(span.data, "gen_ai.conversation.id") ??
+    getStringRecordValue(span.tags, "gen_ai.conversation.id")
+  );
+}
+
+function getStringRecordValue(
+  record: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
+  const value = record?.[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function formatAIConversationSection({
+  aiConversations,
+  organizationSlug,
+  experimentalMode,
+  availableToolNames,
+  directToolNames,
+}: {
+  aiConversations: AIConversationReference[];
+  organizationSlug: string;
+  experimentalMode: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
+}): string[] {
+  if (aiConversations.length === 0) {
+    return [];
+  }
+
+  const instruction = formatToolCallInstruction({
+    toolName: "get_ai_conversation_details",
+    arguments: {
+      organizationSlug,
+      conversationId:
+        aiConversations.length === 1
+          ? aiConversations[0].conversationId
+          : "conversation ID",
+    },
+    experimentalMode,
+    availableToolNames,
+    directToolNames,
+    fallbackInstruction:
+      "AI conversation detail lookup is not available in this session",
+  });
+  const transcriptInstruction = formatTranscriptInstruction(instruction);
+
+  const lines = ["## AI Conversations", ""];
+  if (aiConversations.length === 1) {
+    const [conversation] = aiConversations;
+    lines.push(`**Conversation ID**: \`${conversation.conversationId}\``);
+    if (conversation.spanId) {
+      lines.push(`**Matching Span**: \`${conversation.spanId}\``);
+    }
+    lines.push("");
+    lines.push(transcriptInstruction);
+    lines.push("");
+    return lines;
+  }
+
+  for (const conversation of aiConversations) {
+    const spanSuffix = conversation.spanId
+      ? ` (matching span: \`${conversation.spanId}\`)`
+      : "";
+    lines.push(`- \`${conversation.conversationId}\`${spanSuffix}`);
+  }
+  lines.push("");
+  lines.push(transcriptInstruction);
+  lines.push("");
+  return lines;
+}
+
+function formatTranscriptInstruction(instruction: string): string {
+  return instruction.startsWith("Use ")
+    ? `${instruction} to fetch the full transcript.`
+    : `${instruction}.`;
 }
 
 function buildTraceNextSteps({

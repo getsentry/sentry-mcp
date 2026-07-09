@@ -119,6 +119,16 @@ GET /api/0/organizations/{organizationSlug}/ai-conversations/
 Do not implement conversation search through
 `search_events(dataset="spans")`.
 
+Issue and trace detail enrichment may still perform a bounded opportunistic
+span lookup when the caller already has a trace ID. That lookup must stay scoped
+to the trace, request only the fields needed to identify conversation IDs and
+matching spans plus any field required for result ordering, cap results to a
+small number, and route transcript follow-up through
+`get_ai_conversation_details`. It is not a replacement for
+`search_ai_conversations`. This follows Sentry's Spans-backed AI conversation
+endpoints, which select `gen_ai.conversation.id` from spans, and existing
+trace-scoped spans queries that use `trace:<trace_id>`.
+
 Expected query parameters:
 
 - `query`

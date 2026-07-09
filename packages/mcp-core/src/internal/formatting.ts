@@ -960,6 +960,11 @@ interface SlowDbEvidenceData {
   [key: string]: unknown;
 }
 
+interface AIConversationReference {
+  conversationId: string;
+  spanId?: string;
+}
+
 function normalizeSpanId(value: unknown): string | undefined {
   if (typeof value === "string" && value) {
     return value;
@@ -1977,6 +1982,7 @@ export function formatIssueOutput({
   performanceTrace,
   externalIssues,
   relatedReplayIds,
+  aiConversations,
   experimentalMode,
   availableToolNames,
   directToolNames,
@@ -1989,6 +1995,7 @@ export function formatIssueOutput({
   performanceTrace?: Trace;
   externalIssues?: ExternalIssueList;
   relatedReplayIds?: string[];
+  aiConversations?: AIConversationReference[];
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
@@ -2169,6 +2176,15 @@ export function formatIssueOutput({
   output += `- Commit message issue reference: \`Fixes ${issue.shortId}\` automatically closes the issue when the commit is merged.\n`;
   output +=
     "- The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.\n";
+  if (aiConversations && aiConversations.length > 0) {
+    output += formatAIConversationResponseNote({
+      aiConversations,
+      organizationSlug,
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+    });
+  }
   const issueEventSearchInstruction = formatToolCallInstruction({
     toolName: "search_issue_events",
     arguments: {
@@ -2257,6 +2273,56 @@ export function formatIssueOutput({
     output += `- Breadcrumb trail leading up to this error: \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
   }
   return output;
+}
+
+function formatAIConversationResponseNote({
+  aiConversations,
+  organizationSlug,
+  experimentalMode,
+  availableToolNames,
+  directToolNames,
+}: {
+  aiConversations: AIConversationReference[];
+  organizationSlug: string;
+  experimentalMode: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
+}): string {
+  const instruction = formatToolCallInstruction({
+    toolName: "get_ai_conversation_details",
+    arguments: {
+      organizationSlug,
+      conversationId:
+        aiConversations.length === 1
+          ? aiConversations[0].conversationId
+          : "conversation ID",
+    },
+    experimentalMode,
+    availableToolNames,
+    directToolNames,
+    fallbackInstruction:
+      "AI conversation detail lookup is not available in this session",
+  });
+  const transcriptInstruction = formatTranscriptInstruction(instruction);
+
+  if (aiConversations.length === 1) {
+    const [conversation] = aiConversations;
+    const spanSuffix = conversation.spanId
+      ? ` Matching span: \`${conversation.spanId}\`.`
+      : "";
+    return `- AI conversation found in this trace: \`${conversation.conversationId}\`.${spanSuffix} ${transcriptInstruction}\n`;
+  }
+
+  const conversationIds = aiConversations
+    .map((conversation) => `\`${conversation.conversationId}\``)
+    .join(", ");
+  return `- Multiple AI conversations were found in this trace: ${conversationIds}. ${transcriptInstruction}\n`;
+}
+
+function formatTranscriptInstruction(instruction: string): string {
+  return instruction.startsWith("Use ")
+    ? `${instruction} to fetch the full transcript.`
+    : `${instruction}.`;
 }
 
 const MAX_DISPLAY_REPLAYS = 5;
