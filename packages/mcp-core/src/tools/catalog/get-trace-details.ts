@@ -5,6 +5,7 @@ import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
 import {
   addAIConversationSuggestedActions,
+  formatAIConversationActionInstructions,
   type AIConversationReference,
 } from "../../internal/tool-helpers/ai-conversation-actions";
 import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/resolve-region-url";
@@ -1203,22 +1204,13 @@ function formatAIConversationSection({
     return [];
   }
 
-  const instruction = formatToolCallInstruction({
-    toolName: "get_ai_conversation_details",
-    arguments: {
-      organizationSlug,
-      conversationId:
-        aiConversations.length === 1
-          ? aiConversations[0].conversationId
-          : "conversation ID",
-    },
+  const instructions = formatAIConversationActionInstructions({
+    organizationSlug,
+    aiConversations,
     experimentalMode,
     availableToolNames,
     directToolNames,
-    fallbackInstruction:
-      "AI conversation detail lookup is not available in this session",
   });
-  const transcriptInstruction = formatTranscriptInstruction(instruction);
 
   const lines = ["## AI Conversations", ""];
   if (aiConversations.length === 1) {
@@ -1228,7 +1220,7 @@ function formatAIConversationSection({
       lines.push(`**Matching Span**: \`${conversation.spanId}\``);
     }
     lines.push("");
-    lines.push(transcriptInstruction);
+    lines.push(...instructions);
     lines.push("");
     return lines;
   }
@@ -1240,15 +1232,9 @@ function formatAIConversationSection({
     lines.push(`- \`${conversation.conversationId}\`${spanSuffix}`);
   }
   lines.push("");
-  lines.push(transcriptInstruction);
+  lines.push(...instructions.map((instruction) => `- ${instruction}`));
   lines.push("");
   return lines;
-}
-
-function formatTranscriptInstruction(instruction: string): string {
-  return instruction.startsWith("Use ")
-    ? `${instruction} to fetch the full transcript.`
-    : `${instruction}.`;
 }
 
 function buildTraceNextSteps({

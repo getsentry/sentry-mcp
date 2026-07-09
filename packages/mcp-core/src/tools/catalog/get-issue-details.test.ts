@@ -325,7 +325,7 @@ describe("get_issue_details", () => {
           expect(url.searchParams.get("per_page")).toBe("3");
           expect(url.searchParams.getAll("field")).toEqual([
             "gen_ai.conversation.id",
-            "trace.span_id",
+            "span_id",
             "timestamp",
           ]);
 
@@ -333,12 +333,12 @@ describe("get_issue_details", () => {
             data: [
               {
                 "gen_ai.conversation.id": "conv-123",
-                "trace.span_id": "span-123",
+                span_id: "span-123",
                 timestamp: "2025-04-08T21:15:04+00:00",
               },
               {
                 "gen_ai.conversation.id": "conv-123",
-                "trace.span_id": "span-456",
+                span_id: "span-456",
                 timestamp: "2025-04-08T21:15:05+00:00",
               },
             ],
@@ -361,14 +361,17 @@ describe("get_issue_details", () => {
 
     const text = getTextContent(result);
     expect(text).toContain(
-      "- AI conversation found in this trace: `conv-123`. Matching span: `span-123`. Use the Sentry tool `get_ai_conversation_details` to fetch the full transcript.",
+      "- AI conversation found in this trace: `conv-123`. Matching span: `span-123`.",
+    );
+    expect(text).toContain(
+      '- Use the Sentry tool `execute_sentry_tool(name=\'get_ai_conversation_details\', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})` to fetch the full transcript.',
     );
     expect(
       getStructuredContent<{
         suggestedActions: Array<{
           type: string;
           toolName: string;
-          arguments: Record<string, string>;
+          arguments: Record<string, unknown>;
           reason: string;
         }>;
       }>(result),
@@ -437,7 +440,8 @@ describe("get_issue_details", () => {
 
       - Commit message issue reference: \`Fixes CLOUDFLARE-MCP-41\` automatically closes the issue when the commit is merged.
       - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
-      - AI conversation found in this trace: \`conv-123\`. Matching span: \`span-123\`. Use the Sentry tool \`get_ai_conversation_details\` to fetch the full transcript.
+      - AI conversation found in this trace: \`conv-123\`. Matching span: \`span-123\`.
+      - Use the Sentry tool \`execute_sentry_tool(name='get_ai_conversation_details', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})\` to fetch the full transcript.
       - Issue event search: Use the Sentry tool \`search_issue_events\`
       - Full distributed trace and span tree: Use the Sentry tool \`get_sentry_resource\`
       - Related span search: Use the Sentry tool \`search_events\`
@@ -1890,7 +1894,17 @@ describe("get_issue_details", () => {
 
     // Event with a type that doesn't exist yet (would never be returned by Sentry API)
     // Use the unknown event fixture factory (baseline already has future_ai_agent_trace type)
-    const unsupportedEventFixture = createUnknownEvent();
+    const traceId = "11112222333344445555666677778888";
+    const unsupportedEventFixture = {
+      ...createUnknownEvent(),
+      contexts: {
+        trace: {
+          type: "trace",
+          trace_id: traceId,
+          span_id: "error-span",
+        },
+      },
+    };
 
     mswServer.use(
       // More specific pattern for events (must come first to match before the issue pattern)
@@ -1906,6 +1920,23 @@ describe("get_issue_details", () => {
           return HttpResponse.json(unsupportedIssueFixture);
         },
       ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/events/",
+        () =>
+          HttpResponse.json({
+            data: [
+              {
+                "gen_ai.conversation.id": "conv-unsupported",
+                span_id: "span-unsupported",
+                timestamp: "2025-04-08T21:15:04+00:00",
+              },
+            ],
+          }),
+      ),
+      http.get(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/${traceId}/`,
+        () => HttpResponse.json([]),
+      ),
     );
 
     const result = await getIssueDetails.handler(
@@ -1919,12 +1950,10 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    if (typeof result !== "string") {
-      throw new Error("Expected string result");
-    }
+    const text = typeof result === "string" ? result : getTextContent(result);
 
     // Extract the Sentry Event ID from the result (it varies per run)
-    const sentryEventIdMatch = result.match(
+    const sentryEventIdMatch = text.match(
       /Sentry Event ID \*\*([a-f0-9]{32})\*\*/,
     );
     const sentryEventId = sentryEventIdMatch
@@ -1932,10 +1961,32 @@ describe("get_issue_details", () => {
       : "SENTRY_EVENT_ID";
 
     // Replace the dynamic Sentry Event ID with a placeholder for snapshot testing
-    const normalizedResult = result.replace(
+    const normalizedResult = text.replace(
       /Sentry Event ID \*\*[a-f0-9]{32}\*\*/,
       "Sentry Event ID **<SENTRY_EVENT_ID>**",
     );
+
+    expect(
+      getStructuredContent<{
+        suggestedActions: Array<{
+          toolName: string;
+          arguments: Record<string, unknown>;
+        }>;
+      }>(result),
+    ).toMatchObject({
+      suggestedActions: [
+        {
+          toolName: "execute_sentry_tool",
+          arguments: {
+            name: "get_ai_conversation_details",
+            arguments: {
+              organizationSlug: "sentry-mcp-evals",
+              conversationId: "conv-unsupported",
+            },
+          },
+        },
+      ],
+    });
 
     expect(normalizedResult).toMatchInlineSnapshot(`
       "# Issue FUTURE-TYPE-001 in **sentry-mcp-evals**
@@ -1960,6 +2011,11 @@ describe("get_issue_details", () => {
       This event type is not yet fully supported by the MCP server. Only basic issue information is shown above.
 
       **Please report this**: Open a GitHub issue at https://github.com/getsentry/sentry-mcp/issues/new and include Event ID **ffffffffffffffffffffffffffffffff** and Sentry Event ID **<SENTRY_EVENT_ID>** to help us add support for this event type.
+
+      ## Response Notes
+
+      - AI conversation found in this trace: \`conv-unsupported\`. Matching span: \`span-unsupported\`.
+      - Use the Sentry tool \`execute_sentry_tool(name='get_ai_conversation_details', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-unsupported"})\` to fetch the full transcript.
       "
     `);
 

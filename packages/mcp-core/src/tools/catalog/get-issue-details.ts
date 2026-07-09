@@ -418,7 +418,7 @@ async function findAIConversationsForTrace({
     organizationSlug,
     dataset: "spans",
     query: `trace:${traceId} has:gen_ai.conversation.id`,
-    fields: ["gen_ai.conversation.id", "trace.span_id", "timestamp"],
+    fields: ["gen_ai.conversation.id", "span_id", "timestamp"],
     limit: MAX_AI_CONVERSATION_MATCHES,
     sort: "-timestamp",
     ...buildConversationLookupTimeParams(event),
@@ -445,7 +445,7 @@ async function findAIConversationsForTrace({
 
     references.set(conversationId, {
       conversationId,
-      spanId: getString(record["trace.span_id"]),
+      spanId: getString(record.span_id),
     });
 
     if (references.size >= MAX_AI_CONVERSATION_MATCHES) {

@@ -35,7 +35,10 @@ import {
   isTerminalStatus,
 } from "./tool-helpers/seer";
 import { formatToolCallInstruction } from "./tool-helpers/tool-call-formatting";
-import type { AIConversationReference } from "./tool-helpers/ai-conversation-actions";
+import {
+  formatAIConversationActionInstructions,
+  type AIConversationReference,
+} from "./tool-helpers/ai-conversation-actions";
 import { formatUserGeoSummary } from "./user-formatting";
 
 /**
@@ -2108,6 +2111,17 @@ export function formatIssueOutput({
     }
     output += " to help us add support for this event type.\n";
 
+    if (aiConversations && aiConversations.length > 0) {
+      output += "\n## Response Notes\n\n";
+      output += formatAIConversationResponseNote({
+        aiConversations,
+        organizationSlug,
+        experimentalMode: experimentalMode ?? false,
+        availableToolNames,
+        directToolNames,
+      });
+    }
+
     // For unsupported event types, return early without trying to render event details
     return output;
   }
@@ -2284,41 +2298,26 @@ function formatAIConversationResponseNote({
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
 }): string {
-  const instruction = formatToolCallInstruction({
-    toolName: "get_ai_conversation_details",
-    arguments: {
-      organizationSlug,
-      conversationId:
-        aiConversations.length === 1
-          ? aiConversations[0].conversationId
-          : "conversation ID",
-    },
+  const instructions = formatAIConversationActionInstructions({
+    organizationSlug,
+    aiConversations,
     experimentalMode,
     availableToolNames,
     directToolNames,
-    fallbackInstruction:
-      "AI conversation detail lookup is not available in this session",
   });
-  const transcriptInstruction = formatTranscriptInstruction(instruction);
 
   if (aiConversations.length === 1) {
     const [conversation] = aiConversations;
     const spanSuffix = conversation.spanId
       ? ` Matching span: \`${conversation.spanId}\`.`
       : "";
-    return `- AI conversation found in this trace: \`${conversation.conversationId}\`.${spanSuffix} ${transcriptInstruction}\n`;
+    return `- AI conversation found in this trace: \`${conversation.conversationId}\`.${spanSuffix}\n${instructions.map((instruction) => `- ${instruction}`).join("\n")}\n`;
   }
 
   const conversationIds = aiConversations
     .map((conversation) => `\`${conversation.conversationId}\``)
     .join(", ");
-  return `- Multiple AI conversations were found in this trace: ${conversationIds}. ${transcriptInstruction}\n`;
-}
-
-function formatTranscriptInstruction(instruction: string): string {
-  return instruction.startsWith("Use ")
-    ? `${instruction} to fetch the full transcript.`
-    : `${instruction}.`;
+  return `- Multiple AI conversations were found in this trace: ${conversationIds}.\n${instructions.map((instruction) => `- ${instruction}`).join("\n")}\n`;
 }
 
 const MAX_DISPLAY_REPLAYS = 5;
