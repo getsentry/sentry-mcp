@@ -472,8 +472,7 @@ describe("exchangeCodeForAccessToken", () => {
     expect(logWarn).not.toHaveBeenCalled();
   });
 
-  it("returns an event ID for upstream token exchange system failures", async () => {
-    logIssue.mockReturnValue("oauth-token-event-id");
+  it("does not log an issue for upstream 5xx non-JSON failures", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("upstream unavailable", {
         status: 503,
@@ -496,22 +495,19 @@ describe("exchangeCodeForAccessToken", () => {
 
     const body = await response!.text();
     expect(body).toContain(
-      "There was an internal error authenticating your account. Please try again shortly.",
+      "Sentry&#39;s authentication service returned an unexpected response. Please try again shortly.",
     );
-    expect(body).toContain(
-      "Event ID:</strong> <code>oauth-token-event-id</code>",
-    );
-    expect(logIssue).toHaveBeenCalledWith(
+    expect(body).not.toContain("Event ID:");
+    expect(logWarn).toHaveBeenCalledWith(
       "[oauth] Failed to exchange code for access token",
       expect.objectContaining({
         loggerScope: ["cloudflare", "oauth", "callback"],
       }),
     );
-    expect(logWarn).not.toHaveBeenCalled();
+    expect(logIssue).not.toHaveBeenCalled();
   });
 
-  it("returns an event ID for unknown upstream http failures", async () => {
-    logIssue.mockReturnValue("oauth-forbidden-event-id");
+  it("does not log an issue for non-JSON upstream HTML error pages", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("<title>403</title>403 Forbidden", {
         status: 403,
@@ -534,18 +530,16 @@ describe("exchangeCodeForAccessToken", () => {
 
     const body = await response!.text();
     expect(body).toContain(
-      "There was an internal error authenticating your account. Please try again shortly.",
+      "Sentry&#39;s authentication service returned an unexpected response. Please try again shortly.",
     );
-    expect(body).toContain(
-      "Event ID:</strong> <code>oauth-forbidden-event-id</code>",
-    );
-    expect(logIssue).toHaveBeenCalledWith(
+    expect(body).not.toContain("Event ID:");
+    expect(logWarn).toHaveBeenCalledWith(
       "[oauth] Failed to exchange code for access token",
       expect.objectContaining({
         loggerScope: ["cloudflare", "oauth", "callback"],
       }),
     );
-    expect(logWarn).not.toHaveBeenCalled();
+    expect(logIssue).not.toHaveBeenCalled();
   });
 });
 
@@ -583,12 +577,62 @@ describe("getTokenExchangeFailureDetails", () => {
     });
   });
 
-  it("treats unknown token exchange failures as system failures", () => {
+  it("treats unknown token exchange failures as system failures when response is JSON", () => {
+    expect(
+      getTokenExchangeFailureDetails({ httpStatus: 400, isJsonResponse: true }),
+    ).toEqual({
+      message:
+        "There was an internal error authenticating your account. Please try again shortly.",
+      status: 502,
+      shouldLogIssue: true,
+    });
+  });
+
+  it("treats unknown token exchange failures as system failures with no upstream context", () => {
     expect(getTokenExchangeFailureDetails({})).toEqual({
       message:
         "There was an internal error authenticating your account. Please try again shortly.",
       status: 502,
       shouldLogIssue: true,
+    });
+  });
+
+  it("treats non-JSON upstream responses as upstream failures without logging an issue", () => {
+    expect(
+      getTokenExchangeFailureDetails({
+        httpStatus: 400,
+        isJsonResponse: false,
+      }),
+    ).toEqual({
+      message:
+        "Sentry's authentication service returned an unexpected response. Please try again shortly.",
+      status: 502,
+      shouldLogIssue: false,
+    });
+  });
+
+  it("treats 5xx upstream responses as upstream failures without logging an issue", () => {
+    expect(
+      getTokenExchangeFailureDetails({ httpStatus: 500, isJsonResponse: true }),
+    ).toEqual({
+      message:
+        "Sentry's authentication service returned an unexpected response. Please try again shortly.",
+      status: 502,
+      shouldLogIssue: false,
+    });
+  });
+
+  it("treats 5xx non-JSON upstream responses as upstream failures without logging an issue", () => {
+    expect(
+      getTokenExchangeFailureDetails({
+        httpStatus: 502,
+        isJsonResponse: false,
+      }),
+    ).toEqual({
+      message:
+        "Sentry's authentication service returned an unexpected response. Please try again shortly.",
+      status: 502,
+      shouldLogIssue: false,
     });
   });
 

@@ -43,6 +43,15 @@ const systemFailure = (message: string, status = 502): OAuthFailureDetails => ({
   shouldLogIssue: true,
 });
 
+const upstreamFailure = (
+  message: string,
+  status = 502,
+): OAuthFailureDetails => ({
+  message,
+  status,
+  shouldLogIssue: false,
+});
+
 function isRetryableInvalidGrant(errorDescription?: string): boolean {
   if (!errorDescription) {
     return false;
@@ -115,9 +124,13 @@ export function getOAuthCallbackFailureDetails({
 export function getTokenExchangeFailureDetails({
   oauthError,
   errorDescription,
+  httpStatus,
+  isJsonResponse,
 }: {
   oauthError?: string;
   errorDescription?: string;
+  httpStatus?: number;
+  isJsonResponse?: boolean;
 }): OAuthFailureDetails {
   switch (oauthError) {
     case "access_denied":
@@ -159,6 +172,17 @@ export function getTokenExchangeFailureDetails({
         500,
       );
     default:
+      // When upstream returns non-JSON responses (HTML error pages, proxy errors)
+      // or 5xx server errors without a recognized OAuth error code, this is an
+      // upstream infrastructure issue — not a bug in our system.
+      if (
+        isJsonResponse === false ||
+        (httpStatus !== undefined && httpStatus >= 500)
+      ) {
+        return upstreamFailure(
+          "Sentry's authentication service returned an unexpected response. Please try again shortly.",
+        );
+      }
       return systemFailure(
         "There was an internal error authenticating your account. Please try again shortly.",
       );
@@ -357,10 +381,13 @@ export async function exchangeCodeForAccessToken({
   if (!resp.ok) {
     const responseText = await resp.text();
     const contentType = resp.headers.get("Content-Type");
+    const isJsonResponse = contentType?.includes("application/json") ?? false;
     const upstreamError = parseUpstreamOAuthError(responseText, contentType);
     const failure = getTokenExchangeFailureDetails({
       oauthError: upstreamError.error,
       errorDescription: upstreamError.errorDescription,
+      httpStatus: resp.status,
+      isJsonResponse,
     });
     const logOptions = {
       contexts: {
