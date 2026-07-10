@@ -140,9 +140,6 @@ import traceItemsAttributesTraceMetricsNumberFixture from "./fixtures/trace-item
 import traceItemsAttributesTraceMetricsStringFixture from "./fixtures/trace-items-attributes-tracemetrics-string.json" with {
   type: "json",
 };
-import traceItemsAttributesFixture from "./fixtures/trace-items-attributes.json" with {
-  type: "json",
-};
 import traceMetaWithNullsFixture from "./fixtures/trace-meta-with-nulls.json" with {
   type: "json",
 };
@@ -210,6 +207,17 @@ function buildHandlers(
   }
 
   return result;
+}
+
+function withTraceItemAttributeMetadata(
+  attributes: readonly { key: string; name: string }[],
+  attributeType: "string" | "number" | "boolean",
+) {
+  return attributes.map((attribute) => ({
+    ...attribute,
+    attributeType,
+    attributeSource: { source_type: "sentry" as const },
+  }));
 }
 
 type IssueUpdateBody = {
@@ -1106,37 +1114,37 @@ export const restHandlers = buildHandlers([
       if (!attributeType) {
         if (normalizedItemType === "span") {
           return HttpResponse.json([
-            ...traceItemsAttributesSpansStringFixture.map((attribute) => ({
-              ...attribute,
-              attributeType: "string",
-            })),
-            ...traceItemsAttributesSpansNumberFixture.map((attribute) => ({
-              ...attribute,
-              attributeType: "number",
-            })),
+            ...withTraceItemAttributeMetadata(
+              traceItemsAttributesSpansStringFixture,
+              "string",
+            ),
+            ...withTraceItemAttributeMetadata(
+              traceItemsAttributesSpansNumberFixture,
+              "number",
+            ),
           ]);
         }
         if (normalizedItemType === "logs") {
           return HttpResponse.json([
-            ...traceItemsAttributesLogsStringFixture.map((attribute) => ({
-              ...attribute,
-              attributeType: "string",
-            })),
-            ...traceItemsAttributesLogsNumberFixture.map((attribute) => ({
-              ...attribute,
-              attributeType: "number",
-            })),
+            ...withTraceItemAttributeMetadata(
+              traceItemsAttributesLogsStringFixture,
+              "string",
+            ),
+            ...withTraceItemAttributeMetadata(
+              traceItemsAttributesLogsNumberFixture,
+              "number",
+            ),
           ]);
         }
         return HttpResponse.json([
-          ...traceItemsAttributesTraceMetricsStringFixture.map((attribute) => ({
-            ...attribute,
-            attributeType: "string",
-          })),
-          ...traceItemsAttributesTraceMetricsNumberFixture.map((attribute) => ({
-            ...attribute,
-            attributeType: "number",
-          })),
+          ...withTraceItemAttributeMetadata(
+            traceItemsAttributesTraceMetricsStringFixture,
+            "string",
+          ),
+          ...withTraceItemAttributeMetadata(
+            traceItemsAttributesTraceMetricsNumberFixture,
+            "number",
+          ),
         ]);
       }
 
@@ -1153,27 +1161,57 @@ export const restHandlers = buildHandlers([
       // Return appropriate fixture based on parameters
       if (normalizedItemType === "span") {
         if (attributeType === "string") {
-          return HttpResponse.json(traceItemsAttributesSpansStringFixture);
+          return HttpResponse.json(
+            withTraceItemAttributeMetadata(
+              traceItemsAttributesSpansStringFixture,
+              "string",
+            ),
+          );
         }
-        return HttpResponse.json(traceItemsAttributesSpansNumberFixture);
+        return HttpResponse.json(
+          withTraceItemAttributeMetadata(
+            traceItemsAttributesSpansNumberFixture,
+            "number",
+          ),
+        );
       }
       if (normalizedItemType === "logs") {
         if (attributeType === "string") {
-          return HttpResponse.json(traceItemsAttributesLogsStringFixture);
+          return HttpResponse.json(
+            withTraceItemAttributeMetadata(
+              traceItemsAttributesLogsStringFixture,
+              "string",
+            ),
+          );
         }
-        return HttpResponse.json(traceItemsAttributesLogsNumberFixture);
+        return HttpResponse.json(
+          withTraceItemAttributeMetadata(
+            traceItemsAttributesLogsNumberFixture,
+            "number",
+          ),
+        );
       }
       if (normalizedItemType === "tracemetrics") {
         if (attributeType === "string") {
           return HttpResponse.json(
-            traceItemsAttributesTraceMetricsStringFixture,
+            withTraceItemAttributeMetadata(
+              traceItemsAttributesTraceMetricsStringFixture,
+              "string",
+            ),
           );
         }
-        return HttpResponse.json(traceItemsAttributesTraceMetricsNumberFixture);
+        return HttpResponse.json(
+          withTraceItemAttributeMetadata(
+            traceItemsAttributesTraceMetricsNumberFixture,
+            "number",
+          ),
+        );
       }
 
-      // Fallback (should not reach here with valid inputs)
-      return HttpResponse.json(traceItemsAttributesFixture);
+      return HttpResponse.json(
+        { detail: "Unsupported trace item attribute request" },
+        { status: 400 },
+      );
     },
   },
   {

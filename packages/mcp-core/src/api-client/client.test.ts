@@ -1370,13 +1370,14 @@ describe("API query builders", () => {
                 key: "tags[count,number]",
                 name: "count",
                 attributeType: "number",
+                attributeSource: { source_type: "user" },
               },
               {
-                key: "tags[fallback]",
-                name: 42,
-                attributeType: "invalid",
-                attributeSource: { source_type: "invalid" },
-                secondaryAliases: ["fallback.alias", 42],
+                key: "tags[secondary]",
+                name: "secondary",
+                attributeType: "string",
+                attributeSource: { source_type: "user" },
+                secondaryAliases: ["secondary.alias"],
               },
             ]),
         });
@@ -1409,10 +1410,11 @@ describe("API query builders", () => {
           attributeSource: { source_type: "user" },
         },
         {
-          key: "tags[fallback]",
-          name: "tags[fallback]",
+          key: "tags[secondary]",
+          name: "secondary",
           type: "string",
-          secondaryAliases: ["fallback.alias"],
+          attributeSource: { source_type: "user" },
+          secondaryAliases: ["secondary.alias"],
         },
       ]);
       expect(urls).toHaveLength(1);
@@ -1448,9 +1450,14 @@ describe("API query builders", () => {
             json: () =>
               Promise.resolve({
                 valid: false,
-                projects: { malformed: true },
-                dataset: [],
-                environment: [],
+                projects: [{ valid: true, error: null }],
+                dataset: [{ name: "spans", valid: true, error: null }],
+                environment: [
+                  {
+                    valid: false,
+                    error: "Unknown environments selected",
+                  },
+                ],
                 field: [
                   {
                     name: "tags[type]",
@@ -1502,9 +1509,9 @@ describe("API query builders", () => {
 
       expect(result).toEqual({
         valid: false,
-        projects: [],
-        dataset: [],
-        environment: [],
+        projects: [{ valid: true }],
+        dataset: [{ name: "spans", valid: true }],
+        environment: [{ valid: false, error: "Unknown environments selected" }],
         field: [
           { name: "tags[type]", valid: true, type: "string" },
           {

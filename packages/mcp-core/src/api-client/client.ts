@@ -271,7 +271,7 @@ export type TraceItemAttribute = {
   key: string;
   name: string;
   type: TraceItemAttributeType;
-  attributeSource?: TraceItemAttributeSource;
+  attributeSource: TraceItemAttributeSource;
   secondaryAliases?: string[];
 };
 
@@ -321,16 +321,12 @@ const TraceItemAttributeSourceSchema = z.object({
   is_transformed_alias: z.boolean().optional(),
 });
 
-const optionalErrorSchema = z
-  .string()
-  .nullable()
-  .optional()
-  .transform((error) => (error ? error : undefined));
+const ValidationErrorSchema = z.string().nullable();
 
 const EventsValidationIssueSchema = z
   .object({
     valid: z.boolean(),
-    error: optionalErrorSchema,
+    error: ValidationErrorSchema,
   })
   .transform(
     ({ valid, error }): EventsValidationIssue => ({
@@ -343,7 +339,7 @@ const EventsNamedValidationIssueSchema = z
   .object({
     name: z.string(),
     valid: z.boolean(),
-    error: optionalErrorSchema,
+    error: ValidationErrorSchema,
   })
   .transform(
     ({ name, valid, error }): EventsNamedValidationIssue => ({
@@ -357,8 +353,8 @@ const EventsAttributeValidationSchema = z
   .object({
     name: z.string(),
     valid: z.boolean(),
-    attrType: TraceItemAttributeTypeSchema.nullable().optional(),
-    error: optionalErrorSchema,
+    attrType: TraceItemAttributeTypeSchema.nullable(),
+    error: ValidationErrorSchema,
   })
   .transform(
     ({ name, valid, attrType, error }): EventsAttributeValidationResult => ({
@@ -369,32 +365,17 @@ const EventsAttributeValidationSchema = z
     }),
   );
 
-function parsedArraySchema<Schema extends z.ZodTypeAny>(itemSchema: Schema) {
-  return z
-    .array(z.unknown())
-    .default([])
-    .transform((values): z.output<Schema>[] =>
-      values.flatMap<z.output<Schema>>((value) => {
-        const result = itemSchema.safeParse(value);
-        return result.success ? [result.data] : [];
-      }),
-    )
-    .catch([]);
-}
-
-const EventsValidationIssueListSchema = parsedArraySchema(
-  EventsValidationIssueSchema,
-);
-const EventsNamedValidationIssueListSchema = parsedArraySchema(
+const EventsValidationIssueListSchema = z.array(EventsValidationIssueSchema);
+const EventsNamedValidationIssueListSchema = z.array(
   EventsNamedValidationIssueSchema,
 );
-const EventsAttributeValidationListSchema = parsedArraySchema(
+const EventsAttributeValidationListSchema = z.array(
   EventsAttributeValidationSchema,
 );
 const EventsQueryValidationSchema = z
   .object({
     valid: z.boolean(),
-    error: optionalErrorSchema,
+    error: ValidationErrorSchema,
     fields: EventsAttributeValidationListSchema,
   })
   .transform(
@@ -403,22 +384,11 @@ const EventsQueryValidationSchema = z
       fields,
       ...(error ? { error } : {}),
     }),
-  )
-  .catch({ valid: false, fields: [] });
-
-const INVALID_EVENTS_VALIDATION_RESULT: EventsValidationResult = {
-  valid: false,
-  projects: [],
-  dataset: [],
-  environment: [],
-  field: [],
-  query: { valid: false, fields: [] },
-  orderby: [],
-};
+  );
 
 const EventsValidationResponseSchema = z
   .object({
-    valid: z.boolean().catch(false),
+    valid: z.boolean(),
     projects: EventsValidationIssueListSchema,
     dataset: EventsNamedValidationIssueListSchema,
     environment: EventsValidationIssueListSchema,
@@ -426,40 +396,27 @@ const EventsValidationResponseSchema = z
     query: EventsQueryValidationSchema,
     orderby: EventsAttributeValidationListSchema,
   })
-  .transform((result): EventsValidationResult => result)
-  .catch(INVALID_EVENTS_VALIDATION_RESULT);
+  .transform((result): EventsValidationResult => result);
 
-function parseTraceItemAttributes(
-  body: unknown,
-  fallbackType: TraceItemAttributeType,
-): TraceItemAttribute[] {
-  const attributeSchema = z
-    .object({
-      key: z.string(),
-      name: z.string().optional().catch(undefined),
-      attributeType: TraceItemAttributeTypeSchema.optional().catch(undefined),
-      attributeSource:
-        TraceItemAttributeSourceSchema.optional().catch(undefined),
-      secondaryAliases: z
-        .array(z.unknown())
-        .transform((aliases) =>
-          aliases.filter((alias): alias is string => typeof alias === "string"),
-        )
-        .optional()
-        .catch(undefined),
-    })
-    .transform(
-      ({ key, name, attributeType, attributeSource, secondaryAliases }) => ({
-        key,
-        name: name ?? key,
-        type: attributeType ?? fallbackType,
-        ...(attributeSource ? { attributeSource } : {}),
-        ...(secondaryAliases ? { secondaryAliases } : {}),
-      }),
-    );
+const TraceItemAttributeSchema = z
+  .object({
+    key: z.string(),
+    name: z.string(),
+    attributeType: TraceItemAttributeTypeSchema,
+    attributeSource: TraceItemAttributeSourceSchema,
+    secondaryAliases: z.array(z.string()).optional(),
+  })
+  .transform(
+    ({ key, name, attributeType, attributeSource, secondaryAliases }) => ({
+      key,
+      name,
+      type: attributeType,
+      attributeSource,
+      ...(secondaryAliases ? { secondaryAliases } : {}),
+    }),
+  );
 
-  return parsedArraySchema(attributeSchema).parse(body);
-}
+const TraceItemAttributeListSchema = z.array(TraceItemAttributeSchema);
 
 /**
  * Sentry API client service for interacting with Sentry's REST API.
@@ -3038,7 +2995,7 @@ export class SentryApiService {
     const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
 
     const body = await this.requestJSON(url, undefined, opts);
-    return parseTraceItemAttributes(body, "string");
+    return TraceItemAttributeListSchema.parse(body);
   }
 
   /**
