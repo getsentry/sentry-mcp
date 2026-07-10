@@ -36,6 +36,7 @@ import {
 } from "./tool-helpers/seer";
 import { formatToolCallInstruction } from "./tool-helpers/tool-call-formatting";
 import { formatUserGeoSummary } from "./user-formatting";
+import { isPlainObject } from "./type-guards";
 
 /**
  * Convert Seer fixability score to actionability label.
@@ -1658,10 +1659,6 @@ function formatPerformanceIssueOutput(
   return parts.length > 0 ? `${parts.join("\n")}\n` : "";
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function isPrimitive(value: unknown): value is string | number | boolean {
   return (
     typeof value === "string" ||
@@ -1686,15 +1683,15 @@ function getMetricAlertSnubaQuery(
   }
 
   for (const dataSource of dataSources) {
-    if (!isRecord(dataSource)) {
+    if (!isPlainObject(dataSource)) {
       continue;
     }
     const queryObj = dataSource.query_obj;
-    if (!isRecord(queryObj)) {
+    if (!isPlainObject(queryObj)) {
       continue;
     }
     const snubaQuery = queryObj.snuba_query;
-    if (isRecord(snubaQuery)) {
+    if (isPlainObject(snubaQuery)) {
       return snubaQuery;
     }
   }
@@ -1738,7 +1735,7 @@ function formatMetricAlertValue(value: unknown): string | undefined {
     return formattedValue;
   }
 
-  if (isRecord(value)) {
+  if (isPlainObject(value)) {
     return formatPrimitive(value.value);
   }
 
@@ -1778,7 +1775,7 @@ function formatMetricAlertDetails(
   const conditions = evidenceData.conditions;
   if (Array.isArray(conditions)) {
     const formattedConditions = conditions
-      .filter(isRecord)
+      .filter(isPlainObject)
       .map(formatMetricAlertCondition)
       .filter((condition): condition is string => condition != null);
     if (formattedConditions.length > 0) {

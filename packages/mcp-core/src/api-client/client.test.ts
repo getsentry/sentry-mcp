@@ -1371,6 +1371,13 @@ describe("API query builders", () => {
                 name: "count",
                 attributeType: "number",
               },
+              {
+                key: "tags[fallback]",
+                name: 42,
+                attributeType: "invalid",
+                attributeSource: { source_type: "invalid" },
+                secondaryAliases: ["fallback.alias", 42],
+              },
             ]),
         });
       });
@@ -1400,6 +1407,12 @@ describe("API query builders", () => {
           name: "enabled",
           type: "boolean",
           attributeSource: { source_type: "user" },
+        },
+        {
+          key: "tags[fallback]",
+          name: "tags[fallback]",
+          type: "string",
+          secondaryAliases: ["fallback.alias"],
         },
       ]);
       expect(urls).toHaveLength(1);
@@ -1435,7 +1448,7 @@ describe("API query builders", () => {
             json: () =>
               Promise.resolve({
                 valid: false,
-                projects: [],
+                projects: { malformed: true },
                 dataset: [],
                 environment: [],
                 field: [

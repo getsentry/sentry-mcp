@@ -315,198 +315,150 @@ export type EventsValidationResult = {
   orderby: EventsAttributeValidationResult[];
 };
 
-function parseEventsValidationIssue(
-  value: unknown,
-): EventsValidationIssue | null {
-  if (!isRecord(value) || typeof value.valid !== "boolean") {
-    return null;
-  }
-  const issue: EventsValidationIssue = { valid: value.valid };
-  if (typeof value.error === "string" && value.error.length > 0) {
-    issue.error = value.error;
-  }
-  return issue;
+const TraceItemAttributeTypeSchema = z.enum(["string", "number", "boolean"]);
+const TraceItemAttributeSourceSchema = z.object({
+  source_type: z.enum(["sentry", "user"]),
+  is_transformed_alias: z.boolean().optional(),
+});
+
+const optionalErrorSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .transform((error) => (error ? error : undefined));
+
+const EventsValidationIssueSchema = z
+  .object({
+    valid: z.boolean(),
+    error: optionalErrorSchema,
+  })
+  .transform(
+    ({ valid, error }): EventsValidationIssue => ({
+      valid,
+      ...(error ? { error } : {}),
+    }),
+  );
+
+const EventsNamedValidationIssueSchema = z
+  .object({
+    name: z.string(),
+    valid: z.boolean(),
+    error: optionalErrorSchema,
+  })
+  .transform(
+    ({ name, valid, error }): EventsNamedValidationIssue => ({
+      name,
+      valid,
+      ...(error ? { error } : {}),
+    }),
+  );
+
+const EventsAttributeValidationSchema = z
+  .object({
+    name: z.string(),
+    valid: z.boolean(),
+    attrType: TraceItemAttributeTypeSchema.nullable().optional(),
+    error: optionalErrorSchema,
+  })
+  .transform(
+    ({ name, valid, attrType, error }): EventsAttributeValidationResult => ({
+      name,
+      valid,
+      ...(attrType ? { type: attrType } : {}),
+      ...(error ? { error } : {}),
+    }),
+  );
+
+function parsedArraySchema<Schema extends z.ZodTypeAny>(itemSchema: Schema) {
+  return z
+    .array(z.unknown())
+    .default([])
+    .transform((values): z.output<Schema>[] =>
+      values.flatMap<z.output<Schema>>((value) => {
+        const result = itemSchema.safeParse(value);
+        return result.success ? [result.data] : [];
+      }),
+    )
+    .catch([]);
 }
 
-function parseEventsAttributeValidation(
-  value: unknown,
-): EventsAttributeValidationResult | null {
-  if (
-    !isRecord(value) ||
-    typeof value.name !== "string" ||
-    typeof value.valid !== "boolean"
-  ) {
-    return null;
-  }
-  const result: EventsAttributeValidationResult = {
-    name: value.name,
-    valid: value.valid,
-  };
-  if (isTraceItemAttributeType(value.attrType)) {
-    result.type = value.attrType;
-  }
-  if (typeof value.error === "string" && value.error.length > 0) {
-    result.error = value.error;
-  }
-  return result;
-}
+const EventsValidationIssueListSchema = parsedArraySchema(
+  EventsValidationIssueSchema,
+);
+const EventsNamedValidationIssueListSchema = parsedArraySchema(
+  EventsNamedValidationIssueSchema,
+);
+const EventsAttributeValidationListSchema = parsedArraySchema(
+  EventsAttributeValidationSchema,
+);
+const EventsQueryValidationSchema = z
+  .object({
+    valid: z.boolean(),
+    error: optionalErrorSchema,
+    fields: EventsAttributeValidationListSchema,
+  })
+  .transform(
+    ({ valid, error, fields }): EventsQueryValidation => ({
+      valid,
+      fields,
+      ...(error ? { error } : {}),
+    }),
+  )
+  .catch({ valid: false, fields: [] });
 
-function parseEventsValidationIssues(value: unknown): EventsValidationIssue[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map(parseEventsValidationIssue)
-    .filter((issue): issue is EventsValidationIssue => issue !== null);
-}
+const INVALID_EVENTS_VALIDATION_RESULT: EventsValidationResult = {
+  valid: false,
+  projects: [],
+  dataset: [],
+  environment: [],
+  field: [],
+  query: { valid: false, fields: [] },
+  orderby: [],
+};
 
-function parseEventsAttributeValidations(
-  value: unknown,
-): EventsAttributeValidationResult[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map(parseEventsAttributeValidation)
-    .filter((item): item is EventsAttributeValidationResult => item !== null);
-}
-
-function parseEventsNamedValidationIssue(
-  value: unknown,
-): EventsNamedValidationIssue | null {
-  if (
-    !isRecord(value) ||
-    typeof value.name !== "string" ||
-    typeof value.valid !== "boolean"
-  ) {
-    return null;
-  }
-  const issue: EventsNamedValidationIssue = {
-    name: value.name,
-    valid: value.valid,
-  };
-  if (typeof value.error === "string" && value.error.length > 0) {
-    issue.error = value.error;
-  }
-  return issue;
-}
-
-function parseEventsNamedValidationIssues(
-  value: unknown,
-): EventsNamedValidationIssue[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map(parseEventsNamedValidationIssue)
-    .filter((issue): issue is EventsNamedValidationIssue => issue !== null);
-}
-
-function parseEventsQueryValidation(value: unknown): EventsQueryValidation {
-  if (!isRecord(value) || typeof value.valid !== "boolean") {
-    return { valid: false, fields: [] };
-  }
-  const query: EventsQueryValidation = {
-    valid: value.valid,
-    fields: parseEventsAttributeValidations(value.fields),
-  };
-  if (typeof value.error === "string" && value.error.length > 0) {
-    query.error = value.error;
-  }
-  return query;
-}
-
-function parseEventsValidationResponse(body: unknown): EventsValidationResult {
-  if (!isRecord(body)) {
-    return {
-      valid: false,
-      projects: [],
-      dataset: [],
-      environment: [],
-      field: [],
-      query: { valid: false, fields: [] },
-      orderby: [],
-    };
-  }
-
-  return {
-    valid: typeof body.valid === "boolean" ? body.valid : false,
-    projects: parseEventsValidationIssues(body.projects),
-    dataset: parseEventsNamedValidationIssues(body.dataset),
-    environment: parseEventsValidationIssues(body.environment),
-    field: parseEventsAttributeValidations(body.field),
-    query: parseEventsQueryValidation(body.query),
-    orderby: parseEventsAttributeValidations(body.orderby),
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isTraceItemAttributeType(
-  value: unknown,
-): value is TraceItemAttributeType {
-  return value === "string" || value === "number" || value === "boolean";
-}
-
-function isTraceItemAttributeSourceType(
-  value: unknown,
-): value is TraceItemAttributeSourceType {
-  return value === "sentry" || value === "user";
-}
-
-function parseTraceItemAttributeSource(
-  value: unknown,
-): TraceItemAttributeSource | undefined {
-  if (!isRecord(value) || !isTraceItemAttributeSourceType(value.source_type)) {
-    return undefined;
-  }
-
-  const source: TraceItemAttributeSource = { source_type: value.source_type };
-  if (typeof value.is_transformed_alias === "boolean") {
-    source.is_transformed_alias = value.is_transformed_alias;
-  }
-  return source;
-}
+const EventsValidationResponseSchema = z
+  .object({
+    valid: z.boolean().catch(false),
+    projects: EventsValidationIssueListSchema,
+    dataset: EventsNamedValidationIssueListSchema,
+    environment: EventsValidationIssueListSchema,
+    field: EventsAttributeValidationListSchema,
+    query: EventsQueryValidationSchema,
+    orderby: EventsAttributeValidationListSchema,
+  })
+  .transform((result): EventsValidationResult => result)
+  .catch(INVALID_EVENTS_VALIDATION_RESULT);
 
 function parseTraceItemAttributes(
   body: unknown,
   fallbackType: TraceItemAttributeType,
 ): TraceItemAttribute[] {
-  if (!Array.isArray(body)) {
-    return [];
-  }
-
-  const attributes: TraceItemAttribute[] = [];
-  for (const value of body) {
-    if (!isRecord(value) || typeof value.key !== "string") {
-      continue;
-    }
-
-    const attribute: TraceItemAttribute = {
-      key: value.key,
-      name: typeof value.name === "string" ? value.name : value.key,
-      type: isTraceItemAttributeType(value.attributeType)
-        ? value.attributeType
-        : fallbackType,
-    };
-
-    const attributeSource = parseTraceItemAttributeSource(
-      value.attributeSource,
+  const attributeSchema = z
+    .object({
+      key: z.string(),
+      name: z.string().optional().catch(undefined),
+      attributeType: TraceItemAttributeTypeSchema.optional().catch(undefined),
+      attributeSource:
+        TraceItemAttributeSourceSchema.optional().catch(undefined),
+      secondaryAliases: z
+        .array(z.unknown())
+        .transform((aliases) =>
+          aliases.filter((alias): alias is string => typeof alias === "string"),
+        )
+        .optional()
+        .catch(undefined),
+    })
+    .transform(
+      ({ key, name, attributeType, attributeSource, secondaryAliases }) => ({
+        key,
+        name: name ?? key,
+        type: attributeType ?? fallbackType,
+        ...(attributeSource ? { attributeSource } : {}),
+        ...(secondaryAliases ? { secondaryAliases } : {}),
+      }),
     );
-    if (attributeSource) {
-      attribute.attributeSource = attributeSource;
-    }
-    if (Array.isArray(value.secondaryAliases)) {
-      attribute.secondaryAliases = value.secondaryAliases.filter(
-        (alias): alias is string => typeof alias === "string",
-      );
-    }
-    attributes.push(attribute);
-  }
 
-  return attributes;
+  return parsedArraySchema(attributeSchema).parse(body);
 }
 
 /**
@@ -3056,7 +3008,7 @@ export class SentryApiService {
       { ...opts, allowStatuses: [400] },
     );
     const body = await this.parseJsonResponse(response);
-    return parseEventsValidationResponse(body);
+    return EventsValidationResponseSchema.parse(body);
   }
 
   private async fetchTraceItemAttributes(

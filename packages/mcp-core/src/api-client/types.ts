@@ -101,6 +101,7 @@ import type {
   ReleaseSchema,
   ReplayDetailsSchema,
   ReplayListResponseSchema,
+  ReplayRecordingEventSchema,
   ReplayRecordingSegmentsSchema,
   TagListSchema,
   TagSchema,
@@ -162,6 +163,7 @@ export type AutofixRunState = z.infer<typeof AutofixRunStateSchema>;
 export type AssignedTo = z.infer<typeof AssignedToSchema>;
 export type ReplayDetails = z.infer<typeof ReplayDetailsSchema>;
 export type ReplayList = z.infer<typeof ReplayListResponseSchema>["data"];
+export type ReplayRecordingEvent = z.infer<typeof ReplayRecordingEventSchema>;
 export type ReplayRecordingSegments = z.infer<
   typeof ReplayRecordingSegmentsSchema
 >;
