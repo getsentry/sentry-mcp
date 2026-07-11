@@ -412,7 +412,47 @@ export const ReplayDetailsSchema = z
   })
   .passthrough();
 
-export const ReplayRecordingSegmentsSchema = z.array(z.array(z.unknown()));
+const ReplayRecordingPayloadSchema = z
+  .object({
+    op: z.string().optional().catch(undefined),
+    description: z.string().optional().catch(undefined),
+    message: z.string().optional().catch(undefined),
+    category: z.string().optional().catch(undefined),
+    type: z.string().optional().catch(undefined),
+    data: z
+      .object({
+        duration: z.number().optional().catch(undefined),
+      })
+      .passthrough()
+      .optional()
+      .catch(undefined),
+  })
+  .passthrough();
+
+export const ReplayRecordingEventSchema = z
+  .object({
+    timestamp: z.number().optional().catch(undefined),
+    type: z.number().optional().catch(undefined),
+    data: z
+      .object({
+        tag: z.string().optional().catch(undefined),
+        href: z.string().optional().catch(undefined),
+        payload: ReplayRecordingPayloadSchema.optional().catch(undefined),
+      })
+      .passthrough()
+      .optional()
+      .catch(undefined),
+  })
+  .passthrough();
+
+export const ReplayRecordingSegmentsSchema = z.array(
+  z.array(z.unknown()).transform((events) =>
+    events.flatMap((event) => {
+      const result = ReplayRecordingEventSchema.safeParse(event);
+      return result.success ? [result.data] : [];
+    }),
+  ),
+);
 
 export const ReplayListResponseSchema = z.object({
   data: z.array(ReplayDetailsSchema),

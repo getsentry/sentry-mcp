@@ -597,6 +597,9 @@ importers:
       open:
         specifier: 'catalog:'
         version: 10.1.2
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
     devDependencies:
       tsdown:
         specifier: 'catalog:'

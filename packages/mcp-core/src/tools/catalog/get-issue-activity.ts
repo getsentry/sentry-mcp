@@ -7,6 +7,7 @@ import {
   parseIssueParams,
 } from "../../internal/tool-helpers/issue";
 import type { IssueActivity, IssueComment } from "../../api-client/types";
+import { isPlainObject } from "../../internal/type-guards";
 import { formatAvailableToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
 import type { ServerContext } from "../../types";
 import {
@@ -20,7 +21,6 @@ import {
   formatDate,
   formatId,
   formatUnknown,
-  isRecord,
   readString,
 } from "./support/api-formatting";
 
@@ -45,7 +45,9 @@ function formatActivity(activity: IssueActivity | IssueComment): string {
   const date = formatDate(activity.dateCreated) ?? "unknown time";
   const text = getActivityText(activity);
   const details =
-    !text && isRecord(activity.data) && Object.keys(activity.data).length > 0
+    !text &&
+    isPlainObject(activity.data) &&
+    Object.keys(activity.data).length > 0
       ? `\n  - Data: ${formatUnknown(activity.data)}`
       : "";
   return `- ${date}: ${activity.type ?? "activity"} by ${actor} (${formatId(activity.id)})${text ? `\n  - ${text}` : ""}${details}`;

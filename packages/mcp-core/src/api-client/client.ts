@@ -271,7 +271,7 @@ export type TraceItemAttribute = {
   key: string;
   name: string;
   type: TraceItemAttributeType;
-  attributeSource?: TraceItemAttributeSource;
+  attributeSource: TraceItemAttributeSource;
   secondaryAliases?: string[];
 };
 
@@ -315,199 +315,108 @@ export type EventsValidationResult = {
   orderby: EventsAttributeValidationResult[];
 };
 
-function parseEventsValidationIssue(
-  value: unknown,
-): EventsValidationIssue | null {
-  if (!isRecord(value) || typeof value.valid !== "boolean") {
-    return null;
-  }
-  const issue: EventsValidationIssue = { valid: value.valid };
-  if (typeof value.error === "string" && value.error.length > 0) {
-    issue.error = value.error;
-  }
-  return issue;
-}
+const TraceItemAttributeTypeSchema = z.enum(["string", "number", "boolean"]);
+const TraceItemAttributeSourceSchema = z.object({
+  source_type: z.enum(["sentry", "user"]),
+  is_transformed_alias: z.boolean().optional(),
+});
 
-function parseEventsAttributeValidation(
-  value: unknown,
-): EventsAttributeValidationResult | null {
-  if (
-    !isRecord(value) ||
-    typeof value.name !== "string" ||
-    typeof value.valid !== "boolean"
-  ) {
-    return null;
-  }
-  const result: EventsAttributeValidationResult = {
-    name: value.name,
-    valid: value.valid,
-  };
-  if (isTraceItemAttributeType(value.attrType)) {
-    result.type = value.attrType;
-  }
-  if (typeof value.error === "string" && value.error.length > 0) {
-    result.error = value.error;
-  }
-  return result;
-}
+const ValidationErrorSchema = z.string().nullable();
 
-function parseEventsValidationIssues(value: unknown): EventsValidationIssue[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map(parseEventsValidationIssue)
-    .filter((issue): issue is EventsValidationIssue => issue !== null);
-}
+const EventsValidationIssueSchema = z
+  .object({
+    valid: z.boolean(),
+    error: ValidationErrorSchema,
+  })
+  .transform(
+    ({ valid, error }): EventsValidationIssue => ({
+      valid,
+      ...(error ? { error } : {}),
+    }),
+  );
 
-function parseEventsAttributeValidations(
-  value: unknown,
-): EventsAttributeValidationResult[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map(parseEventsAttributeValidation)
-    .filter((item): item is EventsAttributeValidationResult => item !== null);
-}
+const EventsNamedValidationIssueSchema = z
+  .object({
+    name: z.string(),
+    valid: z.boolean(),
+    error: ValidationErrorSchema,
+  })
+  .transform(
+    ({ name, valid, error }): EventsNamedValidationIssue => ({
+      name,
+      valid,
+      ...(error ? { error } : {}),
+    }),
+  );
 
-function parseEventsNamedValidationIssue(
-  value: unknown,
-): EventsNamedValidationIssue | null {
-  if (
-    !isRecord(value) ||
-    typeof value.name !== "string" ||
-    typeof value.valid !== "boolean"
-  ) {
-    return null;
-  }
-  const issue: EventsNamedValidationIssue = {
-    name: value.name,
-    valid: value.valid,
-  };
-  if (typeof value.error === "string" && value.error.length > 0) {
-    issue.error = value.error;
-  }
-  return issue;
-}
+const EventsAttributeValidationSchema = z
+  .object({
+    name: z.string(),
+    valid: z.boolean(),
+    attrType: TraceItemAttributeTypeSchema.nullable(),
+    error: ValidationErrorSchema,
+  })
+  .transform(
+    ({ name, valid, attrType, error }): EventsAttributeValidationResult => ({
+      name,
+      valid,
+      ...(attrType ? { type: attrType } : {}),
+      ...(error ? { error } : {}),
+    }),
+  );
 
-function parseEventsNamedValidationIssues(
-  value: unknown,
-): EventsNamedValidationIssue[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map(parseEventsNamedValidationIssue)
-    .filter((issue): issue is EventsNamedValidationIssue => issue !== null);
-}
+const EventsValidationIssueListSchema = z.array(EventsValidationIssueSchema);
+const EventsNamedValidationIssueListSchema = z.array(
+  EventsNamedValidationIssueSchema,
+);
+const EventsAttributeValidationListSchema = z.array(
+  EventsAttributeValidationSchema,
+);
+const EventsQueryValidationSchema = z
+  .object({
+    valid: z.boolean(),
+    error: ValidationErrorSchema,
+    fields: EventsAttributeValidationListSchema,
+  })
+  .transform(
+    ({ valid, error, fields }): EventsQueryValidation => ({
+      valid,
+      fields,
+      ...(error ? { error } : {}),
+    }),
+  );
 
-function parseEventsQueryValidation(value: unknown): EventsQueryValidation {
-  if (!isRecord(value) || typeof value.valid !== "boolean") {
-    return { valid: false, fields: [] };
-  }
-  const query: EventsQueryValidation = {
-    valid: value.valid,
-    fields: parseEventsAttributeValidations(value.fields),
-  };
-  if (typeof value.error === "string" && value.error.length > 0) {
-    query.error = value.error;
-  }
-  return query;
-}
+const EventsValidationResponseSchema = z
+  .object({
+    valid: z.boolean(),
+    projects: EventsValidationIssueListSchema,
+    dataset: EventsNamedValidationIssueListSchema,
+    environment: EventsValidationIssueListSchema,
+    field: EventsAttributeValidationListSchema,
+    query: EventsQueryValidationSchema,
+    orderby: EventsAttributeValidationListSchema,
+  })
+  .transform((result): EventsValidationResult => result);
 
-function parseEventsValidationResponse(body: unknown): EventsValidationResult {
-  if (!isRecord(body)) {
-    return {
-      valid: false,
-      projects: [],
-      dataset: [],
-      environment: [],
-      field: [],
-      query: { valid: false, fields: [] },
-      orderby: [],
-    };
-  }
+const TraceItemAttributeSchema = z
+  .object({
+    key: z.string(),
+    name: z.string(),
+    attributeType: TraceItemAttributeTypeSchema,
+    attributeSource: TraceItemAttributeSourceSchema,
+    secondaryAliases: z.array(z.string()).optional(),
+  })
+  .transform(
+    ({ key, name, attributeType, attributeSource, secondaryAliases }) => ({
+      key,
+      name,
+      type: attributeType,
+      attributeSource,
+      ...(secondaryAliases ? { secondaryAliases } : {}),
+    }),
+  );
 
-  return {
-    valid: typeof body.valid === "boolean" ? body.valid : false,
-    projects: parseEventsValidationIssues(body.projects),
-    dataset: parseEventsNamedValidationIssues(body.dataset),
-    environment: parseEventsValidationIssues(body.environment),
-    field: parseEventsAttributeValidations(body.field),
-    query: parseEventsQueryValidation(body.query),
-    orderby: parseEventsAttributeValidations(body.orderby),
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isTraceItemAttributeType(
-  value: unknown,
-): value is TraceItemAttributeType {
-  return value === "string" || value === "number" || value === "boolean";
-}
-
-function isTraceItemAttributeSourceType(
-  value: unknown,
-): value is TraceItemAttributeSourceType {
-  return value === "sentry" || value === "user";
-}
-
-function parseTraceItemAttributeSource(
-  value: unknown,
-): TraceItemAttributeSource | undefined {
-  if (!isRecord(value) || !isTraceItemAttributeSourceType(value.source_type)) {
-    return undefined;
-  }
-
-  const source: TraceItemAttributeSource = { source_type: value.source_type };
-  if (typeof value.is_transformed_alias === "boolean") {
-    source.is_transformed_alias = value.is_transformed_alias;
-  }
-  return source;
-}
-
-function parseTraceItemAttributes(
-  body: unknown,
-  fallbackType: TraceItemAttributeType,
-): TraceItemAttribute[] {
-  if (!Array.isArray(body)) {
-    return [];
-  }
-
-  const attributes: TraceItemAttribute[] = [];
-  for (const value of body) {
-    if (!isRecord(value) || typeof value.key !== "string") {
-      continue;
-    }
-
-    const attribute: TraceItemAttribute = {
-      key: value.key,
-      name: typeof value.name === "string" ? value.name : value.key,
-      type: isTraceItemAttributeType(value.attributeType)
-        ? value.attributeType
-        : fallbackType,
-    };
-
-    const attributeSource = parseTraceItemAttributeSource(
-      value.attributeSource,
-    );
-    if (attributeSource) {
-      attribute.attributeSource = attributeSource;
-    }
-    if (Array.isArray(value.secondaryAliases)) {
-      attribute.secondaryAliases = value.secondaryAliases.filter(
-        (alias): alias is string => typeof alias === "string",
-      );
-    }
-    attributes.push(attribute);
-  }
-
-  return attributes;
-}
+const TraceItemAttributeListSchema = z.array(TraceItemAttributeSchema);
 
 /**
  * Sentry API client service for interacting with Sentry's REST API.
@@ -3054,7 +2963,7 @@ export class SentryApiService {
       { ...opts, allowStatuses: [400] },
     );
     const body = await this.parseJsonResponse(response);
-    return parseEventsValidationResponse(body);
+    return EventsValidationResponseSchema.parse(body);
   }
 
   private async fetchTraceItemAttributes(
@@ -3084,7 +2993,7 @@ export class SentryApiService {
     const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
 
     const body = await this.requestJSON(url, undefined, opts);
-    return parseTraceItemAttributes(body, "string");
+    return TraceItemAttributeListSchema.parse(body);
   }
 
   /**

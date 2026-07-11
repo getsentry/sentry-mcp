@@ -2,6 +2,7 @@ import { setTag } from "@sentry/core";
 import type {
   Issue,
   ReplayDetails,
+  ReplayRecordingEvent,
   ReplayRecordingSegments,
   SentryApiService,
   TraceMeta,
@@ -30,6 +31,10 @@ interface ReplayActivityEvent {
   label: string;
   details: string[];
 }
+
+type ReplayRecordingPayload = NonNullable<
+  NonNullable<ReplayRecordingEvent["data"]>["payload"]
+>;
 
 interface RelatedReplayIssue {
   eventId: string;
@@ -468,15 +473,13 @@ function extractReplayActivityEvents(
   return events;
 }
 
-function summarizeReplayEvent(event: unknown): ReplayActivityEvent | null {
-  if (!isRecord(event)) {
-    return null;
-  }
-
+function summarizeReplayEvent(
+  event: ReplayRecordingEvent,
+): ReplayActivityEvent | null {
   const timestampMs = getEventTimestampMillis(event.timestamp);
-  const data = isRecord(event.data) ? event.data : null;
-  const tag = typeof data?.tag === "string" ? data.tag : "";
-  const payload = isRecord(data?.payload) ? data.payload : null;
+  const data = event.data;
+  const tag = data?.tag ?? "";
+  const payload = data?.payload ?? null;
 
   if (tag) {
     const replayEvent = summarizeTaggedReplayEvent(tag, payload);
@@ -485,8 +488,8 @@ function summarizeReplayEvent(event: unknown): ReplayActivityEvent | null {
     }
   }
 
-  if (typeof event.type === "number" && data) {
-    const href = typeof data.href === "string" ? data.href : null;
+  if (event.type !== undefined && data) {
+    const href = data.href ?? null;
     if (href) {
       return {
         timestampMs,
@@ -501,15 +504,12 @@ function summarizeReplayEvent(event: unknown): ReplayActivityEvent | null {
 
 function summarizeTaggedReplayEvent(
   tag: string,
-  payload: Record<string, unknown> | null,
+  payload: ReplayRecordingPayload | null,
 ): Omit<ReplayActivityEvent, "timestampMs"> | null {
   if (tag === "performanceSpan") {
     const op = firstString(payload?.op);
     const description = firstString(payload?.description);
-    const durationMs =
-      isRecord(payload?.data) && typeof payload.data.duration === "number"
-        ? payload.data.duration
-        : null;
+    const durationMs = payload?.data?.duration ?? null;
 
     if (description || op) {
       return {
@@ -567,10 +567,10 @@ function formatRelativeTime(offsetMs: number): string {
 }
 
 function summarizeObject(
-  value: unknown,
+  value: Record<string, unknown> | null,
   excludedKeys: ReadonlySet<string> = new Set(),
 ): string | null {
-  if (!isRecord(value)) {
+  if (!value) {
     return null;
   }
 
@@ -595,10 +595,6 @@ function firstString(...values: unknown[]): string | null {
     }
   }
   return null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function quoteDetail(value: string): string {

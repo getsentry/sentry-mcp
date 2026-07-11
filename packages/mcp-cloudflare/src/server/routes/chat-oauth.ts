@@ -242,9 +242,11 @@ export default new Hono<{
     if (!state || !storedState || state !== storedState) {
       deleteCookie(c, "chat_oauth_state", getSecureCookieOptions(c.req.url));
       logIssue("Invalid state parameter received", {
-        oauth: {
-          state,
-          expectedState: storedState,
+        contexts: {
+          oauth: {
+            hasState: Boolean(state),
+            hasExpectedState: Boolean(storedState),
+          },
         },
       });
       return c.html(

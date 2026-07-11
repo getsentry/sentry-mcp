@@ -24,6 +24,15 @@ describe("formatToolOutputForDisplay", () => {
     ).toBe('{"status":"ok","count":2}');
   });
 
+  it("uses structured content when the content container is malformed", () => {
+    expect(
+      formatToolOutputForDisplay({
+        content: "invalid",
+        structuredContent: { status: "ok" },
+      }),
+    ).toBe('{"status":"ok"}');
+  });
+
   it("renders non-text content with placeholders", () => {
     expect(
       formatToolOutputForDisplay({
@@ -33,6 +42,18 @@ describe("formatToolOutputForDisplay", () => {
         ],
       }),
     ).toBe("<image message><resource message>");
+  });
+
+  it("preserves valid content when a sibling item is malformed", () => {
+    expect(
+      formatToolOutputForDisplay({
+        content: [
+          { type: "text", text: "valid text" },
+          null,
+          { type: "text", text: 42 },
+        ],
+      }),
+    ).toBe("valid text<unknown message><text message>");
   });
 
   it("supports legacy toolResult payloads", () => {

@@ -1370,6 +1370,14 @@ describe("API query builders", () => {
                 key: "tags[count,number]",
                 name: "count",
                 attributeType: "number",
+                attributeSource: { source_type: "user" },
+              },
+              {
+                key: "tags[secondary]",
+                name: "secondary",
+                attributeType: "string",
+                attributeSource: { source_type: "user" },
+                secondaryAliases: ["secondary.alias"],
               },
             ]),
         });
@@ -1400,6 +1408,13 @@ describe("API query builders", () => {
           name: "enabled",
           type: "boolean",
           attributeSource: { source_type: "user" },
+        },
+        {
+          key: "tags[secondary]",
+          name: "secondary",
+          type: "string",
+          attributeSource: { source_type: "user" },
+          secondaryAliases: ["secondary.alias"],
         },
       ]);
       expect(urls).toHaveLength(1);
@@ -1435,9 +1450,14 @@ describe("API query builders", () => {
             json: () =>
               Promise.resolve({
                 valid: false,
-                projects: [],
-                dataset: [],
-                environment: [],
+                projects: [{ valid: true, error: null }],
+                dataset: [{ name: "spans", valid: true, error: null }],
+                environment: [
+                  {
+                    valid: false,
+                    error: "Unknown environments selected",
+                  },
+                ],
                 field: [
                   {
                     name: "tags[type]",
@@ -1489,9 +1509,9 @@ describe("API query builders", () => {
 
       expect(result).toEqual({
         valid: false,
-        projects: [],
-        dataset: [],
-        environment: [],
+        projects: [{ valid: true }],
+        dataset: [{ name: "spans", valid: true }],
+        environment: [{ valid: false, error: "Unknown environments selected" }],
         field: [
           { name: "tags[type]", valid: true, type: "string" },
           {

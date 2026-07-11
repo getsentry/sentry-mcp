@@ -1,8 +1,6 @@
-export function isPlainObject(
-  value: unknown,
-): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+import { isPlainObject } from "./type-guards";
+
+export { isPlainObject } from "./type-guards";
 
 export function formatUserGeoSummary(value: unknown): string | null {
   if (!isPlainObject(value)) {
