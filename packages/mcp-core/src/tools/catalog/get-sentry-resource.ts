@@ -24,6 +24,7 @@ import {
   fetchSnapshotSummary,
 } from "../support/snapshots/handlers";
 import getAIConversationDetails from "./get-ai-conversation-details";
+import getDashboardDetails from "./get-dashboard-details";
 import getIssueDetails from "./get-issue-details";
 import getMonitorDetails from "./get-monitor-details";
 import getProfileDetails from "./get-profile-details";
@@ -42,6 +43,7 @@ export const FULLY_SUPPORTED_TYPES = [
   "monitor",
   "snapshot",
   "snapshotImage",
+  "dashboard",
 ] as const;
 export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
 
@@ -80,6 +82,8 @@ export interface ResolvedResourceParams {
   // Snapshot params
   snapshotId?: string;
   selectedSnapshot?: string;
+  // Dashboard params
+  dashboardIdOrTitle?: string;
 }
 
 export function resolveResourceParams(params: {
@@ -203,6 +207,13 @@ export function resolveResourceParams(params: {
         selectedSnapshot: imageName,
       };
     }
+
+    case "dashboard":
+      return {
+        type: "dashboard",
+        organizationSlug,
+        dashboardIdOrTitle: resourceId,
+      };
   }
 }
 
@@ -234,7 +245,7 @@ function resolveFromParsedUrl(
     }
     throw new UserInputError(
       "Could not determine resource type from URL. " +
-        "Supported URL patterns: issues, events, traces, AI conversations, profiles, replays, monitors, and releases.",
+        "Supported URL patterns: issues, events, traces, AI conversations, profiles, replays, monitors, dashboards, and releases.",
     );
   }
 
@@ -402,6 +413,16 @@ function resolveFromParsedUrl(
         snapshotId: parsed.snapshotId,
         selectedSnapshot: parsed.selectedSnapshot,
       };
+
+    case "dashboard":
+      if (!parsed.dashboardId) {
+        throw new UserInputError("Could not extract dashboard ID from URL.");
+      }
+      return {
+        type: "dashboard",
+        organizationSlug,
+        dashboardIdOrTitle: parsed.dashboardId,
+      };
   }
 }
 
@@ -514,6 +535,14 @@ export default defineTool({
       "get_monitor_details",
       availableToolNames,
     );
+    // Monitors and dashboards both delegate to inspect-only catalog tools.
+    // Only advertise them when their backing tools are available in this session.
+    // The URL parser still recognises /crons/ and /dashboard/{id}/ unconditionally;
+    // non-inspect sessions get a clear "requires the inspect skill" error at runtime.
+    const dashboardResourcesAvailable = isToolAvailable(
+      "get_dashboard_details",
+      availableToolNames,
+    );
     const fullResolutionInstruction = formatToolCallInstruction({
       toolName: "get_snapshot_image",
       arguments: {
@@ -529,12 +558,20 @@ export default defineTool({
         "Full-resolution snapshot image bytes are not available in this session",
       purpose: "for full-resolution image bytes",
     });
-    const supportedResources = monitorResourcesAvailable
-      ? "issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, preprod snapshots, and snapshot images."
-      : "issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.";
+    const extraResources = [
+      ...(monitorResourcesAvailable ? ["monitors"] : []),
+      ...(dashboardResourcesAvailable ? ["dashboards"] : []),
+    ];
+    const supportedResources =
+      extraResources.length > 0
+        ? `issues, events, traces, spans, AI conversations, breadcrumbs, replays, ${extraResources.join(", ")}, preprod snapshots, and snapshot images.`
+        : "issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.";
     const resourceIds = [
       "- span: <traceId>:<spanId>",
       ...(monitorResourcesAvailable ? ["- monitor: <monitorSlug>"] : []),
+      ...(dashboardResourcesAvailable
+        ? ["- dashboard: <dashboardId or title>"]
+        : []),
       "- snapshot: <snapshotId>",
       "- snapshotImage: <snapshotId>:<image_file_name>",
     ];
@@ -560,6 +597,11 @@ export default defineTool({
       "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
       "get_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')",
       "get_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')",
+      ...(dashboardResourcesAvailable
+        ? [
+            "get_sentry_resource(url='https://sentry.sentry.io/dashboard/542438/')",
+          ]
+        : []),
       "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')",
       "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')",
       "</examples>",
@@ -587,10 +629,11 @@ export default defineTool({
         "monitor",
         "snapshot",
         "snapshotImage",
+        "dashboard",
       ])
       .optional()
       .describe(
-        "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL. Use `monitor` with a monitor slug only when inspect monitor tools are available, `snapshot` with a snapshot artifact ID, or `snapshotImage` with `<snapshotId>:<image_file_name>`.",
+        "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL. Use `monitor` with a monitor slug only when inspect monitor tools are available, `snapshot` with a snapshot artifact ID, `snapshotImage` with `<snapshotId>:<image_file_name>`, or `dashboard` with a dashboard ID or exact title when inspect dashboard tools are available.",
       ),
 
     resourceId: z
@@ -598,7 +641,7 @@ export default defineTool({
       .trim()
       .optional()
       .describe(
-        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug when inspect monitor tools are available, snapshot artifact ID, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL.",
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug when inspect monitor tools are available, dashboard ID or title when inspect dashboard tools are available, snapshot artifact ID, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL.",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),
@@ -763,6 +806,21 @@ export default defineTool({
             end: resolved.end,
             regionUrl: context.constraints.regionUrl ?? null,
             focusOnUserCode: true,
+          },
+          context,
+        );
+
+      case "dashboard":
+        assertCatalogToolAvailable(
+          context,
+          "get_dashboard_details",
+          "Dashboard",
+        );
+        return getDashboardDetails.handler(
+          {
+            organizationSlug: resolved.organizationSlug,
+            dashboardIdOrTitle: resolved.dashboardIdOrTitle!,
+            regionUrl: context.constraints.regionUrl ?? null,
           },
           context,
         );
