@@ -857,7 +857,11 @@ export class SentryApiService {
     }
 
     try {
-      return await response.json();
+      const text = await response.text();
+      if (text.trim() === "") {
+        return null;
+      }
+      return JSON.parse(text);
     } catch (error) {
       // JSON parsing failure after successful response
       throw new Error(
