@@ -5,12 +5,13 @@ describe("search_docs", () => {
   // Note: Query validation (empty, too short, too long) is now handled by Zod schema
   // These validation tests are no longer needed as they test framework behavior, not our tool logic
 
-  it("returns results from the API", async () => {
+  it("searches across all docs when guide is omitted", async () => {
+    const mockFetch = vi.spyOn(global, "fetch");
+
     const result = await searchDocs.handler(
       {
         query: "How do I configure rate limiting?",
         maxResults: 5,
-        guide: null,
       },
       {
         constraints: {
@@ -20,6 +21,15 @@ describe("search_docs", () => {
         userId: "1",
         mcpUrl: "https://mcp.sentry.dev",
       },
+    );
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://mcp.sentry.dev/api/search",
+      expect.objectContaining({
+        body: JSON.stringify({
+          query: "How do I configure rate limiting?",
+          maxResults: 5,
+        }),
+      }),
     );
     expect(result).toMatchInlineSnapshot(`
       "# Documentation Search Results
@@ -63,7 +73,6 @@ describe("search_docs", () => {
         {
           query: "test query",
           maxResults: 3,
-          guide: null,
         },
         {
           constraints: {
@@ -89,7 +98,6 @@ describe("search_docs", () => {
         {
           query: "test query",
           maxResults: 3,
-          guide: null,
         },
         {
           constraints: {
