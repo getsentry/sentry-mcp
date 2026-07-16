@@ -1045,6 +1045,7 @@ const BaseEventSchema = z.object({
   _meta: z.unknown().optional(),
   // dateReceived is when the server received the event (may not be present in all contexts)
   dateReceived: z.string().datetime().optional(),
+  formatted: z.object({ format: z.string(), content: z.string() }).optional(), // add to BaseEventSchema
 });
 
 export const ErrorEventSchema = BaseEventSchema.omit({

@@ -3207,7 +3207,6 @@ export class SentryApiService {
     );
     return ExternalIssueListSchema.parse(body);
   }
-
   /**
    * Retrieves issue user reports and returns the next Sentry cursor when another page exists.
    */
@@ -3259,7 +3258,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Event> {
     const body = await this.requestJSON(
-      `/organizations/${encodeURIComponent(organizationSlug)}/issues/${encodeURIComponent(issueId)}/events/${encodeURIComponent(eventId)}/`,
+      `/organizations/${encodeURIComponent(organizationSlug)}/issues/${encodeURIComponent(issueId)}/events/${encodeURIComponent(eventId)}/?llmFormat=markdown`,
       undefined,
       opts,
     );
