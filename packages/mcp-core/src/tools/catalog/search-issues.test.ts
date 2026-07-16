@@ -39,7 +39,7 @@ describe("search_issues", () => {
   // Helper to create AI agent response
   const mockAIResponse = (
     query = "",
-    sort: "date" | "freq" | "new" | "user" | null = "date",
+    sort: "date" | "freq" | "new" | "user" | "recommended" | null = "date",
     errorMessage?: string,
   ) => {
     const output = errorMessage
@@ -589,12 +589,9 @@ describe("search_issues", () => {
   });
 
   it("should handle all sort options", async () => {
-    const sortOptions: Array<"date" | "freq" | "new" | "user"> = [
-      "date",
-      "freq",
-      "new",
-      "user",
-    ];
+    const sortOptions: Array<
+      "date" | "freq" | "new" | "user" | "recommended"
+    > = ["date", "freq", "new", "user", "recommended"];
 
     for (const sortOption of sortOptions) {
       mockGenerateText.mockResolvedValue(mockAIResponse("", sortOption));
