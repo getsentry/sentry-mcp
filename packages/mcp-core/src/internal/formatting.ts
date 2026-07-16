@@ -2147,17 +2147,27 @@ export function formatIssueOutput({
     output += `**Message**:\n${event.message}\n`;
   }
   output += "\n";
-  output += formatEventOutput(event, {
-    performanceTrace,
-    replaySummary: {
-      apiService,
-      organizationSlug,
-      relatedReplayIds,
-      experimentalMode: experimentalMode ?? false,
-      availableToolNames,
-      directToolNames,
-    },
-  });
+  if (
+    (event.type === "error" ||
+      event.type === "default" ||
+      event.type === "generic" ||
+      event.type === "csp") &&
+    event.formatted?.content
+  ) {
+    output += event.formatted.content;
+  } else {
+    output += formatEventOutput(event, {
+      performanceTrace,
+      replaySummary: {
+        apiService,
+        organizationSlug,
+        relatedReplayIds,
+        experimentalMode: experimentalMode ?? false,
+        availableToolNames,
+        directToolNames,
+      },
+    });
+  }
 
   // Add Seer context if available
   if (autofixState) {

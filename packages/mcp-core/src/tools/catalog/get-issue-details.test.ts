@@ -296,6 +296,153 @@ describe("get_issue_details", () => {
     expect(result).not.toContain("**Culprit**: null");
   });
 
+  it("uses the shared formatter's formatted.content for error/default events", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            formatted: {
+              format: "markdown",
+              content: "## Title\n\nSHARED-FORMATTER-MARKER",
+            },
+          }),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    // error/default events render their body from the shared formatter's content
+    expect(result).toContain("SHARED-FORMATTER-MARKER");
+  });
+
+  it("ignores formatted.content for non-error events (transaction)", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/",
+        () => HttpResponse.json(createPerformanceIssue()),
+        { once: true },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createPerformanceEvent(),
+            formatted: {
+              format: "markdown",
+              content: "TRANSACTION-SHOULD-IGNORE-THIS",
+            },
+          }),
+        { once: true },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/abcdef1234567890abcdef1234567890/",
+        () => HttpResponse.json(createTraceResponseFixture()),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "PERF-N1-001",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    // transaction events still route through formatEventOutput, so formatted is unused
+    expect(result).toContain("Issue PERF-N1-001"); // sanity: real output was produced
+    expect(result).not.toContain("TRANSACTION-SHOULD-IGNORE-THIS");
+  });
+
+  it("uses formatted.content for generic events", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/",
+        () => HttpResponse.json(createRegressedIssue()),
+        { once: true },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createGenericEvent(),
+            formatted: {
+              format: "markdown",
+              content: "## Evidence\n\nGENERIC-FORMATTER-MARKER",
+            },
+          }),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "MCP-SERVER-EQE",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(result).toContain("GENERIC-FORMATTER-MARKER");
+    // the shared formatter replaces MCP's generic renderer
+    expect(result).not.toContain("### Performance Regression Details");
+  });
+
+  it("uses formatted.content for csp events", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/BLOG-CSP-4XC/",
+        () => HttpResponse.json(createCspIssue()),
+        { once: true },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/BLOG-CSP-4XC/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createCspEvent(),
+            formatted: {
+              format: "markdown",
+              content: "## CSP\n\nCSP-FORMATTER-MARKER",
+            },
+          }),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "BLOG-CSP-4XC",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(result).toContain("CSP-FORMATTER-MARKER");
+    // the shared formatter replaces MCP's CSP renderer
+    expect(result).not.toContain("### CSP Violation");
+  });
+
   it("surfaces AI conversation IDs found by bounded span lookup", async () => {
     const traceId = "11112222333344445555666677778888";
     const event = createDefaultEvent({
