@@ -2154,6 +2154,16 @@ export function formatIssueOutput({
       event.type === "csp") &&
     event.formatted?.content
   ) {
+    // the shared formatter body doesn't include the replay note — add it here to match formatEventOutput
+    output += formatIssueReplayOutput({
+      apiService,
+      organizationSlug,
+      event,
+      relatedReplayIds,
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+    });
     output += event.formatted.content;
   } else {
     output += formatEventOutput(event, {

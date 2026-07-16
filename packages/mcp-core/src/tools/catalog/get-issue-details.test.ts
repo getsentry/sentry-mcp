@@ -443,6 +443,43 @@ describe("get_issue_details", () => {
     expect(result).not.toContain("### CSP Violation");
   });
 
+  it("keeps the replay note when error events use formatted.content", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            contexts: {
+              replay: {
+                type: "default",
+                replay_id: "1234567890abcdef1234567890abcdef",
+              },
+            },
+            formatted: {
+              format: "markdown",
+              content: "## Title\n\nBODY-FROM-FORMATTER",
+            },
+          }),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(result).toContain("BODY-FROM-FORMATTER"); // body from the shared formatter
+    expect(result).toContain("## Session Replay"); // replay note preserved (was inside formatEventOutput)
+  });
+
   it("surfaces AI conversation IDs found by bounded span lookup", async () => {
     const traceId = "11112222333344445555666677778888";
     const event = createDefaultEvent({

@@ -1232,6 +1232,8 @@ export const AutofixRunStateSchema = z.object({
     })
     .passthrough()
     .nullable(),
+  // shared-formatter output, present when the autofix endpoint is called with ?llmFormat
+  formatted: z.object({ format: z.string(), content: z.string() }).optional(),
 });
 
 export const EventAttachmentSchema = z.object({
