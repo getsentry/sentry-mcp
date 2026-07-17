@@ -9,7 +9,6 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { type ZodTypeAny, z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,7 +32,7 @@ function zodFieldMapToJsonSchema(
 ): unknown {
   if (!fieldMap || Object.keys(fieldMap).length === 0) return {};
   const obj = z.object(fieldMap);
-  return zodToJsonSchema(obj, { $refStrategy: "none" });
+  return z.toJSONSchema(obj, { io: "input", unrepresentable: "any" });
 }
 
 // Plugin variants whose agent frontmatter gets synced by this script.
@@ -161,7 +160,10 @@ function generateToolDefinitions({
       // Export full JSON Schema under inputSchema for external docs
       inputSchema: jsonSchema,
       outputSchema: t.outputSchema
-        ? zodToJsonSchema(t.outputSchema, { $refStrategy: "none" })
+        ? z.toJSONSchema(t.outputSchema, {
+            io: "input",
+            unrepresentable: "any",
+          })
         : undefined,
       // Preserve tool access requirements for UIs/docs
       requiredScopes: t.requiredScopes,

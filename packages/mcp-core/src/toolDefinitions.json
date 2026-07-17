@@ -3,6 +3,7 @@
     "name": "add_issue_note",
     "description": "Add a human-visible comment to a Sentry issue's activity feed.\n\nUse this tool when the user explicitly asks to leave a note/comment, or when a triage workflow needs to record a user-approved explanation.\n\n<examples>\nadd_issue_note(organizationSlug='my-organization', issueId='PROJECT-123', text='Investigating with the payments team.')\nadd_issue_note(issueUrl='https://my-organization.sentry.io/issues/PROJECT-123/', text='Resolved by deploy 1.2.3.')\n</examples>\n\n<hints>\n- This mutates visible Sentry issue state by posting a comment.\n- Do not use this for private scratch notes, secrets, credentials, or unapproved content.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -10,6 +11,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -18,9 +20,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "issueId": {
           "type": "string",
@@ -38,9 +38,7 @@
           "description": "The exact comment text to add to the issue."
         }
       },
-      "required": ["text"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["text"]
     },
     "requiredScopes": ["event:write"],
     "skills": ["triage"],
@@ -50,6 +48,7 @@
     "name": "add_team_to_project",
     "description": "Grant a team access to an existing Sentry project.\n\nUse this tool when you need to:\n- Add another team to a project\n- Grant a team access without changing project metadata\n- Check whether a team already has project access before adding it\n\n<examples>\nadd_team_to_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- Team access changes are separate from project metadata updates.\n- If the team is already assigned, this tool returns the current team list without making another change.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -57,6 +56,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -65,9 +65,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "projectSlug": {
           "type": "string",
@@ -78,9 +76,7 @@
           "description": "The team's slug. You can find a list of existing teams in an organization with the Sentry tool `find_teams`."
         }
       },
-      "required": ["organizationSlug", "projectSlug", "teamSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "projectSlug", "teamSlug"]
     },
     "requiredScopes": ["project:write", "team:read", "org:read"],
     "skills": ["project-management"],
@@ -90,6 +86,7 @@
     "name": "analyze_issue_with_seer",
     "description": "Use Seer to analyze production errors and get detailed root cause analysis with specific code fixes.\n\nUse this tool when:\n- The user explicitly asks for root cause analysis, Seer analysis, or help fixing/debugging an issue\n- You are unable to accurately determine the root cause from the issue details alone\n\nDo NOT call this tool as an automatic follow-up to get_sentry_resource.\n\nWhat this tool provides:\n- Root cause analysis with code-level explanations\n- Specific file locations and line numbers where errors occur\n- Concrete code fixes you can apply\n- Step-by-step implementation guidance\n\nThis tool automatically:\n1. Checks if analysis already exists (instant results)\n2. Starts new AI analysis if needed (~2-5 minutes)\n3. Returns complete fix recommendations\n\n<examples>\n### User: \"Run Seer on this issue\"\n\n```\nanalyze_issue_with_seer(issueUrl='https://my-org.sentry.io/issues/PROJECT-1Z43')\n```\n\n### User: \"Analyze this issue and suggest a fix\"\n\n```\nanalyze_issue_with_seer(organizationSlug='my-organization', issueId='ERROR-456')\n```\n</examples>\n\n<hints>\n- Only use when the user explicitly requests analysis or you cannot determine the root cause from issue details alone\n- Seer Autofix does not support metric alert issues (issueCategory: metric); use get_issue_details and search_events instead\n- If the user provides an issueUrl, extract it and use that parameter alone\n- The analysis includes actual code snippets and fixes, not just error descriptions\n- Results are cached - subsequent calls return instantly\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -97,6 +94,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -105,9 +103,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "issueId": {
           "type": "string",
@@ -122,9 +118,7 @@
           "type": "string",
           "description": "Optional custom instruction for the AI analysis"
         }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      }
     },
     "requiredScopes": [],
     "skills": ["seer"],
@@ -134,6 +128,7 @@
     "name": "create_dsn",
     "description": "Create an additional DSN for an EXISTING project.\n\nUSE THIS TOOL WHEN:\n- Project already exists and needs additional DSN\n- 'Create another DSN for project X'\n- 'I need a production DSN for existing project'\n\nDO NOT USE for new projects (use create_project instead)\n\nBe careful when using this tool!\n\n<examples>\n### Create additional DSN for existing project\n```\ncreate_dsn(organizationSlug='my-organization', projectSlug='my-project', name='Production')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -141,6 +136,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -149,9 +145,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "projectSlug": {
           "type": "string",
@@ -162,9 +156,7 @@
           "description": "The name of the DSN to create, for example 'Production'."
         }
       },
-      "required": ["organizationSlug", "projectSlug", "name"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "projectSlug", "name"]
     },
     "requiredScopes": ["project:write"],
     "skills": ["project-management"],
@@ -174,6 +166,7 @@
     "name": "create_project",
     "description": "Create a new project in Sentry (provisions DSN automatically).\n\nUSE THIS TOOL WHEN USERS WANT TO:\n- 'Create a new project'\n- 'Set up a project for [app/service] with team [X]'\n- 'I need a new Sentry project'\n- Create project AND need DSN in one step\n- Create project and link an existing repository\n\nReturns the created project slug and a usable SENTRY_DSN when key setup succeeds.\n\nBe careful when using this tool!\n\n<examples>\n### Create new project with team\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')\n```\n### Create project with an explicit slug\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='My Project', slug='my-project', platform='javascript')\n```\n### Create project and link to a repository\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript', repository='getsentry/sentry')\n```\n</examples>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -181,6 +174,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -189,9 +183,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "teamSlug": {
           "type": "string",
@@ -202,6 +194,7 @@
           "description": "The name of the project to create. Typically this is the name of the application or service. It is only used as a visual label in Sentry."
         },
         "slug": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -210,11 +203,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional project slug to create.",
-          "default": null
+          ]
         },
         "platform": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -223,11 +215,11 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The platform for the project. e.g., python, javascript, react, etc.",
-          "default": null
+          ]
         },
         "repository": {
+          "default": null,
+          "description": "Optional repository name to link to the project (e.g. 'getsentry/sentry'). The repo must already be connected to the organization via a VCS integration.",
           "anyOf": [
             {
               "type": "string"
@@ -235,14 +227,10 @@
             {
               "type": "null"
             }
-          ],
-          "default": null,
-          "description": "Optional repository name to link to the project (e.g. 'getsentry/sentry'). The repo must already be connected to the organization via a VCS integration."
+          ]
         }
       },
-      "required": ["organizationSlug", "teamSlug", "name"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "teamSlug", "name"]
     },
     "requiredScopes": ["project:write", "team:read", "org:read"],
     "skills": ["project-management"],
@@ -252,6 +240,7 @@
     "name": "create_team",
     "description": "Create a new team in Sentry.\n\nUSE THIS TOOL WHEN USERS WANT TO:\n- 'Create a new team'\n- 'Set up a team called [X]'\n- 'I need a team for my project'\n\nBe careful when using this tool!\n\n<examples>\n### Create a new team\n```\ncreate_team(organizationSlug='my-organization', name='the-goats')\n```\n</examples>\n\n<hints>\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -259,6 +248,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -267,18 +257,14 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "name": {
           "type": "string",
           "description": "The name of the team to create."
         }
       },
-      "required": ["organizationSlug", "name"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "name"]
     },
     "requiredScopes": ["team:write"],
     "skills": ["project-management"],
@@ -288,6 +274,7 @@
     "name": "execute_sentry_tool",
     "description": "Execute an available Sentry MCP tool discovered through search_sentry_tools.\n\nUse this tool when you need to:\n- Call a Sentry operation returned by search_sentry_tools\n- Execute a tool by name using arguments that match its returned schema\n\n<examples>\nexecute_sentry_tool(name='find_projects', arguments={ organizationSlug: 'my-org' })\nexecute_sentry_tool(name='whoami', arguments={})\n</examples>\n\n<hints>\n- Use search_sentry_tools first if you are not sure which name or arguments to pass.\n- Arguments are validated against the target tool's schema before execution.\n- Active organization, project, and region constraints are injected automatically.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "name": {
@@ -296,15 +283,16 @@
           "description": "The name of the available tool to execute."
         },
         "arguments": {
-          "type": "object",
-          "additionalProperties": {},
           "default": {},
-          "description": "Arguments for the target tool, matching the schema returned by search_sentry_tools."
+          "description": "Arguments for the target tool, matching the schema returned by search_sentry_tools.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
         }
       },
-      "required": ["name"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["name"]
     },
     "requiredScopes": [],
     "skills": ["inspect", "seer", "docs", "triage", "project-management"],
@@ -314,6 +302,7 @@
     "name": "find_alert_rules",
     "description": "Find Sentry alert rules.\n\nUse this tool when you need to:\n- List issue alert rules for a project\n- List metric alert rules for an organization or project\n- Find an alert rule ID by name before inspecting it\n- Check alert conditions, queries, triggers, actions, owner, or environment\n\n<examples>\nfind_alert_rules(organizationSlug='my-org')\nfind_alert_rules(organizationSlug='my-org', projectSlug='backend')\nfind_alert_rules(organizationSlug='my-org', kind='issue', projectSlug='backend', query='critical')\n</examples>\n\n<hints>\n- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.\n- Metric alert rules can be listed organization-wide or project-scoped.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -321,6 +310,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -329,17 +319,16 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "kind": {
+          "default": "all",
           "type": "string",
           "enum": ["all", "issue", "metric"],
-          "description": "Which alert rule family to search. Use `all` to include metric alerts, plus issue alerts when a project is available.",
-          "default": "all"
+          "description": "Which alert rule family to search. Use `all` to include metric alerts, plus issue alerts when a project is available."
         },
         "projectSlug": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -348,11 +337,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug.",
-          "default": null
+          ]
         },
         "query": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -361,11 +349,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional search query for alert rule name.",
-          "default": null
+          ]
         },
         "cursor": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -374,21 +361,17 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional pagination cursor from a previous Sentry API response.",
-          "default": null
+          ]
         },
         "limit": {
+          "default": 10,
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 100,
-          "description": "Maximum number of alert rules to return per alert family.",
-          "default": 10
+          "description": "Maximum number of alert rules to return per alert family."
         }
       },
-      "required": ["organizationSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug"]
     },
     "requiredScopes": ["org:read", "project:read"],
     "skills": ["inspect"],
@@ -398,6 +381,7 @@
     "name": "find_dashboards",
     "description": "Find Sentry dashboards in an organization.\n\nUse this tool when you need to:\n- List dashboards in an organization\n- Find a dashboard ID before calling get_dashboard_details\n- Search dashboards by title\n\n<examples>\nfind_dashboards(organizationSlug='my-organization')\nfind_dashboards(organizationSlug='my-organization', titleQuery='errors')\n</examples>\n\n<hints>\n- Dashboard IDs are organization-scoped.\n- Use `get_dashboard_details` after finding the correct dashboard ID.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -405,6 +389,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -413,11 +398,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "titleQuery": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -426,17 +410,16 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional title substring to search for.",
-          "default": null
+          ]
         },
         "sort": {
+          "default": "title",
           "type": "string",
           "enum": ["title", "-title", "dateCreated", "-dateCreated"],
-          "description": "Sort order for dashboard results.",
-          "default": "title"
+          "description": "Sort order for dashboard results."
         },
         "cursor": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -445,21 +428,17 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional pagination cursor from a previous response. Reuse cursors only with the same search scope and project constraint.",
-          "default": null
+          ]
         },
         "limit": {
+          "default": 10,
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 100,
-          "description": "Maximum number of dashboards to return.",
-          "default": 10
+          "description": "Maximum number of dashboards to return."
         }
       },
-      "required": ["organizationSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug"]
     },
     "requiredScopes": ["org:read"],
     "skills": ["inspect"],
@@ -469,6 +448,7 @@
     "name": "find_dsns",
     "description": "List all Sentry DSNs for a specific project.\n\nUse this tool when you need to:\n- Retrieve a SENTRY_DSN for a specific project\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you might want to call `find_organizations()` first.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -476,6 +456,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -484,18 +465,14 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "projectSlug": {
           "type": "string",
           "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
         }
       },
-      "required": ["organizationSlug", "projectSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "projectSlug"]
     },
     "requiredScopes": ["project:read"],
     "skills": ["project-management"],
@@ -505,6 +482,7 @@
     "name": "find_monitors",
     "description": "Find Sentry cron monitors.\n\nUse this tool when you need to:\n- List cron monitors in an organization\n- Find a monitor by name or slug before getting details\n- Check monitor status, owner, project, schedule, or recent environment state\n\n<examples>\nfind_monitors(organizationSlug='my-organization')\nfind_monitors(organizationSlug='my-organization', projectSlug='backend', query='billing')\n</examples>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -512,6 +490,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -520,11 +499,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "projectSlug": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -533,11 +511,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug.",
-          "default": null
+          ]
         },
         "environment": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -546,11 +523,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional environment name to limit monitor state.",
-          "default": null
+          ]
         },
         "owner": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -559,11 +535,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional owner filter, such as `user:123`, `team:456`, `myteams`, or `unassigned`.",
-          "default": null
+          ]
         },
         "query": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -572,21 +547,17 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional search query for monitor name or slug.",
-          "default": null
+          ]
         },
         "limit": {
+          "default": 10,
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 100,
-          "description": "Maximum number of monitors to return.",
-          "default": 10
+          "description": "Maximum number of monitors to return."
         }
       },
-      "required": ["organizationSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug"]
     },
     "requiredScopes": ["org:read"],
     "skills": ["inspect"],
@@ -596,9 +567,11 @@
     "name": "find_organizations",
     "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "query": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -607,13 +580,9 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Search query to filter results by name or slug. Use this to narrow down results when there are many items.",
-          "default": null
+          ]
         }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      }
     },
     "requiredScopes": ["org:read"],
     "skills": ["inspect", "seer", "docs", "triage", "project-management"],
@@ -623,6 +592,7 @@
     "name": "find_projects",
     "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -630,6 +600,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -638,11 +609,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "query": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -651,14 +621,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Search query to filter results by name or slug. Use this to narrow down results when there are many items.",
-          "default": null
+          ]
         }
       },
-      "required": ["organizationSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug"]
     },
     "requiredScopes": ["project:read"],
     "skills": ["inspect", "seer", "docs", "triage", "project-management"],
@@ -668,6 +634,7 @@
     "name": "find_releases",
     "description": "Find releases in Sentry.\n\nUse this tool when you need to:\n- Find recent releases in a Sentry organization\n- Find the most recent version released of a specific project\n- Determine when a release was deployed to an environment\n\n<examples>\n### Find the most recent releases in the 'my-organization' organization\n\n```\nfind_releases(organizationSlug='my-organization')\n```\n\n### Find releases matching '2ce6a27' in the 'my-organization' organization\n\n```\nfind_releases(organizationSlug='my-organization', query='2ce6a27')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -675,6 +642,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -683,11 +651,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "projectSlug": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -696,11 +663,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug.",
-          "default": null
+          ]
         },
         "query": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -709,14 +675,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Search for versions which contain the provided string.",
-          "default": null
+          ]
         }
       },
-      "required": ["organizationSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug"]
     },
     "requiredScopes": ["project:read"],
     "skills": ["inspect"],
@@ -726,6 +688,7 @@
     "name": "find_teams",
     "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -733,6 +696,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -741,11 +705,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "query": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -754,14 +717,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Search query to filter results by name or slug. Use this to narrow down results when there are many items.",
-          "default": null
+          ]
         }
       },
-      "required": ["organizationSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug"]
     },
     "requiredScopes": ["team:read"],
     "skills": ["inspect", "triage", "project-management"],
@@ -771,6 +730,7 @@
     "name": "get_ai_conversation_details",
     "description": "Fetch the chronological transcript and debugging details for one AI conversation.\n\nReturns a timeline of user messages, assistant messages, and tool calls, with trace/span IDs for deeper debugging. To discover or list conversations, use search_ai_conversations.",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -782,27 +742,26 @@
           "description": "The AI conversation ID from gen_ai.conversation.id."
         },
         "project": {
-          "type": "string",
-          "description": "Numeric project ID to scope the query. Falls back to context constraint or all projects."
+          "description": "Numeric project ID to scope the query. Falls back to context constraint or all projects.",
+          "type": "string"
         },
         "start": {
-          "type": "string",
-          "description": "Explicit start time for the conversation lookup window."
+          "description": "Explicit start time for the conversation lookup window.",
+          "type": "string"
         },
         "end": {
-          "type": "string",
-          "description": "Explicit end time for the conversation lookup window."
+          "description": "Explicit end time for the conversation lookup window.",
+          "type": "string"
         },
         "regionUrl": {
           "type": "string",
           "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
         }
       },
-      "required": ["organizationSlug", "conversationId"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "conversationId"]
     },
     "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "conversationId": {
@@ -827,14 +786,27 @@
             "end": {
               "type": "string"
             }
-          },
-          "additionalProperties": false
+          }
         },
         "startTimestamp": {
-          "type": ["number", "null"]
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "endTimestamp": {
-          "type": ["number", "null"]
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "traceIds": {
           "type": "array",
@@ -875,13 +847,27 @@
                 "type": "string"
               },
               "parentSpanId": {
-                "type": ["string", "null"]
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "project": {
                 "type": "string"
               },
               "projectId": {
-                "type": ["string", "number"]
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
               },
               "timestamp": {
                 "type": "number"
@@ -964,8 +950,7 @@
                       "type": "string"
                     }
                   }
-                },
-                "additionalProperties": false
+                }
               }
             },
             "required": [
@@ -975,14 +960,13 @@
               "projectId",
               "timestamp",
               "durationMs"
-            ],
-            "additionalProperties": false
+            ]
           }
         },
         "timeline": {
           "type": "array",
           "items": {
-            "anyOf": [
+            "oneOf": [
               {
                 "type": "object",
                 "properties": {
@@ -1028,8 +1012,7 @@
                         "type": "number"
                       }
                     },
-                    "required": ["totalTokens", "durationMs"],
-                    "additionalProperties": false
+                    "required": ["totalTokens", "durationMs"]
                   },
                   "genAi": {
                     "type": "object",
@@ -1088,8 +1071,7 @@
                           "type": "string"
                         }
                       }
-                    },
-                    "additionalProperties": false
+                    }
                   }
                 },
                 "required": [
@@ -1099,8 +1081,7 @@
                   "timestamp",
                   "spanId",
                   "traceId"
-                ],
-                "additionalProperties": false
+                ]
               },
               {
                 "type": "object",
@@ -1175,8 +1156,7 @@
                       "toolDefinitions": {
                         "type": "string"
                       }
-                    },
-                    "additionalProperties": false
+                    }
                   }
                 },
                 "required": [
@@ -1186,8 +1166,7 @@
                   "traceId",
                   "timestamp",
                   "durationMs"
-                ],
-                "additionalProperties": false
+                ]
               }
             ]
           }
@@ -1209,9 +1188,7 @@
         "totalTokens",
         "spanSummaries",
         "timeline"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "requiredScopes": ["event:read", "project:read"],
     "skills": ["inspect", "triage", "seer"],
@@ -1221,6 +1198,7 @@
     "name": "get_alert_rule",
     "description": "Get details for a Sentry alert rule.\n\nUse this tool when you need to inspect an alert rule's exact conditions, query, triggers, and actions before explaining or planning changes.\n\n<examples>\nget_alert_rule(organizationSlug='my-org', kind='metric', ruleIdOrName='12345')\nget_alert_rule(organizationSlug='my-org', kind='issue', projectSlug='backend', ruleIdOrName='Notify backend team')\nget_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='P95 latency')\n</examples>\n\n<hints>\n- Use `kind='issue'` or `kind='metric'` for numeric IDs because issue and metric alerts use separate endpoints.\n- With `kind='all'`, a digit-only `ruleIdOrName` is treated as an exact alert rule name.\n- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -1228,6 +1206,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1236,17 +1215,16 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "kind": {
+          "default": "all",
           "type": "string",
           "enum": ["all", "issue", "metric"],
-          "description": "Which alert rule family to inspect. Use `issue` or `metric` for numeric IDs; `all` treats the value as an exact-name lookup.",
-          "default": "all"
+          "description": "Which alert rule family to inspect. Use `issue` or `metric` for numeric IDs; `all` treats the value as an exact-name lookup."
         },
         "projectSlug": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1255,9 +1233,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug.",
-          "default": null
+          ]
         },
         "ruleIdOrName": {
           "type": "string",
@@ -1265,9 +1241,7 @@
           "description": "The alert rule's numeric ID, or an exact alert rule name."
         }
       },
-      "required": ["organizationSlug", "ruleIdOrName"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "ruleIdOrName"]
     },
     "requiredScopes": ["org:read", "project:read"],
     "skills": ["inspect"],
@@ -1277,6 +1251,7 @@
     "name": "get_dashboard_details",
     "description": "Get detailed information about a specific Sentry dashboard.\n\nUse this tool when you need to:\n- Inspect a dashboard's widgets and saved query definitions\n- View dashboard projects, environments, filters, layout, and widget IDs\n- Resolve a dashboard by exact title or numeric ID\n\n<examples>\nget_dashboard_details(organizationSlug='my-organization', dashboardIdOrTitle='12345')\nget_dashboard_details(organizationSlug='my-organization', dashboardIdOrTitle='Errors Overview')\n</examples>\n\n<hints>\n- Numeric dashboard IDs are resolved directly.\n- Title lookups require one exact case-insensitive match. Use `find_dashboards` first if uncertain.\n- This returns saved widget query definitions, not live widget data.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -1284,6 +1259,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1292,9 +1268,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "dashboardIdOrTitle": {
           "type": "string",
@@ -1302,9 +1276,7 @@
           "description": "The dashboard's numeric ID or exact title."
         }
       },
-      "required": ["organizationSlug", "dashboardIdOrTitle"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "dashboardIdOrTitle"]
     },
     "requiredScopes": ["org:read"],
     "skills": ["inspect"],
@@ -1314,6 +1286,7 @@
     "name": "get_doc",
     "description": "Fetch the full markdown content of a Sentry documentation page.\n\nUse this tool when you need to:\n- Read the complete documentation for a specific topic\n- Get detailed implementation examples or code snippets\n- Access the full context of a documentation page\n- Extract specific sections from documentation\n\n<examples>\n### Get the Next.js integration guide\n\n```\nget_doc(path='/platforms/javascript/guides/nextjs.md')\n```\n</examples>\n\n<hints>\n- Use the path from search_docs results for accurate fetching\n- Paths should end with .md extension\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "path": {
@@ -1321,9 +1294,7 @@
           "description": "The documentation path (e.g., '/platforms/javascript/guides/nextjs.md'). Get this from search_docs results."
         }
       },
-      "required": ["path"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["path"]
     },
     "requiredScopes": [],
     "skills": ["inspect", "docs"],
@@ -1333,6 +1304,7 @@
     "name": "get_event_attachment",
     "description": "Download attachments from a Sentry event.\n\nUse this tool when you need to:\n- Download files attached to a specific event\n- Access screenshots, log files, or other attachments uploaded with an error report\n- Retrieve attachment metadata and download URLs\n\n<examples>\n### Download a specific attachment by ID\n\n```\nget_event_attachment(organizationSlug='my-organization', projectSlug='my-project', eventId='c49541c747cb4d8aa3efb70ca5aba243', attachmentId='12345')\n```\n\n### List all attachments for an event\n\n```\nget_event_attachment(organizationSlug='my-organization', projectSlug='my-project', eventId='c49541c747cb4d8aa3efb70ca5aba243')\n```\n\n</examples>\n\n<hints>\n- If `attachmentId` is provided, the specific attachment will be downloaded as an embedded resource\n- If `attachmentId` is omitted, all attachments for the event will be listed with download information\n- The `projectSlug` is required to identify which project the event belongs to\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -1348,6 +1320,7 @@
           "description": "The ID of the event."
         },
         "attachmentId": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1356,11 +1329,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The ID of the attachment to download.",
-          "default": null
+          ]
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1369,14 +1341,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         }
       },
-      "required": ["organizationSlug", "projectSlug", "eventId"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "projectSlug", "eventId"]
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect"],
@@ -1386,6 +1354,7 @@
     "name": "get_event_stacktrace",
     "description": "Get a full thread stacktrace from a specific Sentry event.\n\nUse this tool when you need to:\n- Fetch the full stacktrace for a thread listed in issue details\n- Inspect a non-crashed thread from an event with multiple threads\n- Get Sentry's default selected thread stacktrace when no thread is specified\n\n<examples>\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123')\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', eventId='abc123', thread=259)\nget_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', thread='main')\n</examples>\n\n<hints>\n- `thread` is optional. If omitted, this returns the same default thread Sentry selects: first crashed thread, then first thread with a stacktrace, then first thread.\n- Pass `thread` as a numeric Thread ID or exact thread Name from the issue details thread list.\n- If the issue details show only one useful thread, omit `thread`.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -1393,6 +1362,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1401,35 +1371,33 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "issueId": {
           "type": "string",
           "description": "The Issue ID. e.g. `PROJECT-1Z43`"
         },
         "eventId": {
-          "type": "string",
           "default": "latest",
-          "description": "The event ID for the issue. Defaults to `latest`."
+          "description": "The event ID for the issue. Defaults to `latest`.",
+          "type": "string"
         },
         "thread": {
+          "description": "Optional thread selector. Pass a numeric thread ID, or an exact thread name string. If omitted, returns the same default thread Sentry selects: first crashed thread, then first thread with a stacktrace, then first thread.",
           "anyOf": [
             {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             {
               "type": "string",
               "minLength": 1
             }
-          ],
-          "description": "Optional thread selector. Pass a numeric thread ID, or an exact thread name string. If omitted, returns the same default thread Sentry selects: first crashed thread, then first thread with a stacktrace, then first thread."
+          ]
         }
       },
-      "required": ["organizationSlug", "issueId"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "issueId"]
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect", "triage", "seer"],
@@ -1439,6 +1407,7 @@
     "name": "get_issue_activity",
     "description": "Get the activity feed and comments for a Sentry issue.\n\nUse this tool when you need to:\n- Review prior comments before triaging an issue\n- Understand who resolved, ignored, assigned, or commented on an issue\n- See recent issue activity that is not included in `get_issue_details`\n\n<examples>\nget_issue_activity(organizationSlug='my-organization', issueId='PROJECT-123')\nget_issue_activity(issueUrl='https://my-organization.sentry.io/issues/PROJECT-123/')\n</examples>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -1446,6 +1415,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1454,9 +1424,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "issueId": {
           "type": "string",
@@ -1468,18 +1436,16 @@
           "description": "The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43"
         },
         "includeComments": {
-          "type": "boolean",
-          "default": true
+          "default": true,
+          "type": "boolean"
         },
         "limit": {
+          "default": 25,
           "type": "integer",
           "exclusiveMinimum": 0,
-          "maximum": 100,
-          "default": 25
+          "maximum": 100
         }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      }
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect", "triage"],
@@ -1489,6 +1455,7 @@
     "name": "get_issue_details",
     "description": "Get detailed information about a specific Sentry issue by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific issue ID (e.g., 'CLOUDFLARE-MCP-41', 'PROJECT-123')\n- Ask to 'explain [ISSUE-ID]', 'tell me about [ISSUE-ID]'\n- Want details/stacktrace/analysis for a known issue\n- Provide a Sentry issue URL\n\nDO NOT USE for:\n- General searching or listing issues (use search_issues)\n\nTRIGGER PATTERNS:\n- 'Explain ISSUE-123' → use get_issue_details\n- 'Tell me about PROJECT-456' → use get_issue_details\n- 'What happened in [issue URL]' → use get_issue_details\n\n<examples>\n### With Sentry URL (recommended - simplest approach)\n```\nget_issue_details(issueUrl='https://sentry.sentry.io/issues/6916805731/?project=4509062593708032&query=is%3Aunresolved')\n```\n\n### With issue ID and organization\n```\nget_issue_details(organizationSlug='my-organization', issueId='CLOUDFLARE-MCP-41')\n```\n\n### With event ID and organization\n```\nget_issue_details(organizationSlug='my-organization', eventId='c49541c747cb4d8aa3efb70ca5aba243')\n```\n</examples>\n\n<hints>\n- **IMPORTANT**: If user provides a Sentry URL, pass the ENTIRE URL to issueUrl parameter unchanged\n- When using issueUrl, all other parameters are automatically extracted - don't provide them separately\n- If using issueId (not URL), then organizationSlug is required\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -1496,6 +1463,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1504,9 +1472,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "issueId": {
           "type": "string",
@@ -1521,9 +1487,7 @@
           "format": "uri",
           "description": "The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43"
         }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      }
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect", "triage", "seer"],
@@ -1533,6 +1497,7 @@
     "name": "get_issue_tag_values",
     "description": "Get tag value distribution for a specific Sentry issue.\n\nUse this tool when you need to:\n- Understand how an issue is distributed across different tag values\n- Get aggregate counts of unique tag values (e.g., 'how many unique URLs are affected')\n- Analyze which browsers, environments, or URLs are most impacted by an issue\n- View the tag distributions page data programmatically\n\nCommon tag keys:\n- `url`: Request URLs affected by the issue\n- `browser`: Browser types and versions\n- `browser.name`: Browser names only\n- `os`: Operating systems\n- `environment`: Deployment environments (production, staging, etc.)\n- `release`: Software releases\n- `device`: Device types\n- `user`: Affected users\n\n<examples>\n### Get URL distribution for an issue\n```\nget_issue_tag_values(organizationSlug='my-organization', issueId='PROJECT-123', tagKey='url')\n```\n\n### Get browser distribution using issue URL\n```\nget_issue_tag_values(issueUrl='https://sentry.io/issues/PROJECT-123/', tagKey='browser')\n```\n\n### Get environment distribution\n```\nget_issue_tag_values(organizationSlug='my-organization', issueId='PROJECT-123', tagKey='environment')\n```\n</examples>\n\n<hints>\n- If user provides a Sentry URL, pass the ENTIRE URL to issueUrl parameter unchanged\n- Common tag keys: url, browser, browser.name, os, environment, release, device, user\n- Tag keys are case-sensitive\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -1540,6 +1505,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1548,9 +1514,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "issueId": {
           "type": "string",
@@ -1567,9 +1531,7 @@
           "description": "The tag key to get values for (e.g., 'url', 'browser', 'environment', 'release')."
         }
       },
-      "required": ["tagKey"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["tagKey"]
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect"],
@@ -1579,6 +1541,7 @@
     "name": "get_issue_user_reports",
     "description": "Get legacy User Reports or crash-report feedback attached to a Sentry issue.\n\nUse this tool when you need to:\n- See what a user said happened when an error occurred\n- Check if any legacy bug reports or crash-report feedback were submitted for this issue\n- Get the human-provided context behind a crash, beyond the stack trace\n\n<examples>\nget_issue_user_reports(organizationSlug='my-organization', issueId='PROJECT-123')\nget_issue_user_reports(issueUrl='https://my-organization.sentry.io/issues/PROJECT-123/')\n</examples>\n\n<hints>\n- For standalone User Feedback Widget submissions, use `search_issues(query='issue.category:feedback')`.\n- Reuse pagination cursors only with the same issue scope.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -1586,6 +1549,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1594,9 +1558,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "issueId": {
           "type": "string",
@@ -1608,6 +1570,7 @@
           "description": "The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43"
         },
         "cursor": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1616,20 +1579,16 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional pagination cursor from a previous response.",
-          "default": null
+          ]
         },
         "limit": {
+          "default": 25,
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 100,
-          "description": "Maximum number of user reports to return.",
-          "default": 25
+          "description": "Maximum number of user reports to return."
         }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      }
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect", "triage"],
@@ -1639,6 +1598,7 @@
     "name": "get_latest_base_snapshot",
     "description": "Get the latest UI screenshots/images for an app from the preprod snapshot system.\n\nThis is the primary tool for retrieving app screenshots — not search_events or search_issues.\n\nUse this tool when you need to:\n- Get screenshots, screens, golden images, or reference images for an app\n- Find what the current UI looks like (latest screenshots from the main/default branch)\n- List available snapshots or browse images before requesting specific ones\n- Look up dark mode, light mode, or other variant screenshots\n- Understand what baseline images exist when investigating snapshot test or visual regression CI failures\n\nThe appId parameter is the app identifier (e.g. 'sentry-frontend', 'com.emergetools.hackernews').\nReturns compact image metadata (display_name, image_file_name, group, description) for every image.\n\n<examples>\n### Get the latest screenshots for an app\n\n```\nget_latest_base_snapshot(organizationSlug=\"sentry\", appId=\"sentry-frontend\", project=\"frontend\")\n```\n\n### Get the latest screenshots for a specific branch\n\n```\nget_latest_base_snapshot(organizationSlug=\"sentry\", appId=\"sentry-frontend\", project=\"frontend\", branch=\"main\")\n```\n</examples>\n\n<hints>\n- The response includes compact metadata per image. Scan the list to find images matching what you need (e.g. filter by group or name containing 'button').\n- To view a specific image, use get_sentry_resource(url='<snapshot_url>?selectedSnapshot=<image_file_name>').\n- If you need to investigate a specific snapshot comparison, use get_sentry_resource with the snapshot URL.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -1650,6 +1610,7 @@
           "description": "The app identifier (e.g. 'sentry-frontend', 'com.emergetools.hackernews'). Required."
         },
         "branch": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1658,11 +1619,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Filter by git branch (e.g. 'main'). Omit to use the app's default branch.",
-          "default": null
+          ]
         },
         "project": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1671,11 +1631,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Project slug or numeric ID for scoping (e.g. 'frontend').",
-          "default": null
+          ]
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1684,14 +1643,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         }
       },
-      "required": ["organizationSlug", "appId"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "appId"]
     },
     "requiredScopes": ["project:read"],
     "skills": ["inspect"],
@@ -1701,6 +1656,7 @@
     "name": "get_monitor_details",
     "description": "Get details for a Sentry cron monitor.\n\nUse this tool when you need to:\n- Inspect a monitor's schedule, status, owner, project, and environments\n- Review recent check-ins for missed, failed, timeout, or OK runs\n- Check monitor stats over a recent time range\n\n<examples>\nget_monitor_details(organizationSlug='my-organization', monitorSlug='nightly-import')\nget_monitor_details(organizationSlug='my-organization', monitorSlug='nightly-import', projectSlugOrId='backend', environment='production', period='7d')\n</examples>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -1708,6 +1664,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1716,11 +1673,11 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "projectSlugOrId": {
+          "default": null,
+          "description": "Optional project slug or numeric ID. Use this to disambiguate monitors with the same slug or to scope a monitor URL that includes a project segment.",
           "anyOf": [
             {
               "type": "string"
@@ -1728,9 +1685,7 @@
             {
               "type": "null"
             }
-          ],
-          "default": null,
-          "description": "Optional project slug or numeric ID. Use this to disambiguate monitors with the same slug or to scope a monitor URL that includes a project segment."
+          ]
         },
         "monitorSlug": {
           "type": "string",
@@ -1738,6 +1693,7 @@
           "description": "Monitor slug or GUID."
         },
         "environment": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1746,11 +1702,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional environment name to filter monitor environments, recent check-ins, and stats.",
-          "default": null
+          ]
         },
         "period": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1760,68 +1715,64 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Relative time range. Defaults to `24h` when `start` and `end` are omitted.",
-          "default": null
+          ]
         },
         "start": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
               "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
               "description": "Absolute start time. Must be provided with `end`; do not combine with `period`."
             },
             {
               "type": "null"
             }
-          ],
-          "description": "Absolute start time. Must be provided with `end`; do not combine with `period`.",
-          "default": null
+          ]
         },
         "end": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
               "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
               "description": "Absolute end time. Must be provided with `start`; do not combine with `period`."
             },
             {
               "type": "null"
             }
-          ],
-          "description": "Absolute end time. Must be provided with `start`; do not combine with `period`.",
-          "default": null
+          ]
         },
         "checkInLimit": {
+          "default": 10,
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 50,
-          "description": "Maximum number of recent check-ins to include.",
-          "default": 10
+          "description": "Maximum number of recent check-ins to include."
         },
         "includeStats": {
+          "default": true,
           "type": "boolean",
-          "description": "Include aggregate check-in stats for the selected time range.",
-          "default": true
+          "description": "Include aggregate check-in stats for the selected time range."
         },
         "rollupSeconds": {
+          "default": null,
           "anyOf": [
             {
               "type": "integer",
               "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
               "description": "Optional stats bucket size in seconds. Omit this to let Sentry choose an appropriate rollup."
             },
             {
               "type": "null"
             }
-          ],
-          "description": "Optional stats bucket size in seconds. Omit this to let Sentry choose an appropriate rollup.",
-          "default": null
+          ]
         }
       },
-      "required": ["organizationSlug", "monitorSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "monitorSlug"]
     },
     "requiredScopes": ["project:read"],
     "skills": ["inspect"],
@@ -1831,18 +1782,20 @@
     "name": "get_profile",
     "description": "Analyze CPU profiling data to identify performance bottlenecks and detect regressions.\n\nUSE THIS TOOL WHEN:\n- User asks why a specific endpoint/transaction is slow\n- User wants to understand where CPU time is spent\n- User asks about performance bottlenecks\n- User wants to compare performance between time periods\n- User shares a Sentry profile URL\n\nRETURNS:\n- Hot paths (call stacks consuming the most CPU time)\n- Performance percentiles (p75, p95, p99) for each function\n- User code vs library code breakdown\n- Actionable recommendations for optimization\n- Regression analysis when comparing periods\n\n<examples>\n### Analyze from URL (with transaction name)\n```\nget_profile(\n  profileUrl='https://my-org.sentry.io/explore/profiling/profile/backend/flamegraph/?profilerId=abc123',\n  transactionName='/api/users'\n)\n```\n\n### Analyze by transaction name\n```\nget_profile(\n  organizationSlug='my-org',\n  transactionName='/api/users',\n  projectSlugOrId='backend'\n)\n```\n\n### Compare performance between periods\n```\nget_profile(\n  organizationSlug='my-org',\n  transactionName='/api/users',\n  projectSlugOrId='backend',\n  period='7d',\n  compareAgainstPeriod='14d'\n)\n```\n</examples>\n\n<hints>\n- Use `focusOnUserCode: true` (default) to filter out library code\n- High p99 relative to p75 indicates inconsistent performance\n- Use compareAgainstPeriod to detect regressions over time\n- Transaction names are case-sensitive\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "profileUrl": {
+          "description": "Sentry profile URL. If provided, organization and project are extracted from URL. transactionName is still required.",
           "type": "string",
-          "format": "uri",
-          "description": "Sentry profile URL. If provided, organization and project are extracted from URL. transactionName is still required."
+          "format": "uri"
         },
         "organizationSlug": {
           "type": "string",
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1851,44 +1804,47 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "projectSlugOrId": {
-          "type": ["string", "number"],
-          "description": "Project slug or numeric ID"
+          "description": "Project slug or numeric ID",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
+          ]
         },
         "transactionName": {
-          "type": "string",
-          "description": "Transaction name (e.g., '/api/users', 'POST /graphql')"
+          "description": "Transaction name (e.g., '/api/users', 'POST /graphql')",
+          "type": "string"
         },
         "period": {
-          "type": "string",
-          "pattern": "^\\d+[hdw]$",
+          "default": "7d",
           "description": "Profiling time window (default: '7d'). Use '1h' for very recent profiling data.",
-          "default": "7d"
+          "type": "string",
+          "pattern": "^\\d+[hdw]$"
         },
         "compareAgainstPeriod": {
+          "description": "Compare against this baseline profiling time window. Enables regression detection.",
           "type": "string",
-          "pattern": "^\\d+[hdw]$",
-          "description": "Compare against this baseline profiling time window. Enables regression detection."
+          "pattern": "^\\d+[hdw]$"
         },
         "focusOnUserCode": {
-          "type": "boolean",
           "default": true,
-          "description": "Show only user code (is_application: true). Set to false to include library code."
+          "description": "Show only user code (is_application: true). Set to false to include library code.",
+          "type": "boolean"
         },
         "maxHotPaths": {
+          "default": 10,
+          "description": "Number of hot paths to display (1-20, default: 10)",
           "type": "integer",
           "minimum": 1,
-          "maximum": 20,
-          "default": 10,
-          "description": "Number of hot paths to display (1-20, default: 10)"
+          "maximum": 20
         }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      }
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect"],
@@ -1898,18 +1854,20 @@
     "name": "get_profile_details",
     "description": "Inspect a specific Sentry profile in detail.\n\nUSE THIS TOOL WHEN:\n- User shares a transaction profile URL and wants the details\n- User has a profile ID and wants a concise summary plus raw sample structure\n- User needs to inspect a continuous profile session by profiler ID and time range\n\nRETURNS:\n- Transaction profile summary with profile URL, transaction, trace, release, and runtime details\n- Sample structure summaries such as frame count, sample count, stacks, and thread breakdown\n- Top frames by occurrence for a quick hotspot overview\n\nNOTE: This tool supports two profile modes.\n- Transaction profiles: pass `profileUrl` or `organizationSlug` + `projectSlugOrId` + `profileId`\n- Continuous profiles: pass `profileUrl` or `organizationSlug` + `projectSlugOrId` + `profilerId` + `start` + `end`\n\n<examples>\n### Transaction profile URL\n```\nget_profile_details(\n  profileUrl='https://my-org.sentry.io/explore/profiling/profile/backend/cfe78a5c892d4a64a962d837673398d2/flamegraph/'\n)\n```\n\n### Transaction profile by ID\n```\nget_profile_details(\n  organizationSlug='my-org',\n  projectSlugOrId='backend',\n  profileId='cfe78a5c892d4a64a962d837673398d2'\n)\n```\n\n### Continuous profile by session\n```\nget_profile_details(\n  organizationSlug='my-org',\n  projectSlugOrId='backend',\n  profilerId='041bde57b9844e36b8b7e5734efae5f7',\n  start='2024-01-01T00:00:00Z',\n  end='2024-01-01T01:00:00Z'\n)\n```\n</examples>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "profileUrl": {
+          "description": "Sentry transaction profile or continuous profile URL. If provided, organization, project, and profile identifiers are extracted from the URL.",
           "type": "string",
-          "format": "uri",
-          "description": "Sentry transaction profile or continuous profile URL. If provided, organization, project, and profile identifiers are extracted from the URL."
+          "format": "uri"
         },
         "organizationSlug": {
           "type": "string",
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1918,38 +1876,41 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "projectSlugOrId": {
-          "type": ["string", "number"],
-          "description": "Project slug or numeric ID"
+          "description": "Project slug or numeric ID",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
+          ]
         },
         "profileId": {
-          "type": "string",
-          "description": "Transaction profile ID from a profile flamegraph URL"
+          "description": "Transaction profile ID from a profile flamegraph URL",
+          "type": "string"
         },
         "profilerId": {
-          "type": "string",
-          "description": "Continuous profiler session ID"
+          "description": "Continuous profiler session ID",
+          "type": "string"
         },
         "start": {
-          "type": "string",
-          "description": "Continuous profile start time in ISO 8601 format, for example '2024-01-01T00:00:00Z'"
+          "description": "Continuous profile start time in ISO 8601 format, for example '2024-01-01T00:00:00Z'",
+          "type": "string"
         },
         "end": {
-          "type": "string",
-          "description": "Continuous profile end time in ISO 8601 format, for example '2024-01-01T01:00:00Z'"
+          "description": "Continuous profile end time in ISO 8601 format, for example '2024-01-01T01:00:00Z'",
+          "type": "string"
         },
         "focusOnUserCode": {
-          "type": "boolean",
           "default": true,
-          "description": "Show only user code frames in the hotspot table. Set to false to include library frames."
+          "description": "Show only user code frames in the hotspot table. Set to false to include library frames.",
+          "type": "boolean"
         }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      }
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect"],
@@ -1959,6 +1920,7 @@
     "name": "get_release_details",
     "description": "Get details for a Sentry release.\n\nUse this tool when you need to:\n- Inspect an exact release version\n- Scope a release lookup to a specific project\n- See deploys and environments for a release\n- See recent commits attached to a release\n- Gather release health metadata when a project is known\n\n<examples>\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3')\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3', projectSlugOrId='backend')\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3', includeHealth=true, projectSlugOrId='backend')\n</examples>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -1966,6 +1928,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1974,9 +1937,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "releaseVersion": {
           "type": "string",
@@ -1984,6 +1945,7 @@
           "description": "Exact release version."
         },
         "projectSlugOrId": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -1992,36 +1954,32 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional project slug or numeric ID. Use this to scope release details, deploys, and commits to one project; required for health metadata unless the session is already project-constrained.",
-          "default": null
+          ]
         },
         "includeHealth": {
+          "default": false,
           "type": "boolean",
-          "description": "Include project-specific release health metadata. Requires projectSlugOrId unless the session is already project-constrained.",
-          "default": false
+          "description": "Include project-specific release health metadata. Requires projectSlugOrId unless the session is already project-constrained."
         },
         "includeDeploys": {
+          "default": true,
           "type": "boolean",
-          "description": "Include recent deploys for this release.",
-          "default": true
+          "description": "Include recent deploys for this release."
         },
         "includeCommits": {
+          "default": true,
           "type": "boolean",
-          "description": "Include recent commits attached to this release.",
-          "default": true
+          "description": "Include recent commits attached to this release."
         },
         "limit": {
+          "default": 10,
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 50,
-          "description": "Maximum number of deploys and commits to return, up to 50.",
-          "default": 10
+          "description": "Maximum number of deploys and commits to return, up to 50."
         }
       },
-      "required": ["organizationSlug", "releaseVersion"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "releaseVersion"]
     },
     "requiredScopes": ["project:read"],
     "skills": ["inspect"],
@@ -2031,6 +1989,7 @@
     "name": "get_replay_details",
     "description": "Get high-level information about a specific Sentry replay by URL or replay ID.\n\nUSE THIS TOOL WHEN USERS:\n- Share a replay URL\n- Ask what happened in a specific replay\n- Want a concise replay summary plus the next issue or trace lookups to run\n\n<examples>\n### With replay URL\n```\nget_replay_details(replayUrl='https://my-organization.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/')\n```\n\n### With organization and replay ID\n```\nget_replay_details(organizationSlug='my-organization', replayId='7e07485f-12f9-416b-8b14-26260799b51f')\n```\n</examples>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "replayUrl": {
@@ -2055,12 +2014,9 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+          ]
         }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      }
     },
     "requiredScopes": ["org:read", "project:read", "event:read"],
     "skills": ["inspect"],
@@ -2070,14 +2026,16 @@
     "name": "get_sentry_resource",
     "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use the Sentry tool `get_snapshot_image` for full-resolution image bytes.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- monitor: <monitorSlug>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "url": {
+          "description": "Sentry URL. The resource type is auto-detected from the URL pattern.",
           "type": "string",
-          "format": "uri",
-          "description": "Sentry URL. The resource type is auto-detected from the URL pattern."
+          "format": "uri"
         },
         "resourceType": {
+          "description": "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL. Use `monitor` with a monitor slug only when inspect monitor tools are available, `snapshot` with a snapshot artifact ID, or `snapshotImage` with `<snapshotId>:<image_file_name>`.",
           "type": "string",
           "enum": [
             "issue",
@@ -2090,20 +2048,17 @@
             "monitor",
             "snapshot",
             "snapshotImage"
-          ],
-          "description": "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL. Use `monitor` with a monitor slug only when inspect monitor tools are available, `snapshot` with a snapshot artifact ID, or `snapshotImage` with `<snapshotId>:<image_file_name>`."
+          ]
         },
         "resourceId": {
-          "type": "string",
-          "description": "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug when inspect monitor tools are available, snapshot artifact ID, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL."
+          "description": "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug when inspect monitor tools are available, snapshot artifact ID, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL.",
+          "type": "string"
         },
         "organizationSlug": {
           "type": "string",
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      }
     },
     "requiredScopes": ["event:read", "project:read"],
     "skills": ["inspect", "triage", "seer"],
@@ -2113,6 +2068,7 @@
     "name": "get_snapshot",
     "description": "Get a preprod snapshot comparison summary, including metadata, counts, and changed image sections.\n\nUse this tool when you need to:\n- Investigate a failed snapshot test from CI\n- Review what changed in a specific preprod snapshot\n- Browse snapshot image file names before viewing a specific image\n\nPass organizationSlug and snapshotId. Use get_sentry_resource for snapshot URLs.\nCompact output is returned by default. Set showUnmodified=true to list unchanged and skipped images separately.\n\n<examples>\n### Browse a snapshot\n\n```\nget_snapshot(organizationSlug=\"sentry\", snapshotId=\"231949\")\n```\n\n### Include unchanged and skipped images\n\n```\nget_snapshot(organizationSlug=\"sentry\", snapshotId=\"231949\", showUnmodified=true)\n```\n</examples>\n\n<hints>\n- Use the Sentry tool `get_snapshot_image` to view a specific image preview or full-resolution image bytes.\n- Use get_sentry_resource when starting from a Sentry snapshot URL.\n- The diff percent field shows what percentage of pixels changed (0-100).\n- showUnmodified=true is useful when a diff snapshot has no changed image sections.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -2125,11 +2081,12 @@
           "description": "The numeric snapshot artifact ID."
         },
         "showUnmodified": {
+          "default": false,
           "type": "boolean",
-          "description": "When true, include unchanged and skipped image sections. This can substantially increase response size and token usage for large snapshots.",
-          "default": false
+          "description": "When true, include unchanged and skipped image sections. This can substantially increase response size and token usage for large snapshots."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -2138,14 +2095,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         }
       },
-      "required": ["organizationSlug", "snapshotId"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "snapshotId"]
     },
     "requiredScopes": ["project:read"],
     "skills": ["inspect"],
@@ -2155,6 +2108,7 @@
     "name": "get_snapshot_image",
     "description": "Get metadata and image content for one image in a preprod snapshot.\n\nUse this tool when you need to:\n- View the current, previous, or diff image for a snapshot entry\n- Inspect metadata and context for a specific snapshot image\n- Fetch full-resolution image bytes when preview images are insufficient; full-resolution images can substantially increase response size and token usage\n\nPass organizationSlug, snapshotId, and imageIdentifier. Use get_sentry_resource for snapshot URLs.\nPreview images are returned by default; set imageResolution=full for original bytes when needed, but expect higher response size and token usage.\n\n<examples>\n### View a preview image\n\n```\nget_snapshot_image(organizationSlug=\"sentry\", snapshotId=\"231949\", imageIdentifier=\"login_screen.png\")\n```\n\n### Fetch original full-resolution bytes\n\n```\nget_snapshot_image(organizationSlug=\"sentry\", snapshotId=\"231949\", imageIdentifier=\"login_screen.png\", imageResolution=\"full\")\n```\n</examples>\n\n<hints>\n- Use get_snapshot first if you need to discover available image file names.\n- Use get_sentry_resource when starting from a Sentry snapshot URL.\n- imageIdentifier values may include slashes; pass the full image_file_name exactly as shown by get_snapshot.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -2172,12 +2126,13 @@
           "description": "The snapshot image file name or identifier to fetch."
         },
         "imageResolution": {
+          "default": "preview",
           "type": "string",
           "enum": ["preview", "full"],
-          "description": "Return locally generated previews or original full-resolution bytes. Full-resolution images can substantially increase response size and token usage.",
-          "default": "preview"
+          "description": "Return locally generated previews or original full-resolution bytes. Full-resolution images can substantially increase response size and token usage."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -2186,14 +2141,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         }
       },
-      "required": ["organizationSlug", "snapshotId", "imageIdentifier"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "snapshotId", "imageIdentifier"]
     },
     "requiredScopes": ["project:read"],
     "skills": ["inspect"],
@@ -2203,6 +2154,7 @@
     "name": "get_trace_details",
     "description": "Get detailed information about a specific Sentry trace by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific trace ID (e.g., 'a4d1aae7216b47ff8117cf4e09ce9d0a')\n- Ask to 'show me trace [TRACE-ID]', 'explain trace [TRACE-ID]'\n- Want high-level overview and link to view trace details in Sentry\n- Need trace statistics and span breakdown\n- Want an overview first, then a guided pivot into additional spans or events\n\nDO NOT USE for:\n- General searching for traces (use search_events with trace queries)\n- Complete span enumeration or branch-by-branch reconstruction (use search_events scoped to the trace)\n\nTRIGGER PATTERNS:\n- 'Show me trace abc123' → use get_trace_details\n- 'Explain trace a4d1aae7216b47ff8117cf4e09ce9d0a' → use get_trace_details\n- 'What is trace [trace-id]' → use get_trace_details\n\n<examples>\n### Get trace overview\n```\nget_trace_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\n```\n\n### Focus a single span\n```\nget_trace_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a', spanId='aa8e7f3384ef4ff5')\n```\n</examples>\n\n<hints>\n- Trace IDs are 32-character hexadecimal strings\n- This returns a condensed trace overview, not a full span dump\n- Provide `spanId` to focus on a single span within the trace\n- If the response says it shows a subset of spans, use search_events to inspect the rest of the trace\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -2210,6 +2162,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -2218,9 +2171,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "traceId": {
           "type": "string",
@@ -2233,9 +2184,7 @@
           "description": "The span ID within a trace. Use this with a trace resource to focus on a specific span."
         }
       },
-      "required": ["organizationSlug", "traceId"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "traceId"]
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect"],
@@ -2245,6 +2194,7 @@
     "name": "remove_team_from_project",
     "description": "Revoke a team's access to an existing Sentry project.\n\nUse this tool when you need to:\n- Remove a team from a project\n- Revoke team access without changing project metadata\n- Check project team assignments before removing access\n\nBe careful when using this tool because it revokes project access.\n\n<examples>\nremove_team_from_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- The team must already be assigned to the project.\n- This tool will not remove the last team assigned to a project.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -2252,6 +2202,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -2260,9 +2211,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "projectSlug": {
           "type": "string",
@@ -2273,9 +2222,7 @@
           "description": "The team's slug. You can find a list of existing teams in an organization with the Sentry tool `find_teams`."
         }
       },
-      "required": ["organizationSlug", "projectSlug", "teamSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "projectSlug", "teamSlug"]
     },
     "requiredScopes": ["project:write", "team:read", "org:read"],
     "skills": ["project-management"],
@@ -2285,6 +2232,7 @@
     "name": "search_ai_conversations",
     "description": "Search Sentry AI Conversations and return one summary row per conversation.\n\nUse this tool to find or list AI Conversations. Results are conversation summaries, not raw span rows.\nUse get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_ai_conversations(organizationSlug='my-org', query='failed conversations', period='7d')\nsearch_ai_conversations(organizationSlug='my-org', query='checkout', project='backend')\n</examples>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -2292,77 +2240,76 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "query": {
-          "type": "string",
-          "description": "Conversation query/filter string."
+          "description": "Conversation query/filter string.",
+          "type": "string"
         },
         "project": {
+          "description": "Project slug or numeric project ID, or an array of projects.",
           "anyOf": [
             {
               "type": "string",
               "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
             },
             {
+              "minItems": 1,
               "type": "array",
               "items": {
                 "type": "string",
                 "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
-              },
-              "minItems": 1
+              }
             }
-          ],
-          "description": "Project slug or numeric project ID, or an array of projects."
+          ]
         },
         "environment": {
+          "description": "Environment name, or an array of environments.",
           "anyOf": [
             {
               "type": "string",
               "minLength": 1
             },
             {
+              "minItems": 1,
               "type": "array",
               "items": {
                 "type": "string",
                 "minLength": 1
-              },
-              "minItems": 1
+              }
             }
-          ],
-          "description": "Environment name, or an array of environments."
+          ]
         },
         "period": {
-          "type": "string",
-          "pattern": "^\\d+[hdw]$",
+          "default": "30d",
           "description": "Relative time range. Defaults to 30d.",
-          "default": "30d"
+          "type": "string",
+          "pattern": "^\\d+[hdw]$"
         },
         "start": {
-          "type": "string",
-          "description": "Explicit start time for the search window."
+          "description": "Explicit start time for the search window.",
+          "type": "string"
         },
         "end": {
-          "type": "string",
-          "description": "Explicit end time for the search window."
+          "description": "Explicit end time for the search window.",
+          "type": "string"
         },
         "cursor": {
-          "type": "string",
-          "description": "Pagination cursor from a previous response."
+          "description": "Pagination cursor from a previous response.",
+          "type": "string"
         },
         "limit": {
+          "default": 10,
           "type": "integer",
           "minimum": 1,
-          "maximum": 100,
-          "default": 10
+          "maximum": 100
         },
         "regionUrl": {
           "type": "string",
           "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
         }
       },
-      "required": ["organizationSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug"]
     },
     "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -2376,7 +2323,14 @@
           "type": "number"
         },
         "nextCursor": {
-          "type": ["string", "null"]
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "conversations": {
           "type": "array",
@@ -2427,10 +2381,24 @@
                 }
               },
               "firstInputPreview": {
-                "type": ["string", "null"]
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "lastOutputPreview": {
-                "type": ["string", "null"]
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "flow": {
                 "type": "array",
@@ -2450,14 +2418,27 @@
                     "type": "object",
                     "properties": {
                       "email": {
-                        "type": ["string", "null"]
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       },
                       "username": {
-                        "type": ["string", "null"]
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
-                    "required": ["email", "username"],
-                    "additionalProperties": false
+                    "required": ["email", "username"]
                   },
                   {
                     "type": "null"
@@ -2484,8 +2465,7 @@
               "flow",
               "toolNames",
               "user"
-            ],
-            "additionalProperties": false
+            ]
           }
         }
       },
@@ -2495,9 +2475,7 @@
         "count",
         "nextCursor",
         "conversations"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "requiredScopes": ["event:read", "project:read"],
     "skills": ["inspect", "triage", "seer"],
@@ -2507,6 +2485,7 @@
     "name": "search_docs",
     "description": "Search Sentry documentation for SDK setup, instrumentation, and configuration guidance.\n\nUse this tool when you need to:\n- Set up Sentry SDK or framework integrations (Django, Flask, Express, Next.js, etc.)\n- Configure features like performance monitoring, error sampling, or release tracking\n- Implement custom instrumentation (spans, transactions, breadcrumbs)\n- Configure data scrubbing, filtering, or sampling rules\n\nReturns snippets only. Use the Sentry tool `get_doc` to fetch full documentation content.\n\n<examples>\n```\nsearch_docs(query='Django setup configuration SENTRY_DSN', guide='python/django')\nsearch_docs(query='source maps webpack upload', guide='javascript/nextjs')\n```\n</examples>\n\n<hints>\n- Use guide parameter to filter to specific technologies (e.g., 'javascript/nextjs')\n- Include specific feature names like 'beforeSend', 'tracesSampleRate', 'SENTRY_DSN'\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "query": {
@@ -2516,11 +2495,11 @@
           "description": "The search query in natural language. Be specific about what you're looking for."
         },
         "maxResults": {
+          "default": 3,
+          "description": "Maximum number of results to return (1-10)",
           "type": "integer",
           "minimum": 1,
-          "maximum": 10,
-          "default": 3,
-          "description": "Maximum number of results to return (1-10)"
+          "maximum": 10
         },
         "guide": {
           "type": "string",
@@ -2655,9 +2634,7 @@
           "description": "Optional guide filter to limit search results to specific documentation sections. Use either a platform (e.g., 'javascript', 'python') or platform/guide combination (e.g., 'javascript/nextjs', 'python/django')."
         }
       },
-      "required": ["query"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["query"]
     },
     "requiredScopes": [],
     "skills": ["inspect", "docs"],
@@ -2667,6 +2644,7 @@
     "name": "search_events",
     "description": "Search Sentry events and replays. Use for event counts/statistics.\n\n`query` can be natural language or Sentry search syntax. With an agent configured, it fixes dataset, query, fields, and sort before running.\n\nSupports TWO query types:\n1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'total tokens'\n2. Individual events with timestamps: 'error logs from last hour'\n\nDatasets:\n- errors: Exception/crash events with stack traces, usually grouped into issues\n- logs: Application log entries, including error-severity log messages\n- spans: Raw trace/span events for performance, AI/LLM calls, requests, and operations\n- metrics: Metric rows and aggregates: counters, gauges, distributions, values\n- profiles: Transaction/continuous profile results, profile IDs, profiled transactions\n- replays: Session replay results: rage clicks, dead clicks, visited pages, replay users\nIf the user says logs, log messages, error logs, or warning logs, choose logs instead of errors.\n\nReplay searches return replay lists only; replay count()/avg()/sum() are not supported.\n\nNOT for grouped issue lists (use search_issues) or app screenshots/images (use get_latest_base_snapshot).\n\n<examples>\nsearch_events(organizationSlug='my-org', query='how many errors today')\nsearch_events(organizationSlug='my-org', dataset='errors', query='level:error')\nsearch_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')\nsearch_events(organizationSlug='my-org', dataset='spans', query='span.op:db', sort='-span.duration')\nsearch_events(organizationSlug='my-org', dataset='replays', query='count_errors:>0', sort='-count_errors')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n- Use fields with aggregate functions like count(), avg(), sum() for statistics\n- Sort by -count() for most common, -timestamp for newest\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -2674,15 +2652,16 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "dataset": {
+          "description": "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured.",
           "type": "string",
-          "enum": ["spans", "errors", "logs", "metrics", "profiles", "replays"],
-          "description": "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured."
+          "enum": ["spans", "errors", "logs", "metrics", "profiles", "replays"]
         },
         "query": {
-          "type": "string",
-          "description": "Natural language or Sentry event search query syntax."
+          "description": "Natural language or Sentry event search query syntax.",
+          "type": "string"
         },
         "fields": {
+          "description": "Fields to return for event datasets. If not specified, uses sensible defaults. Include aggregate functions like count(), avg() for statistics. Leave null for dataset='replays'.",
           "anyOf": [
             {
               "type": "array",
@@ -2693,10 +2672,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Fields to return for event datasets. If not specified, uses sensible defaults. Include aggregate functions like count(), avg() for statistics. Leave null for dataset='replays'."
+          ]
         },
         "sort": {
+          "description": "Sort field (prefix with - for descending). If omitted, event datasets default to -timestamp and replays default to -started_at. Use -count() for event aggregations. For dataset='replays', use replay sorts like -started_at or -count_errors.",
           "anyOf": [
             {
               "type": "string"
@@ -2704,10 +2683,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Sort field (prefix with - for descending). If omitted, event datasets default to -timestamp and replays default to -started_at. Use -count() for event aggregations. For dataset='replays', use replay sorts like -started_at or -count_errors."
+          ]
         },
         "projectSlug": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -2716,11 +2695,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool.",
-          "default": null
+          ]
         },
         "environment": {
+          "description": "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead.",
           "anyOf": [
             {
               "anyOf": [
@@ -2729,20 +2707,19 @@
                   "minLength": 1
                 },
                 {
+                  "minItems": 1,
                   "type": "array",
                   "items": {
                     "type": "string",
                     "minLength": 1
-                  },
-                  "minItems": 1
+                  }
                 }
               ]
             },
             {
               "type": "null"
             }
-          ],
-          "description": "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead."
+          ]
         },
         "period": {
           "type": "string",
@@ -2750,6 +2727,7 @@
           "description": "Relative time window, such as `24h`, `7d`, `14d`, `30d`, or `90d`. Controls which records fall within the search window."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -2758,26 +2736,22 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "limit": {
+          "default": 10,
+          "description": "Maximum number of results to return (1-100)",
           "type": "number",
           "minimum": 1,
-          "maximum": 100,
-          "default": 10,
-          "description": "Maximum number of results to return (1-100)"
+          "maximum": 100
         },
         "includeExplanation": {
-          "type": "boolean",
           "default": false,
-          "description": "Include explanation of how the query was translated or repaired"
+          "description": "Include explanation of how the query was translated or repaired",
+          "type": "boolean"
         }
       },
-      "required": ["organizationSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug"]
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect", "triage", "seer"],
@@ -2787,9 +2761,12 @@
     "name": "search_issue_events",
     "description": "Search and filter events within a specific issue.\n\nProvide `query` as natural language or Sentry event search syntax. When an embedded agent is configured, it fixes filters, fields, sort, and time range before running.\n\nThe tool automatically constrains results to the specified issue.\n\nCommon Query Filters:\n- environment:production - Filter by environment\n- release:1.0.0 - Filter by release version\n- user.email:alice@example.com - Filter by user\n- trace:TRACE_ID - Filter by trace ID\n\nFor cross-issue searches use search_issues. For single issue or event details use get_sentry_resource.\n\n<examples>\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', query='from last hour')\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', query='environment:production')\nsearch_issue_events(issueUrl='https://sentry.io/.../issues/123/', query='release:v1.0.0', period='7d')\n</examples>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
+          "default": null,
+          "description": "Organization slug. Required when using issueId. Not needed when using issueUrl.",
           "anyOf": [
             {
               "type": "string",
@@ -2798,26 +2775,24 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Organization slug. Required when using issueId. Not needed when using issueUrl.",
-          "default": null
+          ]
         },
         "issueId": {
-          "type": "string",
-          "description": "Issue ID (e.g., 'MCP-41', 'PROJECT-123'). Requires organizationSlug. Alternatively, use issueUrl."
+          "description": "Issue ID (e.g., 'MCP-41', 'PROJECT-123'). Requires organizationSlug. Alternatively, use issueUrl.",
+          "type": "string"
         },
         "issueUrl": {
+          "description": "Full Sentry issue URL (e.g., 'https://sentry.io/organizations/my-org/issues/123/'). Includes both organization and issue ID.",
           "type": "string",
-          "format": "uri",
-          "description": "Full Sentry issue URL (e.g., 'https://sentry.io/organizations/my-org/issues/123/'). Includes both organization and issue ID."
+          "format": "uri"
         },
         "query": {
-          "type": "string",
-          "description": "Natural language or Sentry event search query syntax for filtering within the issue."
+          "description": "Natural language or Sentry event search query syntax for filtering within the issue.",
+          "type": "string"
         },
         "sort": {
-          "type": "string",
-          "description": "Sort field (prefix with - for descending). Default: -timestamp"
+          "description": "Sort field (prefix with - for descending). Default: -timestamp",
+          "type": "string"
         },
         "period": {
           "type": "string",
@@ -2825,6 +2800,8 @@
           "description": "Relative time window, such as `24h`, `7d`, `14d`, `30d`, or `90d`. Controls which records fall within the search window."
         },
         "projectSlug": {
+          "default": null,
+          "description": "Project slug for better tag discovery. Optional - helps find project-specific tags.",
           "anyOf": [
             {
               "type": "string",
@@ -2833,11 +2810,11 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Project slug for better tag discovery. Optional - helps find project-specific tags.",
-          "default": null
+          ]
         },
         "regionUrl": {
+          "default": null,
+          "description": "Sentry region URL. Optional - defaults to main region.",
           "anyOf": [
             {
               "type": "string",
@@ -2846,25 +2823,21 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Sentry region URL. Optional - defaults to main region.",
-          "default": null
+          ]
         },
         "limit": {
+          "default": 50,
+          "description": "Maximum number of events to return (1-100, default: 50)",
           "type": "number",
           "minimum": 1,
-          "maximum": 100,
-          "default": 50,
-          "description": "Maximum number of events to return (1-100, default: 50)"
+          "maximum": 100
         },
         "includeExplanation": {
-          "type": "boolean",
           "default": false,
-          "description": "Include explanation of how the query was translated or repaired"
+          "description": "Include explanation of how the query was translated or repaired",
+          "type": "boolean"
         }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      }
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect", "triage"],
@@ -2874,6 +2847,7 @@
     "name": "search_issues",
     "description": "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.\n\nProvide `query` as natural language or Sentry issue search syntax. When an embedded agent is configured, it fixes query and sort before running while preserving explicit Sentry search syntax.\n\nReturns grouped issues with metadata like title, status, and user count.\n\nCommon Query Syntax:\n- is:unresolved / is:resolved / is:ignored / is:for_review / is:new / is:regressed / is:escalating\n- level:error / level:warning\n- firstSeen:-24h / lastSeen:-7d\n- assigned:me / assigned_or_suggested:me\n- release:latest\n- issue.category:feedback\n- issue.priority:high\n- environment:production\n- userCount:>100\n\nDO NOT USE FOR COUNTS/AGGREGATIONS → use search_events\nDO NOT USE FOR individual events with timestamps → use search_events\nDO NOT USE FOR details about a specific issue → use get_sentry_resource\n\n<examples>\nsearch_issues(organizationSlug='my-org', query='critical bugs from last week')\nsearch_issues(organizationSlug='my-org', query='is:unresolved is:unassigned', sort='freq')\nsearch_issues(organizationSlug='my-org', query='level:error firstSeen:-24h', projectSlugOrId='my-project')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -2881,17 +2855,19 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "query": {
-          "type": "string",
           "default": "is:unresolved",
-          "description": "Natural language or Sentry issue search query syntax."
+          "description": "Natural language or Sentry issue search query syntax.",
+          "type": "string"
         },
         "sort": {
-          "type": "string",
-          "enum": ["date", "freq", "new", "user"],
           "default": "date",
-          "description": "Sort order: date (last seen), freq (frequency), new (first seen), user (user count)"
+          "description": "Sort order: date (last seen), freq (frequency), new (first seen), user (user count)",
+          "type": "string",
+          "enum": ["date", "freq", "new", "user"]
         },
         "projectSlugOrId": {
+          "default": null,
+          "description": "The project's slug or numeric ID (optional)",
           "anyOf": [
             {
               "type": "string"
@@ -2899,11 +2875,10 @@
             {
               "type": "null"
             }
-          ],
-          "default": null,
-          "description": "The project's slug or numeric ID (optional)"
+          ]
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -2912,32 +2887,28 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "limit": {
+          "default": 10,
+          "description": "Maximum number of issues to return (1-100)",
           "type": "number",
           "minimum": 1,
-          "maximum": 100,
-          "default": 10,
-          "description": "Maximum number of issues to return (1-100)"
+          "maximum": 100
         },
         "period": {
-          "type": "string",
-          "enum": ["24h", "7d", "14d", "30d", "90d"],
           "default": "30d",
-          "description": "Time window for issue search results. Controls which issues are returned based on when they had activity. Default 30d is a balance between coverage and query performance; use 24h for very recent issues or 90d for broader historical searches."
+          "description": "Time window for issue search results. Controls which issues are returned based on when they had activity. Default 30d is a balance between coverage and query performance; use 24h for very recent issues or 90d for broader historical searches.",
+          "type": "string",
+          "enum": ["24h", "7d", "14d", "30d", "90d"]
         },
         "includeExplanation": {
-          "type": "boolean",
           "default": false,
-          "description": "Include explanation of how the query was translated or repaired"
+          "description": "Include explanation of how the query was translated or repaired",
+          "type": "boolean"
         }
       },
-      "required": ["organizationSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug"]
     },
     "requiredScopes": ["event:read"],
     "skills": ["inspect", "triage", "seer"],
@@ -2947,6 +2918,7 @@
     "name": "search_sentry_tools",
     "description": "Search the available Sentry MCP tool catalog by name and description.\n\nMany Sentry operations are intentionally not exposed as top-level tools. Use this for any Sentry-related task when you do not see an obvious direct tool, including long-tail inspection, project management, documentation lookup, preprod snapshots, attachments, DSNs, releases, teams, and issue-specific pivots.\n\nUse this tool when you need to:\n- Find the right Sentry operation for a task\n- Discover catalog tools and their schemas for a task\n- Inspect the executable JSON input schema for an available tool\n\n<examples>\nsearch_sentry_tools(query='list projects')\nsearch_sentry_tools(query='issue details')\nsearch_sentry_tools(query='find dsn', limit=5)\nsearch_sentry_tools(query='snapshot image')\n</examples>\n\n<hints>\n- Results only include tools available in the current session.\n- If a Sentry operation is not listed as a direct tool, search here before deciding it is unavailable.\n- Returned schemas already account for active organization, project, and region constraints.\n- Use the returned name and schema when executing a catalog result.\n- This tool returns structured JSON. Do not parse markdown from its text content.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "query": {
@@ -2955,6 +2927,8 @@
           "description": "Natural language keywords describing the Sentry operation, resource, or workflow to find."
         },
         "limit": {
+          "default": 8,
+          "description": "Maximum number of matching tools to return, up to 20.",
           "anyOf": [
             {
               "type": "integer",
@@ -2964,16 +2938,13 @@
             {
               "type": "null"
             }
-          ],
-          "default": 8,
-          "description": "Maximum number of matching tools to return, up to 20."
+          ]
         }
       },
-      "required": ["query"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["query"]
     },
     "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "query": {
@@ -2992,6 +2963,9 @@
               },
               "inputSchema": {
                 "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
                 "additionalProperties": {},
                 "description": "JSON Schema for the matching tool's arguments. Session-constrained parameters are omitted."
               },
@@ -3010,18 +2984,14 @@
                   "openWorldHint": {
                     "type": "boolean"
                   }
-                },
-                "additionalProperties": false
+                }
               }
             },
-            "required": ["name", "description", "inputSchema", "annotations"],
-            "additionalProperties": false
+            "required": ["name", "description", "inputSchema", "annotations"]
           }
         }
       },
-      "required": ["query", "results"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["query", "results"]
     },
     "requiredScopes": [],
     "skills": ["inspect", "seer", "docs", "triage", "project-management"],
@@ -3031,6 +3001,7 @@
     "name": "update_dsn",
     "description": "Update settings for an existing DSN (client key) in a project, such as name, active status, rate limit, and loader script options.\n\nUSE THIS TOOL WHEN:\n- Deactivating or activating a DSN/client key\n- Setting or removing DSN rate limits ('set rate limit of 1000 per hour on DSN X')\n- Renaming a DSN ('rename DSN X to Production')\n- Configuring Javascript SDK loader script options (session replay, performance, debug, feedback, etc.)\n\nBe careful when using this tool!\n\n<examples>\n### Rename DSN and set rate limit\n```\nupdate_dsn(organizationSlug='my-organization', projectSlug='my-project', keyId='d20df0a1ab5031c7f3c7edca9c02814d', name='Production Key', rateLimitWindow=3600, rateLimitCount=500)\n```\n\n### Deactivate a DSN\n```\nupdate_dsn(organizationSlug='my-organization', projectSlug='my-project', keyId='d20df0a1ab5031c7f3c7edca9c02814d', isActive=false)\n```\n\n### Disable rate limit entirely\n```\nupdate_dsn(organizationSlug='my-organization', projectSlug='my-project', keyId='d20df0a1ab5031c7f3c7edca9c02814d', disableRateLimit=true)\n```\n</examples>\n\n<hints>\n- Use `find_dsns()` first to find the `keyId` for the DSN you want to update.\n- Both `rateLimitWindow` (seconds) and `rateLimitCount` (error cap) must be provided together to set a rate limit.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -3038,6 +3009,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -3046,9 +3018,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "projectSlug": {
           "type": "string",
@@ -3076,6 +3046,7 @@
         "rateLimitCount": {
           "type": "integer",
           "minimum": 0,
+          "maximum": 9007199254740991,
           "description": "The maximum number of errors allowed within the rate limit window."
         },
         "disableRateLimit": {
@@ -3107,9 +3078,7 @@
           "description": "Configure Logs and Metrics for the Javascript Loader Script (requires SDK >= 10.0.0)."
         }
       },
-      "required": ["organizationSlug", "projectSlug", "keyId"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "projectSlug", "keyId"]
     },
     "requiredScopes": ["project:write"],
     "skills": ["project-management"],
@@ -3119,6 +3088,7 @@
     "name": "update_issue",
     "description": "Update a Sentry issue's status or assignment.\n\nUse this to resolve, reopen, assign, or ignore an issue.\n\n<examples>\n```\nupdate_issue(organizationSlug='my-org', issueId='PROJECT-123', status='resolved')\nupdate_issue(organizationSlug='my-org', issueId='PROJECT-123', assignedTo='user:123456')\nupdate_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored')\nupdate_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='forever')\nupdate_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='untilOccurrenceCount', ignoreCount=100, ignoreWindowMinutes=60)\nupdate_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', reason='Ignoring because this is expected noise from the staging deploy')\n```\n</examples>\n\n<hints>\n- Provide `issueUrl` or `organizationSlug` + `issueId`.\n- At least one of `status` or `assignedTo` is required.\n- `assignedTo` format: `user:ID` or `team:ID_OR_SLUG`.\n- Use `execute_sentry_tool(name='whoami', arguments={})` to find your user ID for self-assignment.\n- Status values: `resolved`, `resolvedInNextRelease`, `unresolved`, `ignored`.\n- `status='ignored'` defaults to `ignoreMode='untilEscalating'`.\n- Ignore modes: `untilEscalating`, `forever`, `forDuration`, `untilOccurrenceCount`, `untilUserCount`.\n- Matching ignore inputs are `ignoreDurationMinutes`, `ignoreCount` + optional `ignoreWindowMinutes`, or `ignoreUserCount` + optional `ignoreUserWindowMinutes`.\n- To switch an already ignored issue between `untilEscalating`, `forever`, and condition-based ignore modes, first set `status='unresolved'`, then ignore it again with the new rule.\n- `reason` is optional. When provided, it will be posted as a comment on the issue's activity feed explaining why the action was taken.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -3126,6 +3096,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -3134,9 +3105,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "issueId": {
           "type": "string",
@@ -3175,11 +3144,13 @@
         "ignoreDurationMinutes": {
           "type": "integer",
           "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
           "description": "How many minutes to ignore the issue when ignoreMode is 'forDuration'."
         },
         "ignoreCount": {
           "type": "integer",
           "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
           "description": "How many times the issue must occur before it stops being ignored when ignoreMode is 'untilOccurrenceCount'."
         },
         "ignoreWindowMinutes": {
@@ -3191,6 +3162,7 @@
         "ignoreUserCount": {
           "type": "integer",
           "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
           "description": "How many users must be affected before the issue stops being ignored when ignoreMode is 'untilUserCount'."
         },
         "ignoreUserWindowMinutes": {
@@ -3204,9 +3176,7 @@
           "minLength": 1,
           "description": "Optional reason for taking this action. When provided, it will be posted as a comment on the issue's activity feed."
         }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      }
     },
     "requiredScopes": ["event:write"],
     "skills": ["triage"],
@@ -3216,6 +3186,7 @@
     "name": "update_project",
     "description": "Update project metadata in Sentry, such as name, slug, and platform.\n\nBe careful when using this tool!\n\nUse this tool when you need to:\n- Update a project's name or slug to fix onboarding mistakes\n- Change the platform assigned to a project\n\n<examples>\n### Update a project's name and slug\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')\n```\n\n### Update platform\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', platform='python')\n```\n\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Team access changes are handled by separate project-management tools.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- When updating the slug, the project will be accessible at the new slug after the update\n- Do not update the slug from a project-scoped session; reconnect with an organization-scoped or unconstrained session first.\n</hints>",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "organizationSlug": {
@@ -3223,6 +3194,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "regionUrl": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -3231,15 +3203,14 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
-          "default": null
+          ]
         },
         "projectSlug": {
           "type": "string",
           "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
         },
         "name": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -3248,11 +3219,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The new name for the project",
-          "default": null
+          ]
         },
         "slug": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -3261,11 +3231,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The new slug for the project (must be unique)",
-          "default": null
+          ]
         },
         "platform": {
+          "default": null,
           "anyOf": [
             {
               "type": "string",
@@ -3274,14 +3243,10 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The platform for the project. e.g., python, javascript, react, etc.",
-          "default": null
+          ]
         }
       },
-      "required": ["organizationSlug", "projectSlug"],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": ["organizationSlug", "projectSlug"]
     },
     "requiredScopes": ["project:write"],
     "skills": ["project-management"],

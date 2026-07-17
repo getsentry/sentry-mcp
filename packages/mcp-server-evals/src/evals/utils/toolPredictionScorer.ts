@@ -73,7 +73,7 @@ const predictionSchema = z.object({
     .array(
       z.object({
         name: z.string(),
-        arguments: z.record(z.any()).optional().default({}),
+        arguments: z.record(z.string(), z.any()).optional().default({}),
       }),
     )
     .describe("What tools the AI would likely call"),

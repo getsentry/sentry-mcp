@@ -775,12 +775,14 @@ export const IssueSchema = z
     status: z.string(),
     substatus: z.string().nullable().optional(),
     culprit: z.string().nullable(),
-    type: z.union([
-      z.literal("error"),
-      z.literal("transaction"),
-      z.literal("generic"),
-      z.unknown(),
-    ]),
+    type: z
+      .union([
+        z.literal("error"),
+        z.literal("transaction"),
+        z.literal("generic"),
+        z.unknown(),
+      ])
+      .optional(),
     assignedTo: AssignedToSchema.optional(),
     issueType: z.string().optional(),
     issueCategory: z.string().optional(),
@@ -867,7 +869,7 @@ const StacktraceSchema = z
   .object({
     frames: z.array(FrameInterface),
     framesOmitted: z.array(z.unknown()).nullable().optional(),
-    registers: z.record(z.unknown()).nullable().optional(),
+    registers: z.record(z.string(), z.unknown()).nullable().optional(),
     hasSystemFrames: z.boolean().nullable().optional(),
   })
   .partial()
@@ -882,7 +884,7 @@ export const ThreadEntrySchema = z
     current: z.boolean().nullable(),
     crashed: z.boolean().nullable(),
     state: z.string().nullable(),
-    heldLocks: z.record(z.unknown()).nullable().optional(),
+    heldLocks: z.record(z.string(), z.unknown()).nullable().optional(),
     stacktrace: StacktraceSchema.nullable(),
     rawStacktrace: StacktraceSchema.nullable().optional(),
   })
@@ -901,7 +903,7 @@ export const BreadcrumbSchema = z
     category: z.string().nullable(),
     level: z.string().nullable(),
     message: z.string().nullable(),
-    data: z.record(z.unknown()).nullable(),
+    data: z.record(z.string(), z.unknown()).nullable(),
   })
   .partial();
 
@@ -981,13 +983,15 @@ const BaseEventSchema = z.object({
       z.string(),
       z
         .object({
-          type: z.union([
-            z.literal("default"),
-            z.literal("runtime"),
-            z.literal("os"),
-            z.literal("trace"),
-            z.unknown(),
-          ]),
+          type: z
+            .union([
+              z.literal("default"),
+              z.literal("runtime"),
+              z.literal("os"),
+              z.literal("trace"),
+              z.unknown(),
+            ])
+            .optional(),
         })
         .passthrough(),
     )
@@ -1721,7 +1725,7 @@ export const FlamegraphSchema = z.preprocess(
   z
     .object({
       activeProfileIndex: z.preprocess((value) => value ?? 0, z.number()),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
       platform: z.string(),
       profiles: z.preprocess(
         (value) => value ?? [],
@@ -1784,11 +1788,12 @@ export const ProfileFrameSchema = z
     raw_function: z.string().nullable().optional(),
     symbol: z.string().nullable().optional(),
     lang: z.string().nullable().optional(),
-    data: z.record(z.unknown()).optional(),
+    data: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
 
 const ProfileThreadMetadataSchema = z.record(
+  z.string(),
   z
     .object({
       // Matches Sentry's `Profiling.ContinuousProfile.thread_metadata` type,

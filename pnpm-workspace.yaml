@@ -80,5 +80,4 @@ catalog:
   vitest-evals: ^0.4.0
   workers-mcp: 0.1.0-3
   wrangler: 4.80.0
-  zod: ^3.25.67
-  zod-to-json-schema: ^3.24.6
+  zod: ^4.4.3

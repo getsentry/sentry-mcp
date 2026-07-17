@@ -24,7 +24,7 @@ export const searchToolsOutputSchema = z.object({
       name: z.string(),
       description: z.string(),
       inputSchema: z
-        .record(z.unknown())
+        .record(z.string(), z.unknown())
         .describe(
           "JSON Schema for the matching tool's arguments. Session-constrained parameters are omitted.",
         ),

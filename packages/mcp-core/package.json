@@ -158,8 +158,7 @@
     "@sentry/mcp-server-tsconfig": "workspace:*",
     "msw": "catalog:",
     "tiktoken": "^1.0.18",
-    "yaml": "^2.8.3",
-    "zod-to-json-schema": "catalog:"
+    "yaml": "^2.8.3"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "catalog:",

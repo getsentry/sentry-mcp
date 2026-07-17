@@ -3277,7 +3277,7 @@ export class SentryApiService {
         eventType,
         eventId: bodyObj.id,
         validationError: parseResult.error.message,
-        validationIssues: parseResult.error.errors,
+        validationIssues: parseResult.error.issues,
       },
     });
 

@@ -1,5 +1,4 @@
 import { z, type ZodTypeAny } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 export function zodFieldMapToJsonSchema(
   fieldMap: Record<string, ZodTypeAny>,
@@ -7,9 +6,8 @@ export function zodFieldMapToJsonSchema(
   const zodObject =
     Object.keys(fieldMap).length > 0 ? z.object(fieldMap) : z.object({});
 
-  return zodToJsonSchema(zodObject, {
-    $refStrategy: "none",
-    strictUnions: true,
-    pipeStrategy: "input",
+  return z.toJSONSchema(zodObject, {
+    io: "input",
+    unrepresentable: "any",
   }) as Record<string, unknown>;
 }
