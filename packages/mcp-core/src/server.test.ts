@@ -1,12 +1,13 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import { type Span, setUser, startSpan } from "@sentry/core";
+import { mswServer } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mswServer } from "@sentry/mcp-server-mocks";
 import { z } from "zod";
-import { buildServer } from "./server";
 import { structuredResult } from "./internal/tool-helpers/results";
+import { buildServer } from "./server";
 import type { Skill } from "./skills";
 import {
   getGeneratedTextFromStructuredContent,
@@ -150,6 +151,16 @@ describe("buildServer", () => {
     annotations: {},
     handler: async () => "result",
     ...options,
+  });
+
+  it("builds an SDK v2 server for draft protocol handlers", () => {
+    const server = buildServer({
+      context: baseContext,
+      tools: {},
+      protocolVersion: "draft",
+    });
+
+    expect(server).toBeInstanceOf(ModernMcpServer);
   });
 
   describe("telemetry context", () => {

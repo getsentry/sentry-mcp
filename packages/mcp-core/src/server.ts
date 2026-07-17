@@ -1,4 +1,5 @@
-import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
+import type { ServerOptions as LegacyServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer as LegacyMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 /**
  * MCP Server Configuration and Request Handling Infrastructure.
  *
@@ -19,8 +20,9 @@ import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
  * });
  * ```
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { ServerOptions as ModernServerOptions } from "@modelcontextprotocol/server";
+import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import {
   type SpanAttributeValue,
   getActiveSpan,
@@ -37,8 +39,8 @@ import {
   type RegisteredToolHandlerExtra,
   type ToolRegistry,
   executeToolHandler,
-  getFilteredInputSchema,
   getAvailableTools,
+  getFilteredInputSchema,
   injectConstraintParams,
   resolveToolDescription,
 } from "./tools/catalog-runtime/availability";
@@ -141,13 +143,12 @@ function structuredOutputToCallToolResult(
  * return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
  * ```
  */
-export function buildServer({
-  context,
-  agentMode = false,
-  experimentalMode = false,
-  tools: customTools,
-  jsonSchemaValidator,
-}: {
+type McpServer = LegacyMcpServer | ModernMcpServer;
+type JsonSchemaValidator =
+  | LegacyServerOptions["jsonSchemaValidator"]
+  | ModernServerOptions["jsonSchemaValidator"];
+
+type BuildServerOptions = {
   context: ServerContext;
   agentMode?: boolean;
   experimentalMode?: boolean;
@@ -163,9 +164,26 @@ export function buildServer({
    * buildServer({ context, jsonSchemaValidator: new CfWorkerJsonSchemaValidator() });
    * ```
    */
-  jsonSchemaValidator?: ServerOptions["jsonSchemaValidator"];
+  jsonSchemaValidator?: JsonSchemaValidator;
+};
+
+export function buildServer(
+  options: BuildServerOptions & { protocolVersion: "draft" },
+): ModernMcpServer;
+export function buildServer(options: BuildServerOptions): LegacyMcpServer;
+export function buildServer({
+  context,
+  agentMode = false,
+  experimentalMode = false,
+  tools: customTools,
+  jsonSchemaValidator,
+  protocolVersion = "legacy",
+}: BuildServerOptions & {
+  protocolVersion?: "legacy" | "draft";
 }): McpServer {
-  const server = new McpServer(
+  const McpServerConstructor =
+    protocolVersion === "draft" ? ModernMcpServer : LegacyMcpServer;
+  const server = new McpServerConstructor(
     {
       name: MCP_SERVER_NAME,
       version: LIB_VERSION,
@@ -267,7 +285,21 @@ function configureServer({
       directToolNames: contextWithToolAvailability.directToolNames,
     });
 
-    server.registerTool(
+    const registerTool = server.registerTool.bind(server) as unknown as (
+      name: string,
+      config: {
+        description?: string;
+        inputSchema: unknown;
+        outputSchema?: unknown;
+        annotations?: unknown;
+      },
+      handler: (
+        params: unknown,
+        extra: RegisteredToolHandlerExtra,
+      ) => Promise<CallToolResult>,
+    ) => unknown;
+
+    registerTool(
       tool.name,
       {
         description: resolvedDescription,

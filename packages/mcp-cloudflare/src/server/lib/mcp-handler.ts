@@ -13,13 +13,12 @@
  */
 
 import type { ExportedHandler } from "@cloudflare/workers-types";
-import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
 import * as Sentry from "@sentry/cloudflare";
 import { buildServer } from "@sentry/mcp-core/server";
 import {
   ACTIVE_SKILLS,
-  parseSkills,
   type Skill,
+  parseSkills,
 } from "@sentry/mcp-core/skills";
 import { logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ServerContext } from "@sentry/mcp-core/types";
@@ -450,20 +449,23 @@ async function handleAuthenticatedMcpRequest(
       auth.kind === "oauth" ? auth.onUpstreamUnauthorized : undefined,
   };
 
-  // Create and configure MCP server with tools filtered by context
-  // Context is captured in tool handler closures during buildServer()
-  // Use CfWorkerJsonSchemaValidator for Cloudflare Workers (ajv is not compatible with workerd)
-  const server = buildServer({
-    context: serverContext,
-    agentMode: isAgentMode,
-    experimentalMode: isExperimentalMode,
-    jsonSchemaValidator: new CfWorkerJsonSchemaValidator(),
-  });
-
-  // Run MCP handler - context already captured in closures
-  return createMcpHandler(server, {
-    route: url.pathname,
-  })(request, env, ctx);
+  // The modern handler requires a factory and creates a fresh SDK v2 server
+  // for every request. Context remains request-scoped through tool closures.
+  return createMcpHandler(
+    () =>
+      buildServer({
+        context: serverContext,
+        agentMode: isAgentMode,
+        experimentalMode: isExperimentalMode,
+        protocolVersion: "draft",
+      }),
+    {
+      route: url.pathname,
+      // The Agents handler rejects browser Origins by default except localhost.
+      // Permit only the hostname serving this authenticated endpoint.
+      allowedOriginHostnames: [url.hostname],
+    },
+  )(request, env, ctx);
 }
 
 /**

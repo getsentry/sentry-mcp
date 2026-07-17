@@ -167,6 +167,7 @@
     "@logtape/logtape": "^1.1.1",
     "@logtape/sentry": "^1.1.1",
     "@modelcontextprotocol/sdk": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
     "@sentry/core": "catalog:",
     "ai": "catalog:",
     "dotenv": "catalog:",
