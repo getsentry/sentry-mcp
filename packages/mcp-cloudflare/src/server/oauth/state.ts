@@ -6,7 +6,7 @@ import { z } from "zod";
 // Safe envelope: keep the full downstream AuthRequest (+permissions) under `req`
 // and include only iat/exp metadata at top-level to avoid collisions.
 export const OAuthStateSchema = z.object({
-  req: z.record(z.unknown()),
+  req: z.record(z.string(), z.unknown()),
   iat: z.number().int(),
   exp: z.number().int(),
 });

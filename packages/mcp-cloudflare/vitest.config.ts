@@ -48,6 +48,6 @@ export default defineConfig({
   },
   // Force bundling to apply the ajv alias during module resolution
   ssr: {
-    noExternal: ["@modelcontextprotocol/sdk", "agents", "zod-to-json-schema"],
+    noExternal: ["@modelcontextprotocol/sdk", "agents"],
   },
 });

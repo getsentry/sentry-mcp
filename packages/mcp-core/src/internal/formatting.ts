@@ -2462,7 +2462,7 @@ function stripReplayMetadata(event: Event): Event {
         )
       : {
           ...event.contexts,
-          replay: nextReplayContext,
+          replay: { ...nextReplayContext, type: replayContext.type },
         };
 
   return {

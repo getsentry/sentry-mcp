@@ -98,7 +98,7 @@ export function createExecuteTool(getTools: () => ToolRegistry) {
         .min(1)
         .describe("The name of the available tool to execute."),
       arguments: z
-        .record(z.unknown())
+        .record(z.string(), z.unknown())
         .default({})
         .describe(
           "Arguments for the target tool, matching the schema returned by search_sentry_tools.",
