@@ -54,7 +54,7 @@
     "@radix-ui/react-slot": "catalog:",
     "@sentry/cloudflare": "catalog:",
     "@sentry/react": "catalog:",
-    "agents": "catalog:",
+    "agents": "0.0.0-d163561f",
     "ai": "catalog:",
     "asciinema-player": "^3.10.0",
     "better-sqlite3": "catalog:",

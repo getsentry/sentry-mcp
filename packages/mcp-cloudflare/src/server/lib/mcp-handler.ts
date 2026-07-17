@@ -18,12 +18,12 @@ import * as Sentry from "@sentry/cloudflare";
 import { buildServer } from "@sentry/mcp-core/server";
 import {
   ACTIVE_SKILLS,
-  parseSkills,
   type Skill,
+  parseSkills,
 } from "@sentry/mcp-core/skills";
 import { logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ServerContext } from "@sentry/mcp-core/types";
-import { createMcpHandler } from "agents/mcp";
+import { createLegacyMcpHandler } from "agents/mcp";
 import { annotateResponseMetric } from "../metrics";
 import {
   getOAuthGrantLifecycleTelemetry,
@@ -450,9 +450,8 @@ async function handleAuthenticatedMcpRequest(
       auth.kind === "oauth" ? auth.onUpstreamUnauthorized : undefined,
   };
 
-  // Create and configure MCP server with tools filtered by context
-  // Context is captured in tool handler closures during buildServer()
-  // Use CfWorkerJsonSchemaValidator for Cloudflare Workers (ajv is not compatible with workerd)
+  // Keep the current SDK v1 transport semantics while adopting the canary.
+  // The SDK v2 factory path requires migrating the tool schemas to Zod v4.
   const server = buildServer({
     context: serverContext,
     agentMode: isAgentMode,
@@ -460,8 +459,7 @@ async function handleAuthenticatedMcpRequest(
     jsonSchemaValidator: new CfWorkerJsonSchemaValidator(),
   });
 
-  // Run MCP handler - context already captured in closures
-  return createMcpHandler(server, {
+  return createLegacyMcpHandler(server, {
     route: url.pathname,
   })(request, env, ctx);
 }
