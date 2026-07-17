@@ -161,7 +161,7 @@ function generateToolDefinitions({
       inputSchema: jsonSchema,
       outputSchema: t.outputSchema
         ? z.toJSONSchema(t.outputSchema, {
-            io: "input",
+            io: "output",
             unrepresentable: "any",
           })
         : undefined,

@@ -786,7 +786,8 @@
             "end": {
               "type": "string"
             }
-          }
+          },
+          "additionalProperties": false
         },
         "startTimestamp": {
           "anyOf": [
@@ -950,7 +951,8 @@
                       "type": "string"
                     }
                   }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "required": [
@@ -960,7 +962,8 @@
               "projectId",
               "timestamp",
               "durationMs"
-            ]
+            ],
+            "additionalProperties": false
           }
         },
         "timeline": {
@@ -1012,7 +1015,8 @@
                         "type": "number"
                       }
                     },
-                    "required": ["totalTokens", "durationMs"]
+                    "required": ["totalTokens", "durationMs"],
+                    "additionalProperties": false
                   },
                   "genAi": {
                     "type": "object",
@@ -1071,7 +1075,8 @@
                           "type": "string"
                         }
                       }
-                    }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -1081,7 +1086,8 @@
                   "timestamp",
                   "spanId",
                   "traceId"
-                ]
+                ],
+                "additionalProperties": false
               },
               {
                 "type": "object",
@@ -1156,7 +1162,8 @@
                       "toolDefinitions": {
                         "type": "string"
                       }
-                    }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -1166,7 +1173,8 @@
                   "traceId",
                   "timestamp",
                   "durationMs"
-                ]
+                ],
+                "additionalProperties": false
               }
             ]
           }
@@ -1188,7 +1196,8 @@
         "totalTokens",
         "spanSummaries",
         "timeline"
-      ]
+      ],
+      "additionalProperties": false
     },
     "requiredScopes": ["event:read", "project:read"],
     "skills": ["inspect", "triage", "seer"],
@@ -2438,7 +2447,8 @@
                         ]
                       }
                     },
-                    "required": ["email", "username"]
+                    "required": ["email", "username"],
+                    "additionalProperties": false
                   },
                   {
                     "type": "null"
@@ -2465,7 +2475,8 @@
               "flow",
               "toolNames",
               "user"
-            ]
+            ],
+            "additionalProperties": false
           }
         }
       },
@@ -2475,7 +2486,8 @@
         "count",
         "nextCursor",
         "conversations"
-      ]
+      ],
+      "additionalProperties": false
     },
     "requiredScopes": ["event:read", "project:read"],
     "skills": ["inspect", "triage", "seer"],
@@ -2984,14 +2996,17 @@
                   "openWorldHint": {
                     "type": "boolean"
                   }
-                }
+                },
+                "additionalProperties": false
               }
             },
-            "required": ["name", "description", "inputSchema", "annotations"]
+            "required": ["name", "description", "inputSchema", "annotations"],
+            "additionalProperties": false
           }
         }
       },
-      "required": ["query", "results"]
+      "required": ["query", "results"],
+      "additionalProperties": false
     },
     "requiredScopes": [],
     "skills": ["inspect", "seer", "docs", "triage", "project-management"],
