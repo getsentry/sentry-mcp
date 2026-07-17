@@ -171,7 +171,15 @@ function getHttpUrl(value: unknown): string | undefined {
 
 function getTrustedGitHubSourceUrl(value: unknown): string | undefined {
   const url = getHttpUrl(value);
-  return url?.startsWith("https://www.github.com/") ? url : undefined;
+  if (!url) {
+    return undefined;
+  }
+
+  const parsed = new URL(url);
+  return parsed.protocol === "https:" &&
+    (parsed.hostname === "github.com" || parsed.hostname === "www.github.com")
+    ? url
+    : undefined;
 }
 
 function getGitHubRepository(sourceUrl: string): string | undefined {

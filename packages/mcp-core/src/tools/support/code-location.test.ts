@@ -163,43 +163,47 @@ describe("resolveCodeLocation", () => {
     );
   });
 
-  it("uses a trusted embedded GitHub source link without another API call", async () => {
-    const sourceUrl =
-      "https://www.github.com/acme/backend/blob/abc123/src/main.ts#L84";
-    const event = createDefaultEvent({
-      entries: [
-        {
-          type: "exception",
-          data: {
-            values: [
-              {
-                type: "Error",
-                stacktrace: {
-                  frames: [
-                    {
-                      filename: "src/main.ts",
-                      lineNo: 84,
-                      inApp: true,
-                      sourceLink: sourceUrl,
-                    },
-                  ],
+  it.each([
+    "https://github.com/acme/backend/blob/abc123/src/main.ts#L84",
+    "https://www.github.com/acme/backend/blob/abc123/src/main.ts#L84",
+  ])(
+    "uses a trusted embedded GitHub source link without another API call: %s",
+    async (sourceUrl) => {
+      const event = createDefaultEvent({
+        entries: [
+          {
+            type: "exception",
+            data: {
+              values: [
+                {
+                  type: "Error",
+                  stacktrace: {
+                    frames: [
+                      {
+                        filename: "src/main.ts",
+                        lineNo: 84,
+                        inApp: true,
+                        sourceLink: sourceUrl,
+                      },
+                    ],
+                  },
                 },
-              },
-            ],
+              ],
+            },
           },
-        },
-      ],
-    }) as Event;
-    const getStacktraceLink = mockStacktraceLink();
+        ],
+      }) as Event;
+      const getStacktraceLink = mockStacktraceLink();
 
-    await expect(resolve(event, getStacktraceLink)).resolves.toEqual({
-      repository: "acme/backend",
-      path: "src/main.ts",
-      line: 84,
-      url: sourceUrl,
-    });
-    expect(getStacktraceLink).not.toHaveBeenCalled();
-  });
+      await expect(resolve(event, getStacktraceLink)).resolves.toEqual({
+        repository: "acme/backend",
+        path: "src/main.ts",
+        line: 84,
+        url: sourceUrl,
+      });
+      expect(getStacktraceLink).not.toHaveBeenCalled();
+    },
+  );
 
   it("omits the location when source verification is unavailable", async () => {
     const event = createDefaultEvent() as Event;
