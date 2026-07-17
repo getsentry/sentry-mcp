@@ -6,8 +6,10 @@ export function zodFieldMapToJsonSchema(
   const zodObject =
     Object.keys(fieldMap).length > 0 ? z.object(fieldMap) : z.object({});
 
-  return z.toJSONSchema(zodObject, {
+  const { $schema: _, ...jsonSchema } = z.toJSONSchema(zodObject, {
     io: "input",
+    target: "draft-7",
     unrepresentable: "any",
-  }) as Record<string, unknown>;
+  });
+  return jsonSchema;
 }

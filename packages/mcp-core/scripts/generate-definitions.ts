@@ -32,7 +32,12 @@ function zodFieldMapToJsonSchema(
 ): unknown {
   if (!fieldMap || Object.keys(fieldMap).length === 0) return {};
   const obj = z.object(fieldMap);
-  return z.toJSONSchema(obj, { io: "input", unrepresentable: "any" });
+  const { $schema: _, ...jsonSchema } = z.toJSONSchema(obj, {
+    io: "input",
+    target: "draft-7",
+    unrepresentable: "any",
+  });
+  return jsonSchema;
 }
 
 // Plugin variants whose agent frontmatter gets synced by this script.
@@ -160,10 +165,13 @@ function generateToolDefinitions({
       // Export full JSON Schema under inputSchema for external docs
       inputSchema: jsonSchema,
       outputSchema: t.outputSchema
-        ? z.toJSONSchema(t.outputSchema, {
-            io: "output",
-            unrepresentable: "any",
-          })
+        ? (({ $schema: _, ...jsonSchema }) => jsonSchema)(
+            z.toJSONSchema(t.outputSchema, {
+              io: "output",
+              target: "draft-7",
+              unrepresentable: "any",
+            }),
+          )
         : undefined,
       // Preserve tool access requirements for UIs/docs
       requiredScopes: t.requiredScopes,
