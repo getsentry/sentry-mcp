@@ -30,17 +30,22 @@ import type {
 } from "../api-client/types";
 import { logIssue } from "../telem/logging";
 import {
+  type CodeLocation,
+  findMostRelevantInAppFrame,
+  formatCodeLocation,
+} from "./code-location";
+import {
+  type AIConversationReference,
+  formatAIConversationActionInstructions,
+} from "./tool-helpers/ai-conversation-actions";
+import {
   getAutofixArtifactSummaries,
   getStatusDisplayName,
   isTerminalStatus,
 } from "./tool-helpers/seer";
 import { formatToolCallInstruction } from "./tool-helpers/tool-call-formatting";
-import {
-  formatAIConversationActionInstructions,
-  type AIConversationReference,
-} from "./tool-helpers/ai-conversation-actions";
-import { formatUserGeoSummary } from "./user-formatting";
 import { isPlainObject } from "./type-guards";
+import { formatUserGeoSummary } from "./user-formatting";
 
 /**
  * Convert Seer fixability score to actionability label.
@@ -416,12 +421,12 @@ function formatExceptionInterfaceOutput(
 
     // Only show enhanced frame for the first (outermost) exception to avoid overwhelming output
     if (index === 0) {
-      const firstInAppFrame = findFirstInAppFrame(frames);
+      const relevantFrame = findMostRelevantInAppFrame(frames);
       if (
-        firstInAppFrame &&
-        (firstInAppFrame.context?.length || firstInAppFrame.vars)
+        relevantFrame &&
+        (relevantFrame.context?.length || relevantFrame.vars)
       ) {
-        parts.push(renderEnhancedFrame(firstInAppFrame, event));
+        parts.push(renderEnhancedFrame(relevantFrame, event));
         parts.push("");
         parts.push("**Full Stacktrace:**");
         parts.push("────────────────");
@@ -590,13 +595,10 @@ function formatThreadsInterfaceOutput(
 
   const frames = crashedThread.stacktrace.frames;
 
-  // Find and format the first in-app frame with enhanced view
-  const firstInAppFrame = findFirstInAppFrame(frames);
-  if (
-    firstInAppFrame &&
-    (firstInAppFrame.context?.length || firstInAppFrame.vars)
-  ) {
-    parts.push(renderEnhancedFrame(firstInAppFrame, event));
+  // Find and format the most relevant in-app frame with enhanced view
+  const relevantFrame = findMostRelevantInAppFrame(frames);
+  if (relevantFrame && (relevantFrame.context?.length || relevantFrame.vars)) {
+    parts.push(renderEnhancedFrame(relevantFrame, event));
     parts.push("");
     parts.push("**Full Stacktrace:**");
     parts.push("────────────────");
@@ -725,12 +727,9 @@ export function formatThreadStacktraceOutput({
     parts.push("");
   }
 
-  const firstInAppFrame = findFirstInAppFrame(frames);
-  if (
-    firstInAppFrame &&
-    (firstInAppFrame.context?.length || firstInAppFrame.vars)
-  ) {
-    parts.push(renderEnhancedFrame(firstInAppFrame, event));
+  const relevantFrame = findMostRelevantInAppFrame(frames);
+  if (relevantFrame && (relevantFrame.context?.length || relevantFrame.vars)) {
+    parts.push(renderEnhancedFrame(relevantFrame, event));
     parts.push("");
     parts.push("**Full Stacktrace:**");
     parts.push("────────────────");
@@ -884,27 +883,6 @@ function renderVariablesTable(vars: Record<string, unknown>): string {
   });
 
   return lines.join("\n");
-}
-
-/**
- * Finds the first application frame (in_app) in a stack trace.
- * Searches from the bottom of the stack (oldest frame) to find the first
- * frame that belongs to the user's application code rather than libraries.
- *
- * @param frames - Array of stack frames, typically in reverse chronological order
- * @returns The first in-app frame found, or undefined if none exist
- */
-function findFirstInAppFrame(
-  frames: z.infer<typeof FrameInterface>[],
-): z.infer<typeof FrameInterface> | undefined {
-  // Frames are usually in reverse order (most recent first)
-  // We want the first in-app frame from the bottom
-  for (let i = frames.length - 1; i >= 0; i--) {
-    if (frames[i].inApp === true) {
-      return frames[i];
-    }
-  }
-  return undefined;
 }
 
 /**
@@ -1979,6 +1957,7 @@ export function formatIssueOutput({
   externalIssues,
   relatedReplayIds,
   aiConversations,
+  codeLocation,
   experimentalMode,
   availableToolNames,
   directToolNames,
@@ -1992,6 +1971,7 @@ export function formatIssueOutput({
   externalIssues?: ExternalIssueList;
   relatedReplayIds?: string[];
   aiConversations?: AIConversationReference[];
+  codeLocation?: CodeLocation;
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
@@ -2066,6 +2046,11 @@ export function formatIssueOutput({
   output += `**Project**: ${issue.project.name}\n`;
   output += `**URL**: ${apiService.getIssueUrl(organizationSlug, issue.shortId)}\n`;
   output += "\n";
+
+  if (codeLocation) {
+    output += formatCodeLocation(codeLocation);
+  }
+
   output += "## Event Details\n\n";
 
   // Check if this is an unsupported event type

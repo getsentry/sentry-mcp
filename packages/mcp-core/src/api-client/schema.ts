@@ -805,10 +805,13 @@ export const FrameInterface = z
     colNo: z.number().nullable(),
     absPath: z.string().nullable(),
     module: z.string().nullable(),
+    package: z.string().nullable(),
+    platform: z.string().nullable(),
+    sourceLink: z.string().nullable(),
     // lineno, source code
     context: z.array(z.tuple([z.number(), z.string()])),
     inApp: z.boolean().optional(),
-    vars: z.record(z.string(), z.unknown()).optional(),
+    vars: z.record(z.string(), z.unknown()).nullable().optional(),
   })
   .partial();
 
@@ -821,12 +824,15 @@ export const ExceptionInterface = z
         type: z.string().nullable(),
         handled: z.boolean().nullable(),
       })
-      .partial(),
+      .partial()
+      .nullable(),
     type: z.string().nullable(),
     value: z.string().nullable(),
-    stacktrace: z.object({
-      frames: z.array(FrameInterface),
-    }),
+    stacktrace: z
+      .object({
+        frames: z.array(FrameInterface),
+      })
+      .nullable(),
   })
   .partial();
 
@@ -933,6 +939,7 @@ const EventTagsSchema = z.preprocess((value) => {
 
 const BaseEventSchema = z.object({
   id: z.string(),
+  groupID: z.string().nullable().optional(),
   title: z.string(),
   message: z.string().nullable(),
   platform: z.string().nullable().optional(),
@@ -988,6 +995,26 @@ const BaseEventSchema = z.object({
   // "context" (singular) is the legacy "extra" field for arbitrary user-defined data
   // This is different from "contexts" (plural) which are structured contexts
   context: z.record(z.string(), z.unknown()).optional(),
+  sdk: z
+    .object({
+      name: z.string().nullable().optional(),
+    })
+    .passthrough()
+    .nullable()
+    .optional(),
+  release: z
+    .object({
+      lastCommit: z
+        .object({
+          id: z.string(),
+        })
+        .passthrough()
+        .nullable()
+        .optional(),
+    })
+    .passthrough()
+    .nullable()
+    .optional(),
   tags: EventTagsSchema.optional(),
   user: z
     .object({
@@ -1121,6 +1148,20 @@ export const EventSchema = z.union([
   GenericEventSchema,
   UnknownEventSchema,
 ]);
+
+export const StacktraceLinkSchema = z
+  .object({
+    config: z
+      .object({
+        repoName: z.string(),
+      })
+      .passthrough()
+      .nullable()
+      .optional(),
+    sourcePath: z.string().nullable().optional(),
+    sourceUrl: z.string().nullable().optional(),
+  })
+  .passthrough();
 
 export const EventsResponseSchema = z.object({
   data: z.array(z.unknown()),

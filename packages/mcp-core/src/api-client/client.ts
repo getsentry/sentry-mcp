@@ -77,6 +77,7 @@ import {
   ReplayListResponseSchema,
   ReplayIdsByResourceSchema,
   ReplayRecordingSegmentsSchema,
+  StacktraceLinkSchema,
   AIConversationSummaryListSchema,
   AIConversationSpanListSchema,
   UserReportListSchema,
@@ -129,6 +130,7 @@ import type {
   ReplayDetails,
   ReplayList,
   ReplayRecordingSegments,
+  StacktraceLink,
   AIConversationSummary,
   AIConversationSpanList,
   UserReportList,
@@ -3306,6 +3308,58 @@ export class SentryApiService {
       },
       opts,
     );
+  }
+
+  /**
+   * Resolves a stack frame through the project's configured source code mapping.
+   * The upstream endpoint verifies the mapped path with the SCM integration.
+   */
+  async getStacktraceLink(
+    {
+      organizationSlug,
+      projectSlug,
+      file,
+      platform,
+      lineNo,
+      absPath,
+      module,
+      package: framePackage,
+      commitId,
+      groupId,
+      sdkName,
+      signal,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      file: string;
+      platform?: string;
+      lineNo?: number;
+      absPath?: string;
+      module?: string;
+      package?: string;
+      commitId?: string;
+      groupId?: string;
+      sdkName?: string;
+      signal?: AbortSignal;
+    },
+    opts?: RequestOptions,
+  ): Promise<StacktraceLink> {
+    const query = new URLSearchParams({ file });
+    if (platform) query.set("platform", platform);
+    if (lineNo !== undefined) query.set("lineNo", String(lineNo));
+    if (absPath) query.set("absPath", absPath);
+    if (module) query.set("module", module);
+    if (framePackage) query.set("package", framePackage);
+    if (commitId) query.set("commitId", commitId);
+    if (groupId) query.set("groupId", groupId);
+    if (sdkName) query.set("sdkName", sdkName);
+
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/stacktrace-link/?${query.toString()}`,
+      { signal },
+      opts,
+    );
+    return StacktraceLinkSchema.parse(body);
   }
 
   /**

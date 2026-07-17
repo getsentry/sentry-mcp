@@ -103,6 +103,7 @@ import type {
   ReplayListResponseSchema,
   ReplayRecordingEventSchema,
   ReplayRecordingSegmentsSchema,
+  StacktraceLinkSchema,
   TagListSchema,
   TagSchema,
   TeamListSchema,
@@ -155,6 +156,7 @@ export type Event =
   | TransactionEvent
   | GenericEvent
   | UnknownEvent;
+export type StacktraceLink = z.infer<typeof StacktraceLinkSchema>;
 
 export type EventAttachment = z.infer<typeof EventAttachmentSchema>;
 export type Tag = z.infer<typeof TagSchema>;

@@ -926,6 +926,18 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/events/latest/",
     fetch: () => HttpResponse.json(eventsFixture),
   },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/CLOUDFLARE-MCP/stacktrace-link/",
+    fetch: () =>
+      HttpResponse.json({
+        config: null,
+        sourcePath: null,
+        sourceUrl: null,
+        integrations: [],
+        error: "no_code_mappings_for_project",
+      }),
+  },
 
   // Performance issue with N+1 query detection
   {

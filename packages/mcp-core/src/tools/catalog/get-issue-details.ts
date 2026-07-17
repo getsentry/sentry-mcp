@@ -1,38 +1,40 @@
-import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "../../internal/tool-helpers/define";
-import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import {
-  parseIssueParams,
-  formatIssueOutput,
-  assertIssueWithinProjectConstraint,
-} from "../../internal/tool-helpers/issue";
-import { enhanceNotFoundError } from "../../internal/tool-helpers/enhance-error";
+import { z } from "zod";
 import { ApiNotFoundError } from "../../api-client";
 import type { SentryApiService } from "../../api-client";
 import type {
   AutofixRunState,
-  Event,
-  ErrorEvent,
   DefaultEvent,
-  TransactionEvent,
-  Trace,
+  ErrorEvent,
+  Event,
   ExternalIssueList,
   Issue,
+  Trace,
+  TransactionEvent,
 } from "../../api-client/types";
 import { UserInputError } from "../../errors";
-import type { ServerContext } from "../../types";
-import { logError } from "../../telem/logging";
+import type { CodeLocation } from "../../internal/code-location";
 import {
-  addAIConversationSuggestedActions,
   type AIConversationReference,
+  addAIConversationSuggestedActions,
 } from "../../internal/tool-helpers/ai-conversation-actions";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { enhanceNotFoundError } from "../../internal/tool-helpers/enhance-error";
 import {
-  ParamOrganizationSlug,
-  ParamRegionUrl,
+  assertIssueWithinProjectConstraint,
+  formatIssueOutput,
+  parseIssueParams,
+} from "../../internal/tool-helpers/issue";
+import {
   ParamIssueShortId,
   ParamIssueUrl,
+  ParamOrganizationSlug,
+  ParamRegionUrl,
 } from "../../schema";
+import { logError } from "../../telem/logging";
+import type { ServerContext } from "../../types";
+import { resolveCodeLocation } from "../support/code-location";
 
 const MAX_AI_CONVERSATION_MATCHES = 3;
 const AI_CONVERSATION_LOOKUP_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -131,7 +133,7 @@ export default defineTool({
       });
       // For this call, we might want to provide context if it fails
       const [
-        { event, performanceTrace, aiConversations },
+        { event, performanceTrace, aiConversations, codeLocation },
         { autofixState, externalIssues, relatedReplayIds },
       ] = await Promise.all([
         apiService
@@ -153,10 +155,11 @@ export default defineTool({
           })
           .then(async (event) => ({
             event,
-            ...(await fetchEventTraceEnrichment({
+            ...(await fetchEventEnrichment({
               apiService,
               organizationSlug: orgSlug,
               event,
+              issue,
             })),
           })),
         fetchIssueEnrichmentData({
@@ -177,6 +180,7 @@ export default defineTool({
           externalIssues,
           relatedReplayIds,
           aiConversations,
+          codeLocation,
           experimentalMode: context.experimentalMode,
           availableToolNames: context.availableToolNames,
           directToolNames: context.directToolNames,
@@ -233,7 +237,7 @@ export default defineTool({
     });
 
     const [
-      { event, performanceTrace, aiConversations },
+      { event, performanceTrace, aiConversations, codeLocation },
       { autofixState, externalIssues, relatedReplayIds },
     ] = await Promise.all([
       apiService
@@ -243,10 +247,11 @@ export default defineTool({
         })
         .then(async (event) => ({
           event,
-          ...(await fetchEventTraceEnrichment({
+          ...(await fetchEventEnrichment({
             apiService,
             organizationSlug: orgSlug,
             event,
+            issue,
           })),
         })),
       fetchIssueEnrichmentData({
@@ -267,6 +272,7 @@ export default defineTool({
         externalIssues,
         relatedReplayIds,
         aiConversations,
+        codeLocation,
         experimentalMode: context.experimentalMode,
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
@@ -280,19 +286,22 @@ export default defineTool({
   },
 });
 
-async function fetchEventTraceEnrichment({
+async function fetchEventEnrichment({
   apiService,
   organizationSlug,
   event,
+  issue,
 }: {
   apiService: SentryApiService;
   organizationSlug: string;
   event: Event;
+  issue: Issue;
 }): Promise<{
   performanceTrace: Trace | undefined;
   aiConversations: AIConversationReference[];
+  codeLocation: CodeLocation | undefined;
 }> {
-  const [performanceTrace, aiConversations] = await Promise.all([
+  const [performanceTrace, aiConversations, codeLocation] = await Promise.all([
     maybeFetchPerformanceTrace({
       apiService,
       organizationSlug,
@@ -303,9 +312,15 @@ async function fetchEventTraceEnrichment({
       organizationSlug,
       event,
     }),
+    resolveCodeLocation({
+      apiService,
+      organizationSlug,
+      projectSlug: issue.project.slug,
+      event,
+    }),
   ]);
 
-  return { performanceTrace, aiConversations };
+  return { performanceTrace, aiConversations, codeLocation };
 }
 
 /**
