@@ -1,4 +1,3 @@
-import type { ServerOptions as LegacyServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
 import { McpServer as LegacyMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 /**
  * MCP Server Configuration and Request Handling Infrastructure.
@@ -21,7 +20,6 @@ import { McpServer as LegacyMcpServer } from "@modelcontextprotocol/sdk/server/m
  * ```
  */
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import type { ServerOptions as ModernServerOptions } from "@modelcontextprotocol/server";
 import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import {
   type SpanAttributeValue,
@@ -125,46 +123,14 @@ function structuredOutputToCallToolResult(
  * await startStdio(server, context);
  * ```
  *
- * @example Usage with Cloudflare Workers
- * ```typescript
- * import { buildServer } from "@sentry/mcp-core/server";
- * import { createMcpHandler } from "agents/mcp";
- * import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
- *
- * const serverContext = buildContextFromOAuth();
- * // Context is captured in closures during buildServer()
- * // Use CfWorkerJsonSchemaValidator for Cloudflare Workers (ajv is not compatible)
- * const server = buildServer({
- *   context: serverContext,
- *   jsonSchemaValidator: new CfWorkerJsonSchemaValidator(),
- * });
- *
- * // Context already available to tool handlers via closures
- * return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
- * ```
  */
 type McpServer = LegacyMcpServer | ModernMcpServer;
-type JsonSchemaValidator =
-  | LegacyServerOptions["jsonSchemaValidator"]
-  | ModernServerOptions["jsonSchemaValidator"];
 
 type BuildServerOptions = {
   context: ServerContext;
   agentMode?: boolean;
   experimentalMode?: boolean;
   tools?: ToolRegistry;
-  /**
-   * JSON Schema validator for MCP protocol validation.
-   *
-   * By default, uses AjvJsonSchemaValidator which requires Node.js.
-   * For Cloudflare Workers or other edge runtimes, use CfWorkerJsonSchemaValidator:
-   *
-   * ```typescript
-   * import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
-   * buildServer({ context, jsonSchemaValidator: new CfWorkerJsonSchemaValidator() });
-   * ```
-   */
-  jsonSchemaValidator?: JsonSchemaValidator;
 };
 
 export function buildServer(
@@ -176,20 +142,16 @@ export function buildServer({
   agentMode = false,
   experimentalMode = false,
   tools: customTools,
-  jsonSchemaValidator,
   protocolVersion = "legacy",
 }: BuildServerOptions & {
   protocolVersion?: "legacy" | "draft";
 }): McpServer {
   const McpServerConstructor =
     protocolVersion === "draft" ? ModernMcpServer : LegacyMcpServer;
-  const server = new McpServerConstructor(
-    {
-      name: MCP_SERVER_NAME,
-      version: LIB_VERSION,
-    },
-    { jsonSchemaValidator },
-  );
+  const server = new McpServerConstructor({
+    name: MCP_SERVER_NAME,
+    version: LIB_VERSION,
+  });
 
   const contextWithModes: ServerContext = {
     ...context,

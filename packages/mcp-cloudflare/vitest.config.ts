@@ -33,12 +33,13 @@ export default defineConfig({
   /**
    * Workaround for ajv CJS compatibility in workerd runtime.
    *
-   * The MCP SDK imports ajv at module level (even when using CfWorkerJsonSchemaValidator).
-   * ajv uses CJS require() for JSON files which fails in workerd.
+   * The legacy MCP SDK imports ajv at module level even though hosted requests use
+   * the v2 SDK's workerd-compatible default validator. ajv uses CJS require() for
+   * JSON files which fails in workerd.
    * See: https://github.com/cloudflare/workers-sdk/issues/9822
    *
-   * This is TEST-ONLY - production uses CfWorkerJsonSchemaValidator which
-   * doesn't actually invoke ajv, but the import still triggers the CJS issue.
+   * This is TEST-ONLY: hosted MCP requests do not invoke ajv, but importing the
+   * legacy SDK still triggers the CJS issue.
    */
   resolve: {
     alias: {

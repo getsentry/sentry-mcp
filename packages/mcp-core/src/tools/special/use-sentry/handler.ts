@@ -1,13 +1,13 @@
-import { z } from "zod";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { experimental_createMCPClient } from "@ai-sdk/mcp";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { z } from "zod";
+import type { ToolCall } from "../../../internal/agents/callEmbeddedAgent";
 import { defineTool } from "../../../internal/tool-helpers/define";
-import type { ServerContext } from "../../../types";
-import { useSentryAgent } from "./agent";
 import { buildServer } from "../../../server";
+import type { ServerContext } from "../../../types";
 import tools from "../../index";
 import { CATALOG_INFRASTRUCTURE_TOOL_NAMES } from "../../surfaces";
-import type { ToolCall } from "../../../internal/agents/callEmbeddedAgent";
+import { useSentryAgent } from "./agent";
 
 /**
  * Format tool calls into a readable trace
@@ -106,10 +106,6 @@ export default defineTool({
 
     // Build internal MCP server with the provided context.
     // Context is captured in tool handler closures during buildServer().
-    // We do not thread a jsonSchemaValidator here because the current SDK only
-    // uses it for elicitation responses, and use_sentry does not use elicitation
-    // today. If embedded-agent flows add elicitation later, Cloudflare agent mode
-    // will need to pass CfWorkerJsonSchemaValidator through this path as well.
     const server = buildServer({
       context,
       experimentalMode: context.experimentalMode ?? false,
