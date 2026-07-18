@@ -419,6 +419,8 @@ function configureServer({
       }
     };
 
+    // Narrow the server union so each SDK's registerTool overload is checked.
+    // The registration shape is intentionally shared and covered for both SDKs.
     if (server instanceof ModernMcpServer) {
       server.registerTool(tool.name, toolRegistration, handleToolCall);
     } else {
