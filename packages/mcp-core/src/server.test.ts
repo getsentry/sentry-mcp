@@ -153,14 +153,36 @@ describe("buildServer", () => {
     ...options,
   });
 
-  it("builds an SDK v2 server when requested", () => {
+  it("registers and executes tools with the SDK v2 server", async () => {
     const server = buildServer({
       context: baseContext,
-      tools: {},
+      tools: {
+        v2_tool: createMockTool("v2_tool", {
+          inputSchema: { value: z.string() },
+          handler: async ({ value }) => `v2:${value}`,
+        }),
+      },
       sdkVersion: "v2",
     });
 
     expect(server).toBeInstanceOf(ModernMcpServer);
+    const registeredTools = (
+      server as unknown as {
+        _registeredTools: Record<
+          string,
+          {
+            handler: (params: Record<string, unknown>) => Promise<unknown>;
+          }
+        >;
+      }
+    )._registeredTools;
+
+    expect(registeredTools.v2_tool).toBeDefined();
+    await expect(
+      registeredTools.v2_tool?.handler({ value: "ok" }),
+    ).resolves.toMatchObject({
+      content: [{ type: "text", text: "v2:ok" }],
+    });
   });
 
   describe("telemetry context", () => {
