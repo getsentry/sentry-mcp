@@ -195,6 +195,27 @@ pnpm -w run cli "who am I?"
 - Automatically refreshed when expired
 - To force re-auth: delete the token file
 
+**Running in a VM or container:**
+
+The callback server defaults to `127.0.0.1:8765`, which a browser on the host
+cannot reach. Three environment variables override it:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MCP_OAUTH_PORT` | `8765` | Port the callback server listens on |
+| `MCP_OAUTH_HOST` | `127.0.0.1` | Address the callback server binds to |
+| `MCP_OAUTH_REDIRECT_URI` | `http://localhost:$MCP_OAUTH_PORT/callback` | Redirect URI sent to the OAuth server |
+
+```bash
+# Bind on all interfaces and send the browser to the forwarded address
+MCP_OAUTH_HOST=0.0.0.0 \
+MCP_OAUTH_REDIRECT_URI=http://192.168.1.20:8765/callback \
+  pnpm -w run cli "who am I?"
+```
+
+Set `MCP_OAUTH_REDIRECT_URI` whenever the address the browser uses differs from
+the one the CLI binds to, such as behind port forwarding or a devcontainer.
+
 ### Direct Sentry Token Testing
 
 Remote `/mcp` also accepts explicit upstream Sentry API tokens with a separate
