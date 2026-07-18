@@ -134,7 +134,7 @@ type BuildServerOptions = {
 };
 
 export function buildServer(
-  options: BuildServerOptions & { protocolVersion: "draft" },
+  options: BuildServerOptions & { sdkVersion: "v2" },
 ): ModernMcpServer;
 export function buildServer(options: BuildServerOptions): LegacyMcpServer;
 export function buildServer({
@@ -142,12 +142,12 @@ export function buildServer({
   agentMode = false,
   experimentalMode = false,
   tools: customTools,
-  protocolVersion = "legacy",
+  sdkVersion = "v1",
 }: BuildServerOptions & {
-  protocolVersion?: "legacy" | "draft";
+  sdkVersion?: "v1" | "v2";
 }): McpServer {
   const McpServerConstructor =
-    protocolVersion === "draft" ? ModernMcpServer : LegacyMcpServer;
+    sdkVersion === "v2" ? ModernMcpServer : LegacyMcpServer;
   const server = new McpServerConstructor({
     name: MCP_SERVER_NAME,
     version: LIB_VERSION,

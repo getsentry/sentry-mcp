@@ -153,11 +153,11 @@ describe("buildServer", () => {
     ...options,
   });
 
-  it("builds an SDK v2 server for draft protocol handlers", () => {
+  it("builds an SDK v2 server when requested", () => {
     const server = buildServer({
       context: baseContext,
       tools: {},
-      protocolVersion: "draft",
+      sdkVersion: "v2",
     });
 
     expect(server).toBeInstanceOf(ModernMcpServer);

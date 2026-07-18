@@ -457,7 +457,7 @@ async function handleAuthenticatedMcpRequest(
         context: serverContext,
         agentMode: isAgentMode,
         experimentalMode: isExperimentalMode,
-        protocolVersion: "draft",
+        sdkVersion: "v2",
       }),
     {
       route: url.pathname,
