@@ -145,27 +145,42 @@ export function buildServer({
 }: BuildServerOptions & {
   sdkVersion?: "v1" | "v2";
 }): McpServer {
-  const McpServerConstructor =
-    sdkVersion === "v2" ? ModernMcpServer : LegacyMcpServer;
-  const server = new McpServerConstructor({
-    name: MCP_SERVER_NAME,
-    version: LIB_VERSION,
-  });
-
   const contextWithModes: ServerContext = {
     ...context,
     agentMode,
     experimentalMode,
   };
+  const serverInfo = {
+    name: MCP_SERVER_NAME,
+    version: LIB_VERSION,
+  };
 
-  configureServer({
+  if (sdkVersion === "v2") {
+    const server = new ModernMcpServer(serverInfo);
+    const registrations = configureServer({
+      server,
+      context: contextWithModes,
+      agentMode,
+      experimentalMode,
+      tools: customTools,
+    });
+    for (const { name, config, handler } of registrations) {
+      server.registerTool(name, config, handler);
+    }
+    return wrapMcpServerWithSentry(server);
+  }
+
+  const server = new LegacyMcpServer(serverInfo);
+  const registrations = configureServer({
     server,
     context: contextWithModes,
     agentMode,
     experimentalMode,
     tools: customTools,
   });
-
+  for (const { name, config, handler } of registrations) {
+    server.registerTool(name, config, handler);
+  }
   return wrapMcpServerWithSentry(server);
 }
 
@@ -191,6 +206,7 @@ function configureServer({
   experimentalMode?: boolean;
   tools?: ToolRegistry;
 }) {
+  const registrations = [];
   const registry: ToolRegistry = agentMode
     ? { use_sentry: tools.use_sentry }
     : (customTools ?? tools);
@@ -419,12 +435,12 @@ function configureServer({
       }
     };
 
-    // Narrow the server union so each SDK's registerTool overload is checked.
-    // The registration shape is intentionally shared and covered for both SDKs.
-    if (server instanceof ModernMcpServer) {
-      server.registerTool(tool.name, toolRegistration, handleToolCall);
-    } else {
-      server.registerTool(tool.name, toolRegistration, handleToolCall);
-    }
+    registrations.push({
+      name: tool.name,
+      config: toolRegistration,
+      handler: handleToolCall,
+    });
   }
+
+  return registrations;
 }
