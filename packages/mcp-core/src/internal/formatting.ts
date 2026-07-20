@@ -2169,7 +2169,10 @@ export function formatIssueOutput({
       availableToolNames,
       directToolNames,
     });
-    output += event.formatted.content;
+    const formattedContent = event.formatted.content;
+    output += formattedContent.endsWith("\n")
+      ? formattedContent
+      : `${formattedContent}\n`;
   } else {
     output += formatEventOutput(event, {
       performanceTrace,
