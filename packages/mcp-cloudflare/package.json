@@ -50,6 +50,7 @@
     "@ai-sdk/react": "catalog:",
     "@cloudflare/workers-oauth-provider": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
     "@radix-ui/react-accordion": "catalog:",
     "@radix-ui/react-slot": "catalog:",
     "@sentry/cloudflare": "catalog:",

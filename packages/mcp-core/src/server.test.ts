@@ -1,12 +1,13 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import { type Span, setUser, startSpan } from "@sentry/core";
+import { mswServer } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mswServer } from "@sentry/mcp-server-mocks";
 import { z } from "zod";
-import { buildServer } from "./server";
 import { structuredResult } from "./internal/tool-helpers/results";
+import { buildServer } from "./server";
 import type { Skill } from "./skills";
 import {
   getGeneratedTextFromStructuredContent,
@@ -150,6 +151,38 @@ describe("buildServer", () => {
     annotations: {},
     handler: async () => "result",
     ...options,
+  });
+
+  it("registers and executes tools with the SDK v2 server", async () => {
+    const server = buildServer({
+      context: baseContext,
+      tools: {
+        v2_tool: createMockTool("v2_tool", {
+          inputSchema: { value: z.string() },
+          handler: async ({ value }) => `v2:${value}`,
+        }),
+      },
+      sdkVersion: "v2",
+    });
+
+    expect(server).toBeInstanceOf(ModernMcpServer);
+    const registeredTools = (
+      server as unknown as {
+        _registeredTools: Record<
+          string,
+          {
+            handler: (params: Record<string, unknown>) => Promise<unknown>;
+          }
+        >;
+      }
+    )._registeredTools;
+
+    expect(registeredTools.v2_tool).toBeDefined();
+    await expect(
+      registeredTools.v2_tool?.handler({ value: "ok" }),
+    ).resolves.toMatchObject({
+      content: [{ type: "text", text: "v2:ok" }],
+    });
   });
 
   describe("telemetry context", () => {

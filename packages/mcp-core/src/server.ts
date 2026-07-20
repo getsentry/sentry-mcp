@@ -1,4 +1,4 @@
-import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer as LegacyMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 /**
  * MCP Server Configuration and Request Handling Infrastructure.
  *
@@ -19,8 +19,8 @@ import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
  * });
  * ```
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import {
   type SpanAttributeValue,
   getActiveSpan,
@@ -34,11 +34,10 @@ import { formatErrorForUser } from "./internal/error-handling";
 import type { Skill } from "./skills";
 import { type LogIssueOptions, logIssue } from "./telem/logging";
 import {
-  type RegisteredToolHandlerExtra,
   type ToolRegistry,
   executeToolHandler,
-  getFilteredInputSchema,
   getAvailableTools,
+  getFilteredInputSchema,
   injectConstraintParams,
   resolveToolDescription,
 } from "./tools/catalog-runtime/availability";
@@ -123,70 +122,65 @@ function structuredOutputToCallToolResult(
  * await startStdio(server, context);
  * ```
  *
- * @example Usage with Cloudflare Workers
- * ```typescript
- * import { buildServer } from "@sentry/mcp-core/server";
- * import { createMcpHandler } from "agents/mcp";
- * import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
- *
- * const serverContext = buildContextFromOAuth();
- * // Context is captured in closures during buildServer()
- * // Use CfWorkerJsonSchemaValidator for Cloudflare Workers (ajv is not compatible)
- * const server = buildServer({
- *   context: serverContext,
- *   jsonSchemaValidator: new CfWorkerJsonSchemaValidator(),
- * });
- *
- * // Context already available to tool handlers via closures
- * return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
- * ```
  */
+type McpServer = LegacyMcpServer | ModernMcpServer;
+
+type BuildServerOptions = {
+  context: ServerContext;
+  agentMode?: boolean;
+  experimentalMode?: boolean;
+  tools?: ToolRegistry;
+};
+
+export function buildServer(
+  options: BuildServerOptions & { sdkVersion: "v2" },
+): ModernMcpServer;
+export function buildServer(options: BuildServerOptions): LegacyMcpServer;
 export function buildServer({
   context,
   agentMode = false,
   experimentalMode = false,
   tools: customTools,
-  jsonSchemaValidator,
-}: {
-  context: ServerContext;
-  agentMode?: boolean;
-  experimentalMode?: boolean;
-  tools?: ToolRegistry;
-  /**
-   * JSON Schema validator for MCP protocol validation.
-   *
-   * By default, uses AjvJsonSchemaValidator which requires Node.js.
-   * For Cloudflare Workers or other edge runtimes, use CfWorkerJsonSchemaValidator:
-   *
-   * ```typescript
-   * import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
-   * buildServer({ context, jsonSchemaValidator: new CfWorkerJsonSchemaValidator() });
-   * ```
-   */
-  jsonSchemaValidator?: ServerOptions["jsonSchemaValidator"];
+  sdkVersion = "v1",
+}: BuildServerOptions & {
+  sdkVersion?: "v1" | "v2";
 }): McpServer {
-  const server = new McpServer(
-    {
-      name: MCP_SERVER_NAME,
-      version: LIB_VERSION,
-    },
-    { jsonSchemaValidator },
-  );
-
   const contextWithModes: ServerContext = {
     ...context,
     agentMode,
     experimentalMode,
   };
+  const serverInfo = {
+    name: MCP_SERVER_NAME,
+    version: LIB_VERSION,
+  };
 
-  configureServer({
+  if (sdkVersion === "v2") {
+    const server = new ModernMcpServer(serverInfo);
+    const registrations = configureServer({
+      server,
+      context: contextWithModes,
+      agentMode,
+      experimentalMode,
+      tools: customTools,
+    });
+    for (const { name, config, handler } of registrations) {
+      server.registerTool(name, config, handler);
+    }
+    return wrapMcpServerWithSentry(server);
+  }
+
+  const server = new LegacyMcpServer(serverInfo);
+  const registrations = configureServer({
     server,
     context: contextWithModes,
     agentMode,
     experimentalMode,
     tools: customTools,
   });
-
+  for (const { name, config, handler } of registrations) {
+    server.registerTool(name, config, handler);
+  }
   return wrapMcpServerWithSentry(server);
 }
 
@@ -212,6 +206,7 @@ function configureServer({
   experimentalMode?: boolean;
   tools?: ToolRegistry;
 }) {
+  const registrations = [];
   const registry: ToolRegistry = agentMode
     ? { use_sentry: tools.use_sentry }
     : (customTools ?? tools);
@@ -267,183 +262,185 @@ function configureServer({
       directToolNames: contextWithToolAvailability.directToolNames,
     });
 
-    server.registerTool(
-      tool.name,
-      {
-        description: resolvedDescription,
-        inputSchema: filteredInputSchema,
-        outputSchema: tool.outputSchema,
-        annotations: tool.annotations,
-      },
-      async (params: unknown, extra: RegisteredToolHandlerExtra) => {
-        // Get the active MCP server span and attach request-scoped attributes.
-        const activeSpan = getActiveSpan();
+    const toolRegistration = {
+      description: resolvedDescription,
+      inputSchema: filteredInputSchema,
+      outputSchema: tool.outputSchema,
+      annotations: tool.annotations,
+    };
+    const handleToolCall = async (params: unknown): Promise<CallToolResult> => {
+      // Get the active MCP server span and attach request-scoped attributes.
+      const activeSpan = getActiveSpan();
 
-        if (activeSpan) {
-          activeSpan.setAttribute("app.server.mode.agent", agentMode);
-          activeSpan.setAttribute(
-            "app.server.mode.experimental",
-            experimentalMode,
-          );
-          if (context.transport) {
-            activeSpan.setAttribute("app.transport", context.transport);
-          }
-          if (context.clientFamily) {
-            activeSpan.setAttribute("app.client.family", context.clientFamily);
-          }
-          if (context.constraints.organizationSlug) {
-            activeSpan.setAttribute(
-              "app.constraint.organization_slug",
-              context.constraints.organizationSlug,
-            );
-          }
-          if (context.constraints.projectSlug) {
-            activeSpan.setAttribute(
-              "app.constraint.project_slug",
-              context.constraints.projectSlug,
-            );
-          }
-          if (grantedSkillIds?.length) {
-            for (const skill of grantedSkillIds) {
-              activeSpan.setAttribute(
-                getSkillGrantedAttributeName(skill),
-                true,
-              );
-            }
-          }
-        }
-
-        if (context.userId) {
-          const user = {
-            id: context.userId,
-            ...(context.userIpAddress
-              ? { ip_address: context.userIpAddress }
-              : {}),
-          };
-          setUser(user);
-        }
-        if (context.clientId) {
-          setTag("client.id", context.clientId);
+      if (activeSpan) {
+        activeSpan.setAttribute("app.server.mode.agent", agentMode);
+        activeSpan.setAttribute(
+          "app.server.mode.experimental",
+          experimentalMode,
+        );
+        if (context.transport) {
+          activeSpan.setAttribute("app.transport", context.transport);
         }
         if (context.clientFamily) {
-          setTag("app.client.family", context.clientFamily);
+          activeSpan.setAttribute("app.client.family", context.clientFamily);
         }
-        if (context.transport) {
-          setTag("app.transport", context.transport);
-        }
-        setTag("app.server.mode.agent", agentMode);
-        setTag("app.server.mode.experimental", experimentalMode);
-
-        try {
-          const rawParams =
-            params && typeof params === "object" && !Array.isArray(params)
-              ? (params as Record<string, unknown>)
-              : {};
-          // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
-          const paramsWithConstraints = injectConstraintParams(
-            rawParams,
-            tool,
-            contextWithToolAvailability,
+        if (context.constraints.organizationSlug) {
+          activeSpan.setAttribute(
+            "app.constraint.organization_slug",
+            context.constraints.organizationSlug,
           );
-
-          if (activeSpan) {
-            // Intentional GenAI semconv extension: per-key attrs like http.request.header.<key>.
-            for (const [key, value] of Object.entries(paramsWithConstraints)) {
-              const attributeValue =
-                value == null || typeof value === "object"
-                  ? JSON.stringify(value)
-                  : value;
-              activeSpan.setAttribute(
-                `gen_ai.tool.call.arguments.${key}`,
-                attributeValue as SpanAttributeValue | undefined,
-              );
-            }
+        }
+        if (context.constraints.projectSlug) {
+          activeSpan.setAttribute(
+            "app.constraint.project_slug",
+            context.constraints.projectSlug,
+          );
+        }
+        if (grantedSkillIds?.length) {
+          for (const skill of grantedSkillIds) {
+            activeSpan.setAttribute(getSkillGrantedAttributeName(skill), true);
           }
+        }
+      }
 
-          const output = await executeToolHandler({
-            tool,
-            params: rawParams,
-            context: contextWithToolAvailability,
+      if (context.userId) {
+        const user = {
+          id: context.userId,
+          ...(context.userIpAddress
+            ? { ip_address: context.userIpAddress }
+            : {}),
+        };
+        setUser(user);
+      }
+      if (context.clientId) {
+        setTag("client.id", context.clientId);
+      }
+      if (context.clientFamily) {
+        setTag("app.client.family", context.clientFamily);
+      }
+      if (context.transport) {
+        setTag("app.transport", context.transport);
+      }
+      setTag("app.server.mode.agent", agentMode);
+      setTag("app.server.mode.experimental", experimentalMode);
+
+      try {
+        const rawParams =
+          params && typeof params === "object" && !Array.isArray(params)
+            ? (params as Record<string, unknown>)
+            : {};
+        // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
+        const paramsWithConstraints = injectConstraintParams(
+          rawParams,
+          tool,
+          contextWithToolAvailability,
+        );
+
+        if (activeSpan) {
+          // Intentional GenAI semconv extension: per-key attrs like http.request.header.<key>.
+          for (const [key, value] of Object.entries(paramsWithConstraints)) {
+            const attributeValue =
+              value == null || typeof value === "object"
+                ? JSON.stringify(value)
+                : value;
+            activeSpan.setAttribute(
+              `gen_ai.tool.call.arguments.${key}`,
+              attributeValue as SpanAttributeValue | undefined,
+            );
+          }
+        }
+
+        const output = await executeToolHandler({
+          tool,
+          params: rawParams,
+          context: contextWithToolAvailability,
+        });
+
+        if (activeSpan) {
+          activeSpan.setStatus({
+            code: 1, // ok
           });
+        }
 
-          if (activeSpan) {
-            activeSpan.setStatus({
-              code: 1, // ok
-            });
-          }
-
-          // if the tool returns a string, assume it's a message
-          if (typeof output === "string") {
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: output,
-                },
-              ],
-            };
-          }
-          // if the tool returns a list, assume it's a content list
-          if (Array.isArray(output)) {
-            return {
-              content: output,
-            };
-          }
-          // Some tools return a full MCP CallToolResult for custom content
-          // payloads such as images or resources.
-          if (isCallToolResult(output)) {
-            return output;
-          }
-          if (isStructuredToolOutput(output)) {
-            return structuredOutputToCallToolResult(output);
-          }
-          throw new Error(`Invalid tool output: ${output}`);
-        } catch (error) {
-          if (activeSpan) {
-            activeSpan.setStatus({
-              code: 2, // error
-            });
-            activeSpan.recordException(error);
-          }
-
-          // Upstream 401 during a tool call — route via the transport so it
-          // can revoke the MCP grant; swallow callback errors since the
-          // formatted tool response still needs to land.
-          if (
-            isApiAuthenticationErrorDeep(error) &&
-            context.onUpstreamUnauthorized
-          ) {
-            try {
-              await context.onUpstreamUnauthorized();
-            } catch {}
-          }
-
-          // CRITICAL: Tool errors MUST be returned as formatted text responses,
-          // NOT thrown as exceptions. This ensures consistent error handling
-          // and prevents the MCP client from receiving raw error objects.
-          //
-          // The formatErrorForUser function provides user-friendly error messages
-          // with appropriate formatting for different error types:
-          // - UserInputError: Clear guidance for fixing input problems
-          // - ConfigurationError: Clear guidance for fixing configuration issues
-          // - LLMProviderError: Clear messaging for AI provider availability issues
-          // - ApiError: HTTP status context with helpful messaging
-          // - System errors: Sentry event IDs for debugging
-          //
-          // DO NOT change this to throw error - it breaks error handling!
+        // if the tool returns a string, assume it's a message
+        if (typeof output === "string") {
           return {
             content: [
               {
                 type: "text" as const,
-                text: await formatErrorForUser(error, {
-                  transport: context.transport,
-                }),
+                text: output,
               },
             ],
-            isError: true,
           };
         }
-      },
-    );
+        // if the tool returns a list, assume it's a content list
+        if (Array.isArray(output)) {
+          return {
+            content: output,
+          };
+        }
+        // Some tools return a full MCP CallToolResult for custom content
+        // payloads such as images or resources.
+        if (isCallToolResult(output)) {
+          return output;
+        }
+        if (isStructuredToolOutput(output)) {
+          return structuredOutputToCallToolResult(output);
+        }
+        throw new Error(`Invalid tool output: ${output}`);
+      } catch (error) {
+        if (activeSpan) {
+          activeSpan.setStatus({
+            code: 2, // error
+          });
+          activeSpan.recordException(error);
+        }
+
+        // Upstream 401 during a tool call — route via the transport so it
+        // can revoke the MCP grant; swallow callback errors since the
+        // formatted tool response still needs to land.
+        if (
+          isApiAuthenticationErrorDeep(error) &&
+          context.onUpstreamUnauthorized
+        ) {
+          try {
+            await context.onUpstreamUnauthorized();
+          } catch {}
+        }
+
+        // CRITICAL: Tool errors MUST be returned as formatted text responses,
+        // NOT thrown as exceptions. This ensures consistent error handling
+        // and prevents the MCP client from receiving raw error objects.
+        //
+        // The formatErrorForUser function provides user-friendly error messages
+        // with appropriate formatting for different error types:
+        // - UserInputError: Clear guidance for fixing input problems
+        // - ConfigurationError: Clear guidance for fixing configuration issues
+        // - LLMProviderError: Clear messaging for AI provider availability issues
+        // - ApiError: HTTP status context with helpful messaging
+        // - System errors: Sentry event IDs for debugging
+        //
+        // DO NOT change this to throw error - it breaks error handling!
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: await formatErrorForUser(error, {
+                transport: context.transport,
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+    };
+
+    registrations.push({
+      name: tool.name,
+      config: toolRegistration,
+      handler: handleToolCall,
+    });
   }
+
+  return registrations;
 }
