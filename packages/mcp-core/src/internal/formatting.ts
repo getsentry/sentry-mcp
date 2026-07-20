@@ -42,6 +42,7 @@ import {
   getAutofixArtifactSummaries,
   getStatusDisplayName,
   isTerminalStatus,
+  wrapSeerContent,
 } from "./tool-helpers/seer";
 import { formatToolCallInstruction } from "./tool-helpers/tool-call-formatting";
 import { isPlainObject } from "./type-guards";
@@ -1904,6 +1905,16 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
     return "";
   }
 
+  // Prefer the shared formatter's analysis when the endpoint provides it.
+  // Seer content is LLM-generated, so wrap it in the untrusted-data boundary.
+  if (autofixState.formatted?.content) {
+    const wrapped = wrapSeerContent(
+      autofixState.formatted.content,
+      autofixState.autofix.run_id,
+    );
+    return `## Seer Analysis\n\n${wrapped}\n`;
+  }
+
   const { autofix } = autofixState;
   const parts: string[] = [];
 
@@ -2113,12 +2124,12 @@ export function formatIssueOutput({
   // "default" type represents error events without exception data
   // "generic" type represents performance regressions and metric-based issues
   // "csp" type represents Content Security Policy violations
-  if (
+  const isSharedFormatterType =
     event.type === "error" ||
     event.type === "default" ||
     event.type === "generic" ||
-    event.type === "csp"
-  ) {
+    event.type === "csp";
+  if (isSharedFormatterType) {
     const typedEvent = event as
       | z.infer<typeof ErrorEventSchema>
       | z.infer<typeof DefaultEventSchema>
@@ -2132,13 +2143,7 @@ export function formatIssueOutput({
     output += `**Message**:\n${event.message}\n`;
   }
   output += "\n";
-  if (
-    (event.type === "error" ||
-      event.type === "default" ||
-      event.type === "generic" ||
-      event.type === "csp") &&
-    event.formatted?.content
-  ) {
+  if (isSharedFormatterType && event.formatted?.content) {
     // the shared formatter body doesn't include the replay note — add it here to match formatEventOutput
     output += formatIssueReplayOutput({
       apiService,

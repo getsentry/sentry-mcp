@@ -88,7 +88,9 @@ describe("analyze_issue_with_seer", () => {
     );
 
     expect(result).toContain("SHARED-AUTOFIX-MARKER"); // body from the shared /autofix/ formatter
-    expect(result).not.toContain("<seer_analysis"); // not MCP's getOutputForAutofixRun
+    // LLM-generated content is still wrapped in the untrusted-data boundary
+    expect(result).toContain('<seer_analysis run_id="42" step="analysis">');
+    expect(result).toContain("</seer_analysis>");
   });
 
   it("wraps completed Seer-authored sections with provenance tags", async () => {
