@@ -198,6 +198,7 @@ function createMcpInitializeRequest(accessToken: string, path = "/mcp") {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
       "CF-Connecting-IP": "192.0.2.1",
+      Host: "localhost",
     },
     body: JSON.stringify({
       jsonrpc: "2.0",

@@ -66,6 +66,7 @@ function createMcpRequest(
     "Content-Type": "application/json",
     Accept: "application/json, text/event-stream",
     "CF-Connecting-IP": "192.0.2.1",
+    Host: "localhost",
   };
   if (bearerToken) {
     headers.Authorization = `Bearer ${bearerToken}`;
