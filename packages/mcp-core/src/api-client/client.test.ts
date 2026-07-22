@@ -695,36 +695,19 @@ describe("listOrganizations", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("should fetch from regions endpoint for SaaS", async () => {
-    const mockRegionsResponse = {
-      regions: [
-        { name: "US", url: "https://us.sentry.io" },
-        { name: "EU", url: "https://eu.sentry.io" },
-      ],
-    };
-
-    const mockOrgsUs = [{ id: "1", slug: "org-us", name: "Org US" }];
-    const mockOrgsEu = [{ id: "2", slug: "org-eu", name: "Org EU" }];
+  it("should fetch from the organizations endpoint on the root host for SaaS", async () => {
+    const mockOrgs = [
+      { id: "1", slug: "org-us", name: "Org US" },
+      { id: "2", slug: "org-eu", name: "Org EU" },
+    ];
 
     let callCount = 0;
     globalThis.fetch = vi.fn().mockImplementation((url: string) => {
       callCount++;
-      if (url.includes("/users/me/regions/")) {
+      if (url.includes("/organizations/")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockRegionsResponse),
-        });
-      }
-      if (url.includes("us.sentry.io")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockOrgsUs),
-        });
-      }
-      if (url.includes("eu.sentry.io")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockOrgsEu),
+          json: () => Promise.resolve(mockOrgs),
         });
       }
       return Promise.reject(new Error("Unexpected URL"));
@@ -737,10 +720,15 @@ describe("listOrganizations", () => {
 
     const result = await apiService.listOrganizations();
 
-    expect(callCount).toBe(3); // 1 regions call + 2 org calls
+    expect(callCount).toBe(1); // Single call, no region fanout
     expect(result).toHaveLength(2);
     expect(result).toContainEqual(expect.objectContaining({ slug: "org-us" }));
     expect(result).toContainEqual(expect.objectContaining({ slug: "org-eu" }));
+    // Region fanout is no longer used
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/users/me/regions/"),
+      expect.any(Object),
+    );
   });
 
   it("should fetch directly from organizations endpoint for self-hosted", async () => {
@@ -774,51 +762,6 @@ describe("listOrganizations", () => {
     // Verify that regions endpoint was not called
     expect(globalThis.fetch).not.toHaveBeenCalledWith(
       expect.stringContaining("/users/me/regions/"),
-      expect.any(Object),
-    );
-  });
-
-  it("should fall back to direct organizations endpoint when regions endpoint returns 404 on SaaS", async () => {
-    const mockOrgs = [
-      { id: "1", slug: "org-1", name: "Organization 1" },
-      { id: "2", slug: "org-2", name: "Organization 2" },
-    ];
-
-    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("/users/me/regions/")) {
-        return Promise.resolve({
-          ok: false,
-          status: 404,
-          statusText: "Not Found",
-          text: () => Promise.resolve(JSON.stringify({ detail: "Not found" })),
-        });
-      }
-      if (url.includes("/organizations/")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockOrgs),
-        });
-      }
-      return Promise.reject(new Error("Unexpected URL"));
-    });
-
-    const apiService = new SentryApiService({
-      host: "sentry.io",
-      accessToken: "test-token",
-    });
-
-    const result = await apiService.listOrganizations();
-
-    expect(result).toHaveLength(2);
-    expect(result).toEqual(mockOrgs);
-
-    // Verify it tried regions first, then fell back to organizations
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/users/me/regions/"),
-      expect.any(Object),
-    );
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/organizations/"),
       expect.any(Object),
     );
   });
@@ -1013,7 +956,7 @@ describe("Content-Type validation", () => {
     );
   });
 
-  it("should handle HTML response from regions endpoint", async () => {
+  it("should handle HTML response from organizations endpoint", async () => {
     const htmlContent = `<!DOCTYPE html>
 <html>
 <head><title>Login Required</title></head>
