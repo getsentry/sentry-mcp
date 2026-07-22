@@ -1562,7 +1562,6 @@ export class SentryApiService {
    *
    * @param params Query parameters
    * @param params.query Search query to filter organizations by name/slug
-   * @param opts Request options
    * @returns Array of organizations
    *
    * @example
@@ -1576,7 +1575,6 @@ export class SentryApiService {
    */
   async listOrganizations(
     params?: { query?: string },
-    opts?: RequestOptions,
   ): Promise<OrganizationList> {
     // Build query parameters
     const queryParams = new URLSearchParams();
@@ -1587,7 +1585,7 @@ export class SentryApiService {
     const queryString = queryParams.toString();
     const path = `/organizations/?${queryString}`;
 
-    const body = await this.requestJSON(path, undefined, opts);
+    const body = await this.requestJSON(path, undefined, {});
     return OrganizationListSchema.parse(body);
   }
 
