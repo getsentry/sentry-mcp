@@ -182,6 +182,7 @@ describe("formatIssueOutput", () => {
       experimentalMode: true,
       availableToolNames: new Set([
         "get_sentry_resource",
+        "get_issue_breadcrumbs",
         "search_issue_events",
       ]),
       directToolNames: new Set(["get_sentry_resource", "search_issue_events"]),

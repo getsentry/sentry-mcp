@@ -1,5 +1,4 @@
 import {
-  eventFixture,
   mswServer,
   organizationFixture,
   replayDetailsFixture,
@@ -47,7 +46,6 @@ function callHandler(params: {
     | "event"
     | "trace"
     | "span"
-    | "breadcrumbs"
     | "replay"
     | "monitor"
     | "snapshot"
@@ -770,54 +768,6 @@ describe("get_sentry_resource", () => {
 
   // ─── URL mode with resourceType override ──────────────────────────────────
   describe("URL mode with resourceType override", () => {
-    it("fetches breadcrumbs from issue URL", async () => {
-      const result = await callHandler({
-        url: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41",
-        resourceType: "breadcrumbs",
-      });
-      expect(result).toContain("# Breadcrumbs for CLOUDFLARE-MCP-41");
-      expect(result).toContain("**Total Breadcrumbs**: 4");
-      expect(result).toContain("fetch");
-      expect(result).toContain("console");
-      expect(result).toContain("navigation");
-    });
-
-    it("rejects breadcrumbs outside the active project constraint", async () => {
-      await expect(
-        getSentryResource.handler(
-          {
-            url: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41",
-            resourceType: "breadcrumbs",
-          },
-          {
-            ...baseContext,
-            constraints: {
-              organizationSlug: "sentry-mcp-evals",
-              projectSlug: "frontend",
-            },
-          },
-        ),
-      ).rejects.toThrow(
-        'Issue is outside the active project constraint. Expected project "frontend".',
-      );
-    });
-
-    it("fetches breadcrumbs from event URL (extracts issueId)", async () => {
-      const result = await callHandler({
-        url: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41/events/7ca573c0f4814912aaa9bdc77d1a7d51",
-        resourceType: "breadcrumbs",
-      });
-      expect(result).toContain("# Breadcrumbs for CLOUDFLARE-MCP-41");
-    });
-
-    it("fetches breadcrumbs from path-based org URL", async () => {
-      const result = await callHandler({
-        url: "https://sentry.io/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
-        resourceType: "breadcrumbs",
-      });
-      expect(result).toContain("# Breadcrumbs for CLOUDFLARE-MCP-41");
-    });
-
     it("same resourceType as detected type just passes through (issue)", async () => {
       const result = await callHandler({
         url: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41",
@@ -835,15 +785,6 @@ describe("get_sentry_resource", () => {
           resourceType: "issue",
         }),
       ).rejects.toThrow("Cannot override URL type with resourceType 'issue'");
-    });
-
-    it("rejects breadcrumbs override on non-issue URL (trace)", async () => {
-      await expect(
-        callHandler({
-          url: "https://test-org.sentry.io/explore/traces/trace/a4d1aae7216b47ff8117cf4e09ce9d0a",
-          resourceType: "breadcrumbs",
-        }),
-      ).rejects.toThrow("Could not extract issue ID from URL for breadcrumbs");
     });
 
     it("rejects span override on a plain trace URL", async () => {
@@ -949,30 +890,6 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(
         "# Span `aa8e7f3343113fbf` in Trace `a4d1aae7216b47ff8117cf4e09ce9d0a` in **test-org**",
       );
-    });
-
-    it("fetches breadcrumbs by issueId", async () => {
-      const result = await callHandler({
-        resourceType: "breadcrumbs",
-        organizationSlug: "sentry-mcp-evals",
-        resourceId: "CLOUDFLARE-MCP-41",
-      });
-      expect(result).toContain("# Breadcrumbs for CLOUDFLARE-MCP-41");
-      expect(result).toContain(
-        "**Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51",
-      );
-      expect(result).toContain("**Total Breadcrumbs**: 4");
-      expect(result).toContain("[fetch]");
-      expect(result).toContain("[navigation]");
-    });
-
-    it("uppercases breadcrumbs resourceId", async () => {
-      const result = await callHandler({
-        resourceType: "breadcrumbs",
-        organizationSlug: "sentry-mcp-evals",
-        resourceId: "cloudflare-mcp-41",
-      });
-      expect(result).toContain("# Breadcrumbs for CLOUDFLARE-MCP-41");
     });
 
     it("fetches replay by replayId", async () => {
@@ -1211,96 +1128,6 @@ describe("get_sentry_resource", () => {
     });
   });
 
-  // ─── Breadcrumbs output formatting ────────────────────────────────────────
-  describe("Breadcrumbs output formatting", () => {
-    it("formats breadcrumbs with table, data section, and usage hints", async () => {
-      const result = await callHandler({
-        resourceType: "breadcrumbs",
-        organizationSlug: "sentry-mcp-evals",
-        resourceId: "CLOUDFLARE-MCP-41",
-      });
-      expect(result).toMatchInlineSnapshot(`
-        "# Breadcrumbs for CLOUDFLARE-MCP-41
-
-        **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
-        **Total Breadcrumbs**: 4
-
-        \`\`\`
-        2025-04-08T21:14:50.000Z info    [fetch] GET /api/0/organizations/ [200] {"method":"GET","url":"/api/0/organizations/","status_code":200}
-        2025-04-08T21:14:52.000Z warning [console] Deprecation warning: use v2 endpoint
-        2025-04-08T21:14:55.000Z info    [navigation] {"from":"/dashboard","to":"/settings"}
-        2025-04-08T21:15:04.000Z error   [console] Tool list_organizations is already registered
-        \`\`\`
-
-        Breadcrumbs show the trail of events leading up to the error, in chronological order.
-        Use \`get_sentry_resource(resourceType='issue', organizationSlug='...', resourceId='CLOUDFLARE-MCP-41')\` for full issue details."
-      `);
-    });
-
-    it("handles event with no breadcrumbs gracefully", async () => {
-      const eventNoBreadcrumbs = {
-        ...eventFixture,
-        entries: eventFixture.entries.filter(
-          (e: { type: string }) => e.type !== "breadcrumbs",
-        ),
-      };
-
-      mswServer.use(
-        http.get(
-          "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
-          () => HttpResponse.json(eventNoBreadcrumbs),
-          { once: true },
-        ),
-      );
-
-      const result = await callHandler({
-        resourceType: "breadcrumbs",
-        organizationSlug: "sentry-mcp-evals",
-        resourceId: "CLOUDFLARE-MCP-41",
-      });
-      expect(result).toMatchInlineSnapshot(`
-        "# Breadcrumbs for CLOUDFLARE-MCP-41
-
-        **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
-
-        No breadcrumbs found in the latest event for this issue."
-      `);
-    });
-
-    it("handles event with empty breadcrumbs array", async () => {
-      const eventEmptyBreadcrumbs = {
-        ...eventFixture,
-        entries: [
-          ...eventFixture.entries.filter(
-            (e: { type: string }) => e.type !== "breadcrumbs",
-          ),
-          { type: "breadcrumbs", data: { values: [] } },
-        ],
-      };
-
-      mswServer.use(
-        http.get(
-          "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
-          () => HttpResponse.json(eventEmptyBreadcrumbs),
-          { once: true },
-        ),
-      );
-
-      const result = await callHandler({
-        resourceType: "breadcrumbs",
-        organizationSlug: "sentry-mcp-evals",
-        resourceId: "CLOUDFLARE-MCP-41",
-      });
-      expect(result).toMatchInlineSnapshot(`
-        "# Breadcrumbs for CLOUDFLARE-MCP-41
-
-        **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
-
-        No breadcrumbs found in the latest event for this issue."
-      `);
-    });
-  });
-
   // ─── Validation errors ────────────────────────────────────────────────────
   describe("Validation errors", () => {
     it("throws when neither url nor resourceType provided", async () => {
@@ -1346,15 +1173,6 @@ describe("get_sentry_resource", () => {
       await expect(
         callHandler({
           resourceType: "span",
-          organizationSlug: "my-org",
-        }),
-      ).rejects.toThrow("`resourceId` is required when not using a URL");
-    });
-
-    it("throws when resourceId missing for breadcrumbs type", async () => {
-      await expect(
-        callHandler({
-          resourceType: "breadcrumbs",
           organizationSlug: "my-org",
         }),
       ).rejects.toThrow("`resourceId` is required when not using a URL");

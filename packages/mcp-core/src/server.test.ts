@@ -649,6 +649,7 @@ describe("buildServer", () => {
       expect(toolNames).not.toContain("whoami");
       expect(toolNames).toContain("get_sentry_resource");
       expect(toolNames).not.toContain("get_issue_details");
+      expect(toolNames).not.toContain("get_issue_breadcrumbs");
       expect(toolNames).not.toContain("get_trace_details");
       expect(toolNames).not.toContain("get_snapshot");
       expect(toolNames).not.toContain("get_snapshot_image");

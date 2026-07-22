@@ -19,10 +19,9 @@ describeEval("get-sentry-resource", {
         input: `Show me the breadcrumbs for ${FIXTURES.issueUrl}`,
         expectedTools: [
           {
-            name: "get_sentry_resource",
+            name: "get_issue_breadcrumbs",
             arguments: {
-              url: FIXTURES.issueUrl,
-              resourceType: "breadcrumbs",
+              issueUrl: FIXTURES.issueUrl,
             },
           },
         ],
@@ -31,11 +30,10 @@ describeEval("get-sentry-resource", {
         input: `Fetch the breadcrumbs for issue ${FIXTURES.issueId} in ${FIXTURES.organizationSlug}.`,
         expectedTools: [
           {
-            name: "get_sentry_resource",
+            name: "get_issue_breadcrumbs",
             arguments: {
-              resourceType: "breadcrumbs",
               organizationSlug: FIXTURES.organizationSlug,
-              resourceId: FIXTURES.issueId,
+              issueId: FIXTURES.issueId,
             },
           },
         ],
