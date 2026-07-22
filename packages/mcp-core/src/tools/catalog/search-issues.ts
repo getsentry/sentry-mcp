@@ -17,7 +17,7 @@ const ProjectSlugOrIdSchema = z.string().trim().superRefine(validateSlugOrId);
 
 function buildIssueSearchRepairPrompt(params: {
   query: string;
-  sort: "date" | "freq" | "new" | "user";
+  sort: "date" | "freq" | "new" | "user" | "recommended";
 }): string {
   return [
     "Fix this Sentry issue search request.",
@@ -80,10 +80,10 @@ export default defineTool({
       .default("is:unresolved")
       .describe("Natural language or Sentry issue search query syntax."),
     sort: z
-      .enum(["date", "freq", "new", "user"])
+      .enum(["date", "freq", "new", "user", "recommended"])
       .default("date")
       .describe(
-        "Sort order: date (last seen), freq (frequency), new (first seen), user (user count)",
+        "Sort order: date (last seen), freq (frequency), new (first seen), user (user count), recommended (Sentry's prioritized ranking)",
       ),
     projectSlugOrId: ProjectSlugOrIdSchema.nullable()
       .default(null)
@@ -127,7 +127,7 @@ export default defineTool({
     }
 
     let query: string;
-    let sort: "date" | "freq" | "new" | "user";
+    let sort: "date" | "freq" | "new" | "user" | "recommended";
     let explanation: string | undefined;
 
     let projectId: string | undefined;

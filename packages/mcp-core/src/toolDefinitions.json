@@ -2903,9 +2903,9 @@
         },
         "sort": {
           "default": "date",
-          "description": "Sort order: date (last seen), freq (frequency), new (first seen), user (user count)",
+          "description": "Sort order: date (last seen), freq (frequency), new (first seen), user (user count), recommended (Sentry's prioritized ranking)",
           "type": "string",
-          "enum": ["date", "freq", "new", "user"]
+          "enum": ["date", "freq", "new", "user", "recommended"]
         },
         "projectSlugOrId": {
           "default": null,
