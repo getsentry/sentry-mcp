@@ -16,15 +16,13 @@ import {
 import { ParamOrganizationSlug } from "../../schema";
 import type { ServerContext } from "../../types";
 import { isNumericId } from "../../utils/slug-validation";
-import {
-  fetchSnapshotImage,
-  fetchSnapshotSummary,
-} from "../support/snapshots/handlers";
 import getAIConversationDetails from "./get-ai-conversation-details";
 import getIssueDetails from "./get-issue-details";
 import getMonitorDetails from "./get-monitor-details";
 import getProfileDetails from "./get-profile-details";
 import getReplayDetails from "./get-replay-details";
+import getSnapshot from "./get-snapshot";
+import getSnapshotImage from "./get-snapshot-image";
 import getSpanDetails from "./get-span-details";
 import getTraceDetails from "./get-trace-details";
 
@@ -37,7 +35,6 @@ export const FULLY_SUPPORTED_TYPES = [
   "replay",
   "monitor",
   "snapshot",
-  "snapshotImage",
 ] as const;
 export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
 
@@ -172,17 +169,6 @@ export function resolveResourceParams(params: {
         organizationSlug,
         snapshotId: resourceId,
       };
-
-    case "snapshotImage": {
-      const { snapshotId, imageName } =
-        parseSnapshotImageResourceId(resourceId);
-      return {
-        type: "snapshotImage",
-        organizationSlug,
-        snapshotId,
-        selectedSnapshot: imageName,
-      };
-    }
   }
 }
 
@@ -368,24 +354,6 @@ function resolveFromParsedUrl(
   }
 }
 
-function parseSnapshotImageResourceId(resourceId: string): {
-  snapshotId: string;
-  imageName: string;
-} {
-  const separatorIndex = resourceId.indexOf(":");
-
-  if (separatorIndex <= 0 || separatorIndex === resourceId.length - 1) {
-    throw new UserInputError(
-      "Snapshot image resourceId must use the format `<snapshotId>:<image_file_name>`.",
-    );
-  }
-
-  return {
-    snapshotId: resourceId.slice(0, separatorIndex),
-    imageName: resourceId.slice(separatorIndex + 1),
-  };
-}
-
 function assertCatalogToolAvailable(
   context: ServerContext,
   toolName: string,
@@ -480,7 +448,6 @@ export default defineTool({
     const resourceIds = [
       ...(monitorResourcesAvailable ? ["- monitor: <monitorSlug>"] : []),
       "- snapshot: <snapshotId>",
-      "- snapshotImage: <snapshotId>:<image_file_name>",
     ];
 
     return [
@@ -527,11 +494,10 @@ export default defineTool({
         "replay",
         "monitor",
         "snapshot",
-        "snapshotImage",
       ])
       .optional()
       .describe(
-        "Resource type. With a URL, can override a span-focused trace URL with `trace`. Use `monitor` with a monitor slug only when inspect monitor tools are available, `snapshot` with a snapshot artifact ID, or `snapshotImage` with `<snapshotId>:<image_file_name>`.",
+        "Resource type. With a URL, can override a span-focused trace URL with `trace`. Use `monitor` with a monitor slug only when inspect monitor tools are available or `snapshot` with a snapshot artifact ID.",
       ),
 
     resourceId: z
@@ -539,7 +505,7 @@ export default defineTool({
       .trim()
       .optional()
       .describe(
-        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug when inspect monitor tools are available, snapshot artifact ID, or `<snapshotId>:<image_file_name>` for snapshot image resources. Required when not using a URL.",
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug when inspect monitor tools are available, or snapshot artifact ID. Required when not using a URL.",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),
@@ -682,43 +648,28 @@ export default defineTool({
         );
 
       case "snapshot":
-      case "snapshotImage": {
-        const apiService = apiServiceFromContext(context, {
-          regionUrl: context.constraints.regionUrl ?? undefined,
-        });
-
-        const nextSteps = params.url ? "resource-url" : "resource-id";
-
         if (resolved.selectedSnapshot) {
-          return fetchSnapshotImage(
-            apiService,
-            resolved.organizationSlug,
-            resolved.snapshotId!,
-            resolved.selectedSnapshot,
-            "preview",
+          return getSnapshotImage.handler(
             {
-              nextSteps,
-              experimentalMode: context.experimentalMode ?? false,
-              availableToolNames: context.availableToolNames,
-              directToolNames: context.directToolNames,
+              organizationSlug: resolved.organizationSlug,
+              snapshotId: resolved.snapshotId!,
+              imageIdentifier: resolved.selectedSnapshot,
+              imageResolution: "preview",
+              regionUrl: context.constraints.regionUrl ?? null,
             },
+            context,
           );
         }
 
-        return fetchSnapshotSummary(
-          apiService,
-          resolved.organizationSlug,
-          resolved.snapshotId!,
-          params.url ?? null,
+        return getSnapshot.handler(
           {
-            listImagesWhenNoDiffs: true,
-            nextSteps,
-            experimentalMode: context.experimentalMode ?? false,
-            availableToolNames: context.availableToolNames,
-            directToolNames: context.directToolNames,
+            organizationSlug: resolved.organizationSlug,
+            snapshotId: resolved.snapshotId!,
+            showUnmodified: false,
+            regionUrl: context.constraints.regionUrl ?? null,
           },
+          context,
         );
-      }
 
       default: {
         const _exhaustiveCheck: never = resolved.type;

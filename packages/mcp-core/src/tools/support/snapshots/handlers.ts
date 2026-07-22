@@ -212,7 +212,7 @@ export async function fetchSnapshotImage(
   imageIdentifier: string,
   imageResolution: SnapshotImageResolution,
   options: {
-    nextSteps?: "snapshot-tools" | "resource-url" | "resource-id";
+    nextSteps?: "snapshot-tools" | "resource-url";
     experimentalMode?: boolean;
     availableToolNames?: ReadonlySet<string>;
     directToolNames?: ReadonlySet<string>;
@@ -337,7 +337,7 @@ export async function fetchSnapshotSummary(
   options: {
     showUnmodified?: boolean;
     listImagesWhenNoDiffs?: boolean;
-    nextSteps?: "snapshot-tools" | "resource-url" | "resource-id";
+    nextSteps?: "snapshot-tools" | "resource-url";
     experimentalMode?: boolean;
     availableToolNames?: ReadonlySet<string>;
     directToolNames?: ReadonlySet<string>;
@@ -499,19 +499,6 @@ export async function fetchSnapshotSummary(
     const selectedImageUrl = `${resolvedSnapshotUrl}${separator}selectedSnapshot=<image_file_name>`;
     sections.push(
       `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(url="${selectedImageUrl}")\`\n${formatSnapshotImageFullResolutionStep(
-        {
-          organizationSlug,
-          snapshotId,
-          imageIdentifier: "<image_file_name>",
-          experimentalMode: options.experimentalMode ?? false,
-          availableToolNames: options.availableToolNames,
-          directToolNames: options.directToolNames,
-        },
-      )}`,
-    );
-  } else if (options.nextSteps === "resource-id") {
-    sections.push(
-      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(resourceType="snapshotImage", resourceId="${snapshotId}:<image_file_name>")\`\n${formatSnapshotImageFullResolutionStep(
         {
           organizationSlug,
           snapshotId,
