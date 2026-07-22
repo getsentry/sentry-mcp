@@ -13,6 +13,7 @@ import {
   ParamPlatform,
 } from "../../schema";
 import type { ClientKey, SentryApiService } from "../../api-client/index";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 type RepositoryMatch = {
   name: string;
@@ -173,7 +174,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
     setTag("team.slug", params.teamSlug);
 
     // Resolve repository intent before creating the project so bad or ambiguous

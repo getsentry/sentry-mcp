@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import type { ServerContext } from "../../types";
@@ -8,6 +7,7 @@ import {
   ParamRegionUrl,
   ParamProjectSlugOrAll,
 } from "../../schema";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 export default defineTool({
   name: "find_releases",
@@ -60,7 +60,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
 
     const releases = await apiService.listReleases({
       organizationSlug,

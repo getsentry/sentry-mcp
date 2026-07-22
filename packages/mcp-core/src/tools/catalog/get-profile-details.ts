@@ -16,6 +16,7 @@ import {
   formatProfileChunkAnalysis,
   formatTransactionProfileAnalysis,
 } from "../support/profile/formatter";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 type ResolvedProfileDetailsParams =
   | {
@@ -292,7 +293,7 @@ export default defineTool({
       regionUrl: regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", resolved.organizationSlug);
+    setOrganizationSlug(resolved.organizationSlug);
 
     if (resolved.mode === "transaction") {
       setTag("profile.id", resolved.profileId);

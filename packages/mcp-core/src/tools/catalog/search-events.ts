@@ -47,6 +47,7 @@ import {
   recordEventsSearchValidationTelemetry,
   validateEventsSearch,
 } from "../support/search-events/utils";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 const SEARCH_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
 const DEFAULT_EVENTS_SORT = "-timestamp";
@@ -463,7 +464,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
     const inputDataset = params.dataset ?? "errors";

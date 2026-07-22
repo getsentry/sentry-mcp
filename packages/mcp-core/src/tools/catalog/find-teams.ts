@@ -1,4 +1,3 @@
-import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { UserInputError } from "../../errors";
@@ -8,6 +7,7 @@ import {
   ParamRegionUrl,
   ParamSearchQuery,
 } from "../../schema";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 const RESULT_LIMIT = 25;
 
@@ -46,7 +46,7 @@ export default defineTool({
       );
     }
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
 
     const teams = await apiService.listTeams(organizationSlug, {
       query: params.query ?? undefined,

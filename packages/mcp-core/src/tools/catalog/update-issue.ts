@@ -1,4 +1,3 @@
-import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import {
@@ -25,6 +24,7 @@ import {
   ParamIgnoreUserWindowMinutes,
   ParamReason,
 } from "../../schema";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 type IgnoreMode =
   | "untilEscalating"
@@ -701,7 +701,7 @@ export default defineTool({
         issueUrl: params.issueUrl,
       });
 
-    setTag("organization.slug", orgSlug);
+    setOrganizationSlug(orgSlug);
 
     // Get current issue details first
     const currentIssue = await apiService.getIssue({

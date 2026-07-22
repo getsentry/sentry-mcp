@@ -20,6 +20,7 @@ import {
   formatId,
   readString,
 } from "./support/api-formatting";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 function formatComment(comment: IssueComment): string {
   const actor = comment.user ? formatActor(comment.user) : "current user";
@@ -85,7 +86,7 @@ export default defineTool({
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? context.constraints.regionUrl ?? undefined,
     });
-    setTag("organization.slug", parsed.organizationSlug);
+    setOrganizationSlug(parsed.organizationSlug);
     setTag("issue.id", parsed.issueId);
 
     await ensureIssueWithinProjectConstraint({

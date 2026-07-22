@@ -10,6 +10,7 @@ import {
   resolveDashboardProjectConstraint,
   resolveDashboardId,
 } from "../support/dashboards";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 export default defineTool({
   name: "get_dashboard_details",
@@ -53,7 +54,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
 
     const scopedProject = await resolveDashboardProjectConstraint({
       apiService,

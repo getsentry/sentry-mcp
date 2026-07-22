@@ -11,6 +11,7 @@ import {
   formatDashboardList,
   resolveDashboardProjectConstraint,
 } from "../support/dashboards";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 const PROJECT_DASHBOARD_CURSOR_PREFIX = "mcp-dashboard-project:";
 
@@ -261,7 +262,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
 
     const scopedProject = await resolveDashboardProjectConstraint({
       apiService,

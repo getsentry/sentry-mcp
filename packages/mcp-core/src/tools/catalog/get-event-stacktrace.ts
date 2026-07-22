@@ -12,6 +12,7 @@ import {
 } from "../../schema";
 import type { ServerContext } from "../../types";
 import { fetchAndFormatEventStacktrace } from "../support/event-stacktrace";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 export default defineTool({
   name: "get_event_stacktrace",
@@ -62,7 +63,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationSlug(params.organizationSlug);
     setTag("issue.id", params.issueId);
 
     try {

@@ -15,6 +15,7 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import { formatDate } from "./support/api-formatting";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 function getReporter(report: UserReportList[number]): string {
   const userId = report.user?.id?.trim();
@@ -96,7 +97,7 @@ export default defineTool({
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? context.constraints.regionUrl ?? undefined,
     });
-    setTag("organization.slug", parsed.organizationSlug);
+    setOrganizationSlug(parsed.organizationSlug);
     setTag("issue.id", parsed.issueId);
 
     await ensureIssueWithinProjectConstraint({

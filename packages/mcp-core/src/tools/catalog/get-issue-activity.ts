@@ -23,6 +23,7 @@ import {
   formatUnknown,
   readString,
 } from "./support/api-formatting";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 function getActivityText(
   activity: IssueActivity | IssueComment,
@@ -93,7 +94,7 @@ export default defineTool({
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? context.constraints.regionUrl ?? undefined,
     });
-    setTag("organization.slug", parsed.organizationSlug);
+    setOrganizationSlug(parsed.organizationSlug);
     setTag("issue.id", parsed.issueId);
 
     await ensureIssueWithinProjectConstraint({

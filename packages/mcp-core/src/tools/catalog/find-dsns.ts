@@ -8,6 +8,7 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import type { ServerContext } from "../../types";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 export default defineTool({
   name: "find_dsns",
@@ -39,7 +40,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
     setTag("project.slug", params.projectSlug);
 
     const clientKeys = await apiService.listClientKeys({

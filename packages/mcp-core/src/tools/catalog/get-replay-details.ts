@@ -20,6 +20,7 @@ import {
   ParamRegionUrl,
   ParamReplayUrl,
 } from "../../schema";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 interface ResolvedReplayParams {
   organizationSlug: string;
@@ -96,7 +97,7 @@ export default defineTool({
       regionUrl: regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", resolved.organizationSlug);
+    setOrganizationSlug(resolved.organizationSlug);
     setTag("replay.id", resolved.replayId);
 
     const replay = await apiService.getReplayDetails({

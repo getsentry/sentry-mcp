@@ -3,7 +3,6 @@ import type {
   ImageContent,
   TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
-import { setTag } from "@sentry/core";
 import { blobToBase64 } from "../../internal/blob-utils";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
@@ -16,6 +15,7 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import type { ServerContext } from "../../types";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 export default defineTool({
   name: "get_event_attachment",
@@ -66,7 +66,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationSlug(params.organizationSlug);
 
     // If attachmentId is provided, download the specific attachment
     if (params.attachmentId) {

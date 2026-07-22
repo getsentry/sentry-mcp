@@ -25,6 +25,7 @@ import getSnapshot from "./get-snapshot";
 import getSnapshotImage from "./get-snapshot-image";
 import getSpanDetails from "./get-span-details";
 import getTraceDetails from "./get-trace-details";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 /** Types with full API integration. */
 export const FULLY_SUPPORTED_TYPES = [
@@ -524,7 +525,7 @@ export default defineTool({
     });
 
     setTag("resource.type", resolved.type);
-    setTag("organization.slug", resolved.organizationSlug);
+    setOrganizationSlug(resolved.organizationSlug);
     if (resolved.spanId) {
       setTag("trace.span_id", resolved.spanId);
     }

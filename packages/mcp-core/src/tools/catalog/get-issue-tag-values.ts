@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import {
@@ -16,6 +15,7 @@ import {
   ParamIssueShortId,
   ParamIssueUrl,
 } from "../../schema";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 export default defineTool({
   name: "get_issue_tag_values",
@@ -114,7 +114,7 @@ export default defineTool({
         issueUrl: params.issueUrl,
       });
 
-    setTag("organization.slug", orgSlug);
+    setOrganizationSlug(orgSlug);
 
     await ensureIssueWithinProjectConstraint({
       apiService,

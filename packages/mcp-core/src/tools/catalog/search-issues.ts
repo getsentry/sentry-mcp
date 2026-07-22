@@ -12,6 +12,7 @@ import {
   formatIssueResults,
   formatExplanation,
 } from "../support/search-issues/formatters";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 const ProjectSlugOrIdSchema = z.string().trim().superRefine(validateSlugOrId);
 
@@ -117,7 +118,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationSlug(params.organizationSlug);
     if (params.projectSlugOrId) {
       if (isNumericId(params.projectSlugOrId)) {
         setTag("project.id", params.projectSlugOrId);

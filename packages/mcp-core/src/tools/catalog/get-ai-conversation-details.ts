@@ -10,6 +10,7 @@ import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
 import { UserInputError } from "../../errors";
 import type { AIConversationSpan, SentryApiService } from "../../api-client";
 import type { ServerContext } from "../../types";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 type ToolCall = {
   type: "tool_call";
@@ -696,7 +697,7 @@ export default defineTool({
   outputSchema: aiConversationDetailsOutputSchema,
 
   async handler(params, context: ServerContext) {
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationSlug(params.organizationSlug);
     setTag("ai_conversation.id", params.conversationId);
 
     if ((params.start && !params.end) || (!params.start && params.end)) {

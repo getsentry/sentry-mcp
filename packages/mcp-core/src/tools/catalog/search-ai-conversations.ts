@@ -2,7 +2,6 @@
 // Sentry's conversation list endpoint and intentionally exposes backend default
 // ordering until alternate sorting is applied by the API.
 import { z } from "zod";
-import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import {
@@ -16,6 +15,7 @@ import { structuredResult } from "../../internal/tool-helpers/results";
 import { isNumericId } from "../../utils/slug-validation";
 import type { AIConversationSummary, SentryApiService } from "../../api-client";
 import type { ServerContext } from "../../types";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 const PREVIEW_LENGTH = 240;
 const TRACE_ID_SAMPLE_SIZE = 3;
@@ -249,7 +249,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
 
     const projectIds = await resolveProjectIds({
       apiService,

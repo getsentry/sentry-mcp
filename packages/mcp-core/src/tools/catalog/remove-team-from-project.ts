@@ -10,6 +10,7 @@ import {
   ParamRegionUrl,
   ParamTeamSlug,
 } from "../../schema";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 function formatProjectTeams(teams: Team[]): string {
   if (teams.length === 0) {
@@ -92,7 +93,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
     setTag("project.slug", params.projectSlug);
     setTag("team.slug", params.teamSlug);
 

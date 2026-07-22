@@ -17,6 +17,7 @@ import {
   resolveIssueAlertRule,
   resolveMetricAlertRule,
 } from "./support/alerts";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 const AlertRuleKind = z
   .enum(["all", "issue", "metric"])
@@ -116,7 +117,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
     const organizationSlug = params.organizationSlug;
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
     if (projectSlug) {
       setTag("project.slug", projectSlug);
     }

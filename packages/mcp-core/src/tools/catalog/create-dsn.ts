@@ -8,6 +8,7 @@ import {
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 export default defineTool({
   name: "create_dsn",
@@ -57,7 +58,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
     setTag("project.slug", params.projectSlug);
 
     const clientKey = await apiService.createClientKey({

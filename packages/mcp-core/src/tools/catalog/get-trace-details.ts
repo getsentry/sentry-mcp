@@ -19,6 +19,7 @@ import {
   ParamSpanId,
   ParamTraceId,
 } from "../../schema";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 // Constants for span filtering and tree rendering
 const MAX_TRACE_FETCH_LIMIT = 1000;
@@ -130,7 +131,7 @@ export default defineTool({
       regionUrl: regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationSlug(params.organizationSlug);
     setTag("trace.id", params.traceId);
     if (params.spanId) {
       setTag("trace.span_id", params.spanId);

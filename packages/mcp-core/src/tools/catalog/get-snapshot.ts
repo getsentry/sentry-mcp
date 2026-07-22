@@ -1,4 +1,3 @@
-import { setTag } from "@sentry/core";
 import { z } from "zod";
 import { UserInputError } from "../../errors";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
@@ -7,6 +6,7 @@ import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
 import type { ServerContext } from "../../types";
 import { fetchSnapshotSummary } from "../support/snapshots/handlers";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 export default defineTool({
   name: "get_snapshot",
@@ -90,7 +90,7 @@ export default defineTool({
       );
     }
 
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationSlug(params.organizationSlug);
 
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,

@@ -46,6 +46,7 @@ the pivots and recipes below.
 | `gen_ai.tool.call.result` | JSON tool result payload | spans | returned tool output |
 | `gen_ai.tool.call.result.count` | number of results returned by a tool | spans | zero-result tool calls |
 | `app.resource.type` | resolved Sentry resource type | spans | resource dispatch |
+| `app.organization.slug` | organization resolved by an organization-scoped tool | spans | organization attribution, including URL-derived context |
 | `app.constraint.organization_slug` | active organization constraint | spans | constrained session behavior |
 | `app.constraint.project_slug` | active project constraint | spans | constrained session behavior |
 | `gen_ai.tool.call.arguments.<key>` | effective tool arguments | spans | called tool input |
@@ -63,6 +64,11 @@ the pivots and recipes below.
 | `gen_ai.provider.name` | GenAI provider | spans, tags | provider-specific model behavior |
 | `gen_ai.request.model` | requested GenAI model | spans | model-specific behavior |
 | `user_agent.original` | original HTTP user agent | request data, spans | client identification |
+
+`app.organization.slug` is set in the tool handler after organization resolution,
+so it captures organizations derived from URLs as well as explicit arguments.
+`app.constraint.organization_slug` instead describes the session constraint and
+may be absent or differ before the handler resolves the effective organization.
 
 ## Query Recipes
 
@@ -220,7 +226,7 @@ Sentry API path, or returning no catalog discovery results.
 Spans: tool call spans and downstream Sentry API spans
 
 Attributes: `gen_ai.tool.name`, `mcp.tool.name`, `gen_ai.tool.call.arguments.<key>`,
-`gen_ai.tool.call.result.count`, `mcp.session.id`,
+`gen_ai.tool.call.result.count`, `mcp.session.id`, `app.organization.slug`,
 `app.constraint.organization_slug`, `app.constraint.project_slug`,
 `app.consent.skill.<skill>.granted`, `app.transport`, `user.id`
 
@@ -234,7 +240,8 @@ supported-looking URL returns guidance instead of data.
 
 Spans: `get_sentry_resource` tool span and downstream resource tool span
 
-Attributes: `app.resource.type`, `gen_ai.tool.name`, `trace_id`, `span_id`
+Attributes: `app.resource.type`, `app.organization.slug`, `gen_ai.tool.name`,
+`trace_id`, `span_id`
 
 ### Stdio Transport
 

@@ -16,6 +16,7 @@ import { searchIssueEventsAgent } from "../support/search-issue-events/agent";
 import { formatErrorResults } from "../support/search-events/formatters";
 import { RECOMMENDED_FIELDS } from "../support/search-issue-events/config";
 import { parseIssueParams } from "../support/search-issue-events/utils";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 function buildIssueEventSearchRepairPrompt(params: {
   query?: string;
@@ -140,7 +141,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
     setTag("issue.id", issueId);
     if (params.projectSlug) {
       setTag("project.slug", params.projectSlug);

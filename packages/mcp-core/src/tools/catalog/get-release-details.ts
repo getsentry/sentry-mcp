@@ -15,6 +15,7 @@ import {
   formatUnknown,
 } from "./support/api-formatting";
 import { assertProjectListContainsConstraint } from "./support/project-constraints";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 function formatProjects(release: ReleaseDetails): string | null {
   if (!release.projects || release.projects.length === 0) {
@@ -139,7 +140,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
     const organizationSlug = params.organizationSlug;
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
     setTag("release.version", params.releaseVersion);
     const scopedProjectSlug = context.constraints.projectSlug ?? undefined;
     const requestedProjectSlugOrId = params.projectSlugOrId ?? undefined;

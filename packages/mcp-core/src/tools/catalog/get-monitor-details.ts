@@ -23,6 +23,7 @@ import {
   formatUnknown,
 } from "./support/api-formatting";
 import { assertProjectRefWithinConstraint } from "./support/project-constraints";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 function formatProject(monitor: Monitor): string | null {
   if (!monitor.project) {
@@ -160,7 +161,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
     const organizationSlug = params.organizationSlug;
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
     setTag("monitor.slug", params.monitorSlug);
     const requestedProjectSlugOrId = params.projectSlugOrId ?? undefined;
     const projectSlugOrId =

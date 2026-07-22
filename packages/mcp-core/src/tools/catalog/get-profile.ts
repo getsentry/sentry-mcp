@@ -20,6 +20,7 @@ import {
   resolveScopedOrganizationSlug,
   resolveScopedProjectSlugOrId,
 } from "../../internal/url-scope";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 interface ResolvedProfileParams {
   organizationSlug: string;
@@ -235,7 +236,7 @@ export default defineTool({
       setTag("project.id", String(project.id));
     }
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
     setTag("transaction.name", transactionName);
 
     // Comparison mode: compare two time periods

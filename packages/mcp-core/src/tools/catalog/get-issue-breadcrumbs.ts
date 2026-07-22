@@ -15,6 +15,7 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import type { ServerContext } from "../../types";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 export default defineTool({
   name: "get_issue_breadcrumbs",
@@ -54,7 +55,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? context.constraints.regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", parsed.organizationSlug);
+    setOrganizationSlug(parsed.organizationSlug);
     setTag("issue.id", parsed.issueId);
 
     try {

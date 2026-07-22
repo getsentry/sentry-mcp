@@ -6,6 +6,7 @@ import type { ServerContext } from "../../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
 import { isNumericId } from "../../utils/slug-validation";
 import { renderSnapshotImageTreeSection } from "../support/snapshots/formatting";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 export default defineTool({
   name: "get_latest_base_snapshot",
@@ -75,7 +76,7 @@ export default defineTool({
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationSlug(params.organizationSlug);
 
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,

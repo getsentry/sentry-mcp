@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import type { ServerContext } from "../../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 export default defineTool({
   name: "create_team",
@@ -46,7 +46,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationSlug(organizationSlug);
 
     const team = await apiService.createTeam({
       organizationSlug,

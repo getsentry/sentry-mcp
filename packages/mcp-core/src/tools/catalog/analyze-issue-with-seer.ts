@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import {
@@ -28,6 +27,7 @@ import {
   ParamIssueShortId,
   ParamIssueUrl,
 } from "../../schema";
+import { setOrganizationSlug } from "../../internal/tool-helpers/telemetry";
 
 export default defineTool({
   name: "analyze_issue_with_seer",
@@ -101,7 +101,7 @@ export default defineTool({
         issueUrl: params.issueUrl,
       });
 
-    setTag("organization.slug", orgSlug);
+    setOrganizationSlug(orgSlug);
 
     const issue = await apiService.getIssue({
       organizationSlug: orgSlug,
