@@ -28,8 +28,8 @@ export default defineTool({
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
-    // User data endpoints (like /users/me/regions/) should never use regionUrl
-    // as they must always query the main API server, not region-specific servers
+    // Organizations are listed from the root host, which returns orgs across
+    // all regions, so no regionUrl is passed here.
     const apiService = apiServiceFromContext(context);
     const organizations = await apiService.listOrganizations({
       query: params.query ?? undefined,
