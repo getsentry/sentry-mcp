@@ -46,8 +46,7 @@ function callHandler(params: {
     | "trace"
     | "replay"
     | "monitor"
-    | "snapshot"
-    | "snapshotImage";
+    | "snapshot";
   resourceId?: string;
   organizationSlug?: string;
 }) {
@@ -762,7 +761,7 @@ describe("get_sentry_resource", () => {
       );
       expect(result).toContain("**Images**: 0 total");
       expect(result).toContain(
-        'get_sentry_resource(resourceType="snapshotImage", resourceId="55:<image_file_name>")',
+        "Use the Sentry tool `get_snapshot_image` to view a specific image preview",
       );
       expect(result).toContain(
         "- Use the Sentry tool `get_snapshot_image` to fetch original full-resolution image bytes",
@@ -806,7 +805,7 @@ describe("get_sentry_resource", () => {
       expect(result).toContain("**Snapshot Images:**");
       expect(result).toContain("no_change_login.png — No Change Login — auth");
       expect(result).toContain(
-        'get_sentry_resource(url="https://sentry.sentry.io/preprod/snapshots/55/?selectedSnapshot=<image_file_name>")',
+        "Use the Sentry tool `get_snapshot_image` to view a specific image preview",
       );
     });
 
@@ -865,83 +864,6 @@ describe("get_sentry_resource", () => {
         ),
       });
     });
-
-    it("fetches snapshot image by snapshot ID and image file name", async () => {
-      const imageFileName =
-        "snapshots-iphone-17e/test_CoffeeProductCards.swift_FeaturedProductCard_Kenya.png";
-      const validPng = encodePng({
-        width: 1,
-        height: 1,
-        data: new Uint8Array([255, 0, 0, 255]),
-        depth: 8,
-        channels: 4,
-      });
-
-      mswServer.use(
-        http.get(
-          `https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/55/images/${encodeURIComponent(imageFileName)}/`,
-          () =>
-            HttpResponse.json({
-              image_file_name: imageFileName,
-              comparison_status: "changed",
-              diff_percentage: 0.125,
-              head_image: {
-                image_file_name: imageFileName,
-                display_name: "FeaturedProductCard / Kenya",
-                group: "test/CoffeeProductCards.swift",
-                width: 1320,
-                height: 2868,
-                image_url:
-                  "/api/0/organizations/sentry/preprodartifacts/snapshots/55/images/head.png/download/",
-              },
-              base_image: null,
-              diff_image_url: null,
-            }),
-          { once: true },
-        ),
-        http.get(
-          "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/55/images/head.png/download/",
-          () =>
-            new HttpResponse(validPng, {
-              headers: { "Content-Type": "image/png" },
-            }),
-          { once: true },
-        ),
-      );
-
-      const result = await callHandler({
-        resourceType: "snapshotImage",
-        organizationSlug: "sentry",
-        resourceId: `55:${imageFileName}`,
-      });
-      expect(Array.isArray(result)).toBe(true);
-      if (!Array.isArray(result)) {
-        throw new Error("Expected snapshot image result parts");
-      }
-      expect(result[0]).toMatchObject({
-        type: "text",
-        text: expect.stringContaining(`## ${imageFileName}`),
-      });
-      expect(result[0]).toMatchObject({
-        text: expect.stringContaining("- **Status**: changed"),
-      });
-      expect(result[0]).toMatchObject({
-        text: expect.stringContaining(`- **File**: \`${imageFileName}\``),
-      });
-      expect(result[0]).toMatchObject({
-        type: "text",
-        text: expect.stringContaining("**Image Resolution**: preview"),
-      });
-      expect(result[0]).toMatchObject({
-        type: "text",
-        text: expect.stringContaining(
-          "- **Full Resolution**: Use the Sentry tool `get_snapshot_image` for full-resolution image bytes",
-        ),
-      });
-      expect(result).toContainEqual(
-        expect.objectContaining({ type: "image", mimeType: "image/png" }),
-      );
-    });
   });
 
   // ─── Validation errors ────────────────────────────────────────────────────
@@ -992,18 +914,6 @@ describe("get_sentry_resource", () => {
           organizationSlug: "my-org",
         }),
       ).rejects.toThrow("`resourceId` is required when not using a URL");
-    });
-
-    it("throws when snapshot image resourceId is missing the file name", async () => {
-      await expect(
-        callHandler({
-          resourceType: "snapshotImage",
-          organizationSlug: "my-org",
-          resourceId: "55",
-        }),
-      ).rejects.toThrow(
-        "Snapshot image resourceId must use the format `<snapshotId>:<image_file_name>`.",
-      );
     });
 
     it("throws for unsupported explicit resourceType (profile)", async () => {
