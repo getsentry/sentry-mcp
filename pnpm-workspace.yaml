@@ -33,7 +33,7 @@ catalog:
   "@cloudflare/workers-oauth-provider": ^0.3.0
   "@cloudflare/workers-types": ^4.20260405.1
   "@modelcontextprotocol/sdk": 1.29.0
-  "@modelcontextprotocol/server": 2.0.0-beta.4
+  "@modelcontextprotocol/server": 2.0.0-beta.5
   "@radix-ui/react-accordion": ^1.2.11
   "@radix-ui/react-slot": ^1.2.3
   "@sentry/cloudflare": 10.54.0
@@ -48,7 +48,7 @@ catalog:
   "@types/react-dom": ^19.1.6
   "@vitejs/plugin-react": ^4.6.0
   "@vitest/coverage-v8": ^4.1.2
-  agents: 0.0.0-d163561f
+  agents: https://pkg.pr.new/agents@1557
   ai: ^6.0.64
   better-sqlite3: ^11.10.0
   chalk: ^5.4.1
