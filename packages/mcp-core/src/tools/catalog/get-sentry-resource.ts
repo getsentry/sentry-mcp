@@ -25,6 +25,7 @@ import getIssueDetails from "./get-issue-details";
 import getMonitorDetails from "./get-monitor-details";
 import getProfileDetails from "./get-profile-details";
 import getReplayDetails from "./get-replay-details";
+import getSpanDetails from "./get-span-details";
 import getTraceDetails from "./get-trace-details";
 
 /** Types with full API integration. */
@@ -32,7 +33,6 @@ export const FULLY_SUPPORTED_TYPES = [
   "issue",
   "event",
   "trace",
-  "span",
   "ai_conversation",
   "replay",
   "monitor",
@@ -48,7 +48,8 @@ export type RecognizedType = "release";
 export type ResolvedResourceType =
   | FullySupportedType
   | RecognizedType
-  | "profile";
+  | "profile"
+  | "span";
 
 export interface ResolvedResourceParams {
   type: ResolvedResourceType;
@@ -143,16 +144,6 @@ export function resolveResourceParams(params: {
         traceId: resourceId,
       };
 
-    case "span": {
-      const { traceId, spanId } = parseSpanResourceId(resourceId);
-      return {
-        type: "span",
-        organizationSlug,
-        traceId,
-        spanId,
-      };
-    }
-
     case "ai_conversation":
       return {
         type: "ai_conversation",
@@ -237,11 +228,6 @@ function resolveFromParsedUrl(
         organizationSlug,
         traceId: parsed.traceId,
       };
-    }
-    if (params.resourceType === "span" && detectedType === "trace") {
-      throw new UserInputError(
-        "Could not extract span ID from URL for span resource. Provide a trace URL with `?node=span-<spanId>` or use `resourceId='<traceId>:<spanId>'`.",
-      );
     }
     throw new UserInputError(
       `Cannot override URL type with resourceType '${params.resourceType}'. Only 'trace' on a span URL can be used as a resourceType override with a URL.`,
@@ -400,24 +386,6 @@ function parseSnapshotImageResourceId(resourceId: string): {
   };
 }
 
-function parseSpanResourceId(resourceId: string): {
-  traceId: string;
-  spanId: string;
-} {
-  const parts = resourceId.trim().split(":");
-
-  if (parts.length !== 2 || !parts[0] || !parts[1]) {
-    throw new UserInputError(
-      "Span resourceId must use the format `<traceId>:<spanId>`.",
-    );
-  }
-
-  return {
-    traceId: parts[0],
-    spanId: parts[1],
-  };
-}
-
 function assertCatalogToolAvailable(
   context: ServerContext,
   toolName: string,
@@ -510,7 +478,6 @@ export default defineTool({
       ? "issues, events, traces, spans, AI conversations, replays, monitors, preprod snapshots, and snapshot images."
       : "issues, events, traces, spans, AI conversations, replays, preprod snapshots, and snapshot images.";
     const resourceIds = [
-      "- span: <traceId>:<spanId>",
       ...(monitorResourcesAvailable ? ["- monitor: <monitorSlug>"] : []),
       "- snapshot: <snapshotId>",
       "- snapshotImage: <snapshotId>:<image_file_name>",
@@ -535,7 +502,6 @@ export default defineTool({
       "<examples>",
       "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')",
       "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
-      "get_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')",
       "get_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')",
       "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')",
       "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')",
@@ -557,7 +523,6 @@ export default defineTool({
         "issue",
         "event",
         "trace",
-        "span",
         "ai_conversation",
         "replay",
         "monitor",
@@ -574,7 +539,7 @@ export default defineTool({
       .trim()
       .optional()
       .describe(
-        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug when inspect monitor tools are available, snapshot artifact ID, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL.",
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug when inspect monitor tools are available, snapshot artifact ID, or `<snapshotId>:<image_file_name>` for snapshot image resources. Required when not using a URL.",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),
@@ -647,11 +612,11 @@ export default defineTool({
         );
 
       case "span":
-        return getTraceDetails.handler(
+        return getSpanDetails.handler(
           {
             organizationSlug: resolved.organizationSlug,
             traceId: resolved.traceId!,
-            spanId: resolved.spanId,
+            spanId: resolved.spanId!,
             regionUrl: context.constraints.regionUrl ?? null,
           },
           context,
