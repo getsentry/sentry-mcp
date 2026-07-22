@@ -90,8 +90,9 @@ function fullResolutionHint({
   })}`;
 }
 
-function getSnapshotImagePreviewFallback(): string {
-  return "Use the Sentry tool `get_sentry_resource`";
+function getSnapshotImagePreviewFallback(snapshotUrl: string): string {
+  const separator = snapshotUrl.includes("?") ? "&" : "?";
+  return `Use the Sentry tool \`get_sentry_resource(url="${snapshotUrl}${separator}selectedSnapshot=<image_file_name>")\``;
 }
 
 function formatSnapshotImageFullResolutionStep({
@@ -212,7 +213,6 @@ export async function fetchSnapshotImage(
   imageIdentifier: string,
   imageResolution: SnapshotImageResolution,
   options: {
-    nextSteps?: "snapshot-tools" | "resource-url";
     experimentalMode?: boolean;
     availableToolNames?: ReadonlySet<string>;
     directToolNames?: ReadonlySet<string>;
@@ -337,7 +337,6 @@ export async function fetchSnapshotSummary(
   options: {
     showUnmodified?: boolean;
     listImagesWhenNoDiffs?: boolean;
-    nextSteps?: "snapshot-tools" | "resource-url";
     experimentalMode?: boolean;
     availableToolNames?: ReadonlySet<string>;
     directToolNames?: ReadonlySet<string>;
@@ -494,46 +493,29 @@ export async function fetchSnapshotSummary(
     }
   }
 
-  if (options.nextSteps === "resource-url") {
-    const separator = resolvedSnapshotUrl.includes("?") ? "&" : "?";
-    const selectedImageUrl = `${resolvedSnapshotUrl}${separator}selectedSnapshot=<image_file_name>`;
-    sections.push(
-      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(url="${selectedImageUrl}")\`\n${formatSnapshotImageFullResolutionStep(
-        {
-          organizationSlug,
-          snapshotId,
-          imageIdentifier: "<image_file_name>",
-          experimentalMode: options.experimentalMode ?? false,
-          availableToolNames: options.availableToolNames,
-          directToolNames: options.directToolNames,
-        },
-      )}`,
-    );
-  } else {
-    sections.push(
-      `\n## Next Steps\n\n- ${formatToolCallInstruction({
-        toolName: "get_snapshot_image",
-        arguments: {
-          organizationSlug,
-          snapshotId,
-          imageIdentifier: "<image_file_name>",
-        },
+  sections.push(
+    `\n## Next Steps\n\n- ${formatToolCallInstruction({
+      toolName: "get_snapshot_image",
+      arguments: {
+        organizationSlug,
+        snapshotId,
+        imageIdentifier: "<image_file_name>",
+      },
+      experimentalMode: options.experimentalMode ?? false,
+      availableToolNames: options.availableToolNames,
+      directToolNames: options.directToolNames,
+      fallbackInstruction: getSnapshotImagePreviewFallback(resolvedSnapshotUrl),
+    })} to view a specific image preview\n${formatSnapshotImageFullResolutionStep(
+      {
+        organizationSlug,
+        snapshotId,
+        imageIdentifier: "<image_file_name>",
         experimentalMode: options.experimentalMode ?? false,
         availableToolNames: options.availableToolNames,
         directToolNames: options.directToolNames,
-        fallbackInstruction: getSnapshotImagePreviewFallback(),
-      })} to view a specific image preview\n${formatSnapshotImageFullResolutionStep(
-        {
-          organizationSlug,
-          snapshotId,
-          imageIdentifier: "<image_file_name>",
-          experimentalMode: options.experimentalMode ?? false,
-          availableToolNames: options.availableToolNames,
-          directToolNames: options.directToolNames,
-        },
-      )}`,
-    );
-  }
+      },
+    )}`,
+  );
 
   return sections.join("\n");
 }
