@@ -1,12 +1,9 @@
 import { getActiveSpan, setTag } from "@sentry/core";
 import { z } from "zod";
-import { ApiNotFoundError, type SentryApiService } from "../../api-client";
+import type { SentryApiService } from "../../api-client";
 import { UserInputError } from "../../errors";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import { fetchAndFormatBreadcrumbs } from "../../internal/tool-helpers/breadcrumbs";
 import { defineTool } from "../../internal/tool-helpers/define";
-import { enhanceNotFoundError } from "../../internal/tool-helpers/enhance-error";
-import { ensureIssueWithinProjectConstraint } from "../../internal/tool-helpers/issue";
 import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
 import {
   type ParsedSentryUrl,
@@ -37,7 +34,6 @@ export const FULLY_SUPPORTED_TYPES = [
   "trace",
   "span",
   "ai_conversation",
-  "breadcrumbs",
   "replay",
   "monitor",
   "snapshot",
@@ -164,13 +160,6 @@ export function resolveResourceParams(params: {
         conversationId: resourceId,
       };
 
-    case "breadcrumbs":
-      return {
-        type: "breadcrumbs",
-        organizationSlug,
-        issueId: resourceId.toUpperCase(),
-      };
-
     case "replay":
       return {
         type: "replay",
@@ -207,8 +196,8 @@ export function resolveResourceParams(params: {
 }
 
 /**
- * When resourceType is provided alongside a URL, it overrides the auto-detected type.
- * Breadcrumbs can override issue/event URLs, and trace URLs can override span-focused trace URLs.
+ * When resourceType is provided alongside a URL, it can override a span-focused
+ * trace URL to fetch the full trace.
  */
 function resolveFromParsedUrl(
   parsed: ParsedSentryUrl,
@@ -254,21 +243,9 @@ function resolveFromParsedUrl(
         "Could not extract span ID from URL for span resource. Provide a trace URL with `?node=span-<spanId>` or use `resourceId='<traceId>:<spanId>'`.",
       );
     }
-    if (params.resourceType !== "breadcrumbs") {
-      throw new UserInputError(
-        `Cannot override URL type with resourceType '${params.resourceType}'. Only 'breadcrumbs' or 'trace' on a span URL can be used as a resourceType override with a URL.`,
-      );
-    }
-    if (!parsed.issueId) {
-      throw new UserInputError(
-        "Could not extract issue ID from URL for breadcrumbs. Provide an issue URL.",
-      );
-    }
-    return {
-      type: "breadcrumbs",
-      organizationSlug,
-      issueId: parsed.issueId,
-    };
+    throw new UserInputError(
+      `Cannot override URL type with resourceType '${params.resourceType}'. Only 'trace' on a span URL can be used as a resourceType override with a URL.`,
+    );
   }
 
   switch (detectedType) {
@@ -530,8 +507,8 @@ export default defineTool({
       purpose: "for full-resolution image bytes",
     });
     const supportedResources = monitorResourcesAvailable
-      ? "issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, preprod snapshots, and snapshot images."
-      : "issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.";
+      ? "issues, events, traces, spans, AI conversations, replays, monitors, preprod snapshots, and snapshot images."
+      : "issues, events, traces, spans, AI conversations, replays, preprod snapshots, and snapshot images.";
     const resourceIds = [
       "- span: <traceId>:<spanId>",
       ...(monitorResourcesAvailable ? ["- monitor: <monitorSlug>"] : []),
@@ -582,7 +559,6 @@ export default defineTool({
         "trace",
         "span",
         "ai_conversation",
-        "breadcrumbs",
         "replay",
         "monitor",
         "snapshot",
@@ -590,7 +566,7 @@ export default defineTool({
       ])
       .optional()
       .describe(
-        "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL. Use `monitor` with a monitor slug only when inspect monitor tools are available, `snapshot` with a snapshot artifact ID, or `snapshotImage` with `<snapshotId>:<image_file_name>`.",
+        "Resource type. With a URL, can override a span-focused trace URL with `trace`. Use `monitor` with a monitor slug only when inspect monitor tools are available, `snapshot` with a snapshot artifact ID, or `snapshotImage` with `<snapshotId>:<image_file_name>`.",
       ),
 
     resourceId: z
@@ -693,33 +669,6 @@ export default defineTool({
           },
           context,
         );
-
-      case "breadcrumbs": {
-        const apiService = apiServiceFromContext(context, {
-          regionUrl: context.constraints.regionUrl ?? undefined,
-        });
-        try {
-          await ensureIssueWithinProjectConstraint({
-            apiService,
-            organizationSlug: resolved.organizationSlug,
-            issueId: resolved.issueId!,
-            projectSlug: context.constraints.projectSlug,
-          });
-          return await fetchAndFormatBreadcrumbs(
-            apiService,
-            resolved.organizationSlug,
-            resolved.issueId!,
-          );
-        } catch (error) {
-          if (error instanceof ApiNotFoundError) {
-            throw enhanceNotFoundError(error, {
-              organizationSlug: resolved.organizationSlug,
-              issueId: resolved.issueId,
-            });
-          }
-          throw error;
-        }
-      }
 
       case "replay":
         return getReplayDetails.handler(

@@ -2262,7 +2262,18 @@ export function formatIssueOutput({
     output += `- Related log search: ${logSearchInstruction}\n`;
   }
   if (experimentalMode) {
-    output += `- Breadcrumb trail leading up to this error: \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
+    const breadcrumbsInstruction = formatToolCallInstruction({
+      toolName: "get_issue_breadcrumbs",
+      arguments: {
+        issueUrl: apiService.getIssueUrl(organizationSlug, issue.shortId),
+      },
+      experimentalMode,
+      availableToolNames,
+      directToolNames,
+      fallbackInstruction:
+        "Issue breadcrumbs are not available in this session",
+    });
+    output += `- Breadcrumb trail leading up to this error: ${breadcrumbsInstruction}\n`;
   }
   return output;
 }
