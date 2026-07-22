@@ -2038,7 +2038,7 @@
   },
   {
     "name": "get_sentry_resource",
-    "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, replays, monitors, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use the Sentry tool `get_snapshot_image` for full-resolution image bytes.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- monitor: <monitorSlug>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
+    "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, replays, monitors, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use the Sentry tool `get_snapshot_image` for full-resolution image bytes.\n\nResource IDs:\n- monitor: <monitorSlug>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2054,7 +2054,6 @@
             "issue",
             "event",
             "trace",
-            "span",
             "ai_conversation",
             "replay",
             "monitor",
@@ -2063,7 +2062,7 @@
           ]
         },
         "resourceId": {
-          "description": "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug when inspect monitor tools are available, snapshot artifact ID, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL.",
+          "description": "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug when inspect monitor tools are available, snapshot artifact ID, or `<snapshotId>:<image_file_name>` for snapshot image resources. Required when not using a URL.",
           "type": "string"
         },
         "organizationSlug": {
@@ -2157,6 +2156,45 @@
       "required": ["organizationSlug", "snapshotId", "imageIdentifier"]
     },
     "requiredScopes": ["project:read"],
+    "skills": ["inspect"],
+    "surface": "catalog"
+  },
+  {
+    "name": "get_span_details",
+    "description": "Get detailed information about a specific span within a Sentry trace.\n\nUse this tool when you need to:\n- Inspect a span when you already know its trace ID and span ID\n- Focus a trace investigation on one operation\n- Review a span's attributes, timing, errors, and child spans\n\n<examples>\nget_span_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a', spanId='aa8e7f3384ef4ff5')\n</examples>\n\n<hints>\n- Pass traceId and spanId as separate parameters.\n- Use get_trace_details for a trace overview when no span is selected.\n- Use get_sentry_resource when starting from a Sentry trace or span URL.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "traceId": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{32}$",
+          "description": "The trace ID. e.g. `a4d1aae7216b47ff8117cf4e09ce9d0a`"
+        },
+        "spanId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The span ID within a trace. Use this with a trace resource to focus on a specific span."
+        }
+      },
+      "required": ["organizationSlug", "traceId", "spanId"]
+    },
+    "requiredScopes": ["event:read"],
     "skills": ["inspect"],
     "surface": "catalog"
   },

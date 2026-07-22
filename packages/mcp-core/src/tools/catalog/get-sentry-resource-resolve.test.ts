@@ -485,15 +485,6 @@ describe("resolveResourceParams", () => {
       });
     });
 
-    it("rejects span override on a plain trace URL", () => {
-      expect(() =>
-        resolveResourceParams({
-          url: "https://my-org.sentry.io/explore/traces/trace/abc123",
-          resourceType: "span",
-        }),
-      ).toThrow("Could not extract span ID from URL for span resource");
-    });
-
     it("rejects non-breadcrumbs override on different type URL", () => {
       expect(() =>
         resolveResourceParams({
@@ -559,21 +550,6 @@ describe("resolveResourceParams", () => {
         type: "trace",
         organizationSlug: "my-org",
         traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-      });
-    });
-
-    it("resolves span type from a compound resourceId", () => {
-      expect(
-        resolveResourceParams({
-          resourceType: "span",
-          organizationSlug: "my-org",
-          resourceId: "a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5",
-        }),
-      ).toEqual<ResolvedResourceParams>({
-        type: "span",
-        organizationSlug: "my-org",
-        traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-        spanId: "aa8e7f3384ef4ff5",
       });
     });
   });
@@ -662,16 +638,6 @@ describe("resolveResourceParams", () => {
         monitorSlug: "daily-backup",
         projectSlugOrId: "backend",
       });
-    });
-
-    it("throws when span resourceId is malformed", () => {
-      expect(() =>
-        resolveResourceParams({
-          resourceType: "span",
-          organizationSlug: "my-org",
-          resourceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-        }),
-      ).toThrow("Span resourceId must use the format `<traceId>:<spanId>`.");
     });
 
     it("throws for completely invalid resourceType", () => {
