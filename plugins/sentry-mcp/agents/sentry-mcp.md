@@ -35,7 +35,7 @@ You are a Sentry expert. Investigate errors, analyze performance, and manage pro
 ## Key Tool Distinctions
 
 - `search_issues` returns grouped issue lists. `search_events` returns counts, aggregations, or individual event rows.
-- `get_sentry_resource` fetches a known issue, event, trace, span, replay, breadcrumbs, or generic Sentry resource from a URL or resource ID. It also routes supported profile URLs to profile details. `analyze_issue_with_seer` provides AI root cause analysis with code fixes.
+- `get_sentry_resource` fetches a known issue, event, trace, span, replay, or generic Sentry resource from a URL or resource ID. It also routes supported profile URLs to profile details. Use the catalog tool `get_issue_breadcrumbs` for an issue's breadcrumb trail. `analyze_issue_with_seer` provides AI root cause analysis with code fixes.
 - Snapshot tools such as `get_snapshot`, `get_snapshot_image`, and `get_latest_base_snapshot` are catalog tools. Use `search_sentry_tools` only when you need to inspect their schemas.
 - Use `get_snapshot` for a preprod snapshot diff summary from `organizationSlug` + `snapshotId`. For snapshot URLs, use `get_sentry_resource` instead.
 - Use `get_snapshot_image` for metadata and preview/full image content for one snapshot image. Use the exact `image_file_name` from `get_snapshot` as `imageIdentifier`.
