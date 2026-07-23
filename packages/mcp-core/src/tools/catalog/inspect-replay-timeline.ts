@@ -9,6 +9,7 @@ import { UserInputError } from "../../errors";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/resolve-region-url";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import { parseSentryUrl } from "../../internal/url-helpers";
 import { resolveScopedOrganizationSlug } from "../../internal/url-scope";
 import {
@@ -30,12 +31,39 @@ const ReplayTimelineEventType = z.enum([
 ]);
 type ReplayTimelineEventType = z.infer<typeof ReplayTimelineEventType>;
 
-interface TimelineEvent {
-  timestampMs: number;
-  type: ReplayTimelineEventType;
-  label: string;
-  details: string[];
-}
+const timelineEventDetailSchema = z.object({
+  key: z.string(),
+  value: z.union([z.string(), z.number(), z.boolean()]),
+});
+
+const timelineEventSchema = z.object({
+  timestampMs: z.number(),
+  offsetMs: z.number().nullable(),
+  type: ReplayTimelineEventType,
+  label: z.string(),
+  details: z.array(timelineEventDetailSchema),
+});
+
+export const inspectReplayTimelineOutputSchema = z.object({
+  organizationSlug: z.string(),
+  replayId: z.string(),
+  replayUrl: z.string().url(),
+  startedAt: z.string().nullable(),
+  status: z.enum(["available", "archived", "unavailable"]),
+  unavailableReason: z.string().nullable(),
+  filters: z.object({
+    aroundTimestamp: z.string().nullable(),
+    windowSeconds: z.number(),
+    eventTypes: z.array(ReplayTimelineEventType),
+    limit: z.number(),
+  }),
+  totalMatchingEvents: z.number(),
+  omittedCount: z.number(),
+  events: z.array(timelineEventSchema),
+});
+
+type TimelineEvent = Omit<z.infer<typeof timelineEventSchema>, "offsetMs">;
+type ReplayTimelineOutput = z.infer<typeof inspectReplayTimelineOutputSchema>;
 
 interface ResolvedReplayParams {
   organizationSlug: string;
@@ -102,6 +130,7 @@ export default defineTool({
     readOnlyHint: true,
     openWorldHint: true,
   },
+  outputSchema: inspectReplayTimelineOutputSchema,
   async handler(params, context: ServerContext) {
     const resolved = resolveReplayParams(params);
     const regionUrl = await resolveRegionUrlForOrganization({
@@ -127,23 +156,42 @@ export default defineTool({
       projectSlug: context.constraints.projectSlug,
     });
 
+    const replayUrl =
+      params.replayUrl ??
+      apiService.getReplayUrl(resolved.organizationSlug, replay.id);
+    const windowSeconds = params.windowSeconds ?? 30;
+    const limit = params.limit ?? 50;
+    const filters = {
+      aroundTimestamp: params.aroundTimestamp ?? null,
+      windowSeconds,
+      eventTypes: params.eventTypes ?? [],
+      limit,
+    };
+
     if (replay.is_archived) {
-      return formatUnavailableTimeline(
-        replay,
-        resolved.organizationSlug,
-        params.replayUrl ??
-          apiService.getReplayUrl(resolved.organizationSlug, replay.id),
-        "The recording is archived, so its activity timeline is no longer available.",
+      return structuredResult(
+        unavailableTimeline({
+          replay,
+          organizationSlug: resolved.organizationSlug,
+          replayUrl,
+          status: "archived",
+          reason:
+            "The recording is archived, so its activity timeline is no longer available.",
+          filters,
+        }),
       );
     }
 
     if (replay.project_id == null || (replay.count_segments ?? 0) === 0) {
-      return formatUnavailableTimeline(
-        replay,
-        resolved.organizationSlug,
-        params.replayUrl ??
-          apiService.getReplayUrl(resolved.organizationSlug, replay.id),
-        "No recording segments are available for this replay.",
+      return structuredResult(
+        unavailableTimeline({
+          replay,
+          organizationSlug: resolved.organizationSlug,
+          replayUrl,
+          status: "unavailable",
+          reason: "No recording segments are available for this replay.",
+          filters,
+        }),
       );
     }
 
@@ -164,8 +212,6 @@ export default defineTool({
     const selectedTypes = params.eventTypes
       ? new Set<ReplayTimelineEventType>(params.eventTypes)
       : null;
-    const windowSeconds = params.windowSeconds ?? 30;
-    const limit = params.limit ?? 50;
     const windowMs = windowSeconds * 1000;
     const filteredEvents = allEvents.filter((event) => {
       if (selectedTypes && !selectedTypes.has(event.type)) {
@@ -177,18 +223,23 @@ export default defineTool({
     });
     const displayedEvents = filteredEvents.slice(0, limit);
 
-    return formatTimeline({
-      replay,
+    return structuredResult({
       organizationSlug: resolved.organizationSlug,
-      replayUrl:
-        params.replayUrl ??
-        apiService.getReplayUrl(resolved.organizationSlug, replay.id),
-      events: displayedEvents,
-      replayStartMs,
-      aroundTimestamp: params.aroundTimestamp,
-      windowSeconds,
-      eventTypes: params.eventTypes,
+      replayId: replay.id,
+      replayUrl,
+      startedAt: replay.started_at ?? null,
+      status: "available" as const,
+      unavailableReason: null,
+      filters,
+      totalMatchingEvents: filteredEvents.length,
       omittedCount: filteredEvents.length - displayedEvents.length,
+      events: displayedEvents.map((event) => ({
+        ...event,
+        offsetMs:
+          replayStartMs == null
+            ? null
+            : Math.max(0, event.timestampMs - replayStartMs),
+      })),
     });
   },
 });
@@ -264,7 +315,7 @@ function normalizeReplayEvent(event: ReplayRecordingEvent): TimelineEvent[] {
         timestampMs,
         type: "navigation",
         label: "Page view",
-        details: [`url=${quote(event.data.href)}`],
+        details: [{ key: "url", value: event.data.href }],
       },
     ];
   }
@@ -274,7 +325,6 @@ function normalizeReplayEvent(event: ReplayRecordingEvent): TimelineEvent[] {
   if (!tag || !payload) return [];
   const category = firstString(payload.category);
   const op = firstString(payload.op);
-  const message = firstString(payload.message, payload.description);
   const normalized = `${tag} ${category ?? ""} ${op ?? ""}`.toLowerCase();
   const type = classifyEvent(normalized);
   const details = formatPayloadDetails(payload);
@@ -313,109 +363,56 @@ function formatEventLabel(
   return type;
 }
 
-function formatPayloadDetails(payload: Record<string, unknown>): string[] {
+function formatPayloadDetails(
+  payload: Record<string, unknown>,
+): Array<z.infer<typeof timelineEventDetailSchema>> {
   const data = isRecord(payload.data) ? payload.data : null;
   const values: Array<[string, unknown]> = [
     ["message", payload.message ?? payload.description],
     ["url", data?.url ?? data?.to],
     ["method", data?.method],
     ["status", data?.status_code ?? data?.statusCode],
-    ["duration_ms", data?.duration],
+    ["durationMs", data?.duration],
     ["level", data?.level],
   ];
-  return values.flatMap(([key, value]) => {
+  const details: Array<z.infer<typeof timelineEventDetailSchema>> = [];
+  for (const [key, value] of values) {
     if (typeof value === "string" && value.trim()) {
-      return [`${key}=${quote(value)}`];
+      details.push({ key, value: value.trim() });
+    } else if (typeof value === "number" || typeof value === "boolean") {
+      details.push({ key, value });
     }
-    if (typeof value === "number" || typeof value === "boolean") {
-      return [`${key}=${value}`];
-    }
-    return [];
-  });
+  }
+  return details;
 }
 
-function formatTimeline({
+function unavailableTimeline({
   replay,
   organizationSlug,
   replayUrl,
-  events,
-  replayStartMs,
-  aroundTimestamp,
-  windowSeconds,
-  eventTypes,
-  omittedCount,
+  status,
+  reason,
+  filters,
 }: {
   replay: ReplayDetails;
   organizationSlug: string;
   replayUrl: string;
-  events: TimelineEvent[];
-  replayStartMs?: number;
-  aroundTimestamp?: string;
-  windowSeconds: number;
-  eventTypes?: ReplayTimelineEventType[];
-  omittedCount: number;
-}): string {
-  const lines = [
-    `# Replay Timeline ${replay.id} in **${organizationSlug}**`,
-    "",
-    `- **Replay URL**: ${replayUrl}`,
-    `- **Started**: ${replay.started_at ?? "Unknown"}`,
-  ];
-  if (aroundTimestamp) {
-    lines.push(
-      `- **Time Window**: ${windowSeconds}s before and after ${aroundTimestamp}`,
-    );
-  }
-  if (eventTypes) lines.push(`- **Event Types**: ${eventTypes.join(", ")}`);
-  lines.push("", "## Timeline", "");
-
-  if (events.length === 0) {
-    lines.push(
-      "No matching activity events were recorded in this time window.",
-    );
-  } else {
-    for (const event of events) {
-      const offset =
-        replayStartMs == null
-          ? new Date(event.timestampMs).toISOString()
-          : formatRelativeTime(event.timestampMs - replayStartMs);
-      const details =
-        event.details.length > 0 ? ` · ${event.details.join(" · ")}` : "";
-      lines.push(
-        `- ${offset} · **${event.type}** · \`${event.label}\`${details}`,
-      );
-    }
-  }
-  if (omittedCount > 0) {
-    lines.push(
-      "",
-      `${omittedCount} additional matching event${omittedCount === 1 ? " was" : "s were"} omitted. Increase \`limit\` to return more.`,
-    );
-  }
-  lines.push(
-    "",
-    "## Response Notes",
-    "",
-    "- Use `get_replay_details` with this replay URL to inspect related issues and traces.",
-  );
-  return lines.join("\n");
-}
-
-function formatUnavailableTimeline(
-  replay: ReplayDetails,
-  organizationSlug: string,
-  replayUrl: string,
-  reason: string,
-): string {
-  return [
-    `# Replay Timeline ${replay.id} in **${organizationSlug}**`,
-    "",
-    `- **Replay URL**: ${replayUrl}`,
-    "",
-    "## Timeline",
-    "",
-    reason,
-  ].join("\n");
+  status: "archived" | "unavailable";
+  reason: string;
+  filters: ReplayTimelineOutput["filters"];
+}): ReplayTimelineOutput {
+  return {
+    organizationSlug,
+    replayId: replay.id,
+    replayUrl,
+    startedAt: replay.started_at ?? null,
+    status,
+    unavailableReason: reason,
+    filters,
+    totalMatchingEvents: 0,
+    omittedCount: 0,
+    events: [],
+  };
 }
 
 function getEventTimestampMillis(value: unknown): number | null {
@@ -429,15 +426,6 @@ function parseTimestamp(value?: string | null): number | undefined {
   return Number.isNaN(timestamp) ? undefined : timestamp;
 }
 
-function formatRelativeTime(offsetMs: number): string {
-  const seconds = Math.max(0, Math.round(offsetMs / 1000));
-  const minutes = Math.floor(seconds / 60);
-  const remainder = seconds % 60;
-  return minutes > 0
-    ? `T+${minutes}m${remainder > 0 ? ` ${remainder}s` : ""}`
-    : `T+${remainder}s`;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -447,8 +435,4 @@ function firstString(...values: unknown[]): string | null {
     if (typeof value === "string" && value.trim()) return value.trim();
   }
   return null;
-}
-
-function quote(value: string): string {
-  return JSON.stringify(value.trim());
 }

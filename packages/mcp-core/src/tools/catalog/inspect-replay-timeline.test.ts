@@ -2,6 +2,10 @@ import { mswServer, replayDetailsFixture } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { getServerContext } from "../../test-setup.js";
+import {
+  assertStructuredOnlyResult,
+  getStructuredContent,
+} from "../../test-utils/structured-content.js";
 import inspectReplayTimeline from "./inspect-replay-timeline.js";
 
 const replayUrl = `https://sentry-mcp-evals.sentry.io/explore/replays/${replayDetailsFixture.id}/`;
@@ -13,21 +17,66 @@ describe("inspect_replay_timeline", () => {
       getServerContext(),
     );
 
-    expect(result).toMatchInlineSnapshot(`
-      "# Replay Timeline 7e07485f-12f9-416b-8b14-26260799b51f in **sentry-mcp-evals**
-
-      - **Replay URL**: https://sentry-mcp-evals.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/
-      - **Started**: 2025-04-07T12:00:00.000Z
-
-      ## Timeline
-
-      - T+0s · **navigation** · \`Page view\` · url=\"https://example.com/login\"
-      - T+10s · **navigation** · \`navigation.navigate\` · message=\"https://example.com/checkout\" · duration_ms=710
-      - T+20s · **click** · \`ui.click\` · message=\"Clicked submit order\"
-
-      ## Response Notes
-
-      - Use \`get_replay_details\` with this replay URL to inspect related issues and traces."
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toMatchInlineSnapshot(`
+      {
+        "events": [
+          {
+            "details": [
+              {
+                "key": "url",
+                "value": "https://example.com/login",
+              },
+            ],
+            "label": "Page view",
+            "offsetMs": 0,
+            "timestampMs": 1744027200000,
+            "type": "navigation",
+          },
+          {
+            "details": [
+              {
+                "key": "message",
+                "value": "https://example.com/checkout",
+              },
+              {
+                "key": "durationMs",
+                "value": 710,
+              },
+            ],
+            "label": "navigation.navigate",
+            "offsetMs": 10000,
+            "timestampMs": 1744027210000,
+            "type": "navigation",
+          },
+          {
+            "details": [
+              {
+                "key": "message",
+                "value": "Clicked submit order",
+              },
+            ],
+            "label": "ui.click",
+            "offsetMs": 20000,
+            "timestampMs": 1744027220000,
+            "type": "click",
+          },
+        ],
+        "filters": {
+          "aroundTimestamp": null,
+          "eventTypes": [],
+          "limit": 50,
+          "windowSeconds": 30,
+        },
+        "omittedCount": 0,
+        "organizationSlug": "sentry-mcp-evals",
+        "replayId": "7e07485f-12f9-416b-8b14-26260799b51f",
+        "replayUrl": "https://sentry-mcp-evals.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/",
+        "startedAt": "2025-04-07T12:00:00.000Z",
+        "status": "available",
+        "totalMatchingEvents": 3,
+        "unavailableReason": null,
+      }
     `);
   });
 
@@ -42,12 +91,22 @@ describe("inspect_replay_timeline", () => {
       getServerContext(),
     );
 
-    expect(result).toContain(
-      "- **Time Window**: 2s before and after 2025-04-07T12:00:20.000Z",
-    );
-    expect(result).toContain("- **Event Types**: click");
-    expect(result).toContain("**click**");
-    expect(result).not.toContain("**navigation**");
+    const structuredContent = getStructuredContent<{
+      filters: {
+        aroundTimestamp: string;
+        windowSeconds: number;
+        eventTypes: string[];
+      };
+      events: Array<{ type: string }>;
+    }>(result);
+    expect(structuredContent.filters).toMatchObject({
+      aroundTimestamp: "2025-04-07T12:00:20.000Z",
+      windowSeconds: 2,
+      eventTypes: ["click"],
+    });
+    expect(structuredContent.events).toEqual([
+      expect.objectContaining({ type: "click" }),
+    ]);
   });
 
   it("reports archived recordings without fetching segments", async () => {
@@ -71,9 +130,15 @@ describe("inspect_replay_timeline", () => {
       getServerContext(),
     );
 
-    expect(result).toContain(
-      "The recording is archived, so its activity timeline is no longer available.",
-    );
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toMatchObject({
+      status: "archived",
+      unavailableReason:
+        "The recording is archived, so its activity timeline is no longer available.",
+      totalMatchingEvents: 0,
+      omittedCount: 0,
+      events: [],
+    });
   });
 
   it("surfaces recording fetch failures instead of returning an empty timeline", async () => {

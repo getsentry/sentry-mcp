@@ -2303,6 +2303,171 @@
         }
       }
     },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string"
+        },
+        "replayId": {
+          "type": "string"
+        },
+        "replayUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "startedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["available", "archived", "unavailable"]
+        },
+        "unavailableReason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "filters": {
+          "type": "object",
+          "properties": {
+            "aroundTimestamp": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "windowSeconds": {
+              "type": "number"
+            },
+            "eventTypes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "navigation",
+                  "click",
+                  "error",
+                  "console",
+                  "network",
+                  "performance",
+                  "other"
+                ]
+              }
+            },
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "aroundTimestamp",
+            "windowSeconds",
+            "eventTypes",
+            "limit"
+          ],
+          "additionalProperties": false
+        },
+        "totalMatchingEvents": {
+          "type": "number"
+        },
+        "omittedCount": {
+          "type": "number"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timestampMs": {
+                "type": "number"
+              },
+              "offsetMs": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "navigation",
+                  "click",
+                  "error",
+                  "console",
+                  "network",
+                  "performance",
+                  "other"
+                ]
+              },
+              "label": {
+                "type": "string"
+              },
+              "details": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["key", "value"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["timestampMs", "offsetMs", "type", "label", "details"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "organizationSlug",
+        "replayId",
+        "replayUrl",
+        "startedAt",
+        "status",
+        "unavailableReason",
+        "filters",
+        "totalMatchingEvents",
+        "omittedCount",
+        "events"
+      ],
+      "additionalProperties": false
+    },
     "requiredScopes": ["org:read", "project:read", "event:read"],
     "skills": ["inspect"],
     "surface": "catalog"
