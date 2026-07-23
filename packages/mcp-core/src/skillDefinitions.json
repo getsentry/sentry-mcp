@@ -5,7 +5,7 @@
     "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, monitors, profiles, documentation, and project metadata",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 35,
+    "toolCount": 36,
     "tools": [
       {
         "name": "find_alert_rules",
@@ -151,6 +151,11 @@
         "name": "get_trace_details",
         "description": "Get detailed information about a specific Sentry trace by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific trace ID (e.g., 'a4d1aae7216b47ff8117cf4e09ce9d0a')\n- Ask to 'show me trace [TRACE-ID]', 'explain trace [TRACE-ID]'\n- Want high-level overview and link to view trace details in Sentry\n- Need trace statistics and span breakdown\n- Want an overview first, then a guided pivot into additional spans or events\n\nDO NOT USE for:\n- General searching for traces (use search_events with trace queries)\n- Complete span enumeration or branch-by-branch reconstruction (use search_events scoped to the trace)\n\nTRIGGER PATTERNS:\n- 'Show me trace abc123' → use get_trace_details\n- 'Explain trace a4d1aae7216b47ff8117cf4e09ce9d0a' → use get_trace_details\n- 'What is trace [trace-id]' → use get_trace_details\n\n<examples>\n### Get trace overview\n```\nget_trace_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\n```\n\n### Focus a single span\n```\nget_trace_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a', spanId='aa8e7f3384ef4ff5')\n```\n</examples>\n\n<hints>\n- Trace IDs are 32-character hexadecimal strings\n- This returns a condensed trace overview, not a full span dump\n- Provide `spanId` to focus on a single span within the trace\n- If the response says it shows a subset of spans, use search_events to inspect the rest of the trace\n</hints>",
         "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "inspect_replay_timeline",
+        "description": "Inspect the timestamped activity timeline for a specific Sentry replay.\n\nUse this tool when you need to:\n- Reconstruct what a user did before an error or frustrating interaction\n- Inspect navigation, clicks, console messages, network activity, and performance spans\n- Focus on a time window around a known moment in a replay\n\n<examples>\ninspect_replay_timeline(replayUrl='https://my-org.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/')\ninspect_replay_timeline(organizationSlug='my-org', replayId='7e07485f-12f9-416b-8b14-26260799b51f', eventTypes=['click', 'error', 'network'])\ninspect_replay_timeline(replayUrl='https://my-org.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/', aroundTimestamp='2026-07-23T19:14:21Z', windowSeconds=30)\n</examples>\n\n<hints>\n- aroundTimestamp is an absolute ISO-8601 timestamp; windowSeconds applies before and after it\n- Use get_replay_details for replay metadata and related issues or traces\n</hints>",
+        "requiredScopes": ["org:read", "project:read", "event:read"]
       },
       {
         "name": "search_ai_conversations",

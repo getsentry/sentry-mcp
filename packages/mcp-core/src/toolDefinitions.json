@@ -2237,6 +2237,77 @@
     "surface": "catalog"
   },
   {
+    "name": "inspect_replay_timeline",
+    "description": "Inspect the timestamped activity timeline for a specific Sentry replay.\n\nUse this tool when you need to:\n- Reconstruct what a user did before an error or frustrating interaction\n- Inspect navigation, clicks, console messages, network activity, and performance spans\n- Focus on a time window around a known moment in a replay\n\n<examples>\ninspect_replay_timeline(replayUrl='https://my-org.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/')\ninspect_replay_timeline(organizationSlug='my-org', replayId='7e07485f-12f9-416b-8b14-26260799b51f', eventTypes=['click', 'error', 'network'])\ninspect_replay_timeline(replayUrl='https://my-org.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/', aroundTimestamp='2026-07-23T19:14:21Z', windowSeconds=30)\n</examples>\n\n<hints>\n- aroundTimestamp is an absolute ISO-8601 timestamp; windowSeconds applies before and after it\n- Use get_replay_details for replay metadata and related issues or traces\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "replayUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the replay. e.g. https://my-organization.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/"
+        },
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "replayId": {
+          "type": "string",
+          "description": "The replay ID. e.g. `7e07485f-12f9-416b-8b14-26260799b51f`"
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "aroundTimestamp": {
+          "description": "Optional absolute ISO-8601 timestamp to inspect around.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "windowSeconds": {
+          "description": "Seconds before and after aroundTimestamp to include. Defaults to 30.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300
+        },
+        "eventTypes": {
+          "description": "Optional event categories to include.",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "navigation",
+              "click",
+              "error",
+              "console",
+              "network",
+              "performance",
+              "other"
+            ]
+          }
+        },
+        "limit": {
+          "description": "Maximum timeline events to return. Defaults to 50.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      }
+    },
+    "requiredScopes": ["org:read", "project:read", "event:read"],
+    "skills": ["inspect"],
+    "surface": "catalog"
+  },
+  {
     "name": "remove_team_from_project",
     "description": "Revoke a team's access to an existing Sentry project.\n\nUse this tool when you need to:\n- Remove a team from a project\n- Revoke team access without changing project metadata\n- Check project team assignments before removing access\n\nBe careful when using this tool because it revokes project access.\n\n<examples>\nremove_team_from_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- The team must already be assigned to the project.\n- This tool will not remove the last team assigned to a project.\n</hints>",
     "inputSchema": {
