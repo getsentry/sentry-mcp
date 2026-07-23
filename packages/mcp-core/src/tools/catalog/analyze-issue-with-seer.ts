@@ -11,6 +11,7 @@ import {
   isTerminalStatus,
   getHumanInterventionGuidance,
   getOutputForAutofixRun,
+  wrapSeerContent,
   getActiveAutofixTodo,
   getSeerUnsupportedIssueMessage,
   isSeerSupportedIssue,
@@ -177,7 +178,12 @@ export default defineTool({
       if (isTerminalStatus(existingStatus)) {
         // Return results immediately, no polling needed
         output += `## Analysis ${getStatusDisplayName(existingStatus)}\n\n`;
-        output += getOutputForAutofixRun(autofixState.autofix);
+        output += autofixState.formatted?.content
+          ? wrapSeerContent(
+              autofixState.formatted.content,
+              autofixState.autofix.run_id,
+            )
+          : getOutputForAutofixRun(autofixState.autofix);
 
         if (existingStatus !== "completed") {
           output += `\n**Status**: ${existingStatus}\n`;
@@ -210,7 +216,12 @@ export default defineTool({
       // Check if completed (terminal state)
       if (isTerminalStatus(status)) {
         output += `## Analysis ${getStatusDisplayName(status)}\n\n`;
-        output += getOutputForAutofixRun(autofixState.autofix);
+        output += autofixState.formatted?.content
+          ? wrapSeerContent(
+              autofixState.formatted.content,
+              autofixState.autofix.run_id,
+            )
+          : getOutputForAutofixRun(autofixState.autofix);
 
         if (status !== "completed") {
           output += `\n**Status**: ${status}\n`;
@@ -279,7 +290,12 @@ export default defineTool({
     // Show current progress
     if (autofixState.autofix) {
       output += `**Current Status**: ${getStatusDisplayName(autofixState.autofix.status)}\n\n`;
-      output += getOutputForAutofixRun(autofixState.autofix);
+      output += autofixState.formatted?.content
+        ? wrapSeerContent(
+            autofixState.formatted.content,
+            autofixState.autofix.run_id,
+          )
+        : getOutputForAutofixRun(autofixState.autofix);
     }
 
     // Timeout reached

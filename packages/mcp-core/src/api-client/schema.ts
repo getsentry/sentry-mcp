@@ -1042,6 +1042,8 @@ const BaseEventSchema = z.object({
   _meta: z.unknown().optional(),
   // dateReceived is when the server received the event (may not be present in all contexts)
   dateReceived: z.string().datetime().optional(),
+  // shared-formatter output, present when the event endpoint is called with ?llmFormat
+  formatted: z.object({ format: z.string(), content: z.string() }).optional(),
 });
 
 export const ErrorEventSchema = BaseEventSchema.omit({
@@ -1276,6 +1278,8 @@ export const AutofixRunStateSchema = z.object({
     })
     .passthrough()
     .nullable(),
+  // shared-formatter output, present when the autofix endpoint is called with ?llmFormat
+  formatted: z.object({ format: z.string(), content: z.string() }).optional(),
 });
 
 export const EventAttachmentSchema = z.object({
