@@ -100,6 +100,7 @@ export function createSearchToolsTool(getTools: () => ToolRegistry) {
     },
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       openWorldHint: false,
     },
     outputSchema: searchToolsOutputSchema,
