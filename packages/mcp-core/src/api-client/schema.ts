@@ -763,7 +763,10 @@ export const AssignedToSchema = z.union([
 export const IssueSchema = z
   .object({
     id: z.union([z.string(), z.number()]),
-    shortId: z.string(),
+    shortId: z
+      .string()
+      .nullish()
+      .transform((v) => v ?? ""),
     title: z.string(),
     firstSeen: z.string().datetime().nullable(),
     lastSeen: z.string().datetime().nullable(),
