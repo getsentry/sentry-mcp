@@ -141,6 +141,22 @@ import type {
 
 const SENTRY_MCP_SEARCH_EVENTS_REFERRER = "api.mcp.search-events";
 
+type ExplorerAggregateParams = {
+  fields?: string[];
+  aggregateFunctions?: string[];
+  groupByFields?: string[];
+};
+
+type ExplorerUrlParams = ExplorerAggregateParams & {
+  organizationSlug: string;
+  query: string;
+  projectId?: string;
+  sort?: string;
+  statsPeriod?: string;
+  start?: string;
+  end?: string;
+};
+
 /**
  * Mapping of common network error codes to user-friendly messages.
  * These help users understand and resolve connection issues.
@@ -1172,42 +1188,91 @@ export class SentryApiService {
     return `${path}?${urlParams.toString()}`;
   }
 
+  private isAggregateExplorerQuery(params: ExplorerAggregateParams): boolean {
+    return Boolean(
+      params.aggregateFunctions?.length ||
+        params.fields?.some(
+          (field) => field.includes("(") && field.includes(")"),
+        ),
+    );
+  }
+
   /**
-   * Builds a URL for the modern EAP (Event Analytics Platform) API used by spans/logs.
-   *
-   * The EAP API uses structured aggregate queries with separate aggregateField
-   * parameters containing JSON objects for groupBy and yAxes.
+   * Adds the structured aggregate fields shared by the Spans and Logs Explorer
+   * URL formats. Each group-by and collection of y-axes is encoded as a
+   * separate JSON-valued `aggregateField` parameter.
    *
    * @example
-   * // URL format: /explore/traces/?aggregateField={"groupBy":"span.op"}&aggregateField={"yAxes":["count()"]}
-   * buildEapUrl("my-org", "span.op:db", "123", ["span.op", "count()"], "-count()", ["count()"], ["span.op"])
+   * aggregateField={"groupBy":"span.op"}&aggregateField={"yAxes":["count()"]}
    */
-  private buildEapUrl(params: {
-    organizationSlug: string;
-    query: string;
-    dataset: "spans" | "logs";
-    projectId?: string;
-    fields?: string[];
-    sort?: string;
-    statsPeriod?: string;
-    start?: string;
-    end?: string;
-    aggregateFunctions?: string[];
-    groupByFields?: string[];
-  }): string {
-    const {
-      organizationSlug,
-      query,
-      dataset,
-      projectId,
-      fields,
-      sort,
-      statsPeriod,
-      start,
-      end,
-      aggregateFunctions,
-      groupByFields,
-    } = params;
+  private appendAggregateFields(
+    urlParams: URLSearchParams,
+    params: ExplorerAggregateParams,
+  ): void {
+    const { fields, aggregateFunctions, groupByFields } = params;
+
+    if (aggregateFunctions?.length || groupByFields?.length) {
+      // Prefer the structured aggregate metadata returned by search_events.
+      for (const field of groupByFields ?? []) {
+        urlParams.append("aggregateField", JSON.stringify({ groupBy: field }));
+      }
+
+      if (aggregateFunctions?.length) {
+        urlParams.append(
+          "aggregateField",
+          JSON.stringify({ yAxes: aggregateFunctions }),
+        );
+      }
+      return;
+    }
+
+    // Fall back to deriving aggregate metadata from the selected fields.
+    const parsedGroupByFields =
+      fields?.filter((field) => !field.includes("(") && !field.includes(")")) ??
+      [];
+    const parsedAggregateFunctions =
+      fields?.filter((field) => field.includes("(") && field.includes(")")) ??
+      [];
+
+    for (const field of parsedGroupByFields) {
+      urlParams.append("aggregateField", JSON.stringify({ groupBy: field }));
+    }
+
+    if (parsedAggregateFunctions.length > 0) {
+      urlParams.append(
+        "aggregateField",
+        JSON.stringify({ yAxes: parsedAggregateFunctions }),
+      );
+    }
+  }
+
+  private appendExplorerTimeParams(
+    urlParams: URLSearchParams,
+    params: { statsPeriod?: string; start?: string; end?: string },
+  ): void {
+    if (params.start && params.end) {
+      urlParams.set("start", params.start);
+      urlParams.set("end", params.end);
+    } else {
+      urlParams.set("statsPeriod", params.statsPeriod || "24h");
+    }
+  }
+
+  private buildExplorePath(
+    organizationSlug: string,
+    page: "logs" | "traces",
+  ): string {
+    // For SaaS instances, always use sentry.io for web UI URLs regardless of region.
+    // Regional subdomains (e.g., us.sentry.io) are only for API endpoints.
+    if (this.isSaas()) {
+      return `${this.protocol}://${organizationSlug}.sentry.io/explore/${page}/`;
+    }
+    return `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/${page}/`;
+  }
+
+  /** Builds a Spans Explorer URL using its `query`, `field`, and `sort` contract. */
+  private buildSpansExplorerUrl(params: ExplorerUrlParams): string {
+    const { organizationSlug, query, projectId, fields, sort } = params;
 
     const urlParams = new URLSearchParams();
     urlParams.set("query", query);
@@ -1216,68 +1281,14 @@ export class SentryApiService {
       urlParams.set("project", projectId);
     }
 
-    // Determine if this is an aggregate query
-    const isAggregateQuery =
-      (aggregateFunctions?.length ?? 0) > 0 ||
-      fields?.some((field) => field.includes("(") && field.includes(")")) ||
-      false;
+    const isAggregateQuery = this.isAggregateExplorerQuery(params);
 
     if (isAggregateQuery) {
-      // EAP API uses structured aggregate parameters
-      if (
-        (aggregateFunctions?.length ?? 0) > 0 ||
-        (groupByFields?.length ?? 0) > 0
-      ) {
-        // Add each groupBy field as a separate aggregateField parameter
-        if (groupByFields && groupByFields.length > 0) {
-          for (const field of groupByFields) {
-            urlParams.append(
-              "aggregateField",
-              JSON.stringify({ groupBy: field }),
-            );
-          }
-        }
-
-        // Add aggregate functions (yAxes)
-        if (aggregateFunctions && aggregateFunctions.length > 0) {
-          urlParams.append(
-            "aggregateField",
-            JSON.stringify({ yAxes: aggregateFunctions }),
-          );
-        }
-      } else {
-        // Fallback: parse fields to extract aggregate info
-        const parsedGroupByFields =
-          fields?.filter(
-            (field) => !field.includes("(") && !field.includes(")"),
-          ) || [];
-        const parsedAggregateFunctions =
-          fields?.filter(
-            (field) => field.includes("(") && field.includes(")"),
-          ) || [];
-
-        for (const field of parsedGroupByFields) {
-          urlParams.append(
-            "aggregateField",
-            JSON.stringify({ groupBy: field }),
-          );
-        }
-
-        if (parsedAggregateFunctions.length > 0) {
-          urlParams.append(
-            "aggregateField",
-            JSON.stringify({ yAxes: parsedAggregateFunctions }),
-          );
-        }
-      }
-
+      this.appendAggregateFields(urlParams, params);
       urlParams.set("mode", "aggregate");
     } else {
-      // Non-aggregate query, add individual fields
-      if (fields && fields.length > 0) {
-        for (const field of fields) {
-          urlParams.append("field", field);
-        }
+      for (const field of fields ?? []) {
+        urlParams.append("field", field);
       }
     }
 
@@ -1286,28 +1297,43 @@ export class SentryApiService {
       urlParams.set("sort", sort);
     }
 
-    // Add time parameters - either statsPeriod or start/end
-    if (start && end) {
-      urlParams.set("start", start);
-      urlParams.set("end", end);
+    this.appendExplorerTimeParams(urlParams, params);
+    urlParams.set("table", "span");
+
+    return `${this.buildExplorePath(organizationSlug, "traces")}?${urlParams.toString()}`;
+  }
+
+  /**
+   * Builds a Logs Explorer URL using its logs-specific page parameters.
+   * Sample and aggregate views use distinct field and sort parameters, and an
+   * omitted project is represented by `project=-1` to preserve all-project scope.
+   */
+  private buildLogsExplorerUrl(params: ExplorerUrlParams): string {
+    const { organizationSlug, query, projectId, fields, sort } = params;
+    const urlParams = new URLSearchParams();
+
+    urlParams.set("logsQuery", query);
+    urlParams.set("project", projectId ?? "-1");
+
+    const isAggregateQuery = this.isAggregateExplorerQuery(params);
+    if (isAggregateQuery) {
+      this.appendAggregateFields(urlParams, params);
     } else {
-      urlParams.set("statsPeriod", statsPeriod || "24h");
+      for (const field of fields ?? []) {
+        urlParams.append("logsFields", field);
+      }
     }
 
-    // Add table parameter for spans dataset (required for UI)
-    if (dataset === "spans") {
-      urlParams.set("table", "span");
+    urlParams.set("mode", isAggregateQuery ? "aggregate" : "samples");
+    if (sort) {
+      urlParams.set(
+        isAggregateQuery ? "logsAggregateSortBys" : "logsSortBys",
+        sort,
+      );
     }
 
-    const basePath = dataset === "logs" ? "logs" : "traces";
-    // For SaaS instances, always use sentry.io for web UI URLs regardless of region
-    // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
-    const webHost = this.isSaas() ? "sentry.io" : this.host;
-    const path = this.isSaas()
-      ? `${this.protocol}://${organizationSlug}.${webHost}/explore/${basePath}/`
-      : `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/${basePath}/`;
-
-    return `${path}?${urlParams.toString()}`;
+    this.appendExplorerTimeParams(urlParams, params);
+    return `${this.buildExplorePath(organizationSlug, "logs")}?${urlParams.toString()}`;
   }
 
   private extractTraceMetricsFromResults(
@@ -1426,11 +1452,9 @@ export class SentryApiService {
       );
     }
 
-    // Route to modern EAP API (spans and logs)
-    return this.buildEapUrl({
+    const explorerParams = {
       organizationSlug,
       query,
-      dataset,
       projectId,
       fields,
       sort,
@@ -1439,7 +1463,11 @@ export class SentryApiService {
       end,
       aggregateFunctions,
       groupByFields,
-    });
+    };
+
+    return dataset === "logs"
+      ? this.buildLogsExplorerUrl(explorerParams)
+      : this.buildSpansExplorerUrl(explorerParams);
   }
 
   /**
