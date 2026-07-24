@@ -327,6 +327,86 @@ describe("getEventsExplorerUrl", () => {
       expect(result).toContain("mode=aggregate");
     });
   });
+
+  describe("logs dataset", () => {
+    it("should build a sample Logs Explorer URL scoped to all projects", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+      const result = apiService.getEventsExplorerUrl(
+        "sentry-mcp",
+        "severity:error",
+        undefined,
+        "logs",
+        ["timestamp", "message", "severity"],
+        "-timestamp",
+        undefined,
+        undefined,
+        "7d",
+      );
+      const url = new URL(result);
+
+      expect(url.pathname).toBe("/explore/logs/");
+      expect(url.searchParams.get("logsQuery")).toBe("severity:error");
+      expect(url.searchParams.getAll("logsFields")).toEqual([
+        "timestamp",
+        "message",
+        "severity",
+      ]);
+      expect(url.searchParams.get("logsSortBys")).toBe("-timestamp");
+      expect(url.searchParams.get("mode")).toBe("samples");
+      expect(url.searchParams.get("project")).toBe("-1");
+      expect(url.searchParams.get("statsPeriod")).toBe("7d");
+      expect(url.searchParams.has("query")).toBe(false);
+      expect(url.searchParams.has("field")).toBe(false);
+      expect(url.searchParams.has("sort")).toBe(false);
+    });
+
+    it("should preserve explicit project and absolute time scope", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+      const result = apiService.getEventsExplorerUrl(
+        "sentry-mcp",
+        "service:api",
+        "123456",
+        "logs",
+        ["timestamp", "message"],
+        "-timestamp",
+        undefined,
+        undefined,
+        "7d",
+        "2025-07-29T07:00:00",
+        "2025-07-31T06:59:59",
+      );
+      const url = new URL(result);
+
+      expect(url.searchParams.get("project")).toBe("123456");
+      expect(url.searchParams.get("start")).toBe("2025-07-29T07:00:00");
+      expect(url.searchParams.get("end")).toBe("2025-07-31T06:59:59");
+      expect(url.searchParams.has("statsPeriod")).toBe(false);
+    });
+
+    it("should build an aggregate Logs Explorer URL", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+      const result = apiService.getEventsExplorerUrl(
+        "sentry-mcp",
+        "severity:error",
+        undefined,
+        "logs",
+        ["service", "count()"],
+        "-count()",
+        ["count()"],
+        ["service"],
+      );
+      const url = new URL(result);
+
+      expect(url.searchParams.get("mode")).toBe("aggregate");
+      expect(url.searchParams.getAll("aggregateField")).toEqual([
+        JSON.stringify({ groupBy: "service" }),
+        JSON.stringify({ yAxes: ["count()"] }),
+      ]);
+      expect(url.searchParams.get("logsAggregateSortBys")).toBe("-count()");
+      expect(url.searchParams.has("logsFields")).toBe(false);
+      expect(url.searchParams.has("logsSortBys")).toBe(false);
+    });
+  });
 });
 
 describe("monitor time parameters", () => {
@@ -1602,21 +1682,19 @@ describe("API query builders", () => {
       });
     });
 
-    describe("buildEapUrl", () => {
+    describe("spans explorer URLs", () => {
       it("should build correct URL for spans dataset with aggregate fields", () => {
         const apiService = new SentryApiService({ host: "sentry.io" });
-
-        // @ts-expect-error - accessing private method for testing
-        const url = apiService.buildEapUrl({
-          organizationSlug: "my-org",
-          query: "is_transaction:True",
-          dataset: "spans",
-          projectId: "123456",
-          fields: ["span.description", "count()"],
-          sort: "-count()",
-          aggregateFunctions: ["count()"],
-          groupByFields: ["span.description"],
-        });
+        const url = apiService.getEventsExplorerUrl(
+          "my-org",
+          "is_transaction:True",
+          "123456",
+          "spans",
+          ["span.description", "count()"],
+          "-count()",
+          ["count()"],
+          ["span.description"],
+        );
 
         expect(url).toContain("https://my-org.sentry.io/explore/traces/");
         expect(url).toContain("mode=aggregate");
@@ -1633,17 +1711,16 @@ describe("API query builders", () => {
 
       it("should not include empty groupBy in aggregateField", () => {
         const apiService = new SentryApiService({ host: "sentry.io" });
-
-        // @ts-expect-error - accessing private method for testing
-        const url = apiService.buildEapUrl({
-          organizationSlug: "my-org",
-          query: "span.op:db",
-          dataset: "spans",
-          fields: ["count()"],
-          sort: "-count()",
-          aggregateFunctions: ["count()"],
-          groupByFields: [],
-        });
+        const url = apiService.getEventsExplorerUrl(
+          "my-org",
+          "span.op:db",
+          undefined,
+          "spans",
+          ["count()"],
+          "-count()",
+          ["count()"],
+          [],
+        );
 
         expect(url).toContain("mode=aggregate");
         expect(url).toContain(
@@ -1654,17 +1731,16 @@ describe("API query builders", () => {
 
       it("should handle multiple groupBy fields", () => {
         const apiService = new SentryApiService({ host: "sentry.io" });
-
-        // @ts-expect-error - accessing private method for testing
-        const url = apiService.buildEapUrl({
-          organizationSlug: "my-org",
-          query: "",
-          dataset: "spans",
-          fields: ["span.op", "span.description", "count()"],
-          sort: "-count()",
-          aggregateFunctions: ["count()"],
-          groupByFields: ["span.op", "span.description"],
-        });
+        const url = apiService.getEventsExplorerUrl(
+          "my-org",
+          "",
+          undefined,
+          "spans",
+          ["span.op", "span.description", "count()"],
+          "-count()",
+          ["count()"],
+          ["span.op", "span.description"],
+        );
 
         expect(url).toContain(
           `aggregateField=%7B%22groupBy%22%3A%22span.op%22%7D`,
@@ -1679,15 +1755,14 @@ describe("API query builders", () => {
 
       it("should handle non-aggregate queries", () => {
         const apiService = new SentryApiService({ host: "sentry.io" });
-
-        // @ts-expect-error - accessing private method for testing
-        const url = apiService.buildEapUrl({
-          organizationSlug: "my-org",
-          query: "span.op:http",
-          dataset: "spans",
-          fields: ["span.op", "span.description", "span.duration"],
-          sort: "-span.duration",
-        });
+        const url = apiService.getEventsExplorerUrl(
+          "my-org",
+          "span.op:http",
+          undefined,
+          "spans",
+          ["span.op", "span.description", "span.duration"],
+          "-span.duration",
+        );
 
         expect(url).not.toContain("mode=aggregate");
         expect(url).not.toContain("aggregateField");
@@ -1697,31 +1772,15 @@ describe("API query builders", () => {
         expect(url).toContain("sort=-span.duration");
       });
 
-      it("should use correct path for logs dataset", () => {
-        const apiService = new SentryApiService({ host: "sentry.io" });
-
-        // @ts-expect-error - accessing private method for testing
-        const url = apiService.buildEapUrl({
-          organizationSlug: "my-org",
-          query: "severity:error",
-          dataset: "logs",
-          fields: ["timestamp", "message"],
-        });
-
-        expect(url).toContain("/explore/logs/");
-        expect(url).not.toContain("/explore/traces/");
-      });
-
       it("should handle self-hosted URLs correctly", () => {
         const apiService = new SentryApiService({ host: "sentry.example.com" });
-
-        // @ts-expect-error - accessing private method for testing
-        const url = apiService.buildEapUrl({
-          organizationSlug: "my-org",
-          query: "",
-          dataset: "spans",
-          fields: ["span.op"],
-        });
+        const url = apiService.getEventsExplorerUrl(
+          "my-org",
+          "",
+          undefined,
+          "spans",
+          ["span.op"],
+        );
 
         expect(url).toMatchInlineSnapshot(
           `"https://sentry.example.com/organizations/my-org/explore/traces/?query=&field=span.op&statsPeriod=24h&table=span"`,
