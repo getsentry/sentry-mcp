@@ -4,6 +4,7 @@ import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { logIssue } from "../../telem/logging";
 import { UserInputError } from "../../errors";
+import { ApiClientError } from "../../api-client";
 import type { ServerContext } from "../../types";
 import type { Project } from "../../api-client/index";
 import {
@@ -104,6 +105,9 @@ export default defineTool({
         platform: params.platform,
       });
     } catch (err) {
+      if (err instanceof ApiClientError) {
+        throw err;
+      }
       logIssue(err);
       throw new Error(
         `Failed to update project ${params.projectSlug}: ${err instanceof Error ? err.message : "Unknown error"}`,
