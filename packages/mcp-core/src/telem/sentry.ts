@@ -102,6 +102,12 @@ export function sentryBeforeSend(event: any, hint: any): any {
     event.fingerprint = ["AI_APICallError", firstException.value];
   }
 
+  // Drop client-side JsonRpcError_-32603 validation errors — these are
+  // expected failures (invalid MCP requests) and should not be reported.
+  if (firstException?.value?.startsWith("JsonRpcError_-32603:")) {
+    return null;
+  }
+
   // Always scrub the entire event
   const [scrubbedEvent, didScrub, descriptions] = scrubValue(event);
 
