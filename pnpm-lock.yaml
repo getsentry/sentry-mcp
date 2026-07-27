@@ -77,7 +77,7 @@ catalogs:
       version: 4.6.0
     agents:
       specifier: https://pkg.pr.new/agents@1557
-      version: 0.17.4
+      version: 0.19.0
     ai:
       specifier: ^6.0.64
       version: 6.0.64
@@ -3039,7 +3039,7 @@ packages:
 
   agents@https://pkg.pr.new/agents@1557:
     resolution: {integrity: sha512-fZ+gia4frmqSYGjYyytCultIc8oXQOzNsFDkS5Y+q5yrSAXa1J208rTHHrTXZy4KtPEBc5WXEaZY6sfI62DSZg==, tarball: https://pkg.pr.new/agents@1557}
-    version: 0.17.4
+    version: 0.19.0
     hasBin: true
     peerDependencies:
       '@ai-sdk/react': ^3.0.204
