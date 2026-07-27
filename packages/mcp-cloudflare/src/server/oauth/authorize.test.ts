@@ -333,6 +333,42 @@ describe("oauth authorize routes", () => {
       expect(await response.text()).toBe("Invalid redirect URI");
     });
 
+    it("accepts an ephemeral loopback port against a portless CIMD registration", async () => {
+      mockOAuthProvider.lookupClient.mockResolvedValue({
+        clientId: "https://claude.ai/oauth/claude-code-client-metadata",
+        clientName: "Claude Code",
+        redirectUris: [
+          "http://localhost/callback",
+          "http://127.0.0.1/callback",
+        ],
+        tokenEndpointAuthMethod: "none",
+      });
+      const oauthReqInfo = {
+        clientId: "https://claude.ai/oauth/claude-code-client-metadata",
+        redirectUri: "http://localhost:3118/callback",
+        scope: ["org:read"],
+        state: "original-state",
+      };
+      const formData = new FormData();
+      const signedState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      formData.append("state", signedState);
+      formData.append("skill", "triage");
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "POST",
+        body: formData,
+      });
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(302);
+    });
+
     it("should encode skills in the redirect state", async () => {
       const oauthReqInfo = {
         clientId: "test-client",
