@@ -125,6 +125,31 @@ describe("worker entrypoint", () => {
     expect(MockOAuthProvider).not.toHaveBeenCalled();
   });
 
+  it("serves path-scoped protected resource metadata before the oauth provider", async () => {
+    const response = await handler.fetch!(
+      new Request(
+        "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry/mcp-server?experimental=1",
+      ),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      resource: "https://mcp.sentry.dev/mcp/sentry/mcp-server?experimental=1",
+      authorization_servers: ["https://mcp.sentry.dev"],
+      scopes_supported: [
+        "org:read",
+        "project:write",
+        "team:write",
+        "event:write",
+      ],
+      bearer_methods_supported: ["header"],
+    });
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(MockOAuthProvider).not.toHaveBeenCalled();
+  });
+
   it("strips CORS headers from non-public OAuth endpoints", async () => {
     mockOAuthProviderFetch.mockResolvedValueOnce(
       new Response("ok", {

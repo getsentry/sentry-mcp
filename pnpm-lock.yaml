@@ -28,8 +28,8 @@ catalogs:
       specifier: 0.14.1
       version: 0.14.1
     '@cloudflare/workers-oauth-provider':
-      specifier: ^0.3.0
-      version: 0.3.0
+      specifier: ^0.8.2
+      version: 0.8.2
     '@cloudflare/workers-types':
       specifier: ^4.20260405.1
       version: 4.20260405.1
@@ -266,7 +266,7 @@ importers:
         version: 3.0.232(react@19.2.7)(zod@4.4.3)
       '@cloudflare/workers-oauth-provider':
         specifier: 'catalog:'
-        version: 0.3.0
+        version: 0.8.2
       '@modelcontextprotocol/sdk':
         specifier: 1.29.0
         version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
@@ -1085,8 +1085,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@cloudflare/workers-oauth-provider@0.3.0':
-    resolution: {integrity: sha512-I39kyUzNQWxVTIQs56xbnnHSrOY5UjiGKVeYI2zY5h+LjUxqeiuOBTTlKEDUirRvnMmBg3yppA6pR8bYKBrTAA==}
+  '@cloudflare/workers-oauth-provider@0.8.2':
+    resolution: {integrity: sha512-Pho5qWDl4qj1STI5QYMQfPmJBBkxyrFpXyDl9BrtYOfWHxThabEzdi9p3ezS2cUkbjA0E6L5ki/kq2pcbRUtlg==}
 
   '@cloudflare/workers-types@4.20260405.1':
     resolution: {integrity: sha512-PokTmySa+D6MY01R1UfYH48korsN462NK/fl3aw47Hg7XuLuSo/RTpjT0vtWaJhJoFY5tHGOBBIbDcIc8wltLg==}
@@ -3038,7 +3038,7 @@ packages:
     engines: {node: '>= 6.0.0'}
 
   agents@https://pkg.pr.new/agents@1557:
-    resolution: {integrity: sha512-gw0wBP0szbezm76Cvd04E4Q0dDEHz9q21EjHEXrRYqhW/WlQZSwD1i4TmXWYn0V9MwqkAlc8D/KmODXzYMlJ2g==, tarball: https://pkg.pr.new/agents@1557}
+    resolution: {integrity: sha512-fZ+gia4frmqSYGjYyytCultIc8oXQOzNsFDkS5Y+q5yrSAXa1J208rTHHrTXZy4KtPEBc5WXEaZY6sfI62DSZg==, tarball: https://pkg.pr.new/agents@1557}
     version: 0.17.4
     hasBin: true
     peerDependencies:
@@ -6027,7 +6027,7 @@ snapshots:
   '@cloudflare/workerd-windows-64@1.20260401.1':
     optional: true
 
-  '@cloudflare/workers-oauth-provider@0.3.0': {}
+  '@cloudflare/workers-oauth-provider@0.8.2': {}
 
   '@cloudflare/workers-types@4.20260405.1': {}
 
