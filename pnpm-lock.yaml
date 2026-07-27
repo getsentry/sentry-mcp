@@ -157,8 +157,8 @@ catalogs:
       specifier: ^5.8.3
       version: 5.8.3
     valibot:
-      specifier: ^1.4.0
-      version: 1.4.0
+      specifier: ^1.4.2
+      version: 1.4.2
     vite:
       specifier: ^6.3.5
       version: 6.3.5
@@ -219,7 +219,7 @@ importers:
         version: 5.8.3
       valibot:
         specifier: 'catalog:'
-        version: 1.4.0(typescript@5.8.3)
+        version: 1.4.2(typescript@5.8.3)
       vitest:
         specifier: 'catalog:'
         version: 4.1.2(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@6.3.5(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.9.0))
@@ -3042,15 +3042,15 @@ packages:
     version: 0.19.0
     hasBin: true
     peerDependencies:
-      '@ai-sdk/react': ^3.0.204
-      '@cloudflare/codemode': 0.4.3
+      '@ai-sdk/react': ^3.0.0 || ^4.0.0
+      '@cloudflare/codemode': 0.5.0
       '@modelcontextprotocol/client': 2.0.0-beta.5
       '@modelcontextprotocol/sdk': 1.29.0
       '@modelcontextprotocol/server': 2.0.0-beta.5
       '@tanstack/ai': '>=0.10.2 <1.0.0'
       '@x402/core': ^2.0.0
       '@x402/evm': ^2.0.0
-      ai: ^6.0.0
+      ai: ^6.0.0 || ^7.0.0
       chat: ^4.29.0
       just-bash: ^3.0.0
       react: ^19.0.0
@@ -5305,8 +5305,8 @@ packages:
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
-  valibot@1.4.0:
-    resolution: {integrity: sha512-iC/x7fVcSyOwlm/VSt7RlHnzNGLGvR9GnxdifUeWoCJo0q4ZZvrVkIHC6faTlkxG47I2Y4UrFquPuVHCrOnrLg==}
+  valibot@1.4.2:
+    resolution: {integrity: sha512-gjdCvJ6d3RyHAneqxMYMW9QMCwYMb3jpOO0IyHZV1bnRHFBHrX3VkIILt5XYR0WhwHiH7Mty8ovuPZ/O3gamrg==}
     peerDependencies:
       typescript: '>=5'
     peerDependenciesMeta:
@@ -10250,7 +10250,7 @@ snapshots:
 
   util-deprecate@1.0.2: {}
 
-  valibot@1.4.0(typescript@5.8.3):
+  valibot@1.4.2(typescript@5.8.3):
     optionalDependencies:
       typescript: 5.8.3
 
