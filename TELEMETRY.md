@@ -4,7 +4,6 @@
 
 Use this when investigating Sentry MCP production incidents across the
 Cloudflare HTTP server, stdio package, MCP tools, OAuth flows, and test-client
-agent mode.
 
 Primary backend: Sentry Logs, Issues, Spans/Traces, and Metrics in the MCP
 server projects. Start with a Sentry event, trace ID, route, user, client
@@ -38,7 +37,6 @@ the pivots and recipes below.
 | `app.rate_limit.scope` | local rate-limit scope | metrics | IP vs user rate limits |
 | `app.route.group` | coarse route family | metrics | `mcp`, `oauth`, `chat`, `search` |
 | `app.transport` | MCP transport | tags, spans | `http`, `sse`, or `stdio` |
-| `app.server.mode.agent` | agent-mode flag | metrics, spans, tags | `?agent=1` or stdio `--agent` adoption |
 | `app.server.mode.experimental` | experimental-mode flag | metrics, spans, tags | `?experimental=1` or stdio `--experimental` adoption |
 | `mcp.session.id` | MCP session identity | spans | session timeline |
 | `gen_ai.tool.name` | MCP tool being called | spans, issues | tool timeline |
@@ -86,7 +84,6 @@ HTTP response rates by route and status.
 
 ```text
 dataset=tracemetrics query='metric:app.server.response http.route:"<route>"'
-fields=timestamp,metric,http.request.method,http.route,http.response.status_code,app.response.status_class,app.route.group,app.client.family,app.server.mode.agent,app.server.mode.experimental,value
 aggregate=sum(value) by http.route,http.response.status_code
 ```
 
@@ -94,8 +91,6 @@ MCP mode adoption by client family.
 
 ```text
 dataset=tracemetrics query='metric:app.server.response http.route:"/mcp/:organizationSlug?/:projectSlug?"'
-fields=timestamp,metric,app.client.family,app.server.mode.agent,app.server.mode.experimental,value
-aggregate=sum(value) by app.client.family,app.server.mode.agent,app.server.mode.experimental
 ```
 
 Local rate-limit volume and scope.
@@ -150,7 +145,6 @@ Tool execution timeline for a slow or failing tool.
 
 ```text
 dataset=spans query='gen_ai.tool.name:"<tool_name>" app.consent.skill.<skill>.granted:true'
-fields=timestamp,trace,span_id,span.op,span.duration,gen_ai.tool.name,app.transport,app.client.family,app.server.mode.agent,app.server.mode.experimental,app.constraint.organization_slug,app.constraint.project_slug,gen_ai.tool.call.arguments.organizationSlug,gen_ai.tool.call.arguments.projectSlugOrId,error.type
 sort=-timestamp
 ```
 
@@ -177,7 +171,6 @@ Stdio sessions by configured host or mode.
 
 ```text
 dataset=spans query='app.transport:stdio app.upstream.host:"<host>"'
-fields=timestamp,trace,span_id,app.server.version,app.server.mode.agent,app.server.mode.experimental,app.url.full,error.type
 sort=-timestamp
 ```
 
@@ -194,7 +187,6 @@ Attributes: `http.request.method`, `http.route`,
 `http.response.status_code`, `app.response.status_class`,
 `app.route.group`, `app.response.reason`, `app.rate_limit.scope`,
 `app.request.duration_ms`. MCP responses also include
-`app.client.family`, `app.server.mode.agent`, and
 `app.server.mode.experimental`.
 
 ### OAuth And Client Registration
@@ -238,10 +230,8 @@ Attributes: `app.resource.type`, `gen_ai.tool.name`, `trace_id`, `span_id`
 
 ### Stdio Transport
 
-Local package startup, host selection, agent mode, experimental mode, or token
 resolution behaves differently than the hosted server.
 
-Attributes: `app.server.version`, `app.transport`, `app.server.mode.agent`,
 `app.server.mode.experimental`, `app.upstream.host`, `app.url.full`
 
 ### Agent And GenAI

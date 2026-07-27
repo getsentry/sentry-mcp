@@ -86,15 +86,10 @@ function hasRequiredCapabilities({
 function isAllowedBySkills({
   tool,
   context,
-  agentMode,
 }: {
   tool: ToolConfig<any>;
   context: ServerContext;
-  agentMode: boolean;
 }): boolean {
-  if (agentMode) {
-    return true;
-  }
 
   const grantedSkills: Set<Skill> | undefined = context.grantedSkills
     ? new Set<Skill>(context.grantedSkills)
@@ -152,12 +147,10 @@ export function injectConstraintParams(
 export function getAvailableTools({
   tools,
   context,
-  agentMode = false,
   experimentalMode,
   useDefaultSurfacePolicy,
 }: CatalogContext & {
   tools: ToolRegistry;
-  agentMode?: boolean;
 }): ToolWithContext[] {
   const availableTools: ToolWithContext[] = [];
 
@@ -168,11 +161,7 @@ export function getAvailableTools({
       useDefaultSurfacePolicy,
     });
 
-    if (agentMode) {
-      if (key !== "use_sentry") {
-        continue;
-      }
-    } else if (!placement.isCatalogTool && !placement.isTopLevel) {
+    if (!placement.isCatalogTool && !placement.isTopLevel) {
       continue;
     }
 
@@ -180,7 +169,7 @@ export function getAvailableTools({
       continue;
     }
 
-    if (!isAllowedBySkills({ tool, context, agentMode })) {
+    if (!isAllowedBySkills({ tool, context })) {
       continue;
     }
 
@@ -201,24 +190,18 @@ export function getAvailableTools({
 export function getToolsForMcpRegistration({
   tools,
   context,
-  agentMode = false,
   experimentalMode,
   useDefaultSurfacePolicy,
 }: CatalogContext & {
   tools: ToolRegistry;
-  agentMode?: boolean;
 }): ToolWithContext[] {
   const availableTools = getAvailableTools({
     tools,
     context,
-    agentMode,
     experimentalMode,
     useDefaultSurfacePolicy,
   });
 
-  if (agentMode) {
-    return availableTools;
-  }
 
   return availableTools.filter(({ isTopLevel }) => isTopLevel);
 }

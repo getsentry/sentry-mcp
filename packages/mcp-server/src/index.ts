@@ -251,7 +251,7 @@ async function main() {
       console.warn(
         "Warning: No LLM API key found (OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY).",
       );
-      console.warn("Agent-assisted search and use_sentry will be unavailable.");
+      console.warn("AI-powered search tools will be unavailable.");
       console.warn(
         "Search tools still work with direct Sentry query syntax via the 'query' parameter.",
       );
@@ -285,7 +285,6 @@ async function main() {
       tags: {
         "app.server.version": LIB_VERSION,
         "app.transport": "stdio",
-        "app.server.mode.agent": cli.agent ? "true" : "false",
         "app.server.mode.experimental": cli.experimental ? "true" : "false",
         "app.upstream.host": cfg.sentryHost,
         "app.url.full": cfg.mcpUrl,
@@ -305,14 +304,6 @@ async function main() {
       (process.env.NODE_ENV !== "production" ? "development" : "production"),
   });
 
-  // Log agent mode status
-  if (cli.agent) {
-    console.warn("Agent mode enabled: Only use_sentry tool is available.");
-    console.warn(
-      "The use_sentry tool provides access to all Sentry operations through natural language.",
-    );
-    console.warn("");
-  }
 
   // Log experimental mode status
   if (cli.experimental) {
@@ -361,17 +352,14 @@ async function main() {
     sentryProtocol: cfg.sentryProtocol,
     mcpUrl: cfg.mcpUrl,
     openaiBaseUrl: cfg.openaiBaseUrl,
-    agentMode: cli.agent,
     experimentalMode: cli.experimental,
     transport: "stdio" as const,
   };
 
   // Build server with context to filter tools based on granted skills
-  // Use agentMode when --agent flag is set (only exposes use_sentry tool)
   // Use experimentalMode when --experimental flag is set (enables forward-looking variants)
   const server = buildServer({
     context,
-    agentMode: cli.agent,
     experimentalMode: cli.experimental,
   });
 

@@ -182,7 +182,6 @@ After:
 
 - `handleApiError` re-throws `ApiAuthenticationError` unwrapped.
 - `server.ts` tool-handler catch detects it (walking `error.cause` up to 3 levels) and invokes `context.onUpstreamUnauthorized`.
-- `use_sentry`'s tool wrapper does the same check before re-throwing, so 401s inside the embedded agent aren't absorbed by the AI SDK.
 - The Cloudflare transport's `onUpstreamUnauthorized` emits `app.oauth.grant_revoked` with `app.oauth.grant_revoked.reason:upstream_rejected_in_use` and calls `env.OAUTH_PROVIDER.revokeGrant` under `ctx.waitUntil`. `workers-oauth-provider` stores tokens under `token:userId:grantId:*` in KV and validates every access token via a KV lookup, so revoking the grant invalidates all outstanding wrapper tokens too — the client's next `/mcp` request gets a 401 and is forced into a clean re-auth.
 - `formatErrorForUser` returns "Authorization Expired — please re-authorize" instead of falling through to the generic Input Error template.
 

@@ -162,19 +162,6 @@ export MCP_URL=https://mcp.sentry.dev
 pnpm -w run cli "query"
 ```
 
-### Testing Agent Mode
-
-Agent mode uses only the `use_sentry` tool (natural language interface):
-
-```bash
-# Test agent mode locally
-pnpm -w run cli --agent "show me my recent errors"
-
-# Test agent mode in production
-pnpm -w run cli --mcp-host=https://mcp.sentry.dev --agent "what projects do I have?"
-```
-
-**Agent mode is ~2x slower** because it requires an additional AI call to translate natural language to tool calls.
 
 ### OAuth Flow Testing
 

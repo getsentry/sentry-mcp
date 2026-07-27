@@ -16,7 +16,6 @@ export type CliArgs = {
   skills?: string;
   allSkills?: boolean;
   disableSkills?: string;
-  agent?: boolean;
   experimental?: boolean;
   organizationSlug?: string;
   projectSlug?: string;
@@ -55,7 +54,6 @@ export type MergedArgs = {
   skills?: string;
   allSkills?: boolean;
   disableSkills?: string;
-  agent?: boolean;
   experimental?: boolean;
   organizationSlug?: string;
   projectSlug?: string;

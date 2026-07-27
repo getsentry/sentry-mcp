@@ -1,24 +1,24 @@
-import { Hono, type Context } from "hono";
-import { openai } from "@ai-sdk/openai";
-import {
-  streamText,
-  type ToolSet,
-  stepCountIs,
-  convertToModelMessages,
-} from "ai";
 import { experimental_createMCPClient } from "@ai-sdk/mcp";
+import { openai } from "@ai-sdk/openai";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { Env } from "../types";
 import { logInfo, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import {
-  AuthDataSchema,
-  TokenResponseSchema,
+  convertToModelMessages,
+  stepCountIs,
+  streamText,
+  type ToolSet,
+} from "ai";
+import { type Context, Hono } from "hono";
+import { annotateResponseMetric } from "../metrics";
+import type { Env } from "../types";
+import {
   type AuthData,
+  AuthDataSchema,
   type ChatRequest,
   type RateLimitResult,
+  TokenResponseSchema,
 } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
-import { annotateResponseMetric } from "../metrics";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
 
@@ -186,9 +186,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
   let mcpClient: MCPClient | null = null;
 
   try {
-    const { messages, endpointMode } = await c.req.json<
-      ChatRequest & { endpointMode?: "standard" | "agent" }
-    >();
+    const { messages } = await c.req.json<ChatRequest>();
 
     // Validate messages array
     if (!Array.isArray(messages)) {
@@ -207,13 +205,8 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
 
     try {
       // Get the current request URL to construct the MCP endpoint URL
-      // Use ?agent=1 query parameter to activate agent mode
       const requestUrl = new URL(c.req.url);
       const mcpUrl = new URL(`${requestUrl.protocol}//${requestUrl.host}/mcp`);
-      if (endpointMode === "agent") {
-        mcpUrl.searchParams.set("agent", "1");
-      }
-
       const httpTransport = new StreamableHTTPClientTransport(mcpUrl, {
         requestInit: {
           headers: {
@@ -250,10 +243,6 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             const mcpUrl = new URL(
               `${requestUrl.protocol}//${requestUrl.host}/mcp`,
             );
-            if (endpointMode === "agent") {
-              mcpUrl.searchParams.set("agent", "1");
-            }
-
             const httpTransport = new StreamableHTTPClientTransport(mcpUrl, {
               requestInit: {
                 headers: {

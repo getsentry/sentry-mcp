@@ -313,8 +313,6 @@ async function handleAuthenticatedMcpRequest(
   const organizationSlug = groups?.org || null;
   const projectSlug = groups?.project || null;
 
-  // Check for agent mode query parameter
-  const isAgentMode = url.searchParams.get("agent") === "1";
 
   // Check for experimental mode query parameter
   const isExperimentalMode = url.searchParams.get("experimental") === "1";
@@ -333,7 +331,6 @@ async function handleAuthenticatedMcpRequest(
   activeSpan?.setAttribute("app.transport", "http");
   activeSpan?.setAttribute("app.auth.kind", auth.kind);
   activeSpan?.setAttribute("app.client.family", clientFamily);
-  activeSpan?.setAttribute("app.server.mode.agent", isAgentMode);
   activeSpan?.setAttribute("app.server.mode.experimental", isExperimentalMode);
   if (utmSource) {
     activeSpan?.setAttribute(UTM_SOURCE_ATTRIBUTE, utmSource);
@@ -442,7 +439,6 @@ async function handleAuthenticatedMcpRequest(
     constraints,
     sentryHost,
     mcpUrl: env.MCP_URL,
-    agentMode: isAgentMode,
     experimentalMode: isExperimentalMode,
     transport: "http",
     onUpstreamUnauthorized:
@@ -455,8 +451,7 @@ async function handleAuthenticatedMcpRequest(
     () =>
       buildServer({
         context: serverContext,
-        agentMode: isAgentMode,
-        experimentalMode: isExperimentalMode,
+            experimentalMode: isExperimentalMode,
         sdkVersion: "v2",
       }),
     {
@@ -586,7 +581,6 @@ const mcpHandler: ExportedHandler<Env> = {
       );
     }
 
-    // Latched so use_sentry's multi-tool runs revoke at most once per request.
     let upstreamUnauthorizedHandled = false;
 
     return handleAuthenticatedMcpRequest(request, env, ctx, {

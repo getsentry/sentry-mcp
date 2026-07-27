@@ -95,7 +95,6 @@ pnpm run build                            # Build all packages
 # Testing
 pnpm -w run cli --transport stdio "q"      # Test MCP tools
 pnpm -w run cli --transport stdio --access-token=TOKEN "q"
-pnpm -w run cli --transport stdio --agent "query"
 
 # Quality (run before committing)
 pnpm run tsc && pnpm run lint && pnpm run test

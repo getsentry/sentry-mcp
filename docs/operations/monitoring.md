@@ -159,7 +159,6 @@ These are Sentry MCP application attributes that are not part of the MCP semanti
 - `app.client.family` - Low-cardinality MCP client bucket derived from User-Agent or registered client name
 - `app.constraint.organization_slug` - Session organization constraint
 - `app.constraint.project_slug` - Session project constraint
-- `app.server.mode.agent` - Whether agent mode is enabled for this MCP request or stdio session
 - `app.server.mode.experimental` - Whether experimental tools are enabled for this MCP request or stdio session
 - `app.consent.skill.<skill>.granted` - Per-skill boolean attributes for skills granted to the MCP request. Skill ids are normalized with `-` replaced by `_`
 - `app.upstream.host` - Upstream Sentry host configured for the server
@@ -268,7 +267,6 @@ Shared low-cardinality attributes:
 Additional attributes on MCP response metrics:
 
 - `app.client.family` - Bucketed MCP client User-Agent
-- `app.server.mode.agent` - `true` when the MCP URL includes `?agent=1`
 - `app.server.mode.experimental` - `true` when the MCP URL includes `?experimental=1`
 
 Additional attributes on direct OAuth client endpoints:
@@ -300,7 +298,6 @@ Interpretation:
 - Use `sum(app.server.response)` grouped by `http.route` and
   `http.response.status_code` for response rates
 - Use `sum(app.server.response)` filtered to the MCP route and grouped by
-  `app.client.family`, `app.server.mode.agent`, and
   `app.server.mode.experimental` for mode adoption
 - Use `sum(app.server.response)` filtered by
   `app.response.reason=local_rate_limit` to measure when we rate-limited the
