@@ -25,6 +25,7 @@ import {
   bucketOAuthErrorDescription,
   getOAuthErrorTelemetry,
 } from "./oauth/telemetry";
+import { createProtectedResourceMetadataResponse } from "./protected-resource-metadata";
 import getSentryConfig from "./sentry.config";
 import type { Env } from "./types";
 import { getClientIp } from "./utils/client-ip";
@@ -188,11 +189,29 @@ const wrappedOAuthProvider = {
 
     // RFC 9728 metadata must be derived from the exact protected resource
     // identifier. We expose only path-specific metadata for `/mcp...`.
+    //
+    // workers-oauth-provider >=0.4 intercepts all PRM well-known paths itself.
+    // Its path-aware implementation does not preserve query strings on the
+    // `resource` identifier, and it would also serve origin-level metadata at
+    // `/.well-known/oauth-protected-resource`. Keep our handler in front so
+    // `/mcp...` metadata (including query) stays exact and the origin endpoint
+    // remains 404.
     if (url.pathname === "/.well-known/oauth-protected-resource") {
       return finalizeResponse(
         request,
         url,
         new Response("Not Found", { status: 404 }),
+      );
+    }
+
+    if (
+      url.pathname === "/.well-known/oauth-protected-resource/mcp" ||
+      url.pathname.startsWith("/.well-known/oauth-protected-resource/mcp/")
+    ) {
+      return finalizeResponse(
+        request,
+        url,
+        createProtectedResourceMetadataResponse(url),
       );
     }
 
@@ -315,6 +334,12 @@ const wrappedOAuthProvider = {
       authorizeEndpoint: "/oauth/authorize",
       tokenEndpoint: "/oauth/token",
       clientRegistrationEndpoint: "/oauth/register",
+      // Accept HTTPS URL client_ids via Client ID Metadata Documents (CIMD).
+      // Requires wrangler `global_fetch_strictly_public` (already set) so the
+      // provider can safely fetch metadata without zone-origin SSRF bypass.
+      // Root AS metadata advertises support automatically; scoped metadata is
+      // handled in authorization-server-metadata.ts.
+      clientIdMetadataDocumentEnabled: true,
       tokenExchangeCallback: (options) =>
         tokenExchangeCallback(options, env, request, clientFamily),
       scopesSupported: Object.keys(SCOPES),

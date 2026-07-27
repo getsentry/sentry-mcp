@@ -49,6 +49,9 @@ export function createScopedAuthorizationServerMetadataResponse(
     ),
     token_endpoint: new URL("/oauth/token", requestUrl.origin).href,
     registration_endpoint: new URL("/oauth/register", requestUrl.origin).href,
+    // Mirror the root AS metadata the provider emits when CIMD is enabled.
+    // This compatibility shim is served by us, not workers-oauth-provider.
+    client_id_metadata_document_supported: true,
     scopes_supported: Object.keys(SCOPES),
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
