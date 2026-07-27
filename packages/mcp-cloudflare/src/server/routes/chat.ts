@@ -243,10 +243,6 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             const mcpUrl = new URL(
               `${requestUrl.protocol}//${requestUrl.host}/mcp`,
             );
-            if (endpointMode === "agent") {
-              mcpUrl.searchParams.set("agent", "1");
-            }
-
             const httpTransport = new StreamableHTTPClientTransport(mcpUrl, {
               requestInit: {
                 headers: {
