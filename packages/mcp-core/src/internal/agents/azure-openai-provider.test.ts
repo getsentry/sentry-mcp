@@ -16,38 +16,31 @@ describe("azure-openai-provider", () => {
 
   beforeEach(() => {
     setAzureOpenAIBaseUrl(undefined);
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.OPENAI_MODEL;
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.OPENROUTER_API_KEY;
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.OPENAI_API_VERSION;
   });
 
   afterEach(() => {
     if (originalModel === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.OPENAI_MODEL;
     } else {
       process.env.OPENAI_MODEL = originalModel;
     }
 
     if (originalApiKey === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.OPENAI_API_KEY;
     } else {
       process.env.OPENAI_API_KEY = originalApiKey;
     }
 
     if (originalOpenRouterApiKey === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.OPENROUTER_API_KEY;
     } else {
       process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey;
     }
 
     if (originalApiVersion === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.OPENAI_API_VERSION;
     } else {
       process.env.OPENAI_API_VERSION = originalApiVersion;
