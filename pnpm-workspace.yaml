@@ -28,7 +28,7 @@ catalog:
   "@ai-sdk/mcp": ^1.0.16
   "@ai-sdk/openai": ^3.0.23
   "@ai-sdk/react": ^3.0.232
-  "@biomejs/biome": ^1.9.4
+  "@biomejs/biome": ^2.5.5
   "@cloudflare/vite-plugin": ^1.31.0
   "@cloudflare/vitest-pool-workers": 0.14.1
   "@cloudflare/workers-oauth-provider": ^0.8.2

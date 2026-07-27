@@ -13,7 +13,6 @@ describe("OAuthClient", () => {
   });
 
   afterEach(() => {
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.MCP_OAUTH_REDIRECT_URI;
   });
 

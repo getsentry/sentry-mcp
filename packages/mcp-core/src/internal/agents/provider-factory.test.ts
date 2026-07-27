@@ -18,38 +18,30 @@ describe("provider-factory", () => {
     setAgentProvider(undefined);
     setAzureOpenAIBaseUrl(undefined);
     // Clear environment variables
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.ANTHROPIC_API_KEY;
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.OPENAI_API_KEY;
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.OPENROUTER_API_KEY;
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.EMBEDDED_AGENT_PROVIDER;
   });
 
   afterEach(() => {
     // Restore original environment
     if (originalAnthropicKey === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.ANTHROPIC_API_KEY;
     } else {
       process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
     }
     if (originalOpenAIKey === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.OPENAI_API_KEY;
     } else {
       process.env.OPENAI_API_KEY = originalOpenAIKey;
     }
     if (originalOpenRouterKey === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.OPENROUTER_API_KEY;
     } else {
       process.env.OPENROUTER_API_KEY = originalOpenRouterKey;
     }
     if (originalProviderEnv === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.EMBEDDED_AGENT_PROVIDER;
     } else {
       process.env.EMBEDDED_AGENT_PROVIDER = originalProviderEnv;
