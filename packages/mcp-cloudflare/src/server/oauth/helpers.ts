@@ -728,8 +728,8 @@ export function getAuthorizationServerIssuer(requestUrl: string | URL): string {
  * RFC 9207: append `iss` to an authorization response redirect URL.
  *
  * Adds the parameter to the query string (response_mode=query) or fragment
- * (response_mode=fragment / implicit). Existing `iss` values are left alone so
- * we never overwrite a provider-supplied parameter if one appears later.
+ * (response_mode=fragment / implicit). Any existing value is replaced because
+ * RFC 9207 requires the response value to equal this server's issuer exactly.
  */
 export function appendAuthorizationResponseIss(
   redirectTo: string,
@@ -738,18 +738,14 @@ export function appendAuthorizationResponseIss(
   const hashIndex = redirectTo.indexOf("#");
   if (hashIndex === -1) {
     const url = new URL(redirectTo);
-    if (!url.searchParams.has("iss")) {
-      url.searchParams.set("iss", issuer);
-    }
+    url.searchParams.set("iss", issuer);
     return url.href;
   }
 
   const beforeHash = redirectTo.slice(0, hashIndex);
   const fragment = redirectTo.slice(hashIndex + 1);
   const params = new URLSearchParams(fragment);
-  if (!params.has("iss")) {
-    params.set("iss", issuer);
-  }
+  params.set("iss", issuer);
   // URLSearchParams encodes spaces as `+`; OAuth fragments typically use `%20`.
   // Our issuer/code/state values don't contain spaces, so this is fine.
   return `${beforeHash}#${params.toString()}`;

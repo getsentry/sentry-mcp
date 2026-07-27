@@ -946,14 +946,14 @@ describe("appendAuthorizationResponseIss", () => {
     );
   });
 
-  it("does not overwrite an existing iss parameter", () => {
+  it("replaces an existing iss parameter with the canonical issuer", () => {
     expect(
       appendAuthorizationResponseIss(
         "https://client.example.com/callback?code=abc&iss=https%3A%2F%2Fother.example",
         "https://mcp.sentry.dev",
       ),
     ).toBe(
-      "https://client.example.com/callback?code=abc&iss=https%3A%2F%2Fother.example",
+      "https://client.example.com/callback?code=abc&iss=https%3A%2F%2Fmcp.sentry.dev",
     );
   });
 });
