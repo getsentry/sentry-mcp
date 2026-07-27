@@ -233,6 +233,21 @@ describe("/mcp", () => {
     expect(body.result?.tools.length).toBeGreaterThan(0);
   });
 
+  it("does not accept a scoped token at a different tenant path", async () => {
+    const accessToken = await issueAccessToken(
+      "https://mcp.sentry.dev/mcp/org-a/project-a",
+    );
+
+    const ctx = createExecutionContext();
+    const response = await handler.fetch!(
+      createMcpRequest("/mcp/org-b/project-b", accessToken, "tools/list", {}),
+      workerEnv,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+  });
+
   it("refreshes token and serves MCP requests when upstream token is valid", async () => {
     const { clientId, tokens } = await issueTokens(
       "https://mcp.sentry.dev/mcp",

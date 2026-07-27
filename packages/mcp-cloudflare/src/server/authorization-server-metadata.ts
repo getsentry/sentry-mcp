@@ -52,11 +52,10 @@ export function createScopedAuthorizationServerMetadataResponse(
     // Mirror the root AS metadata the provider emits when CIMD is enabled.
     // This compatibility shim is served by us, not workers-oauth-provider.
     client_id_metadata_document_supported: true,
-    // RFC 9207: we append `iss` on authorization responses (callback redirect).
-    // Note: the emitted `iss` is the canonical origin-level issuer (matching
-    // PRM authorization_servers + root AS metadata), not this path-scoped
-    // compatibility issuer. Clients should discover via RFC 9728 PRM.
-    authorization_response_iss_parameter_supported: true,
+    // Do not advertise RFC 9207 here: this compatibility document's issuer is
+    // path-scoped, while authorization responses use the canonical origin-level
+    // issuer advertised by RFC 9728 PRM and root AS metadata. RFC 9207 requires
+    // the metadata issuer and response `iss` to be identical.
     scopes_supported: Object.keys(SCOPES),
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
