@@ -334,6 +334,12 @@ const wrappedOAuthProvider = {
       authorizeEndpoint: "/oauth/authorize",
       tokenEndpoint: "/oauth/token",
       clientRegistrationEndpoint: "/oauth/register",
+      // Accept HTTPS URL client_ids via Client ID Metadata Documents (CIMD).
+      // Requires wrangler `global_fetch_strictly_public` (already set) so the
+      // provider can safely fetch metadata without zone-origin SSRF bypass.
+      // Root AS metadata advertises support automatically; scoped metadata is
+      // handled in authorization-server-metadata.ts.
+      clientIdMetadataDocumentEnabled: true,
       tokenExchangeCallback: (options) =>
         tokenExchangeCallback(options, env, request, clientFamily),
       scopesSupported: Object.keys(SCOPES),

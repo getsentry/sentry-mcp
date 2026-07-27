@@ -238,6 +238,7 @@ describe("app", () => {
           "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp%2Fsentry%2Fmcp-server",
         token_endpoint: "https://mcp.sentry.dev/oauth/token",
         registration_endpoint: "https://mcp.sentry.dev/oauth/register",
+        client_id_metadata_document_supported: true,
         scopes_supported: [
           "org:read",
           "project:write",

@@ -177,6 +177,23 @@ describe("worker entrypoint", () => {
     expect(response.headers.has("Access-Control-Expose-Headers")).toBe(false);
   });
 
+  it("enables Client ID Metadata Documents on the oauth provider", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(new Response("ok"));
+
+    await handler.fetch!(
+      new Request("https://mcp.sentry.dev/oauth/token"),
+      env,
+      ctx,
+    );
+
+    expect(MockOAuthProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientIdMetadataDocumentEnabled: true,
+        clientRegistrationEndpoint: "/oauth/register",
+      }),
+    );
+  });
+
   it("patches MCP 401 responses with protected resource metadata", async () => {
     mockOAuthProviderFetch.mockResolvedValueOnce(
       new Response("unauthorized", {
