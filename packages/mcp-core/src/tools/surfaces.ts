@@ -12,7 +12,7 @@ export const CATALOG_INFRASTRUCTURE_TOOL_NAMES = [
   "execute_sentry_tool",
 ] as const;
 
-export const WRAPPER_TOOL_NAMES = ["use_sentry"] as const;
+export const WRAPPER_TOOL_NAMES = [] as const;
 
 export const TOP_LEVEL_TOOL_NAMES = [
   "find_organizations",

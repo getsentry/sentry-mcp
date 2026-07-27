@@ -1,29 +1,25 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { AuthForm, ChatUI } from ".";
-import { useAuth } from "../../contexts/auth-context";
-import { Bot, Loader2, LogOut, PanelLeftOpen, Sparkles } from "lucide-react";
-import type { ChatProps } from "./types";
-import { usePersistedChat } from "../../hooks/use-persisted-chat";
 import TOOL_DEFINITIONS from "@sentry/mcp-core/toolDefinitions";
+import { DefaultChatTransport, type UIMessage } from "ai";
+import { Loader2, LogOut, PanelLeftOpen } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "../../contexts/auth-context";
 import { useMcpMetadata } from "../../hooks/use-mcp-metadata";
+import { usePersistedChat } from "../../hooks/use-persisted-chat";
 import { useStreamingSimulation } from "../../hooks/use-streaming-simulation";
-import { SlidingPanel } from "../ui/sliding-panel";
 import { isAuthError } from "../../utils/chat-error-handler";
-import { useEndpointMode } from "../../hooks/use-endpoint-mode";
 import { Button } from "../ui/button";
+import { SlidingPanel } from "../ui/sliding-panel";
+import { AuthForm, ChatUI } from ".";
+import type { ChatProps } from "./types";
 
 // We don't need user info since we're using MCP tokens
 // The MCP server handles all Sentry authentication internally
 
 export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
   const { isLoading, isAuthenticated, authError, handleOAuthLogin } = useAuth();
-
-  // Use endpoint mode hook to manage MCP endpoint preference
-  const { endpointMode, toggleEndpointMode } = useEndpointMode();
 
   // Use persisted chat to save/load messages from localStorage
   const { initialMessages, saveMessages, clearPersistedMessages } =
@@ -46,14 +42,9 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
   // Manage input state manually (AI SDK 5+ removed built-in input management)
   const [input, setInput] = useState("");
 
-  // Create transport with endpoint mode in body - memoize to avoid recreation
   const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: "/api/chat",
-        body: { endpointMode },
-      }),
-    [endpointMode],
+    () => new DefaultChatTransport({ api: "/api/chat" }),
+    [],
   );
 
   const {
@@ -198,23 +189,21 @@ Try asking me things like:
     };
   }, []);
 
-  // Track previous auth and endpoint mode to detect changes requiring message clearing
-  const prevStateRef = useRef({ isAuthenticated, endpointMode });
+  // Track previous auth state to clear messages on logout.
+  const prevStateRef = useRef({ isAuthenticated });
 
-  // Clear messages when user logs out or endpoint mode changes
+  // Clear messages when the user logs out.
   useEffect(() => {
     const prev = prevStateRef.current;
 
-    // Clear on logout (was authenticated but now isn't) or endpoint mode change
     const didLogout = prev.isAuthenticated && !isAuthenticated;
-    const didChangeMode = prev.endpointMode !== endpointMode;
 
-    if (didLogout || didChangeMode) {
+    if (didLogout) {
       clearMessages();
     }
 
-    prevStateRef.current = { isAuthenticated, endpointMode };
-  }, [isAuthenticated, endpointMode, clearMessages]);
+    prevStateRef.current = { isAuthenticated };
+  }, [isAuthenticated, clearMessages]);
 
   // Save messages when they change
   useEffect(() => {
@@ -390,35 +379,7 @@ Try asking me things like:
       {/* {showControls && ( */}
       <div className="w-full [mask-image:linear-gradient(to_bottom,red,transparent)] pointer-events-none absolute top-0 left-0 h-20 z-10 backdrop-blur-md bg-gradient-to-b from-background to-background/20 xl:from-background-2 xl:to-[#20163333]" />
       <div className="flex flex-row sm:grid sm:grid-cols-3 xl:flex xl:flex-row-reverse justify-between items-center absolute left-4 right-6 top-4 gap-4 z-20">
-        {isAuthenticated && toggleEndpointMode ? (
-          <Button
-            type="button"
-            onClick={toggleEndpointMode}
-            variant={endpointMode === "agent" ? "default" : "outline"}
-            title={
-              endpointMode === "agent"
-                ? "Agent mode: Only use_sentry tool (click to switch to standard)"
-                : "Standard mode: Direct tools plus searchable catalog (click to switch to agent)"
-            }
-            className={`shadow-lg max-xl:order-2 rounded-xl backdrop-blur ${
-              endpointMode === "agent" ? "ring-4 ring-violet-300/50" : "ring-0"
-            }`}
-          >
-            {endpointMode === "agent" ? (
-              <>
-                <Sparkles className="size-4" />
-                Agent Mode
-              </>
-            ) : (
-              <>
-                <Bot className="size-4" />
-                Standard Mode
-              </>
-            )}
-          </Button>
-        ) : (
-          <div />
-        )}
+        <div />
         <div className="contents xl:flex gap-4">
           <Button
             type="button"

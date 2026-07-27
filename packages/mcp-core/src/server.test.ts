@@ -306,26 +306,6 @@ describe("buildServer", () => {
       expect(toolNames).toContain("experimental_tool");
     });
 
-    it("only registers use_sentry in agent mode", () => {
-      // In agent mode, only use_sentry is registered, which handles all tools internally
-      const server = buildServer({
-        context: baseContext,
-        agentMode: true,
-        experimentalMode: false,
-        tools: {
-          use_sentry: createMockTool("use_sentry", { skills: [] }),
-          experimental_tool: createMockTool("experimental_tool", {
-            experimental: true,
-          }),
-        },
-      });
-
-      // In agent mode, only use_sentry should be registered
-      const toolNames = getRegisteredToolNames(server);
-      expect(toolNames).toContain("use_sentry");
-      // experimental_tool is not registered because agent mode only registers use_sentry
-      expect(toolNames).not.toContain("experimental_tool");
-    });
 
     it("does not filter tools with experimental: false", () => {
       const server = buildServer({
@@ -726,7 +706,6 @@ describe("buildServer", () => {
       expect(toolNames).toContain("search_sentry_tools");
       expect(toolNames).toContain("execute_sentry_tool");
       expect(toolNames).not.toContain("whoami");
-      expect(toolNames).not.toContain("use_sentry");
       expect(toolNames).not.toContain("search_docs");
       expect(toolNames).not.toContain("get_doc");
       expect(toolNames).not.toContain("get_issue_details");
@@ -922,16 +901,6 @@ describe("buildServer", () => {
       );
     });
 
-    it("discloses only use_sentry through MCP tools/list in agent mode", async () => {
-      const server = buildServer({
-        context: baseContext,
-        agentMode: true,
-      });
-
-      const registeredTools = await listRegisteredTools(server);
-
-      expect(registeredTools.map((tool) => tool.name)).toEqual(["use_sentry"]);
-    });
 
     it("keeps snapshot tools catalog-only while enforcing the inspect skill gate", async () => {
       const withoutInspect = buildServer({
@@ -985,26 +954,6 @@ describe("buildServer", () => {
       expect(catalogToolNames).toContain("get_latest_base_snapshot");
     });
 
-    it("exposes use_sentry safety annotations through tool metadata in agent mode", async () => {
-      const server = buildServer({
-        context: baseContext,
-        agentMode: true,
-      });
-
-      const registeredTools = await listRegisteredTools(server);
-      const useSentryTool = registeredTools.find(
-        (tool) => tool.name === "use_sentry",
-      );
-
-      expect(useSentryTool).toMatchObject({
-        name: "use_sentry",
-        annotations: {
-          readOnlyHint: false,
-          destructiveHint: true,
-          openWorldHint: true,
-        },
-      });
-    });
 
     it("exposes catalog tools with conservative safety annotations", async () => {
       const server = buildServer({

@@ -406,8 +406,6 @@ Add to `.vscode/settings.json`:
 --sentry-dsn=DSN                  # Custom Sentry DSN for telemetry
 --sentry-dsn=                     # Disable telemetry
 
-# Agent mode (testing use_sentry tool)
---agent                           # Enable agent mode (only use_sentry tool)
 
 # Help
 --help                            # Show all options
@@ -489,18 +487,6 @@ OPENAI_API_KEY=your-key pnpm start --access-token=TOKEN
 # - Call search_issues(query="unresolved crashes")
 ```
 
-### 5. Test Agent Mode
-
-```bash
-# Enable agent mode (only use_sentry tool available)
-pnpm start --access-token=TOKEN --agent
-
-# In Inspector, verify:
-# - Only "use_sentry" tool appears in list
-# - Test: use_sentry(request="show me my organizations")
-```
-
-## Troubleshooting
 
 ### "Command not found: npx @sentry/mcp-server"
 

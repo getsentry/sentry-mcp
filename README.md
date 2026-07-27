@@ -245,9 +245,6 @@ pnpm eval
 # Test with local dev server (default: http://localhost:5173)
 pnpm -w run cli "who am I?"
 
-# Test agent mode (use_sentry tool only)
-pnpm -w run cli --agent "who am I?"
-
 # Test against production
 pnpm -w run cli --mcp-host=https://mcp.sentry.dev "query"
 

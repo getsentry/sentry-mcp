@@ -22,8 +22,8 @@ import { McpServer as LegacyMcpServer } from "@modelcontextprotocol/sdk/server/m
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import {
-  type SpanAttributeValue,
   getActiveSpan,
+  type SpanAttributeValue,
   setTag,
   setUser,
   wrapMcpServerWithSentry,
@@ -34,12 +34,12 @@ import { formatErrorForUser } from "./internal/error-handling";
 import type { Skill } from "./skills";
 import { type LogIssueOptions, logIssue } from "./telem/logging";
 import {
-  type ToolRegistry,
   executeToolHandler,
   getAvailableTools,
   getFilteredInputSchema,
   injectConstraintParams,
   resolveToolDescription,
+  type ToolRegistry,
 } from "./tools/catalog-runtime/availability";
 import tools from "./tools/index";
 import type { StructuredToolOutput } from "./tools/types";
@@ -127,7 +127,6 @@ type McpServer = LegacyMcpServer | ModernMcpServer;
 
 type BuildServerOptions = {
   context: ServerContext;
-  agentMode?: boolean;
   experimentalMode?: boolean;
   tools?: ToolRegistry;
 };
@@ -138,7 +137,6 @@ export function buildServer(
 export function buildServer(options: BuildServerOptions): LegacyMcpServer;
 export function buildServer({
   context,
-  agentMode = false,
   experimentalMode = false,
   tools: customTools,
   sdkVersion = "v1",
@@ -147,7 +145,6 @@ export function buildServer({
 }): McpServer {
   const contextWithModes: ServerContext = {
     ...context,
-    agentMode,
     experimentalMode,
   };
   const serverInfo = {
@@ -160,7 +157,6 @@ export function buildServer({
     const registrations = configureServer({
       server,
       context: contextWithModes,
-      agentMode,
       experimentalMode,
       tools: customTools,
     });
@@ -174,7 +170,6 @@ export function buildServer({
   const registrations = configureServer({
     server,
     context: contextWithModes,
-    agentMode,
     experimentalMode,
     tools: customTools,
   });
@@ -190,26 +185,20 @@ export function buildServer({
  * Internal function used by buildServer(). Use buildServer() instead for most cases.
  * Tools are filtered at registration time based on grantedSkills, and context is
  * captured in closures for tool handler execution.
- *
- * In agent mode, only the use_sentry tool is registered, bypassing authorization checks.
  */
 function configureServer({
   server,
   context,
-  agentMode = false,
   experimentalMode = false,
   tools: customTools,
 }: {
   server: McpServer;
   context: ServerContext;
-  agentMode?: boolean;
   experimentalMode?: boolean;
   tools?: ToolRegistry;
 }) {
   const registrations = [];
-  const registry: ToolRegistry = agentMode
-    ? { use_sentry: tools.use_sentry }
-    : (customTools ?? tools);
+  const registry: ToolRegistry = customTools ?? tools;
 
   // Get granted skills from context for tool filtering
   const grantedSkills: Set<Skill> | undefined = context.grantedSkills
@@ -221,13 +210,10 @@ function configureServer({
   const availableTools = getAvailableTools({
     tools: registry,
     context,
-    agentMode,
     experimentalMode,
-    useDefaultSurfacePolicy: !customTools || agentMode,
+    useDefaultSurfacePolicy: !customTools,
   });
-  const toolsToRegister = agentMode
-    ? availableTools
-    : availableTools.filter(({ isTopLevel }) => isTopLevel);
+  const toolsToRegister = availableTools.filter(({ isTopLevel }) => isTopLevel);
   const contextWithToolAvailability: ServerContext = {
     ...context,
     availableToolNames: new Set(
@@ -273,7 +259,6 @@ function configureServer({
       const activeSpan = getActiveSpan();
 
       if (activeSpan) {
-        activeSpan.setAttribute("app.server.mode.agent", agentMode);
         activeSpan.setAttribute(
           "app.server.mode.experimental",
           experimentalMode,
@@ -321,7 +306,6 @@ function configureServer({
       if (context.transport) {
         setTag("app.transport", context.transport);
       }
-      setTag("app.server.mode.agent", agentMode);
       setTag("app.server.mode.experimental", experimentalMode);
 
       try {

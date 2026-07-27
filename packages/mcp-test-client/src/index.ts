@@ -55,10 +55,6 @@ program
   )
   .option("--host <host>", "Sentry host for stdio transport")
   .option("--sentry-dsn <dsn>", "Sentry DSN for error reporting")
-  .option(
-    "--agent",
-    "Use agent mode (/mcp?agent=1) instead of standard mode (for use_sentry tool)",
-  )
   .option("--experimental", "Enable experimental tools (/mcp?experimental=1)")
   .option(
     "--list-tools",
@@ -136,14 +132,12 @@ program
           accessToken,
           host: sentryHost,
           sentryDsn: sentryDsn,
-          useAgentEndpoint: options.agent,
           useExperimental: options.experimental,
         });
       } else {
         connection = await connectToRemoteMCPServer({
           mcpHost: options.mcpHost,
           accessToken,
-          useAgentEndpoint: options.agent,
           useExperimental: options.experimental,
         });
       }

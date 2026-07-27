@@ -142,12 +142,6 @@
       "stability": "development",
       "examples": ["12", "99"]
     },
-    "app.server.mode.agent": {
-      "description": "Whether Sentry MCP agent mode is enabled for the request or stdio session.",
-      "type": "boolean",
-      "note": "Metrics and tags record this as the low-cardinality string values `true` or `false`; spans record it as a boolean.",
-      "examples": [true, false]
-    },
     "app.server.mode.experimental": {
       "description": "Whether Sentry MCP experimental mode is enabled for the request or stdio session.",
       "type": "boolean",

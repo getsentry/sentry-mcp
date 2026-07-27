@@ -102,7 +102,6 @@ jobs:
           declare const server: Parameters<typeof startStdio>[0];
 
           const telemetryContext: StdioServerContext = {
-            agentMode: false,
             experimentalMode: false,
             mcpUrl: "https://example.com/mcp",
             sentryHost: "sentry.io",
