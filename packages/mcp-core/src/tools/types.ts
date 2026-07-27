@@ -91,10 +91,14 @@ export interface ToolConfig<
   requiredCapabilities?: (keyof ProjectCapabilities)[]; // Project capabilities required for this tool
   outputSchema?: z.ZodType;
   annotations: {
-    readOnlyHint?: boolean;
-    destructiveHint?: boolean;
+    // readOnlyHint, destructiveHint, and openWorldHint are required so every
+    // tool declares its safety posture explicitly. Filters and confirmation
+    // gates rely on these; an undefined hint is a silent gap. Enforced further
+    // by tools.test.ts (see "complete MCP safety annotations").
+    readOnlyHint: boolean;
+    destructiveHint: boolean;
     idempotentHint?: boolean;
-    openWorldHint?: boolean;
+    openWorldHint: boolean;
   };
   handler: ToolHandler<TSchema>;
 }

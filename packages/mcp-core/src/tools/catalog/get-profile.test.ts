@@ -7,6 +7,7 @@ describe("get_profile", () => {
   it("marks profile analysis as open-world because it reads Sentry APIs", () => {
     expect(getProfile.annotations).toEqual({
       readOnlyHint: true,
+      destructiveHint: false,
       openWorldHint: true,
     });
   });

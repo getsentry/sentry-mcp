@@ -16,6 +16,7 @@ export default defineTool({
   requiredScopes: [], // No specific scopes required - uses authentication token
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {

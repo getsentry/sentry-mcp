@@ -89,6 +89,7 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
@@ -99,12 +100,17 @@ export default defineTool({
 
 ### Safety Annotations
 
-**REQUIRED**: All tools must include safety annotations for MCP directory compliance.
+**REQUIRED**: Every tool must declare `readOnlyHint`, `destructiveHint`, and
+`openWorldHint` explicitly (each `true` or `false`, never omitted). This is
+enforced at compile time (the `annotations` type requires them) and by
+`tools.test.ts`, because filters and confirmation gates depend on these hints;
+an absent hint is a silent gap. Read-only tools must set `destructiveHint: false`
+(not leave it undefined).
 
 **Available annotations:**
 - `readOnlyHint` (boolean): Tool doesn't modify data
 - `destructiveHint` (boolean): Tool may modify/delete existing data
-- `idempotentHint` (boolean): Repeated calls with same arguments have no additional effect
+- `idempotentHint` (boolean, optional): Repeated calls with same arguments have no additional effect
 - `openWorldHint` (boolean): Tool interacts with external services (default: true for API calls)
 
 **Annotation patterns:**
@@ -113,6 +119,7 @@ export default defineTool({
 // Read-only tools (queries, lists, searches)
 annotations: {
   readOnlyHint: true,
+  destructiveHint: false,
   openWorldHint: true,
 }
 
