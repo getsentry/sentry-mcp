@@ -143,6 +143,7 @@ export default new Hono<{ Bindings: Env }>()
         return createResourceValidationError(
           oauthReqInfo.redirectUri,
           oauthReqInfo.state ?? undefined,
+          c.req.url,
         );
       }
 
@@ -293,6 +294,7 @@ export default new Hono<{ Bindings: Env }>()
       return createResourceValidationError(
         oauthReqWithSkills.redirectUri,
         oauthReqWithSkills.state,
+        c.req.url,
       );
     }
 

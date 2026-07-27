@@ -194,6 +194,59 @@ describe("worker entrypoint", () => {
     );
   });
 
+  it("patches root authorization server metadata with RFC 9207 iss support", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          issuer: "https://mcp.sentry.dev",
+          authorization_endpoint: "https://mcp.sentry.dev/oauth/authorize",
+          token_endpoint: "https://mcp.sentry.dev/oauth/token",
+          client_id_metadata_document_supported: true,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const response = await handler.fetch!(
+      new Request(
+        "https://mcp.sentry.dev/.well-known/oauth-authorization-server",
+      ),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      issuer: "https://mcp.sentry.dev",
+      authorization_endpoint: "https://mcp.sentry.dev/oauth/authorize",
+      token_endpoint: "https://mcp.sentry.dev/oauth/token",
+      client_id_metadata_document_supported: true,
+      authorization_response_iss_parameter_supported: true,
+    });
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  });
+
+  it("leaves non-metadata provider responses unchanged when patching root AS metadata", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("ok", {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/oauth/token"),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("ok");
+  });
+
   it("patches MCP 401 responses with protected resource metadata", async () => {
     mockOAuthProviderFetch.mockResolvedValueOnce(
       new Response("unauthorized", {

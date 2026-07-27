@@ -52,6 +52,11 @@ export function createScopedAuthorizationServerMetadataResponse(
     // Mirror the root AS metadata the provider emits when CIMD is enabled.
     // This compatibility shim is served by us, not workers-oauth-provider.
     client_id_metadata_document_supported: true,
+    // RFC 9207: we append `iss` on authorization responses (callback redirect).
+    // Note: the emitted `iss` is the canonical origin-level issuer (matching
+    // PRM authorization_servers + root AS metadata), not this path-scoped
+    // compatibility issuer. Clients should discover via RFC 9728 PRM.
+    authorization_response_iss_parameter_supported: true,
     scopes_supported: Object.keys(SCOPES),
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
@@ -68,4 +73,52 @@ export function createScopedAuthorizationServerMetadataResponse(
   return new Response(JSON.stringify(metadata), {
     headers: { "Content-Type": "application/json" },
   });
+}
+
+const ROOT_AUTHORIZATION_SERVER_METADATA_PATH =
+  "/.well-known/oauth-authorization-server";
+
+/**
+ * workers-oauth-provider emits root AS metadata but does not advertise RFC 9207
+ * support. When we append `iss` on authorization responses, patch the provider
+ * document so clients can discover that behavior.
+ */
+export async function patchRootAuthorizationServerMetadata(
+  response: Response,
+  url: URL,
+): Promise<Response> {
+  if (
+    !response.ok ||
+    url.pathname !== ROOT_AUTHORIZATION_SERVER_METADATA_PATH
+  ) {
+    return response;
+  }
+
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return response;
+  }
+
+  try {
+    const metadata = (await response.clone().json()) as Record<string, unknown>;
+    if (metadata.authorization_response_iss_parameter_supported === true) {
+      return response;
+    }
+
+    const patched = {
+      ...metadata,
+      authorization_response_iss_parameter_supported: true,
+    };
+
+    const headers = new Headers(response.headers);
+    headers.set("Content-Type", "application/json");
+    return new Response(JSON.stringify(patched), {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  } catch {
+    // Leave non-JSON or unreadable provider responses alone.
+    return response;
+  }
 }

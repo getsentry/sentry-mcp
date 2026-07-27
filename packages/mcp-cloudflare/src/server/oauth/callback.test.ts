@@ -587,6 +587,9 @@ describe("oauth callback routes", () => {
       expect(response.status).toBe(302);
       expect(response.headers.get("location")).toContain(REDIRECT_URI);
       expect(response.headers.get("location")).toContain("code=");
+      expect(
+        new URL(response.headers.get("location")!).searchParams.get("iss"),
+      ).toBe("http://localhost");
     });
 
     it("completes callback, exchanges the code, and uses the resulting token at /mcp", async () => {
@@ -616,6 +619,7 @@ describe("oauth callback routes", () => {
       const authorizationCode = redirectUrl.searchParams.get("code");
 
       expect(authorizationCode).toBeTruthy();
+      expect(redirectUrl.searchParams.get("iss")).toBe("http://localhost");
 
       const tokenCtx = createExecutionContext();
       const tokenResponse = await handler.fetch!(
@@ -679,6 +683,7 @@ describe("oauth callback routes", () => {
       const authorizationCode = redirectUrl.searchParams.get("code");
 
       expect(authorizationCode).toBeTruthy();
+      expect(redirectUrl.searchParams.get("iss")).toBe("http://localhost");
 
       const tokenCtx = createExecutionContext();
       const tokenResponse = await handler.fetch!(

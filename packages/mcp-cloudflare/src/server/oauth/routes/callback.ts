@@ -10,8 +10,10 @@ import type { Env, WorkerProps } from "../../types";
 import { setSentryUserFromRequest } from "../../utils/sentry-user";
 import { SENTRY_TOKEN_URL } from "../constants";
 import {
+  appendAuthorizationResponseIss,
   createOAuthFailureResponse,
   exchangeCodeForAccessToken,
+  getAuthorizationServerIssuer,
   getOAuthCallbackFailureDetails,
   validateResourceParameter,
 } from "../helpers";
@@ -345,6 +347,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     });
   }
 
+  // RFC 9207: workers-oauth-provider does not emit `iss` on authorization
+  // responses. Append the canonical origin-level issuer so clients that
+  // validate `iss` against PRM/root AS metadata can mix-up-protect the code.
+  const issuer = getAuthorizationServerIssuer(c.req.url);
   // Use manual redirect instead of Response.redirect() to allow middleware to add headers
-  return c.redirect(redirectTo);
+  return c.redirect(appendAuthorizationResponseIss(redirectTo, issuer));
 });
