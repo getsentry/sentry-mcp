@@ -5,6 +5,7 @@ import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { Hono } from "hono";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import { resolveClientFamilyFromName } from "../../lib/client-family";
+import { isRegisteredRedirectUri } from "../../lib/redirect-uri";
 import type { Env, WorkerProps } from "../../types";
 import { setSentryUserFromRequest } from "../../utils/sentry-user";
 import { SENTRY_TOKEN_URL } from "../constants";
@@ -180,9 +181,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       oauthReqInfo.clientId,
     );
     registeredClientName = client?.clientName;
-    const uriIsAllowed =
-      Array.isArray(client?.redirectUris) &&
-      client.redirectUris.includes(oauthReqInfo.redirectUri);
+    const uriIsAllowed = isRegisteredRedirectUri(
+      oauthReqInfo.redirectUri,
+      client?.redirectUris,
+    );
     if (!uriIsAllowed) {
       logWarn("Redirect URI not registered for client on callback", {
         loggerScope: ["cloudflare", "oauth", "callback"],
