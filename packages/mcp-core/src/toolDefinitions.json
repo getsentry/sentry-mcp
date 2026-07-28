@@ -3441,6 +3441,39 @@
       },
       "required": ["organizationSlug", "projectSlug"]
     },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "slug": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "platform": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": ["id", "slug", "name", "platform"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["project"],
+      "additionalProperties": false
+    },
     "requiredScopes": ["project:write"],
     "skills": ["project-management"],
     "surface": "catalog"
