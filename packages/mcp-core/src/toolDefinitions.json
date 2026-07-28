@@ -1206,7 +1206,7 @@
   },
   {
     "name": "find_releases",
-    "description": "Find releases in Sentry.\n\nUse this tool when you need to:\n- Find recent releases in a Sentry organization\n- Find the most recent version released of a specific project\n- Determine when a release was deployed to an environment\n\n<examples>\n### Find the most recent releases in the 'my-organization' organization\n\n```\nfind_releases(organizationSlug='my-organization')\n```\n\n### Find releases matching '2ce6a27' in the 'my-organization' organization\n\n```\nfind_releases(organizationSlug='my-organization', query='2ce6a27')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n</hints>",
+    "description": "Find releases in Sentry.\n\nUse this tool when you need to:\n- Find recent releases in a Sentry organization\n- Find the most recent version released of a specific project\n- Determine when a release was deployed to an environment\n\nReturns up to 25 results. When hasMore is true, use the projectSlug or query parameter to narrow down results.\n\n<examples>\n### Find the most recent releases in the 'my-organization' organization\n\n```\nfind_releases(organizationSlug='my-organization')\n```\n\n### Find releases matching '2ce6a27' in the 'my-organization' organization\n\n```\nfind_releases(organizationSlug='my-organization', query='2ce6a27')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1252,6 +1252,187 @@
         }
       },
       "required": ["organizationSlug"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "releases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "string"
+              },
+              "dateCreated": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "dateReleased": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "firstEvent": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastEvent": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "newIssues": {
+                "type": "number"
+              },
+              "projects": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "lastCommit": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "author": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "dateCreated": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                      }
+                    },
+                    "required": ["id", "message", "author", "dateCreated"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastDeploy": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "environment": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "dateStarted": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "dateFinished": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "environment",
+                      "dateStarted",
+                      "dateFinished"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "version",
+              "dateCreated",
+              "dateReleased",
+              "firstEvent",
+              "lastEvent",
+              "newIssues",
+              "projects",
+              "lastCommit",
+              "lastDeploy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      },
+      "required": ["releases", "hasMore"],
+      "additionalProperties": false
     },
     "requiredScopes": ["project:read"],
     "skills": ["inspect"],

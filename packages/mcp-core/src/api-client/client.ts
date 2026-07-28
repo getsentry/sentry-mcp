@@ -2448,16 +2448,21 @@ export class SentryApiService {
       organizationSlug,
       projectSlug,
       query,
+      limit,
     }: {
       organizationSlug: string;
       projectSlug?: string;
       query?: string;
+      limit?: number;
     },
     opts?: RequestOptions,
   ): Promise<ReleaseList> {
     const searchQuery = new URLSearchParams();
     if (query) {
       searchQuery.set("query", query);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
     }
 
     const path = projectSlug
