@@ -1678,6 +1678,72 @@
       },
       "required": ["tagKey"]
     },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "totalValues": {
+              "type": "number"
+            },
+            "topValues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "count": {
+                    "type": "number"
+                  },
+                  "firstSeen": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "lastSeen": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["value", "count", "firstSeen", "lastSeen"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["key", "name", "totalValues", "topValues"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["tag"],
+      "additionalProperties": false
+    },
     "requiredScopes": ["event:read"],
     "skills": ["inspect"],
     "surface": "catalog"
