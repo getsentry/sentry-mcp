@@ -368,7 +368,7 @@
   },
   {
     "name": "find_alert_rules",
-    "description": "Find Sentry alert rules.\n\nUse this tool when you need to:\n- List issue alert rules for a project\n- List metric alert rules for an organization or project\n- Find an alert rule ID by name before inspecting it\n- Check alert conditions, queries, triggers, actions, owner, or environment\n\n<examples>\nfind_alert_rules(organizationSlug='my-org')\nfind_alert_rules(organizationSlug='my-org', projectSlug='backend')\nfind_alert_rules(organizationSlug='my-org', kind='issue', projectSlug='backend', query='critical')\n</examples>\n\n<hints>\n- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.\n- Metric alert rules can be listed organization-wide or project-scoped.\n</hints>",
+    "description": "Find Sentry alert rules.\n\nUse this tool when you need to:\n- List issue alert rules for a project\n- List metric alert rules for an organization or project\n- Find an alert rule ID by name before inspecting it\n- Check alert conditions, queries, triggers, actions, owner, or environment\n\n<examples>\nfind_alert_rules(organizationSlug='my-org')\nfind_alert_rules(organizationSlug='my-org', projectSlug='backend')\nfind_alert_rules(organizationSlug='my-org', kind='issue', projectSlug='backend', query='critical')\n</examples>\n\n<hints>\n- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.\n- Metric alert rules can be listed organization-wide or project-scoped.\n- Issue and metric alert rules have independent pagination state. Reuse a nextCursor only with its matching kind.\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -439,6 +439,315 @@
         }
       },
       "required": ["organizationSlug"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "issueRules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "actionMatch": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "filterMatch": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "frequencyMinutes": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "environment": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "owner": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dateCreated": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dateUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastTriggered": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "webUrl": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "status",
+              "actionMatch",
+              "filterMatch",
+              "frequencyMinutes",
+              "environment",
+              "owner",
+              "dateCreated",
+              "dateUpdated",
+              "lastTriggered",
+              "webUrl"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "metricRules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dataset": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "aggregate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "query": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "timeWindowMinutes": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "projects": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "environment": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "owner": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dateCreated": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "webUrl": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "status",
+              "dataset",
+              "aggregate",
+              "query",
+              "timeWindowMinutes",
+              "projects",
+              "environment",
+              "owner",
+              "dateCreated",
+              "webUrl"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "pagination": {
+          "type": "object",
+          "properties": {
+            "issue": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["nextCursor"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "metric": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["nextCursor"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": ["issue", "metric"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["issueRules", "metricRules", "pagination"],
+      "additionalProperties": false
     },
     "requiredScopes": ["org:read", "project:read"],
     "skills": ["inspect"],

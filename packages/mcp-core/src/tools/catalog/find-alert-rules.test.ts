@@ -1,7 +1,13 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
-import findAlertRules from "./find-alert-rules.js";
+import {
+  assertStructuredOnlyResult,
+  getStructuredContent,
+} from "../../test-utils/structured-content";
+import findAlertRules, {
+  findAlertRulesOutputSchema,
+} from "./find-alert-rules.js";
 
 const context = {
   constraints: {
@@ -146,46 +152,56 @@ describe("find_alert_rules", () => {
     expect(new URL(metricRequestUrl ?? "").searchParams.get("project")).toBe(
       project.id,
     );
-    expect(result).toMatchInlineSnapshot(`
-      "# Alert Rules in **sentry-mcp-evals/cloudflare-mcp**
-
-      ## Issue Alert Rules
-
-      ### Notify backend team
-
-      **Kind**: Issue Alert
-      **ID**: 123
-      **Project**: cloudflare-mcp
-      **Status**: enabled
-      **Frequency**: 30 minutes
-      **Environment**: production
-      **Owner**: team:backend
-      **Created**: 2026-01-02T03:04:05.000Z
-      **Updated**: 2026-01-02T04:04:05.000Z
-      **URL**: https://sentry-mcp-evals.sentry.io/monitors/alerts/123/
-
-      ## Metric Alert Rules
-
-      ### P95 latency
-
-      **Kind**: Metric Alert
-      **ID**: 456
-      **Status**: 0
-      **Dataset**: transactions
-      **Aggregate**: p95(transaction.duration)
-      **Query**: environment:production
-      **Time Window**: 5 minutes
-      **Projects**: cloudflare-mcp
-      **Environment**: production
-      **Owner**: team:backend
-      **Created**: 2026-01-03T03:04:05.000Z
-      **URL**: https://sentry-mcp-evals.sentry.io/issues/alerts/rules/details/456/
-
-      ## Response Notes
-
-      - Use \`get_alert_rule\` with \`kind\` and the numeric rule ID for full details.
-      - Use full details to inspect alert conditions, filters, and notification actions before changing a rule in Sentry.
-      "
+    assertStructuredOnlyResult(result);
+    const structuredContent = getStructuredContent(result);
+    expect(findAlertRulesOutputSchema.parse(structuredContent)).toEqual(
+      structuredContent,
+    );
+    expect(structuredContent).toMatchInlineSnapshot(`
+      {
+        "issueRules": [
+          {
+            "actionMatch": null,
+            "dateCreated": "2026-01-02T03:04:05.000Z",
+            "dateUpdated": "2026-01-02T04:04:05.000Z",
+            "environment": "production",
+            "filterMatch": null,
+            "frequencyMinutes": 30,
+            "id": "123",
+            "lastTriggered": null,
+            "name": "Notify backend team",
+            "owner": "team:backend",
+            "status": "enabled",
+            "webUrl": "https://sentry-mcp-evals.sentry.io/monitors/alerts/123/",
+          },
+        ],
+        "metricRules": [
+          {
+            "aggregate": "p95(transaction.duration)",
+            "dataset": "transactions",
+            "dateCreated": "2026-01-03T03:04:05.000Z",
+            "environment": "production",
+            "id": "456",
+            "name": "P95 latency",
+            "owner": "team:backend",
+            "projects": [
+              "cloudflare-mcp",
+            ],
+            "query": "environment:production",
+            "status": 0,
+            "timeWindowMinutes": 5,
+            "webUrl": "https://sentry-mcp-evals.sentry.io/issues/alerts/rules/details/456/",
+          },
+        ],
+        "pagination": {
+          "issue": {
+            "nextCursor": null,
+          },
+          "metric": {
+            "nextCursor": null,
+          },
+        },
+      }
     `);
   });
 
@@ -205,11 +221,14 @@ describe("find_alert_rules", () => {
       context,
     );
 
-    expect(result).toContain("## Metric Alert Rules");
-    expect(result).not.toContain("## Issue Alert Rules");
-    expect(result).toContain(
-      "Issue alert rules are project-scoped; pass `projectSlug` to include them.",
-    );
+    expect(getStructuredContent(result)).toMatchObject({
+      issueRules: [],
+      metricRules: [{ id: "456", name: "P95 latency" }],
+      pagination: {
+        issue: null,
+        metric: { nextCursor: null },
+      },
+    });
   });
 
   it("resolves project redirects before listing metric alerts", async () => {
@@ -274,9 +293,10 @@ describe("find_alert_rules", () => {
       context,
     );
 
-    expect(result).toContain(
-      'More issue alert rules are available. Pass `kind: "issue"` and `cursor: "issue-page-2"`',
-    );
+    expect(getStructuredContent(result).pagination).toEqual({
+      issue: { nextCursor: "issue-page-2" },
+      metric: null,
+    });
   });
 
   it("uses workflows for issue query searches and combined-rules for metric query searches", async () => {
@@ -313,8 +333,13 @@ describe("find_alert_rules", () => {
       context,
     );
 
-    expect(result).toContain("Notify backend team");
-    expect(result).toContain("P95 latency");
+    const structuredContent = getStructuredContent(result);
+    expect(structuredContent.issueRules).toMatchObject([
+      { id: "123", name: "Notify backend team" },
+    ]);
+    expect(structuredContent.metricRules).toMatchObject([
+      { id: "456", name: "P95 latency" },
+    ]);
     expect(issueRequestUrl).not.toBeNull();
     const issueParams = new URL(issueRequestUrl ?? "").searchParams;
     expect(issueParams.get("query")).toBe('name:"*backend*"');
@@ -358,8 +383,9 @@ describe("find_alert_rules", () => {
       context,
     );
 
-    expect(result).toContain("Notify backend team");
-    expect(result).not.toContain("Organization workflow");
+    expect(getStructuredContent(result).issueRules).toMatchObject([
+      { id: "123", name: "Notify backend team" },
+    ]);
   });
 
   it("follows workflow pages until enough attached issue rules are found", async () => {
@@ -409,8 +435,9 @@ describe("find_alert_rules", () => {
     expect(new URL(requestUrls[1]).searchParams.get("cursor")).toBe(
       "workflow-page-2",
     );
-    expect(result).toContain("Notify backend team");
-    expect(result).not.toContain("Organization workflow");
+    expect(getStructuredContent(result).issueRules).toMatchObject([
+      { id: "123", name: "Notify backend team" },
+    ]);
   });
 
   it("does not expose a workflow cursor when an overfull page is capped", async () => {
@@ -449,29 +476,33 @@ describe("find_alert_rules", () => {
       context,
     );
 
-    expect(result).toMatchInlineSnapshot(`
-      "# Alert Rules in **sentry-mcp-evals/cloudflare-mcp**
-
-      ## Issue Alert Rules
-
-      ### Notify backend team
-
-      **Kind**: Issue Alert
-      **ID**: 123
-      **Project**: cloudflare-mcp
-      **Status**: enabled
-      **Frequency**: 30 minutes
-      **Environment**: production
-      **Owner**: team:backend
-      **Created**: 2026-01-02T03:04:05.000Z
-      **Updated**: 2026-01-02T04:04:05.000Z
-      **URL**: https://sentry-mcp-evals.sentry.io/monitors/alerts/123/
-
-      ## Response Notes
-
-      - Use \`get_alert_rule\` with \`kind\` and the numeric rule ID for full details.
-      - Use full details to inspect alert conditions, filters, and notification actions before changing a rule in Sentry.
-      "
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toMatchInlineSnapshot(`
+      {
+        "issueRules": [
+          {
+            "actionMatch": null,
+            "dateCreated": "2026-01-02T03:04:05.000Z",
+            "dateUpdated": "2026-01-02T04:04:05.000Z",
+            "environment": "production",
+            "filterMatch": null,
+            "frequencyMinutes": 30,
+            "id": "123",
+            "lastTriggered": null,
+            "name": "Notify backend team",
+            "owner": "team:backend",
+            "status": "enabled",
+            "webUrl": "https://sentry-mcp-evals.sentry.io/monitors/alerts/123/",
+          },
+        ],
+        "metricRules": [],
+        "pagination": {
+          "issue": {
+            "nextCursor": null,
+          },
+          "metric": null,
+        },
+      }
     `);
   });
 
@@ -507,10 +538,13 @@ describe("find_alert_rules", () => {
       context,
     );
 
-    expect(result).toContain("P95 latency");
-    expect(result).toContain(
-      'More metric alert rules are available. Pass `kind: "metric"` and `cursor: "metric-query-page-2"`',
-    );
+    expect(getStructuredContent(result)).toMatchObject({
+      metricRules: [{ id: "456", name: "P95 latency" }],
+      pagination: {
+        issue: null,
+        metric: { nextCursor: "metric-query-page-2" },
+      },
+    });
   });
 
   it("rejects issue alert search without a project", async () => {
