@@ -590,6 +590,7 @@ describe("fetchCustomAttributes", () => {
                 key: "custom.db.pool_size",
                 name: "Custom DB Pool Size",
                 attributeType: "number",
+                attributeSource: { source_type: "user" },
               },
             ]);
           },
@@ -615,8 +616,12 @@ describe("fetchCustomAttributes", () => {
         },
       );
 
-      expect(result?.error).toBeUndefined();
-      expect(result?.result).toContain("custom.db.pool_size");
+      if (!result || Symbol.asyncIterator in result) {
+        throw new Error("Expected a non-streaming agent tool response");
+      }
+
+      expect(result.error).toBeUndefined();
+      expect(result.result).toContain("custom.db.pool_size");
       expect(requests).toHaveLength(1);
       expect(requests[0]!.get("itemType")).toBe("spans");
       expect(requests[0]!.get("project")).toBe("123");
