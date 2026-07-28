@@ -1,6 +1,8 @@
 import { setTag } from "@sentry/core";
+import { z } from "zod";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
 import {
@@ -10,6 +12,16 @@ import {
 } from "../../schema";
 
 const RESULT_LIMIT = 25;
+
+export const findTeamsOutputSchema = z.object({
+  teams: z.array(
+    z.object({
+      slug: z.string(),
+      id: z.string(),
+    }),
+  ),
+  hasMore: z.boolean(),
+});
 
 export default defineTool({
   name: "find_teams",
@@ -23,7 +35,7 @@ export default defineTool({
     "- Find a team's slug and numeric ID to aid other tool requests",
     "- Search for specific teams by name or slug",
     "",
-    `Returns up to ${RESULT_LIMIT} results. If you hit this limit, use the query parameter to narrow down results.`,
+    `Returns up to ${RESULT_LIMIT} results. When hasMore is true, use the query parameter to narrow down results.`,
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
@@ -35,6 +47,7 @@ export default defineTool({
     destructiveHint: false,
     openWorldHint: true,
   },
+  outputSchema: findTeamsOutputSchema,
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -51,27 +64,14 @@ export default defineTool({
 
     const teams = await apiService.listTeams(organizationSlug, {
       query: params.query ?? undefined,
+      limit: RESULT_LIMIT + 1,
     });
 
-    let output = `# Teams in **${organizationSlug}**\n\n`;
-
-    if (params.query) {
-      output += `**Search query:** "${params.query}"\n\n`;
-    }
-
-    if (teams.length === 0) {
-      output += params.query
-        ? `No teams found matching "${params.query}".\n`
-        : "No teams found.\n";
-      return output;
-    }
-
-    output += teams.map((team) => `- ${team.slug} (ID: ${team.id})\n`).join("");
-
-    if (teams.length === RESULT_LIMIT) {
-      output += `\n---\n\n**Note:** Showing ${RESULT_LIMIT} results (maximum). There may be more teams available. Use the \`query\` parameter to search for specific teams.`;
-    }
-
-    return output;
+    return structuredResult({
+      teams: teams
+        .slice(0, RESULT_LIMIT)
+        .map((team) => ({ slug: team.slug, id: String(team.id) })),
+      hasMore: teams.length > RESULT_LIMIT,
+    });
   },
 });
