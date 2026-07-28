@@ -5,6 +5,24 @@ import searchEvents from "./search-events";
 import { MAX_EVENTS_VALIDATION_ATTEMPTS } from "../support/search-events/utils";
 import { generateText } from "ai";
 import { UserInputError } from "../../errors";
+import { getTextContent } from "../../test-utils/structured-content";
+
+function getToolText(result: unknown): string {
+  if (typeof result === "string") {
+    return result;
+  }
+  if (Array.isArray(result)) {
+    const textContent = result.find(
+      (item) =>
+        typeof item === "object" &&
+        item !== null &&
+        "text" in item &&
+        typeof item.text === "string",
+    );
+    return textContent && "text" in textContent ? textContent.text : "";
+  }
+  return getTextContent(result);
+}
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -249,11 +267,12 @@ describe("search_events", () => {
     );
 
     expect(mockGenerateText).not.toHaveBeenCalled();
-    expect(result).toContain('"tags[type]": "Unified"');
-    expect(result).toContain(
+    const text = getToolText(result);
+    expect(text).toContain('"tags[type]": "Unified"');
+    expect(text).toContain(
       '- Query: `transaction:"VPN connections" tags[type]:Unified tags[country]:CN`',
     );
-    expect(result).toContain(
+    expect(text).toContain(
       "- Fields: `tags[type]`, `tags[sequence]`, `span.status`, `tags[reason]`, `count()`",
     );
   });
@@ -498,8 +517,9 @@ describe("search_events", () => {
     );
 
     expect(mockGenerateText).toHaveBeenCalled();
-    expect(result).toContain('"tags[type]": "Unified"');
-    expect(result).toContain('"tags[sequence]": "42"');
+    const text = getToolText(result);
+    expect(text).toContain('"tags[type]": "Unified"');
+    expect(text).toContain('"tags[sequence]": "42"');
   });
 
   it("should include the sort field even when caller's explicit fields omit it", async () => {
@@ -975,7 +995,7 @@ describe("search_events", () => {
       },
     );
 
-    expect(result).toMatchInlineSnapshot(`
+    expect(getToolText(result)).toMatchInlineSnapshot(`
       "# Search Results for "slow request duration metrics"
 
       **Suggested presentation:** A compact table with grouping labels and units works well for these metric aggregates.
@@ -1012,6 +1032,16 @@ describe("search_events", () => {
       - Switch between samples and aggregates in Sentry for deeper analysis
       "
     `);
+    expect(result).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "resource",
+          resource: expect.objectContaining({
+            mimeType: "application/json;chart",
+          }),
+        }),
+      ]),
+    );
   });
 
   it("should request trace metric identity fields for metrics sample queries", async () => {
@@ -1075,12 +1105,9 @@ describe("search_events", () => {
       },
     );
 
-    expect(typeof result).toBe("string");
-    if (typeof result !== "string") {
-      throw new Error("Expected string result");
-    }
+    const text = getToolText(result);
 
-    const urlMatch = result.match(/https:\/\/[^\n]+/);
+    const urlMatch = text.match(/https:\/\/[^\n]+/);
     expect(urlMatch).not.toBeNull();
 
     const url = new URL(urlMatch![0]);
@@ -1358,12 +1385,9 @@ describe("search_events", () => {
       },
     );
 
-    expect(typeof result).toBe("string");
-    if (typeof result !== "string") {
-      throw new Error("Expected string result");
-    }
+    const text = getToolText(result);
 
-    const urlMatch = result.match(/https:\/\/[^\n]+/);
+    const urlMatch = text.match(/https:\/\/[^\n]+/);
     expect(urlMatch).not.toBeNull();
 
     const url = new URL(urlMatch![0]);
@@ -2390,11 +2414,12 @@ describe("search_events", () => {
     );
 
     expect(mockGenerateText).toHaveBeenCalled();
-    expect(result).toContain("Mozilla/5.0");
-    expect(result).toContain("150");
-    expect(result).toContain("120");
+    const text = getToolText(result);
+    expect(text).toContain("Mozilla/5.0");
+    expect(text).toContain("150");
+    expect(text).toContain("120");
     // Should NOT contain user.id references
-    expect(result).not.toContain("user.id");
+    expect(text).not.toContain("user.id");
   });
 
   it("should search events with direct query syntax (no agent)", async () => {

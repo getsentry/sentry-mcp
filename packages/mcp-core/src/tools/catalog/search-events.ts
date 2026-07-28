@@ -11,6 +11,7 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import type { ServerContext } from "../../types";
+import { SEARCH_EVENTS_CHART_RESOURCE_URI } from "../../ui-resource-uris";
 import {
   PUBLIC_EVENTS_DATASETS,
   type PublicEventsDataset,
@@ -458,6 +459,9 @@ export default defineTool({
     destructiveHint: false,
     openWorldHint: true,
   },
+  ui: {
+    resourceUri: SEARCH_EVENTS_CHART_RESOURCE_URI,
+  },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -500,6 +504,7 @@ export default defineTool({
     let sortParam: string;
     let timeParams: { statsPeriod?: string; start?: string; end?: string };
     let explanation: string | undefined;
+    let chartType: SearchEventsAgentResult["chartType"] = null;
     let environment: string | string[] | null | undefined = params.environment;
 
     const explicitSort = params.sort?.trim() || undefined;
@@ -562,6 +567,7 @@ export default defineTool({
           ? explicitSort
           : parsed.sort?.trim() || defaultSortForDataset(dataset);
       explanation = parsed.explanation;
+      chartType = parsed.chartType;
       environment = params.environment ?? parsed.environment;
 
       timeParams =
@@ -763,6 +769,7 @@ export default defineTool({
               parsed,
             ));
             validationExplanation = parsed.explanation || validationExplanation;
+            chartType = parsed.chartType ?? chartType;
             sentryQuery = applyEnvironmentToEventsQuery(
               dataset,
               sentryQuery,
@@ -886,6 +893,7 @@ export default defineTool({
       sentryQuery,
       fields,
       explanation,
+      chartType: chartType ?? undefined,
       executedSearch: {
         dataset,
         query: sentryQuery,
