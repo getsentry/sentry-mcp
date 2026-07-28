@@ -2,21 +2,88 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
+import type { IssueAlertRule, MetricAlertRule } from "../../api-client/types";
 import {
   ParamOrganizationSlug,
   ParamProjectSlugOrAll,
   ParamRegionUrl,
 } from "../../schema";
 import { assertProjectRefWithinConstraint } from "./support/project-constraints";
-import { formatIssueAlertRule, formatMetricAlertRule } from "./support/alerts";
+import { formatActor, formatDate } from "./support/api-formatting";
 
 const AlertRuleKind = z
   .enum(["all", "issue", "metric"])
   .describe(
     "Which alert rule family to search. Use `all` to include metric alerts, plus issue alerts when a project is available.",
   );
+
+const issueAlertRuleSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: z.string().nullable(),
+  actionMatch: z.string().nullable(),
+  filterMatch: z.string().nullable(),
+  frequencyMinutes: z.number().nullable(),
+  environment: z.string().nullable(),
+  owner: z.string().nullable(),
+  dateCreated: z.string().nullable(),
+  dateUpdated: z.string().nullable(),
+  lastTriggered: z.string().nullable(),
+  webUrl: z.string(),
+});
+
+const metricAlertRuleSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: z.union([z.string(), z.number()]).nullable(),
+  dataset: z.string().nullable(),
+  aggregate: z.string().nullable(),
+  query: z.string().nullable(),
+  timeWindowMinutes: z.number().nullable(),
+  projects: z.array(z.string()),
+  environment: z.string().nullable(),
+  owner: z.string().nullable(),
+  dateCreated: z.string().nullable(),
+  webUrl: z.string(),
+});
+
+const paginationStateSchema = z.object({
+  nextCursor: z.string().nullable(),
+});
+
+export const findAlertRulesOutputSchema = z.object({
+  issueRules: z.array(issueAlertRuleSummarySchema),
+  metricRules: z.array(metricAlertRuleSummarySchema),
+  pagination: z.object({
+    issue: paginationStateSchema.nullable(),
+    metric: paginationStateSchema.nullable(),
+  }),
+});
+
+function getIssueAlertRuleFrequency(rule: IssueAlertRule): number | null {
+  if (typeof rule.frequency === "number") {
+    return rule.frequency;
+  }
+  const frequency = rule.config.frequency;
+  return typeof frequency === "number" ? frequency : null;
+}
+
+function getIssueAlertRuleStatus(rule: IssueAlertRule): string | null {
+  if (rule.status) {
+    return rule.status;
+  }
+  if (rule.enabled === undefined) {
+    return null;
+  }
+  return rule.enabled ? "enabled" : "disabled";
+}
+
+function getOwner(owner: unknown): string | null {
+  return owner ? formatActor(owner) : null;
+}
 
 export default defineTool({
   name: "find_alert_rules",
@@ -40,6 +107,7 @@ export default defineTool({
     "<hints>",
     "- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.",
     "- Metric alert rules can be listed organization-wide or project-scoped.",
+    "- Issue and metric alert rules have independent pagination state. Reuse a nextCursor only with its matching kind.",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -74,6 +142,7 @@ export default defineTool({
     destructiveHint: false,
     openWorldHint: true,
   },
+  outputSchema: findAlertRulesOutputSchema,
   async handler(params, context: ServerContext) {
     const requestedProjectSlug =
       params.projectSlug && params.projectSlug !== "all"
@@ -129,67 +198,39 @@ export default defineTool({
           limit: params.limit,
         })
       : { rules: [], nextCursor: null };
-    const issueRules = issuePage.rules;
-    const metricRules = metricPage.rules;
-
-    const scopeLabel = projectSlug
-      ? `${organizationSlug}/${projectSlug}`
-      : organizationSlug;
-    let output = `# Alert Rules in **${scopeLabel}**\n\n`;
-    if (issueRules.length === 0 && metricRules.length === 0) {
-      output += "No alert rules found.\n";
-      if (params.kind === "all" && !projectSlug) {
-        output +=
-          "\nIssue alert rules are project-scoped; pass `projectSlug` to include them.\n";
-      }
-      return output;
-    }
-
-    if (issueRules.length > 0) {
-      output += "## Issue Alert Rules\n\n";
-      output += issueRules
-        .slice(0, params.limit)
-        .map((rule) =>
-          formatIssueAlertRule(rule, projectSlug ?? "", {
-            headingLevel: 3,
-            includeComponents: false,
-            url: apiService.getIssueAlertRuleUrl(organizationSlug, rule.id),
-          }),
-        )
-        .join("\n\n");
-      output += "\n\n";
-    }
-
-    if (metricRules.length > 0) {
-      output += "## Metric Alert Rules\n\n";
-      output += metricRules
-        .slice(0, params.limit)
-        .map((rule) =>
-          formatMetricAlertRule(rule, {
-            headingLevel: 3,
-            includeComponents: false,
-            url: apiService.getMetricAlertRuleUrl(organizationSlug, rule.id),
-          }),
-        )
-        .join("\n\n");
-      output += "\n\n";
-    }
-
-    output += "## Response Notes\n\n";
-    output +=
-      "- Use `get_alert_rule` with `kind` and the numeric rule ID for full details.\n";
-    output +=
-      "- Use full details to inspect alert conditions, filters, and notification actions before changing a rule in Sentry.\n";
-    if (issuePage.nextCursor) {
-      output += `- More issue alert rules are available. Pass \`kind: "issue"\` and \`cursor: "${issuePage.nextCursor}"\` with the same search scope to fetch the next page.\n`;
-    }
-    if (metricPage.nextCursor) {
-      output += `- More metric alert rules are available. Pass \`kind: "metric"\` and \`cursor: "${metricPage.nextCursor}"\` with the same search scope to fetch the next page.\n`;
-    }
-    if (params.kind === "all" && !projectSlug) {
-      output +=
-        "- Issue alert rules are project-scoped; pass `projectSlug` to include them.\n";
-    }
-    return output;
+    return structuredResult({
+      issueRules: issuePage.rules.map((rule: IssueAlertRule) => ({
+        id: String(rule.id),
+        name: rule.name,
+        status: getIssueAlertRuleStatus(rule),
+        actionMatch: rule.actionMatch ?? null,
+        filterMatch: rule.filterMatch ?? null,
+        frequencyMinutes: getIssueAlertRuleFrequency(rule),
+        environment: rule.environment ?? null,
+        owner: getOwner(rule.owner),
+        dateCreated: formatDate(rule.dateCreated),
+        dateUpdated: formatDate(rule.dateUpdated),
+        lastTriggered: formatDate(rule.lastTriggered),
+        webUrl: apiService.getIssueAlertRuleUrl(organizationSlug, rule.id),
+      })),
+      metricRules: metricPage.rules.map((rule: MetricAlertRule) => ({
+        id: String(rule.id),
+        name: rule.name,
+        status: rule.status ?? null,
+        dataset: rule.dataset ?? null,
+        aggregate: rule.aggregate ?? null,
+        query: rule.query ?? null,
+        timeWindowMinutes: rule.timeWindow ?? null,
+        projects: rule.projects,
+        environment: rule.environment ?? null,
+        owner: getOwner(rule.owner),
+        dateCreated: formatDate(rule.dateCreated),
+        webUrl: apiService.getMetricAlertRuleUrl(organizationSlug, rule.id),
+      })),
+      pagination: {
+        issue: includeIssue ? { nextCursor: issuePage.nextCursor } : null,
+        metric: includeMetric ? { nextCursor: metricPage.nextCursor } : null,
+      },
+    });
   },
 });
