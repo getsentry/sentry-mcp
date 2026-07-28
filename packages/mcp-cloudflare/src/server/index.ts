@@ -25,6 +25,7 @@ import {
   bucketOAuthErrorDescription,
   getOAuthErrorTelemetry,
 } from "./oauth/telemetry";
+import { patchRootAuthorizationServerMetadata } from "./authorization-server-metadata";
 import { createProtectedResourceMetadataResponse } from "./protected-resource-metadata";
 import getSentryConfig from "./sentry.config";
 import type { Env } from "./types";
@@ -373,8 +374,12 @@ const wrappedOAuthProvider = {
       });
     }
 
-    // --- Phase 3: Patch headers, then apply our CORS policy ---
-    const patched = patchWwwAuthenticate(response, url);
+    // --- Phase 3: Patch headers/metadata, then apply our CORS policy ---
+    const patchedAuth = patchWwwAuthenticate(response, url);
+    const patched = await patchRootAuthorizationServerMetadata(
+      patchedAuth,
+      url,
+    );
     return finalizeResponse(request, url, patched);
   },
 };
