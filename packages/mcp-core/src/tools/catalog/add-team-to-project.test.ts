@@ -1,6 +1,10 @@
 import { mswServer, teamFixture } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
+import {
+  assertStructuredOnlyResult,
+  getStructuredContent,
+} from "../../test-utils/structured-content";
 import { prepareToolParams } from "../catalog-runtime/availability";
 import { TOP_LEVEL_TOOL_NAMES } from "../surfaces";
 import addTeamToProject from "./add-team-to-project";
@@ -15,7 +19,7 @@ const context = {
   userId: "1",
 };
 
-function team(overrides: { id: string; slug: string; name: string }) {
+function team(overrides: { id: string | number; slug: string; name: string }) {
   return {
     ...teamFixture,
     ...overrides,
@@ -66,23 +70,23 @@ describe("add_team_to_project", () => {
 
     expect(listCalls).toBe(2);
     expect(postCalls).toBe(1);
-    expect(result).toMatchInlineSnapshot(`
-      "# Team Access Granted in **sentry-mcp-evals**
-
-      **Project**: cloudflare-mcp
-      **Team**: backend
-      **Result**: Team access was granted.
-
-      ## Current Project Teams
-
-      - **the-goats** (ID: 4509106740854784) - the-goats
-      - **backend** (ID: 4509109078196224) - Backend
-
-      ## Response Notes
-
-      - Project slug for later requests: \`cloudflare-mcp\`
-      - Current team slugs: \`the-goats\`, \`backend\`
-      "
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toMatchInlineSnapshot(`
+      {
+        "changed": true,
+        "teams": [
+          {
+            "id": "4509106740854784",
+            "name": "the-goats",
+            "slug": "the-goats",
+          },
+          {
+            "id": "4509109078196224",
+            "name": "Backend",
+            "slug": "backend",
+          },
+        ],
+      }
     `);
   });
 
@@ -92,11 +96,15 @@ describe("add_team_to_project", () => {
       slug: "backend",
       name: "Backend",
     });
+    let listCalls = 0;
     let postCalls = 0;
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/",
-        () => HttpResponse.json([teamFixture, backendTeam]),
+        () => {
+          listCalls += 1;
+          return HttpResponse.json([teamFixture, backendTeam]);
+        },
       ),
       http.post(
         "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/backend/",
@@ -120,12 +128,26 @@ describe("add_team_to_project", () => {
       context,
     );
 
+    expect(listCalls).toBe(1);
     expect(postCalls).toBe(0);
-    expect(result).toContain("# Team Already Assigned");
-    expect(result).toContain(
-      "No change was made because the team already had project access.",
-    );
-    expect(result).toContain("- **backend** (ID: 4509109078196224) - Backend");
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toMatchInlineSnapshot(`
+      {
+        "changed": false,
+        "teams": [
+          {
+            "id": "4509106740854784",
+            "name": "the-goats",
+            "slug": "the-goats",
+          },
+          {
+            "id": "4509109078196224",
+            "name": "Backend",
+            "slug": "backend",
+          },
+        ],
+      }
+    `);
   });
 
   it("preserves mixed-case slugs and injects active constraints", async () => {
@@ -142,7 +164,7 @@ describe("add_team_to_project", () => {
               ? []
               : [
                   team({
-                    id: "99",
+                    id: 99,
                     slug: "TeamABC",
                     name: "Team ABC",
                   }),
@@ -189,7 +211,17 @@ describe("add_team_to_project", () => {
       "/api/0/projects/MyOrg/MyProject/teams/TeamABC/",
       "/api/0/projects/MyOrg/MyProject/teams/",
     ]);
-    expect(result).toContain("**Team**: TeamABC");
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toEqual({
+      changed: true,
+      teams: [
+        {
+          id: "99",
+          slug: "TeamABC",
+          name: "Team ABC",
+        },
+      ],
+    });
   });
 
   it("is registered as catalog-only", () => {
