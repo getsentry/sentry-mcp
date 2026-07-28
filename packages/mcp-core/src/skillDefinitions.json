@@ -19,7 +19,7 @@
       },
       {
         "name": "find_monitors",
-        "description": "Find Sentry cron monitors.\n\nUse this tool when you need to:\n- List cron monitors in an organization\n- Find a monitor by name or slug before getting details\n- Check monitor status, owner, project, schedule, or recent environment state\n\n<examples>\nfind_monitors(organizationSlug='my-organization')\nfind_monitors(organizationSlug='my-organization', projectSlug='backend', query='billing')\n</examples>",
+        "description": "Find Sentry cron monitors.\n\nUse this tool when you need to:\n- List cron monitors in an organization\n- Find a monitor by name or slug before getting details\n- Check monitor status, owner, project, schedule, or recent environment state\n- When `hasMore` is true, narrow the results with project, environment, owner, or query filters\n\n<examples>\nfind_monitors(organizationSlug='my-organization')\nfind_monitors(organizationSlug='my-organization', projectSlug='backend', query='billing')\n</examples>",
         "requiredScopes": ["org:read"]
       },
       {

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import type { Monitor } from "../../api-client/types";
 import type { ServerContext } from "../../types";
 import {
@@ -9,78 +10,129 @@ import {
   ParamProjectSlugOrAll,
   ParamRegionUrl,
 } from "../../schema";
-import {
-  compactLines,
-  formatActor,
-  formatDate,
-  formatId,
-  formatUnknown,
-} from "./support/api-formatting";
 import { assertProjectRefWithinConstraint } from "./support/project-constraints";
 
-function formatProject(monitor: Monitor): string | null {
-  if (!monitor.project) {
+const ENVIRONMENT_LIMIT = 5;
+
+const monitorScheduleOutputSchema = z.object({
+  type: z.string().nullable(),
+  value: z.string().nullable(),
+  checkInMargin: z.number().nullable(),
+  maxRuntime: z.number().nullable(),
+});
+
+const monitorEnvironmentOutputSchema = z.object({
+  name: z.string().nullable(),
+  status: z.string().nullable(),
+  lastCheckIn: z.string().datetime().nullable(),
+});
+
+const monitorSummaryOutputSchema = z.object({
+  id: z.string().nullable(),
+  slug: z.string(),
+  name: z.string(),
+  projectSlug: z.string().nullable(),
+  status: z.string().nullable(),
+  owner: z.string().nullable(),
+  lastCheckIn: z.string().datetime().nullable(),
+  nextCheckIn: z.string().datetime().nullable(),
+  webUrl: z.string().url(),
+  schedule: monitorScheduleOutputSchema.nullable(),
+  environments: z.array(monitorEnvironmentOutputSchema),
+  hasMoreEnvironments: z.boolean(),
+});
+
+export const findMonitorsOutputSchema = z.object({
+  monitors: z.array(monitorSummaryOutputSchema),
+  hasMore: z.boolean(),
+});
+
+function getOwnerName(monitor: Monitor): string | null {
+  const owner = monitor.owner;
+  if (!owner) {
     return null;
   }
-
-  return monitor.project.slug ?? monitor.project.name ?? null;
+  if (typeof owner === "string") {
+    return owner.trim() || null;
+  }
+  return (
+    owner.name?.trim() ||
+    owner.email?.trim() ||
+    owner.username?.trim() ||
+    (owner.id === undefined ? null : String(owner.id))
+  );
 }
 
-function formatMonitorConfig(monitor: Monitor): string[] {
+function parseSchedule(value: unknown): {
+  type: string | null;
+  value: string | null;
+} {
+  if (typeof value === "string") {
+    return { type: null, value: value.trim() || null };
+  }
+  if (Array.isArray(value)) {
+    const [first, second, third] = value;
+    if (first === "crontab" && typeof second === "string") {
+      return { type: "crontab", value: second };
+    }
+    if (
+      first === "interval" &&
+      (typeof second === "number" || typeof second === "string") &&
+      typeof third === "string"
+    ) {
+      return { type: "interval", value: `${second} ${third}` };
+    }
+    if (
+      (typeof first === "number" || typeof first === "string") &&
+      typeof second === "string"
+    ) {
+      return { type: "interval", value: `${first} ${second}` };
+    }
+    return { type: null, value: null };
+  }
+  if (!value || typeof value !== "object") {
+    return { type: null, value: null };
+  }
+  const schedule = value as Record<string, unknown>;
+  const type = typeof schedule.type === "string" ? schedule.type : null;
+  if (type === "crontab" && typeof schedule.value === "string") {
+    return { type, value: schedule.value };
+  }
+  if (
+    type === "interval" &&
+    (typeof schedule.value === "number" ||
+      typeof schedule.value === "string") &&
+    typeof schedule.unit === "string"
+  ) {
+    return { type, value: `${schedule.value} ${schedule.unit}` };
+  }
+  return { type, value: null };
+}
+
+function getSchedule(monitor: Monitor) {
   const config = monitor.config;
   if (!config) {
-    return [];
+    return null;
   }
-
-  return ["schedule", "schedule_type", "checkin_margin", "max_runtime"]
-    .filter((key) => config[key] !== undefined)
-    .map((key) => `**${key}**: ${formatUnknown(config[key])}`);
-}
-
-function formatMonitor(monitor: Monitor, monitorUrl: string): string {
-  const project = formatProject(monitor);
-  const owner = monitor.owner ? formatActor(monitor.owner) : null;
-  const environments = monitor.environments ?? [];
-
-  const lines = compactLines([
-    `## ${monitor.name ?? monitor.slug}`,
-    "",
-    `**Slug**: ${monitor.slug}`,
-    `**ID**: ${formatId(monitor.id)}`,
-    project ? `**Project**: ${project}` : null,
-    monitor.status ? `**Status**: ${monitor.status}` : null,
-    monitor.type ? `**Type**: ${monitor.type}` : null,
-    owner ? `**Owner**: ${owner}` : null,
-    formatDate(monitor.lastCheckIn)
-      ? `**Last Check-In**: ${formatDate(monitor.lastCheckIn)}`
-      : null,
-    formatDate(monitor.nextCheckIn)
-      ? `**Next Check-In**: ${formatDate(monitor.nextCheckIn)}`
-      : null,
-    `**URL**: [Open Monitor](${monitorUrl})`,
-  ]);
-
-  const configLines = formatMonitorConfig(monitor);
-  if (configLines.length > 0) {
-    lines.push("", "### Schedule", "", ...configLines);
+  const parsedSchedule = parseSchedule(config.schedule);
+  const type =
+    typeof config.schedule_type === "string"
+      ? config.schedule_type
+      : parsedSchedule.type;
+  const value = parsedSchedule.value;
+  const checkInMargin =
+    typeof config.checkin_margin === "number" ? config.checkin_margin : null;
+  const maxRuntime =
+    typeof config.max_runtime === "number" ? config.max_runtime : null;
+  if (
+    type === null &&
+    value === null &&
+    checkInMargin === null &&
+    maxRuntime === null
+  ) {
+    return null;
   }
-
-  if (environments.length > 0) {
-    lines.push("", "### Environments", "");
-    for (const environment of environments.slice(0, 5)) {
-      const label = environment.name ?? "unknown";
-      const status = environment.status ? ` - ${environment.status}` : "";
-      const lastCheckIn = formatDate(environment.lastCheckIn);
-      lines.push(
-        `- ${label}${status}${lastCheckIn ? ` (last check-in ${lastCheckIn})` : ""}`,
-      );
-    }
-    if (environments.length > 5) {
-      lines.push(`- ...and ${environments.length - 5} more`);
-    }
-  }
-
-  return lines.join("\n");
+  return { type, value, checkInMargin, maxRuntime };
 }
 
 export default defineTool({
@@ -94,6 +146,7 @@ export default defineTool({
     "- List cron monitors in an organization",
     "- Find a monitor by name or slug before getting details",
     "- Check monitor status, owner, project, schedule, or recent environment state",
+    "- When `hasMore` is true, narrow the results with project, environment, owner, or query filters",
     "",
     "<examples>",
     "find_monitors(organizationSlug='my-organization')",
@@ -128,7 +181,7 @@ export default defineTool({
       .number()
       .int()
       .positive()
-      .max(100)
+      .max(99)
       .describe("Maximum number of monitors to return.")
       .default(10),
   },
@@ -137,6 +190,7 @@ export default defineTool({
     destructiveHint: false,
     openWorldHint: true,
   },
+  outputSchema: findMonitorsOutputSchema,
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -165,33 +219,40 @@ export default defineTool({
       environment: params.environment ?? undefined,
       owner: params.owner ?? undefined,
       query: params.query ?? undefined,
-      limit: params.limit,
+      limit: params.limit + 1,
     });
 
-    let output = `# Cron Monitors in **${organizationSlug}**\n\n`;
-    if (monitors.length === 0) {
-      output += "No monitors found.\n";
-      return output;
-    }
-
-    output += monitors
-      .slice(0, params.limit)
-      .map((monitor) => {
-        const project = formatProject(monitor);
-        return formatMonitor(
-          monitor,
-          apiService.getMonitorUrl(
+    return structuredResult({
+      monitors: monitors.slice(0, params.limit).map((monitor) => {
+        const projectSlug =
+          monitor.project?.slug ?? monitor.project?.name ?? null;
+        const environments = monitor.environments ?? [];
+        return {
+          id: monitor.id === undefined ? null : String(monitor.id),
+          slug: monitor.slug,
+          name: monitor.name ?? monitor.slug,
+          projectSlug,
+          status: monitor.status ?? null,
+          owner: getOwnerName(monitor),
+          lastCheckIn: monitor.lastCheckIn ?? null,
+          nextCheckIn: monitor.nextCheckIn ?? null,
+          webUrl: apiService.getMonitorUrl(
             organizationSlug,
             monitor.slug,
-            project ?? undefined,
+            projectSlug ?? undefined,
           ),
-        );
-      })
-      .join("\n\n");
-    output += "\n\n## Response Notes\n\n";
-    output +=
-      "- Use `get_monitor_details` with a monitor slug for check-ins and stats.\n";
-    output += "- Monitor issue searches commonly use `monitor.slug:<slug>`.\n";
-    return output;
+          schedule: getSchedule(monitor),
+          environments: environments
+            .slice(0, ENVIRONMENT_LIMIT)
+            .map((environment) => ({
+              name: environment.name ?? null,
+              status: environment.status ?? null,
+              lastCheckIn: environment.lastCheckIn ?? null,
+            })),
+          hasMoreEnvironments: environments.length > ENVIRONMENT_LIMIT,
+        };
+      }),
+      hasMore: monitors.length > params.limit,
+    });
   },
 });
