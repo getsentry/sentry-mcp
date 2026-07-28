@@ -260,6 +260,29 @@
       },
       "required": ["organizationSlug", "name"]
     },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "team": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "slug": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": ["id", "slug", "name"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["team"],
+      "additionalProperties": false
+    },
     "requiredScopes": ["team:write"],
     "skills": ["project-management"],
     "surface": "catalog"
