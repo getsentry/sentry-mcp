@@ -1,6 +1,8 @@
 import { setTag } from "@sentry/core";
+import { z } from "zod";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import type { Team } from "../../api-client/index";
 import type { ServerContext } from "../../types";
 import {
@@ -10,53 +12,23 @@ import {
   ParamTeamSlug,
 } from "../../schema";
 
-function formatProjectTeams(teams: Team[]): string {
-  if (teams.length === 0) {
-    return "No teams are currently assigned to this project.\n";
-  }
+const assignedTeamSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  name: z.string(),
+});
 
-  return teams
-    .map((team) => `- **${team.slug}** (ID: ${team.id}) - ${team.name}`)
-    .join("\n");
-}
+export const addTeamToProjectOutputSchema = z.object({
+  changed: z.boolean(),
+  teams: z.array(assignedTeamSchema),
+});
 
-function formatTeamSlugs(teams: Team[]): string {
-  if (teams.length === 0) {
-    return "none";
-  }
-
-  return teams.map((team) => `\`${team.slug}\``).join(", ");
-}
-
-function formatResponse({
-  organizationSlug,
-  projectSlug,
-  teamSlug,
-  teams,
-  alreadyAssigned,
-}: {
-  organizationSlug: string;
-  projectSlug: string;
-  teamSlug: string;
-  teams: Team[];
-  alreadyAssigned: boolean;
-}): string {
-  let output = alreadyAssigned
-    ? `# Team Already Assigned in **${organizationSlug}**\n\n`
-    : `# Team Access Granted in **${organizationSlug}**\n\n`;
-  output += `**Project**: ${projectSlug}\n`;
-  output += `**Team**: ${teamSlug}\n`;
-  output += `**Result**: ${
-    alreadyAssigned
-      ? "No change was made because the team already had project access."
-      : "Team access was granted."
-  }\n\n`;
-  output += "## Current Project Teams\n\n";
-  output += formatProjectTeams(teams);
-  output += "\n\n## Response Notes\n\n";
-  output += `- Project slug for later requests: \`${projectSlug}\`\n`;
-  output += `- Current team slugs: ${formatTeamSlugs(teams)}\n`;
-  return output;
+function mapTeam(team: Team) {
+  return {
+    id: String(team.id),
+    slug: team.slug,
+    name: team.name,
+  };
 }
 
 export default defineTool({
@@ -92,6 +64,7 @@ export default defineTool({
     idempotentHint: true,
     openWorldHint: true,
   },
+  outputSchema: addTeamToProjectOutputSchema,
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -111,12 +84,9 @@ export default defineTool({
     );
 
     if (alreadyAssigned) {
-      return formatResponse({
-        organizationSlug,
-        projectSlug: params.projectSlug,
-        teamSlug: params.teamSlug,
-        teams: currentTeams,
-        alreadyAssigned: true,
+      return structuredResult({
+        changed: false,
+        teams: currentTeams.map(mapTeam),
       });
     }
 
@@ -131,12 +101,9 @@ export default defineTool({
       projectSlug: params.projectSlug,
     });
 
-    return formatResponse({
-      organizationSlug,
-      projectSlug: params.projectSlug,
-      teamSlug: params.teamSlug,
-      teams: updatedTeams,
-      alreadyAssigned: false,
+    return structuredResult({
+      changed: true,
+      teams: updatedTeams.map(mapTeam),
     });
   },
 });
