@@ -1257,7 +1257,19 @@ describe("buildServer", () => {
         arguments: {},
       });
 
-      expect(getTextContent(result)).toContain("# Organizations");
+      expect(getStructuredContent(result)).toEqual({
+        organizations: [
+          {
+            slug: "sentry-mcp-evals",
+            webUrl: "https://sentry.io/sentry-mcp-evals",
+            regionUrl: "https://us.sentry.io",
+          },
+        ],
+        hasMore: false,
+      });
+      expect(getTextContent(result)).toBe(
+        getGeneratedTextFromStructuredContent(result),
+      );
     });
 
     it("execute_sentry_tool dispatches to a catalog-only tool", async () => {

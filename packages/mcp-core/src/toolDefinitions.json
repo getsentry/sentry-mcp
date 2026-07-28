@@ -673,6 +673,51 @@
         }
       }
     },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "organizations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "slug": {
+                "type": "string"
+              },
+              "webUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "regionUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["slug", "webUrl", "regionUrl"],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      },
+      "required": ["organizations", "hasMore"],
+      "additionalProperties": false
+    },
     "requiredScopes": ["org:read"],
     "skills": ["inspect", "seer", "docs", "triage", "project-management"],
     "surface": "direct"
