@@ -3391,6 +3391,58 @@
     "name": "whoami",
     "description": "Identify the authenticated user in Sentry.\n\nUse this tool when you need to:\n- Get the user's name and email address.",
     "inputSchema": {},
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "email": {
+              "type": "string"
+            }
+          },
+          "required": ["id", "name", "email"],
+          "additionalProperties": false
+        },
+        "sessionConstraints": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "organizationSlug": {
+                  "type": "string"
+                },
+                "projectSlug": {
+                  "type": "string"
+                },
+                "regionUrl": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["user", "sessionConstraints"],
+      "additionalProperties": false
+    },
     "requiredScopes": [],
     "skills": ["inspect", "seer", "docs", "triage", "project-management"],
     "surface": "catalog"
