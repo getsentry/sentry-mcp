@@ -2,8 +2,17 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import type { ServerContext } from "../../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+
+export const createTeamOutputSchema = z.object({
+  team: z.object({
+    id: z.string(),
+    slug: z.string(),
+    name: z.string(),
+  }),
+});
 
 export default defineTool({
   name: "create_team",
@@ -40,6 +49,7 @@ export default defineTool({
     destructiveHint: false,
     openWorldHint: true,
   },
+  outputSchema: createTeamOutputSchema,
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -52,12 +62,12 @@ export default defineTool({
       organizationSlug,
       name: params.name,
     });
-    let output = `# New Team in **${organizationSlug}**\n\n`;
-    output += `**ID**: ${team.id}\n`;
-    output += `**Slug**: ${team.slug}\n`;
-    output += `**Name**: ${team.name}\n`;
-    output += "\n## Response Notes\n\n";
-    output += `- Please tell the user the team slug.\n`;
-    return output;
+    return structuredResult({
+      team: {
+        id: String(team.id),
+        slug: team.slug,
+        name: team.name,
+      },
+    });
   },
 });
