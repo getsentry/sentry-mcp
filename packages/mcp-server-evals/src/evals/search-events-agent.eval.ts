@@ -50,6 +50,8 @@ defineAgentEval(
           name: "datasetAttributes",
           arguments: {
             dataset: "spans",
+            substringMatch: "temperature",
+            attributeTypes: ["number"],
           },
         },
         {
@@ -74,6 +76,7 @@ defineAgentEval(
           name: "datasetAttributes",
           arguments: {
             dataset: "errors",
+            substringMatch: "custom.payment.processor",
           },
         },
       ],
@@ -91,6 +94,8 @@ defineAgentEval(
           name: "datasetAttributes",
           arguments: {
             dataset: "spans",
+            substringMatch: "custom.db.pool_size",
+            attributeTypes: ["number"],
           },
         },
       ],
