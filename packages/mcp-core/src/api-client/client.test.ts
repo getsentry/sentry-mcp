@@ -1,5 +1,5 @@
 import { mswServer, teamFixture } from "@sentry/mcp-server-mocks";
-import { HttpResponse, http } from "msw";
+import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigurationError } from "../errors";
 import { SentryApiService } from "./client";
