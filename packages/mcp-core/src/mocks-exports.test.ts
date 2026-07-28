@@ -48,5 +48,7 @@ describe("@sentry/mcp-server-mocks exports", () => {
     expect(isLLMProviderRequest("https://example.azure.com/openai/v1/")).toBe(
       false,
     );
+    expect(isLLMProviderRequest("/relative/request")).toBe(false);
+    expect(isLLMProviderRequest("not a valid URL")).toBe(false);
   });
 });

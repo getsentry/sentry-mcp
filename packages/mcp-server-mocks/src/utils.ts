@@ -7,7 +7,12 @@ export function setupMockServer(handlers: Array<any> = []): SetupServer {
 }
 
 export function isLLMProviderRequest(requestUrl: string): boolean {
-  const url = new URL(requestUrl);
+  let url: URL;
+  try {
+    url = new URL(requestUrl);
+  } catch {
+    return false;
+  }
 
   if (
     url.hostname === "api.openai.com" ||
