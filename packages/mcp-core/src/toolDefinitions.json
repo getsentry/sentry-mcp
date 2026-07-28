@@ -578,7 +578,7 @@
   },
   {
     "name": "find_projects",
-    "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+    "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -612,6 +612,29 @@
         }
       },
       "required": ["organizationSlug"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "slug": {
+                "type": "string"
+              }
+            },
+            "required": ["slug"],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      },
+      "required": ["projects", "hasMore"],
+      "additionalProperties": false
     },
     "requiredScopes": ["project:read"],
     "skills": ["inspect", "seer", "docs", "triage", "project-management"],
