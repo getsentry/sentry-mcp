@@ -1503,8 +1503,9 @@ export class SentryApiService {
    *
    * @param params Query parameters
    * @param params.query Search query to filter organizations by name/slug
+   * @param params.limit Maximum number of organizations to return (defaults to 25)
    * @param opts Request options
-   * @returns Array of organizations across all accessible regions (limited to 25 results)
+   * @returns Array of organizations across all accessible regions
    *
    * @example
    * ```typescript
@@ -1516,12 +1517,14 @@ export class SentryApiService {
    * ```
    */
   async listOrganizations(
-    params?: { query?: string },
+    params?: { query?: string; limit?: number },
     opts?: RequestOptions,
   ): Promise<OrganizationList> {
+    const limit = params?.limit ?? 25;
+
     // Build query parameters
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "25");
+    queryParams.set("per_page", String(limit));
     if (params?.query) {
       queryParams.set("query", params.query);
     }
@@ -1559,7 +1562,7 @@ export class SentryApiService {
         .reduce((acc, curr) => acc.concat(curr), []);
 
       // Apply the limit after combining results from all regions
-      return allOrganizations.slice(0, 25);
+      return allOrganizations.slice(0, limit);
     } catch (error) {
       // If regions endpoint fails (e.g., older self-hosted versions identifying as sentry.io),
       // fall back to direct organizations endpoint
