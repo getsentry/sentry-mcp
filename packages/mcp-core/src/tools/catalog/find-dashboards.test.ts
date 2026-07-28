@@ -1,7 +1,13 @@
 import { dashboardListFixture, mswServer } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
-import findDashboards from "./find-dashboards.js";
+import {
+  assertStructuredOnlyResult,
+  getStructuredContent,
+} from "../../test-utils/structured-content.js";
+import findDashboards, {
+  findDashboardsOutputSchema,
+} from "./find-dashboards.js";
 
 const context = {
   constraints: {
@@ -20,7 +26,7 @@ const projectConstrainedContext = {
 };
 
 describe("find_dashboards", () => {
-  it("lists dashboards with pagination hints", async () => {
+  it("lists dashboards with a pagination cursor", async () => {
     const result = await findDashboards.handler(
       {
         organizationSlug: "sentry-mcp-evals",
@@ -33,27 +39,39 @@ describe("find_dashboards", () => {
       context,
     );
 
-    expect(result).toMatchInlineSnapshot(`
-      "# Dashboards in **sentry-mcp-evals**
-
-      ## Errors Overview
-
-      **ID**: 101
-      **Widgets**: 2
-      **Widget Types**: line, table
-      **Projects**: 4509106749636608
-      **Environments**: production
-      **Created By**: Jane Developer
-      **Created**: 2025-04-14T10:15:00.000Z
-      **Last Visited**: 2025-04-15T12:00:00.000Z
-      **Favorited**: yes
-      **URL**: [Open Dashboard](https://sentry-mcp-evals.sentry.io/dashboard/101/?project=4509106749636608)
-
-      ## Response Notes
-
-      - Use \`get_dashboard_details\` with the dashboard ID for widgets and query definitions.
-      - More dashboards are available. Pass \`cursor: "dashboard-cursor"\` to fetch the next page.
-      "
+    assertStructuredOnlyResult(result);
+    const structuredContent = getStructuredContent(result);
+    expect(findDashboards.outputSchema).toBe(findDashboardsOutputSchema);
+    expect(findDashboardsOutputSchema.parse(structuredContent)).toEqual(
+      structuredContent,
+    );
+    expect(structuredContent).toMatchInlineSnapshot(`
+      {
+        "dashboards": [
+          {
+            "createdBy": "Jane Developer",
+            "dateCreated": "2025-04-14T10:15:00.000Z",
+            "environments": [
+              "production",
+            ],
+            "id": "101",
+            "isFavorited": true,
+            "lastVisited": "2025-04-15T12:00:00.000Z",
+            "prebuiltId": null,
+            "projects": [
+              "4509106749636608",
+            ],
+            "title": "Errors Overview",
+            "url": "https://sentry-mcp-evals.sentry.io/dashboard/101/?project=4509106749636608",
+            "widgetCount": 2,
+            "widgetTypes": [
+              "line",
+              "table",
+            ],
+          },
+        ],
+        "nextCursor": "dashboard-cursor",
+      }
     `);
   });
 
@@ -70,14 +88,11 @@ describe("find_dashboards", () => {
       context,
     );
 
-    expect(result).toMatchInlineSnapshot(`
-      "# Dashboards in **sentry-mcp-evals**
-
-      **Title query:** "missing"
-
-      No dashboards found matching "missing".
-      "
-    `);
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toEqual({
+      dashboards: [],
+      nextCursor: null,
+    });
   });
 
   it("filters explicit dashboard project IDs in project-constrained sessions", async () => {
@@ -126,12 +141,17 @@ describe("find_dashboards", () => {
       "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
       "/api/0/organizations/sentry-mcp-evals/dashboards/",
     ]);
-    expect(result).not.toContain("**ID**: 101");
-    expect(result).toContain("## Errors Overview Copy");
-    expect(result).toContain("**ID**: 102");
-    expect(result).toContain(
-      "https://sentry-mcp-evals.sentry.io/dashboard/102/?project=4509109104082945",
-    );
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toMatchObject({
+      dashboards: [
+        {
+          id: "102",
+          title: "Errors Overview Copy",
+          projects: [],
+          url: "https://sentry-mcp-evals.sentry.io/dashboard/102/?project=4509109104082945",
+        },
+      ],
+    });
   });
 
   it("fetches additional pages to fill project-constrained dashboard results", async () => {
@@ -216,12 +236,16 @@ describe("find_dashboards", () => {
     expect(new URL(requestUrls[0]!).searchParams.get("per_page")).toBe("2");
     expect(new URL(requestUrls[1]!).searchParams.get("cursor")).toBe("page-2");
     expect(new URL(requestUrls[1]!).searchParams.get("per_page")).toBe("2");
-    expect(result).not.toContain("Other Project Errors");
-    expect(result).not.toContain("Other Project Metrics");
-    expect(result).toContain("## Cloudflare Errors");
-    expect(result).toContain("## Cloudflare Metrics");
-    expect(result).toContain(
-      'More dashboards are available. Pass `cursor: "mcp-dashboard-project:',
+    assertStructuredOnlyResult(result);
+    const structuredContent = findDashboardsOutputSchema.parse(
+      getStructuredContent(result),
+    );
+    expect(structuredContent.dashboards.map(({ id }) => id)).toEqual([
+      "203",
+      "204",
+    ]);
+    expect(structuredContent.nextCursor).toEqual(
+      expect.stringContaining("mcp-dashboard-project:"),
     );
   });
 
@@ -313,14 +337,19 @@ describe("find_dashboards", () => {
       },
       projectConstrainedContext,
     );
-    const nextCursor = /cursor: "([^"]+)"/.exec(firstResult)?.[1];
+    assertStructuredOnlyResult(firstResult);
+    const firstStructuredContent = findDashboardsOutputSchema.parse(
+      getStructuredContent(firstResult),
+    );
+    const nextCursor = firstStructuredContent.nextCursor;
 
     expect(nextCursor).toEqual(
       expect.stringContaining("mcp-dashboard-project:"),
     );
-    expect(firstResult).toContain("## Cloudflare Errors");
-    expect(firstResult).toContain("## Cloudflare Metrics");
-    expect(firstResult).not.toContain("Cloudflare Throughput");
+    expect(firstStructuredContent.dashboards.map(({ id }) => id)).toEqual([
+      "301",
+      "303",
+    ]);
 
     const secondResult = await findDashboards.handler(
       {
@@ -336,9 +365,10 @@ describe("find_dashboards", () => {
 
     expect(new URL(requestUrls[2]!).searchParams.get("cursor")).toBe("page-2");
     expect(new URL(requestUrls[2]!).searchParams.get("per_page")).toBe("2");
-    expect(secondResult).toContain("## Cloudflare Throughput");
-    expect(secondResult).not.toContain("Cloudflare Metrics");
-    expect(secondResult).not.toContain("Cloudflare Latency");
+    assertStructuredOnlyResult(secondResult);
+    expect(getStructuredContent(secondResult)).toMatchObject({
+      dashboards: [{ id: "304", title: "Cloudflare Throughput" }],
+    });
   });
 
   it("resumes a project cursor within the first API page", async () => {
@@ -401,8 +431,10 @@ describe("find_dashboards", () => {
     const searchParams = new URL(requestUrl).searchParams;
     expect(searchParams.has("cursor")).toBe(false);
     expect(searchParams.get("per_page")).toBe("2");
-    expect(result).not.toContain("Cloudflare Errors");
-    expect(result).toContain("## Cloudflare Metrics");
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toMatchObject({
+      dashboards: [{ id: "402", title: "Cloudflare Metrics" }],
+    });
   });
 
   it("rejects project cursors in org-wide searches before calling Sentry", async () => {
@@ -453,7 +485,10 @@ describe("find_dashboards", () => {
       },
       projectConstrainedContext,
     );
-    const projectCursor = /cursor: "([^"]+)"/.exec(projectResult)?.[1];
+    assertStructuredOnlyResult(projectResult);
+    const projectCursor = findDashboardsOutputSchema.parse(
+      getStructuredContent(projectResult),
+    ).nextCursor;
     expect(projectCursor).toEqual(
       expect.stringContaining("mcp-dashboard-project:"),
     );

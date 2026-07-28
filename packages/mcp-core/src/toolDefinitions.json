@@ -506,6 +506,115 @@
       },
       "required": ["organizationSlug"]
     },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "dashboards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "widgetCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "widgetTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "projects": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "environments": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "createdBy": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dateCreated": {
+                "type": "string"
+              },
+              "lastVisited": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "isFavorited": {
+                "type": "boolean"
+              },
+              "prebuiltId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "widgetCount",
+              "widgetTypes",
+              "projects",
+              "environments",
+              "createdBy",
+              "dateCreated",
+              "lastVisited",
+              "isFavorited",
+              "prebuiltId",
+              "url"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["dashboards", "nextCursor"],
+      "additionalProperties": false
+    },
     "requiredScopes": ["org:read"],
     "skills": ["inspect"],
     "surface": "catalog"

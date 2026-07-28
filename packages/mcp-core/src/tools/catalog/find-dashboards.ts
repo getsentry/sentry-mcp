@@ -4,15 +4,36 @@ import type { DashboardListItem, SentryApiService } from "../../api-client";
 import { UserInputError } from "../../errors";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import type { ServerContext } from "../../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
 import {
   filterDashboardsByProjectConstraint,
-  formatDashboardList,
   resolveDashboardProjectConstraint,
 } from "../support/dashboards";
+import { formatActor } from "./support/api-formatting";
 
 const PROJECT_DASHBOARD_CURSOR_PREFIX = "mcp-dashboard-project:";
+
+const dashboardSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  widgetCount: z.number().int().nonnegative(),
+  widgetTypes: z.array(z.string()),
+  projects: z.array(z.string()),
+  environments: z.array(z.string()),
+  createdBy: z.string().nullable(),
+  dateCreated: z.string(),
+  lastVisited: z.string().nullable(),
+  isFavorited: z.boolean(),
+  prebuiltId: z.string().nullable(),
+  url: z.string().url(),
+});
+
+export const findDashboardsOutputSchema = z.object({
+  dashboards: z.array(dashboardSummarySchema),
+  nextCursor: z.string().nullable(),
+});
 
 type ProjectDashboardCursor = {
   v: 1;
@@ -256,6 +277,7 @@ export default defineTool({
     destructiveHint: false,
     openWorldHint: true,
   },
+  outputSchema: findDashboardsOutputSchema,
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -297,17 +319,35 @@ export default defineTool({
       }));
     }
 
-    return formatDashboardList({
-      dashboards,
-      organizationSlug,
-      titleQuery: params.titleQuery,
+    return structuredResult({
+      dashboards: dashboards.map((dashboard) => ({
+        id: String(dashboard.id),
+        title: dashboard.title,
+        widgetCount: dashboard.widgetPreview.length,
+        widgetTypes: Array.from(new Set(dashboard.widgetDisplay)),
+        projects: dashboard.projects.map(String),
+        environments: dashboard.environment,
+        createdBy: dashboard.createdBy
+          ? formatActor(dashboard.createdBy)
+          : null,
+        dateCreated: dashboard.dateCreated,
+        lastVisited: dashboard.lastVisited ?? null,
+        isFavorited: dashboard.isFavorited ?? false,
+        prebuiltId:
+          dashboard.prebuiltId === null || dashboard.prebuiltId === undefined
+            ? null
+            : String(dashboard.prebuiltId),
+        url: apiService.getDashboardUrl(
+          organizationSlug,
+          String(dashboard.id),
+          {
+            projectId:
+              scopedProject?.id ??
+              (dashboard.projects.length === 1 ? dashboard.projects[0] : null),
+          },
+        ),
+      })),
       nextCursor,
-      getDashboardUrl: (dashboard) =>
-        apiService.getDashboardUrl(organizationSlug, String(dashboard.id), {
-          projectId:
-            scopedProject?.id ??
-            (dashboard.projects.length === 1 ? dashboard.projects[0] : null),
-        }),
     });
   },
 });
