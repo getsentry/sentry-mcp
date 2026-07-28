@@ -464,6 +464,32 @@
       },
       "required": ["organizationSlug", "projectSlug"]
     },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "dsns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "dsn": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "name", "dsn"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["dsns"],
+      "additionalProperties": false
+    },
     "requiredScopes": ["project:read"],
     "skills": ["project-management"],
     "surface": "catalog"
