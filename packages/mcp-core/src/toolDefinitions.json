@@ -2269,6 +2269,35 @@
       },
       "required": ["organizationSlug", "projectSlug", "teamSlug"]
     },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "changed": {
+          "type": "boolean"
+        },
+        "teams": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "slug", "name"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["changed", "teams"],
+      "additionalProperties": false
+    },
     "requiredScopes": ["project:write", "team:read", "org:read"],
     "skills": ["project-management"],
     "surface": "catalog"
