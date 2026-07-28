@@ -197,21 +197,29 @@ To contribute changes, you'll need to set up your local environment:
      - `SENTRY_CLIENT_SECRET=your_development_sentry_client_secret`
      - `COOKIE_SECRET=my-super-secret-cookie`
 
-4. **Start the development server:**
+4. **Start the development server with local Sentry telemetry:**
 
    ```shell
-   pnpm dev
+   # Cloudflare HTTP server and React client
+   pnpm dev:local
+
+   # Node.js stdio transport (requires SENTRY_ACCESS_TOKEN)
+   pnpm dev:stdio:local
    ```
+
+   These scripts use [`sentry local run`](https://github.com/getsentry/cli/blob/main/docs/src/fragments/commands/local.md) to start a local telemetry server and inject `SENTRY_SPOTLIGHT` into the server process. The Cloudflare script also receives `VITE_SENTRY_SPOTLIGHT` for the browser client. Use `pnpm dev` or `pnpm dev:stdio` when you do not need local telemetry.
 
 ### Verify
 
-Run the server locally to make it available at `http://localhost:5173`
+Run the Cloudflare server locally to make it available at `http://localhost:5173`:
 
 ```shell
-pnpm dev
+pnpm dev:local
 ```
 
 To test the local server, enter `http://localhost:5173/mcp` into Inspector and hit connect. Once you follow the prompts, you'll be able to "List Tools".
+
+For stdio, set `SENTRY_ACCESS_TOKEN`, run `pnpm dev:stdio:local`, and connect an MCP client to the stdio process. Events from either transport appear in the `sentry local` output.
 
 ### Tests
 
