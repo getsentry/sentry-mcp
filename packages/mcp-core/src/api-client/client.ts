@@ -1653,16 +1653,17 @@ export class SentryApiService {
    * @param organizationSlug Organization identifier
    * @param params Query parameters
    * @param params.query Search query to filter projects by name/slug
+   * @param params.limit Maximum number of projects to return
    * @param opts Request options
-   * @returns Array of projects in the organization (limited to 25 results)
+   * @returns Array of projects in the organization
    */
   async listProjects(
     organizationSlug: string,
-    params?: { query?: string },
+    params?: { query?: string; limit?: number },
     opts?: RequestOptions,
   ): Promise<ProjectList> {
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "25");
+    queryParams.set("per_page", String(params?.limit ?? 25));
     if (params?.query) {
       queryParams.set("query", params.query);
     }

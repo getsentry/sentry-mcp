@@ -29,7 +29,7 @@
       },
       {
         "name": "find_projects",
-        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["project:read"]
       },
       {
@@ -204,7 +204,7 @@
       },
       {
         "name": "find_projects",
-        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["project:read"]
       },
       {
@@ -265,7 +265,7 @@
       },
       {
         "name": "find_projects",
-        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["project:read"]
       },
       {
@@ -305,7 +305,7 @@
       },
       {
         "name": "find_projects",
-        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["project:read"]
       },
       {
@@ -420,7 +420,7 @@
       },
       {
         "name": "find_projects",
-        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["project:read"]
       },
       {
