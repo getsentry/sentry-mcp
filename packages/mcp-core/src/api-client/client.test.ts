@@ -1,8 +1,8 @@
-import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer, teamFixture } from "@sentry/mcp-server-mocks";
-import { SentryApiService } from "./client";
+import { HttpResponse, http } from "msw";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigurationError } from "../errors";
+import { SentryApiService } from "./client";
 
 describe("getIssueUrl", () => {
   it("should work with sentry.io", () => {
@@ -446,6 +446,49 @@ describe("monitor time parameters", () => {
       "Cannot use both statsPeriod and start/end parameters",
     );
     expect(requestReceived).toBe(false);
+  });
+});
+
+describe("getIssue", () => {
+  it("uses the numeric issue ID when Sentry returns a null shortId", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/issues/123456/",
+        () =>
+          HttpResponse.json({
+            id: "123456",
+            shortId: null,
+            title: "TypeError: Cannot read properties of undefined",
+            firstSeen: "2026-07-27T00:00:00Z",
+            lastSeen: "2026-07-28T00:00:00Z",
+            count: "1",
+            userCount: 1,
+            permalink: "https://sentry.io/issues/123456/",
+            project: {
+              id: "1",
+              name: "test-project",
+              slug: "test-project",
+              platform: "javascript",
+            },
+            platform: "javascript",
+            status: "unresolved",
+            culprit: "app/example.ts",
+            type: "error",
+          }),
+      ),
+    );
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const issue = await apiService.getIssue({
+      organizationSlug: "my-org",
+      issueId: "123456",
+    });
+
+    expect(issue.shortId).toBe("123456");
   });
 });
 
