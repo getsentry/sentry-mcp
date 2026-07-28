@@ -1596,16 +1596,17 @@ export class SentryApiService {
    * @param organizationSlug Organization identifier
    * @param params Query parameters
    * @param params.query Search query to filter teams by name/slug
+   * @param params.limit Maximum number of teams to return
    * @param opts Request options including host override
-   * @returns Array of teams in the organization (limited to 25 results)
+   * @returns Array of teams in the organization
    */
   async listTeams(
     organizationSlug: string,
-    params?: { query?: string },
+    params?: { query?: string; limit?: number },
     opts?: RequestOptions,
   ): Promise<TeamList> {
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "25");
+    queryParams.set("per_page", String(params?.limit ?? 25));
     if (params?.query) {
       queryParams.set("query", params.query);
     }
