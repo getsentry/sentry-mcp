@@ -763,7 +763,7 @@ export const AssignedToSchema = z.union([
 export const IssueSchema = z
   .object({
     id: z.union([z.string(), z.number()]),
-    shortId: z.string(),
+    shortId: z.string().nullable(),
     title: z.string(),
     firstSeen: z.string().datetime().nullable(),
     lastSeen: z.string().datetime().nullable(),
@@ -795,7 +795,10 @@ export const IssueSchema = z
       .optional(),
     seerFixabilityScore: z.number().nullable().optional(),
   })
-  .passthrough();
+  .passthrough()
+  .transform((issue) =>
+    Object.assign(issue, { shortId: issue.shortId ?? String(issue.id) }),
+  );
 
 export const IssueListSchema = z.array(IssueSchema);
 

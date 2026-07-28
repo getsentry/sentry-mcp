@@ -99,6 +99,33 @@ describe("getSeerActionabilityLabel", () => {
 });
 
 describe("formatIssueOutput", () => {
+  it("uses the issue URL for commit references when shortId is unavailable", () => {
+    const output = formatIssueOutput({
+      organizationSlug: "sentry-mcp-evals",
+      issue: {
+        id: "123456",
+        shortId: "123456",
+        title: "Retry job failed",
+        count: "1",
+        userCount: 1,
+        status: "unresolved",
+        project: {
+          name: "cloudflare-mcp",
+          slug: "cloudflare-mcp",
+        },
+      } as Issue,
+      event: new EventBuilder("javascript").withId("event-1").build(),
+      apiService: {
+        getIssueUrl: () => "https://sentry.example/issues/123456",
+      } as unknown as SentryApiService,
+    });
+
+    expect(output).toContain(
+      "`Fixes https://sentry.example/issues/123456` automatically closes the issue",
+    );
+    expect(output).not.toContain("`Fixes 123456`");
+  });
+
   it("does not use Seer provenance tags as fallback summary text", () => {
     const output = formatIssueOutput({
       organizationSlug: "sentry-mcp-evals",
