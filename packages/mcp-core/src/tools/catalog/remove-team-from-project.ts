@@ -1,6 +1,8 @@
 import { setTag } from "@sentry/core";
+import { z } from "zod";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import { UserInputError } from "../../errors";
 import type { Team } from "../../api-client/index";
 import type { ServerContext } from "../../types";
@@ -11,45 +13,23 @@ import {
   ParamTeamSlug,
 } from "../../schema";
 
-function formatProjectTeams(teams: Team[]): string {
-  if (teams.length === 0) {
-    return "No teams are currently assigned to this project.\n";
-  }
+const assignedTeamSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  name: z.string(),
+});
 
-  return teams
-    .map((team) => `- **${team.slug}** (ID: ${team.id}) - ${team.name}`)
-    .join("\n");
-}
+export const removeTeamFromProjectOutputSchema = z.object({
+  changed: z.boolean(),
+  teams: z.array(assignedTeamSchema),
+});
 
-function formatTeamSlugs(teams: Team[]): string {
-  if (teams.length === 0) {
-    return "none";
-  }
-
-  return teams.map((team) => `\`${team.slug}\``).join(", ");
-}
-
-function formatResponse({
-  organizationSlug,
-  projectSlug,
-  teamSlug,
-  teams,
-}: {
-  organizationSlug: string;
-  projectSlug: string;
-  teamSlug: string;
-  teams: Team[];
-}): string {
-  let output = `# Team Access Revoked in **${organizationSlug}**\n\n`;
-  output += `**Project**: ${projectSlug}\n`;
-  output += `**Removed Team**: ${teamSlug}\n`;
-  output += "**Result**: Team access was revoked.\n\n";
-  output += "## Current Project Teams\n\n";
-  output += formatProjectTeams(teams);
-  output += "\n\n## Response Notes\n\n";
-  output += `- Project slug for later requests: \`${projectSlug}\`\n`;
-  output += `- Current team slugs: ${formatTeamSlugs(teams)}\n`;
-  return output;
+function mapTeam(team: Team) {
+  return {
+    id: String(team.id),
+    slug: team.slug,
+    name: team.name,
+  };
 }
 
 export default defineTool({
@@ -86,6 +66,7 @@ export default defineTool({
     destructiveHint: true,
     openWorldHint: true,
   },
+  outputSchema: removeTeamFromProjectOutputSchema,
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -127,11 +108,9 @@ export default defineTool({
       projectSlug: params.projectSlug,
     });
 
-    return formatResponse({
-      organizationSlug,
-      projectSlug: params.projectSlug,
-      teamSlug: params.teamSlug,
-      teams: updatedTeams,
+    return structuredResult({
+      changed: true,
+      teams: updatedTeams.map(mapTeam),
     });
   },
 });

@@ -2,6 +2,10 @@ import { mswServer, teamFixture } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
 import { UserInputError } from "../../errors";
+import {
+  assertStructuredOnlyResult,
+  getStructuredContent,
+} from "../../test-utils/structured-content";
 import { prepareToolParams } from "../catalog-runtime/availability";
 import { TOP_LEVEL_TOOL_NAMES } from "../surfaces";
 import catalogTools from "./index";
@@ -16,7 +20,7 @@ const context = {
   userId: "1",
 };
 
-function team(overrides: { id: string; slug: string; name: string }) {
+function team(overrides: { id: string | number; slug: string; name: string }) {
   return {
     ...teamFixture,
     ...overrides,
@@ -67,22 +71,18 @@ describe("remove_team_from_project", () => {
 
     expect(listCalls).toBe(2);
     expect(deleteCalls).toBe(1);
-    expect(result).toMatchInlineSnapshot(`
-      "# Team Access Revoked in **sentry-mcp-evals**
-
-      **Project**: cloudflare-mcp
-      **Removed Team**: the-goats
-      **Result**: Team access was revoked.
-
-      ## Current Project Teams
-
-      - **backend** (ID: 4509109078196224) - Backend
-
-      ## Response Notes
-
-      - Project slug for later requests: \`cloudflare-mcp\`
-      - Current team slugs: \`backend\`
-      "
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toMatchInlineSnapshot(`
+      {
+        "changed": true,
+        "teams": [
+          {
+            "id": "4509109078196224",
+            "name": "Backend",
+            "slug": "backend",
+          },
+        ],
+      }
     `);
   });
 
@@ -172,7 +172,7 @@ describe("remove_team_from_project", () => {
             listCalls === 1
               ? [
                   team({
-                    id: "99",
+                    id: 99,
                     slug: "TeamABC",
                     name: "Team ABC",
                   }),
@@ -224,7 +224,17 @@ describe("remove_team_from_project", () => {
       "/api/0/projects/MyOrg/MyProject/teams/TeamABC/",
       "/api/0/projects/MyOrg/MyProject/teams/",
     ]);
-    expect(result).toContain("**Removed Team**: TeamABC");
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toEqual({
+      changed: true,
+      teams: [
+        {
+          id: "100",
+          slug: "OtherTeam",
+          name: "Other Team",
+        },
+      ],
+    });
   });
 
   it("is registered as catalog-only", () => {
