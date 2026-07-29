@@ -13,6 +13,7 @@ declare namespace Cloudflare {
 		OPENAI_API_KEY?: string;
 		OPENROUTER_API_KEY?: string;
 		OPENROUTER_MODEL?: string;
+		OPENROUTER_REASONING_EFFORT?: string;
 		EMBEDDED_AGENT_PROVIDER?: string;
 		COOKIE_SECRET: string;
 		CHAT_RATE_LIMITER: RateLimit;
@@ -27,7 +28,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "SENTRY_CLIENT_ID" | "SENTRY_CLIENT_SECRET" | "SENTRY_DSN" | "OPENAI_API_KEY" | "OPENROUTER_API_KEY" | "OPENROUTER_MODEL" | "EMBEDDED_AGENT_PROVIDER" | "COOKIE_SECRET">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "SENTRY_CLIENT_ID" | "SENTRY_CLIENT_SECRET" | "SENTRY_DSN" | "OPENAI_API_KEY" | "OPENROUTER_API_KEY" | "OPENROUTER_MODEL" | "OPENROUTER_REASONING_EFFORT" | "EMBEDDED_AGENT_PROVIDER" | "COOKIE_SECRET">> {}
 }
 
 // Begin runtime types

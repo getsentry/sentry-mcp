@@ -1,6 +1,9 @@
 import { experimental_createMCPClient } from "@ai-sdk/mcp";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { getOpenRouterModel } from "@sentry/mcp-core/internal/agents/openrouter-provider";
+import {
+  getOpenRouterModel,
+  getOpenRouterProviderOptions,
+} from "@sentry/mcp-core/internal/agents/openrouter-provider";
 import { logInfo, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import {
   convertToModelMessages,
@@ -335,6 +338,7 @@ Start conversations by exploring what's available in their account. Use tools li
 Remember: You're a test assistant, not a general-purpose helper. Stay focused on testing the MCP integration with their real data.`,
       maxOutputTokens: 2000,
       stopWhen: stepCountIs(10),
+      providerOptions: getOpenRouterProviderOptions(),
       experimental_telemetry: {
         isEnabled: true,
       },

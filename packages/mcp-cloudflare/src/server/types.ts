@@ -64,6 +64,7 @@ export interface Env {
   OPENAI_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
   OPENROUTER_MODEL?: string;
+  OPENROUTER_REASONING_EFFORT?: string;
   EMBEDDED_AGENT_PROVIDER?: string;
   MCP_URL?: string;
   OAUTH_PROVIDER: OAuthHelpers;

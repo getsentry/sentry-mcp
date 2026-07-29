@@ -14,7 +14,7 @@ function createEnv(overrides: Partial<Env> = {}): Env {
     SENTRY_DSN: "https://public@example.ingest.sentry.io/1",
     SENTRY_HOST: "sentry.io",
     OPENROUTER_API_KEY: "test-openrouter-key",
-    OPENROUTER_MODEL: "openai/gpt-5.5",
+    OPENROUTER_MODEL: "openai/gpt-5.6-luna",
     EMBEDDED_AGENT_PROVIDER: "openrouter",
     OAUTH_PROVIDER: {} as Env["OAUTH_PROVIDER"],
     AI: {} as Ai,

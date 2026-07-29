@@ -100,7 +100,7 @@ function createTestEnv(): Env {
     SENTRY_CLIENT_SECRET: "test-client-secret",
     SENTRY_HOST: "sentry.io",
     OPENROUTER_API_KEY: "test-openrouter-key",
-    OPENROUTER_MODEL: "openai/gpt-5.5",
+    OPENROUTER_MODEL: "openai/gpt-5.6-luna",
     EMBEDDED_AGENT_PROVIDER: "openrouter",
     OAUTH_KV: {} as KVNamespace,
     OAUTH_PROVIDER: {

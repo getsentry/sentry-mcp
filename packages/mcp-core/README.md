@@ -83,7 +83,8 @@ MCP_ADD_SCOPES=event:write             # Add to default scopes (keeps defaults) 
 OPENAI_API_KEY=your-openai-key         # Use OpenAI for AI-powered search tools
 OPENAI_MODEL=gpt-5                     # OpenAI model to use (default: "gpt-5")
 OPENROUTER_API_KEY=your-openrouter-key # Or use OpenRouter for AI-powered search tools
-OPENROUTER_MODEL=openai/gpt-5.5        # OpenRouter model to use (default: "openai/gpt-5.5")
+OPENROUTER_MODEL=openai/gpt-5.6-luna   # OpenRouter model to use (default: "openai/gpt-5.6-luna")
+OPENROUTER_REASONING_EFFORT=high       # OpenRouter reasoning effort: "none", "low", "medium", "high", "xhigh", "max", or "" to disable (default: "high")
 OPENAI_REASONING_EFFORT=low            # Reasoning effort for o1 models: "low", "medium", "high", or "" to disable (default: "low")
 
 # No environment variable exists for the OpenAI base URL override; use --openai-base-url instead.
