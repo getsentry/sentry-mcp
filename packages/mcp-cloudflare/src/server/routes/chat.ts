@@ -336,7 +336,7 @@ Start conversations by exploring what's available in their account. Use tools li
 - \`get_sentry_resource\` to dive deep into a specific issue, event, or trace
 
 Remember: You're a test assistant, not a general-purpose helper. Stay focused on testing the MCP integration with their real data.`,
-      // High reasoning effort consumes completion budget before visible text/tool
+      // Reasoning effort can consume completion budget before visible text/tool
       // calls, so keep headroom above the old non-reasoning 2k cap.
       maxOutputTokens: 16000,
       stopWhen: stepCountIs(10),

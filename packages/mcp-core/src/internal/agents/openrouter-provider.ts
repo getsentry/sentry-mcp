@@ -4,7 +4,7 @@ import { USER_AGENT } from "../../version";
 import type { ProviderOptions } from "./types";
 
 const DEFAULT_OPENROUTER_MODEL = "openai/gpt-5.6-luna";
-const DEFAULT_OPENROUTER_REASONING_EFFORT = "high";
+const DEFAULT_OPENROUTER_REASONING_EFFORT = "medium";
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 /**

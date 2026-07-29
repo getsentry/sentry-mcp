@@ -98,22 +98,22 @@ describe("openrouter-provider", () => {
     ).toBe("google/gemini-2.5-pro");
   });
 
-  it("defaults reasoning effort to high and allows override", () => {
-    expect(getOpenRouterProviderOptions()).toEqual({
-      openai: {
-        structuredOutputs: false,
-        strictJsonSchema: false,
-        reasoningEffort: "high",
-      },
-    });
-
-    process.env.OPENROUTER_REASONING_EFFORT = "medium";
-
+  it("defaults reasoning effort to medium and allows override", () => {
     expect(getOpenRouterProviderOptions()).toEqual({
       openai: {
         structuredOutputs: false,
         strictJsonSchema: false,
         reasoningEffort: "medium",
+      },
+    });
+
+    process.env.OPENROUTER_REASONING_EFFORT = "high";
+
+    expect(getOpenRouterProviderOptions()).toEqual({
+      openai: {
+        structuredOutputs: false,
+        strictJsonSchema: false,
+        reasoningEffort: "high",
       },
     });
 
