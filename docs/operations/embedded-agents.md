@@ -72,8 +72,8 @@ For OpenRouter:
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
-# Optional; defaults to openai/gpt-5
-export OPENROUTER_MODEL=openai/gpt-5
+# Optional; defaults to openai/gpt-5.5
+export OPENROUTER_MODEL=openai/gpt-5.5
 # Recommended, and required when multiple provider keys are set
 export EMBEDDED_AGENT_PROVIDER=openrouter
 ```
@@ -219,7 +219,7 @@ export OPENAI_MODEL=gpt-4
 # Anthropic (default: claude-opus-4-5-20251101)
 export ANTHROPIC_MODEL=claude-sonnet-4-5-20250929
 
-# OpenRouter (default: openai/gpt-5)
+# OpenRouter (default: openai/gpt-5.5)
 export OPENROUTER_MODEL=anthropic/claude-sonnet-4
 ```
 

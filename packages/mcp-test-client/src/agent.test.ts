@@ -9,12 +9,12 @@ function createStreamingResponse() {
       start(controller) {
         controller.enqueue(
           encoder.encode(
-            'data: {"id":"chatcmpl-test","object":"chat.completion.chunk","created":0,"model":"openai/gpt-5","choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":null}]}\n\n',
+            'data: {"id":"chatcmpl-test","object":"chat.completion.chunk","created":0,"model":"openai/gpt-5.5","choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":null}]}\n\n',
           ),
         );
         controller.enqueue(
           encoder.encode(
-            'data: {"id":"chatcmpl-test","object":"chat.completion.chunk","created":0,"model":"openai/gpt-5","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n',
+            'data: {"id":"chatcmpl-test","object":"chat.completion.chunk","created":0,"model":"openai/gpt-5.5","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n',
           ),
         );
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
@@ -102,7 +102,7 @@ describe("runAgent", () => {
     expect(requestUrl).toBe("https://openrouter.ai/api/v1/chat/completions");
     expect(authorization).toBe("Bearer sk-or-test");
     expect(requestBody).toMatchObject({
-      model: "openai/gpt-5",
+      model: "openai/gpt-5.5",
       stream: true,
     });
   });

@@ -74,7 +74,7 @@ describe("openrouter-provider", () => {
 
   it("uses default and configured models", () => {
     expect((getOpenRouterModel() as LanguageModelV3).modelId).toBe(
-      "openai/gpt-5",
+      "openai/gpt-5.5",
     );
 
     process.env.OPENROUTER_MODEL = "anthropic/claude-sonnet-4";

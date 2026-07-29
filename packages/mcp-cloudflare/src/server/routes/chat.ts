@@ -1,6 +1,6 @@
 import { experimental_createMCPClient } from "@ai-sdk/mcp";
-import { openai } from "@ai-sdk/openai";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { getOpenRouterModel } from "@sentry/mcp-core/internal/agents/openrouter-provider";
 import { logInfo, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import {
   convertToModelMessages,
@@ -93,9 +93,10 @@ async function refreshTokenIfNeeded(
 }
 
 export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
-  // Validate that we have an OpenAI API key
-  if (!c.env.OPENAI_API_KEY) {
-    logIssue("OPENAI_API_KEY is not configured", {
+  // Validate that we have an OpenRouter API key (process.env is populated from
+  // worker bindings via nodejs_compat_populate_process_env).
+  if (!c.env.OPENROUTER_API_KEY && !process.env.OPENROUTER_API_KEY) {
+    logIssue("OPENROUTER_API_KEY is not configured", {
       loggerScope: ["cloudflare", "chat"],
     });
     return c.json(
@@ -307,7 +308,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
     });
 
     const result = streamText({
-      model: openai("gpt-4o"),
+      model: getOpenRouterModel(),
       messages: modelMessages,
       tools,
       system: `You are an AI assistant designed EXCLUSIVELY for testing the Sentry MCP service. Your sole purpose is to help users test MCP functionality with their real Sentry account data - nothing more, nothing less.

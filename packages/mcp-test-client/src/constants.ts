@@ -2,7 +2,7 @@
 export const DEFAULT_MCP_URL = "https://mcp.sentry.dev";
 
 export const DEFAULT_OPENAI_MODEL = "gpt-4o";
-export const DEFAULT_OPENROUTER_MODEL = "openai/gpt-5";
+export const DEFAULT_OPENROUTER_MODEL = "openai/gpt-5.5";
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 // OAuth configuration. Overridable via MCP_OAUTH_PORT, MCP_OAUTH_HOST, and

@@ -62,7 +62,7 @@ SENTRY_ACCESS_TOKEN=your_sentry_access_token
 # Leave unset to target the SaaS host
 SENTRY_HOST=sentry.example.com  # Hostname only
 MCP_URL=https://mcp.sentry.dev  # MCP server host (defaults to production)
-MCP_MODEL=openai/gpt-5  # Override default model
+MCP_MODEL=openai/gpt-5.5  # Override default model
 
 # Optional - Error tracking
 SENTRY_DSN=your_sentry_dsn  # Error tracking for the client itself

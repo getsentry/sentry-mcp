@@ -2,7 +2,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 import { USER_AGENT } from "../../version";
 
-const DEFAULT_OPENROUTER_MODEL = "openai/gpt-5";
+const DEFAULT_OPENROUTER_MODEL = "openai/gpt-5.5";
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 /**
