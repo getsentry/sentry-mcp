@@ -1,7 +1,7 @@
-import CodeSnippet from "../../ui/code-snippet";
+import { NPM_PACKAGE_NAME } from "../../../../constants";
 import { Button } from "../../ui/button";
+import CodeSnippet from "../../ui/code-snippet";
 import { KeyIcon } from "../../ui/key-icon";
-import { NPM_PACKAGE_NAME, NPM_REMOTE_NAME } from "../../../../constants";
 
 interface VSCodeInstructionsProps {
   transport: "cloud" | "stdio";
@@ -12,10 +12,6 @@ export function VSCodeInstructions({ transport }: VSCodeInstructionsProps) {
 
   if (transport === "cloud") {
     const endpoint = new URL("/mcp", window.location.href).href;
-    const coreConfig = {
-      command: "npx",
-      args: ["-y", `${NPM_REMOTE_NAME}@latest`, endpoint],
-    };
 
     const vsCodeHandler = `vscode:mcp/install?${encodeURIComponent(
       JSON.stringify({

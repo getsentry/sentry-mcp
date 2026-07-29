@@ -1,7 +1,11 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
-import findMonitors from "./find-monitors.js";
+import {
+  assertStructuredOnlyResult,
+  getStructuredContent,
+} from "../../test-utils/structured-content.js";
+import findMonitors, { findMonitorsOutputSchema } from "./find-monitors.js";
 
 const context = {
   constraints: {
@@ -26,37 +30,47 @@ describe("find_monitors", () => {
       context,
     );
 
-    expect(result).toMatchInlineSnapshot(`
-      "# Cron Monitors in **sentry-mcp-evals**
-
-      ## Nightly Import
-
-      **Slug**: nightly-import
-      **ID**: 4509100000000001
-      **Project**: cloudflare-mcp
-      **Status**: ok
-      **Owner**: the-goats
-      **Last Check-In**: 2025-04-14T02:00:13.000Z
-      **Next Check-In**: 2025-04-15T02:00:00.000Z
-      **URL**: [Open Monitor](https://sentry-mcp-evals.sentry.io/crons/cloudflare-mcp/nightly-import/)
-
-      ### Schedule
-
-      **schedule**: ["crontab","0 2 * * *"]
-      **schedule_type**: crontab
-      **checkin_margin**: 5
-      **max_runtime**: 30
-
-      ### Environments
-
-      - production - ok (last check-in 2025-04-14T02:00:13.000Z)
-      - staging - missed_checkin (last check-in 2025-04-13T02:00:18.000Z)
-
-      ## Response Notes
-
-      - Use \`get_monitor_details\` with a monitor slug for check-ins and stats.
-      - Monitor issue searches commonly use \`monitor.slug:<slug>\`.
-      "
+    assertStructuredOnlyResult(result);
+    const structuredContent = getStructuredContent(result);
+    expect(findMonitorsOutputSchema.parse(structuredContent)).toEqual(
+      structuredContent,
+    );
+    expect(structuredContent).toMatchInlineSnapshot(`
+      {
+        "hasMore": false,
+        "monitors": [
+          {
+            "environments": [
+              {
+                "lastCheckIn": "2025-04-14T02:00:13.000Z",
+                "name": "production",
+                "status": "ok",
+              },
+              {
+                "lastCheckIn": "2025-04-13T02:00:18.000Z",
+                "name": "staging",
+                "status": "missed_checkin",
+              },
+            ],
+            "hasMoreEnvironments": false,
+            "id": "4509100000000001",
+            "lastCheckIn": "2025-04-14T02:00:13.000Z",
+            "name": "Nightly Import",
+            "nextCheckIn": "2025-04-15T02:00:00.000Z",
+            "owner": "the-goats",
+            "projectSlug": "cloudflare-mcp",
+            "schedule": {
+              "checkInMargin": 5,
+              "maxRuntime": 30,
+              "type": "crontab",
+              "value": "0 2 * * *",
+            },
+            "slug": "nightly-import",
+            "status": "ok",
+            "webUrl": "https://sentry-mcp-evals.sentry.io/crons/cloudflare-mcp/nightly-import/",
+          },
+        ],
+      }
     `);
   });
 
@@ -122,7 +136,7 @@ describe("find_monitors", () => {
     expect(params.get("environment")).toBe("production");
     expect(params.get("owner")).toBe("team:123");
     expect(params.get("query")).toBe("billing");
-    expect(params.get("per_page")).toBe("25");
+    expect(params.get("per_page")).toBe("26");
   });
 
   it("uses the active project constraint as the monitor list project", async () => {
@@ -199,7 +213,6 @@ describe("find_monitors", () => {
               status: "ok",
               project: {
                 id: "4509109104082945",
-                slug: "cloudflare-mcp",
                 name: "cloudflare-mcp",
               },
               config: {
@@ -225,8 +238,113 @@ describe("find_monitors", () => {
       context,
     );
 
-    expect(result).toContain(
-      "[Open Monitor](https://sentry-mcp-evals.sentry.io/crons/cloudflare-mcp/nightly%2Fimport%201/)",
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toMatchObject({
+      monitors: [
+        {
+          projectSlug: "cloudflare-mcp",
+          webUrl:
+            "https://sentry-mcp-evals.sentry.io/crons/cloudflare-mcp/nightly%2Fimport%201/",
+        },
+      ],
+    });
+  });
+
+  it("preserves object and legacy interval schedules without inventing ids", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/",
+        () =>
+          HttpResponse.json([
+            {
+              slug: "object-interval",
+              name: "Object Interval",
+              config: {
+                schedule: { type: "interval", value: 5, unit: "day" },
+              },
+              environments: [],
+            },
+            {
+              id: "2",
+              slug: "legacy-interval",
+              name: "Legacy Interval",
+              config: {
+                schedule: ["interval", 3, "hour"],
+              },
+              environments: [],
+            },
+          ]),
+      ),
     );
+
+    const result = await findMonitors.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        projectSlug: null,
+        environment: null,
+        owner: null,
+        query: null,
+        limit: 10,
+      },
+      context,
+    );
+
+    expect(getStructuredContent(result)).toMatchObject({
+      monitors: [
+        {
+          id: null,
+          schedule: { type: "interval", value: "5 day" },
+        },
+        {
+          id: "2",
+          schedule: { type: "interval", value: "3 hour" },
+        },
+      ],
+    });
+  });
+
+  it("reports more results and returns only the requested monitor limit", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/monitors/",
+        ({ request }) => {
+          expect(new URL(request.url).searchParams.get("per_page")).toBe("11");
+          return HttpResponse.json(
+            Array.from({ length: 11 }, (_, index) => ({
+              id: String(index + 1),
+              slug: `monitor-${index + 1}`,
+              name: `Monitor ${index + 1}`,
+              status: "ok",
+              project: {
+                id: "1",
+                slug: "cloudflare-mcp",
+                name: "cloudflare-mcp",
+              },
+              config: null,
+              environments: [],
+            })),
+          );
+        },
+      ),
+    );
+
+    const result = await findMonitors.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        projectSlug: null,
+        environment: null,
+        owner: null,
+        query: null,
+        limit: 10,
+      },
+      context,
+    );
+
+    assertStructuredOnlyResult(result);
+    const structuredContent = getStructuredContent(result);
+    expect(structuredContent.hasMore).toBe(true);
+    expect(structuredContent.monitors).toHaveLength(10);
   });
 });

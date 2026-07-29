@@ -4,6 +4,10 @@ import { afterEach, describe, it, expect } from "vitest";
 import { UserInputError } from "../../errors.js";
 import updateProject from "./update-project.js";
 import { prepareToolParams } from "../catalog-runtime/availability";
+import {
+  assertStructuredOnlyResult,
+  getStructuredContent,
+} from "../../test-utils/structured-content";
 
 const context = {
   constraints: {
@@ -20,6 +24,24 @@ describe("update_project", () => {
   });
 
   it("updates name and platform", async () => {
+    mswServer.use(
+      http.put(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
+        async ({ request }) => {
+          expect(await request.json()).toEqual({
+            name: "New Project Name",
+            platform: "python",
+          });
+          return HttpResponse.json({
+            id: 4509109104082945,
+            slug: "cloudflare-mcp",
+            name: "New Project Name",
+            platform: "python",
+          });
+        },
+      ),
+    );
+
     const result = await updateProject.handler(
       {
         organizationSlug: "sentry-mcp-evals",
@@ -31,22 +53,17 @@ describe("update_project", () => {
       },
       context,
     );
-    expect(result).toMatchInlineSnapshot(`
-      "# Updated Project in **sentry-mcp-evals**
 
-      **ID**: 4509109104082945
-      **Slug**: cloudflare-mcp
-      **Name**: New Project Name
-      **Platform**: python
-
-      ## Updates Applied
-      - Updated name to "New Project Name"
-      - Updated platform to "python"
-
-      ## Response Notes
-
-      - Project slug for later requests: \`cloudflare-mcp\`
-      "
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toMatchInlineSnapshot(`
+      {
+        "project": {
+          "id": "4509109104082945",
+          "name": "New Project Name",
+          "platform": "python",
+          "slug": "cloudflare-mcp",
+        },
+      }
     `);
   });
 
@@ -83,7 +100,15 @@ describe("update_project", () => {
 
     expect(paths).toEqual(["/api/0/projects/MyOrg/OldProject/"]);
     expect(updateBody).toEqual({ slug: "NewProject" });
-    expect(result).toContain("**Slug**: NewProject");
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toEqual({
+      project: {
+        id: "4509109104082945",
+        slug: "NewProject",
+        name: "New Project",
+        platform: "node",
+      },
+    });
   });
 
   it("rejects calls without metadata fields", async () => {

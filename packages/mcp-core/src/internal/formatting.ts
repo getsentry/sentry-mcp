@@ -2165,7 +2165,10 @@ export function formatIssueOutput({
       : undefined;
 
   output += "## Response Notes\n\n";
-  output += `- Commit message issue reference: \`Fixes ${issue.shortId}\` automatically closes the issue when the commit is merged.\n`;
+  const commitIssueReference = /^\d+$/.test(issue.shortId)
+    ? apiService.getIssueUrl(organizationSlug, issue.shortId)
+    : issue.shortId;
+  output += `- Commit message issue reference: \`Fixes ${commitIssueReference}\` automatically closes the issue when the commit is merged.\n`;
   output +=
     "- The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.\n";
   if (aiConversations && aiConversations.length > 0) {

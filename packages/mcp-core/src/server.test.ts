@@ -306,7 +306,6 @@ describe("buildServer", () => {
       expect(toolNames).toContain("experimental_tool");
     });
 
-
     it("does not filter tools with experimental: false", () => {
       const server = buildServer({
         context: baseContext,
@@ -901,7 +900,6 @@ describe("buildServer", () => {
       );
     });
 
-
     it("keeps snapshot tools catalog-only while enforcing the inspect skill gate", async () => {
       const withoutInspect = buildServer({
         context: {
@@ -953,7 +951,6 @@ describe("buildServer", () => {
       expect(catalogToolNames).toContain("get_snapshot_image");
       expect(catalogToolNames).toContain("get_latest_base_snapshot");
     });
-
 
     it("exposes catalog tools with conservative safety annotations", async () => {
       const server = buildServer({
@@ -1260,7 +1257,19 @@ describe("buildServer", () => {
         arguments: {},
       });
 
-      expect(getTextContent(result)).toContain("# Organizations");
+      expect(getStructuredContent(result)).toEqual({
+        organizations: [
+          {
+            slug: "sentry-mcp-evals",
+            webUrl: "https://sentry.io/sentry-mcp-evals",
+            regionUrl: "https://us.sentry.io",
+          },
+        ],
+        hasMore: false,
+      });
+      expect(getTextContent(result)).toBe(
+        getGeneratedTextFromStructuredContent(result),
+      );
     });
 
     it("execute_sentry_tool dispatches to a catalog-only tool", async () => {
@@ -1367,7 +1376,28 @@ describe("buildServer", () => {
         arguments: {},
       });
 
-      expect(getTextContent(result)).toContain("You are authenticated as");
+      const payload = getStructuredContent<{
+        user: {
+          id: string;
+          name: string | null;
+          email: string;
+        };
+        sessionConstraints: null;
+      }>(result);
+
+      expect(payload).toMatchInlineSnapshot(`
+        {
+          "sessionConstraints": null,
+          "user": {
+            "email": "test@example.com",
+            "id": "123456",
+            "name": "Test User",
+          },
+        }
+      `);
+      expect(getTextContent(result)).toBe(
+        getGeneratedTextFromStructuredContent(result),
+      );
     });
 
     it("execute_sentry_tool dispatches structured catalog results", async () => {

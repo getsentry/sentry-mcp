@@ -1503,8 +1503,9 @@ export class SentryApiService {
    *
    * @param params Query parameters
    * @param params.query Search query to filter organizations by name/slug
+   * @param params.limit Maximum number of organizations to return (defaults to 25)
    * @param opts Request options
-   * @returns Array of organizations across all accessible regions (limited to 25 results)
+   * @returns Array of organizations across all accessible regions
    *
    * @example
    * ```typescript
@@ -1516,12 +1517,14 @@ export class SentryApiService {
    * ```
    */
   async listOrganizations(
-    params?: { query?: string },
+    params?: { query?: string; limit?: number },
     opts?: RequestOptions,
   ): Promise<OrganizationList> {
+    const limit = params?.limit ?? 25;
+
     // Build query parameters
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "25");
+    queryParams.set("per_page", String(limit));
     if (params?.query) {
       queryParams.set("query", params.query);
     }
@@ -1559,7 +1562,7 @@ export class SentryApiService {
         .reduce((acc, curr) => acc.concat(curr), []);
 
       // Apply the limit after combining results from all regions
-      return allOrganizations.slice(0, 25);
+      return allOrganizations.slice(0, limit);
     } catch (error) {
       // If regions endpoint fails (e.g., older self-hosted versions identifying as sentry.io),
       // fall back to direct organizations endpoint
@@ -1596,16 +1599,17 @@ export class SentryApiService {
    * @param organizationSlug Organization identifier
    * @param params Query parameters
    * @param params.query Search query to filter teams by name/slug
+   * @param params.limit Maximum number of teams to return
    * @param opts Request options including host override
-   * @returns Array of teams in the organization (limited to 25 results)
+   * @returns Array of teams in the organization
    */
   async listTeams(
     organizationSlug: string,
-    params?: { query?: string },
+    params?: { query?: string; limit?: number },
     opts?: RequestOptions,
   ): Promise<TeamList> {
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "25");
+    queryParams.set("per_page", String(params?.limit ?? 25));
     if (params?.query) {
       queryParams.set("query", params.query);
     }
@@ -1653,16 +1657,17 @@ export class SentryApiService {
    * @param organizationSlug Organization identifier
    * @param params Query parameters
    * @param params.query Search query to filter projects by name/slug
+   * @param params.limit Maximum number of projects to return
    * @param opts Request options
-   * @returns Array of projects in the organization (limited to 25 results)
+   * @returns Array of projects in the organization
    */
   async listProjects(
     organizationSlug: string,
-    params?: { query?: string },
+    params?: { query?: string; limit?: number },
     opts?: RequestOptions,
   ): Promise<ProjectList> {
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "25");
+    queryParams.set("per_page", String(params?.limit ?? 25));
     if (params?.query) {
       queryParams.set("query", params.query);
     }
@@ -2443,16 +2448,21 @@ export class SentryApiService {
       organizationSlug,
       projectSlug,
       query,
+      limit,
     }: {
       organizationSlug: string;
       projectSlug?: string;
       query?: string;
+      limit?: number;
     },
     opts?: RequestOptions,
   ): Promise<ReleaseList> {
     const searchQuery = new URLSearchParams();
     if (query) {
       searchQuery.set("query", query);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
     }
 
     const path = projectSlug

@@ -1,7 +1,24 @@
+import { z } from "zod";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import type { ServerContext } from "../../types";
 import { ALL_SKILLS } from "../../skills";
+
+export const whoamiOutputSchema = z.object({
+  user: z.object({
+    id: z.string(),
+    name: z.string().nullable(),
+    email: z.string(),
+  }),
+  sessionConstraints: z
+    .object({
+      organizationSlug: z.string().optional(),
+      projectSlug: z.string().optional(),
+      regionUrl: z.string().optional(),
+    })
+    .nullable(),
+});
 
 export default defineTool({
   name: "whoami",
@@ -12,6 +29,7 @@ export default defineTool({
     "- Get the user's name and email address.",
   ].join("\n"),
   inputSchema: {},
+  outputSchema: whoamiOutputSchema,
   skills: ALL_SKILLS, // Foundational tool - available to all skills
   requiredScopes: [], // No specific scopes required - uses authentication token
   annotations: {
@@ -26,30 +44,31 @@ export default defineTool({
     // API client will throw ApiClientError/ApiServerError which the MCP server wrapper handles
     const user = await apiService.getAuthenticatedUser();
 
-    let output = `You are authenticated as ${user.name} (${user.email}).\n\nYour Sentry User ID is ${user.id}.`;
-
-    // Add constraints information
     const constraints = context.constraints;
-    if (
+    const sessionConstraints =
       constraints.organizationSlug ||
       constraints.projectSlug ||
       constraints.regionUrl
-    ) {
-      output += "\n\n## Session Constraints\n\n";
+        ? {
+            ...(constraints.organizationSlug
+              ? { organizationSlug: constraints.organizationSlug }
+              : {}),
+            ...(constraints.projectSlug
+              ? { projectSlug: constraints.projectSlug }
+              : {}),
+            ...(constraints.regionUrl
+              ? { regionUrl: constraints.regionUrl }
+              : {}),
+          }
+        : null;
 
-      if (constraints.organizationSlug) {
-        output += `- **Organization**: ${constraints.organizationSlug}\n`;
-      }
-      if (constraints.projectSlug) {
-        output += `- **Project**: ${constraints.projectSlug}\n`;
-      }
-      if (constraints.regionUrl) {
-        output += `- **Region URL**: ${constraints.regionUrl}\n`;
-      }
-
-      output += "\nThese constraints limit the scope of this MCP session.";
-    }
-
-    return output;
+    return structuredResult({
+      user: {
+        id: String(user.id),
+        name: user.name ?? null,
+        email: user.email,
+      },
+      sessionConstraints,
+    });
   },
 });
