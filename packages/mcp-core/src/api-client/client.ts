@@ -1573,9 +1573,9 @@ export class SentryApiService {
    * });
    * ```
    */
-  async listOrganizations(
-    params?: { query?: string },
-  ): Promise<OrganizationList> {
+  async listOrganizations(params?: {
+    query?: string;
+  }): Promise<OrganizationList> {
     // Build query parameters
     const queryParams = new URLSearchParams();
     queryParams.set("per_page", "25");
@@ -1585,7 +1585,13 @@ export class SentryApiService {
     const queryString = queryParams.toString();
     const path = `/organizations/?${queryString}`;
 
-    const body = await this.requestJSON(path, undefined, {});
+    let host = undefined;
+    // For SaaS, always use the main sentry.io host, not regional hosts
+    if (this.isSaas()) {
+      host = "sentry.io";
+    }
+
+    const body = await this.requestJSON(path, undefined, { host });
     return OrganizationListSchema.parse(body);
   }
 
