@@ -1,6 +1,7 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { generateText } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ConfigurationError } from "../../errors.js";
 import {
   getOpenRouterModel,
   getOpenRouterProviderOptions,
@@ -125,5 +126,24 @@ describe("openrouter-provider", () => {
         strictJsonSchema: false,
       },
     });
+  });
+
+  it("maps max to xhigh and rejects unknown reasoning effort", () => {
+    process.env.OPENROUTER_REASONING_EFFORT = "max";
+
+    expect(getOpenRouterProviderOptions()).toEqual({
+      openai: {
+        structuredOutputs: false,
+        strictJsonSchema: false,
+        reasoningEffort: "xhigh",
+      },
+    });
+
+    process.env.OPENROUTER_REASONING_EFFORT = "ludicrous";
+
+    expect(() => getOpenRouterProviderOptions()).toThrow(ConfigurationError);
+    expect(() => getOpenRouterProviderOptions()).toThrow(
+      /Invalid OPENROUTER_REASONING_EFFORT/,
+    );
   });
 });

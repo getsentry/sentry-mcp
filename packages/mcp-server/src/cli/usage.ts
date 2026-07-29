@@ -48,7 +48,7 @@ Environment variables:
   ANTHROPIC_API_KEY       Anthropic API key for AI-powered search tools
   OPENROUTER_API_KEY      OpenRouter API key for AI-powered search tools
   OPENROUTER_MODEL        OpenRouter model (default: openai/gpt-5.6-luna)
-  OPENROUTER_REASONING_EFFORT  OpenRouter reasoning effort (default: medium)
+  OPENROUTER_REASONING_EFFORT  OpenRouter reasoning effort: none|minimal|low|medium|high|xhigh (max→xhigh), or "" to omit (default: medium)
   EMBEDDED_AGENT_PROVIDER Provider override: openai, azure-openai, anthropic, or openrouter
   MCP_DISABLE_SKILLS      Disable specific skills (comma-separated)
 
