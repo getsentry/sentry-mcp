@@ -145,5 +145,10 @@ describe("openrouter-provider", () => {
     expect(() => getOpenRouterProviderOptions()).toThrow(
       /Invalid OPENROUTER_REASONING_EFFORT/,
     );
+
+    // Prototype keys must not bypass validation via inherited Object props.
+    process.env.OPENROUTER_REASONING_EFFORT = "constructor";
+
+    expect(() => getOpenRouterProviderOptions()).toThrow(ConfigurationError);
   });
 });
