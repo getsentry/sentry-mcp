@@ -165,6 +165,34 @@ function createTraceResponseFixture() {
 
 describe("get_issue_details", () => {
   it("serializes with issueId", async () => {
+    let stacktraceLinkRequested = false;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/CLOUDFLARE-MCP/stacktrace-link/",
+        ({ request }) => {
+          stacktraceLinkRequested = true;
+          const query = new URL(request.url).searchParams;
+          expect(query.get("file")).toBe("index.js");
+          expect(query.get("lineNo")).toBe("19631");
+          expect(query.get("platform")).toBe("javascript");
+          expect(query.get("absPath")).toBe("/index.js");
+          expect(query.get("module")).toBe("index");
+          expect(query.get("groupId")).toBe("6507376925");
+          expect(query.get("sdkName")).toBe("sentry.javascript.cloudflare");
+
+          return HttpResponse.json({
+            config: { repoName: "getsentry/sentry-mcp" },
+            sourcePath: "packages/mcp-cloudflare/src/index.ts",
+            sourceUrl:
+              "https://github.com/getsentry/sentry-mcp/blob/main/packages/mcp-cloudflare/src/index.ts#L19631",
+            integrations: [],
+            error: null,
+          });
+        },
+        { once: true },
+      ),
+    );
+
     const result = await getIssueDetails.handler(
       {
         organizationSlug: "sentry-mcp-evals",
@@ -181,6 +209,7 @@ describe("get_issue_details", () => {
         userId: "1",
       },
     );
+    expect(stacktraceLinkRequested).toBe(true);
     expect(result).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
 
@@ -198,6 +227,13 @@ describe("get_issue_details", () => {
       **Platform**: javascript
       **Project**: CLOUDFLARE-MCP
       **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
+
+      ## Code Location
+
+      **Repository**: getsentry/sentry-mcp
+      **Path**: packages/mcp-cloudflare/src/index.ts
+      **Line**: 19631
+      **Source**: https://github.com/getsentry/sentry-mcp/blob/main/packages/mcp-cloudflare/src/index.ts#L19631
 
       ## Event Details
 

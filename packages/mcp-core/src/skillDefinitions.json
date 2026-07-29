@@ -5,11 +5,11 @@
     "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, monitors, profiles, documentation, and project metadata",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 33,
+    "toolCount": 35,
     "tools": [
       {
         "name": "find_alert_rules",
-        "description": "Find Sentry alert rules.\n\nUse this tool when you need to:\n- List issue alert rules for a project\n- List metric alert rules for an organization or project\n- Find an alert rule ID by name before inspecting it\n- Check alert conditions, queries, triggers, actions, owner, or environment\n\n<examples>\nfind_alert_rules(organizationSlug='my-org')\nfind_alert_rules(organizationSlug='my-org', projectSlug='backend')\nfind_alert_rules(organizationSlug='my-org', kind='issue', projectSlug='backend', query='critical')\n</examples>\n\n<hints>\n- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.\n- Metric alert rules can be listed organization-wide or project-scoped.\n</hints>",
+        "description": "Find Sentry alert rules.\n\nUse this tool when you need to:\n- List issue alert rules for a project\n- List metric alert rules for an organization or project\n- Find an alert rule ID by name before inspecting it\n- Check alert conditions, queries, triggers, actions, owner, or environment\n\n<examples>\nfind_alert_rules(organizationSlug='my-org')\nfind_alert_rules(organizationSlug='my-org', projectSlug='backend')\nfind_alert_rules(organizationSlug='my-org', kind='issue', projectSlug='backend', query='critical')\n</examples>\n\n<hints>\n- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.\n- Metric alert rules can be listed organization-wide or project-scoped.\n- Issue and metric alert rules have independent pagination state. Reuse a nextCursor only with its matching kind.\n</hints>",
         "requiredScopes": ["org:read", "project:read"]
       },
       {
@@ -19,7 +19,7 @@
       },
       {
         "name": "find_monitors",
-        "description": "Find Sentry cron monitors.\n\nUse this tool when you need to:\n- List cron monitors in an organization\n- Find a monitor by name or slug before getting details\n- Check monitor status, owner, project, schedule, or recent environment state\n\n<examples>\nfind_monitors(organizationSlug='my-organization')\nfind_monitors(organizationSlug='my-organization', projectSlug='backend', query='billing')\n</examples>",
+        "description": "Find Sentry cron monitors.\n\nUse this tool when you need to:\n- List cron monitors in an organization\n- Find a monitor by name or slug before getting details\n- Check monitor status, owner, project, schedule, or recent environment state\n- When `hasMore` is true, narrow the results with project, environment, owner, or query filters\n\n<examples>\nfind_monitors(organizationSlug='my-organization')\nfind_monitors(organizationSlug='my-organization', projectSlug='backend', query='billing')\n</examples>",
         "requiredScopes": ["org:read"]
       },
       {
@@ -29,17 +29,17 @@
       },
       {
         "name": "find_projects",
-        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["project:read"]
       },
       {
         "name": "find_releases",
-        "description": "Find releases in Sentry.\n\nUse this tool when you need to:\n- Find recent releases in a Sentry organization\n- Find the most recent version released of a specific project\n- Determine when a release was deployed to an environment\n\n<examples>\n### Find the most recent releases in the 'my-organization' organization\n\n```\nfind_releases(organizationSlug='my-organization')\n```\n\n### Find releases matching '2ce6a27' in the 'my-organization' organization\n\n```\nfind_releases(organizationSlug='my-organization', query='2ce6a27')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n</hints>",
+        "description": "Find releases in Sentry.\n\nUse this tool when you need to:\n- Find recent releases in a Sentry organization\n- Find the most recent version released of a specific project\n- Determine when a release was deployed to an environment\n\nReturns up to 25 results. When hasMore is true, use the projectSlug or query parameter to narrow down results.\n\n<examples>\n### Find the most recent releases in the 'my-organization' organization\n\n```\nfind_releases(organizationSlug='my-organization')\n```\n\n### Find releases matching '2ce6a27' in the 'my-organization' organization\n\n```\nfind_releases(organizationSlug='my-organization', query='2ce6a27')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n</hints>",
         "requiredScopes": ["project:read"]
       },
       {
         "name": "find_teams",
-        "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["team:read"]
       },
       {
@@ -75,6 +75,11 @@
       {
         "name": "get_issue_activity",
         "description": "Get the activity feed and comments for a Sentry issue.\n\nUse this tool when you need to:\n- Review prior comments before triaging an issue\n- Understand who resolved, ignored, assigned, or commented on an issue\n- See recent issue activity that is not included in `get_issue_details`\n\n<examples>\nget_issue_activity(organizationSlug='my-organization', issueId='PROJECT-123')\nget_issue_activity(issueUrl='https://my-organization.sentry.io/issues/PROJECT-123/')\n</examples>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "get_issue_breadcrumbs",
+        "description": "Get the breadcrumb trail from the latest event for a Sentry issue.\n\nUse this tool when you need to:\n- See the user and application actions leading up to an error\n- Inspect navigation, console, HTTP, and other breadcrumb events\n- Reconstruct the immediate context before an issue occurred\n\n<examples>\nget_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123')\nget_issue_breadcrumbs(issueUrl='https://my-org.sentry.io/issues/PROJECT-123/')\n</examples>",
         "requiredScopes": ["event:read"]
       },
       {
@@ -124,7 +129,7 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, breadcrumbs, replays, monitors, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use the Sentry tool `get_snapshot_image` for full-resolution image bytes.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- monitor: <monitorSlug>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
+        "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, replays, monitors, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use the Sentry tool `get_snapshot_image` for full-resolution image bytes.\n\nResource IDs:\n- monitor: <monitorSlug>\n- snapshot: <snapshotId>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
         "requiredScopes": ["event:read", "project:read"]
       },
       {
@@ -136,6 +141,11 @@
         "name": "get_snapshot_image",
         "description": "Get metadata and image content for one image in a preprod snapshot.\n\nUse this tool when you need to:\n- View the current, previous, or diff image for a snapshot entry\n- Inspect metadata and context for a specific snapshot image\n- Fetch full-resolution image bytes when preview images are insufficient; full-resolution images can substantially increase response size and token usage\n\nPass organizationSlug, snapshotId, and imageIdentifier. Use get_sentry_resource for snapshot URLs.\nPreview images are returned by default; set imageResolution=full for original bytes when needed, but expect higher response size and token usage.\n\n<examples>\n### View a preview image\n\n```\nget_snapshot_image(organizationSlug=\"sentry\", snapshotId=\"231949\", imageIdentifier=\"login_screen.png\")\n```\n\n### Fetch original full-resolution bytes\n\n```\nget_snapshot_image(organizationSlug=\"sentry\", snapshotId=\"231949\", imageIdentifier=\"login_screen.png\", imageResolution=\"full\")\n```\n</examples>\n\n<hints>\n- Use get_snapshot first if you need to discover available image file names.\n- Use get_sentry_resource when starting from a Sentry snapshot URL.\n- imageIdentifier values may include slashes; pass the full image_file_name exactly as shown by get_snapshot.\n</hints>",
         "requiredScopes": ["project:read"]
+      },
+      {
+        "name": "get_span_details",
+        "description": "Get detailed information about a specific span within a Sentry trace.\n\nUse this tool when you need to:\n- Inspect a span when you already know its trace ID and span ID\n- Focus a trace investigation on one operation\n- Review a span's attributes, timing, errors, and child spans\n\n<examples>\nget_span_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a', spanId='aa8e7f3384ef4ff5')\n</examples>\n\n<hints>\n- Pass traceId and spanId as separate parameters.\n- Use get_trace_details for a trace overview when no span is selected.\n- Use get_sentry_resource when starting from a Sentry trace or span URL.\n</hints>",
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "get_trace_details",
@@ -194,7 +204,7 @@
       },
       {
         "name": "find_projects",
-        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["project:read"]
       },
       {
@@ -214,7 +224,7 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Full-resolution snapshot image bytes are not available in this session.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
+        "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, replays, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Full-resolution snapshot image bytes are not available in this session.\n\nResource IDs:\n- snapshot: <snapshotId>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
         "requiredScopes": ["event:read", "project:read"]
       },
       {
@@ -255,7 +265,7 @@
       },
       {
         "name": "find_projects",
-        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["project:read"]
       },
       {
@@ -281,7 +291,7 @@
     "description": "Resolve, assign, and update issues",
     "defaultEnabled": false,
     "order": 4,
-    "toolCount": 16,
+    "toolCount": 17,
     "tools": [
       {
         "name": "add_issue_note",
@@ -295,12 +305,12 @@
       },
       {
         "name": "find_projects",
-        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["project:read"]
       },
       {
         "name": "find_teams",
-        "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["team:read"]
       },
       {
@@ -319,6 +329,11 @@
         "requiredScopes": ["event:read"]
       },
       {
+        "name": "get_issue_breadcrumbs",
+        "description": "Get the breadcrumb trail from the latest event for a Sentry issue.\n\nUse this tool when you need to:\n- See the user and application actions leading up to an error\n- Inspect navigation, console, HTTP, and other breadcrumb events\n- Reconstruct the immediate context before an issue occurred\n\n<examples>\nget_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123')\nget_issue_breadcrumbs(issueUrl='https://my-org.sentry.io/issues/PROJECT-123/')\n</examples>",
+        "requiredScopes": ["event:read"]
+      },
+      {
         "name": "get_issue_details",
         "description": "Get detailed information about a specific Sentry issue by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific issue ID (e.g., 'CLOUDFLARE-MCP-41', 'PROJECT-123')\n- Ask to 'explain [ISSUE-ID]', 'tell me about [ISSUE-ID]'\n- Want details/stacktrace/analysis for a known issue\n- Provide a Sentry issue URL\n\nDO NOT USE for:\n- General searching or listing issues (use search_issues)\n\nTRIGGER PATTERNS:\n- 'Explain ISSUE-123' → use get_issue_details\n- 'Tell me about PROJECT-456' → use get_issue_details\n- 'What happened in [issue URL]' → use get_issue_details\n\n<examples>\n### With Sentry URL (recommended - simplest approach)\n```\nget_issue_details(issueUrl='https://sentry.sentry.io/issues/6916805731/?project=4509062593708032&query=is%3Aunresolved')\n```\n\n### With issue ID and organization\n```\nget_issue_details(organizationSlug='my-organization', issueId='CLOUDFLARE-MCP-41')\n```\n\n### With event ID and organization\n```\nget_issue_details(organizationSlug='my-organization', eventId='c49541c747cb4d8aa3efb70ca5aba243')\n```\n</examples>\n\n<hints>\n- **IMPORTANT**: If user provides a Sentry URL, pass the ENTIRE URL to issueUrl parameter unchanged\n- When using issueUrl, all other parameters are automatically extracted - don't provide them separately\n- If using issueId (not URL), then organizationSlug is required\n</hints>",
         "requiredScopes": ["event:read"]
@@ -330,7 +345,7 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Full-resolution snapshot image bytes are not available in this session.\n\nResource IDs:\n- span: <traceId>:<spanId>\n- snapshot: <snapshotId>\n- snapshotImage: <snapshotId>:<image_file_name>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
+        "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, replays, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Full-resolution snapshot image bytes are not available in this session.\n\nResource IDs:\n- snapshot: <snapshotId>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
         "requiredScopes": ["event:read", "project:read"]
       },
       {
@@ -405,12 +420,12 @@
       },
       {
         "name": "find_projects",
-        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["project:read"]
       },
       {
         "name": "find_teams",
-        "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["team:read"]
       },
       {

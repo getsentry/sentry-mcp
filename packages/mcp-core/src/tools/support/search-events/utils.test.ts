@@ -383,16 +383,23 @@ describe("fetchCustomAttributes", () => {
             }
 
             return HttpResponse.json([
-              { key: "span.op", name: "Operation", attributeType: "string" },
+              {
+                key: "span.op",
+                name: "Operation",
+                attributeType: "string",
+                attributeSource: { source_type: "sentry" },
+              },
               {
                 key: "sentry:internal",
                 name: "Internal",
                 attributeType: "string",
+                attributeSource: { source_type: "sentry" },
               },
               {
                 key: "span.duration",
                 name: "Duration",
                 attributeType: "number",
+                attributeSource: { source_type: "sentry" },
               },
             ]);
           },
@@ -458,13 +465,20 @@ describe("fetchCustomAttributes", () => {
                 key: "metric.name",
                 name: "Metric Name",
                 attributeType: "string",
+                attributeSource: { source_type: "sentry" },
               },
               {
                 key: "metric.type",
                 name: "Metric Type",
                 attributeType: "string",
+                attributeSource: { source_type: "sentry" },
               },
-              { key: "value", name: "Metric Value", attributeType: "number" },
+              {
+                key: "value",
+                name: "Metric Value",
+                attributeType: "number",
+                attributeSource: { source_type: "sentry" },
+              },
             ]);
           },
         ),
@@ -505,16 +519,19 @@ describe("fetchCustomAttributes", () => {
                 key: "tags[type]",
                 name: "type",
                 attributeType: "string",
+                attributeSource: { source_type: "sentry" },
               },
               {
                 key: "tags[sequence,number]",
                 name: "sequence",
                 attributeType: "number",
+                attributeSource: { source_type: "user" },
               },
               {
                 key: "tags[enabled,boolean]",
                 name: "enabled",
                 attributeType: "boolean",
+                attributeSource: { source_type: "user" },
               },
             ]);
           },

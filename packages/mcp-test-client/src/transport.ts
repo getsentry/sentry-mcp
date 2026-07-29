@@ -31,9 +31,6 @@ export function buildStdioServerLaunchConfig(
   if (config.sentryDsn) {
     args.push(`--sentry-dsn=${config.sentryDsn}`);
   }
-  if (config.useAgentEndpoint) {
-    args.push("--agent");
-  }
   if (config.useExperimental) {
     args.push("--experimental");
   }

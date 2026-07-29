@@ -1,6 +1,4 @@
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+import { isPlainObject } from "../../../internal/type-guards";
 
 export function formatId(value: string | number | undefined | null): string {
   return value === undefined || value === null ? "unknown" : String(value);
@@ -24,7 +22,7 @@ export function formatActor(value: unknown): string {
     return value;
   }
 
-  if (!isRecord(value)) {
+  if (!isPlainObject(value)) {
     return "unknown";
   }
 

@@ -2484,6 +2484,7 @@ describe("search_events", () => {
                 {
                   name: "spon.duration",
                   valid: false,
+                  attrType: null,
                   error: "Unknown attribute",
                 },
               ],
@@ -2494,6 +2495,7 @@ describe("search_events", () => {
                   {
                     name: "spon.duration",
                     valid: false,
+                    attrType: null,
                     error: "Unknown attribute",
                   },
                 ],
@@ -2502,6 +2504,7 @@ describe("search_events", () => {
                 {
                   name: "-spon.duration",
                   valid: false,
+                  attrType: null,
                   error: "Orderby must also be a selected field",
                 },
               ],
@@ -2676,6 +2679,7 @@ describe("search_events", () => {
                 {
                   name: "spon.duration",
                   valid: false,
+                  attrType: null,
                   error: "Unknown attribute",
                 },
               ],
@@ -2902,6 +2906,7 @@ describe("search_events", () => {
               {
                 name: "spon.duration",
                 valid: false,
+                attrType: null,
                 error: "Unknown attribute",
               },
             ],
@@ -2912,6 +2917,7 @@ describe("search_events", () => {
                 {
                   name: "spon.duration",
                   valid: false,
+                  attrType: null,
                   error: "Unknown attribute",
                 },
               ],

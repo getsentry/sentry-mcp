@@ -403,7 +403,47 @@ export const ReplayDetailsSchema = z
   })
   .passthrough();
 
-export const ReplayRecordingSegmentsSchema = z.array(z.array(z.unknown()));
+const ReplayRecordingPayloadSchema = z
+  .object({
+    op: z.string().optional().catch(undefined),
+    description: z.string().optional().catch(undefined),
+    message: z.string().optional().catch(undefined),
+    category: z.string().optional().catch(undefined),
+    type: z.string().optional().catch(undefined),
+    data: z
+      .object({
+        duration: z.number().optional().catch(undefined),
+      })
+      .passthrough()
+      .optional()
+      .catch(undefined),
+  })
+  .passthrough();
+
+export const ReplayRecordingEventSchema = z
+  .object({
+    timestamp: z.number().optional().catch(undefined),
+    type: z.number().optional().catch(undefined),
+    data: z
+      .object({
+        tag: z.string().optional().catch(undefined),
+        href: z.string().optional().catch(undefined),
+        payload: ReplayRecordingPayloadSchema.optional().catch(undefined),
+      })
+      .passthrough()
+      .optional()
+      .catch(undefined),
+  })
+  .passthrough();
+
+export const ReplayRecordingSegmentsSchema = z.array(
+  z.array(z.unknown()).transform((events) =>
+    events.flatMap((event) => {
+      const result = ReplayRecordingEventSchema.safeParse(event);
+      return result.success ? [result.data] : [];
+    }),
+  ),
+);
 
 export const ReplayListResponseSchema = z.object({
   data: z.array(ReplayDetailsSchema),
@@ -714,7 +754,7 @@ export const AssignedToSchema = z.union([
 export const IssueSchema = z
   .object({
     id: z.union([z.string(), z.number()]),
-    shortId: z.string(),
+    shortId: z.string().nullable(),
     title: z.string(),
     firstSeen: z.string().datetime().nullable(),
     lastSeen: z.string().datetime().nullable(),
@@ -726,12 +766,14 @@ export const IssueSchema = z
     status: z.string(),
     substatus: z.string().nullable().optional(),
     culprit: z.string().nullable(),
-    type: z.union([
-      z.literal("error"),
-      z.literal("transaction"),
-      z.literal("generic"),
-      z.unknown(),
-    ]),
+    type: z
+      .union([
+        z.literal("error"),
+        z.literal("transaction"),
+        z.literal("generic"),
+        z.unknown(),
+      ])
+      .optional(),
     assignedTo: AssignedToSchema.optional(),
     issueType: z.string().optional(),
     issueCategory: z.string().optional(),
@@ -744,7 +786,10 @@ export const IssueSchema = z
       .optional(),
     seerFixabilityScore: z.number().nullable().optional(),
   })
-  .passthrough();
+  .passthrough()
+  .transform((issue) =>
+    Object.assign(issue, { shortId: issue.shortId ?? String(issue.id) }),
+  );
 
 export const IssueListSchema = z.array(IssueSchema);
 
@@ -756,10 +801,13 @@ export const FrameInterface = z
     colNo: z.number().nullable(),
     absPath: z.string().nullable(),
     module: z.string().nullable(),
+    package: z.string().nullable(),
+    platform: z.string().nullable(),
+    sourceLink: z.string().nullable(),
     // lineno, source code
     context: z.array(z.tuple([z.number(), z.string()])),
     inApp: z.boolean().optional(),
-    vars: z.record(z.string(), z.unknown()).optional(),
+    vars: z.record(z.string(), z.unknown()).nullable().optional(),
   })
   .partial();
 
@@ -772,12 +820,15 @@ export const ExceptionInterface = z
         type: z.string().nullable(),
         handled: z.boolean().nullable(),
       })
-      .partial(),
+      .partial()
+      .nullable(),
     type: z.string().nullable(),
     value: z.string().nullable(),
-    stacktrace: z.object({
-      frames: z.array(FrameInterface),
-    }),
+    stacktrace: z
+      .object({
+        frames: z.array(FrameInterface),
+      })
+      .nullable(),
   })
   .partial();
 
@@ -812,7 +863,7 @@ const StacktraceSchema = z
   .object({
     frames: z.array(FrameInterface),
     framesOmitted: z.array(z.unknown()).nullable().optional(),
-    registers: z.record(z.unknown()).nullable().optional(),
+    registers: z.record(z.string(), z.unknown()).nullable().optional(),
     hasSystemFrames: z.boolean().nullable().optional(),
   })
   .partial()
@@ -827,7 +878,7 @@ export const ThreadEntrySchema = z
     current: z.boolean().nullable(),
     crashed: z.boolean().nullable(),
     state: z.string().nullable(),
-    heldLocks: z.record(z.unknown()).nullable().optional(),
+    heldLocks: z.record(z.string(), z.unknown()).nullable().optional(),
     stacktrace: StacktraceSchema.nullable(),
     rawStacktrace: StacktraceSchema.nullable().optional(),
   })
@@ -846,7 +897,7 @@ export const BreadcrumbSchema = z
     category: z.string().nullable(),
     level: z.string().nullable(),
     message: z.string().nullable(),
-    data: z.record(z.unknown()).nullable(),
+    data: z.record(z.string(), z.unknown()).nullable(),
   })
   .partial();
 
@@ -884,6 +935,7 @@ const EventTagsSchema = z.preprocess((value) => {
 
 const BaseEventSchema = z.object({
   id: z.string(),
+  groupID: z.string().nullable().optional(),
   title: z.string(),
   message: z.string().nullable(),
   platform: z.string().nullable().optional(),
@@ -925,13 +977,15 @@ const BaseEventSchema = z.object({
       z.string(),
       z
         .object({
-          type: z.union([
-            z.literal("default"),
-            z.literal("runtime"),
-            z.literal("os"),
-            z.literal("trace"),
-            z.unknown(),
-          ]),
+          type: z
+            .union([
+              z.literal("default"),
+              z.literal("runtime"),
+              z.literal("os"),
+              z.literal("trace"),
+              z.unknown(),
+            ])
+            .optional(),
         })
         .passthrough(),
     )
@@ -939,6 +993,26 @@ const BaseEventSchema = z.object({
   // "context" (singular) is the legacy "extra" field for arbitrary user-defined data
   // This is different from "contexts" (plural) which are structured contexts
   context: z.record(z.string(), z.unknown()).optional(),
+  sdk: z
+    .object({
+      name: z.string().nullable().optional(),
+    })
+    .passthrough()
+    .nullable()
+    .optional(),
+  release: z
+    .object({
+      lastCommit: z
+        .object({
+          id: z.string(),
+        })
+        .passthrough()
+        .nullable()
+        .optional(),
+    })
+    .passthrough()
+    .nullable()
+    .optional(),
   tags: EventTagsSchema.optional(),
   user: z
     .object({
@@ -1072,6 +1146,20 @@ export const EventSchema = z.union([
   GenericEventSchema,
   UnknownEventSchema,
 ]);
+
+export const StacktraceLinkSchema = z
+  .object({
+    config: z
+      .object({
+        repoName: z.string(),
+      })
+      .passthrough()
+      .nullable()
+      .optional(),
+    sourcePath: z.string().nullable().optional(),
+    sourceUrl: z.string().nullable().optional(),
+  })
+  .passthrough();
 
 export const EventsResponseSchema = z.object({
   data: z.array(z.unknown()),
@@ -1631,7 +1719,7 @@ export const FlamegraphSchema = z.preprocess(
   z
     .object({
       activeProfileIndex: z.preprocess((value) => value ?? 0, z.number()),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
       platform: z.string(),
       profiles: z.preprocess(
         (value) => value ?? [],
@@ -1694,11 +1782,12 @@ export const ProfileFrameSchema = z
     raw_function: z.string().nullable().optional(),
     symbol: z.string().nullable().optional(),
     lang: z.string().nullable().optional(),
-    data: z.record(z.unknown()).optional(),
+    data: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
 
 const ProfileThreadMetadataSchema = z.record(
+  z.string(),
   z
     .object({
       // Matches Sentry's `Profiling.ContinuousProfile.thread_metadata` type,

@@ -77,12 +77,6 @@ that is not part of the tool response. Review raw tool output against
 and free of raw API JSON, internal implementation IDs, empty placeholders, and
 unrelated instructions.
 
-If your changes involve agent mode or experimental tools:
-
-```bash
-pnpm -w run cli --transport stdio --agent "show me my recent errors"
-pnpm -w run cli --transport stdio --experimental "your query"
-```
 
 ## 3. Real Agent Clients
 
@@ -91,9 +85,6 @@ in a real agent client:
 
 ```bash
 pnpm -w run build
-pnpm -w run agent-cli-test auth login
-pnpm -w run agent-cli-test --provider claude --setup stdio
-pnpm -w run agent-cli-test --provider codex --setup stdio
 ```
 
 What this verifies:
@@ -105,7 +96,6 @@ For agent-client-specific behavior, replace the default harness prompt with the
 same realistic prod prompt used for stdio QA. Passing QA requires the same
 changed-tool transcript evidence, not only `whoami`.
 
-The `stdio` setup uses `packages/agent-cli-test/projects/stdio/.sentry/mcp.json`
 as an isolated auth cache. Real clients do not give stdio subprocesses a TTY,
 so warm the cache before running the harness. It also runs the built
 `packages/mcp-server/dist/index.js`, so build first to avoid stale code.
@@ -139,8 +129,6 @@ pnpm -w run cli --mcp-host=http://localhost:5173/mcp/<org> \
   "<same realistic prod prompt used for stdio QA>"
 pnpm -w run cli --mcp-host=http://localhost:5173/mcp/<org>/<project> \
   "<same realistic prod prompt used for stdio QA>"
-pnpm -w run agent-cli-test --provider claude --setup repo
-pnpm -w run agent-cli-test --provider codex --setup repo
 ```
 
 Look for `Connected to MCP server (<resolved MCP URL>)` to confirm HTTP

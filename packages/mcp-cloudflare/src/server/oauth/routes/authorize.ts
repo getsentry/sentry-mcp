@@ -7,6 +7,7 @@ import {
   parseRedirectApproval,
 } from "../../lib/approval-dialog";
 import { redirectUriHasUserInfo } from "../../lib/html-utils";
+import { isRegisteredRedirectUri } from "../../lib/redirect-uri";
 import { resolveClientFamilyFromName } from "../../lib/client-family";
 import type { Env } from "../../types";
 import { SENTRY_AUTH_URL } from "../constants";
@@ -142,6 +143,7 @@ export default new Hono<{ Bindings: Env }>()
         return createResourceValidationError(
           oauthReqInfo.redirectUri,
           oauthReqInfo.state ?? undefined,
+          c.req.url,
         );
       }
 
@@ -251,9 +253,10 @@ export default new Hono<{ Bindings: Env }>()
       client = await c.env.OAUTH_PROVIDER.lookupClient(
         oauthReqWithSkills.clientId,
       );
-      const uriIsAllowed =
-        Array.isArray(client?.redirectUris) &&
-        client.redirectUris.includes(oauthReqWithSkills.redirectUri);
+      const uriIsAllowed = isRegisteredRedirectUri(
+        oauthReqWithSkills.redirectUri,
+        client?.redirectUris,
+      );
       if (!uriIsAllowed) {
         logWarn("Redirect URI not registered for client", {
           loggerScope: ["cloudflare", "oauth", "authorize"],
@@ -291,6 +294,7 @@ export default new Hono<{ Bindings: Env }>()
       return createResourceValidationError(
         oauthReqWithSkills.redirectUri,
         oauthReqWithSkills.state,
+        c.req.url,
       );
     }
 

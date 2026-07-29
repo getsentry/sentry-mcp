@@ -1,12 +1,13 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import { type Span, setUser, startSpan } from "@sentry/core";
+import { mswServer } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mswServer } from "@sentry/mcp-server-mocks";
 import { z } from "zod";
-import { buildServer } from "./server";
 import { structuredResult } from "./internal/tool-helpers/results";
+import { buildServer } from "./server";
 import type { Skill } from "./skills";
 import {
   getGeneratedTextFromStructuredContent,
@@ -147,9 +148,45 @@ describe("buildServer", () => {
     inputSchema: {},
     skills: ["inspect"],
     requiredScopes: [],
-    annotations: {},
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
     handler: async () => "result",
     ...options,
+  });
+
+  it("registers and executes tools with the SDK v2 server", async () => {
+    const server = buildServer({
+      context: baseContext,
+      tools: {
+        v2_tool: createMockTool("v2_tool", {
+          inputSchema: { value: z.string() },
+          handler: async ({ value }) => `v2:${value}`,
+        }),
+      },
+      sdkVersion: "v2",
+    });
+
+    expect(server).toBeInstanceOf(ModernMcpServer);
+    const registeredTools = (
+      server as unknown as {
+        _registeredTools: Record<
+          string,
+          {
+            handler: (params: Record<string, unknown>) => Promise<unknown>;
+          }
+        >;
+      }
+    )._registeredTools;
+
+    expect(registeredTools.v2_tool).toBeDefined();
+    await expect(
+      registeredTools.v2_tool?.handler({ value: "ok" }),
+    ).resolves.toMatchObject({
+      content: [{ type: "text", text: "v2:ok" }],
+    });
   });
 
   describe("telemetry context", () => {
@@ -197,7 +234,11 @@ describe("buildServer", () => {
         },
         tools: {
           example_tool: createMockTool("example_tool", {
-            annotations: { readOnlyHint: true },
+            annotations: {
+              readOnlyHint: true,
+              destructiveHint: false,
+              openWorldHint: true,
+            },
           }),
         },
       });
@@ -263,27 +304,6 @@ describe("buildServer", () => {
       const toolNames = getRegisteredToolNames(server);
       expect(toolNames).toContain("regular_tool");
       expect(toolNames).toContain("experimental_tool");
-    });
-
-    it("only registers use_sentry in agent mode", () => {
-      // In agent mode, only use_sentry is registered, which handles all tools internally
-      const server = buildServer({
-        context: baseContext,
-        agentMode: true,
-        experimentalMode: false,
-        tools: {
-          use_sentry: createMockTool("use_sentry", { skills: [] }),
-          experimental_tool: createMockTool("experimental_tool", {
-            experimental: true,
-          }),
-        },
-      });
-
-      // In agent mode, only use_sentry should be registered
-      const toolNames = getRegisteredToolNames(server);
-      expect(toolNames).toContain("use_sentry");
-      // experimental_tool is not registered because agent mode only registers use_sentry
-      expect(toolNames).not.toContain("experimental_tool");
     });
 
     it("does not filter tools with experimental: false", () => {
@@ -616,6 +636,7 @@ describe("buildServer", () => {
       expect(toolNames).not.toContain("whoami");
       expect(toolNames).toContain("get_sentry_resource");
       expect(toolNames).not.toContain("get_issue_details");
+      expect(toolNames).not.toContain("get_issue_breadcrumbs");
       expect(toolNames).not.toContain("get_trace_details");
       expect(toolNames).not.toContain("get_snapshot");
       expect(toolNames).not.toContain("get_snapshot_image");
@@ -684,7 +705,6 @@ describe("buildServer", () => {
       expect(toolNames).toContain("search_sentry_tools");
       expect(toolNames).toContain("execute_sentry_tool");
       expect(toolNames).not.toContain("whoami");
-      expect(toolNames).not.toContain("use_sentry");
       expect(toolNames).not.toContain("search_docs");
       expect(toolNames).not.toContain("get_doc");
       expect(toolNames).not.toContain("get_issue_details");
@@ -880,17 +900,6 @@ describe("buildServer", () => {
       );
     });
 
-    it("discloses only use_sentry through MCP tools/list in agent mode", async () => {
-      const server = buildServer({
-        context: baseContext,
-        agentMode: true,
-      });
-
-      const registeredTools = await listRegisteredTools(server);
-
-      expect(registeredTools.map((tool) => tool.name)).toEqual(["use_sentry"]);
-    });
-
     it("keeps snapshot tools catalog-only while enforcing the inspect skill gate", async () => {
       const withoutInspect = buildServer({
         context: {
@@ -941,27 +950,6 @@ describe("buildServer", () => {
       expect(catalogToolNames).toContain("get_snapshot");
       expect(catalogToolNames).toContain("get_snapshot_image");
       expect(catalogToolNames).toContain("get_latest_base_snapshot");
-    });
-
-    it("exposes use_sentry safety annotations through tool metadata in agent mode", async () => {
-      const server = buildServer({
-        context: baseContext,
-        agentMode: true,
-      });
-
-      const registeredTools = await listRegisteredTools(server);
-      const useSentryTool = registeredTools.find(
-        (tool) => tool.name === "use_sentry",
-      );
-
-      expect(useSentryTool).toMatchObject({
-        name: "use_sentry",
-        annotations: {
-          readOnlyHint: false,
-          destructiveHint: true,
-          openWorldHint: true,
-        },
-      });
     });
 
     it("exposes catalog tools with conservative safety annotations", async () => {
@@ -1269,7 +1257,19 @@ describe("buildServer", () => {
         arguments: {},
       });
 
-      expect(getTextContent(result)).toContain("# Organizations");
+      expect(getStructuredContent(result)).toEqual({
+        organizations: [
+          {
+            slug: "sentry-mcp-evals",
+            webUrl: "https://sentry.io/sentry-mcp-evals",
+            regionUrl: "https://us.sentry.io",
+          },
+        ],
+        hasMore: false,
+      });
+      expect(getTextContent(result)).toBe(
+        getGeneratedTextFromStructuredContent(result),
+      );
     });
 
     it("execute_sentry_tool dispatches to a catalog-only tool", async () => {
@@ -1376,7 +1376,28 @@ describe("buildServer", () => {
         arguments: {},
       });
 
-      expect(getTextContent(result)).toContain("You are authenticated as");
+      const payload = getStructuredContent<{
+        user: {
+          id: string;
+          name: string | null;
+          email: string;
+        };
+        sessionConstraints: null;
+      }>(result);
+
+      expect(payload).toMatchInlineSnapshot(`
+        {
+          "sessionConstraints": null,
+          "user": {
+            "email": "test@example.com",
+            "id": "123456",
+            "name": "Test User",
+          },
+        }
+      `);
+      expect(getTextContent(result)).toBe(
+        getGeneratedTextFromStructuredContent(result),
+      );
     });
 
     it("execute_sentry_tool dispatches structured catalog results", async () => {

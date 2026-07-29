@@ -238,6 +238,7 @@ describe("app", () => {
           "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp%2Fsentry%2Fmcp-server",
         token_endpoint: "https://mcp.sentry.dev/oauth/token",
         registration_endpoint: "https://mcp.sentry.dev/oauth/register",
+        client_id_metadata_document_supported: true,
         scopes_supported: [
           "org:read",
           "project:write",
@@ -270,6 +271,9 @@ describe("app", () => {
         "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp%2Fsentry%2Fmcp-server%3Fexperimental%3D1",
       );
       expect(json.issuer).toBe("https://mcp.sentry.dev/mcp/sentry/mcp-server");
+      expect(
+        json.authorization_response_iss_parameter_supported,
+      ).toBeUndefined();
     });
   });
 });

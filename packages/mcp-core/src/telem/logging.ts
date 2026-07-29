@@ -195,98 +195,11 @@ export function getLogger(
 
 const ISSUE_LOGGER_SCOPE = ["runtime", "issues"] as const;
 
-interface ParsedBaseOptions {
-  contexts?: SentryLogContexts;
-  extra?: LogContext;
-  loggerScope?: string | readonly string[];
-}
-
-interface ParsedLogIssueOptions extends ParsedBaseOptions {
-  attachments?: LogAttachments;
-}
-
 interface SerializedError {
   message: string;
   name?: string;
   stack?: string;
   cause?: SerializedError;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isSentryContexts(value: unknown): value is SentryLogContexts {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return Object.values(value).every((entry) => isRecord(entry));
-}
-
-function isBaseLogOptionsCandidate(value: unknown): value is BaseLogOptions {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  if ("extra" in value || "loggerScope" in value) {
-    return true;
-  }
-
-  if ("contexts" in value) {
-    const contexts = (value as { contexts?: unknown }).contexts;
-    return contexts === undefined || isSentryContexts(contexts);
-  }
-
-  return false;
-}
-
-function isLogIssueOptionsCandidate(value: unknown): value is LogIssueOptions {
-  return (
-    isBaseLogOptionsCandidate(value) ||
-    (isRecord(value) && "attachments" in value)
-  );
-}
-
-function parseBaseOptions(
-  contextsOrOptions?: SentryLogContexts | BaseLogOptions,
-): ParsedBaseOptions {
-  if (isBaseLogOptionsCandidate(contextsOrOptions)) {
-    const { contexts, extra, loggerScope } = contextsOrOptions;
-    return {
-      contexts,
-      extra,
-      loggerScope,
-    };
-  }
-
-  if (isSentryContexts(contextsOrOptions)) {
-    return { contexts: contextsOrOptions };
-  }
-
-  return {};
-}
-
-function parseLogIssueOptions(
-  contextsOrOptions?: SentryLogContexts | LogIssueOptions,
-  attachmentsArg?: LogAttachments,
-): ParsedLogIssueOptions {
-  const base = parseBaseOptions(contextsOrOptions);
-
-  const attachments = isLogIssueOptionsCandidate(contextsOrOptions)
-    ? contextsOrOptions.attachments
-    : undefined;
-
-  return {
-    ...base,
-    attachments: attachments ?? attachmentsArg,
-  };
-}
-
-function parseLogOptions(
-  contextsOrOptions?: SentryLogContexts | LogOptions,
-): LogOptions {
-  return parseBaseOptions(contextsOrOptions);
 }
 
 function safeJsonStringify(value: unknown): string | undefined {
@@ -365,7 +278,7 @@ const DEFAULT_LOGGER_SCOPE: readonly string[] = [];
 
 function buildLogProperties(
   level: LogLevel,
-  options: ParsedBaseOptions,
+  options: BaseLogOptions,
   serializedError?: SerializedError,
 ): LogContext {
   const properties: LogContext = {
@@ -400,11 +313,10 @@ function buildLogProperties(
 function logWithLevel(
   level: LogLevel,
   value: unknown,
-  contextsOrOptions?: SentryLogContexts | LogOptions,
+  options: LogOptions = {},
 ): void {
   ensureLoggingConfigured();
 
-  const options = parseLogOptions(contextsOrOptions);
   const serializedError =
     value instanceof Error ? serializeError(value) : undefined;
   const message = serializedError
@@ -439,60 +351,28 @@ function logWithLevel(
   }
 }
 
-export function logDebug(
-  value: unknown,
-  contextsOrOptions?: SentryLogContexts | LogOptions,
-): void {
-  logWithLevel("debug", value, contextsOrOptions);
+export function logDebug(value: unknown, options?: LogOptions): void {
+  logWithLevel("debug", value, options);
 }
 
-export function logInfo(
-  value: unknown,
-  contextsOrOptions?: SentryLogContexts | LogOptions,
-): void {
-  logWithLevel("info", value, contextsOrOptions);
+export function logInfo(value: unknown, options?: LogOptions): void {
+  logWithLevel("info", value, options);
 }
 
-export function logWarn(
-  value: unknown,
-  contextsOrOptions?: SentryLogContexts | LogOptions,
-): void {
-  logWithLevel("warning", value, contextsOrOptions);
+export function logWarn(value: unknown, options?: LogOptions): void {
+  logWithLevel("warning", value, options);
 }
 
-export function logError(
-  value: unknown,
-  contextsOrOptions?: SentryLogContexts | LogOptions,
-): void {
-  logWithLevel("error", value, contextsOrOptions);
+export function logError(value: unknown, options?: LogOptions): void {
+  logWithLevel("error", value, options);
 }
 
-export function logIssue(
-  error: Error | unknown,
-  contexts?: SentryLogContexts,
-  attachments?: LogAttachments,
-): string | undefined;
-export function logIssue(
-  error: Error | unknown,
-  options: LogIssueOptions,
-): string | undefined;
-export function logIssue(
-  message: string,
-  contexts?: SentryLogContexts,
-  attachments?: LogAttachments,
-): string | undefined;
-export function logIssue(
-  message: string,
-  options: LogIssueOptions,
-): string | undefined;
 export function logIssue(
   error: unknown,
-  contextsOrOptions?: SentryLogContexts | LogIssueOptions,
-  attachmentsArg?: LogAttachments,
+  options: LogIssueOptions = {},
 ): string | undefined {
   ensureLoggingConfigured();
 
-  const options = parseLogIssueOptions(contextsOrOptions, attachmentsArg);
   const eventId = withScope((scopeInstance) => {
     if (options.contexts) {
       for (const [key, context] of Object.entries(options.contexts)) {

@@ -9,20 +9,17 @@ describe("openrouter-provider", () => {
 
   beforeEach(() => {
     process.env.OPENROUTER_API_KEY = "test-openrouter-key";
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.OPENROUTER_MODEL;
   });
 
   afterEach(() => {
     if (originalApiKey === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.OPENROUTER_API_KEY;
     } else {
       process.env.OPENROUTER_API_KEY = originalApiKey;
     }
 
     if (originalModel === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.OPENROUTER_MODEL;
     } else {
       process.env.OPENROUTER_MODEL = originalModel;

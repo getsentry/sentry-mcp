@@ -2,12 +2,46 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
   ParamProjectSlugOrAll,
 } from "../../schema";
+
+const RESULT_LIMIT = 25;
+
+export const findReleasesOutputSchema = z.object({
+  releases: z.array(
+    z.object({
+      version: z.string(),
+      dateCreated: z.string().datetime(),
+      dateReleased: z.string().datetime().nullable(),
+      firstEvent: z.string().datetime().nullable(),
+      lastEvent: z.string().datetime().nullable(),
+      newIssues: z.number(),
+      projects: z.array(z.string()),
+      lastCommit: z
+        .object({
+          id: z.string(),
+          message: z.string().nullable(),
+          author: z.string().nullable(),
+          dateCreated: z.string().datetime(),
+        })
+        .nullable(),
+      lastDeploy: z
+        .object({
+          id: z.string(),
+          environment: z.string().nullable(),
+          dateStarted: z.string().datetime().nullable(),
+          dateFinished: z.string().datetime().nullable(),
+        })
+        .nullable(),
+    }),
+  ),
+  hasMore: z.boolean(),
+});
 
 export default defineTool({
   name: "find_releases",
@@ -20,6 +54,8 @@ export default defineTool({
     "- Find recent releases in a Sentry organization",
     "- Find the most recent version released of a specific project",
     "- Determine when a release was deployed to an environment",
+    "",
+    `Returns up to ${RESULT_LIMIT} results. When hasMore is true, use the projectSlug or query parameter to narrow down results.`,
     "",
     "<examples>",
     "### Find the most recent releases in the 'my-organization' organization",
@@ -52,8 +88,10 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
+  outputSchema: findReleasesOutputSchema,
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -66,82 +104,53 @@ export default defineTool({
       organizationSlug,
       projectSlug: params.projectSlug ?? undefined,
       query: params.query ?? undefined,
+      limit: RESULT_LIMIT + 1,
     });
-    let output = `# Releases in **${organizationSlug}${params.projectSlug ? `/${params.projectSlug}` : ""}**\n\n`;
-    if (releases.length === 0) {
-      output += "No releases found.\n";
-      return output;
-    }
-    output += releases
-      .map((release) => {
-        const releaseInfo = [
-          `## ${release.shortVersion}`,
-          "",
-          `**Created**: ${new Date(release.dateCreated).toISOString()}`,
-        ];
-        if (release.dateReleased) {
-          releaseInfo.push(
-            `**Released**: ${new Date(release.dateReleased).toISOString()}`,
-          );
-        }
-        if (release.firstEvent) {
-          releaseInfo.push(
-            `**First Event**: ${new Date(release.firstEvent).toISOString()}`,
-          );
-        }
-        if (release.lastEvent) {
-          releaseInfo.push(
-            `**Last Event**: ${new Date(release.lastEvent).toISOString()}`,
-          );
-        }
-        if (release.newGroups !== undefined) {
-          releaseInfo.push(`**New Issues**: ${release.newGroups}`);
-        }
-        if (release.projects && release.projects.length > 0) {
-          releaseInfo.push(
-            `**Projects**: ${release.projects.map((p) => p.name).join(", ")}`,
-          );
-        }
-        if (release.lastCommit) {
-          const commitAuthor =
-            release.lastCommit.author?.name ??
-            release.lastCommit.author?.email ??
-            "Unknown";
-          releaseInfo.push("", `### Last Commit`, "");
-          releaseInfo.push(`**Commit ID**: ${release.lastCommit.id}`);
-          releaseInfo.push(
-            `**Commit Message**: ${release.lastCommit.message ?? "Unknown"}`,
-          );
-          releaseInfo.push(`**Commit Author**: ${commitAuthor}`);
-          releaseInfo.push(
-            `**Commit Date**: ${new Date(release.lastCommit.dateCreated).toISOString()}`,
-          );
-        }
-        if (release.lastDeploy) {
-          releaseInfo.push("", `### Last Deploy`, "");
-          releaseInfo.push(`**Deploy ID**: ${release.lastDeploy.id}`);
-          releaseInfo.push(
-            `**Environment**: ${release.lastDeploy.environment ?? "Unknown"}`,
-          );
-          if (release.lastDeploy.dateStarted) {
-            releaseInfo.push(
-              `**Deploy Started**: ${new Date(release.lastDeploy.dateStarted).toISOString()}`,
-            );
-          }
-          if (release.lastDeploy.dateFinished) {
-            releaseInfo.push(
-              `**Deploy Finished**: ${new Date(release.lastDeploy.dateFinished).toISOString()}`,
-            );
-          }
-        }
-        return releaseInfo.join("\n");
-      })
-      .join("\n\n");
-    output += "\n\n";
-    output += "## Response Notes\n\n";
-    output +=
-      "- Release versions can be referenced in commit messages or documentation.\n";
-    output += `- Release filter syntax for issue searches: \`release:${releases.length ? releases[0]!.shortVersion : "VERSION"}\`.\n`;
-    return output;
+
+    return structuredResult({
+      releases: releases.slice(0, RESULT_LIMIT).map((release) => ({
+        version: release.shortVersion,
+        dateCreated: new Date(release.dateCreated).toISOString(),
+        dateReleased: release.dateReleased
+          ? new Date(release.dateReleased).toISOString()
+          : null,
+        firstEvent: release.firstEvent
+          ? new Date(release.firstEvent).toISOString()
+          : null,
+        lastEvent: release.lastEvent
+          ? new Date(release.lastEvent).toISOString()
+          : null,
+        newIssues: release.newGroups,
+        projects: release.projects
+          .map((project) => project.slug)
+          .filter((slug): slug is string => slug !== null),
+        lastCommit: release.lastCommit
+          ? {
+              id: String(release.lastCommit.id),
+              message: release.lastCommit.message,
+              author:
+                release.lastCommit.author?.name ??
+                release.lastCommit.author?.email ??
+                null,
+              dateCreated: new Date(
+                release.lastCommit.dateCreated,
+              ).toISOString(),
+            }
+          : null,
+        lastDeploy: release.lastDeploy
+          ? {
+              id: String(release.lastDeploy.id),
+              environment: release.lastDeploy.environment,
+              dateStarted: release.lastDeploy.dateStarted
+                ? new Date(release.lastDeploy.dateStarted).toISOString()
+                : null,
+              dateFinished: release.lastDeploy.dateFinished
+                ? new Date(release.lastDeploy.dateFinished).toISOString()
+                : null,
+            }
+          : null,
+      })),
+      hasMore: releases.length > RESULT_LIMIT,
+    });
   },
 });

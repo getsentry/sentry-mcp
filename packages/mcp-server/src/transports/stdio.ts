@@ -26,7 +26,6 @@ import * as Sentry from "@sentry/node";
 export type StdioServerContext = {
   sentryHost?: string;
   mcpUrl?: string;
-  agentMode?: boolean;
   experimentalMode?: boolean;
 };
 
@@ -36,7 +35,6 @@ function getStdioSpanAttributes(
   const attributes: Record<string, string | boolean> = {
     "app.transport": "stdio",
     "app.server.version": LIB_VERSION,
-    "app.server.mode.agent": context.agentMode ?? false,
     "app.server.mode.experimental": context.experimentalMode ?? false,
     "network.transport": "pipe",
     "service.version": LIB_VERSION,

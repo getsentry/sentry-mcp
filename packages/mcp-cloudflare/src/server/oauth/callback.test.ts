@@ -198,6 +198,7 @@ function createMcpInitializeRequest(accessToken: string, path = "/mcp") {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
       "CF-Connecting-IP": "192.0.2.1",
+      Host: "localhost",
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
@@ -255,6 +256,70 @@ describe("oauth callback routes", () => {
 
       expect(response.status).toBe(400);
       expect(await response.text()).toBe("Invalid state");
+    });
+
+    it("accepts an ephemeral loopback port against a portless CIMD registration", async () => {
+      const loopbackRedirectUri = "http://localhost:3118/callback";
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await testEnv.OAUTH_PROVIDER.createClient({
+        clientName: "Claude Code",
+        redirectUris: [
+          "http://localhost/callback",
+          "http://127.0.0.1/callback",
+        ],
+        tokenEndpointAuthMethod: "none",
+      });
+
+      const approvalState = await signState(
+        {
+          req: {
+            oauthReqInfo: {
+              clientId: client.clientId,
+              redirectUri: loopbackRedirectUri,
+              scope: ["org:read"],
+            },
+          },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        COOKIE_SECRET,
+      );
+      const formData = new FormData();
+      formData.append("state", approvalState);
+      formData.append("skill", "inspect");
+      const approval = await oauthApp.fetch(
+        new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        }),
+        testEnv,
+      );
+      expect(approval.status).toBe(302);
+      const cookie = approval.headers.get("Set-Cookie")?.split(";")[0];
+
+      const now = Date.now();
+      const state = await signState(
+        {
+          req: {
+            clientId: client.clientId,
+            redirectUri: loopbackRedirectUri,
+            scope: ["org:read"],
+            skills: ["inspect"],
+          },
+          iat: now,
+          exp: now + 10 * 60 * 1000,
+        } as unknown as OAuthState,
+        COOKIE_SECRET,
+      );
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        cookie,
+        code: "test-code",
+      });
+
+      expect(response.status).toBe(302);
     });
 
     it("renders a safe upstream oauth error page and skips token exchange", async () => {
@@ -522,6 +587,9 @@ describe("oauth callback routes", () => {
       expect(response.status).toBe(302);
       expect(response.headers.get("location")).toContain(REDIRECT_URI);
       expect(response.headers.get("location")).toContain("code=");
+      expect(
+        new URL(response.headers.get("location")!).searchParams.get("iss"),
+      ).toBe("http://localhost");
     });
 
     it("completes callback, exchanges the code, and uses the resulting token at /mcp", async () => {
@@ -551,6 +619,7 @@ describe("oauth callback routes", () => {
       const authorizationCode = redirectUrl.searchParams.get("code");
 
       expect(authorizationCode).toBeTruthy();
+      expect(redirectUrl.searchParams.get("iss")).toBe("http://localhost");
 
       const tokenCtx = createExecutionContext();
       const tokenResponse = await handler.fetch!(
@@ -614,6 +683,7 @@ describe("oauth callback routes", () => {
       const authorizationCode = redirectUrl.searchParams.get("code");
 
       expect(authorizationCode).toBeTruthy();
+      expect(redirectUrl.searchParams.get("iss")).toBe("http://localhost");
 
       const tokenCtx = createExecutionContext();
       const tokenResponse = await handler.fetch!(

@@ -160,6 +160,28 @@ describe("get_snapshot", () => {
     expect(result).not.toContain("skipped.png");
   });
 
+  it("preserves the selectedSnapshot URL fallback when the image tool is unavailable", async () => {
+    setupSnapshotMock();
+
+    const result = await getSnapshot.handler(
+      {
+        organizationSlug: "sentry",
+        snapshotId: "231949",
+        showUnmodified: false,
+        regionUrl: null,
+      },
+      {
+        ...getServerContext(),
+        availableToolNames: new Set(),
+        directToolNames: new Set(),
+      },
+    );
+
+    expect(result).toContain(
+      'get_sentry_resource(url="https://sentry.sentry.io/preprod/snapshots/231949/?selectedSnapshot=<image_file_name>")',
+    );
+  });
+
   it("throws on missing explicit params", async () => {
     await expect(
       callHandler({

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import {
   ensureIssueWithinProjectConstraint,
   parseIssueParams,
@@ -16,6 +17,22 @@ import {
   ParamIssueShortId,
   ParamIssueUrl,
 } from "../../schema";
+
+export const getIssueTagValuesOutputSchema = z.object({
+  tag: z.object({
+    key: z.string(),
+    name: z.string(),
+    totalValues: z.number(),
+    topValues: z.array(
+      z.object({
+        value: z.string().nullable(),
+        count: z.number(),
+        firstSeen: z.string().nullable(),
+        lastSeen: z.string().nullable(),
+      }),
+    ),
+  }),
+});
 
 export default defineTool({
   name: "get_issue_tag_values",
@@ -81,8 +98,10 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
+  outputSchema: getIssueTagValuesOutputSchema,
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -142,52 +161,18 @@ export default defineTool({
       throw error;
     }
 
-    // Format the output
-    let output = `# Tag Distribution: ${tagValues.name}\n\n`;
-    output += `**Issue**: ${parsedIssueId}\n`;
-    output += `**Tag Key**: \`${tagValues.key}\`\n`;
-    output += `**Total Unique Values**: ${tagValues.totalValues}\n\n`;
-
-    if (tagValues.topValues.length === 0) {
-      output += "No values found for this tag.\n";
-      return output;
-    }
-
-    output += "## Top Values\n\n";
-    output += "| Value | Count | First Seen | Last Seen |\n";
-    output += "|-------|-------|------------|----------|\n";
-
-    for (const value of tagValues.topValues) {
-      const firstSeen = value.firstSeen
-        ? new Date(value.firstSeen).toISOString().split("T")[0]
-        : "-";
-      const lastSeen = value.lastSeen
-        ? new Date(value.lastSeen).toISOString().split("T")[0]
-        : "-";
-      // Handle null values (can occur with certain tag types)
-      const rawValue = value.value ?? "(null)";
-      // Truncate long values for readability
-      let displayValue =
-        rawValue.length > 60 ? `${rawValue.substring(0, 57)}...` : rawValue;
-      // Escape markdown table special characters (backslashes first)
-      displayValue = displayValue
-        .replace(/\\/g, "\\\\")
-        .replace(/\|/g, "\\|")
-        .replace(/`/g, "\\`")
-        .replace(/\n/g, " ");
-      output += `| \`${displayValue}\` | ${value.count} | ${firstSeen} | ${lastSeen} |\n`;
-    }
-
-    if (tagValues.topValues.length > 0 && tagValues.totalValues > 0) {
-      const shownCount = tagValues.topValues.length;
-      output += `\n*Showing top ${shownCount} of ${tagValues.totalValues} unique values*\n`;
-    }
-
-    // Add lightweight follow-up hints
-    output += "\n## Response Notes\n\n";
-    output += `- Full issue details: \`get_sentry_resource(resourceType='issue', organizationSlug='${orgSlug}', resourceId='${parsedIssueId}')\`\n`;
-    output += `- Other common tag keys: url, browser, environment, release, os, device, user\n`;
-
-    return output;
+    return structuredResult({
+      tag: {
+        key: tagValues.key,
+        name: tagValues.name,
+        totalValues: tagValues.totalValues,
+        topValues: tagValues.topValues.map((tagValue) => ({
+          value: tagValue.value,
+          count: tagValue.count,
+          firstSeen: tagValue.firstSeen ?? null,
+          lastSeen: tagValue.lastSeen ?? null,
+        })),
+      },
+    });
   },
 });

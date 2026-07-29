@@ -89,7 +89,6 @@ function getBooleanAttribute(value: boolean): string {
 function getMcpRequestAttributes(request: Request, url: URL) {
   return {
     clientFamily: resolveClientFamily(request.headers.get("user-agent")),
-    agentMode: url.searchParams.get("agent") === "1",
     experimentalMode: url.searchParams.get("experimental") === "1",
     utmSource: resolveUtmSourceFromUrl(url),
   };
@@ -131,9 +130,6 @@ function getMetricAttributes(
 
   if (trackedRoute.group === "mcp") {
     const mcpAttributes = getMcpRequestAttributes(request, url);
-    attributes["app.server.mode.agent"] = getBooleanAttribute(
-      mcpAttributes.agentMode,
-    );
     attributes["app.server.mode.experimental"] = getBooleanAttribute(
       mcpAttributes.experimentalMode,
     );
@@ -187,7 +183,6 @@ export function annotateTrackedRequestSpan(
   if (trackedRoute.group === "mcp") {
     const mcpAttributes = getMcpRequestAttributes(request, url);
     activeSpan.setAttribute("app.transport", "http");
-    activeSpan.setAttribute("app.server.mode.agent", mcpAttributes.agentMode);
     activeSpan.setAttribute(
       "app.server.mode.experimental",
       mcpAttributes.experimentalMode,

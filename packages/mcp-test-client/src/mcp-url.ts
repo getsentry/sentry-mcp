@@ -37,14 +37,9 @@ export function resolveAuthorizationServerUrl(mcpHost?: string): URL {
 export function applyProtectedResourceFlags(
   protectedResourceUrl: URL,
   options: {
-    useAgentEndpoint?: boolean;
     useExperimental?: boolean;
   },
 ): URL {
-  if (options.useAgentEndpoint) {
-    protectedResourceUrl.searchParams.set("agent", "1");
-  }
-
   if (options.useExperimental) {
     protectedResourceUrl.searchParams.set("experimental", "1");
   }

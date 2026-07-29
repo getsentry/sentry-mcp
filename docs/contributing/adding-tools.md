@@ -8,7 +8,6 @@ Not every tool is exposed to every consumer. We rely on several mechanisms to ke
 
 - **Catalog by default** — Most tools are searchable/executable through `search_sentry_tools` + `execute_sentry_tool` automatically. Search uses the tool's existing name and description.
 - **Catalog registry** — `packages/mcp-core/src/tools/catalog/index.ts` lists ordinary Sentry operation tools. The catalog directory is intentionally flat: one tool entry per file.
-- **Special tools** — Wrapper/gateway tools (`search_sentry_tools`, `execute_sentry_tool`, `use_sentry`) live in `packages/mcp-core/src/tools/special/`. They still use the same tool types, but they are kept out of the ordinary catalog.
 - **Central direct exposure policy** — `packages/mcp-core/src/tools/surfaces.ts` lists the catalog tools that are also exposed directly through MCP `tools/list`. The direct surface intentionally keeps long-tail tools catalog-only because `search_sentry_tools` + `execute_sentry_tool` are available as primary primitives.
 - **`requiredCapabilities`** — Tools declare which project capabilities they need (e.g. `profiles`, `replays`, `traces`). If the upstream project doesn't have a capability enabled, the tool is automatically hidden.
 - **`experimental` / `hideInExperimentalMode`** — Feature flags for tools that are being tested or replaced.
@@ -89,6 +88,7 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
@@ -99,12 +99,17 @@ export default defineTool({
 
 ### Safety Annotations
 
-**REQUIRED**: All tools must include safety annotations for MCP directory compliance.
+**REQUIRED**: Every tool must declare `readOnlyHint`, `destructiveHint`, and
+`openWorldHint` explicitly (each `true` or `false`, never omitted). This is
+enforced at compile time (the `annotations` type requires them) and by
+`tools.test.ts`, because filters and confirmation gates depend on these hints;
+an absent hint is a silent gap. Read-only tools must set `destructiveHint: false`
+(not leave it undefined).
 
 **Available annotations:**
 - `readOnlyHint` (boolean): Tool doesn't modify data
 - `destructiveHint` (boolean): Tool may modify/delete existing data
-- `idempotentHint` (boolean): Repeated calls with same arguments have no additional effect
+- `idempotentHint` (boolean, optional): Repeated calls with same arguments have no additional effect
 - `openWorldHint` (boolean): Tool interacts with external services (default: true for API calls)
 
 **Annotation patterns:**
@@ -113,6 +118,7 @@ export default defineTool({
 // Read-only tools (queries, lists, searches)
 annotations: {
   readOnlyHint: true,
+  destructiveHint: false,
   openWorldHint: true,
 }
 

@@ -66,6 +66,7 @@ function createMcpRequest(
     "Content-Type": "application/json",
     Accept: "application/json, text/event-stream",
     "CF-Connecting-IP": "192.0.2.1",
+    Host: "localhost",
   };
   if (bearerToken) {
     headers.Authorization = `Bearer ${bearerToken}`;
@@ -360,12 +361,36 @@ describe("MCP Handler", () => {
       );
 
       expect(response.status).toBe(200);
+      const structuredContent = {
+        user: {
+          id: "123456",
+          name: "Test User",
+          email: "test@example.com",
+        },
+        sessionConstraints: null,
+      };
       const body = await parseSSEResponse<{
-        result?: { content?: Array<{ text?: string }> };
+        jsonrpc: "2.0";
+        id: number;
+        result: {
+          content: Array<{ type: "text"; text: string }>;
+          structuredContent: typeof structuredContent;
+        };
       }>(response);
-      const text = body.result?.content?.map((item) => item.text).join("\n");
 
-      expect(text).toContain("You are authenticated as");
+      expect(body).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(structuredContent, null, 2),
+            },
+          ],
+          structuredContent,
+        },
+      });
     });
 
     it("applies the Sentry-Bearer MCP rate limit per token", async () => {

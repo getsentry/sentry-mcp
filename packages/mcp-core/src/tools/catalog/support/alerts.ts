@@ -5,13 +5,13 @@ import type {
 import type { SentryApiService } from "../../../api-client";
 import { ApiNotFoundError } from "../../../api-client";
 import { UserInputError } from "../../../errors";
+import { isPlainObject } from "../../../internal/type-guards";
 import {
   compactLines,
   formatActor,
   formatDate,
   formatId,
   formatUnknown,
-  isRecord,
 } from "./api-formatting";
 
 const NUMERIC_ID_PATTERN = /^\d+$/;
@@ -83,7 +83,7 @@ function formatDetailValue(value: unknown): string | null {
       .filter((item): item is string => item !== null);
     return items.length > 0 ? items.join(", ") : null;
   }
-  if (isRecord(value)) {
+  if (isPlainObject(value)) {
     const details = Object.entries(value)
       .filter(([key]) => key !== "id")
       .map(([key, item]) => {
@@ -116,7 +116,7 @@ function getComponentDetailEntries(
       value !== null &&
       !shouldSkipDetail(key, value)
     ) {
-      if (key === "config" && isRecord(value)) {
+      if (key === "config" && isPlainObject(value)) {
         detailEntries.push(
           ...Object.entries(value).filter(
             ([configKey, configValue]) =>
@@ -231,7 +231,7 @@ function readComponentList(value: unknown): AlertComponent[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
   }
-  return value.filter(isRecord);
+  return value.filter(isPlainObject);
 }
 
 function formatComponentSummary(

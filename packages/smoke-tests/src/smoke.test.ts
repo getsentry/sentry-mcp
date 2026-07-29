@@ -2,8 +2,9 @@ import { describe, it, expect, beforeAll } from "vitest";
 import pkg from "../package.json";
 
 const PREVIEW_URL = process.env.PREVIEW_URL;
-// All endpoints should respond quickly - 1 second is plenty for 401/200 responses
-const DEFAULT_TIMEOUT_MS = 1000;
+// Leave enough headroom for transient Cloudflare edge latency. Response-time
+// expectations are enforced separately by the performance smoke test below.
+const DEFAULT_TIMEOUT_MS = 5000;
 const IS_LOCAL_DEV =
   PREVIEW_URL?.includes("localhost") || PREVIEW_URL?.includes("127.0.0.1");
 

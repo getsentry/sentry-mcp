@@ -1,6 +1,8 @@
 import { setTag } from "@sentry/core";
+import { z } from "zod";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
 import {
@@ -11,6 +13,15 @@ import {
 import { ALL_SKILLS } from "../../skills";
 
 const RESULT_LIMIT = 25;
+
+export const findProjectsOutputSchema = z.object({
+  projects: z.array(
+    z.object({
+      slug: z.string(),
+    }),
+  ),
+  hasMore: z.boolean(),
+});
 
 export default defineTool({
   name: "find_projects",
@@ -24,7 +35,7 @@ export default defineTool({
     "- Find a project's slug to aid other tool requests",
     "- Search for specific projects by name or slug",
     "",
-    `Returns up to ${RESULT_LIMIT} results. If you hit this limit, use the query parameter to narrow down results.`,
+    `Returns up to ${RESULT_LIMIT} results. When hasMore is true, use the query parameter to narrow down results.`,
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
@@ -33,8 +44,10 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
+  outputSchema: findProjectsOutputSchema,
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -51,27 +64,14 @@ export default defineTool({
 
     const projects = await apiService.listProjects(organizationSlug, {
       query: params.query ?? undefined,
+      limit: RESULT_LIMIT + 1,
     });
 
-    let output = `# Projects in **${organizationSlug}**\n\n`;
-
-    if (params.query) {
-      output += `**Search query:** "${params.query}"\n\n`;
-    }
-
-    if (projects.length === 0) {
-      output += params.query
-        ? `No projects found matching "${params.query}".\n`
-        : "No projects found.\n";
-      return output;
-    }
-
-    output += projects.map((project) => `- **${project.slug}**\n`).join("");
-
-    if (projects.length === RESULT_LIMIT) {
-      output += `\n---\n\n**Note:** Showing ${RESULT_LIMIT} results (maximum). There may be more projects available. Use the \`query\` parameter to search for specific projects.`;
-    }
-
-    return output;
+    return structuredResult({
+      projects: projects
+        .slice(0, RESULT_LIMIT)
+        .map((project) => ({ slug: project.slug })),
+      hasMore: projects.length > RESULT_LIMIT,
+    });
   },
 });

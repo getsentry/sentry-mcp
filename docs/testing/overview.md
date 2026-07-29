@@ -101,8 +101,6 @@ Interactive testing with the MCP test client (preferred for testing MCP changes)
 # Test with local dev server (default: http://localhost:5173)
 pnpm -w run cli "who am I?"
 
-# Test agent mode (use_sentry tool only) - approximately 2x slower
-pnpm -w run cli --agent "who am I?"
 
 # Test against production
 pnpm -w run cli --mcp-host=https://mcp.sentry.dev "query"
@@ -116,7 +114,7 @@ pnpm -w run cli --access-token=TOKEN "query"
 - Testing OAuth flows
 - Debugging tool interactions
 - Validating real API responses
-- Testing AI-powered tools (search_events, search_issues, search_issue_events, use_sentry)
+- Testing AI-powered tools (search_events, search_issues, search_issue_events)
 
 **Note:** The CLI defaults to `http://localhost:5173` for easier local development. Override with `--mcp-host` or set `MCP_URL` environment variable to test against different servers.
 
@@ -125,16 +123,12 @@ Use the agent CLI harness when you need to verify behavior through the actual Cl
 
 ```bash
 # Claude Code against the local dev server config
-pnpm -w run agent-cli-test --provider claude --setup repo
 
 # Codex against the local dev server config
-pnpm -w run agent-cli-test --provider codex --setup repo
 
 # Claude Code against the checked-in stdio config
-pnpm -w run agent-cli-test --provider claude --setup stdio
 
 # Codex against the checked-in stdio config
-pnpm -w run agent-cli-test --provider codex --setup stdio
 ```
 
 This harness:
@@ -144,11 +138,9 @@ This harness:
 
 Use `--setup repo --server sentry` to target the hosted server instead of the local `sentry-dev` entry.
 
-The checked-in `stdio` setup uses an isolated auth cache at `packages/agent-cli-test/projects/stdio/.sentry/mcp.json`.
 Because real clients launch stdio servers non-interactively, first-run device-code auth does not start inside Claude or Codex. Warm that cache from a real TTY first:
 
 ```bash
-pnpm -w run agent-cli-test auth login
 ```
 
 When the harness fails, rerun the provider directly with debug enabled so you can inspect the exact MCP startup failure:

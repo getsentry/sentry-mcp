@@ -1,13 +1,13 @@
 import { Prose } from "../ui/prose";
 import InstallTabs, { Tab } from "./install-tabs";
+import { AmpInstructions } from "./instructions/amp";
 // Import IDE instruction components
 import { ClaudeCodeInstructions } from "./instructions/claude-code";
-import { CursorInstructions } from "./instructions/cursor";
-import { VSCodeInstructions } from "./instructions/vscode";
 import { CodexCLIInstructions } from "./instructions/codex-cli";
-import { AmpInstructions } from "./instructions/amp";
+import { CursorInstructions } from "./instructions/cursor";
 import { GeminiInstructions } from "./instructions/gemini";
 import { OpenCodeInstructions } from "./instructions/opencode";
+import { VSCodeInstructions } from "./instructions/vscode";
 import { WarpInstructions } from "./instructions/warp";
 import { WindsurfInstructions } from "./instructions/windsurf";
 import { ZedInstructions } from "./instructions/zed";
@@ -40,19 +40,6 @@ export default function RemoteSetup() {
             constraints.
           </small>
         </p>
-        <p>
-          <strong>Agent Mode:</strong> Reduce context by exposing a single{" "}
-          <code>use_sentry</code> tool instead of individual skills. The
-          embedded AI agent handles natural language requests and automatically
-          chains tool calls as needed. Note: Agent mode approximately doubles
-          response time due to the embedded AI layer.
-        </p>
-        <ul>
-          <li>
-            <code>?agent=1</code> — Enable agent mode (works with path
-            constraints)
-          </li>
-        </ul>
       </Prose>
     </>
   );

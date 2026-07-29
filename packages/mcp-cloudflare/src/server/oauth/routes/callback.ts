@@ -5,12 +5,15 @@ import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { Hono } from "hono";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import { resolveClientFamilyFromName } from "../../lib/client-family";
+import { isRegisteredRedirectUri } from "../../lib/redirect-uri";
 import type { Env, WorkerProps } from "../../types";
 import { setSentryUserFromRequest } from "../../utils/sentry-user";
 import { SENTRY_TOKEN_URL } from "../constants";
 import {
+  appendAuthorizationResponseIss,
   createOAuthFailureResponse,
   exchangeCodeForAccessToken,
+  getAuthorizationServerIssuer,
   getOAuthCallbackFailureDetails,
   validateResourceParameter,
 } from "../helpers";
@@ -180,9 +183,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       oauthReqInfo.clientId,
     );
     registeredClientName = client?.clientName;
-    const uriIsAllowed =
-      Array.isArray(client?.redirectUris) &&
-      client.redirectUris.includes(oauthReqInfo.redirectUri);
+    const uriIsAllowed = isRegisteredRedirectUri(
+      oauthReqInfo.redirectUri,
+      client?.redirectUris,
+    );
     if (!uriIsAllowed) {
       logWarn("Redirect URI not registered for client on callback", {
         loggerScope: ["cloudflare", "oauth", "callback"],
@@ -343,6 +347,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     });
   }
 
+  // RFC 9207: workers-oauth-provider does not emit `iss` on authorization
+  // responses. Append the canonical origin-level issuer so clients that
+  // validate `iss` against PRM/root AS metadata can mix-up-protect the code.
+  const issuer = getAuthorizationServerIssuer(c.req.url);
   // Use manual redirect instead of Response.redirect() to allow middleware to add headers
-  return c.redirect(redirectTo);
+  return c.redirect(appendAuthorizationResponseIss(redirectTo, issuer));
 });

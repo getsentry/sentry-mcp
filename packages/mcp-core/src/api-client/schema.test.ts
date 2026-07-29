@@ -21,6 +21,7 @@ import {
   ProfileFrameSchema,
   ReleaseSchema,
   ReplayDetailsSchema,
+  ReplayRecordingSegmentsSchema,
   TagSchema,
   TraceMetaSchema,
   TransactionProfileSampleSchema,
@@ -537,6 +538,44 @@ describe("ReplayDetailsSchema", () => {
       region: null,
       subdivision: null,
     });
+  });
+});
+
+describe("ReplayRecordingSegmentsSchema", () => {
+  it("keeps usable event fields when sibling fields are malformed", () => {
+    expect(
+      ReplayRecordingSegmentsSchema.parse([
+        [
+          {
+            timestamp: "invalid",
+            type: 5,
+            data: {
+              tag: "ui.click",
+              href: 123,
+              payload: {
+                message: "Clicked checkout",
+                data: { duration: "invalid" },
+              },
+            },
+          },
+        ],
+      ]),
+    ).toEqual([
+      [
+        {
+          timestamp: undefined,
+          type: 5,
+          data: {
+            tag: "ui.click",
+            href: undefined,
+            payload: {
+              message: "Clicked checkout",
+              data: { duration: undefined },
+            },
+          },
+        },
+      ],
+    ]);
   });
 });
 

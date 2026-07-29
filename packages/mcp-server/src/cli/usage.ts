@@ -21,7 +21,6 @@ Common optional flags:
   --host <host>           Change Sentry host (self-hosted)
   --insecure-http         Use http:// for self-hosted --host values
   --sentry-dsn <dsn>      Override DSN used for telemetry reporting
-  --agent                 Agent mode: only expose use_sentry tool (for AI agents)
   --experimental          Enable forward-looking tool variants and experimental features
 
 Embedded agent configuration:

@@ -16,7 +16,7 @@ A simple CLI tool to test the Sentry MCP server using stdio transport with an AI
 
 - Node.js >= 22.13
 - pnpm package manager
-- OpenAI or OpenRouter API key for prompt/agent mode
+- OpenAI or OpenRouter API key for prompt mode
 - Sentry access token with appropriate permissions for token-based stdio mode
 
 ## Installation
@@ -51,7 +51,7 @@ The OAuth flow uses PKCE (Proof Key for Code Exchange) and doesn't require a cli
 Create a `.env` file in the package directory:
 
 ```env
-# Required for prompt/agent mode; set exactly one provider key
+# Required for prompt mode; set exactly one provider key
 OPENAI_API_KEY=your_openai_api_key
 OPENROUTER_API_KEY=your_openrouter_api_key
 

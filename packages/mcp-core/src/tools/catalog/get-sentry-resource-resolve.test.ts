@@ -459,45 +459,6 @@ describe("resolveResourceParams", () => {
 
   // ─── URL mode with resourceType override ──────────────────────────────────
   describe("URL mode with resourceType override", () => {
-    it("overrides issue URL with breadcrumbs type", () => {
-      expect(
-        resolveResourceParams({
-          url: "https://my-org.sentry.io/issues/PROJECT-123",
-          resourceType: "breadcrumbs",
-        }),
-      ).toEqual<ResolvedResourceParams>({
-        type: "breadcrumbs",
-        organizationSlug: "my-org",
-        issueId: "PROJECT-123",
-      });
-    });
-
-    it("overrides event URL with breadcrumbs type (extracts issueId)", () => {
-      expect(
-        resolveResourceParams({
-          url: "https://my-org.sentry.io/issues/PROJECT-123/events/abc123def",
-          resourceType: "breadcrumbs",
-        }),
-      ).toEqual<ResolvedResourceParams>({
-        type: "breadcrumbs",
-        organizationSlug: "my-org",
-        issueId: "PROJECT-123",
-      });
-    });
-
-    it("overrides path-based org URL with breadcrumbs type", () => {
-      expect(
-        resolveResourceParams({
-          url: "https://sentry.io/my-org/issues/PROJECT-123/",
-          resourceType: "breadcrumbs",
-        }),
-      ).toEqual<ResolvedResourceParams>({
-        type: "breadcrumbs",
-        organizationSlug: "my-org",
-        issueId: "PROJECT-123",
-      });
-    });
-
     it("passes through when override matches detected type", () => {
       expect(
         resolveResourceParams({
@@ -524,15 +485,6 @@ describe("resolveResourceParams", () => {
       });
     });
 
-    it("rejects span override on a plain trace URL", () => {
-      expect(() =>
-        resolveResourceParams({
-          url: "https://my-org.sentry.io/explore/traces/trace/abc123",
-          resourceType: "span",
-        }),
-      ).toThrow("Could not extract span ID from URL for span resource");
-    });
-
     it("rejects non-breadcrumbs override on different type URL", () => {
       expect(() =>
         resolveResourceParams({
@@ -540,24 +492,6 @@ describe("resolveResourceParams", () => {
           resourceType: "issue",
         }),
       ).toThrow("Cannot override URL type with resourceType 'issue'");
-    });
-
-    it("rejects breadcrumbs override on trace URL (no issueId)", () => {
-      expect(() =>
-        resolveResourceParams({
-          url: "https://my-org.sentry.io/explore/traces/trace/abc123",
-          resourceType: "breadcrumbs",
-        }),
-      ).toThrow("Could not extract issue ID from URL for breadcrumbs");
-    });
-
-    it("rejects breadcrumbs override on replay URL (no issueId)", () => {
-      expect(() =>
-        resolveResourceParams({
-          url: "https://my-org.sentry.io/replays/abc123/",
-          resourceType: "breadcrumbs",
-        }),
-      ).toThrow("Could not extract issue ID from URL for breadcrumbs");
     });
   });
 
@@ -616,49 +550,6 @@ describe("resolveResourceParams", () => {
         type: "trace",
         organizationSlug: "my-org",
         traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-      });
-    });
-
-    it("resolves span type from a compound resourceId", () => {
-      expect(
-        resolveResourceParams({
-          resourceType: "span",
-          organizationSlug: "my-org",
-          resourceId: "a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5",
-        }),
-      ).toEqual<ResolvedResourceParams>({
-        type: "span",
-        organizationSlug: "my-org",
-        traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-        spanId: "aa8e7f3384ef4ff5",
-      });
-    });
-
-    it("resolves breadcrumbs type", () => {
-      expect(
-        resolveResourceParams({
-          resourceType: "breadcrumbs",
-          organizationSlug: "my-org",
-          resourceId: "PROJECT-123",
-        }),
-      ).toEqual<ResolvedResourceParams>({
-        type: "breadcrumbs",
-        organizationSlug: "my-org",
-        issueId: "PROJECT-123",
-      });
-    });
-
-    it("uppercases breadcrumbs resourceId", () => {
-      expect(
-        resolveResourceParams({
-          resourceType: "breadcrumbs",
-          organizationSlug: "my-org",
-          resourceId: "project-123",
-        }),
-      ).toEqual<ResolvedResourceParams>({
-        type: "breadcrumbs",
-        organizationSlug: "my-org",
-        issueId: "PROJECT-123",
       });
     });
   });
@@ -747,16 +638,6 @@ describe("resolveResourceParams", () => {
         monitorSlug: "daily-backup",
         projectSlugOrId: "backend",
       });
-    });
-
-    it("throws when span resourceId is malformed", () => {
-      expect(() =>
-        resolveResourceParams({
-          resourceType: "span",
-          organizationSlug: "my-org",
-          resourceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-        }),
-      ).toThrow("Span resourceId must use the format `<traceId>:<spanId>`.");
     });
 
     it("throws for completely invalid resourceType", () => {

@@ -13,9 +13,11 @@ import getAlertRule from "./get-alert-rule";
 import getIssueDetails from "./get-issue-details";
 import getEventStacktrace from "./get-event-stacktrace";
 import getIssueActivity from "./get-issue-activity";
+import getIssueBreadcrumbs from "./get-issue-breadcrumbs";
 import getIssueTagValues from "./get-issue-tag-values";
 import getIssueUserReports from "./get-issue-user-reports";
 import getTraceDetails from "./get-trace-details";
+import getSpanDetails from "./get-span-details";
 import getReplayDetails from "./get-replay-details";
 import getEventAttachment from "./get-event-attachment";
 import updateIssue from "./update-issue";
@@ -50,7 +52,7 @@ import type { ToolConfig } from "../types";
  * These tools are searchable/executable through search_sentry_tools and execute_sentry_tool.
  * A central subset is also exposed directly via tools/list in surfaces.ts.
  *
- * Wrapper tools such as search_sentry_tools, execute_sentry_tool, and use_sentry intentionally
+ * Wrapper tools such as search_sentry_tools and execute_sentry_tool intentionally
  * live outside this catalog.
  */
 const catalogTools = {
@@ -69,9 +71,11 @@ const catalogTools = {
   get_issue_details: getIssueDetails,
   get_event_stacktrace: getEventStacktrace,
   get_issue_activity: getIssueActivity,
+  get_issue_breadcrumbs: getIssueBreadcrumbs,
   get_issue_user_reports: getIssueUserReports,
   get_issue_tag_values: getIssueTagValues,
   get_trace_details: getTraceDetails,
+  get_span_details: getSpanDetails,
   get_replay_details: getReplayDetails,
   get_event_attachment: getEventAttachment,
   update_issue: updateIssue,

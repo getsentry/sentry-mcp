@@ -162,19 +162,6 @@ export MCP_URL=https://mcp.sentry.dev
 pnpm -w run cli "query"
 ```
 
-### Testing Agent Mode
-
-Agent mode uses only the `use_sentry` tool (natural language interface):
-
-```bash
-# Test agent mode locally
-pnpm -w run cli --agent "show me my recent errors"
-
-# Test agent mode in production
-pnpm -w run cli --mcp-host=https://mcp.sentry.dev --agent "what projects do I have?"
-```
-
-**Agent mode is ~2x slower** because it requires an additional AI call to translate natural language to tool calls.
 
 ### OAuth Flow Testing
 
@@ -194,6 +181,27 @@ pnpm -w run cli "who am I?"
 - Tokens stored in `~/.sentry-mcp-tokens.json`
 - Automatically refreshed when expired
 - To force re-auth: delete the token file
+
+**Running in a VM or container:**
+
+The callback server defaults to `127.0.0.1:8765`, which a browser on the host
+cannot reach. Three environment variables override it:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MCP_OAUTH_PORT` | `8765` | Port the callback server listens on |
+| `MCP_OAUTH_HOST` | `127.0.0.1` | Address the callback server binds to |
+| `MCP_OAUTH_REDIRECT_URI` | `http://localhost:$MCP_OAUTH_PORT/callback` | Redirect URI sent to the OAuth server |
+
+```bash
+# Bind on all interfaces and send the browser to the forwarded address
+MCP_OAUTH_HOST=0.0.0.0 \
+MCP_OAUTH_REDIRECT_URI=http://192.168.1.20:8765/callback \
+  pnpm -w run cli "who am I?"
+```
+
+Set `MCP_OAUTH_REDIRECT_URI` whenever the address the browser uses differs from
+the one the CLI binds to, such as behind port forwarding or a devcontainer.
 
 ### Direct Sentry Token Testing
 

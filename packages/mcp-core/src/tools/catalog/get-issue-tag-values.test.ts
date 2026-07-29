@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import getIssueTagValues from "./get-issue-tag-values.js";
+import {
+  assertStructuredOnlyResult,
+  getStructuredContent,
+} from "../../test-utils/structured-content.js";
+import getIssueTagValues, {
+  getIssueTagValuesOutputSchema,
+} from "./get-issue-tag-values.js";
 import { getServerContext } from "../../test-setup.js";
 import { UserInputError } from "../../errors.js";
 
@@ -17,30 +23,52 @@ describe("get_issue_tag_values", () => {
       },
       getServerContext(),
     );
-    expect(result).toMatchInlineSnapshot(`
-      "# Tag Distribution: Url
-
-      **Issue**: CLOUDFLARE-MCP-41
-      **Tag Key**: \`url\`
-      **Total Unique Values**: 156
-
-      ## Top Values
-
-      | Value | Count | First Seen | Last Seen |
-      |-------|-------|------------|----------|
-      | \`/upload/github/org/repo/commit/abc123\` | 45 | 2024-01-10 | 2024-01-15 |
-      | \`/api/v1/users/profile\` | 32 | 2024-01-11 | 2024-01-15 |
-      | \`/dashboard/overview\` | 28 | 2024-01-12 | 2024-01-15 |
-      | \`/settings/notifications\` | 21 | 2024-01-13 | 2024-01-14 |
-      | \`/checkout/payment\` | 15 | 2024-01-14 | 2024-01-14 |
-
-      *Showing top 5 of 156 unique values*
-
-      ## Response Notes
-
-      - Full issue details: \`get_sentry_resource(resourceType='issue', organizationSlug='sentry-mcp-evals', resourceId='CLOUDFLARE-MCP-41')\`
-      - Other common tag keys: url, browser, environment, release, os, device, user
-      "
+    assertStructuredOnlyResult(result);
+    expect(getIssueTagValues.outputSchema).toBe(getIssueTagValuesOutputSchema);
+    const structuredContent = getStructuredContent(result);
+    expect(getIssueTagValuesOutputSchema.parse(structuredContent)).toEqual(
+      structuredContent,
+    );
+    expect(structuredContent).toMatchInlineSnapshot(`
+      {
+        "tag": {
+          "key": "url",
+          "name": "Url",
+          "topValues": [
+            {
+              "count": 45,
+              "firstSeen": "2024-01-10T08:00:00.000Z",
+              "lastSeen": "2024-01-15T10:30:00.000Z",
+              "value": "/upload/github/org/repo/commit/abc123",
+            },
+            {
+              "count": 32,
+              "firstSeen": "2024-01-11T14:20:00.000Z",
+              "lastSeen": "2024-01-15T09:45:00.000Z",
+              "value": "/api/v1/users/profile",
+            },
+            {
+              "count": 28,
+              "firstSeen": "2024-01-12T11:30:00.000Z",
+              "lastSeen": "2024-01-15T08:15:00.000Z",
+              "value": "/dashboard/overview",
+            },
+            {
+              "count": 21,
+              "firstSeen": "2024-01-13T16:45:00.000Z",
+              "lastSeen": "2024-01-14T22:00:00.000Z",
+              "value": "/settings/notifications",
+            },
+            {
+              "count": 15,
+              "firstSeen": "2024-01-14T10:00:00.000Z",
+              "lastSeen": "2024-01-14T18:30:00.000Z",
+              "value": "/checkout/payment",
+            },
+          ],
+          "totalValues": 156,
+        },
+      }
     `);
   });
 
@@ -56,8 +84,14 @@ describe("get_issue_tag_values", () => {
       },
       getServerContext(),
     );
-    expect(result).toContain("# Tag Distribution: Browser");
-    expect(result).toContain("**Tag Key**: `browser`");
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toMatchObject({
+      tag: {
+        key: "browser",
+        name: "Browser",
+        totalValues: 156,
+      },
+    });
   });
 
   it("rejects issues outside the active project constraint", async () => {
@@ -180,8 +214,8 @@ describe("get_issue_tag_values", () => {
                 name: null,
                 value: null,
                 count: 5,
-                lastSeen: "2024-01-14T09:00:00.000Z",
-                firstSeen: "2024-01-12T14:00:00.000Z",
+                lastSeen: null,
+                firstSeen: null,
               },
             ],
           });
@@ -200,10 +234,27 @@ describe("get_issue_tag_values", () => {
       getServerContext(),
     );
 
-    // Verify the output handles null values by displaying "(null)"
-    expect(result).toContain("# Tag Distribution: Custom Tag");
-    expect(result).toContain("`valid_value`");
-    expect(result).toContain("`(null)`");
-    expect(result).toContain("| 5 |"); // The null value entry should have count 5
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toEqual({
+      tag: {
+        key: "custom_tag",
+        name: "Custom Tag",
+        totalValues: 2,
+        topValues: [
+          {
+            value: "valid_value",
+            count: 10,
+            firstSeen: "2024-01-10T08:00:00.000Z",
+            lastSeen: "2024-01-15T10:30:00.000Z",
+          },
+          {
+            value: null,
+            count: 5,
+            firstSeen: null,
+            lastSeen: null,
+          },
+        ],
+      },
+    });
   });
 });

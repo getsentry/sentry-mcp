@@ -89,7 +89,7 @@ jobs:
 
           ---
 
-          **Note:** This measures the static overhead of tool definitions sent to LLM clients with every request. Lower is better. The \`use_sentry\` tool is excluded as it's only available in agent mode.
+          **Note:** This measures the static overhead of tool definitions sent to LLM clients with every request. Lower is better.
           REPORT_EOF
 
           # Display report

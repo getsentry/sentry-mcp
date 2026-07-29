@@ -35,29 +35,24 @@ describe("runAgent", () => {
 
   beforeEach(() => {
     process.env.OPENROUTER_API_KEY = "sk-or-test";
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.OPENROUTER_MODEL;
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.MCP_MODEL;
   });
 
   afterEach(() => {
     if (originalOpenRouterApiKey === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.OPENROUTER_API_KEY;
     } else {
       process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey;
     }
 
     if (originalOpenRouterModel === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.OPENROUTER_MODEL;
     } else {
       process.env.OPENROUTER_MODEL = originalOpenRouterModel;
     }
 
     if (originalMcpModel === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
       delete process.env.MCP_MODEL;
     } else {
       process.env.MCP_MODEL = originalMcpModel;

@@ -1,13 +1,24 @@
 import { setTag } from "@sentry/core";
+import { z } from "zod";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
-import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import {
   ParamOrganizationSlug,
   ParamProjectSlug,
   ParamRegionUrl,
 } from "../../schema";
 import type { ServerContext } from "../../types";
+
+export const findDsnsOutputSchema = z.object({
+  dsns: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      dsn: z.string(),
+    }),
+  ),
+});
 
 export default defineTool({
   name: "find_dsns",
@@ -31,8 +42,10 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
+  outputSchema: findDsnsOutputSchema,
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -46,32 +59,13 @@ export default defineTool({
       organizationSlug,
       projectSlug: params.projectSlug,
     });
-    let output = `# DSNs in **${organizationSlug}/${params.projectSlug}**\n\n`;
-    if (clientKeys.length === 0) {
-      output += `No DSNs were found.\n\nYou can create a new one. ${formatToolCallInstruction(
-        {
-          toolName: "create_dsn",
-          arguments: {
-            organizationSlug,
-            projectSlug: params.projectSlug,
-            name: "Production",
-          },
-          experimentalMode: context.experimentalMode ?? false,
-          availableToolNames: context.availableToolNames,
-          directToolNames: context.directToolNames,
-        },
-      )}.`;
-      return output;
-    }
-    for (const clientKey of clientKeys) {
-      output += `## ${clientKey.name}\n`;
-      output += `**ID**: ${clientKey.id}\n`;
-      output += `**DSN**: ${clientKey.dsn.public}\n\n`;
-    }
-    output += "## Response Notes\n\n";
-    output += "- Please tell the user the DSN.\n";
-    output +=
-      "- The `SENTRY_DSN` value is a URL used to initialize Sentry SDKs.\n";
-    return output;
+
+    return structuredResult({
+      dsns: clientKeys.map((clientKey) => ({
+        id: String(clientKey.id),
+        name: clientKey.name,
+        dsn: clientKey.dsn.public,
+      })),
+    });
   },
 });

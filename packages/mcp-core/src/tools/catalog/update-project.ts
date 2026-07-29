@@ -2,6 +2,7 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import { logIssue } from "../../telem/logging";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
@@ -12,6 +13,15 @@ import {
   ParamProjectSlug,
   ParamPlatform,
 } from "../../schema";
+
+export const updateProjectOutputSchema = z.object({
+  project: z.object({
+    id: z.string(),
+    slug: z.string(),
+    name: z.string(),
+    platform: z.string().nullable(),
+  }),
+});
 
 export default defineTool({
   name: "update_project",
@@ -72,6 +82,7 @@ export default defineTool({
     idempotentHint: false,
     openWorldHint: true,
   },
+  outputSchema: updateProjectOutputSchema,
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -111,28 +122,13 @@ export default defineTool({
       );
     }
 
-    let output = `# Updated Project in **${organizationSlug}**\n\n`;
-    output += `**ID**: ${project.id}\n`;
-    output += `**Slug**: ${project.slug}\n`;
-    output += `**Name**: ${project.name}\n`;
-    if (project.platform) {
-      output += `**Platform**: ${project.platform}\n`;
-    }
-
-    // Display what was updated
-    const updates: string[] = [];
-    if (params.name) updates.push(`name to "${params.name}"`);
-    if (params.slug) updates.push(`slug to "${params.slug}"`);
-    if (params.platform) updates.push(`platform to "${params.platform}"`);
-
-    if (updates.length > 0) {
-      output += `\n## Updates Applied\n`;
-      output += updates.map((update) => `- Updated ${update}`).join("\n");
-      output += `\n`;
-    }
-
-    output += "\n## Response Notes\n\n";
-    output += `- Project slug for later requests: \`${project.slug}\`\n`;
-    return output;
+    return structuredResult({
+      project: {
+        id: String(project.id),
+        slug: project.slug,
+        name: project.name,
+        platform: project.platform ?? null,
+      },
+    });
   },
 });

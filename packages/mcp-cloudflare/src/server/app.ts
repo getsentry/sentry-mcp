@@ -40,7 +40,6 @@ When scoped, tools automatically default to the constrained org/project and unne
 ### Query Parameters
 
 - \`?experimental=1\` — Enable forward-looking tool variants and experimental features
-- \`?agent=1\` — Agent mode: exposes a single \`use_sentry\` tool that handles natural language requests via an embedded AI agent (roughly doubles response time)
 
 Parameters can be combined: \`${baseUrl}/mcp/my-org/my-project?experimental=1\`
 

@@ -8,7 +8,6 @@ Sentry MCP uses embedded AI agents for the following tools:
 - `search_events` - Natural language search across events, metrics, and session replays
 - `search_issues` - Natural language search across issues
 - `search_issue_events` - Search events within a specific issue
-- `use_sentry` - Unified natural language interface to all Sentry operations
 
 These tools require an LLM provider (OpenAI, Azure OpenAI, Anthropic, or OpenRouter) to be configured.
 

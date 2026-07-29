@@ -23,8 +23,10 @@ vi.mock("@sentry/cloudflare", () => ({
 }));
 
 import {
+  appendAuthorizationResponseIss,
   createResourceValidationError,
   exchangeCodeForAccessToken,
+  getAuthorizationServerIssuer,
   getOAuthCallbackFailureDetails,
   getTokenExchangeFailureDetails,
   tokenExchangeCallback,
@@ -906,11 +908,62 @@ describe("validateResourceParameter", () => {
   });
 });
 
+describe("getAuthorizationServerIssuer", () => {
+  it("returns the request origin as the canonical issuer", () => {
+    expect(
+      getAuthorizationServerIssuer(
+        "https://mcp.sentry.dev/oauth/callback?code=abc",
+      ),
+    ).toBe("https://mcp.sentry.dev");
+    expect(
+      getAuthorizationServerIssuer(
+        new URL("http://localhost:8787/oauth/authorize"),
+      ),
+    ).toBe("http://localhost:8787");
+  });
+});
+
+describe("appendAuthorizationResponseIss", () => {
+  it("appends iss to query-mode authorization responses", () => {
+    expect(
+      appendAuthorizationResponseIss(
+        "https://client.example.com/callback?code=abc&state=xyz",
+        "https://mcp.sentry.dev",
+      ),
+    ).toBe(
+      "https://client.example.com/callback?code=abc&state=xyz&iss=https%3A%2F%2Fmcp.sentry.dev",
+    );
+  });
+
+  it("appends iss to fragment-mode authorization responses", () => {
+    expect(
+      appendAuthorizationResponseIss(
+        "https://client.example.com/callback#code=abc&state=xyz",
+        "https://mcp.sentry.dev",
+      ),
+    ).toBe(
+      "https://client.example.com/callback#code=abc&state=xyz&iss=https%3A%2F%2Fmcp.sentry.dev",
+    );
+  });
+
+  it("replaces an existing iss parameter with the canonical issuer", () => {
+    expect(
+      appendAuthorizationResponseIss(
+        "https://client.example.com/callback?code=abc&iss=https%3A%2F%2Fother.example",
+        "https://mcp.sentry.dev",
+      ),
+    ).toBe(
+      "https://client.example.com/callback?code=abc&iss=https%3A%2F%2Fmcp.sentry.dev",
+    );
+  });
+});
+
 describe("createResourceValidationError", () => {
   it("should create redirect response with invalid_target error", () => {
     const response = createResourceValidationError(
       "https://client.example.com/callback",
       "state123",
+      "https://mcp.sentry.dev/oauth/authorize",
     );
 
     expect(response.status).toBe(302);
@@ -926,11 +979,14 @@ describe("createResourceValidationError", () => {
       "resource parameter",
     );
     expect(locationUrl.searchParams.get("state")).toBe("state123");
+    expect(locationUrl.searchParams.get("iss")).toBe("https://mcp.sentry.dev");
   });
 
   it("should create redirect without state parameter if not provided", () => {
     const response = createResourceValidationError(
       "https://client.example.com/callback",
+      undefined,
+      "https://mcp.sentry.dev/oauth/authorize",
     );
 
     const location = response.headers.get("Location");
@@ -939,12 +995,14 @@ describe("createResourceValidationError", () => {
     const locationUrl = new URL(location!);
     expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
     expect(locationUrl.searchParams.get("state")).toBeNull();
+    expect(locationUrl.searchParams.get("iss")).toBe("https://mcp.sentry.dev");
   });
 
   it("should preserve existing query parameters in redirect URI", () => {
     const response = createResourceValidationError(
       "https://client.example.com/callback?existing=param",
       "state456",
+      "https://mcp.sentry.dev/oauth/authorize",
     );
 
     const location = response.headers.get("Location");
@@ -953,11 +1011,14 @@ describe("createResourceValidationError", () => {
     expect(locationUrl.searchParams.get("existing")).toBe("param");
     expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
     expect(locationUrl.searchParams.get("state")).toBe("state456");
+    expect(locationUrl.searchParams.get("iss")).toBe("https://mcp.sentry.dev");
   });
 
   it("should have proper error description per RFC 8707", () => {
     const response = createResourceValidationError(
       "https://client.example.com/callback",
+      undefined,
+      "https://mcp.sentry.dev/oauth/authorize",
     );
 
     const location = response.headers.get("Location");

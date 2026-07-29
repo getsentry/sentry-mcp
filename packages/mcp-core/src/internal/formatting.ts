@@ -30,15 +30,21 @@ import type {
 } from "../api-client/types";
 import { logIssue } from "../telem/logging";
 import {
+  type CodeLocation,
+  findMostRelevantInAppFrame,
+  formatCodeLocation,
+} from "./code-location";
+import {
+  type AIConversationReference,
+  formatAIConversationActionInstructions,
+} from "./tool-helpers/ai-conversation-actions";
+import {
   getAutofixArtifactSummaries,
   getStatusDisplayName,
   isTerminalStatus,
 } from "./tool-helpers/seer";
 import { formatToolCallInstruction } from "./tool-helpers/tool-call-formatting";
-import {
-  formatAIConversationActionInstructions,
-  type AIConversationReference,
-} from "./tool-helpers/ai-conversation-actions";
+import { isPlainObject } from "./type-guards";
 import { formatUserGeoSummary } from "./user-formatting";
 
 /**
@@ -415,12 +421,12 @@ function formatExceptionInterfaceOutput(
 
     // Only show enhanced frame for the first (outermost) exception to avoid overwhelming output
     if (index === 0) {
-      const firstInAppFrame = findFirstInAppFrame(frames);
+      const relevantFrame = findMostRelevantInAppFrame(frames);
       if (
-        firstInAppFrame &&
-        (firstInAppFrame.context?.length || firstInAppFrame.vars)
+        relevantFrame &&
+        (relevantFrame.context?.length || relevantFrame.vars)
       ) {
-        parts.push(renderEnhancedFrame(firstInAppFrame, event));
+        parts.push(renderEnhancedFrame(relevantFrame, event));
         parts.push("");
         parts.push("**Full Stacktrace:**");
         parts.push("────────────────");
@@ -589,13 +595,10 @@ function formatThreadsInterfaceOutput(
 
   const frames = crashedThread.stacktrace.frames;
 
-  // Find and format the first in-app frame with enhanced view
-  const firstInAppFrame = findFirstInAppFrame(frames);
-  if (
-    firstInAppFrame &&
-    (firstInAppFrame.context?.length || firstInAppFrame.vars)
-  ) {
-    parts.push(renderEnhancedFrame(firstInAppFrame, event));
+  // Find and format the most relevant in-app frame with enhanced view
+  const relevantFrame = findMostRelevantInAppFrame(frames);
+  if (relevantFrame && (relevantFrame.context?.length || relevantFrame.vars)) {
+    parts.push(renderEnhancedFrame(relevantFrame, event));
     parts.push("");
     parts.push("**Full Stacktrace:**");
     parts.push("────────────────");
@@ -724,12 +727,9 @@ export function formatThreadStacktraceOutput({
     parts.push("");
   }
 
-  const firstInAppFrame = findFirstInAppFrame(frames);
-  if (
-    firstInAppFrame &&
-    (firstInAppFrame.context?.length || firstInAppFrame.vars)
-  ) {
-    parts.push(renderEnhancedFrame(firstInAppFrame, event));
+  const relevantFrame = findMostRelevantInAppFrame(frames);
+  if (relevantFrame && (relevantFrame.context?.length || relevantFrame.vars)) {
+    parts.push(renderEnhancedFrame(relevantFrame, event));
     parts.push("");
     parts.push("**Full Stacktrace:**");
     parts.push("────────────────");
@@ -883,27 +883,6 @@ function renderVariablesTable(vars: Record<string, unknown>): string {
   });
 
   return lines.join("\n");
-}
-
-/**
- * Finds the first application frame (in_app) in a stack trace.
- * Searches from the bottom of the stack (oldest frame) to find the first
- * frame that belongs to the user's application code rather than libraries.
- *
- * @param frames - Array of stack frames, typically in reverse chronological order
- * @returns The first in-app frame found, or undefined if none exist
- */
-function findFirstInAppFrame(
-  frames: z.infer<typeof FrameInterface>[],
-): z.infer<typeof FrameInterface> | undefined {
-  // Frames are usually in reverse order (most recent first)
-  // We want the first in-app frame from the bottom
-  for (let i = frames.length - 1; i >= 0; i--) {
-    if (frames[i].inApp === true) {
-      return frames[i];
-    }
-  }
-  return undefined;
 }
 
 /**
@@ -1662,10 +1641,6 @@ function formatPerformanceIssueOutput(
   return parts.length > 0 ? `${parts.join("\n")}\n` : "";
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function isPrimitive(value: unknown): value is string | number | boolean {
   return (
     typeof value === "string" ||
@@ -1690,15 +1665,15 @@ function getMetricAlertSnubaQuery(
   }
 
   for (const dataSource of dataSources) {
-    if (!isRecord(dataSource)) {
+    if (!isPlainObject(dataSource)) {
       continue;
     }
     const queryObj = dataSource.query_obj;
-    if (!isRecord(queryObj)) {
+    if (!isPlainObject(queryObj)) {
       continue;
     }
     const snubaQuery = queryObj.snuba_query;
-    if (isRecord(snubaQuery)) {
+    if (isPlainObject(snubaQuery)) {
       return snubaQuery;
     }
   }
@@ -1742,7 +1717,7 @@ function formatMetricAlertValue(value: unknown): string | undefined {
     return formattedValue;
   }
 
-  if (isRecord(value)) {
+  if (isPlainObject(value)) {
     return formatPrimitive(value.value);
   }
 
@@ -1782,7 +1757,7 @@ function formatMetricAlertDetails(
   const conditions = evidenceData.conditions;
   if (Array.isArray(conditions)) {
     const formattedConditions = conditions
-      .filter(isRecord)
+      .filter(isPlainObject)
       .map(formatMetricAlertCondition)
       .filter((condition): condition is string => condition != null);
     if (formattedConditions.length > 0) {
@@ -1982,6 +1957,7 @@ export function formatIssueOutput({
   externalIssues,
   relatedReplayIds,
   aiConversations,
+  codeLocation,
   experimentalMode,
   availableToolNames,
   directToolNames,
@@ -1995,6 +1971,7 @@ export function formatIssueOutput({
   externalIssues?: ExternalIssueList;
   relatedReplayIds?: string[];
   aiConversations?: AIConversationReference[];
+  codeLocation?: CodeLocation;
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
@@ -2069,6 +2046,11 @@ export function formatIssueOutput({
   output += `**Project**: ${issue.project.name}\n`;
   output += `**URL**: ${apiService.getIssueUrl(organizationSlug, issue.shortId)}\n`;
   output += "\n";
+
+  if (codeLocation) {
+    output += formatCodeLocation(codeLocation);
+  }
+
   output += "## Event Details\n\n";
 
   // Check if this is an unsupported event type
@@ -2183,7 +2165,10 @@ export function formatIssueOutput({
       : undefined;
 
   output += "## Response Notes\n\n";
-  output += `- Commit message issue reference: \`Fixes ${issue.shortId}\` automatically closes the issue when the commit is merged.\n`;
+  const commitIssueReference = /^\d+$/.test(issue.shortId)
+    ? apiService.getIssueUrl(organizationSlug, issue.shortId)
+    : issue.shortId;
+  output += `- Commit message issue reference: \`Fixes ${commitIssueReference}\` automatically closes the issue when the commit is merged.\n`;
   output +=
     "- The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.\n";
   if (aiConversations && aiConversations.length > 0) {
@@ -2280,7 +2265,18 @@ export function formatIssueOutput({
     output += `- Related log search: ${logSearchInstruction}\n`;
   }
   if (experimentalMode) {
-    output += `- Breadcrumb trail leading up to this error: \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
+    const breadcrumbsInstruction = formatToolCallInstruction({
+      toolName: "get_issue_breadcrumbs",
+      arguments: {
+        issueUrl: apiService.getIssueUrl(organizationSlug, issue.shortId),
+      },
+      experimentalMode,
+      availableToolNames,
+      directToolNames,
+      fallbackInstruction:
+        "Issue breadcrumbs are not available in this session",
+    });
+    output += `- Breadcrumb trail leading up to this error: ${breadcrumbsInstruction}\n`;
   }
   return output;
 }
@@ -2480,7 +2476,7 @@ function stripReplayMetadata(event: Event): Event {
         )
       : {
           ...event.contexts,
-          replay: nextReplayContext,
+          replay: { ...nextReplayContext, type: replayContext.type },
         };
 
   return {

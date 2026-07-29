@@ -81,6 +81,7 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
@@ -104,7 +105,6 @@ export default defineTool({
       {
         showUnmodified: params.showUnmodified,
         listImagesWhenNoDiffs: true,
-        nextSteps: "snapshot-tools",
         experimentalMode: context.experimentalMode ?? false,
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
