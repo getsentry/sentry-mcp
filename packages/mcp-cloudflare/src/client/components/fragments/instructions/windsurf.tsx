@@ -1,5 +1,4 @@
 import CodeSnippet from "../../ui/code-snippet";
-import { NPM_REMOTE_NAME } from "../../../../constants";
 
 interface WindsurfInstructionsProps {
   transport: "cloud" | "stdio";
@@ -9,20 +8,18 @@ export function WindsurfInstructions({ transport }: WindsurfInstructionsProps) {
   if (transport === "cloud") {
     const endpoint = new URL("/mcp", window.location.href).href;
     const coreConfig = {
-      command: "npx",
-      args: ["-y", `${NPM_REMOTE_NAME}@latest`, endpoint],
+      serverUrl: endpoint,
     };
 
     return (
       <>
         <ol>
-          <li>Open Windsurf Settings.</li>
           <li>
-            Under <strong>Cascade</strong>, you'll find{" "}
-            <strong>Model Context Protocol Servers</strong>.
+            Open <strong>Settings → Tools → Windsurf Settings</strong>.
           </li>
           <li>
-            Select <strong>Add Server</strong>.
+            Under <strong>Model Context Protocol Servers</strong>, select{" "}
+            <strong>View Raw Config</strong>.
           </li>
           <li>
             <CodeSnippet
@@ -39,6 +36,19 @@ export function WindsurfInstructions({ transport }: WindsurfInstructionsProps) {
             />
           </li>
         </ol>
+        <p>
+          <small>
+            For more details, see the{" "}
+            <a
+              href="https://docs.windsurf.com/plugins/cascade/mcp"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Windsurf MCP documentation
+            </a>
+            .
+          </small>
+        </p>
       </>
     );
   }
