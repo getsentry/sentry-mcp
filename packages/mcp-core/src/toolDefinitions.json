@@ -750,6 +750,16 @@
         "conversationId": {
           "type": "string"
         },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "organizationSlug": {
           "type": "string"
         },
@@ -1165,6 +1175,7 @@
       },
       "required": [
         "conversationId",
+        "title",
         "organizationSlug",
         "url",
         "lookupWindow",

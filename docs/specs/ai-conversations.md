@@ -238,6 +238,7 @@ raw span dump and not a lossy grouping invented by MCP.
 Current expected behavior:
 
 - Input is organization slug plus conversation ID.
+- Output includes `title` when Sentry has conversation metadata (`null` otherwise).
 - Output includes a chronological transcript timeline.
 - Timeline events are sorted by event timestamp and include a `type`
   discriminator.

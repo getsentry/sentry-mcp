@@ -184,6 +184,7 @@ const spanSummarySchema = z.object({
 
 export const aiConversationDetailsOutputSchema = z.object({
   conversationId: z.string(),
+  title: z.string().nullable(),
   organizationSlug: z.string(),
   url: z.string().url(),
   lookupWindow: lookupWindowSchema,
@@ -609,6 +610,7 @@ function buildConversationArtifact(
   apiService: SentryApiService,
   organizationSlug: string,
   conversationId: string,
+  title: string | null,
   spans: AIConversationSpan[],
   lookupWindow: LookupWindow,
 ): AIConversationDetailsOutput {
@@ -633,6 +635,7 @@ function buildConversationArtifact(
 
   return withoutUndefined({
     conversationId,
+    title,
     organizationSlug,
     url: apiService.getAIConversationUrl(organizationSlug, conversationId),
     lookupWindow,
@@ -718,7 +721,7 @@ export default defineTool({
       projectId = params.project;
     }
 
-    const spans = await apiService.getAIConversation(
+    const conversation = await apiService.getAIConversation(
       {
         organizationSlug: params.organizationSlug,
         conversationId: params.conversationId,
@@ -733,7 +736,8 @@ export default defineTool({
       apiService,
       params.organizationSlug,
       params.conversationId,
-      spans,
+      conversation.title,
+      conversation.spans,
       params.start && params.end
         ? { start: params.start, end: params.end }
         : { statsPeriod: "30d" },
