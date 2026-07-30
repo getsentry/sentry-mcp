@@ -17,6 +17,7 @@ import { mswServer } from "@sentry/mcp-server-mocks";
 import { z } from "zod";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SentryApiService } from "../../api-client";
+import { UserInputError } from "../../errors";
 import {
   getFilteredInputSchema,
   injectConstraintParams,
@@ -37,11 +38,14 @@ const VICTIM_ORG = "bbtest-victimorg";
 const VICTIM_PROJECT = "victim-proj";
 
 /**
- * The exact payload shapes from the reports, plus the bypass variants VULN-2450
- * asked us to retest because encode-only fixes for this class have historically
- * been circumvented.
+ * Payloads that encoding renders inert, so the request is still issued but stays
+ * within the constrained org and project.
+ *
+ * These are the exact shapes from the reports, plus the bypass variants VULN-2450
+ * asked us to retest because encode-only fixes for this class have historically been
+ * circumvented.
  */
-const TRAVERSAL_PAYLOADS = [
+const CONTAINED_PAYLOADS = [
   ["cross-project", `../../${VICTIM_PROJECT}/events/abc123`],
   ["cross-org", `../../../${VICTIM_ORG}/${VICTIM_PROJECT}/events/abc123`],
   [
@@ -56,6 +60,24 @@ const TRAVERSAL_PAYLOADS = [
   ["null byte", `abc\u0000/../${VICTIM_ORG}`],
   ["fragment truncation", "abc/#"],
   ["query injection", "abc/?download=1"],
+  // Inert once encoded, because the `%` is itself encoded.
+  ["bare encoded double dot", "%2e%2e"],
+] as const;
+
+/**
+ * Payloads that are entirely a dot segment. These carry no separator, so encoding
+ * leaves them intact and the URL parser still collapses them. They cannot name
+ * another tenant, but they do consume a preceding segment and move the request to a
+ * different endpoint, so `apiPath` rejects them outright and no request is issued.
+ */
+const REJECTED_PAYLOADS = [
+  ["bare double dot", ".."],
+  ["bare single dot", "."],
+] as const;
+
+const TRAVERSAL_PAYLOADS = [
+  ...CONTAINED_PAYLOADS,
+  ...REJECTED_PAYLOADS,
 ] as const;
 
 let requestedUrls: string[] = [];
@@ -80,7 +102,9 @@ afterEach(() => {
  * either validation rejected the input or the request stayed in scope.
  */
 async function callToolAsClient(
-  tool: ToolConfig<never>,
+  // Matches getFilteredInputSchema and injectConstraintParams, which take
+  // ToolConfig<any> so they can accept tools with heterogeneous schemas.
+  tool: ToolConfig<any>,
   clientParams: Record<string, unknown>,
   context: ServerContext,
 ): Promise<{ rejected: boolean }> {
@@ -268,62 +292,56 @@ describe("path traversal containment", () => {
    *
    * This block drives the client directly with the same payloads, standing in for a
    * parameter that a future tool forgets to validate. It is the actual evidence that
-   * encoding is load-bearing on its own, which is the reason this class of bug should
-   * not recur the way it did after the slug-only fix in VULN-848.
+   * the API client layer is load-bearing on its own, which is the reason this class of
+   * bug should not recur the way it did after the slug-only fix in VULN-848.
    */
   describe("the API client contains traversal without any validation layer", () => {
     const apiService = () =>
       new SentryApiService({ accessToken: "access-token", host: "sentry.io" });
 
-    it.each(TRAVERSAL_PAYLOADS)(
-      "listEventAttachments eventId: %s",
-      async (_label, payload) => {
-        await apiService()
-          .listEventAttachments({
-            organizationSlug: SCOPED_ORG,
-            projectSlug: SCOPED_PROJECT,
-            eventId: payload,
-          })
-          .catch(() => {});
+    const sinks = {
+      listEventAttachments: (eventId: string) =>
+        apiService().listEventAttachments({
+          organizationSlug: SCOPED_ORG,
+          projectSlug: SCOPED_PROJECT,
+          eventId,
+        }),
+      getTransactionProfile: (profileId: string) =>
+        apiService().getTransactionProfile({
+          organizationSlug: SCOPED_ORG,
+          projectSlugOrId: SCOPED_PROJECT,
+          profileId,
+        }),
+      updateClientKey: (keyId: string) =>
+        apiService().updateClientKey({
+          organizationSlug: SCOPED_ORG,
+          projectSlug: SCOPED_PROJECT,
+          keyId,
+          name: "XORG-PWN",
+          isActive: false,
+        }),
+    };
 
-        expect(requestedUrls).toHaveLength(1);
-        expectAllRequestsInScope();
-      },
-    );
+    describe.each(Object.entries(sinks))("%s", (_name, call) => {
+      it.each(CONTAINED_PAYLOADS)(
+        "issues one in-scope request for %s",
+        async (_label, payload) => {
+          await call(payload).catch(() => {});
 
-    it.each(TRAVERSAL_PAYLOADS)(
-      "getTransactionProfile profileId: %s",
-      async (_label, payload) => {
-        await apiService()
-          .getTransactionProfile({
-            organizationSlug: SCOPED_ORG,
-            projectSlugOrId: SCOPED_PROJECT,
-            profileId: payload,
-          })
-          .catch(() => {});
+          expect(requestedUrls).toHaveLength(1);
+          expectAllRequestsInScope();
+        },
+      );
 
-        expect(requestedUrls).toHaveLength(1);
-        expectAllRequestsInScope();
-      },
-    );
+      it.each(REJECTED_PAYLOADS)(
+        "issues no request at all for %s",
+        async (_label, payload) => {
+          await expect(call(payload)).rejects.toThrow(UserInputError);
 
-    it.each(TRAVERSAL_PAYLOADS)(
-      "updateClientKey keyId: %s",
-      async (_label, payload) => {
-        await apiService()
-          .updateClientKey({
-            organizationSlug: SCOPED_ORG,
-            projectSlug: SCOPED_PROJECT,
-            keyId: payload,
-            name: "XORG-PWN",
-            isActive: false,
-          })
-          .catch(() => {});
-
-        expect(requestedUrls).toHaveLength(1);
-        expectAllRequestsInScope();
-      },
-    );
+          expect(requestedUrls).toEqual([]);
+        },
+      );
+    });
   });
 
   describe("constraint keys remain unreachable by the client", () => {

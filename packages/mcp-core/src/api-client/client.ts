@@ -1531,7 +1531,7 @@ export class SentryApiService {
       queryParams.set("query", params.query);
     }
     const queryString = queryParams.toString();
-    const path = apiPath`/organizations/` + `?${queryString}`;
+    const path = `/organizations/?${queryString}`;
 
     // For self-hosted instances, the regions endpoint doesn't exist
     if (!this.isSaas()) {
@@ -1616,8 +1616,8 @@ export class SentryApiService {
       queryParams.set("query", params.query);
     }
     const queryString = queryParams.toString();
-    const path =
-      apiPath`/organizations/${organizationSlug}/teams/` + `?${queryString}`;
+    const teamsPath = apiPath`/organizations/${organizationSlug}/teams/`;
+    const path = `${teamsPath}?${queryString}`;
 
     const body = await this.requestJSON(path, undefined, opts);
     return TeamListSchema.parse(body);
@@ -1675,8 +1675,8 @@ export class SentryApiService {
       queryParams.set("query", params.query);
     }
     const queryString = queryParams.toString();
-    const path =
-      apiPath`/organizations/${organizationSlug}/projects/` + `?${queryString}`;
+    const projectsPath = apiPath`/organizations/${organizationSlug}/projects/`;
+    const path = `${projectsPath}?${queryString}`;
 
     const body = await this.requestJSON(path, undefined, opts);
     return ProjectListSchema.parse(body);

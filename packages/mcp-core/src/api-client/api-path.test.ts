@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { UserInputError } from "../errors";
 import { apiPath } from "./api-path";
 
 /**
@@ -84,6 +85,9 @@ describe("apiPath", () => {
       ["scheme relative", "//evil.example.com/x"],
       ["absolute path", "/organizations/other-org/members"],
       ["trailing dot segment", "abc/.."],
+      ["dots with a suffix", "..a"],
+      ["dots with a prefix", "a.."],
+      ["three dots", "..."],
     ])("contains %s", (_label, attack) => {
       const resolved = resolve(
         apiPath`/projects/my-org/my-proj/events/${attack}/`,
@@ -111,6 +115,51 @@ describe("apiPath", () => {
       expect(url.search).toBe("");
     });
   });
+
+  /**
+   * A value that is entirely a dot segment carries no separator, so encoding leaves
+   * it intact and the URL parser still collapses it. It cannot reach another tenant
+   * (that needs a `/` to name one) but it does consume a preceding segment and move
+   * the request to a different endpoint, so it has to be rejected rather than encoded.
+   */
+  describe("bare dot segments", () => {
+    it.each([".", ".."])("rejects %s", (attack) => {
+      expect(() => apiPath`/projects/o/p/keys/${attack}/`).toThrow(
+        UserInputError,
+      );
+    });
+
+    it("would otherwise consume the preceding segment", () => {
+      // Demonstrates why encoding cannot solve this: the encoded form still collapses.
+      expect(resolve(`/projects/o/p/keys/${encodeURIComponent("..")}/`)).toBe(
+        "/api/0/projects/o/p/",
+      );
+      expect(resolve("/projects/o/p/keys/%2e%2e/")).toBe(
+        "/api/0/projects/o/p/",
+      );
+    });
+
+    /**
+     * A percent-encoded spelling arriving as *input* is already inert, because the `%`
+     * itself gets encoded (`%2e%2e` becomes `%252e%252e`). These must be contained
+     * rather than rejected, so that a legitimate value is never refused.
+     */
+    it.each(["%2e", "%2E", "%2e%2e", ".%2e", "%2e."])(
+      "contains rather than rejects %s",
+      (value) => {
+        expect(() => apiPath`/projects/o/p/keys/${value}/`).not.toThrow();
+        expect(resolve(apiPath`/projects/o/p/keys/${value}/`)).toBe(
+          `/api/0/projects/o/p/keys/${encodeURIComponent(value)}/`,
+        );
+      },
+    );
+
+    it("still accepts identifiers that merely contain dots", () => {
+      for (const value of ["1.2.3", "my.project", "...", "..a", "a.."]) {
+        expect(() => apiPath`/projects/o/p/keys/${value}/`).not.toThrow();
+      }
+    });
+  });
 });
 
 /**
@@ -125,6 +174,27 @@ describe("apiPath", () => {
 describe("client.ts request path invariant", () => {
   const source = readFileSync(new URL("./client.ts", import.meta.url), "utf8");
 
+  /**
+   * Returns the path portion of a template literal body, stopping at the query
+   * separator. Only interpolation before the `?` needs the `apiPath` tag; query
+   * values are already encoded by `URLSearchParams` and must keep their separators
+   * literal.
+   */
+  function pathPortion(body: string): string {
+    let depth = 0;
+    for (let i = 0; i < body.length; i++) {
+      if (body[i] === "$" && body[i + 1] === "{") {
+        depth++;
+        i++;
+      } else if (body[i] === "}" && depth > 0) {
+        depth--;
+      } else if (body[i] === "?" && depth === 0) {
+        return body.slice(0, i);
+      }
+    }
+    return body;
+  }
+
   it("interpolates every request path through apiPath", () => {
     const offenders: string[] = [];
 
@@ -135,9 +205,13 @@ describe("client.ts request path invariant", () => {
       // A template literal opening with a slash is an API request path.
       for (let i = 0; i < line.length - 1; i++) {
         if (line[i] !== "`" || line[i + 1] !== "/") continue;
+
+        const closing = line.indexOf("`", i + 1);
+        const body = line.slice(i + 1, closing === -1 ? undefined : closing);
         const isTagged = line.slice(0, i).endsWith("apiPath");
-        const interpolates = /\$\{/.test(line.slice(i));
-        if (!isTagged && interpolates) {
+        const interpolatesPath = /\$\{/.test(pathPortion(body));
+
+        if (!isTagged && interpolatesPath) {
           offenders.push(`${index + 1}: ${trimmed}`);
         }
       }
