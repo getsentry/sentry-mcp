@@ -48,6 +48,7 @@ the pivots and recipes below.
 | `app.constraint.project_slug` | active project constraint | spans | constrained session behavior |
 | `gen_ai.tool.call.arguments.<key>` | effective tool arguments | spans | called tool input |
 | `app.client.family` | bucketed MCP client family | metrics, spans | client-specific OAuth behavior |
+| `app.oauth.client_registration.method` | CIMD vs DCR client registration method | metrics, auth spans | `cimd`, `dcr`, or `unknown` on auth paths only |
 | `app.oauth.token_exchange.outcome` | OAuth refresh outcome | metrics | token refresh diagnosis |
 | `app.oauth.grant_revoked.reason` | wrapper grant revoke reason | metrics | sign-out diagnosis |
 | `app.consent.skill` | skill granted during approval | metrics | per-skill adoption |
@@ -123,6 +124,22 @@ Register and callback volume by client family.
 dataset=tracemetrics query='metric:app.oauth.register OR metric:app.oauth.callback_completed'
 fields=timestamp,metric,app.client.family,value
 aggregate=sum(value) by metric,app.client.family
+```
+
+Completed auth flows by client registration method.
+
+```text
+dataset=tracemetrics query='metric:app.oauth.callback_completed'
+fields=timestamp,metric,app.oauth.client_registration.method,app.client.family,value
+aggregate=sum(value) by app.oauth.client_registration.method,app.client.family
+```
+
+Auth-path spans by client registration method.
+
+```text
+dataset=spans query='http.route:/oauth/callback OR http.route:/oauth/authorize OR http.route:/oauth/token OR http.route:/oauth/register'
+fields=timestamp,trace,span_id,http.route,app.oauth.client_registration.method,app.client.family,user.id,http.response.status_code
+aggregate=count() by app.oauth.client_registration.method,app.client.family,http.route
 ```
 
 OAuth skill adoption by client family.
@@ -202,7 +219,12 @@ Metrics: `app.oauth.token_exchange`, `app.oauth.grant_revoked`,
 Attributes: `app.oauth.token_exchange.outcome`, `app.oauth.grant.shape`,
 `app.oauth.probe.status_code`, `app.oauth.probe.reason`,
 `app.oauth.grant_revoked.reason`, `app.consent.skill`,
-`app.client.family`, `user.id`
+`app.client.family`, `app.oauth.client_registration.method`, `user.id`
+
+`app.oauth.client_registration.method` is auth-path only (`cimd` | `dcr` |
+`unknown`) on authorize/callback/register/token metrics and spans. It is not
+attached to ordinary `/mcp` request spans. HTTPS URL `client_id` values map to
+`cimd`; opaque non-URL ids map to `dcr`; `/oauth/register` is always `dcr`.
 
 ### MCP Tool Execution
 

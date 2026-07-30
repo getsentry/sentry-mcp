@@ -21,6 +21,7 @@ import {
 } from "./metrics";
 import { tokenExchangeCallback } from "./oauth";
 import {
+  CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
   bucketOAuthErrorCode,
   bucketOAuthErrorDescription,
   getOAuthErrorTelemetry,
@@ -369,8 +370,19 @@ const wrappedOAuthProvider = {
       url.pathname === "/oauth/register" &&
       response.ok
     ) {
+      // /oauth/register is the DCR path; CIMD clients never hit this endpoint.
+      const registrationMethodTelemetry = {
+        [CLIENT_REGISTRATION_METHOD_ATTRIBUTE]: "dcr" as const,
+      };
+      activeSpan?.setAttribute(
+        CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+        registrationMethodTelemetry[CLIENT_REGISTRATION_METHOD_ATTRIBUTE],
+      );
       Sentry.metrics.count("app.oauth.register", 1, {
-        attributes: { "app.client.family": clientFamily },
+        attributes: {
+          "app.client.family": clientFamily,
+          ...registrationMethodTelemetry,
+        },
       });
     }
 

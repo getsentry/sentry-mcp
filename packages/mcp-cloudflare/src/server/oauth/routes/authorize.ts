@@ -9,6 +9,10 @@ import {
 import { redirectUriHasUserInfo } from "../../lib/html-utils";
 import { isRegisteredRedirectUri } from "../../lib/redirect-uri";
 import { resolveClientFamilyFromName } from "../../lib/client-family";
+import {
+  CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+  getClientRegistrationMethodTelemetry,
+} from "../telemetry";
 import type { Env } from "../../types";
 import { SENTRY_AUTH_URL } from "../constants";
 import {
@@ -195,9 +199,16 @@ export default new Hono<{ Bindings: Env }>()
       defaultSkills,
     });
 
+    const registrationMethodTelemetry =
+      getClientRegistrationMethodTelemetry(clientId);
+    Sentry.getActiveSpan()?.setAttribute(
+      CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+      registrationMethodTelemetry[CLIENT_REGISTRATION_METHOD_ATTRIBUTE],
+    );
     Sentry.metrics.count("app.oauth.consent_prompted", 1, {
       attributes: {
         "app.client.family": resolveClientFamilyFromName(client?.clientName),
+        ...registrationMethodTelemetry,
       },
     });
 
@@ -307,9 +318,17 @@ export default new Hono<{ Bindings: Env }>()
     };
     const signedState = await signState(payload, c.env.COOKIE_SECRET);
 
+    const registrationMethodTelemetry = getClientRegistrationMethodTelemetry(
+      oauthReqWithSkills.clientId,
+    );
+    Sentry.getActiveSpan()?.setAttribute(
+      CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+      registrationMethodTelemetry[CLIENT_REGISTRATION_METHOD_ATTRIBUTE],
+    );
     Sentry.metrics.count("app.oauth.consent_granted", 1, {
       attributes: {
         "app.client.family": resolveClientFamilyFromName(client?.clientName),
+        ...registrationMethodTelemetry,
       },
     });
 
