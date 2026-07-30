@@ -1,25 +1,16 @@
-import { describeEval } from "vitest-evals";
-import { FIXTURES, NoOpTaskRunner, ToolPredictionScorer } from "./utils";
+import { FIXTURES, defineToolPredictionEval } from "./utils";
 
-describeEval("list-dsns", {
-  data: async () => {
-    return [
+defineToolPredictionEval("list-dsns", [
+  {
+    input: `What is the SENTRY_DSN for ${FIXTURES.organizationSlug}/${FIXTURES.projectSlug}?`,
+    expectedTools: [
       {
-        input: `What is the SENTRY_DSN for ${FIXTURES.organizationSlug}/${FIXTURES.projectSlug}?`,
-        expectedTools: [
-          {
-            name: "find_dsns",
-            arguments: {
-              organizationSlug: FIXTURES.organizationSlug,
-              projectSlug: FIXTURES.projectSlug,
-            },
-          },
-        ],
+        name: "find_dsns",
+        arguments: {
+          organizationSlug: FIXTURES.organizationSlug,
+          projectSlug: FIXTURES.projectSlug,
+        },
       },
-    ];
+    ],
   },
-  task: NoOpTaskRunner(),
-  scorers: [ToolPredictionScorer()],
-  threshold: 0.6,
-  timeout: 30000,
-});
+]);

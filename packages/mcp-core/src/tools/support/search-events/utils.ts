@@ -711,7 +711,7 @@ export function createDatasetAttributesTool(options: {
 
   return agentTool({
     description:
-      "Query and filter available attributes and fields for a specific Sentry dataset to understand what data is available",
+      "Discover custom, uncommon, or ambiguous attributes for a specific Sentry dataset. Use targeted filters when checking a specific custom field. Do not use this to confirm built-in or common fields already documented in the prompt.",
     parameters: z.object({
       dataset: z
         .enum(PUBLIC_EVENTS_DATASETS)
@@ -721,7 +721,9 @@ export function createDatasetAttributesTool(options: {
         .trim()
         .min(1)
         .optional()
-        .describe("Optional substring to find matching attribute names"),
+        .describe(
+          "Optional substring to find matching attribute names for a specific custom or ambiguous field",
+        ),
       query: z
         .string()
         .trim()
@@ -735,7 +737,7 @@ export function createDatasetAttributesTool(options: {
         .min(1)
         .optional()
         .describe(
-          "Optional attribute types to list. Use ['string','number','boolean'] when unsure.",
+          "Optional attribute types to list when the requested operation requires a string, number, or boolean field",
         ),
     }),
     execute: async ({ dataset, substringMatch, query, attributeTypes }) => {
