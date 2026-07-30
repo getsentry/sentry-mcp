@@ -25,6 +25,57 @@ export type OAuthErrorTelemetry = {
   oauthTokenShape?: OAuthTokenShape;
 };
 
+/**
+ * Low-cardinality OAuth client registration method.
+ * CIMD clients present an HTTPS URL as client_id; DCR clients receive an
+ * opaque registered client_id from /oauth/register.
+ */
+export const CLIENT_REGISTRATION_METHOD_ATTRIBUTE =
+  "app.oauth.client_registration.method" as const;
+
+export type ClientRegistrationMethod = "cimd" | "dcr" | "unknown";
+
+/**
+ * Classifies an OAuth client_id as CIMD, DCR, or unknown without emitting
+ * the raw client_id. HTTPS URL client_ids are CIMD; opaque non-URL ids are
+ * treated as DCR under the current server client model.
+ */
+export function resolveClientRegistrationMethod(
+  clientId: unknown,
+): ClientRegistrationMethod {
+  if (typeof clientId !== "string") {
+    return "unknown";
+  }
+
+  const trimmed = clientId.trim();
+  if (!trimmed) {
+    return "unknown";
+  }
+
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "https:" ? "cimd" : "unknown";
+  } catch {
+    return "dcr";
+  }
+}
+
+/**
+ * Returns the bounded client-registration-method attribute for metrics,
+ * spans, and logs.
+ */
+export function getClientRegistrationMethodTelemetry(
+  clientId: unknown,
+): Record<
+  typeof CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+  ClientRegistrationMethod
+> {
+  return {
+    [CLIENT_REGISTRATION_METHOD_ATTRIBUTE]:
+      resolveClientRegistrationMethod(clientId),
+  };
+}
+
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 

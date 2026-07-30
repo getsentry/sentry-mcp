@@ -91,6 +91,7 @@ Fired on a successful `/oauth/callback`. Pairs with `grant_revoked` to derive pe
 Attributes:
 
 - `app.client.family` — resolved from the DCR-registered `client_name` (not the browser User-Agent, which is always a browser string on this endpoint)
+- `app.oauth.client_registration.method` — `cimd` | `dcr` | `unknown`, classified from the OAuth `client_id` (HTTPS URL => CIMD; opaque id => DCR)
 - `user.id`
 
 ### `app.oauth.register` (counter)
@@ -100,6 +101,7 @@ Fired from the `wrappedOAuthProvider` after the library handles a successful `/o
 Attributes:
 
 - `app.client.family` — from the client's User-Agent (accurate here — DCR is hit directly by the MCP client, not via browser)
+- `app.oauth.client_registration.method` — always `dcr` on this endpoint
 
 ### Structured logs
 

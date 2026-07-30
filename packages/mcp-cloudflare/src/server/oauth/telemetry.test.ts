@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   bucketOAuthErrorCode,
   bucketOAuthErrorDescription,
+  CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+  getClientRegistrationMethodTelemetry,
   getOAuthErrorTelemetry,
   getOAuthGrantTelemetry,
   getOAuthGrantLifecycleTelemetry,
   getOAuthTokenShape,
+  resolveClientRegistrationMethod,
 } from "./telemetry";
 
 describe("OAuth telemetry", () => {
@@ -171,6 +174,32 @@ describe("OAuth telemetry", () => {
     expect(getOAuthGrantLifecycleTelemetry({})).toEqual({
       "app.oauth.grant.age_bucket": "unknown",
       "app.oauth.upstream.expires_in_bucket": "unknown",
+    });
+  });
+
+  it("classifies client_ids as CIMD, DCR, or unknown", () => {
+    expect(
+      resolveClientRegistrationMethod(
+        "https://claude.ai/oauth/claude-code-client-metadata",
+      ),
+    ).toBe("cimd");
+    expect(
+      resolveClientRegistrationMethod("  https://example.com/meta  "),
+    ).toBe("cimd");
+    expect(resolveClientRegistrationMethod("opaque-client-id")).toBe("dcr");
+    expect(resolveClientRegistrationMethod("http://example.com/meta")).toBe(
+      "unknown",
+    );
+    expect(resolveClientRegistrationMethod("")).toBe("unknown");
+    expect(resolveClientRegistrationMethod("   ")).toBe("unknown");
+    expect(resolveClientRegistrationMethod(undefined)).toBe("unknown");
+    expect(resolveClientRegistrationMethod(null)).toBe("unknown");
+    expect(
+      getClientRegistrationMethodTelemetry(
+        "https://claude.ai/oauth/claude-code-client-metadata",
+      ),
+    ).toEqual({
+      [CLIENT_REGISTRATION_METHOD_ATTRIBUTE]: "cimd",
     });
   });
 });

@@ -251,6 +251,8 @@ describe("tokenExchangeCallback", () => {
           "app.oauth.token_exchange.outcome": "cached_valid_local",
           "app.oauth.grant.age_bucket": "1d_7d",
           "app.oauth.upstream.expires_in_bucket": "1d_7d",
+          "app.oauth.client_registration.method":
+            expect.stringMatching(/^(cimd|dcr|unknown)$/),
         }),
       },
     );
