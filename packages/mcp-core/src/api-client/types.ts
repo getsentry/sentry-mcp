@@ -43,6 +43,7 @@ import type {
   AssignedToSchema,
   AIConversationSummaryListSchema,
   AIConversationSummarySchema,
+  AIConversationDetailsResponseSchema,
   AIConversationSpanListSchema,
   AIConversationSpanSchema,
   AIConversationUserSchema,
@@ -203,6 +204,9 @@ export type Trace = z.infer<typeof TraceSchema>;
 export type AIConversationSpan = z.infer<typeof AIConversationSpanSchema>;
 export type AIConversationSpanList = z.infer<
   typeof AIConversationSpanListSchema
+>;
+export type AIConversationDetails = z.infer<
+  typeof AIConversationDetailsResponseSchema
 >;
 export type AIConversationUser = z.infer<typeof AIConversationUserSchema>;
 export type AIConversationSummary = z.infer<typeof AIConversationSummarySchema>;

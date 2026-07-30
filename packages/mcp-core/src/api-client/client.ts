@@ -79,7 +79,7 @@ import {
   ReplayRecordingSegmentsSchema,
   StacktraceLinkSchema,
   AIConversationSummaryListSchema,
-  AIConversationSpanListSchema,
+  AIConversationDetailsResponseSchema,
   UserReportListSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
@@ -132,6 +132,7 @@ import type {
   ReplayRecordingSegments,
   StacktraceLink,
   AIConversationSummary,
+  AIConversationDetails,
   AIConversationSpanList,
   UserReportList,
 } from "./types";
@@ -4207,13 +4208,16 @@ export class SentryApiService {
       maxPages?: number;
     },
     opts?: RequestOptions,
-  ): Promise<AIConversationSpanList> {
+  ): Promise<AIConversationDetails> {
     const spans: AIConversationSpanList = [];
+    let title: string | null = null;
     let cursor: string | null = null;
 
     for (let page = 0; page < maxPages; page++) {
       const queryParams = new URLSearchParams();
       queryParams.set("per_page", String(perPage));
+      // Temporary: drop when Sentry defaults conversation details to the v2 envelope.
+      queryParams.set("apiVersion", "2");
       this.applyTimeParams(
         queryParams,
         start || end ? undefined : statsPeriod,
@@ -4234,7 +4238,10 @@ export class SentryApiService {
         opts,
       );
       const body = await this.parseJsonResponse(response);
-      spans.push(...AIConversationSpanListSchema.parse(body));
+      const details = AIConversationDetailsResponseSchema.parse(body);
+      // Pages repeat the same conversation-scoped title.
+      title = details.title;
+      spans.push(...details.spans);
 
       cursor = getNextCursor(response.headers.get("link"));
       if (!cursor) {
@@ -4242,7 +4249,11 @@ export class SentryApiService {
       }
     }
 
-    return spans;
+    return {
+      conversationId,
+      title,
+      spans,
+    };
   }
 
   /**

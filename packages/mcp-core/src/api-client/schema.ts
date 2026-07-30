@@ -1554,6 +1554,15 @@ export const AIConversationSpanSchema = z
 
 export const AIConversationSpanListSchema = z.array(AIConversationSpanSchema);
 
+/** Conversation details response envelope (`conversationId`, `title`, `spans`). */
+export const AIConversationDetailsResponseSchema = z
+  .object({
+    conversationId: z.string(),
+    title: z.string().nullable(),
+    spans: AIConversationSpanListSchema,
+  })
+  .passthrough();
+
 /**
  * Schemas validated against getsentry/sentry:
  * - `src/sentry/api/endpoints/organization_ai_conversations.py`
