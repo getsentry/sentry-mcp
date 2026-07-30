@@ -9,7 +9,7 @@ import {
   ParamPeriod,
   ParamRegionUrl,
 } from "../../schema";
-import { isNumericId } from "../../utils/slug-validation";
+import { isNumericId, validateSlugOrId } from "../../utils/slug-validation";
 import {
   formatFlamegraphAnalysis,
   formatFlamegraphComparison,
@@ -152,7 +152,7 @@ export default defineTool({
     organizationSlug: ParamOrganizationSlug.optional(),
     regionUrl: ParamRegionUrl.nullable().default(null),
     projectSlugOrId: z
-      .union([z.string(), z.number()])
+      .union([z.string().trim().superRefine(validateSlugOrId), z.number()])
       .optional()
       .describe("Project slug or numeric ID"),
     transactionName: z

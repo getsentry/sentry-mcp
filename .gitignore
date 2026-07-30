@@ -29,6 +29,7 @@ _.seed
 node_modules/
 jspm_packages/
 .npm
+.pnpm-store/
 .node_repl_history
 *.tgz
 .cache

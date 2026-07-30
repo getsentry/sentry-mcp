@@ -6,7 +6,11 @@ import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/res
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
-import { isNumericId } from "../../utils/slug-validation";
+import {
+  isNumericId,
+  validateResourceId,
+  validateSlugOrId,
+} from "../../utils/slug-validation";
 import { parseSentryUrl, isProfileUrl } from "../../internal/url-helpers";
 import {
   resolveScopedOrganizationSlug,
@@ -234,17 +238,19 @@ export default defineTool({
     organizationSlug: ParamOrganizationSlug.optional(),
     regionUrl: ParamRegionUrl.nullable().default(null),
     projectSlugOrId: z
-      .union([z.string(), z.number()])
+      .union([z.string().trim().superRefine(validateSlugOrId), z.number()])
       .optional()
       .describe("Project slug or numeric ID"),
     profileId: z
       .string()
       .trim()
+      .superRefine(validateResourceId)
       .optional()
       .describe("Transaction profile ID from a profile flamegraph URL"),
     profilerId: z
       .string()
       .trim()
+      .superRefine(validateResourceId)
       .optional()
       .describe("Continuous profiler session ID"),
     start: z
