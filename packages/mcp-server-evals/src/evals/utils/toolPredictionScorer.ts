@@ -205,6 +205,12 @@ export function ToolPredictionScorer(
         expectedDescription,
       ),
       schema: predictionSchema,
+      providerOptions: {
+        openai: {
+          structuredOutputs: false,
+          strictJsonSchema: false,
+        },
+      },
       experimental_telemetry: {
         isEnabled: true,
         functionId: "tool_prediction_scorer",
