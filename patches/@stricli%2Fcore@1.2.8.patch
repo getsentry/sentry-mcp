@@ -1,0 +1,80 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index a9afbc1ab78cad7ba97d53882a80236af62854df..8c66958d340038dd8669848d0e2dbd49064dcd1f 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -1300,7 +1300,7 @@ function buildRouteScanner(root, config, startingPrefix) {
+             target = current;
+           }
+           return;
+-        } else if (input === "--helpAll" || input === "--help-all" || input === "-H") {
++        } else if (input === "--helpAll" || input === "--help-all") {
+           helpRequested = "all";
+           if (!target) {
+             target = current;
+@@ -1881,7 +1881,7 @@ function formatDocumentationForFlagParameters(flags, aliases, args) {
+   if (args.includeHelpAllFlag) {
+     const helpAllFlagName = formatForDisplay("helpAll", args.config.caseStyle);
+     rows.push({
+-      aliases: "-H",
++      aliases: "",
+       flagName: atLeastOneOptional ? ` --${helpAllFlagName}` : `--${helpAllFlagName}`,
+       brief: briefs.helpAll,
+       hidden: !args.config.alwaysShowHelpAllFlag
+@@ -1920,7 +1920,7 @@ function* generateBuiltInFlagUsageLines(args) {
+   yield args.config.useAliasInUsageLine ? "-h" : "--help";
+   if (args.includeHelpAllFlag) {
+     const helpAllFlagName = formatForDisplay("helpAll", args.config.caseStyle);
+-    yield args.config.useAliasInUsageLine ? "-H" : `--${helpAllFlagName}`;
++    yield `--${helpAllFlagName}`;
+   }
+   if (args.includeVersionFlag) {
+     yield args.config.useAliasInUsageLine ? "-v" : "--version";
+@@ -2057,7 +2057,7 @@ function checkForInvalidVariadicSeparators(flags) {
+ function buildCommand(builderArgs) {
+   const { flags = {}, aliases = {} } = builderArgs.parameters;
+   checkForReservedFlags(flags, ["help", "helpAll", "help-all"]);
+-  checkForReservedAliases(aliases, ["h", "H"]);
++  checkForReservedAliases(aliases, ["h"]);
+   checkForNegationCollisions(flags);
+   checkForInvalidVariadicSeparators(flags);
+   let loader;
+diff --git a/dist/index.js b/dist/index.js
+index f76639637e812453d107bda3e3ec165fc195f4d8..47b8419d3977b45072d276eeaa71e29df7be36a8 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1252,7 +1252,7 @@ function buildRouteScanner(root, config, startingPrefix) {
+             target = current;
+           }
+           return;
+-        } else if (input === "--helpAll" || input === "--help-all" || input === "-H") {
++        } else if (input === "--helpAll" || input === "--help-all") {
+           helpRequested = "all";
+           if (!target) {
+             target = current;
+@@ -1833,7 +1833,7 @@ function formatDocumentationForFlagParameters(flags, aliases, args) {
+   if (args.includeHelpAllFlag) {
+     const helpAllFlagName = formatForDisplay("helpAll", args.config.caseStyle);
+     rows.push({
+-      aliases: "-H",
++      aliases: "",
+       flagName: atLeastOneOptional ? ` --${helpAllFlagName}` : `--${helpAllFlagName}`,
+       brief: briefs.helpAll,
+       hidden: !args.config.alwaysShowHelpAllFlag
+@@ -1872,7 +1872,7 @@ function* generateBuiltInFlagUsageLines(args) {
+   yield args.config.useAliasInUsageLine ? "-h" : "--help";
+   if (args.includeHelpAllFlag) {
+     const helpAllFlagName = formatForDisplay("helpAll", args.config.caseStyle);
+-    yield args.config.useAliasInUsageLine ? "-H" : `--${helpAllFlagName}`;
++    yield `--${helpAllFlagName}`;
+   }
+   if (args.includeVersionFlag) {
+     yield args.config.useAliasInUsageLine ? "-v" : "--version";
+@@ -2009,7 +2009,7 @@ function checkForInvalidVariadicSeparators(flags) {
+ function buildCommand(builderArgs) {
+   const { flags = {}, aliases = {} } = builderArgs.parameters;
+   checkForReservedFlags(flags, ["help", "helpAll", "help-all"]);
+-  checkForReservedAliases(aliases, ["h", "H"]);
++  checkForReservedAliases(aliases, ["h"]);
+   checkForNegationCollisions(flags);
+   checkForInvalidVariadicSeparators(flags);
+   let loader;
