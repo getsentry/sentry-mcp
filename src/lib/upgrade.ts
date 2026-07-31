@@ -9,11 +9,13 @@
 import { spawn } from "node:child_process";
 import {
   chmodSync,
-  createWriteStream,
+  closeSync,
   existsSync,
+  openSync,
   realpathSync,
   statSync,
   unlinkSync,
+  writeSync,
 } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -563,12 +565,74 @@ export type DownloadResult = {
 };
 
 /**
+ * Write `chunk` to `fd` in full, looping to handle short writes
+ * (interrupted syscalls, partial writes under memory pressure).
+ *
+ * Throws on a 0-byte return — that's the kernel telling us the fd is
+ * unwritable and no further progress is possible, so we surface it
+ * rather than spin forever.
+ */
+function writeChunkSync(fd: number, chunk: Uint8Array): void {
+  let written = 0;
+  while (written < chunk.byteLength) {
+    const n = writeSync(fd, chunk, written, chunk.byteLength - written);
+    if (n <= 0) {
+      throw new Error(
+        `writeSync returned ${n} for chunk of ${chunk.byteLength - written} bytes`
+      );
+    }
+    written += n;
+  }
+}
+
+/**
+ * Drain a decompressed body into `fd`, awaiting the underlying stream
+ * pipeline. Returns the terminal stream error (if any) and any error
+ * raised by the synchronous write loop. The fd is owned by the caller —
+ * this function never closes it.
+ */
+async function drainBodyToFd(
+  body: ReadableStream<Uint8Array>,
+  fd: number,
+  onBytes: (n: number) => void
+): Promise<{ streamError: unknown; writeError: Error | undefined }> {
+  let writeError: Error | undefined;
+  let streamError: unknown;
+  try {
+    for await (const chunk of body.pipeThrough(
+      new DecompressionStream("gzip")
+    )) {
+      if (writeError) {
+        break;
+      }
+      try {
+        writeChunkSync(fd, chunk);
+        onBytes(chunk.byteLength);
+      } catch (err) {
+        writeError = err instanceof Error ? err : new Error(String(err));
+        break;
+      }
+    }
+  } catch (err) {
+    streamError = err;
+  }
+  return { streamError, writeError };
+}
+
+/**
  * Stream a response body through a decompression transform and write to disk.
  *
- * Uses a manual `for await` loop with `Bun.file().writer()` instead of
- * `Bun.write(path, Response)` to work around a Bun event-loop bug where
- * streaming response bodies get GC'd before completing.
- * See: https://github.com/oven-sh/bun/issues/13237
+ * Uses `fs.openSync` + `fs.writeSync` + `fs.closeSync` (NOT
+ * `fs.createWriteStream`) so the output fd is released synchronously
+ * before this function returns. Node's `writer.end()` callback fires on
+ * the `'finish'` event — data flushed, not fd released — and a
+ * subsequent `spawn` of the output file on Linux then fails with
+ * `ETXTBSY` ("text file busy") in a small but reproducible race window.
+ * `fs.writeFile` (used for the raw fallback path) does not exhibit the
+ * bug because it closes the fd synchronously; this function used to be
+ * inconsistent with that behavior — full-download fallbacks hit ETXTBSY
+ * while direct full-downloads succeeded. Closing synchronously makes
+ * both paths race-free.
  *
  * @param body - Readable stream from a fetch response
  * @param destPath - File path to write the decompressed output
@@ -578,74 +642,33 @@ async function streamDecompressToFile(
   destPath: string,
   setMessage?: SetMessage
 ): Promise<void> {
-  const stream = body.pipeThrough(new DecompressionStream("gzip"));
-  const writer = createWriteStream(destPath);
   // Indeterminate byte counter: the decompressed size isn't known ahead of
   // time (Content-Length covers only the compressed stream), so we show a live
   // byte count rather than a misleading fraction. Feeds the surrounding
   // spinner via setMessage — cosmetic, never aborts.
   const progress = makeByteProgress("Downloading", null, setMessage);
-  // Capture write errors early — without a listener, Node crashes with
-  // ERR_UNHANDLED_ERROR if a write fails (ENOSPC, EIO, etc.) during the loop.
-  let writeError: Error | undefined;
-  writer.on("error", (err) => {
-    writeError ??= err;
-  });
+  const fd = openSync(destPath, "w", 0o644);
 
-  // Track the original streaming error so a later writer.end() rejection can't
-  // mask it: an exception thrown from a finally overwrites a pending try
-  // exception. We rethrow the ORIGINAL error preferentially.
-  let streamError: unknown;
+  // Drain the body to the fd. Awaited so we know before closeSync whether
+  // the drain terminated with an error.
+  const { streamError, writeError } = await drainBodyToFd(body, fd, (n) =>
+    progress.onProgress(n)
+  );
+  progress.done();
+
+  // Synchronous close — guarantees the fd is released before this function
+  // returns, so the caller can `spawn` the output file immediately. If a
+  // write error already exists, the close error is moot — surface the write.
   try {
-    for await (const chunk of stream) {
-      if (writeError) {
-        break;
-      }
-      const ok = writer.write(chunk);
-      progress.onProgress(chunk.byteLength);
-      if (!(ok || writeError)) {
-        // Race drain against error — an I/O failure (ENOSPC) while the
-        // buffer is full would never emit 'drain', causing a hang.
-        // Clean up the unused listener to avoid MaxListenersExceededWarning.
-        await new Promise<void>((resolve) => {
-          const onDrain = (): void => {
-            writer.removeListener("error", onError);
-            resolve();
-          };
-          const onError = (): void => {
-            writer.removeListener("drain", onDrain);
-            resolve();
-          };
-          writer.once("drain", onDrain);
-          writer.once("error", onError);
-        });
-      }
-    }
+    closeSync(fd);
   } catch (err) {
-    streamError = err;
-  } finally {
-    progress.done();
+    if (!writeError) {
+      throw err instanceof Error ? err : new Error(String(err));
+    }
   }
 
-  // Always flush/close the writer. If the stream already failed, surface THAT
-  // error (the root cause) and demote any end() rejection to a debug log so it
-  // can't mask the original.
-  try {
-    await new Promise<void>((resolve, reject) => {
-      writer.end((err?: Error | null) => {
-        const finalErr = err ?? writeError;
-        if (finalErr) {
-          reject(finalErr);
-        } else {
-          resolve();
-        }
-      });
-    });
-  } catch (endErr) {
-    if (streamError === undefined) {
-      throw endErr;
-    }
-    log.debug(`writer.end failed after a stream error: ${String(endErr)}`);
+  if (writeError) {
+    throw writeError;
   }
 
   if (streamError !== undefined) {
