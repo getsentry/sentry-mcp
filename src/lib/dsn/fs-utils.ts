@@ -19,6 +19,7 @@ import * as Sentry from "@sentry/node-core/light";
  * - ENOTDIR: A path component is not a directory (e.g., `/file.txt/child`)
  * - EINVAL: Invalid argument (e.g., scandir on a special/virtual filesystem entry like /proc paths)
  * - ELOOP: Too many symbolic links (e.g., cyclic symlink encountered during scan)
+ * - ETIMEDOUT: Connection timed out (e.g., transient read on a network or cloud-mounted filesystem)
  *
  * All other errors are unexpected and should be reported to Sentry.
  *
@@ -35,7 +36,8 @@ function isIgnorableFileError(error: unknown): boolean {
       code === "EISDIR" ||
       code === "ENOTDIR" ||
       code === "EINVAL" ||
-      code === "ELOOP"
+      code === "ELOOP" ||
+      code === "ETIMEDOUT"
     );
   }
   return false;

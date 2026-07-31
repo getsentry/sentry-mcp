@@ -77,6 +77,14 @@ describe("handleFileError", () => {
       });
       expect(captureException).not.toHaveBeenCalled();
     });
+
+    test("ETIMEDOUT — connection timed out on a network mount", () => {
+      handleFileError(errnoError("ETIMEDOUT"), {
+        operation: "scandir",
+        path: "/mnt/cloud-storage",
+      });
+      expect(captureException).not.toHaveBeenCalled();
+    });
   });
 
   describe("unexpected errors (SHOULD report to Sentry)", () => {
