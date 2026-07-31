@@ -1,8 +1,8 @@
-import { openai } from "@ai-sdk/openai";
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { experimental_createMCPClient } from "@ai-sdk/mcp";
 import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
+import { getOpenRouterModel } from "@sentry/mcp-core/internal/agents/openrouter-provider";
 
 // Cache for available tools to avoid reconnecting for each test
 let cachedTools: string[] | null = null;
@@ -63,8 +63,6 @@ interface ToolPredictionScorerOptions {
   expectedTools?: ExpectedToolCall[];
   result?: any;
 }
-
-const defaultModel = openai("gpt-4o");
 
 const predictionSchema = z.object({
   score: z.number().min(0).max(1).describe("Score from 0 to 1"),
@@ -129,7 +127,7 @@ CRITICAL: The expected tools represent the actual realistic behavior for this sp
  * A scorer that uses AI to predict what tools would be called without executing them.
  * This is much faster than actually running the tools and checking what was called.
  *
- * @param model - Optional language model to use for predictions (defaults to gpt-4o)
+ * @param model - Optional language model to use for predictions (defaults to OpenRouter)
  * @returns A scorer function that compares predicted vs expected tool calls
  *
  * @example
@@ -170,7 +168,9 @@ CRITICAL: The expected tools represent the actual realistic behavior for this sp
  * If `expectedTools` is not provided in test data, the scorer is automatically skipped
  * and returns `{ score: null }` to allow other scorers to run without interference.
  */
-export function ToolPredictionScorer(model: LanguageModel = defaultModel) {
+export function ToolPredictionScorer(
+  model: LanguageModel = getOpenRouterModel(),
+) {
   return async function ToolPredictionScorer(
     opts: ToolPredictionScorerOptions,
   ) {
