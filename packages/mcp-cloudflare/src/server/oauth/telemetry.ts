@@ -31,7 +31,7 @@ export type OAuthErrorTelemetry = {
  * opaque registered client_id from /oauth/register.
  */
 export const CLIENT_REGISTRATION_METHOD_ATTRIBUTE =
-  "app.oauth.client_registration.method" as const;
+  "app.client.registration.method" as const;
 
 export type ClientRegistrationMethod = "cimd" | "dcr" | "unknown";
 
