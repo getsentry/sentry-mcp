@@ -8,11 +8,11 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.39.2",
+    "@astrojs/starlight": "^0.41.5",
     "@sentry/astro": "^10.38.0",
     "@sentry/starlight-theme": "^0.8.0",
-    "astro": "^6.4.6",
-    "sharp": "^0.33.5",
+    "astro": "^7.1.1",
+    "sharp": "^0.35.0",
     "shiki": "^3.21.0"
   }
 }
