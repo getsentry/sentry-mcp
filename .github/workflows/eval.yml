@@ -60,7 +60,8 @@ jobs:
         run: pnpm eval:ci evals
         continue-on-error: true
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          EMBEDDED_AGENT_PROVIDER: openrouter
 
       - name: Create eval status check
         uses: actions/github-script@v7
