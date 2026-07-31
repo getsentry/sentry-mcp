@@ -65,6 +65,8 @@ export default defineConfig({
       plugins: [sentryStarlightTheme(), sentryAgentMarkdown()],
       components: {
         Header: "./src/components/Header.astro",
+        // The custom landing page should not render the docs theme footer.
+        Footer: "./src/components/Footer.astro",
         PageTitle: "./src/components/PageTitle.astro",
       },
       head: [
