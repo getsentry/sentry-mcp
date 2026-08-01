@@ -26,15 +26,16 @@ export {
   deleteIssueAlertRule,
   deleteMetricAlertRule,
   getIssueAlertRule,
-  getIssueAlertRuleDocument,
+  getIssueAlertWorkflowDocument,
   getMetricAlertRule,
   getMetricAlertRuleDocument,
   type IssueAlertRule,
   listIssueAlertsPaginated,
   listMetricAlertsPaginated,
   type MetricAlertRule,
-  putIssueAlertRule,
   putMetricAlertRule,
+  resolveErrorDetectorId,
+  updateIssueAlertRule,
 } from "./api/alerts.js";
 export {
   createDashboard,

@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
+  createIssueAlertRule,
   deleteIssueAlertRule,
   deleteMetricAlertRule,
   getIssueAlertRule,
+  getIssueAlertWorkflowDocument,
   getMetricAlertRule,
   listIssueAlertsPaginated,
   listMetricAlertsPaginated,
+  resolveErrorDetectorId,
+  updateIssueAlertRule,
 } from "../../../src/lib/api/alerts.js";
 import { DEFAULT_SENTRY_URL } from "../../../src/lib/constants.js";
 import { setAuthToken } from "../../../src/lib/db/auth.js";
@@ -276,6 +280,82 @@ describe("getMetricAlertRule", () => {
 
     const rule = await getMetricAlertRule("test-org", "9");
     expect(rule.owner).toBe("team:42");
+  });
+});
+
+describe("createIssueAlertRule", () => {
+  test("POSTs the body to the org-scoped /workflows/ endpoint", async () => {
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const req = new Request(input!, init);
+      expect(req.method).toBe("POST");
+      expect(new URL(req.url).pathname).toBe(
+        "/api/0/organizations/test-org/workflows/"
+      );
+      expect(await req.json()).toEqual({ name: "New", detectorIds: [7] });
+      return Response.json(workflowRule({ id: "5", name: "New" }));
+    });
+
+    const created = await createIssueAlertRule("test-org", {
+      name: "New",
+      detectorIds: [7],
+    });
+    expect(created.id).toBe("5");
+  });
+});
+
+describe("updateIssueAlertRule", () => {
+  test("PUTs the body to the /workflows/{id}/ endpoint", async () => {
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const req = new Request(input!, init);
+      expect(req.method).toBe("PUT");
+      expect(new URL(req.url).pathname).toBe(
+        "/api/0/organizations/test-org/workflows/42/"
+      );
+      expect(await req.json()).toEqual({ name: "Renamed" });
+      return Response.json(workflowRule({ id: "42", name: "Renamed" }));
+    });
+
+    const updated = await updateIssueAlertRule("test-org", "42", {
+      name: "Renamed",
+    });
+    expect(updated.name).toBe("Renamed");
+  });
+});
+
+describe("getIssueAlertWorkflowDocument", () => {
+  test("reads the single workflow detail endpoint", async () => {
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const url = new URL(new Request(input!, init).url);
+      expect(url.pathname).toBe("/api/0/organizations/test-org/workflows/42/");
+      return Response.json(workflowRule({ id: "42" }));
+    });
+
+    const doc = await getIssueAlertWorkflowDocument("test-org", "42");
+    expect(doc.id).toBe("42");
+  });
+});
+
+describe("resolveErrorDetectorId", () => {
+  test("returns the id of the project's error detector", async () => {
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const url = new URL(new Request(input!, init).url);
+      expect(url.pathname).toBe("/api/0/organizations/test-org/detectors/");
+      expect(url.searchParams.get("project")).toBe("test-project");
+      expect(url.searchParams.get("query")).toBe("type:error");
+      return Response.json([{ id: 7, type: "error" }]);
+    });
+
+    await expect(
+      resolveErrorDetectorId("test-org", "test-project")
+    ).resolves.toBe(7);
+  });
+
+  test("throws 404 ApiError when the project has no error detector", async () => {
+    globalThis.fetch = mockFetch(async () => Response.json([]));
+
+    await expect(
+      resolveErrorDetectorId("test-org", "test-project")
+    ).rejects.toMatchObject({ name: "ApiError", status: 404 });
   });
 });
 

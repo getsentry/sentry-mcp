@@ -39,7 +39,6 @@ type EditFlags = {
   readonly status?: "active" | "disabled";
   readonly condition?: string[];
   readonly action?: string[];
-  readonly "action-match"?: "all" | "any";
   readonly json: boolean;
 };
 
@@ -59,8 +58,8 @@ describe("alert issues edit", () => {
 
   beforeEach(() => {
     getRuleSpy = vi.spyOn(apiClient, "getIssueAlertRule");
-    getDocSpy = vi.spyOn(apiClient, "getIssueAlertRuleDocument");
-    putSpy = vi.spyOn(apiClient, "putIssueAlertRule");
+    getDocSpy = vi.spyOn(apiClient, "getIssueAlertWorkflowDocument");
+    putSpy = vi.spyOn(apiClient, "updateIssueAlertRule");
     resolveSpy = vi.spyOn(resolveTarget, "resolveTargetsFromParsedArg");
   });
 
@@ -84,27 +83,27 @@ describe("alert issues edit", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  test("merges additional fields into full PUT body", async () => {
+  test("merges additional fields into full workflow update body", async () => {
     const context = createContext();
     resolveSpy.mockResolvedValue({ targets: [sampleTarget] });
     getRuleSpy.mockResolvedValue(sampleRule);
     getDocSpy.mockResolvedValue({
       id: "42",
       name: "Rule Alpha",
-      status: "active",
-      actionMatch: "any",
-      conditions: [{ id: "old-condition" }],
-      actions: [{ id: "old-action" }],
-      frequency: 30,
+      enabled: true,
+      config: { frequency: 30 },
+      triggers: {
+        logicType: "any-short",
+        conditions: [{ id: "old-condition" }],
+      },
+      actionFilters: [
+        { logicType: "all", conditions: [], actions: [{ id: "old-action" }] },
+      ],
     });
     putSpy.mockResolvedValue({
       id: "42",
       name: "Rule Beta",
-      status: "disabled",
-      actionMatch: "all",
-      conditions: [{ id: "new-condition" }],
-      actions: [{ id: "new-action" }],
-      frequency: 30,
+      enabled: false,
     });
     const func = (await editCommand.loader()) as unknown as (
       this: unknown,
@@ -119,20 +118,49 @@ describe("alert issues edit", () => {
         status: "disabled",
         condition: ['{"id":"new-condition"}'],
         action: ['{"id":"new-action"}'],
-        "action-match": "all",
         json: true,
       },
       "test-org/test-project/42"
     );
 
-    expect(putSpy).toHaveBeenCalledWith("test-org", "test-project", "42", {
+    expect(putSpy).toHaveBeenCalledWith("test-org", "42", {
       id: "42",
       name: "Rule Beta",
-      status: "disabled",
-      actionMatch: "all",
-      conditions: [{ id: "new-condition" }],
-      actions: [{ id: "new-action" }],
-      frequency: 30,
+      enabled: false,
+      config: { frequency: 30 },
+      triggers: {
+        logicType: "any-short",
+        conditions: [{ id: "new-condition" }],
+      },
+      actionFilters: [
+        { logicType: "all", conditions: [], actions: [{ id: "new-action" }] },
+      ],
     });
+  });
+
+  test("maps the workflow enabled field to a status label in output", async () => {
+    const context = createContext();
+    resolveSpy.mockResolvedValue({ targets: [sampleTarget] });
+    getRuleSpy.mockResolvedValue(sampleRule);
+    getDocSpy.mockResolvedValue({
+      id: "42",
+      name: "Rule Alpha",
+      enabled: true,
+    });
+    putSpy.mockResolvedValue({ id: "42", name: "Rule Alpha", enabled: false });
+    const func = (await editCommand.loader()) as unknown as (
+      this: unknown,
+      flags: EditFlags,
+      arg: string
+    ) => Promise<void>;
+
+    await func.call(
+      context,
+      { status: "disabled", json: true },
+      "test-org/test-project/42"
+    );
+
+    const output = context.stdout.write.mock.calls.map((c) => c[0]).join("");
+    expect(JSON.parse(output)).toMatchObject({ id: "42", status: "disabled" });
   });
 });

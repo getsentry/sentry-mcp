@@ -35,6 +35,36 @@ export function parseMatchMode(
   );
 }
 
+/**
+ * Map an action-filter match mode to a workflow DataConditionGroup logic type.
+ *
+ * Applies to the **action-filter** ("if") group only. Mirrors the backend
+ * issue-alert dual-write: "any" → "any-short", "all" → "all". The filter group
+ * never holds trigger-type conditions, so the workflows create validator
+ * accepts either logic type here.
+ */
+export function matchToLogicType(
+  match: "all" | "any" | undefined
+): "all" | "any-short" {
+  return match === "any" ? "any-short" : "all";
+}
+
+/**
+ * Logic type for an issue alert's **trigger** ("when") DataConditionGroup.
+ *
+ * Always "any-short". The org-scoped workflows create endpoint rejects a
+ * trigger group that carries an issue-alert trigger condition
+ * (first_seen_event / regression_event / reappeared_event /
+ * issue_resolved_trigger) with any other logic type — see
+ * `BaseDataConditionGroupValidator._validate_logic_type` in getsentry/sentry.
+ * An issue alert attaches to one error detector, so `all` vs `any` on the
+ * trigger group is not a meaningful choice; use `--filter-match` to control
+ * the action-filter group's match mode instead.
+ */
+export function triggerLogicType(): "any-short" {
+  return "any-short";
+}
+
 /** Parse and validate an "active" | "disabled" status flag. Returns `undefined` when absent. */
 export function parseStatusFlag(
   value: string | undefined
