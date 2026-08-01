@@ -485,12 +485,12 @@ describe("listCommand.func — standard mode", () => {
     const func = await listCommand.loader();
     await func.call(
       context,
-      { json: false, limit: 50, query: "level:error", sort: "newest" },
+      { json: false, limit: 50, query: "severity:error", sort: "newest" },
       `${ORG}/${PROJECT}`
     );
 
     expect(listLogsSpy).toHaveBeenCalledWith(ORG, PROJECT, {
-      query: "level:error",
+      query: "severity:error",
       limit: 50,
       statsPeriod: "30d",
       sort: "newest",
@@ -706,12 +706,12 @@ describe("listCommand.func — trace mode", () => {
     const func = await listCommand.loader();
     await func.call(
       context,
-      { json: false, limit: 50, query: "level:error", sort: "newest" },
+      { json: false, limit: 50, query: "severity:error", sort: "newest" },
       TRACE_ID
     );
 
     expect(listTraceLogsSpy).toHaveBeenCalledWith(ORG, TRACE_ID, {
-      query: "level:error",
+      query: "severity:error",
       limit: 50,
       statsPeriod: "14d",
       sort: "newest",

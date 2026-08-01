@@ -462,7 +462,7 @@ describe("logsCommand.func", () => {
           web: false,
           period: parsePeriod("7d"),
           limit: 50,
-          query: "level:error",
+          query: "severity:error",
           sort: "newest",
         },
         TRACE_ID
@@ -471,7 +471,7 @@ describe("logsCommand.func", () => {
       expect(listTraceLogsSpy).toHaveBeenCalledWith(ORG, TRACE_ID, {
         statsPeriod: "7d",
         limit: 50,
-        query: "level:error",
+        query: "severity:error",
         sort: "newest",
       });
     });

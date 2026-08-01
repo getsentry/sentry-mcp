@@ -716,7 +716,7 @@ export const listCommand = buildListCommand(
         "  sentry log list -f                 # Stream logs (2s poll interval)\n" +
         "  sentry log list -f 5               # Stream logs (5s poll interval)\n" +
         "  sentry log list --limit 50         # Show last 50 logs\n" +
-        "  sentry log list -q 'level:error'   # Filter to errors only\n" +
+        "  sentry log list -q 'severity:error' # Filter to errors only\n" +
         "  sentry log list abc123def456abc123def456abc123de  # Filter by trace\n\n" +
         "Alias: `sentry logs` → `sentry log list`",
     },
@@ -746,7 +746,7 @@ export const listCommand = buildListCommand(
           kind: "parsed",
           parse: sanitizeQuery,
           brief:
-            'Filter query (e.g., "level:error", "project:backend", "project:[a,b]")',
+            'Filter query (e.g., "severity:error", "project:backend", "project:[a,b]")',
           optional: true,
         },
         follow: {

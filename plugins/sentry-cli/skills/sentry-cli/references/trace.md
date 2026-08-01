@@ -93,7 +93,7 @@ View logs associated with a trace
 - `-w, --web - Open trace in browser`
 - `-t, --period <value> - Time range: "7d", "2026-07-01..2026-08-01", ">=2026-07-01" - (default: "14d")`
 - `-n, --limit <value> - Number of log entries (<=1000) - (default: "100")`
-- `-q, --query <value> - Filter query (e.g., "level:error", "project:backend", "project:[a,b]")`
+- `-q, --query <value> - Filter query (e.g., "severity:error", "project:backend", "project:[a,b]")`
 - `-s, --sort <value> - Sort order: "newest" (default) or "oldest" - (default: "newest")`
 - `-f, --fresh - Bypass cache, re-detect projects, and fetch fresh data`
 
@@ -107,7 +107,7 @@ sentry trace logs abc123def456abc123def456abc12345
 sentry trace logs --period 30d abc123def456abc123def456abc12345
 
 # Filter logs within a trace
-sentry trace logs -q 'level:error' abc123def456abc123def456abc12345
+sentry trace logs -q 'severity:error' abc123def456abc123def456abc12345
 ```
 
 All commands also support `--json`, `--fields`, `--help`, `--log-level`, and `--verbose` flags.
