@@ -8,9 +8,8 @@
 # Create an issue alert rule with inline JSON condition/action
 sentry alert issues create my-org/my-project \
   --name "Error Spike" \
-  --condition '{"id":"sentry.rules.conditions.first_seen_event.FirstSeenEventCondition"}' \
-  --action '{"id":"sentry.mail.actions.NotifyEmailAction","targetType":"Team","targetIdentifier":1}' \
-  --action-match any
+  --condition '{"type":"first_seen_event","comparison":true,"conditionResult":true}' \
+  --action '{"type":"email","data":{},"config":{"targetType":"team","targetIdentifier":"1"}}'
 ```
 
 ### List issue alert rules
