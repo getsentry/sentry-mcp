@@ -88,7 +88,14 @@ export type SentryProject = Partial<SdkProjectListItem> & {
     name?: string;
     [key: string]: unknown;
   };
-  /** Project status (returned by API but not in the OpenAPI spec) */
+  /**
+   * Project status (returned by API but not in the OpenAPI spec).
+   *
+   * Overlay convention: the SDK type (`SdkProjectListItem`) carries every
+   * documented field; this overlay adds ONLY fields the API returns but the
+   * spec omits, each a backend `@extend_schema` candidate. Keep it minimal —
+   * do not restate fields the SDK already types.
+   */
   status?: string;
 };
 
