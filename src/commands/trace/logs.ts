@@ -157,7 +157,7 @@ export const logsCommand = buildCommand({
         kind: "parsed",
         parse: sanitizeQuery,
         brief:
-          'Filter query (e.g., "level:error", "project:backend", "project:[a,b]")',
+          'Filter query (e.g., "severity:error", "project:backend", "project:[a,b]")',
         optional: true,
       },
       sort: {
