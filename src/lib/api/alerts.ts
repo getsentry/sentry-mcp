@@ -31,8 +31,8 @@ export type IssueAlertRule = {
   /** "active" | "disabled" */
   status: string;
   actionMatch: string;
-  conditions: unknown[];
-  actions: unknown[];
+  conditions?: unknown[];
+  actions?: unknown[];
   frequency: number;
   environment: string | null;
   owner: string | null;
