@@ -57,5 +57,5 @@ sentry trace logs abc123def456abc123def456abc12345
 sentry trace logs --period 30d abc123def456abc123def456abc12345
 
 # Filter logs within a trace
-sentry trace logs -q 'level:error' abc123def456abc123def456abc12345
+sentry trace logs -q 'severity:error' abc123def456abc123def456abc12345
 ```

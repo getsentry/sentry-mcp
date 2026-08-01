@@ -22,7 +22,7 @@ Showing 4 logs.
 
 ```bash
 # Show only error logs
-sentry log list -q 'level:error'
+sentry log list -q 'severity:error'
 
 # Filter by message content
 sentry log list -q 'database'
@@ -41,7 +41,7 @@ sentry log list -f
 sentry log list -f 5
 
 # Stream error logs from a specific project
-sentry log list my-org/backend -f -q 'level:error'
+sentry log list my-org/backend -f -q 'severity:error'
 ```
 
 ### View a log entry
