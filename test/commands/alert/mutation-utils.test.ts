@@ -1,10 +1,12 @@
 import { describe, expect, test } from "vitest";
 import {
+  matchToLogicType,
   normalizeProjectList,
   parseJsonObjectList,
   parseMatchMode,
   parseStatusFlag,
   statusToMetricValue,
+  triggerLogicType,
   validateIssueRuleArrays,
   validateMetricDataset,
   validateMetricTimeWindow,
@@ -38,6 +40,26 @@ describe("parseMatchMode", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(ValidationError);
     }
+  });
+});
+
+describe("matchToLogicType", () => {
+  test('maps "any" to "any-short"', () => {
+    expect(matchToLogicType("any")).toBe("any-short");
+  });
+
+  test('maps "all" to "all"', () => {
+    expect(matchToLogicType("all")).toBe("all");
+  });
+
+  test('defaults undefined to "all"', () => {
+    expect(matchToLogicType(undefined)).toBe("all");
+  });
+});
+
+describe("triggerLogicType", () => {
+  test("is always any-short (workflows endpoint rejects other logic types for issue triggers)", () => {
+    expect(triggerLogicType()).toBe("any-short");
   });
 });
 

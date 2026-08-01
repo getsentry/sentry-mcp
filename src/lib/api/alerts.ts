@@ -7,8 +7,11 @@
  */
 
 import {
+  createOrganizationWorkflow,
   getOrganizationDetector,
+  getOrganizationWorkflow,
   listOrganizationDetectors,
+  updateOrganizationWorkflow,
 } from "@sentry/api";
 import { ApiError } from "../errors.js";
 import { resolveOrgRegion } from "../region.js";
@@ -262,24 +265,59 @@ export async function listIssueAlertsPaginated(
 }
 
 /**
- * Single GET for a project issue alert rule as full JSON (used as the edit
- * baseline for PUT).
- *
- * NOTE: still uses the deprecated project-scoped `/rules/` endpoint. It backs
- * the mutation path (`getIssueAlertRuleDocument` → edit), which is migrating to
- * `/workflows/` in a follow-up (getsentry/cli#1182).
+ * Full workflow document for the edit baseline (name, config, environment,
+ * triggers, action_filters, detector_ids, ...), read from the org-scoped
+ * `/organizations/{org}/workflows/{id}/` detail endpoint.
  */
-async function fetchIssueAlertRuleJson(
+export async function getIssueAlertWorkflowDocument(
   orgSlug: string,
-  projectSlug: string,
-  ruleId: string
+  workflowId: string
 ): Promise<Record<string, unknown>> {
-  const regionUrl = await resolveOrgRegion(orgSlug);
-  const { data } = await apiRequestToRegion<Record<string, unknown>>(
-    regionUrl,
-    `/projects/${orgSlug}/${projectSlug}/rules/${encodeURIComponent(ruleId)}/`
+  const config = await getOrgSdkConfig(orgSlug);
+  const result = await getOrganizationWorkflow({
+    ...config,
+    path: {
+      organization_id_or_slug: orgSlug,
+      workflow_id: Number(workflowId),
+    },
+  });
+  return unwrapResult<Record<string, unknown>>(
+    result,
+    "Failed to fetch issue alert rule"
   );
-  return data;
+}
+
+/**
+ * Resolve the id of a project's error detector ("Error Monitor"). An issue alert
+ * workflow must connect to it via `detector_ids` to fire on new issues. Reads the
+ * org-scoped detectors endpoint filtered to the project and the `error` type.
+ *
+ * @throws {ApiError} 404 if the project has no error detector
+ */
+export async function resolveErrorDetectorId(
+  orgSlug: string,
+  projectSlug: string
+): Promise<number> {
+  const config = await getOrgSdkConfig(orgSlug);
+  const result = await listOrganizationDetectors({
+    ...config,
+    path: { organization_id_or_slug: orgSlug },
+    query: { project: [projectSlug], query: "type:error" },
+  });
+  const detectors = unwrapResult<Array<{ id: string | number }>>(
+    result,
+    "Failed to resolve error detector"
+  );
+  const detector = detectors[0];
+  if (!detector) {
+    throw new ApiError(
+      `No error detector found for project '${projectSlug}'`,
+      404,
+      undefined,
+      `/organizations/${orgSlug}/detectors/`
+    );
+  }
+  return Number(detector.id);
 }
 
 /**
@@ -452,49 +490,60 @@ export async function deleteIssueAlertRule(
 }
 
 /**
- * Full document for PUT (includes conditions, actions, etc. from the API).
+ * Replace (update) an issue alert workflow. Sentry PUT is a full replacement.
+ *
+ * `workflowId` is the id surfaced by the migrated read path; the update is keyed
+ * by id on the org-scoped `/workflows/{id}/` endpoint.
  */
-export function getIssueAlertRuleDocument(
+export async function updateIssueAlertRule(
   orgSlug: string,
-  projectSlug: string,
-  ruleId: string
-): Promise<Record<string, unknown>> {
-  return fetchIssueAlertRuleJson(orgSlug, projectSlug, ruleId);
-}
-
-/**
- * Replace an issue alert rule (Sentry PUT is a full replacement).
- */
-export async function putIssueAlertRule(
-  orgSlug: string,
-  projectSlug: string,
-  ruleId: string,
+  workflowId: string,
   body: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const regionUrl = await resolveOrgRegion(orgSlug);
-  const { data } = await apiRequestToRegion<Record<string, unknown>>(
-    regionUrl,
-    `/projects/${orgSlug}/${projectSlug}/rules/${encodeURIComponent(ruleId)}/`,
-    { method: "PUT", body }
+  const config = await getOrgSdkConfig(orgSlug);
+  const result = await updateOrganizationWorkflow({
+    ...config,
+    path: {
+      organization_id_or_slug: orgSlug,
+      workflow_id: Number(workflowId),
+    },
+    // The SDK types conditions/actions as `unknown[]`; the CLI supplies the
+    // workflow-native body as a plain record, so cast into the typed arg.
+    body: body as unknown as Parameters<
+      typeof updateOrganizationWorkflow
+    >[0]["body"],
+  });
+  return unwrapResult<Record<string, unknown>>(
+    result,
+    "Failed to update issue alert rule"
   );
-  return data;
 }
 
 /**
- * Create an issue (project) alert rule.
+ * Create an issue alert workflow on the org-scoped `/workflows/` endpoint.
+ *
+ * `body` must be workflow-shaped (name, detector_ids, config, triggers,
+ * action_filters, ...). Project linkage is carried by `detector_ids`, so no
+ * project slug is part of the request.
  */
 export async function createIssueAlertRule(
   orgSlug: string,
-  projectSlug: string,
   body: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const regionUrl = await resolveOrgRegion(orgSlug);
-  const { data } = await apiRequestToRegion<Record<string, unknown>>(
-    regionUrl,
-    `/projects/${orgSlug}/${projectSlug}/rules/`,
-    { method: "POST", body }
+  const config = await getOrgSdkConfig(orgSlug);
+  const result = await createOrganizationWorkflow({
+    ...config,
+    path: { organization_id_or_slug: orgSlug },
+    // The SDK types conditions/actions as `unknown[]`; the CLI supplies the
+    // workflow-native body as a plain record, so cast into the typed arg.
+    body: body as unknown as Parameters<
+      typeof createOrganizationWorkflow
+    >[0]["body"],
+  });
+  return unwrapResult<Record<string, unknown>>(
+    result,
+    "Failed to create issue alert rule"
   );
-  return data;
 }
 
 // Metric alert (org) write operations

@@ -7,8 +7,8 @@
 
 import type { SentryContext } from "../../../context.js";
 import {
-  getIssueAlertRuleDocument,
-  putIssueAlertRule,
+  getIssueAlertWorkflowDocument,
+  updateIssueAlertRule,
 } from "../../../lib/api-client.js";
 import { parseOrgProjectArg } from "../../../lib/arg-parsing.js";
 import { buildCommand, numberParser } from "../../../lib/command.js";
@@ -16,9 +16,11 @@ import { ContextError, ValidationError } from "../../../lib/errors.js";
 import { CommandOutput } from "../../../lib/formatters/output.js";
 import { resolveTargetsFromParsedArg } from "../../../lib/resolve-target.js";
 import {
+  matchToLogicType,
   parseJsonObjectList,
   parseMatchMode,
   parseStatusFlag,
+  triggerLogicType,
   validateIssueRuleArrays,
 } from "../mutation-utils.js";
 import { parseIssueRuleArg, resolveIssueAlertRule } from "./rule-resolve.js";
@@ -31,7 +33,6 @@ type EditFlags = {
   readonly status?: "active" | "disabled" | undefined;
   readonly condition?: string[];
   readonly action?: string[];
-  readonly "action-match"?: "all" | "any";
   readonly frequency?: number;
   readonly environment?: string;
   readonly filter?: string[];
@@ -53,7 +54,6 @@ function hasIssueMutations(flags: EditFlags): boolean {
     flags.status !== undefined ||
     flags.condition !== undefined ||
     flags.action !== undefined ||
-    flags["action-match"] !== undefined ||
     flags.frequency !== undefined ||
     flags.environment !== undefined ||
     flags.filter !== undefined ||
@@ -87,32 +87,54 @@ function applyIssueEdits(
     body.name = flags.name;
   }
   if (flags.status !== undefined) {
-    body.status = flags.status;
-  }
-  if (conditions !== undefined) {
-    body.conditions = conditions;
-  }
-  if (actions !== undefined) {
-    body.actions = actions;
-  }
-  if (flags["action-match"] !== undefined) {
-    body.actionMatch = flags["action-match"];
+    // Workflows use an `enabled` boolean rather than a status string.
+    body.enabled = flags.status === "active";
   }
   if (flags.frequency !== undefined) {
-    body.frequency = flags.frequency;
+    const config = (body.config as Record<string, unknown> | undefined) ?? {};
+    config.frequency = flags.frequency;
+    body.config = config;
   }
   if (flags.environment !== undefined) {
     body.environment =
       flags.environment.trim() === "" ? null : flags.environment;
   }
-  if (filters !== undefined) {
-    body.filters = filters;
-  }
-  if (flags["filter-match"] !== undefined) {
-    body.filterMatch = flags["filter-match"];
-  }
   if (flags.owner !== undefined) {
     body.owner = flags.owner.trim() === "" ? null : flags.owner;
+  }
+
+  // Triggers: the "when" data-condition group. Issue-alert triggers always use
+  // the 'any-short' logic type (see triggerLogicType), so we pin it whenever the
+  // conditions change rather than exposing a trigger match flag.
+  if (conditions !== undefined) {
+    const triggers =
+      (body.triggers as Record<string, unknown> | undefined) ?? {};
+    triggers.conditions = conditions;
+    triggers.logicType = triggerLogicType();
+    body.triggers = triggers;
+  }
+
+  // Action filter: the "if" group plus its actions. Issue alerts use one filter.
+  if (
+    actions !== undefined ||
+    filters !== undefined ||
+    flags["filter-match"] !== undefined
+  ) {
+    const actionFilters = Array.isArray(body.actionFilters)
+      ? (body.actionFilters as Record<string, unknown>[])
+      : [];
+    const filter = (actionFilters[0] as Record<string, unknown>) ?? {};
+    if (actions !== undefined) {
+      filter.actions = actions;
+    }
+    if (filters !== undefined) {
+      filter.conditions = filters;
+    }
+    if (flags["filter-match"] !== undefined) {
+      filter.logicType = matchToLogicType(flags["filter-match"]);
+    }
+    actionFilters[0] = filter;
+    body.actionFilters = actionFilters;
   }
 
   if (conditions !== undefined) {
@@ -183,12 +205,6 @@ export const editCommand = buildCommand({
         optional: true,
         brief: "Action object JSON (repeatable, or pass one JSON array)",
       },
-      "action-match": {
-        kind: "parsed",
-        parse: (value: string) => parseMatchMode(value, "action-match"),
-        optional: true,
-        brief: "Condition/action match mode: all or any",
-      },
       frequency: {
         kind: "parsed",
         parse: numberParser,
@@ -224,7 +240,7 @@ export const editCommand = buildCommand({
     aliases: {
       c: "condition",
       a: "action",
-      m: "action-match",
+      m: "filter-match",
     },
   },
   async *func(this: SentryContext, flags: EditFlags, arg: string) {
@@ -248,21 +264,21 @@ export const editCommand = buildCommand({
     );
 
     const body = {
-      ...(await getIssueAlertRuleDocument(target.org, target.project, rule.id)),
+      ...(await getIssueAlertWorkflowDocument(target.org, rule.id)),
     } as Record<string, unknown>;
     applyIssueEdits(body, flags);
 
-    const updated = await putIssueAlertRule(
-      target.org,
-      target.project,
-      rule.id,
-      body
-    );
+    const updated = await updateIssueAlertRule(target.org, rule.id, body);
     yield new CommandOutput({
       ...updated,
       org: target.org,
       project: target.project,
       id: String(updated.id ?? rule.id),
+      // The workflows endpoint returns `enabled` rather than `status`; map it
+      // back to a status label so human/JSON output matches the create path.
+      status: String(
+        updated.status ?? (updated.enabled === false ? "disabled" : "active")
+      ),
     } satisfies EditResult);
   },
 });
