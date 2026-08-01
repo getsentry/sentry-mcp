@@ -37,7 +37,7 @@ yarn global add sentry
 bun add -g sentry
 ```
 
-> The npm/pnpm/yarn packages require Node.js 18+. On Node.js 22.15+ the CLI uses the built-in `node:sqlite`; on Node.js 18–22.14 it transparently falls back to a bundled WASM SQLite driver.
+> The npm/pnpm/yarn packages require Node.js 20+. On Node.js 22.15+ the CLI uses the built-in `node:sqlite`; on Node.js 20–22.14 it transparently falls back to a bundled WASM SQLite driver.
 
 ### Run Without Installing
 
@@ -83,7 +83,7 @@ Credentials are stored in `~/.sentry/` with restricted permissions (mode 600).
 ## Library Usage
 
 <!-- GENERATED:START library-prereq -->
-Use Sentry CLI programmatically in Node.js (≥18.0) without spawning a subprocess:
+Use Sentry CLI programmatically in Node.js (≥20.0) without spawning a subprocess:
 <!-- GENERATED:END library-prereq -->
 
 ```typescript
