@@ -32,8 +32,8 @@ function formatIssueAlertView(data: IssueRuleResolution): string {
     `Status:       ${rule.status}`,
     `Action Match: ${rule.actionMatch}`,
     `Frequency:    ${rule.frequency}m`,
-    `Conditions:   ${rule.conditions.length}`,
-    `Actions:      ${rule.actions.length}`,
+    `Conditions:   ${rule.conditions?.length ?? 0}`,
+    `Actions:      ${rule.actions?.length ?? 0}`,
     `Environment:  ${rule.environment ?? "all"}`,
     `Owner:        ${rule.owner ?? "none"}`,
   ].join("\n");
