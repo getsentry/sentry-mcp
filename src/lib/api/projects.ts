@@ -5,6 +5,7 @@
  */
 
 import {
+  createOrganizationProject,
   createTeamProject,
   listOrganizationProjects,
   listProjectKeys,
@@ -27,7 +28,6 @@ import {
 } from "../db/project-cache.js";
 import { getCachedOrganizations } from "../db/regions.js";
 import { type AuthGuardSuccess, withAuthGuard } from "../errors.js";
-import { resolveOrgRegion } from "../region.js";
 import { getApiBaseUrl } from "../sentry-client.js";
 import { buildProjectUrl } from "../sentry-urls.js";
 import { isAllDigits } from "../utils.js";
@@ -234,9 +234,17 @@ export async function createProjectWithDsn(
   return { project, dsn, url };
 }
 
-/** Raw response shape from the org-scoped project creation endpoint. */
+/**
+ * Response from the org-scoped project creation endpoint.
+ *
+ * `createOrganizationProject` returns a standard project plus `team_slug` — the
+ * personal team the server auto-creates for the caller. `team_slug` is returned
+ * by the API but absent from the OpenAPI spec, so it is declared here as a typed
+ * overlay on the SDK-derived `SentryProject` (same convention as
+ * `SentryProject.organization`/`status`; a backend `@extend_schema` candidate).
+ */
 type ProjectWithAutoTeam = SentryProject & {
-  /** The personal team auto-created by the server for the requesting user. */
+  /** Personal team auto-created by the server (returned, not in the OpenAPI spec). */
   team_slug: string;
 };
 
@@ -284,11 +292,16 @@ export async function createProjectWithAutoTeam(
   orgSlug: string,
   body: CreateProjectBody
 ): Promise<CreatedAutoTeamProjectDetails> {
-  const regionUrl = await resolveOrgRegion(orgSlug);
-  const { data } = await apiRequestToRegion<ProjectWithAutoTeam>(
-    regionUrl,
-    `/organizations/${orgSlug}/projects/`,
-    { method: "POST", body }
+  const config = await getOrgSdkConfig(orgSlug);
+  const result = await createOrganizationProject({
+    ...config,
+    path: { organization_id_or_slug: orgSlug },
+    body,
+  });
+  // `team_slug` is returned but not in the spec — see the ProjectWithAutoTeam overlay.
+  const data = unwrapResult<ProjectWithAutoTeam>(
+    result,
+    "Failed to create project"
   );
   const dsn = await tryGetPrimaryDsn(orgSlug, data.slug);
   const url = buildProjectUrl(orgSlug, data.slug);
@@ -470,8 +483,11 @@ export async function findProjectByDsnKey(
   const regions = regionsResult.ok ? regionsResult.value : ([] as Region[]);
 
   if (regions.length === 0) {
-    // Fall back to default region for self-hosted
-    // This uses an internal query parameter not in the public API
+    // Escape hatch (intentionally raw, not an SDK call): the `?query=dsn:` filter
+    // on `/projects/` is an internal search param absent from the OpenAPI spec,
+    // so the SDK provides no typed operation for it. Kept as a documented raw
+    // call until the param is promoted (backend `@extend_schema` candidate).
+    // Fall back to the default region for self-hosted.
     const { data: projects } = await apiRequestToRegion<SentryProject[]>(
       getApiBaseUrl(),
       "/projects/",
@@ -485,6 +501,8 @@ export async function findProjectByDsnKey(
     regions.map((region) =>
       limit(async () => {
         try {
+          // Same `?query=dsn:` escape hatch as above (see the region-fallback
+          // branch) — internal search param, no typed SDK operation yet.
           const { data } = await apiRequestToRegion<SentryProject[]>(
             region.url,
             "/projects/",
@@ -527,21 +545,18 @@ export async function getProject(
 ): Promise<SentryProject> {
   const config = await getOrgSdkConfig(orgSlug);
 
-  // `collapse` is server-supported but not in the OpenAPI spec, so the
-  // SDK types `query` as `never` on `GetProjectData`. Double-cast
-  // via `unknown` to bypass the stricter argument type while still
-  // sending the param at runtime. Same intent as the `per_page` cast
-  // used above.
-  const result = (await sdkGetProject({
+  // `collapse=organization` is server-supported but absent from the OpenAPI
+  // spec, so the SDK types `query` as `never` on `GetProjectData`. Cast just
+  // this param to send it at runtime; the trimmed `{id, slug}` payload it
+  // yields is modeled by the `SentryProject.organization` overlay.
+  const result = await sdkGetProject({
     ...config,
     path: {
       organization_id_or_slug: orgSlug,
       project_id_or_slug: projectSlug,
     },
-    query: { collapse: "organization" },
-  } as unknown as Parameters<typeof sdkGetProject>[0])) as
-    | { data: unknown; error: undefined }
-    | { data: undefined; error: unknown };
+    query: { collapse: "organization" } as never,
+  });
 
   return unwrapResult<SentryProject>(result, "Failed to get project");
 }
