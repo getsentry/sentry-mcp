@@ -38,7 +38,7 @@
   ],
   "license": "FSL-1.1-Apache-2.0",
   "engines": {
-    "node": ">=18.0"
+    "node": ">=20.0"
   },
   "devEngines": {
     "runtime": {
