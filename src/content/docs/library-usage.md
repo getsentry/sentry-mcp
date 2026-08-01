@@ -211,14 +211,14 @@ Calls should be sequential (awaited one at a time).
 | **Output** | Parsed object (zero-copy) | String (needs JSON.parse) |
 | **Errors** | `SentryError` with typed fields | Exit code + stderr string |
 | **Auth** | `token` option or env vars | Env vars only |
-| **Node.js** | >=18 required | Any version |
+| **Node.js** | >=20 required | Any version |
 
 ## Requirements
 
-- **Node.js >= 18**. On Node.js 22.15+ the built-in `node:sqlite` module is used; on Node.js 18–22.14 the CLI transparently falls back to a bundled WASM SQLite driver, so no native module or extra install step is required.
+- **Node.js >= 20**. On Node.js 22.15+ the built-in `node:sqlite` module is used; on Node.js 20–22.14 the CLI transparently falls back to a bundled WASM SQLite driver, so no native module or extra install step is required.
 
 :::caution
-The WASM SQLite fallback (Node.js 18–22.14) does not support [WAL mode](https://www.sqlite.org/wal.html), so concurrent access from multiple processes is slower and its local cache reads/writes are less efficient. For the best performance and reliability we **strongly recommend** the [standalone binary](/installation/) (which bundles a modern runtime) or running on **Node.js 22.15+** so the native `node:sqlite` driver is used.
+The WASM SQLite fallback (Node.js 20–22.14) does not support [WAL mode](https://www.sqlite.org/wal.html), so concurrent access from multiple processes is slower and its local cache reads/writes are less efficient. For the best performance and reliability we **strongly recommend** the [standalone binary](/installation/) (which bundles a modern runtime) or running on **Node.js 22.15+** so the native `node:sqlite` driver is used.
 :::
 
 ## Streaming Commands
