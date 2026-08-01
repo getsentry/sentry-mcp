@@ -388,6 +388,10 @@ function extractFunctionName(aggregate: string): string {
  * Example: `p50(value,completion.duration_ms,distribution,none)`
  */
 function isTracemetricsAggregate(aggregate: string): boolean {
+  // equation| prefix denotes a formula combining multiple tracemetrics aggregates
+  if (aggregate.startsWith("equation|")) {
+    return true;
+  }
   const parenIdx = aggregate.indexOf("(");
   if (parenIdx < 0) {
     return false;

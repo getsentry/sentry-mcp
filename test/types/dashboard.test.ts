@@ -33,6 +33,7 @@ import {
   TABLE_DISPLAY_TYPES,
   type TextResult,
   TIMESERIES_DISPLAY_TYPES,
+  validateAggregateNames,
   validateWidgetLayout,
   WIDGET_TYPES,
   type WidgetDataResult,
@@ -960,6 +961,34 @@ describe("mapWidgetTypeToDataset", () => {
 
   test("returns null for undefined", () => {
     expect(mapWidgetTypeToDataset(undefined)).toBeNull();
+  });
+});
+
+describe("validateAggregateNames", () => {
+  test("accepts comma-separated tracemetrics aggregates", () => {
+    expect(() =>
+      validateAggregateNames(
+        ["p50(value,completion.duration_ms,distribution,none)"],
+        "tracemetrics"
+      )
+    ).not.toThrow();
+  });
+
+  test("accepts equation| formula aggregates for tracemetrics", () => {
+    expect(() =>
+      validateAggregateNames(
+        [
+          "equation|p50(value,a,distribution,none) / p50(value,b,distribution,none)",
+        ],
+        "tracemetrics"
+      )
+    ).not.toThrow();
+  });
+
+  test("rejects span-style aggregates for tracemetrics", () => {
+    expect(() => validateAggregateNames(["count()"], "tracemetrics")).toThrow(
+      ValidationError
+    );
   });
 });
 
