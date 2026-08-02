@@ -12,6 +12,7 @@ import {
   isVersionRequest,
   preprocessArgv,
   rewriteDashedFlagValues,
+  rewriteHelpJsonRequest,
 } from "../../src/lib/argv-hoist.js";
 
 describe("hoistGlobalFlags", () => {
@@ -466,6 +467,20 @@ describe("preprocessArgv", () => {
     ]);
   });
 
+  test("rewrites --help --json to the help command instead of hoisting", () => {
+    expect(preprocessArgv(["--help", "--json"])).toEqual(["help", "--json"]);
+    expect(preprocessArgv(["issue", "list", "--help", "--json"])).toEqual([
+      "help",
+      "--json",
+      "issue",
+      "list",
+    ]);
+  });
+
+  test("leaves a bare --help to normal hoisting (Stricli renders text help)", () => {
+    expect(preprocessArgv(["issue", "--help"])).toEqual(["issue", "--help"]);
+  });
+
   test("leaves a wrapped-command --version (after --) to hoisting, not version", () => {
     expect(
       preprocessArgv(["monitor", "run", "job", "--", "tool", "--version"])
@@ -507,5 +522,162 @@ describe("preprocessArgv", () => {
         "--auto",
       ])
     ).toEqual(["release", "set-commits", "1.0.0", "--from", "--auto"]);
+  });
+});
+
+describe("rewriteHelpJsonRequest", () => {
+  test("rewrites top-level --help --json to the help command", () => {
+    expect(rewriteHelpJsonRequest(["--help", "--json"])).toEqual([
+      "help",
+      "--json",
+    ]);
+  });
+
+  test("rewrites a group --help --json to help <group>", () => {
+    expect(rewriteHelpJsonRequest(["issue", "--help", "--json"])).toEqual([
+      "help",
+      "--json",
+      "issue",
+    ]);
+  });
+
+  test("recognizes the -h short alias for --help", () => {
+    // Stricli treats `-h` as an alias of `--help`, so the JSON rewrite must
+    // fire for it too — otherwise `sentry -h --json` falls through to text usage.
+    expect(rewriteHelpJsonRequest(["-h", "--json"])).toEqual([
+      "help",
+      "--json",
+    ]);
+    expect(rewriteHelpJsonRequest(["issue", "-h", "--json"])).toEqual([
+      "help",
+      "--json",
+      "issue",
+    ]);
+  });
+
+  test("rewrites a nested command --help --json to help <group> <command>", () => {
+    expect(
+      rewriteHelpJsonRequest(["issue", "list", "--help", "--json"])
+    ).toEqual(["help", "--json", "issue", "list"]);
+  });
+
+  test("is order-insensitive between --help and --json", () => {
+    expect(rewriteHelpJsonRequest(["--json", "issue", "--help"])).toEqual([
+      "help",
+      "--json",
+      "issue",
+    ]);
+  });
+
+  test("carries a --fields value through to the help command", () => {
+    expect(
+      rewriteHelpJsonRequest([
+        "issue",
+        "list",
+        "--help",
+        "--json",
+        "--fields",
+        "path,brief",
+      ])
+    ).toEqual(["help", "--json", "issue", "list", "--fields", "path,brief"]);
+  });
+
+  test("carries a --fields=value form through to the help command", () => {
+    expect(
+      rewriteHelpJsonRequest(["issue", "--help", "--json", "--fields=path"])
+    ).toEqual(["help", "--json", "issue", "--fields", "path"]);
+  });
+
+  test("drops unrelated flags from the rewritten path", () => {
+    expect(
+      rewriteHelpJsonRequest(["--verbose", "issue", "--help", "--json"])
+    ).toEqual(["help", "--json", "issue"]);
+  });
+
+  test("drops a value flag's spaced value so it never becomes a path segment", () => {
+    // `--org acme` / `--limit 5` must not leak `acme` / `5` into the command
+    // path, which would resolve the wrong command or a not-found error.
+    expect(
+      rewriteHelpJsonRequest([
+        "issue",
+        "list",
+        "--org",
+        "acme",
+        "--help",
+        "--json",
+      ])
+    ).toEqual(["help", "--json", "issue", "list"]);
+    expect(
+      rewriteHelpJsonRequest([
+        "issue",
+        "list",
+        "--limit",
+        "5",
+        "--help",
+        "--json",
+      ])
+    ).toEqual(["help", "--json", "issue", "list"]);
+  });
+
+  test("keeps a path segment following a boolean flag", () => {
+    // `--verbose` is a known boolean flag, so the token after it (`list`) is a
+    // real command-path segment, not a flag value.
+    expect(
+      rewriteHelpJsonRequest(["issue", "--verbose", "list", "--help", "--json"])
+    ).toEqual(["help", "--json", "issue", "list"]);
+  });
+
+  test("keeps a path segment following an =-form value flag", () => {
+    // `--org=acme` carries its value inline, so the next token (`issue`/`list`)
+    // is a real command-path segment. A naive length check would treat the
+    // whole `org=acme` string as an unknown value flag and swallow `issue`.
+    expect(
+      rewriteHelpJsonRequest([
+        "--org=acme",
+        "issue",
+        "list",
+        "--help",
+        "--json",
+      ])
+    ).toEqual(["help", "--json", "issue", "list"]);
+    expect(
+      rewriteHelpJsonRequest(["issue", "--limit=5", "list", "--help", "--json"])
+    ).toEqual(["help", "--json", "issue", "list"]);
+  });
+
+  test("does not let --fields swallow a following flag", () => {
+    // `--fields --json`: --fields has no value, and --json must still register
+    // so the rewrite fires.
+    expect(
+      rewriteHelpJsonRequest(["issue", "list", "--help", "--fields", "--json"])
+    ).toEqual(["help", "--json", "issue", "list"]);
+  });
+
+  test("returns null for bare --help without --json", () => {
+    expect(rewriteHelpJsonRequest(["issue", "--help"])).toBeNull();
+  });
+
+  test("returns null for --json without --help", () => {
+    expect(rewriteHelpJsonRequest(["issue", "list", "--json"])).toBeNull();
+  });
+
+  test("returns null when neither flag is present", () => {
+    expect(rewriteHelpJsonRequest(["issue", "list"])).toBeNull();
+  });
+
+  test("ignores --help --json after the -- escape separator", () => {
+    // `sentry monitor run <slug> -- tool --help --json` must forward the flags
+    // to the wrapped command, not print the CLI's JSON help.
+    expect(
+      rewriteHelpJsonRequest([
+        "monitor",
+        "run",
+        "job",
+        "--",
+        "tool",
+        "--help",
+        "--json",
+      ])
+    ).toBeNull();
   });
 });
