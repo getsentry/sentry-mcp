@@ -138,6 +138,48 @@ describe("alert issues edit", () => {
     });
   });
 
+  test("seeds logicType and conditions when the rule has no action filter yet", async () => {
+    const context = createContext();
+    resolveSpy.mockResolvedValue({ targets: [sampleTarget] });
+    getRuleSpy.mockResolvedValue(sampleRule);
+    getDocSpy.mockResolvedValue({
+      id: "42",
+      name: "Rule Alpha",
+      enabled: true,
+      config: { frequency: 30 },
+      triggers: {
+        logicType: "any-short",
+        conditions: [{ id: "old-condition" }],
+      },
+    });
+    putSpy.mockResolvedValue({ id: "42", name: "Rule Alpha", enabled: true });
+    const func = (await editCommand.loader()) as unknown as (
+      this: unknown,
+      flags: EditFlags,
+      arg: string
+    ) => Promise<void>;
+
+    await func.call(
+      context,
+      { action: ['{"id":"new-action"}'], json: true },
+      "test-org/test-project/42"
+    );
+
+    expect(putSpy).toHaveBeenCalledWith("test-org", "42", {
+      id: "42",
+      name: "Rule Alpha",
+      enabled: true,
+      config: { frequency: 30 },
+      triggers: {
+        logicType: "any-short",
+        conditions: [{ id: "old-condition" }],
+      },
+      actionFilters: [
+        { logicType: "all", conditions: [], actions: [{ id: "new-action" }] },
+      ],
+    });
+  });
+
   test("maps the workflow enabled field to a status label in output", async () => {
     const context = createContext();
     resolveSpy.mockResolvedValue({ targets: [sampleTarget] });
