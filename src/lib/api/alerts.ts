@@ -7,13 +7,16 @@
  */
 
 import {
+  createOrganizationProjectDetector,
   createOrganizationWorkflow,
+  deleteOrganizationDetector,
   getOrganizationDetector,
   getOrganizationWorkflow,
   listOrganizationDetectors,
+  updateOrganizationDetector,
   updateOrganizationWorkflow,
 } from "@sentry/api";
-import { ApiError } from "../errors.js";
+import { ApiError, ValidationError } from "../errors.js";
 import { resolveOrgRegion } from "../region.js";
 import {
   apiRequestToRegion,
@@ -362,8 +365,8 @@ export async function getIssueAlertRule(
 // 2026-08-17 (getsentry/cli#1274, #1182). Detectors return a nested shape, so
 // `mapDetectorToMetricAlertRule` flattens each detector into the existing
 // `MetricAlertRule` shape the commands already consume. Mutations
-// (create/update/delete) still use the legacy endpoint pending a follow-up
-// migration to the detectors/monitors + workflows write APIs.
+// (create/update/delete) also target the detectors write API — the flat CLI
+// input is translated into the nested detector body by `buildDetectorBody`.
 
 /** Search query that limits the detectors endpoint to metric alert rules. */
 const METRIC_DETECTOR_QUERY = "type:metric_issue";
@@ -404,19 +407,6 @@ export async function listMetricAlertsPaginated(
     "Failed to list metric alert rules"
   );
   return { data: data.map(mapDetectorToMetricAlertRule), nextCursor };
-}
-
-/** Single GET for org metric alert rule (typed or full JSON for PUT). */
-async function fetchMetricAlertRuleJson(
-  orgSlug: string,
-  ruleId: string
-): Promise<Record<string, unknown>> {
-  const regionUrl = await resolveOrgRegion(orgSlug);
-  const { data } = await apiRequestToRegion<Record<string, unknown>>(
-    regionUrl,
-    `/organizations/${orgSlug}/alert-rules/${encodeURIComponent(ruleId)}/`
-  );
-  return data;
 }
 
 /**
@@ -547,55 +537,226 @@ export async function createIssueAlertRule(
 }
 
 // Metric alert (org) write operations
+//
+// The CLI create/edit commands build a *flat* legacy alert-rule body (name,
+// query, aggregate, dataset, timeWindow, triggers, projects, environment,
+// owner). The detectors write API takes a *nested* shape (dataSources /
+// conditionGroup / config), so `buildDetectorBody` translates the flat body
+// into the detector document before the request is sent. This keeps the
+// command layer unchanged while the transport moves off the retiring
+// `/alert-rules/` endpoint (getsentry/cli#1274, #1277).
 
 /**
- * Delete a metric (organization) alert rule. May return 202 with no body.
+ * Datasets whose events flow through the error/transaction pipeline
+ * (`queryType: 0`) rather than the trace-item pipeline (`queryType: 1`).
+ */
+const ERROR_LIKE_DATASETS = new Set(["errors", "events"]);
+
+/** Detector `queryType` for a metric alert dataset. */
+function datasetQueryType(dataset: string): 0 | 1 {
+  return ERROR_LIKE_DATASETS.has(dataset.trim().toLowerCase()) ? 0 : 1;
+}
+
+/**
+ * Default `eventTypes` for a metric alert dataset.
+ *
+ * Error-like datasets track `error`/`default` events; everything else measures
+ * spans. The backend accepts an explicit `eventTypes` on the data source and
+ * derives the internal query type from `queryType`.
+ */
+function datasetEventTypes(dataset: string): string[] {
+  return ERROR_LIKE_DATASETS.has(dataset.trim().toLowerCase())
+    ? ["error", "default"]
+    : ["trace_item_span"];
+}
+
+/**
+ * Build the single data source describing the threshold query for a detector.
+ *
+ * `timeWindow` is carried by the flat body in *minutes* (every CLI formatter
+ * appends "m"), but the detector API expects *seconds*, matching the inverse
+ * conversion in `mapDetectorToMetricAlertRule`.
+ */
+function buildDetectorDataSource(
+  body: Record<string, unknown>
+): Record<string, unknown> {
+  const dataset = typeof body.dataset === "string" ? body.dataset : "";
+  const timeWindowMinutes =
+    typeof body.timeWindow === "number" ? body.timeWindow : 0;
+  const source: Record<string, unknown> = {
+    aggregate: typeof body.aggregate === "string" ? body.aggregate : "",
+    dataset,
+    query: typeof body.query === "string" ? body.query : "",
+    queryType: datasetQueryType(dataset),
+    eventTypes: datasetEventTypes(dataset),
+    timeWindow: timeWindowMinutes * 60,
+  };
+  if (typeof body.environment === "string" && body.environment !== "") {
+    source.environment = body.environment;
+  }
+  return source;
+}
+
+/**
+ * Translate a flat metric alert body into the nested detector write payload.
+ *
+ * The flat body is what the create/edit commands assemble (and the edit merge
+ * baseline, which reuses the `MetricAlertRule` shape). Trigger objects are
+ * passed through verbatim as the condition group's conditions — their
+ * `alertThreshold`/`actions` shape is already validated command-side. `status`
+ * (0 active / 1 disabled) maps onto the detector's `enabled` boolean.
+ */
+function buildDetectorBody(
+  body: Record<string, unknown>
+): Record<string, unknown> {
+  const detectorBody: Record<string, unknown> = {
+    name: typeof body.name === "string" ? body.name : "",
+    type: "metric_issue",
+    dataSources: [buildDetectorDataSource(body)],
+    config: { detectionType: "static" },
+  };
+
+  const triggers = Array.isArray(body.triggers) ? body.triggers : undefined;
+  if (triggers) {
+    detectorBody.conditionGroup = {
+      logicType: "any",
+      conditions: triggers,
+    };
+  }
+
+  if (body.status !== undefined) {
+    detectorBody.enabled = Number(body.status) !== 1;
+  }
+  if (body.owner !== undefined) {
+    detectorBody.owner = body.owner as string | null;
+  }
+  return detectorBody;
+}
+
+/**
+ * Resolve the target project slug for a metric detector create.
+ *
+ * Detector create is project-scoped (`/projects/{project}/detectors/`), unlike
+ * the legacy org-scoped `/alert-rules/` create. The flat body carries the
+ * project(s) in `projects`; the first entry is used. A metric alert without a
+ * project cannot be created against the detectors API.
+ *
+ * @throws {ValidationError} when no project slug is present
+ */
+function resolveDetectorProject(body: Record<string, unknown>): string {
+  const projects = Array.isArray(body.projects) ? body.projects : [];
+  const project = projects.find(
+    (value): value is string => typeof value === "string" && value.trim() !== ""
+  );
+  if (!project) {
+    throw new ValidationError(
+      "A project is required to create a metric alert rule (pass --project).",
+      "project"
+    );
+  }
+  return project;
+}
+
+/**
+ * Delete a metric alert rule via the org-scoped `/detectors/{id}/` endpoint.
+ *
+ * `ruleId` is the detector id surfaced by the migrated read path. Succeeds with
+ * 204 No Content and no response body.
  */
 export async function deleteMetricAlertRule(
   orgSlug: string,
   ruleId: string
 ): Promise<void> {
-  const regionUrl = await resolveOrgRegion(orgSlug);
-  await apiRequestToRegionNoContent(
-    regionUrl,
-    `/organizations/${orgSlug}/alert-rules/${encodeURIComponent(ruleId)}/`,
-    { method: "DELETE" }
-  );
+  const config = await getOrgSdkConfig(orgSlug);
+  const result = await deleteOrganizationDetector({
+    ...config,
+    // Detector IDs are opaque strings the API accepts verbatim; the SDK types
+    // detector_id as number, so pass the string through the string-keyed path.
+    path: {
+      organization_id_or_slug: orgSlug,
+      detector_id: ruleId,
+    } as unknown as {
+      organization_id_or_slug: string;
+      detector_id: number;
+    },
+  });
+  unwrapResult(result, `Failed to delete metric alert rule '${ruleId}'`);
 }
 
-export function getMetricAlertRuleDocument(
+/**
+ * Fetch the edit baseline for a metric alert rule.
+ *
+ * The edit command merges flag overrides onto this baseline in the flat
+ * `MetricAlertRule` shape, then hands the merged body to `putMetricAlertRule`,
+ * which translates it into the nested detector document. Returning the flat
+ * shape (rather than the raw detector) keeps the command-side merge coherent.
+ */
+export async function getMetricAlertRuleDocument(
   orgSlug: string,
   ruleId: string
 ): Promise<Record<string, unknown>> {
-  return fetchMetricAlertRuleJson(orgSlug, ruleId);
+  const rule = await getMetricAlertRule(orgSlug, ruleId);
+  return { ...rule };
 }
 
+/**
+ * Update a metric alert rule via the org-scoped `/detectors/{id}/` endpoint.
+ *
+ * `body` is the flat merged edit body; it is translated into the nested
+ * detector update payload before the PUT.
+ */
 export async function putMetricAlertRule(
   orgSlug: string,
   ruleId: string,
   body: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const regionUrl = await resolveOrgRegion(orgSlug);
-  const { data } = await apiRequestToRegion<Record<string, unknown>>(
-    regionUrl,
-    `/organizations/${orgSlug}/alert-rules/${encodeURIComponent(ruleId)}/`,
-    { method: "PUT", body }
+  const config = await getOrgSdkConfig(orgSlug);
+  const result = await updateOrganizationDetector({
+    ...config,
+    path: {
+      organization_id_or_slug: orgSlug,
+      detector_id: ruleId,
+    } as unknown as {
+      organization_id_or_slug: string;
+      detector_id: number;
+    },
+    // The SDK types the detector body with snake_case keys and opaque
+    // dataSources/conditions; the CLI supplies the camelCase document the
+    // endpoint's CamelSnakeSerializer expects, so cast into the typed arg.
+    body: buildDetectorBody(body) as unknown as Parameters<
+      typeof updateOrganizationDetector
+    >[0]["body"],
+  });
+  return unwrapResult<Record<string, unknown>>(
+    result,
+    `Failed to update metric alert rule '${ruleId}'`
   );
-  return data;
 }
 
 /**
- * Create a metric (organization) alert rule.
+ * Create a metric alert rule via the project-scoped `/detectors/` endpoint.
+ *
+ * `body` is the flat create body; the target project is taken from
+ * `body.projects` and the rest is translated into the nested detector payload.
  */
 export async function createMetricAlertRule(
   orgSlug: string,
   body: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const regionUrl = await resolveOrgRegion(orgSlug);
-  const { data } = await apiRequestToRegion<Record<string, unknown>>(
-    regionUrl,
-    `/organizations/${orgSlug}/alert-rules/`,
-    { method: "POST", body }
+  const projectSlug = resolveDetectorProject(body);
+  const config = await getOrgSdkConfig(orgSlug);
+  const result = await createOrganizationProjectDetector({
+    ...config,
+    path: {
+      organization_id_or_slug: orgSlug,
+      project_id_or_slug: projectSlug,
+    },
+    body: buildDetectorBody(body) as unknown as Parameters<
+      typeof createOrganizationProjectDetector
+    >[0]["body"],
+  });
+  return unwrapResult<Record<string, unknown>>(
+    result,
+    "Failed to create metric alert rule"
   );
-  return data;
 }

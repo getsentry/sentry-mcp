@@ -1,13 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   createIssueAlertRule,
+  createMetricAlertRule,
   deleteIssueAlertRule,
   deleteMetricAlertRule,
   getIssueAlertRule,
   getIssueAlertWorkflowDocument,
   getMetricAlertRule,
+  getMetricAlertRuleDocument,
   listIssueAlertsPaginated,
   listMetricAlertsPaginated,
+  putMetricAlertRule,
   resolveErrorDetectorId,
   updateIssueAlertRule,
 } from "../../../src/lib/api/alerts.js";
@@ -360,19 +363,155 @@ describe("resolveErrorDetectorId", () => {
 });
 
 describe("deleteMetricAlertRule", () => {
-  test("treats empty-body 202 as success", async () => {
+  test("deletes via the org-scoped /detectors/{id}/ endpoint", async () => {
     globalThis.fetch = mockFetch(async (input, init) => {
       const req = new Request(input!, init);
       expect(req.method).toBe("DELETE");
-      expect(req.url).toBe(
-        `${DEFAULT_SENTRY_URL}/api/0/organizations/test-org/alert-rules/9/`
+      expect(new URL(req.url).pathname).toBe(
+        "/api/0/organizations/test-org/detectors/9/"
       );
       expect(req.headers.get("Authorization")).toBe("Bearer test-token");
-      return new Response(null, { status: 202 });
+      return new Response(null, { status: 204 });
     });
 
     await expect(
       deleteMetricAlertRule("test-org", "9")
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("createMetricAlertRule", () => {
+  test("POSTs a nested detector body to the project-scoped /detectors/ endpoint", async () => {
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const req = new Request(input!, init);
+      expect(req.method).toBe("POST");
+      expect(new URL(req.url).pathname).toBe(
+        "/api/0/organizations/test-org/projects/backend/detectors/"
+      );
+      expect(await req.json()).toEqual({
+        name: "P95 latency",
+        type: "metric_issue",
+        dataSources: [
+          {
+            aggregate: "p95(transaction.duration)",
+            dataset: "transactions",
+            query: "environment:prod",
+            queryType: 1,
+            eventTypes: ["trace_item_span"],
+            // 5m from the flat body is sent to the detector API as 300s.
+            timeWindow: 300,
+            environment: "prod",
+          },
+        ],
+        config: { detectionType: "static" },
+        conditionGroup: {
+          logicType: "any",
+          conditions: [{ alertThreshold: 500, actions: [{ id: "notify" }] }],
+        },
+      });
+      return Response.json(
+        { ...metricDetector({ id: "77", name: "P95 latency" }) },
+        { status: 201 }
+      );
+    });
+
+    const created = await createMetricAlertRule("test-org", {
+      name: "P95 latency",
+      query: "environment:prod",
+      aggregate: "p95(transaction.duration)",
+      dataset: "transactions",
+      timeWindow: 5,
+      environment: "prod",
+      triggers: [{ alertThreshold: 500, actions: [{ id: "notify" }] }],
+      projects: ["backend"],
+    });
+    expect(created.id).toBe("77");
+  });
+
+  test("maps error-like datasets to queryType 0 and error eventTypes", async () => {
+    let sentBody: Record<string, unknown> = {};
+    globalThis.fetch = mockFetch(async (input, init) => {
+      sentBody = (await new Request(input!, init).json()) as Record<
+        string,
+        unknown
+      >;
+      return Response.json(metricDetector({ id: "1" }), { status: 201 });
+    });
+
+    await createMetricAlertRule("test-org", {
+      name: "Error volume",
+      query: "event.type:error",
+      aggregate: "count()",
+      dataset: "errors",
+      timeWindow: 15,
+      triggers: [{ alertThreshold: 100, actions: [{ id: "notify" }] }],
+      projects: ["backend"],
+    });
+
+    const source = (sentBody.dataSources as Record<string, unknown>[])[0];
+    expect(source?.queryType).toBe(0);
+    expect(source?.eventTypes).toEqual(["error", "default"]);
+    expect(source?.timeWindow).toBe(900);
+  });
+
+  test("throws ValidationError when no project is provided", async () => {
+    await expect(
+      createMetricAlertRule("test-org", {
+        name: "No project",
+        query: "",
+        aggregate: "count()",
+        dataset: "errors",
+        timeWindow: 5,
+        triggers: [{ alertThreshold: 1, actions: [{ id: "notify" }] }],
+      })
+    ).rejects.toMatchObject({ name: "ValidationError" });
+  });
+});
+
+describe("getMetricAlertRuleDocument", () => {
+  test("returns the flat rule baseline from the detector GET", async () => {
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const url = new URL(new Request(input!, init).url);
+      expect(url.pathname).toBe("/api/0/organizations/test-org/detectors/9/");
+      return Response.json(metricDetector({ id: "9", name: "Baseline" }));
+    });
+
+    const doc = await getMetricAlertRuleDocument("test-org", "9");
+    expect(doc).toMatchObject({
+      id: "9",
+      name: "Baseline",
+      aggregate: "p95(transaction.duration)",
+      dataset: "transactions",
+      timeWindow: 5,
+    });
+  });
+});
+
+describe("putMetricAlertRule", () => {
+  test("PUTs a nested detector body to the /detectors/{id}/ endpoint", async () => {
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const req = new Request(input!, init);
+      expect(req.method).toBe("PUT");
+      expect(new URL(req.url).pathname).toBe(
+        "/api/0/organizations/test-org/detectors/9/"
+      );
+      const body = (await req.json()) as Record<string, unknown>;
+      expect(body.name).toBe("Renamed");
+      expect(body.type).toBe("metric_issue");
+      // status 1 (disabled) maps onto the detector's enabled=false flag.
+      expect(body.enabled).toBe(false);
+      return Response.json(metricDetector({ id: "9", name: "Renamed" }));
+    });
+
+    const updated = await putMetricAlertRule("test-org", "9", {
+      name: "Renamed",
+      query: "environment:prod",
+      aggregate: "p95(transaction.duration)",
+      dataset: "transactions",
+      timeWindow: 5,
+      status: 1,
+      triggers: [{ alertThreshold: 500, actions: [{ id: "notify" }] }],
+    });
+    expect(updated.id).toBe("9");
   });
 });
