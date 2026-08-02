@@ -36,10 +36,22 @@ import {
   isItemIncluded,
   SENTRY_CONTENT_TYPE,
 } from "../../lib/formatters/local.js";
-import { logger } from "../../lib/logger.js";
+import { logger, printLine } from "../../lib/logger.js";
 
 /** Default port for the local dev server. */
 export const DEFAULT_PORT = 8969;
+
+/**
+ * Value advertised in the `X-Powered-By` response header.
+ *
+ * Spotlight clients (the desktop app, the browser overlay) probe `/health` and
+ * treat a sidecar as present only when this exact header value comes back —
+ * see `isSidecarRunning()` in `@spotlightjs/spotlight`. Without it they assume
+ * no sidecar is running, try to start their own on the same port, fail with
+ * EADDRINUSE, and report "not connected" even though this server is happily
+ * receiving envelopes.
+ */
+export const SERVER_IDENTIFIER = "spotlight-by-sentry";
 
 /** Buffer size: how many recent envelopes to retain for late subscribers. */
 const BUFFER_SIZE = 500;
@@ -118,14 +130,25 @@ const LOCALHOST_ORIGIN_RE =
  * arbitrary remote origins to read the SSE envelope stream.
  */
 
-/** Build a subscriber callback that serializes envelopes to an SSE stream. */
-function buildSSEHandler(stream: {
-  writeSSE: (event: {
-    id?: string;
-    event?: string;
-    data: string;
-  }) => Promise<void>;
-}) {
+/**
+ * Build a subscriber callback that serializes envelopes to an SSE stream.
+ *
+ * @param stream - Hono SSE stream to write to
+ * @param useBase64 - Whether the client requested the `;base64` event-type
+ *   suffix (via `?base64` on `/stream`). Spotlight UI clients use the suffix
+ *   to pick their decode path, so it must be echoed back or they drop events.
+ */
+function buildSSEHandler(
+  stream: {
+    writeSSE: (event: {
+      id?: string;
+      event?: string;
+      data: string;
+    }) => Promise<void>;
+  },
+  useBase64 = false
+) {
+  const base64Indicator = useBase64 ? ";base64" : "";
   return (container: {
     getParsedEnvelope: () => {
       envelope: [Record<string, unknown>, unknown[]];
@@ -142,7 +165,7 @@ function buildSSEHandler(stream: {
       stream
         .writeSSE({
           id: envelopeId ? String(envelopeId) : undefined,
-          event: container.getContentType(),
+          event: `${container.getContentType()}${base64Indicator}`,
           data: JSON.stringify(parsed.envelope),
         })
         .catch((err: unknown) => {
@@ -164,6 +187,11 @@ export function buildApp(
   spotlightBuffer: ReturnType<typeof createSpotlightBuffer>
 ): Hono {
   const app = new Hono();
+
+  app.use("*", async (c, next) => {
+    c.header("X-Powered-By", SERVER_IDENTIFIER);
+    await next();
+  });
 
   app.use(
     "*",
@@ -231,14 +259,18 @@ export function buildApp(
   /**
    * SSE stream — overlay / UI clients connect here to receive a
    * live feed of envelopes. The SSE event format:
-   *   - `event` is the content type (e.g., "application/x-sentry-envelope")
+   *   - `event` is the content type (e.g., "application/x-sentry-envelope"),
+   *     suffixed with `;base64` when the client passed `?base64`
    *   - `id` is the envelope UUID (enables reconnection)
    *   - `data` is the parsed envelope JSON ([header, items])
    */
-  app.get("/stream", (c) =>
-    streamSSE(c, async (stream) => {
+  app.get("/stream", (c) => {
+    // Presence, not value: clients connect with a bare `?base64` as often
+    // as `?base64=1`, so an empty string still means "yes".
+    const useBase64 = c.req.query("base64") !== undefined;
+    return streamSSE(c, async (stream) => {
       const lastEventId = c.req.header("Last-Event-ID");
-      const onEnvelope = buildSSEHandler(stream);
+      const onEnvelope = buildSSEHandler(stream, useBase64);
       const readerId = spotlightBuffer.subscribe(onEnvelope, lastEventId);
 
       await new Promise<void>((resolve) => {
@@ -247,8 +279,8 @@ export function buildApp(
           resolve();
         });
       });
-    })
-  );
+    });
+  });
 
   return app;
 }
@@ -642,7 +674,7 @@ function processSSEEvent(
             showAttributes
           );
       for (const line of lines) {
-        logger.log(line);
+        printLine(line);
       }
     }
   } catch (err) {
@@ -762,7 +794,7 @@ export const serverCommand = buildCommand({
             activeFilters,
             flags.attributes
           )) {
-            logger.log(line);
+            printLine(line);
           }
         } catch (err) {
           logger.debug(

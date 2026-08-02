@@ -5,7 +5,7 @@
  * attachSentryReporter, and the logger instance configuration.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   attachSentryReporter,
   getEnvLogLevel,
@@ -13,6 +13,7 @@ import {
   LOG_LEVEL_NAMES,
   logger,
   parseLogLevel,
+  printLine,
   setLogLevel,
 } from "../../src/lib/logger.js";
 
@@ -206,6 +207,36 @@ describe("logger instance", () => {
       expect(logger.level).toBe(3);
     } finally {
       setLogLevel(before);
+    }
+  });
+});
+
+/** Matches an `HH:MM:SS` clock time anywhere in a rendered log line. */
+const TIME_RE = /\d{2}:\d{2}:\d{2}/g;
+
+describe("printLine", () => {
+  test("writes the line verbatim to stderr with a trailing newline", () => {
+    const spy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    try {
+      printLine("12:34:56 [INFO]    [SERVER]  Hello");
+      expect(spy).toHaveBeenCalledWith("12:34:56 [INFO]    [SERVER]  Hello\n");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("does not add a second timestamp the way logger.log does", () => {
+    const spy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    try {
+      printLine("12:34:56 [INFO]    [SERVER]  Hello");
+      const written = spy.mock.calls.map((call) => String(call[0])).join("");
+      expect(written.match(TIME_RE)).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
     }
   });
 });
