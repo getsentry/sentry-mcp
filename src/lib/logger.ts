@@ -171,6 +171,24 @@ export const logger = createConsola({
 });
 
 /**
+ * Write an already-formatted line to stderr verbatim, bypassing consola.
+ *
+ * Event tails (`sentry local`) render their own prefix — an event timestamp,
+ * level tag, and source tag — before printing. Routing those lines through
+ * `logger.log()` makes consola's reporter prepend/append a *second* timestamp
+ * (the wall-clock print time), so every line carried two different times.
+ * Writing directly keeps the single, meaningful event timestamp.
+ *
+ * Uses the same stream as {@link logger} so ordering with surrounding
+ * `logger.info()` status messages is preserved.
+ *
+ * @param line - Fully formatted line, without a trailing newline
+ */
+export function printLine(line: string): void {
+  process.stderr.write(`${line}\n`);
+}
+
+/**
  * Patch a consola instance's `withTag` so every child (and grandchild)
  * is registered in {@link scopedLoggers} for {@link setLogLevel} propagation.
  */

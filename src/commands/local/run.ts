@@ -21,7 +21,7 @@ import { detectDevCommand } from "../../lib/dev-script.js";
 import { CliError, EXIT, ValidationError } from "../../lib/errors.js";
 import { bold } from "../../lib/formatters/colors.js";
 import { formatEnvelopeLines } from "../../lib/formatters/local.js";
-import { logger } from "../../lib/logger.js";
+import { logger, printLine } from "../../lib/logger.js";
 import {
   buildApp,
   DEFAULT_PORT,
@@ -117,7 +117,7 @@ async function startBackgroundServer(
   const subscriptionId = buffer.subscribe((container) => {
     try {
       for (const line of formatEnvelopeLines(container, noFilters)) {
-        logger.log(line);
+        printLine(line);
       }
     } catch (err) {
       logger.debug(

@@ -12,6 +12,7 @@ import {
   feedSSELine,
   isServerRunning,
   parsePort,
+  SERVER_IDENTIFIER,
 } from "../../../src/commands/local/server.js";
 import { ValidationError } from "../../../src/lib/errors.js";
 import { SENTRY_CONTENT_TYPE } from "../../../src/lib/formatters/local.js";
@@ -143,6 +144,52 @@ describe("feedSSELine", () => {
   });
 });
 
+/** Minimal well-formed Sentry envelope used by the ingest/SSE tests. */
+const TEST_ENVELOPE =
+  '{"sdk":{"name":"sentry.node"}}\n{"type":"event"}\n{"message":"test"}';
+
+/**
+ * Subscribe to the SSE stream at `streamPath`, ingest one envelope, and return
+ * the decoded text of the first frame the subscriber receives.
+ *
+ * The subscription is registered inside `streamSSE`'s async callback, so the
+ * envelope must not be posted until that callback has had a chance to run —
+ * otherwise the subscriber misses it and the read hangs.
+ */
+async function readFirstSSEEvent(streamPath: string): Promise<string> {
+  const buffer = createSpotlightBuffer(10);
+  const app = buildApp(buffer);
+
+  const res = await app.request(streamPath, {
+    headers: { Accept: "text/event-stream" },
+  });
+  if (!res.body) {
+    throw new Error("SSE response had no body");
+  }
+  const reader = res.body.getReader();
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    await app.request("/stream", {
+      method: "POST",
+      headers: { "Content-Type": SENTRY_CONTENT_TYPE },
+      body: TEST_ENVELOPE,
+    });
+
+    const decoder = new TextDecoder();
+    let text = "";
+    while (!text.includes("event: ")) {
+      const { done, value } = await reader.read();
+      if (done) {
+        throw new Error(`SSE stream closed before an event arrived: ${text}`);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    return text;
+  } finally {
+    await reader.cancel();
+  }
+}
+
 describe("buildApp", () => {
   test("health endpoint returns OK", async () => {
     const buffer = createSpotlightBuffer(10);
@@ -231,6 +278,39 @@ describe("buildApp", () => {
     if (res.body) {
       await res.body.cancel();
     }
+  });
+
+  test("advertises itself as a Spotlight sidecar via X-Powered-By", async () => {
+    const buffer = createSpotlightBuffer(10);
+    const app = buildApp(buffer);
+
+    const res = await app.request("/health");
+    // The literal is spelled out rather than compared against the constant:
+    // Spotlight's isSidecarRunning() matches this exact string, so a rename
+    // here would silently break desktop-app detection.
+    expect(res.headers.get("x-powered-by")).toBe("spotlight-by-sentry");
+  });
+
+  test("sets X-Powered-By on ingest responses too", async () => {
+    const buffer = createSpotlightBuffer(10);
+    const app = buildApp(buffer);
+
+    const res = await app.request("/stream", {
+      method: "POST",
+      headers: { "Content-Type": SENTRY_CONTENT_TYPE },
+      body: TEST_ENVELOPE,
+    });
+    expect(res.headers.get("x-powered-by")).toBe(SERVER_IDENTIFIER);
+  });
+
+  test("SSE event type carries no base64 suffix by default", async () => {
+    const chunk = await readFirstSSEEvent("/stream");
+    expect(chunk).toContain(`event: ${SENTRY_CONTENT_TYPE}\n`);
+  });
+
+  test("SSE event type gains ;base64 suffix when the client asks for it", async () => {
+    const chunk = await readFirstSSEEvent("/stream?base64=1");
+    expect(chunk).toContain(`event: ${SENTRY_CONTENT_TYPE};base64\n`);
   });
 });
 
