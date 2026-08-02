@@ -123,7 +123,18 @@ function applyIssueEdits(
     const actionFilters = Array.isArray(body.actionFilters)
       ? (body.actionFilters as Record<string, unknown>[])
       : [];
-    const filter = (actionFilters[0] as Record<string, unknown>) ?? {};
+    const existingFilter = actionFilters[0] as
+      | Record<string, unknown>
+      | undefined;
+    // When the rule has no action filter yet, a partial edit (e.g. only
+    // --action) must still emit a valid DataConditionGroup. Seed the same
+    // defaults the create path uses so the group carries a logicType and a
+    // conditions array; the workflows API rejects a group without a logic
+    // type. An existing filter keeps its own logicType/conditions.
+    const filter: Record<string, unknown> = existingFilter ?? {
+      logicType: matchToLogicType(undefined),
+      conditions: [],
+    };
     if (actions !== undefined) {
       filter.actions = actions;
     }
