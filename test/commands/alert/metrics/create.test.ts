@@ -114,6 +114,32 @@ describe("alert metrics create", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
+  test("rejects create without a project", async () => {
+    const context = createContext();
+    const func = (await createCommand.loader()) as unknown as (
+      this: unknown,
+      flags: CreateFlags,
+      arg: string
+    ) => Promise<void>;
+
+    await expect(
+      func.call(
+        context,
+        {
+          name: "Metric Rule",
+          query: "event.type:error",
+          aggregate: "count()",
+          dataset: "errors",
+          "time-window": 5,
+          trigger: ['{"alertThreshold":100,"actions":[{"id":"notify"}]}'],
+          "dry-run": true,
+          json: true,
+        },
+        "test-org"
+      )
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
   test("dry run does not call create API", async () => {
     const context = createContext();
     resolveOrgSpy.mockResolvedValue({ org: "test-org" });
@@ -132,6 +158,7 @@ describe("alert metrics create", () => {
         dataset: "errors",
         "time-window": 5,
         trigger: ['{"alertThreshold":100,"actions":[{"id":"notify"}]}'],
+        project: ["backend"],
         "dry-run": true,
         json: true,
       },
@@ -159,6 +186,7 @@ describe("alert metrics create", () => {
         dataset: "errors",
         "time-window": 5,
         trigger: ['{"alertThreshold":100,"actions":[{"id":"notify"}]}'],
+        project: ["backend"],
         "dry-run": true,
         json: true,
       },
@@ -190,6 +218,7 @@ describe("alert metrics create", () => {
         dataset: "errors",
         "time-window": 5,
         trigger: ['{"alertThreshold":100,"actions":[{"id":"notify"}]}'],
+        project: ["backend"],
         "dry-run": true,
         json: true,
       },
@@ -275,6 +304,7 @@ describe("alert metrics create", () => {
         dataset: "errors",
         "time-window": 5,
         trigger: ['{"alertThreshold":100,"actions":[{"id":"notify"}]}'],
+        project: ["backend"],
         "dry-run": false,
         json: true,
       },
@@ -288,6 +318,7 @@ describe("alert metrics create", () => {
       dataset: "errors",
       timeWindow: 5,
       triggers: [{ alertThreshold: 100, actions: [{ id: "notify" }] }],
+      projects: ["backend"],
     });
   });
 });

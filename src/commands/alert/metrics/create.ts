@@ -79,9 +79,9 @@ export const createCommand = buildCommand({
     fullDescription:
       "Create an organization-scoped metric alert rule.\n\n" +
       "Required fields:\n" +
-      "  --name, --query, --aggregate, --dataset, --time-window, --trigger (>=1)\n\n" +
+      "  --name, --query, --aggregate, --dataset, --time-window, --trigger (>=1), --project\n\n" +
       "Optional fields:\n" +
-      "  --project (repeatable), --environment, --owner\n\n" +
+      "  --environment, --owner\n\n" +
       "Examples:\n" +
       "  sentry alert metrics create my-org --name 'P95 latency' \\\n" +
       "    --query 'environment:prod' --aggregate 'p95(transaction.duration)' \\\n" +
@@ -184,6 +184,12 @@ export const createCommand = buildCommand({
     const triggers = parseJsonObjectList(flags.trigger, "trigger");
     validateMetricTriggers(triggers);
     const projects = normalizeProjectList(flags.project);
+    if (!projects || projects.length === 0) {
+      throw new ValidationError(
+        "A project is required to create a metric alert rule (pass --project).",
+        "project"
+      );
+    }
 
     const orgSlug = await resolveMetricCreateOrg(arg, cwd);
 
