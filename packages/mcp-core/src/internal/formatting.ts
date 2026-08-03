@@ -1905,16 +1905,6 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
     return "";
   }
 
-  // Prefer the shared formatter's analysis when the endpoint provides it.
-  // Seer content is LLM-generated, so wrap it in the untrusted-data boundary.
-  if (autofixState.formatted?.content) {
-    const wrapped = wrapSeerContent(
-      autofixState.formatted.content,
-      autofixState.autofix.run_id,
-    );
-    return `## Seer Analysis\n\n${wrapped}\n`;
-  }
-
   const { autofix } = autofixState;
   const parts: string[] = [];
 
@@ -1927,17 +1917,24 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
     parts.push("");
   }
 
-  // Summarize from the run's artifacts: the solution if available, otherwise
-  // the root cause if it has been identified.
-  const { rootCause, solution } = getAutofixArtifactSummaries(autofix);
-  if (solution) {
-    parts.push("**Summary:**");
-    parts.push(solution);
-  } else if (rootCause) {
-    parts.push("**Root Cause Identified:**");
-    parts.push(rootCause);
-  } else if (!isTerminalStatus(autofix.status)) {
-    parts.push("Analysis has started but no results yet.");
+  // Prefer the shared formatter's analysis for the body when the endpoint provides it, but
+  // keep the status handling around it: a run that failed or needs input must say so either
+  // way. Seer content is LLM-generated, so wrap it in the untrusted-data boundary.
+  if (autofixState.formatted?.content) {
+    parts.push(wrapSeerContent(autofixState.formatted.content, autofix.run_id));
+  } else {
+    // Summarize from the run's artifacts: the solution if available, otherwise
+    // the root cause if it has been identified.
+    const { rootCause, solution } = getAutofixArtifactSummaries(autofix);
+    if (solution) {
+      parts.push("**Summary:**");
+      parts.push(solution);
+    } else if (rootCause) {
+      parts.push("**Root Cause Identified:**");
+      parts.push(rootCause);
+    } else if (!isTerminalStatus(autofix.status)) {
+      parts.push("Analysis has started but no results yet.");
+    }
   }
 
   if (autofix.status === "error") {

@@ -515,6 +515,57 @@ describe("get_issue_details", () => {
     expect(result).toContain('<seer_analysis run_id="7" step="analysis">');
   });
 
+  it.each([
+    {
+      label: "in progress",
+      status: "processing",
+      expected: "**Status:** Processing",
+    },
+    {
+      label: "failed",
+      status: "error",
+      expected: "**Status:** Analysis failed.",
+    },
+    {
+      label: "awaiting input",
+      status: "awaiting_user_input",
+      expected: "**Status:** Analysis paused - additional information needed.",
+    },
+  ])(
+    "still reports Seer run status ($label) alongside formatted content",
+    async ({ status, expected }) => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+          () =>
+            HttpResponse.json({
+              autofix: { run_id: 7, status, blocks: [] },
+              formatted: {
+                format: "markdown",
+                content: "## Root Cause\n\nEMBEDDED-SEER-MARKER",
+              },
+            }),
+          { once: true },
+        ),
+      );
+
+      const result = await getIssueDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          eventId: undefined,
+          issueUrl: undefined,
+          regionUrl: null,
+        },
+        baseContext,
+      );
+
+      // the formatted body must not hide that the run needs attention
+      expect(result).toContain("EMBEDDED-SEER-MARKER");
+      expect(result).toContain(expected);
+    },
+  );
+
   it("surfaces AI conversation IDs found by bounded span lookup", async () => {
     const traceId = "11112222333344445555666677778888";
     const event = createDefaultEvent({
