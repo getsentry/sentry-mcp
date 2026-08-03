@@ -57,6 +57,7 @@ cli/
 │   │   ├── build/       # download, upload
 │   │   ├── cli/         # defaults, feedback, fix, import, setup, uninstall, upgrade
 │   │   ├── code-mappings/# upload
+│   │   ├── conversation/# list, view
 │   │   ├── dart-symbol-map/# upload
 │   │   ├── dashboard/   # add, create, delete, edit, list, restore, revisions, view
 │   │   ├── debug-files/ # bundle-jvm, bundle-sources, check, find, print-sources, upload
