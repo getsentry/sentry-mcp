@@ -507,6 +507,10 @@ export async function consumeSSE(opts: ConsumeSSEOptions): Promise<void> {
     // After a previous successful connection, retry on any failure since
     // the server may be restarting.
     if (!hasConnectedBefore && result !== "connected-then-lost") {
+      // `/health` answered but `/stream` never opened, so nothing will ever
+      // be printed. Say so — `local run` keeps the child process going, and
+      // without this it just looks like events stopped arriving.
+      logger.warn(`Could not attach to the event stream at ${url}/stream`);
       return;
     }
     // Reset backoff after a successful connection that later dropped,
@@ -604,6 +608,7 @@ async function consumeSSEOnce(opts: ConsumeSSEOnceOptions): Promise<boolean> {
     return false;
   }
   if (!res.body) {
+    logger.debug("SSE stream returned 200 with no body");
     return false;
   }
   // Signal that we have a live connection — the caller uses this to
