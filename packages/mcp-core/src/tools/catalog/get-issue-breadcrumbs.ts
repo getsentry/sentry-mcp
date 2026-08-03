@@ -36,11 +36,6 @@ export default defineTool({
     "get_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123', eventId='abc123')",
     "get_issue_breadcrumbs(issueUrl='https://my-org.sentry.io/issues/PROJECT-123/')",
     "</examples>",
-    "",
-    "<hints>",
-    "- `eventId` is optional and defaults to `latest`.",
-    "- Pass a specific event ID to inspect breadcrumbs for a non-latest event in the issue.",
-    "</hints>",
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug.optional(),

@@ -79,7 +79,7 @@
       },
       {
         "name": "get_issue_breadcrumbs",
-        "description": "Get the breadcrumb trail from a Sentry issue event.\nDefaults to the latest event when eventId is omitted.\n\nUse this tool when you need to:\n- See the user and application actions leading up to an error\n- Inspect navigation, console, HTTP, and other breadcrumb events\n- Reconstruct the immediate context before an issue occurred\n- Compare breadcrumb trails across multiple events in the same issue\n\n<examples>\nget_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123')\nget_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123', eventId='abc123')\nget_issue_breadcrumbs(issueUrl='https://my-org.sentry.io/issues/PROJECT-123/')\n</examples>\n\n<hints>\n- `eventId` is optional and defaults to `latest`.\n- Pass a specific event ID to inspect breadcrumbs for a non-latest event in the issue.\n</hints>",
+        "description": "Get the breadcrumb trail from a Sentry issue event.\nDefaults to the latest event when eventId is omitted.\n\nUse this tool when you need to:\n- See the user and application actions leading up to an error\n- Inspect navigation, console, HTTP, and other breadcrumb events\n- Reconstruct the immediate context before an issue occurred\n- Compare breadcrumb trails across multiple events in the same issue\n\n<examples>\nget_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123')\nget_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123', eventId='abc123')\nget_issue_breadcrumbs(issueUrl='https://my-org.sentry.io/issues/PROJECT-123/')\n</examples>",
         "requiredScopes": ["event:read"]
       },
       {
@@ -330,7 +330,7 @@
       },
       {
         "name": "get_issue_breadcrumbs",
-        "description": "Get the breadcrumb trail from a Sentry issue event.\nDefaults to the latest event when eventId is omitted.\n\nUse this tool when you need to:\n- See the user and application actions leading up to an error\n- Inspect navigation, console, HTTP, and other breadcrumb events\n- Reconstruct the immediate context before an issue occurred\n- Compare breadcrumb trails across multiple events in the same issue\n\n<examples>\nget_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123')\nget_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123', eventId='abc123')\nget_issue_breadcrumbs(issueUrl='https://my-org.sentry.io/issues/PROJECT-123/')\n</examples>\n\n<hints>\n- `eventId` is optional and defaults to `latest`.\n- Pass a specific event ID to inspect breadcrumbs for a non-latest event in the issue.\n</hints>",
+        "description": "Get the breadcrumb trail from a Sentry issue event.\nDefaults to the latest event when eventId is omitted.\n\nUse this tool when you need to:\n- See the user and application actions leading up to an error\n- Inspect navigation, console, HTTP, and other breadcrumb events\n- Reconstruct the immediate context before an issue occurred\n- Compare breadcrumb trails across multiple events in the same issue\n\n<examples>\nget_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123')\nget_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123', eventId='abc123')\nget_issue_breadcrumbs(issueUrl='https://my-org.sentry.io/issues/PROJECT-123/')\n</examples>",
         "requiredScopes": ["event:read"]
       },
       {
