@@ -9,6 +9,8 @@
  *
  * If no server is already running on the target port, one is started
  * automatically in the background and shut down when the child exits.
+ * If one is already running, this command attaches to it as an SSE consumer
+ * so events still tail to the terminal.
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
@@ -24,6 +26,7 @@ import { formatEnvelopeLines } from "../../lib/formatters/local.js";
 import { logger, printLine } from "../../lib/logger.js";
 import {
   buildApp,
+  consumeSSE,
   DEFAULT_PORT,
   isServerRunning,
   parsePort,
@@ -94,11 +97,47 @@ function isPackageJsonSource(source: string): boolean {
   return source.startsWith("package.json");
 }
 
-/** State for a background server started by `local run`. */
-type BackgroundServer = {
+/**
+ * A live event tail for the duration of the child process, plus the teardown
+ * to run once it exits. Produced either by {@link startBackgroundServer} (we
+ * own the server) or {@link attachToExistingServer} (someone else does).
+ */
+type EventTail = {
   url: string;
   cleanup: () => Promise<void>;
 };
+
+/**
+ * Tail events from a server this command did not start.
+ *
+ * Something else already owns the port — most often the Spotlight desktop
+ * app's own sidecar, or a `sentry local serve` in another terminal. Without
+ * this, `run` stayed completely silent for the whole session: envelopes
+ * reached the other server, but nothing was ever printed here. Attaching as
+ * an SSE consumer is what `sentry local serve` does in the same situation.
+ */
+function attachToExistingServer(url: string): EventTail {
+  const ac = new AbortController();
+  const tail = consumeSSE({
+    url,
+    activeFilters: new Set<never>(),
+    signal: ac.signal,
+  }).catch((err: unknown) => {
+    if (!ac.signal.aborted) {
+      logger.debug(
+        `Event tail stopped: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  });
+
+  return {
+    url,
+    cleanup: async () => {
+      ac.abort();
+      await tail;
+    },
+  };
+}
 
 /**
  * Start a background dev server and subscribe to its buffer so incoming
@@ -107,7 +146,7 @@ type BackgroundServer = {
 async function startBackgroundServer(
   port: number,
   host: string
-): Promise<BackgroundServer> {
+): Promise<EventTail> {
   const buffer = createSpotlightBuffer(BUFFER_SIZE);
   const app = buildApp(buffer);
   const { server, port: boundPort } = await tryListen(app, port, host);
@@ -271,13 +310,15 @@ export const runCommand = buildCommand({
     }
 
     let url = `http://${flags.host}:${flags.port}`;
-    let bg: BackgroundServer | undefined;
+    let tail: EventTail;
 
-    const alreadyRunning = await isServerRunning(url);
-    if (!alreadyRunning) {
+    if (await isServerRunning(url)) {
+      logger.info(`Connected to existing server at ${bold(url)}`);
+      tail = attachToExistingServer(url);
+    } else {
       logger.info("No server detected, starting one in the background...");
-      bg = await startBackgroundServer(flags.port, flags.host);
-      url = bg.url;
+      tail = await startBackgroundServer(flags.port, flags.host);
+      url = tail.url;
       logger.info(`Background server listening on ${bold(url)}`);
     }
 
@@ -296,9 +337,7 @@ export const runCommand = buildCommand({
         stdio: "inherit",
       });
     } catch (err) {
-      if (bg) {
-        await bg.cleanup();
-      }
+      await tail.cleanup();
       throw new CliError(
         `Failed to start "${args[0]}": ${err instanceof Error ? err.message : String(err)}`,
         EXIT.GENERAL
@@ -342,9 +381,7 @@ export const runCommand = buildCommand({
       }
       process.removeListener("SIGINT", onSigint);
       process.removeListener("SIGTERM", onSigterm);
-      if (bg) {
-        await bg.cleanup();
-      }
+      await tail.cleanup();
     }
 
     if (exitCode !== 0) {
