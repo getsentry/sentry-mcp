@@ -132,6 +132,82 @@ function redactArgv(argv: string[]): string[] {
 }
 
 /**
+ * Whether `process.exitCode` is Stricli's UnknownCommand code.
+ *
+ * Checks both the raw (negative) and unsigned-byte forms because Node.js keeps
+ * the raw value while Bun converts to an unsigned byte.
+ */
+function isUnknownCommandExit(unknownCode: number): boolean {
+  return (
+    process.exitCode === unknownCode ||
+    process.exitCode === (unknownCode + 256) % 256
+  );
+}
+
+/**
+ * Recover help requests that Stricli's route scanner rejected as unknown
+ * commands, re-dispatching them so the user still gets help output.
+ *
+ * Three shapes are recovered when the run exited with UnknownCommand:
+ *
+ * 1. **`--version` on an unknown command** (e.g. `sentry cli nope --version`) —
+ *    in a group without a default command, the scanner aborts on the unknown
+ *    token before consuming `--version`, so `versionRequested` never trips.
+ *    Printed here so `--version` still wins at any depth, matching the old
+ *    pre-scanner `isVersionRequest` behavior.
+ * 2. **`--help --json` on an unknown command** (e.g.
+ *    `sentry cli nope --help --json`) — in a group without a default command,
+ *    route resolution fails before the `renderHelp` hook runs, so no JSON is
+ *    produced. Retried as the `help` command so agents get a structured
+ *    `{ error }` object instead of Stricli's text `UnknownCommand`.
+ * 3. **A trailing `help` token** (e.g. `sentry dashboard help`) — retried as
+ *    `sentry help <group...>`, which routes to the custom help command.
+ *
+ * @param cliArgs - The raw CLI arguments that were dispatched
+ * @param executor - The command executor (middleware chain) to retry with
+ * @param unknownCode - Stricli's `ExitCode.UnknownCommand`
+ */
+async function recoverUnknownCommandHelp(
+  cliArgs: string[],
+  executor: (argv: string[]) => Promise<void>,
+  unknownCode: number
+): Promise<void> {
+  if (!isUnknownCommandExit(unknownCode) || cliArgs[0] === "help") {
+    return;
+  }
+
+  const { isVersionRequest, rewriteHelpJsonToHelpCommand } = await import(
+    "./lib/help.js"
+  );
+
+  if (isVersionRequest(cliArgs)) {
+    process.exitCode = 0;
+    const { CLI_VERSION } = await import("./lib/constants.js");
+    process.stdout.write(`${CLI_VERSION}\n`);
+    return;
+  }
+
+  const helpJsonArgs = rewriteHelpJsonToHelpCommand(cliArgs);
+  if (helpJsonArgs) {
+    process.exitCode = 0;
+    await executor(helpJsonArgs);
+    return;
+  }
+
+  if (cliArgs.length >= 2 && cliArgs.at(-1) === "help") {
+    process.exitCode = 0;
+    const groupArgs = cliArgs.slice(0, -1);
+    const { warning } = await import("./lib/formatters/colors.js");
+    process.stderr.write(
+      warning(
+        `Tip: use --help for help (e.g., sentry ${groupArgs.join(" ")} --help)\n`
+      )
+    );
+    await executor(["help", ...groupArgs]);
+  }
+}
+
+/**
  * Error-recovery middleware for the CLI.
  *
  * Each middleware wraps command execution and may intercept specific errors
@@ -161,12 +237,11 @@ export async function runCli(cliArgs: string[]): Promise<void> {
   const { isatty } = await import("node:tty");
   const { ExitCode, run } = await import("@stricli/core");
   const { app } = await import("./app.js");
-  const { preprocessArgv } = await import("./lib/argv-glue.js");
   const { buildContext } = await import("./context.js");
   const { AuthError, OutputError, formatError, getExitCode } = await import(
     "./lib/errors.js"
   );
-  const { error, warning } = await import("./lib/formatters/colors.js");
+  const { error } = await import("./lib/formatters/colors.js");
   const { runInteractiveLogin } = await import("./lib/interactive-login.js");
   const { assertAutoLoginHostTrusted, recoverWithAutoLogin } = await import(
     "./lib/auto-auth.js"
@@ -185,17 +260,11 @@ export async function runCli(cliArgs: string[]): Promise<void> {
     shouldSuppressNotification,
   } = await import("./lib/version-check.js");
 
-  // Normalize argv before dispatch (see preprocessArgv). Global-flag hoisting is
-  // now handled by Stricli's patched route scanner (top-level-flags allow-list),
-  // so only two application-boundary transforms remain:
-  //  - `--version` after a route group/subcommand (e.g. `sentry cli --version`)
-  //    is normalized to a top-level `--version`; Stricli only handles it at the
-  //    application proxy. `-v` is left alone — it's the --verbose alias.
-  //  - a flag-based `--help --json` request is rewritten to the `help` command
-  //    so JSON help works for the `--help` forms agents reach for.
-  // The original cliArgs are kept for post-run checks (e.g., help recovery)
-  // that rely on the original token positions.
-  const normalizedArgs = preprocessArgv(cliArgs);
+  // Global-flag hoisting, `--version` at any route depth, and `--help --json`
+  // structured output are all handled inside Stricli now (the patched route
+  // scanner's top-level-flags allow-list + `versionRequested` state, and the
+  // `documentation.renderHelp` hook in app.ts), so no argv preprocessing is
+  // needed before dispatch — the raw args go straight to `run()`.
 
   // ---------------------------------------------------------------------------
   // Error-recovery middleware
@@ -503,12 +572,15 @@ export async function runCli(cliArgs: string[]): Promise<void> {
       // stderr and sets exitCode without throwing. Report to Sentry so
       // we can track typo/confusion patterns and improve suggestions.
       if (
-        (process.exitCode === ExitCode.UnknownCommand ||
-          process.exitCode === (ExitCode.UnknownCommand + 256) % 256) &&
-        // Skip when the unknown token is "help" — the outer code in
-        // runCli recovers this by retrying as `sentry help <group...>`
-        argv.at(-1) !== "help"
+        process.exitCode === ExitCode.UnknownCommand ||
+        process.exitCode === (ExitCode.UnknownCommand + 256) % 256
       ) {
+        // Skip help/`--version` requests that `recoverUnknownCommandHelp`
+        // turns into successful output — they aren't real unknown commands.
+        const { isRecoverableUnknownCommand } = await import("./lib/help.js");
+        if (isRecoverableUnknownCommand(argv)) {
+          return;
+        }
         // Best-effort: telemetry must never crash the CLI
         try {
           await reportUnknownCommand(argv);
@@ -616,9 +688,11 @@ export async function runCli(cliArgs: string[]): Promise<void> {
     setLogLevel(envLogLevel);
   }
 
-  // Use hoisted args so positional checks (e.g., args[0] === "cli") work
-  // even when global flags precede the subcommand in the original argv.
-  const suppressNotification = shouldSuppressNotification(normalizedArgs);
+  // `shouldSuppressNotification` scans for `--version`/`--json` and the
+  // `cli setup`/`cli fix` subcommands at any position, skipping interleaved
+  // global flags — so it works on the raw args even though global flags may
+  // precede the subcommand.
+  const suppressNotification = shouldSuppressNotification(cliArgs);
 
   // Start background update check (non-blocking)
   if (!suppressNotification) {
@@ -626,33 +700,11 @@ export async function runCli(cliArgs: string[]): Promise<void> {
   }
 
   try {
-    await executor(normalizedArgs);
+    await executor(cliArgs);
 
-    // When Stricli can't match a subcommand in a route group (e.g.,
-    // `sentry dashboard help`), it writes "No command registered for `help`"
-    // to stderr and sets exitCode to UnknownCommand. If the unrecognized
-    // token was "help", retry as `sentry help <group...>` which routes to
-    // the custom help command with proper introspection output.
-    // Check both raw (-5) and unsigned (251) forms because Node.js keeps
-    // the raw value while Bun converts to unsigned byte.
-    // Uses original cliArgs (not hoisted) so the `at(-1) === "help"` check
-    // works when global flags were placed before "help".
-    if (
-      (process.exitCode === ExitCode.UnknownCommand ||
-        process.exitCode === (ExitCode.UnknownCommand + 256) % 256) &&
-      cliArgs.length >= 2 &&
-      cliArgs.at(-1) === "help" &&
-      cliArgs[0] !== "help"
-    ) {
-      process.exitCode = 0;
-      const helpArgs = ["help", ...cliArgs.slice(0, -1)];
-      process.stderr.write(
-        warning(
-          `Tip: use --help for help (e.g., sentry ${cliArgs.slice(0, -1).join(" ")} --help)\n`
-        )
-      );
-      await executor(helpArgs);
-    }
+    // Recover help/`--help --json` requests that Stricli's route scanner
+    // rejected as unknown commands (see the helpers below).
+    await recoverUnknownCommandHelp(cliArgs, executor, ExitCode.UnknownCommand);
   } catch (err) {
     // OutputError: data was already rendered to stdout by the command wrapper.
     // Just set exitCode silently — no stderr message needed.
@@ -662,7 +714,7 @@ export async function runCli(cliArgs: string[]): Promise<void> {
     }
     process.stderr.write(`${error("Error:")} ${formatError(err)}\n`);
     process.exitCode = getExitCode(err);
-    const notification = getErrorUpdateNotification(err, normalizedArgs);
+    const notification = getErrorUpdateNotification(err, cliArgs);
     if (notification) {
       process.stderr.write(notification);
     }

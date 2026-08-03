@@ -252,6 +252,30 @@ const CONTENT_ASSERTIONS: ReadonlyArray<{
       "@stricli/core CJS: built-in `-v`=version alias not dropped (`sentry -v <command>` prints the version instead of running the command verbosely)",
   },
   {
+    file: "@stricli/core/dist/index.js",
+    requiredMarker: "versionRequested",
+    description:
+      "@stricli/core ESM: scanner `versionRequested` state missing (`--version` after a subcommand, e.g. `sentry cli --version`, will not print the version)",
+  },
+  {
+    file: "@stricli/core/dist/index.cjs",
+    requiredMarker: "versionRequested",
+    description:
+      "@stricli/core CJS: scanner `versionRequested` state missing (`--version` after a subcommand, e.g. `sentry cli --version`, will not print the version)",
+  },
+  {
+    file: "@stricli/core/dist/index.js",
+    requiredMarker: "renderHelp",
+    description:
+      "@stricli/core ESM: pluggable `renderHelp` hook missing (`sentry --help --json` will fall back to text help instead of structured JSON)",
+  },
+  {
+    file: "@stricli/core/dist/index.cjs",
+    requiredMarker: "renderHelp",
+    description:
+      "@stricli/core CJS: pluggable `renderHelp` hook missing (`sentry --help --json` will fall back to text help instead of structured JSON)",
+  },
+  {
     file: "@sentry/core/build/cjs/index.js",
     staleMarker: "exports.instrumentOpenAiClient",
     description:

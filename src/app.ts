@@ -72,6 +72,7 @@ import {
 } from "./lib/errors.js";
 import { error as errorColor, warning } from "./lib/formatters/colors.js";
 import { buildTopLevelFlags } from "./lib/global-flags.js";
+import { renderJsonHelp } from "./lib/help.js";
 import { isRouteMap, type RouteMap } from "./lib/introspect.js";
 import { buildRouteMap } from "./lib/route-map.js";
 
@@ -407,6 +408,15 @@ export const app = buildApplication(routes, {
     topLevelFlags: buildTopLevelFlags(),
   },
   determineExitCode: getExitCode,
+  documentation: {
+    // Pluggable help renderer (via our @stricli/core patch): render `--help
+    // --json` as structured JSON through the same introspection path as
+    // `sentry help --json`, instead of Stricli's text usage. Returns undefined
+    // for non-JSON help so the built-in text output is unchanged. This replaces
+    // the old argv `--help --json` → `help` command rewrite.
+    renderHelp: ({ prefix, unprocessedInputs }) =>
+      renderJsonHelp(prefix, unprocessedInputs),
+  },
   localization: {
     loadText: () => customText,
   },

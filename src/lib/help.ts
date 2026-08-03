@@ -12,6 +12,12 @@ import { isAuthenticated } from "./db/auth.js";
 import { TOP_LEVEL_ENV_VARS } from "./env-registry.js";
 import { cyan, magenta, muted } from "./formatters/colors.js";
 import {
+  filterFields,
+  formatJson,
+  parseFieldsList,
+} from "./formatters/json.js";
+import { GLOBAL_FLAGS } from "./global-flags.js";
+import {
   type CommandInfo,
   extractAllRoutes,
   getPositionalString,
@@ -372,6 +378,257 @@ export function introspectCommand(
     };
   }
   return resolved.info;
+}
+
+/**
+ * Render structured JSON help for `--help --json` requests, or `undefined` when
+ * the request is a plain text help request.
+ *
+ * Wired into Stricli's `documentation.renderHelp` hook (see `app.ts`). Stricli
+ * calls this whenever it is about to print help — for `--help`/`--helpAll` or a
+ * bare route group — passing the resolved route `prefix` (leading with the app
+ * name) and the `unprocessedInputs` that survived route resolution (which
+ * include forwarded top-level flags such as `--json`/`--fields`).
+ *
+ * When `--json` is present, this reproduces exactly what `sentry help --json
+ * [command]` writes to stdout: `introspectAllCommands()` for the full tree, or
+ * `introspectCommand(path)` for a specific command/group, serialized with
+ * {@link formatJson} and optionally narrowed by `--fields`. When `--json` is
+ * absent, it returns `undefined` so Stricli falls back to the built-in text
+ * help — leaving `sentry --help` and `sentry <cmd> --help` unchanged.
+ *
+ * @param prefix - Resolved route path including the app name (`["sentry", ...]`)
+ * @param unprocessedInputs - Inputs left after route resolution, including any
+ *   forwarded top-level flags
+ * @returns The JSON help string (with trailing newline), or `undefined` to fall
+ *   back to text help
+ */
+export function renderJsonHelp(
+  prefix: readonly string[],
+  unprocessedInputs: readonly string[]
+): string | undefined {
+  const { hasJson, fields, extraPath } = parseHelpJsonFlags(unprocessedInputs);
+  if (!hasJson) {
+    return;
+  }
+
+  // The route path is `prefix` (minus the app name), plus any non-flag tokens
+  // the scanner couldn't route — e.g. `sentry issue nope --help --json` leaves
+  // `nope` in unprocessedInputs. Folding those in lets `introspectCommand`
+  // return a `{ error }` object for an unknown command instead of silently
+  // rendering the parent group, matching the old `--help --json` behavior.
+  const commandPath = [...prefix.slice(1), ...extraPath];
+  const data =
+    commandPath.length === 0
+      ? introspectAllCommands()
+      : introspectCommand(commandPath);
+
+  const final = fields && fields.length > 0 ? filterFields(data, fields) : data;
+  return `${formatJson(final)}\n`;
+}
+
+/**
+ * Whether a raw argv is a `--version` request that should print the version.
+ *
+ * The patched scanner only trips `versionRequested` when it actually consumes
+ * the `--version` token, so a `--version` sitting after an unknown route token
+ * in a group without a default command (e.g. `sentry cli nope --version`) never
+ * reaches that state — the run aborts as `UnknownCommand` first. `cli.ts` uses
+ * this as a post-run recovery to restore the old `isVersionRequest` behavior:
+ * any bare `--version` before a `--` escape prints the version.
+ *
+ * `-v` is intentionally excluded — the Sentry CLI remaps it to `--verbose` via
+ * `GLOBAL_FLAGS`, matching the scanner patch that drops Stricli's `-v`=version
+ * alias. Tokens after a `--` escape belong to a wrapped command and are ignored.
+ *
+ * @param argv - Raw CLI arguments (e.g. `process.argv.slice(2)`)
+ * @returns `true` when the version should be printed
+ */
+export function isVersionRequest(argv: readonly string[]): boolean {
+  for (const token of argv) {
+    if (token === "--") {
+      return false;
+    }
+    if (token === "--version") {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether an `UnknownCommand` exit for `argv` is recoverable by `cli.ts` into
+ * successful output rather than a real unknown-command error.
+ *
+ * Mirrors the three shapes `recoverUnknownCommandHelp` retries — a `--version`
+ * request, a `--help --json` request, or a trailing `help` token. The unknown
+ * `unknown_command` telemetry event is suppressed for these so recoverable help
+ * and version invocations (e.g. `sentry cli nope --help --json`, whose last
+ * token is `--json`, not `help`) don't produce spurious noise.
+ *
+ * @param argv - Raw CLI arguments that were dispatched
+ * @returns `true` when the unknown-command exit will be recovered
+ */
+export function isRecoverableUnknownCommand(argv: readonly string[]): boolean {
+  return (
+    isVersionRequest(argv) ||
+    rewriteHelpJsonToHelpCommand(argv) !== undefined ||
+    (argv.length >= 2 && argv.at(-1) === "help")
+  );
+}
+
+/**
+ * Rewrite a raw `--help --json` argv into an equivalent `help` command
+ * invocation, or `undefined` when the argv is not a `--help --json` request.
+ *
+ * Used by `cli.ts` as a post-run recovery: when the route scanner rejects an
+ * unknown token in a group that has no default command (e.g.
+ * `sentry cli nope --help --json`), it fails before the `renderHelp` hook runs,
+ * so no JSON is produced. Re-dispatching the returned args (`["help", "--json",
+ * ...path]`, with `--fields` appended when present) routes through the `help`
+ * command, which emits the structured `{ error }` JSON for the unknown command
+ * — matching the pre-scanner `--help --json` behavior.
+ *
+ * Both `--help` (or its `-h` alias) and `--json` must appear before a `--`
+ * escape separator; otherwise `undefined` is returned and normal handling
+ * applies.
+ *
+ * @param argv - Raw CLI arguments (e.g. `process.argv.slice(2)`)
+ * @returns The `help`-command argv, or `undefined` when not a `--help --json`
+ *   request
+ */
+export function rewriteHelpJsonToHelpCommand(
+  argv: readonly string[]
+): string[] | undefined {
+  let hasHelp = false;
+  const { hasJson, fields, extraPath } = parseHelpJsonFlags(argv);
+  for (const token of argv) {
+    if (token === "--") {
+      break;
+    }
+    if (token === "--help" || token === "-h") {
+      hasHelp = true;
+    }
+  }
+  if (!(hasHelp && hasJson)) {
+    return;
+  }
+  const rewritten = ["help", "--json", ...extraPath];
+  if (fields && fields.length > 0) {
+    rewritten.push("--fields", fields.join(","));
+  }
+  return rewritten;
+}
+
+/**
+ * Scan the top-level flags forwarded past route resolution for `--json`,
+ * `--fields`, and any leftover non-flag command-path tokens.
+ *
+ * Only tokens before a `--` escape separator are considered so a wrapped
+ * command's own `--json` (`sentry monitor run <slug> -- tool --json`) is not
+ * treated as a help request. `--fields` supports both the spaced
+ * (`--fields a,b`) and inline (`--fields=a,b`) forms; its value is parsed with
+ * {@link parseFieldsList} for parity with the wrapper's `--fields` handling.
+ *
+ * `extraPath` collects non-flag tokens that were not part of the resolved route
+ * (e.g. an unknown subcommand the scanner forwarded to a group's default
+ * command). Spaced values of value-taking global flags (`--fields`, `--org`,
+ * `--project`, `--log-level`) are consumed so they are not mistaken for path
+ * segments — e.g. `--org acme cli nope` must yield `["cli", "nope"]`, not
+ * `["acme", "cli", "nope"]`. Boolean flags and other `--`-prefixed tokens are
+ * ignored.
+ */
+function parseHelpJsonFlags(inputs: readonly string[]): {
+  hasJson: boolean;
+  fields: string[] | undefined;
+  extraPath: string[];
+} {
+  let hasJson = false;
+  let fields: string[] | undefined;
+  const extraPath: string[] = [];
+  for (let i = 0; i < inputs.length; i += 1) {
+    const token = inputs[i] ?? "";
+    if (token === "--") {
+      break;
+    }
+    if (token === "--json") {
+      hasJson = true;
+    } else if (token.startsWith("--fields")) {
+      i = consumeFieldsFlag(inputs, i, (parsed) => {
+        fields = parsed;
+      });
+    } else if (isValueFlagToken(token)) {
+      i = consumeValueFlag(inputs, i);
+    } else if (!token.startsWith("-")) {
+      extraPath.push(token);
+    }
+  }
+  return { hasJson, fields, extraPath };
+}
+
+/**
+ * Skip the spaced value of a value-taking global flag at `index` so it is not
+ * collected as a command-path segment, returning the index of the last token
+ * consumed. Inline `--org=acme` carries its value in the same token, and a
+ * following `-`-prefixed token is another flag, not a value — both leave the
+ * index unchanged.
+ */
+function consumeValueFlag(inputs: readonly string[], index: number): number {
+  const token = inputs[index] ?? "";
+  if (token.includes("=") || inputs[index + 1]?.startsWith("-")) {
+    return index;
+  }
+  return inputs[index + 1] === undefined ? index : index + 1;
+}
+
+/**
+ * Tokens for value-taking global flags whose spaced value must be skipped when
+ * scanning for the help command path, excluding `--fields` (extracted
+ * separately) and `--json` (a boolean). Derived from {@link GLOBAL_FLAGS} so it
+ * stays in sync as global flags change: includes each value flag's `--<name>`
+ * and any `-<short>` alias. The inline `--<name>=<value>` form is matched by
+ * {@link isValueFlagToken}, which strips the `=<value>` suffix before lookup.
+ */
+const VALUE_FLAG_TOKENS: ReadonlySet<string> = new Set(
+  GLOBAL_FLAGS.filter(
+    (flag) => flag.kind === "value" && flag.name !== "fields"
+  ).flatMap((flag) =>
+    flag.short === null
+      ? [`--${flag.name}`]
+      : [`--${flag.name}`, `-${flag.short}`]
+  )
+);
+
+/**
+ * Whether `token` is a value-taking global flag (spaced `--org` or inline
+ * `--org=acme`) whose following value should not be treated as a path segment.
+ */
+function isValueFlagToken(token: string): boolean {
+  const name = token.startsWith("--") ? token.split("=", 1)[0] : token;
+  return VALUE_FLAG_TOKENS.has(name ?? token);
+}
+
+/**
+ * Parse a `--fields` flag at `index` (inline `--fields=a,b` or spaced
+ * `--fields a,b`), passing the parsed list to `assign`, and return the index of
+ * the last token consumed so the caller's loop advances past a spaced value.
+ */
+function consumeFieldsFlag(
+  inputs: readonly string[],
+  index: number,
+  assign: (fields: string[]) => void
+): number {
+  const token = inputs[index] ?? "";
+  if (token.startsWith("--fields=")) {
+    assign(parseFieldsList(token.slice("--fields=".length)));
+    return index;
+  }
+  const next = inputs[index + 1];
+  if (next !== undefined && !next.startsWith("-")) {
+    assign(parseFieldsList(next));
+    return index + 1;
+  }
+  return index;
 }
 
 // ---------------------------------------------------------------------------

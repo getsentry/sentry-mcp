@@ -4,7 +4,7 @@
  *
  * The end-to-end behavior (a global flag placed before the subcommand reaching
  * the leaf command) is covered via the patched Stricli scanner in
- * `argv-glue.integration.test.ts`. These tests pin the derivation contract so
+ * `scanner-flags.integration.test.ts`. These tests pin the derivation contract so
  * the allow-list stays in sync with the flag definitions and matches the shape
  * Stricli's `scanner.topLevelFlags` option expects.
  */
