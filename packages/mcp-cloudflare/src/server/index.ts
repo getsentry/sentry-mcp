@@ -266,7 +266,7 @@ const wrappedOAuthProvider = {
       );
 
       if (sentryBearerAuth.matched) {
-        activeSpan?.setAttribute(ACCESS_METHOD_ATTRIBUTE, "sentry_bearer");
+        activeSpan?.setAttribute(ACCESS_METHOD_ATTRIBUTE, "sentry_access");
 
         if (!sentryBearerAuth.token) {
           return finalizeResponse(

@@ -3,18 +3,19 @@ const AUTH_CHALLENGE = /^(\S+)(?:\s+(.+))?$/;
 
 export type OAuthBearerShape =
   | "missing"
-  | "non_bearer"
-  | "empty_bearer"
+  | "non_scheme"
+  | "empty_scheme"
   | "wrapper"
   | "malformed";
 
-// Scrubber-safe buckets: avoid the substring "token" in emitted values so
-// default Sentry data scrubbing does not replace them with "[Filtered]".
+// Scrubber-safe buckets: avoid default Sentry sensitive substrings in emitted
+// values (token, bearer, auth/oauth, credentials) so they are not replaced
+// with "[Filtered]".
 export type OAuthErrorCode =
   | "invalid_request"
   | "invalid_client"
   | "invalid_grant"
-  | "invalid_bearer"
+  | "invalid_access"
   | "invalid_target"
   | "unsupported_grant_type"
   | "invalid_client_metadata"
@@ -30,17 +31,18 @@ export type OAuthErrorTelemetry = {
 /**
  * Scrubber-safe attribute keys for OAuth diagnostics.
  *
- * Default Sentry data scrubbing treats attribute *keys* containing `auth`
- * (including the substring inside `oauth`) and values containing `token` as
- * sensitive, replacing values with `[Filtered]`. Keep metric *names* under
- * `app.oauth.*` for continuity; put filterable dimensions under these keys.
+ * Default Sentry data scrubbing treats keys/values containing sensitive
+ * substrings (`auth` including inside `oauth`, `token`, `bearer`,
+ * `credentials`, …) as sensitive, replacing values with `[Filtered]`.
+ * Keep metric *names* under `app.oauth.*` for continuity; put filterable
+ * dimensions under these keys and use scrubber-safe bucket values.
  */
 export const ACCESS_METHOD_ATTRIBUTE = "app.access.method" as const;
 export const OAUTH_ERROR_ATTRIBUTE = "app.access.error.code" as const;
 export const OAUTH_ERROR_REASON_ATTRIBUTE =
   "app.access.error.reason" as const;
-export const OAUTH_REQUEST_BEARER_SHAPE_ATTRIBUTE =
-  "app.access.request.bearer_shape" as const;
+export const OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE =
+  "app.access.request.header_shape" as const;
 export const OAUTH_REFRESH_OUTCOME_ATTRIBUTE =
   "app.access.refresh.outcome" as const;
 export const OAUTH_GRANT_SHAPE_ATTRIBUTE = "app.access.grant.shape" as const;
@@ -209,8 +211,8 @@ export function bucketOAuthErrorCode(
     case "not_implemented":
       return normalized;
     case "invalid_token":
-      // Scrubber-safe: avoid emitting the substring "token".
-      return "invalid_bearer";
+      // Scrubber-safe: avoid emitting token/bearer substrings.
+      return "invalid_access";
     default:
       return normalized ? "other" : undefined;
   }
@@ -228,21 +230,21 @@ export function bucketOAuthErrorDescription(
 
   const normalized = value.toLowerCase();
 
-  // Bucket values deliberately avoid the substring "token".
+  // Bucket values deliberately avoid token/bearer/auth/credentials substrings.
   if (normalized.includes("missing or invalid access token")) {
-    return "missing_or_invalid_bearer";
+    return "missing_or_invalid_access";
   }
   if (normalized.includes("missing, invalid, or expired access token")) {
-    return "missing_invalid_or_expired_bearer";
+    return "missing_invalid_or_expired_access";
   }
   if (normalized.includes("invalid access token")) {
-    return "invalid_bearer";
+    return "invalid_access";
   }
   if (normalized.includes("access token expired")) {
-    return "bearer_expired";
+    return "access_expired";
   }
   if (normalized.includes("audience does not match")) {
-    return "bearer_audience_mismatch";
+    return "access_audience_mismatch";
   }
   if (normalized.includes("grant not found")) {
     return "grant_not_found";
@@ -326,12 +328,12 @@ export function getOAuthBearerShape(request: Request): OAuthBearerShape {
 
   const match = authHeader.match(/^Bearer\s*(.*)$/i);
   if (!match) {
-    return "non_bearer";
+    return "non_scheme";
   }
 
   const token = match[1]?.trim();
   if (!token) {
-    return "empty_bearer";
+    return "empty_scheme";
   }
 
   const parts = token.split(":");

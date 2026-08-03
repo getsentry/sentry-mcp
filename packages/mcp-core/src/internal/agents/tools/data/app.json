@@ -6,9 +6,9 @@
     "app.access.error.code": {
       "description": "Scrubber-safe OAuth error code returned by Sentry MCP or the OAuth provider.",
       "type": "string",
-      "note": "Emitted under app.access.* so default Sentry data scrubbing does not redact values via the auth substring in oauth. invalid_token responses are bucketed as invalid_bearer.",
+      "note": "Emitted under app.access.* so default Sentry data scrubbing does not redact values via sensitive substrings (auth/oauth, token, bearer, credentials). invalid_token responses are bucketed as invalid_access.",
       "examples": [
-        "invalid_bearer",
+        "invalid_access",
         "invalid_grant",
         "invalid_client",
         "other"
@@ -17,10 +17,10 @@
     "app.access.error.reason": {
       "description": "Low-cardinality scrubber-safe bucket for an OAuth error description.",
       "type": "string",
-      "note": "Values deliberately avoid the substring token.",
+      "note": "Values deliberately avoid sensitive substrings (token, bearer, auth/oauth, credentials).",
       "examples": [
-        "missing_or_invalid_bearer",
-        "invalid_bearer",
+        "missing_or_invalid_access",
+        "invalid_access",
         "grant_not_found",
         "other"
       ]
@@ -62,8 +62,8 @@
       "description": "How the MCP request obtained upstream Sentry access.",
       "type": "string",
       "examples": [
-        "oauth_grant",
-        "sentry_bearer"
+        "mcp_grant",
+        "sentry_access"
       ]
     },
     "app.access.probe.reason": {
@@ -88,7 +88,7 @@
     "app.access.refresh.outcome": {
       "description": "Outcome bucket for a Sentry MCP OAuth refresh/token-exchange path.",
       "type": "string",
-      "note": "Attached to metric app.oauth.token_exchange. Attribute key avoids oauth/token substrings for scrubber safety.",
+      "note": "Attached to metric app.oauth.token_exchange. Attribute key avoids sensitive substrings for scrubber safety.",
       "examples": [
         "cached_valid_local",
         "cached_valid_probed",
@@ -96,15 +96,15 @@
         "verification_indeterminate"
       ]
     },
-    "app.access.request.bearer_shape": {
-      "description": "Low-cardinality shape of the bearer credential supplied to an OAuth-protected request.",
+    "app.access.request.header_shape": {
+      "description": "Low-cardinality shape of the Authorization header supplied to an access-protected request.",
       "type": "string",
       "examples": [
         "missing",
         "wrapper",
         "malformed",
-        "non_bearer",
-        "empty_bearer"
+        "non_scheme",
+        "empty_scheme"
       ]
     },
     "app.access.upstream.expires_in_bucket": {
@@ -174,8 +174,9 @@
       "examples": [
         "ip",
         "user",
-        "sentry_bearer"
-      ]
+        "sentry_access"
+      ],
+      "note": "sentry_access is the scrubber-safe bucket for direct Sentry access-header rate limits."
     },
     "app.referrer.family": {
       "description": "Sentry MCP low-cardinality bucket for the external referrer host.",

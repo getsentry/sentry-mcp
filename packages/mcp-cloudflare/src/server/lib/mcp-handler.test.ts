@@ -444,7 +444,7 @@ describe("MCP Handler", () => {
       expect(response.status).toBe(429);
       expect(await response.text()).toContain("Rate limit exceeded");
       expect(response.headers.get("x-sentry-rate-limit-scope")).toBe(
-        "sentry_bearer",
+        "sentry_access",
       );
     });
 

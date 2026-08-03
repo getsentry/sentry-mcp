@@ -333,7 +333,7 @@ async function handleAuthenticatedMcpRequest(
   activeSpan?.setAttribute("app.transport", "http");
   activeSpan?.setAttribute(
     ACCESS_METHOD_ATTRIBUTE,
-    auth.kind === "oauth" ? "oauth_grant" : "sentry_bearer",
+    auth.kind === "oauth" ? "mcp_grant" : "sentry_access",
   );
   activeSpan?.setAttribute("app.client.family", clientFamily);
   activeSpan?.setAttribute("app.server.mode.experimental", isExperimentalMode);
@@ -357,7 +357,7 @@ async function handleAuthenticatedMcpRequest(
       : {
           identifier: auth.accessToken,
           keyPrefix: "mcp:sentry-token" as const,
-          scope: "sentry_bearer" as const,
+          scope: "sentry_access" as const,
         };
   const rateLimitResult = await checkRateLimit(
     rateLimitConfig.identifier,
@@ -522,8 +522,8 @@ const mcpHandler: ExportedHandler<Env> = {
       );
     }
 
-    // Attribute values avoid the substring "token" so Sentry's default PII
-    // scrubber doesn't replace them with "[Filtered]" on ingest.
+    // Attribute values avoid sensitive substrings (token/bearer/auth/credentials)
+    // so Sentry's default PII scrubber doesn't replace them with "[Filtered]".
     if (!rawProps.refreshToken) {
       return revokeStaleGrant(
         ctx,

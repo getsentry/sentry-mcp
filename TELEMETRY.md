@@ -48,7 +48,7 @@ the pivots and recipes below.
 | `app.constraint.project_slug` | active project constraint | spans | constrained session behavior |
 | `gen_ai.tool.call.arguments.<key>` | effective tool arguments | spans | called tool input |
 | `app.client.family` | bucketed MCP client family | metrics, spans | client-specific OAuth behavior |
-| `app.access.method` | upstream access method | spans | `oauth_grant` or `sentry_bearer` |
+| `app.access.method` | upstream access method | spans | `mcp_grant` or `sentry_access` |
 | `app.client.registration.method` | CIMD vs DCR client registration method | metrics, auth spans | `cimd`, `dcr`, or `unknown` on auth paths only |
 | `app.access.refresh.outcome` | OAuth refresh outcome | metrics | token refresh diagnosis |
 | `app.access.grant.revoked_reason` | wrapper grant revoke reason | metrics | sign-out diagnosis |
@@ -230,8 +230,8 @@ Named under `app.client.*` (not `app.oauth.*`) so default Sentry data scrubbing
 does not redact values via the `auth` substring in `oauth`.
 
 Diagnostic OAuth *attributes* use the readable `app.access.*` namespace for
-the OAuth access lifecycle. This avoids the scrubbed `auth`/`token` substrings;
-error and reason buckets also avoid `token`.
+the OAuth access lifecycle. This avoids scrubbed substrings (`auth`/`oauth`,
+`token`, `bearer`, `credentials`); error/reason/method buckets avoid them too.
 Metric names remain under `app.oauth.*`.
 
 ### MCP Tool Execution

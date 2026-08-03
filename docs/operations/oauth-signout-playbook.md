@@ -38,7 +38,7 @@ MCP client ──(tool call)──> /mcp ──> mcp-handler ──> tool handle
 
 ## Telemetry surface
 
-All metrics live in the `mcp-server` project on Sentry. Attribute *keys* avoid the `oauth`/`token` substrings (`app.access.*`) and values deliberately avoid `"token"` because Sentry's default PII scrubber replaces matching keys/values with `[Filtered]` at ingest (see PR #916 and #1219).
+All metrics live in the `mcp-server` project on Sentry. Attribute *keys* avoid sensitive substrings (`auth`/`oauth`, `token`, `bearer`, `credentials`) via `app.access.*`, and values deliberately avoid those same substrings, because Sentry's default PII scrubber replaces matching keys/values with `[Filtered]` at ingest (see PR #916 and #1219).
 
 ### `app.oauth.token_exchange` (counter)
 
@@ -120,9 +120,9 @@ Tracked `/mcp` and direct OAuth endpoint spans/response metrics include:
 - `http.route`
 - `app.route.group`
 - `app.client.family` for `/mcp`, `/oauth/token`, and `/oauth/register`
-- `app.access.error.code` for OAuth error responses, for example `invalid_bearer`
-- `app.access.error.reason` as a bounded bucket, for example `invalid_bearer`
-- `app.access.request.bearer_shape` on 401s, for example `missing`, `wrapper`, or `malformed`
+- `app.access.error.code` for OAuth error responses, for example `invalid_access`
+- `app.access.error.reason` as a bounded bucket, for example `invalid_access`
+- `app.access.request.header_shape` on 401s, for example `missing`, `wrapper`, or `malformed`
 
 ## Diagnostic queries
 
@@ -139,7 +139,7 @@ logs message:"OAuth grant rejected for reauthorization" userId:"<id>" grouped by
 
 ```
 metric app.oauth.grant_revoked sum of value grouped by app.client.family, app.access.grant.revoked_reason over 24 hours
-spans /mcp http.response.status_code:401 grouped by app.client.family, app.access.error.code, app.access.request.bearer_shape over 24 hours
+spans /mcp http.response.status_code:401 grouped by app.client.family, app.access.error.code, app.access.request.header_shape over 24 hours
 ```
 
 ### Probe-failure status distribution (is Sentry ever returning 403/400?)

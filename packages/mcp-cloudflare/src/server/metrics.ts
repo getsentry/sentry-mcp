@@ -7,11 +7,11 @@ import { resolveClientFamily } from "./lib/client-family";
 import {
   OAUTH_ERROR_ATTRIBUTE,
   OAUTH_ERROR_REASON_ATTRIBUTE,
-  OAUTH_REQUEST_BEARER_SHAPE_ATTRIBUTE,
+  OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE,
   type OAuthErrorTelemetry,
 } from "./oauth/telemetry";
 
-export type RateLimitScope = "ip" | "user" | "sentry_bearer";
+export type RateLimitScope = "ip" | "user" | "sentry_access";
 type ResponseReason = "local_rate_limit";
 
 type TrackedRoute = {
@@ -218,7 +218,7 @@ export function annotateTrackedRequestSpan(
 
   if (options?.oauthBearerShape) {
     activeSpan.setAttribute(
-      OAUTH_REQUEST_BEARER_SHAPE_ATTRIBUTE,
+      OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE,
       options.oauthBearerShape,
     );
   }
@@ -263,7 +263,7 @@ export function extractResponseMetricOptions(
     rateLimitScope:
       rateLimitScope === "ip" ||
       rateLimitScope === "user" ||
-      rateLimitScope === "sentry_bearer"
+      rateLimitScope === "sentry_access"
         ? rateLimitScope
         : undefined,
   };
@@ -317,7 +317,7 @@ export function recordResponseMetric(
   }
 
   if (options?.oauthBearerShape) {
-    responseAttributes[OAUTH_REQUEST_BEARER_SHAPE_ATTRIBUTE] =
+    responseAttributes[OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE] =
       options.oauthBearerShape;
   }
 

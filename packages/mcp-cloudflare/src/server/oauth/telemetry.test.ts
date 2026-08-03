@@ -25,14 +25,14 @@ describe("OAuth telemetry", () => {
           headers: { Authorization: "Basic abc" },
         }),
       ),
-    ).toBe("non_bearer");
+    ).toBe("non_scheme");
     expect(
       getOAuthBearerShape(
         new Request("https://mcp.sentry.dev/mcp", {
           headers: { Authorization: "Bearer " },
         }),
       ),
-    ).toBe("empty_bearer");
+    ).toBe("empty_scheme");
     expect(
       getOAuthBearerShape(
         new Request("https://mcp.sentry.dev/mcp", {
@@ -64,8 +64,8 @@ describe("OAuth telemetry", () => {
     );
 
     expect(telemetry).toEqual({
-      oauthError: "invalid_bearer",
-      oauthErrorReason: "missing_invalid_or_expired_bearer",
+      oauthError: "invalid_access",
+      oauthErrorReason: "missing_invalid_or_expired_access",
       oauthBearerShape: "wrapper",
     });
   });
@@ -91,8 +91,8 @@ describe("OAuth telemetry", () => {
     );
 
     expect(telemetry).toEqual({
-      oauthError: "invalid_bearer",
-      oauthErrorReason: "invalid_bearer",
+      oauthError: "invalid_access",
+      oauthErrorReason: "invalid_access",
       oauthBearerShape: "wrapper",
     });
   });
@@ -125,7 +125,7 @@ describe("OAuth telemetry", () => {
   });
 
   it("keeps OAuth error code cardinality bounded", async () => {
-    expect(bucketOAuthErrorCode("invalid_token")).toBe("invalid_bearer");
+    expect(bucketOAuthErrorCode("invalid_token")).toBe("invalid_access");
     expect(bucketOAuthErrorCode("vendor-specific-error")).toBe("other");
 
     const telemetry = await getOAuthErrorTelemetry(
