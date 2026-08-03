@@ -7,7 +7,7 @@
  */
 
 import type { LogSortDirection } from "./api/logs.js";
-import { ContextError, ValidationError } from "./errors.js";
+import { ContextError, ValidationError, validationError } from "./errors.js";
 import { validateResourceId } from "./input-validation.js";
 
 import type { ParsedSentryUrl } from "./sentry-url-parser.js";
@@ -87,6 +87,82 @@ const LINE_SPLIT_PATTERN = /\r?\n/;
  */
 export function looksLikeIssueShortId(str: string): boolean {
   return ISSUE_SHORT_ID_PATTERN.test(str);
+}
+
+/** Matches purely numeric issue suffixes (e.g. `1` in `issue-1`). */
+const NUMERIC_SUFFIX_RE = /^\d+$/;
+
+/** Issue command tokens agents often mistake for project slugs in dash args. */
+const CLI_COMMAND_TOKEN_NOUNS = new Set(["issue", "issues"]);
+
+/**
+ * Check if a slug is an issue command token (e.g. "issue", "issues").
+ *
+ * Used to detect when agents pass command-like tokens as project prefixes in
+ * dash-separated issue args (`issue-1` → project `issue`, suffix `1`). Only
+ * combined with a purely numeric suffix — alphanumeric suffixes like `api-G`
+ * are valid issue short IDs, and other CLI nouns like `api` or `release` may
+ * be real project slugs even with numeric suffixes (`api-1`, `release-123`).
+ *
+ * Matching is case-sensitive on the slug: uppercase prefixes like `ISSUE` in
+ * `ISSUE-1` are valid short IDs, not mistaken lowercase command tokens.
+ */
+export function isIssueCommandToken(slug: string): boolean {
+  return CLI_COMMAND_TOKEN_NOUNS.has(slug);
+}
+
+/**
+ * Reject dash-parsed args where the project segment is an issue command token
+ * and the suffix is purely numeric (e.g. `issue-1`, `my-org/issue-1`).
+ *
+ * @throws {ValidationError} When the project segment is `issue`/`issues` and the
+ *   suffix is purely numeric
+ */
+function rejectIssueCommandTokenWithNumericSuffix(
+  arg: string,
+  projectSlug: string,
+  suffix: string
+): void {
+  if (!(isIssueCommandToken(projectSlug) && NUMERIC_SUFFIX_RE.test(suffix))) {
+    return;
+  }
+  const normalizedProject = projectSlug.toLowerCase();
+  throw validationError(
+    `"${arg}" looks like a command token plus a suffix, not an issue short ID.\n` +
+      `  Parsed as project '${normalizedProject}' + suffix '${suffix}', but '${normalizedProject}' is an issue command name.`,
+    [
+      "sentry issue view PROJECT-1",
+      "sentry issue explain PROJECT-1",
+      "sentry issue explain 123456789",
+      "sentry issue explain my-org/project/PROJECT-G",
+    ],
+    "issue"
+  );
+}
+
+/**
+ * Reject org/project list targets that look like `issue-1` command tokens.
+ *
+ * `parseOrgProjectArg` treats bare `issue-1` as a single project slug; this
+ * applies the same guard as `parseIssueArg` for bare and `org/issue-1` forms.
+ *
+ * @throws {ValidationError} When the target matches an issue command token with
+ *   a purely numeric suffix
+ */
+export function rejectIssueCommandTokenListTarget(target: string): void {
+  const trimmed = target.trim();
+  const dashIdx = trimmed.lastIndexOf("-");
+  if (dashIdx === -1) {
+    return;
+  }
+  const suffix = trimmed.slice(dashIdx + 1);
+  if (!NUMERIC_SUFFIX_RE.test(suffix)) {
+    return;
+  }
+  const prefix = trimmed.slice(0, dashIdx);
+  const slashIdx = prefix.lastIndexOf("/");
+  const projectSegment = slashIdx === -1 ? prefix : prefix.slice(slashIdx + 1);
+  rejectIssueCommandTokenWithNumericSuffix(trimmed, projectSegment, suffix);
 }
 
 // ---------------------------------------------------------------------------
@@ -824,6 +900,8 @@ function parseAfterSlash(
       );
     }
 
+    rejectIssueCommandTokenWithNumericSuffix(arg, project, suffix);
+
     // "my-org/cli-G" or "sentry/spotlight-electron-4Y"
     // Lowercase the project slug — Sentry slugs are always lowercase.
     return { type: "explicit", org, project: project.toLowerCase(), suffix };
@@ -1011,6 +1089,8 @@ function parseWithDash(arg: string): ParsedIssueArg {
       "issue"
     );
   }
+
+  rejectIssueCommandTokenWithNumericSuffix(arg, projectSlug, suffix);
 
   // "cli-G" or "spotlight-electron-4Y"
   // Lowercase the project slug since Sentry slugs are always lowercase.
