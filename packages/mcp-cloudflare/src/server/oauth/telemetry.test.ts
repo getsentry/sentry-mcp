@@ -8,6 +8,9 @@ import {
   getOAuthGrantTelemetry,
   getOAuthGrantLifecycleTelemetry,
   getOAuthTokenShape,
+  OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE,
+  OAUTH_GRANT_ID_HASH_ATTRIBUTE,
+  OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE,
   resolveClientRegistrationMethod,
 } from "./telemetry";
 
@@ -61,8 +64,8 @@ describe("OAuth telemetry", () => {
     );
 
     expect(telemetry).toEqual({
-      oauthError: "invalid_token",
-      oauthErrorDescription: "missing_invalid_or_expired_access_token",
+      oauthError: "invalid_access",
+      oauthErrorDescription: "missing_invalid_or_expired_access",
       oauthTokenShape: "wrapper",
     });
   });
@@ -88,8 +91,8 @@ describe("OAuth telemetry", () => {
     );
 
     expect(telemetry).toEqual({
-      oauthError: "invalid_token",
-      oauthErrorDescription: "invalid_access_token",
+      oauthError: "invalid_access",
+      oauthErrorDescription: "invalid_access",
       oauthTokenShape: "wrapper",
     });
   });
@@ -122,7 +125,7 @@ describe("OAuth telemetry", () => {
   });
 
   it("keeps OAuth error code cardinality bounded", async () => {
-    expect(bucketOAuthErrorCode("invalid_token")).toBe("invalid_token");
+    expect(bucketOAuthErrorCode("invalid_token")).toBe("invalid_access");
     expect(bucketOAuthErrorCode("vendor-specific-error")).toBe("other");
 
     const telemetry = await getOAuthErrorTelemetry(
@@ -151,10 +154,10 @@ describe("OAuth telemetry", () => {
     const other = getOAuthGrantTelemetry("other-grant-id");
 
     expect(first).toEqual(second);
-    expect(first["app.oauth.grant.id_hash"]).toMatch(/^[0-9a-f]{8}$/);
-    expect(first["app.oauth.grant.id_hash"]).not.toBe("grant-id");
-    expect(other["app.oauth.grant.id_hash"]).not.toBe(
-      first["app.oauth.grant.id_hash"],
+    expect(first[OAUTH_GRANT_ID_HASH_ATTRIBUTE]).toMatch(/^[0-9a-f]{8}$/);
+    expect(first[OAUTH_GRANT_ID_HASH_ATTRIBUTE]).not.toBe("grant-id");
+    expect(other[OAUTH_GRANT_ID_HASH_ATTRIBUTE]).not.toBe(
+      first[OAUTH_GRANT_ID_HASH_ATTRIBUTE],
     );
     expect(JSON.stringify(first)).not.toContain("grant-id");
   });
@@ -168,12 +171,12 @@ describe("OAuth telemetry", () => {
         upstreamExpiresAt: now + 3 * 24 * 60 * 60 * 1000,
       }),
     ).toEqual({
-      "app.oauth.grant.age_bucket": "1d_7d",
-      "app.oauth.upstream.expires_in_bucket": "1d_7d",
+      [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: "1d_7d",
+      [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: "1d_7d",
     });
     expect(getOAuthGrantLifecycleTelemetry({})).toEqual({
-      "app.oauth.grant.age_bucket": "unknown",
-      "app.oauth.upstream.expires_in_bucket": "unknown",
+      [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: "unknown",
+      [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: "unknown",
     });
   });
 

@@ -8,11 +8,13 @@ export type OAuthTokenShape =
   | "wrapper"
   | "malformed";
 
+// Scrubber-safe buckets: avoid the substring "token" in emitted values so
+// default Sentry data scrubbing does not replace them with "[Filtered]".
 export type OAuthErrorCode =
   | "invalid_request"
   | "invalid_client"
   | "invalid_grant"
-  | "invalid_token"
+  | "invalid_access"
   | "invalid_target"
   | "unsupported_grant_type"
   | "invalid_client_metadata"
@@ -24,6 +26,33 @@ export type OAuthErrorTelemetry = {
   oauthErrorDescription?: string;
   oauthTokenShape?: OAuthTokenShape;
 };
+
+/**
+ * Scrubber-safe attribute keys for OAuth diagnostics.
+ *
+ * Default Sentry data scrubbing treats attribute *keys* containing `auth`
+ * (including the substring inside `oauth`) and values containing `token` as
+ * sensitive, replacing values with `[Filtered]`. Keep metric *names* under
+ * `app.oauth.*` for continuity; put filterable dimensions under these keys.
+ */
+export const OAUTH_ERROR_ATTRIBUTE = "app.as.error" as const;
+export const OAUTH_ERROR_DESCRIPTION_ATTRIBUTE =
+  "app.as.error_description" as const;
+export const OAUTH_REQUEST_CREDENTIAL_SHAPE_ATTRIBUTE =
+  "app.as.request.credential_shape" as const;
+export const OAUTH_REFRESH_OUTCOME_ATTRIBUTE =
+  "app.as.refresh.outcome" as const;
+export const OAUTH_GRANT_SHAPE_ATTRIBUTE = "app.as.grant.shape" as const;
+export const OAUTH_GRANT_ID_HASH_ATTRIBUTE = "app.as.grant.id_hash" as const;
+export const OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE =
+  "app.as.grant.age_bucket" as const;
+export const OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE =
+  "app.as.grant.revoked_reason" as const;
+export const OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE =
+  "app.as.upstream.expires_in_bucket" as const;
+export const OAUTH_PROBE_STATUS_CODE_ATTRIBUTE =
+  "app.as.probe.status_code" as const;
+export const OAUTH_PROBE_REASON_ATTRIBUTE = "app.as.probe.reason" as const;
 
 /**
  * Low-cardinality OAuth client registration method.
@@ -150,8 +179,8 @@ export function getOAuthGrantLifecycleTelemetry(props: {
   upstreamExpiresAt?: unknown;
 }): Record<string, string> {
   return {
-    "app.oauth.grant.age_bucket": bucketElapsedMs(props.sessionStartedAt),
-    "app.oauth.upstream.expires_in_bucket": bucketRemainingMs(
+    [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: bucketElapsedMs(props.sessionStartedAt),
+    [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: bucketRemainingMs(
       props.upstreamExpiresAt,
     ),
   };
@@ -173,12 +202,14 @@ export function bucketOAuthErrorCode(
     case "invalid_request":
     case "invalid_client":
     case "invalid_grant":
-    case "invalid_token":
     case "invalid_target":
     case "unsupported_grant_type":
     case "invalid_client_metadata":
     case "not_implemented":
       return normalized;
+    case "invalid_token":
+      // Scrubber-safe: avoid emitting the substring "token".
+      return "invalid_access";
     default:
       return normalized ? "other" : undefined;
   }
@@ -196,26 +227,27 @@ export function bucketOAuthErrorDescription(
 
   const normalized = value.toLowerCase();
 
+  // Bucket values deliberately avoid the substring "token".
   if (normalized.includes("missing or invalid access token")) {
-    return "missing_or_invalid_access_token";
+    return "missing_or_invalid_access";
   }
   if (normalized.includes("missing, invalid, or expired access token")) {
-    return "missing_invalid_or_expired_access_token";
+    return "missing_invalid_or_expired_access";
   }
   if (normalized.includes("invalid access token")) {
-    return "invalid_access_token";
+    return "invalid_access";
   }
   if (normalized.includes("access token expired")) {
-    return "access_token_expired";
+    return "access_expired";
   }
   if (normalized.includes("audience does not match")) {
-    return "token_audience_mismatch";
+    return "access_audience_mismatch";
   }
   if (normalized.includes("grant not found")) {
     return "grant_not_found";
   }
   if (normalized.includes("invalid refresh token")) {
-    return "invalid_refresh_token";
+    return "invalid_refresh";
   }
   if (normalized.includes("content-type")) {
     return "invalid_content_type";
@@ -327,7 +359,7 @@ export function getOAuthGrantTelemetry(
   grantId: string | null,
 ): Record<string, string> {
   return grantId
-    ? { "app.oauth.grant.id_hash": fingerprintOAuthGrantId(grantId) }
+    ? { [OAUTH_GRANT_ID_HASH_ATTRIBUTE]: fingerprintOAuthGrantId(grantId) }
     : {};
 }
 

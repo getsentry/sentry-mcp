@@ -27,6 +27,7 @@ import { annotateResponseMetric } from "../metrics";
 import {
   getOAuthGrantLifecycleTelemetry,
   getOAuthGrantTelemetry,
+  OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE,
 } from "../oauth/telemetry";
 import type { WorkerProps } from "../types";
 import type { Env } from "../types";
@@ -110,7 +111,7 @@ function logGrantReauthorization(
   logWarn("OAuth grant rejected for reauthorization", {
     loggerScope: ["cloudflare", "mcp-handler"],
     extra: {
-      "app.oauth.grant_revoked.reason": reason,
+      [OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE]: reason,
       "app.client.family": clientFamily,
       userId,
       clientId,
@@ -139,7 +140,7 @@ function revokeStaleGrant(
   if (grantId) {
     Sentry.metrics.count("app.oauth.grant_revoked", 1, {
       attributes: {
-        "app.oauth.grant_revoked.reason": revokeReason,
+        [OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE]: revokeReason,
         "app.client.family": clientFamily,
         ...lifecycleTelemetry,
       },
@@ -352,7 +353,7 @@ async function handleAuthenticatedMcpRequest(
       : {
           identifier: auth.accessToken,
           keyPrefix: "mcp:sentry-token" as const,
-          scope: "sentry-token" as const,
+          scope: "sentry_access" as const,
         };
   const rateLimitResult = await checkRateLimit(
     rateLimitConfig.identifier,
@@ -604,7 +605,7 @@ const mcpHandler: ExportedHandler<Env> = {
         }
         Sentry.metrics.count("app.oauth.grant_revoked", 1, {
           attributes: {
-            "app.oauth.grant_revoked.reason": "upstream_rejected_in_use",
+            [OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE]: "upstream_rejected_in_use",
             "app.client.family": clientFamily,
             ...lifecycleTelemetry,
           },

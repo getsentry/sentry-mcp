@@ -4,9 +4,14 @@ import {
   resolveUtmSourceFromUrl,
 } from "./lib/attribution";
 import { resolveClientFamily } from "./lib/client-family";
-import type { OAuthErrorTelemetry } from "./oauth/telemetry";
+import {
+  OAUTH_ERROR_ATTRIBUTE,
+  OAUTH_ERROR_DESCRIPTION_ATTRIBUTE,
+  OAUTH_REQUEST_CREDENTIAL_SHAPE_ATTRIBUTE,
+  type OAuthErrorTelemetry,
+} from "./oauth/telemetry";
 
-export type RateLimitScope = "ip" | "user" | "sentry-token";
+export type RateLimitScope = "ip" | "user" | "sentry_access";
 type ResponseReason = "local_rate_limit";
 
 type TrackedRoute = {
@@ -201,19 +206,19 @@ export function annotateTrackedRequestSpan(
   }
 
   if (options?.oauthError) {
-    activeSpan.setAttribute("app.oauth.error", options.oauthError);
+    activeSpan.setAttribute(OAUTH_ERROR_ATTRIBUTE, options.oauthError);
   }
 
   if (options?.oauthErrorDescription) {
     activeSpan.setAttribute(
-      "app.oauth.error_description",
+      OAUTH_ERROR_DESCRIPTION_ATTRIBUTE,
       options.oauthErrorDescription,
     );
   }
 
   if (options?.oauthTokenShape) {
     activeSpan.setAttribute(
-      "app.oauth.request.token_shape",
+      OAUTH_REQUEST_CREDENTIAL_SHAPE_ATTRIBUTE,
       options.oauthTokenShape,
     );
   }
@@ -258,7 +263,7 @@ export function extractResponseMetricOptions(
     rateLimitScope:
       rateLimitScope === "ip" ||
       rateLimitScope === "user" ||
-      rateLimitScope === "sentry-token"
+      rateLimitScope === "sentry_access"
         ? rateLimitScope
         : undefined,
   };
@@ -303,16 +308,16 @@ export function recordResponseMetric(
   }
 
   if (options?.oauthError) {
-    responseAttributes["app.oauth.error"] = options.oauthError;
+    responseAttributes[OAUTH_ERROR_ATTRIBUTE] = options.oauthError;
   }
 
   if (options?.oauthErrorDescription) {
-    responseAttributes["app.oauth.error_description"] =
+    responseAttributes[OAUTH_ERROR_DESCRIPTION_ATTRIBUTE] =
       options.oauthErrorDescription;
   }
 
   if (options?.oauthTokenShape) {
-    responseAttributes["app.oauth.request.token_shape"] =
+    responseAttributes[OAUTH_REQUEST_CREDENTIAL_SHAPE_ATTRIBUTE] =
       options.oauthTokenShape;
   }
 

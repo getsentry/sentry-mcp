@@ -23,6 +23,12 @@ vi.mock("@sentry/cloudflare", () => ({
 }));
 
 import {
+  OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE,
+  OAUTH_GRANT_SHAPE_ATTRIBUTE,
+  OAUTH_REFRESH_OUTCOME_ATTRIBUTE,
+  OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE,
+} from "./telemetry";
+import {
   appendAuthorizationResponseIss,
   createResourceValidationError,
   exchangeCodeForAccessToken,
@@ -248,9 +254,9 @@ describe("tokenExchangeCallback", () => {
       1,
       {
         attributes: expect.objectContaining({
-          "app.oauth.token_exchange.outcome": "cached_valid_local",
-          "app.oauth.grant.age_bucket": "1d_7d",
-          "app.oauth.upstream.expires_in_bucket": "1d_7d",
+          [OAUTH_REFRESH_OUTCOME_ATTRIBUTE]: "cached_valid_local",
+          [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: "1d_7d",
+          [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: "1d_7d",
           "app.client.registration.method":
             expect.stringMatching(/^(cimd|dcr|unknown)$/),
         }),

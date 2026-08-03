@@ -25,6 +25,8 @@ import {
   bucketOAuthErrorCode,
   bucketOAuthErrorDescription,
   getOAuthErrorTelemetry,
+  OAUTH_ERROR_ATTRIBUTE,
+  OAUTH_ERROR_DESCRIPTION_ATTRIBUTE,
 } from "./oauth/telemetry";
 import { patchRootAuthorizationServerMetadata } from "./authorization-server-metadata";
 import { createProtectedResourceMetadataResponse } from "./protected-resource-metadata";
@@ -354,8 +356,8 @@ const wrappedOAuthProvider = {
           loggerScope: ["cloudflare", "oauth", "provider"],
           extra: {
             "http.response.status_code": status,
-            "app.oauth.error": bucketOAuthErrorCode(code),
-            "app.oauth.error_description":
+            [OAUTH_ERROR_ATTRIBUTE]: bucketOAuthErrorCode(code),
+            [OAUTH_ERROR_DESCRIPTION_ATTRIBUTE]:
               bucketOAuthErrorDescription(description),
             "app.client.family": clientFamily,
           },

@@ -17,7 +17,7 @@ the pivots and recipes below.
 | `trace_id` from an issue, span, or log | Sentry Traces and Logs | `span_id` | full request/tool timeline and failing span | inspect child spans and logs |
 | Sentry `event_id` | Sentry Issue/Event | `trace_id`, `http.route`, `gen_ai.tool.name` | exception context and owning request/tool | query trace logs |
 | HTTP route or status symptom | Sentry Metrics and Logs | `http.route`, `http.response.status_code` | route volume, status mix, local rate limits | inspect matching traces |
-| OAuth sign-out or refresh symptom | Sentry Metrics and Logs | `app.client.family`, `app.oauth.*` | refresh outcome, revoked grants, client family | inspect user trace or request logs |
+| OAuth sign-out or refresh symptom | Sentry Metrics and Logs | `app.client.family`, `app.as.*`, `app.oauth.*` metrics | refresh outcome, revoked grants, client family | inspect user trace or request logs |
 | MCP tool name | Sentry Spans and Issues | `gen_ai.tool.name` | failing or slow tool calls | inspect tool span and Sentry API spans |
 | Sentry resource URL/type | Sentry Spans | `app.resource.type` | `get_sentry_resource` dispatch behavior | inspect resolved type and downstream tool |
 | Agent/model/token symptom | Sentry Spans | `gen_ai.*` | provider, model, token, and agent behavior | inspect agent and tool spans |
@@ -49,12 +49,12 @@ the pivots and recipes below.
 | `gen_ai.tool.call.arguments.<key>` | effective tool arguments | spans | called tool input |
 | `app.client.family` | bucketed MCP client family | metrics, spans | client-specific OAuth behavior |
 | `app.client.registration.method` | CIMD vs DCR client registration method | metrics, auth spans | `cimd`, `dcr`, or `unknown` on auth paths only |
-| `app.oauth.token_exchange.outcome` | OAuth refresh outcome | metrics | token refresh diagnosis |
-| `app.oauth.grant_revoked.reason` | wrapper grant revoke reason | metrics | sign-out diagnosis |
+| `app.as.refresh.outcome` | OAuth refresh outcome | metrics | token refresh diagnosis |
+| `app.as.grant.revoked_reason` | wrapper grant revoke reason | metrics | sign-out diagnosis |
 | `app.consent.skill` | skill granted during approval | metrics | per-skill adoption |
 | `app.consent.skill.<skill>.granted` | skill granted on an MCP request | spans | tool behavior by enabled skills |
-| `app.oauth.probe.status_code` | upstream probe HTTP status | metrics | Sentry token validity probe result |
-| `app.oauth.probe.reason` | indeterminate probe bucket | metrics | upstream instability |
+| `app.as.probe.status_code` | upstream probe HTTP status | metrics | Sentry token validity probe result |
+| `app.as.probe.reason` | indeterminate probe bucket | metrics | upstream instability |
 | `app.upstream.host` | configured Sentry host | tags, spans | host-specific behavior |
 | `app.server.version` | MCP server package version | tags, spans | release/version behavior |
 | `app.utm_source` | sanitized in-product `utm_source` query param | spans | in-product attribution |
@@ -76,8 +76,8 @@ sort=timestamp
 Captured errors for a route, tool, or OAuth symptom.
 
 ```text
-dataset=issues query='http.route:"<route>" OR gen_ai.tool.name:"<tool_name>" OR app.oauth.grant_revoked.reason:"<reason>"'
-fields=timestamp,event_id,trace_id,http.route,gen_ai.tool.name,app.oauth.grant_revoked.reason,error.type,exception.message
+dataset=issues query='http.route:"<route>" OR gen_ai.tool.name:"<tool_name>" OR app.as.grant.revoked_reason:"<reason>"'
+fields=timestamp,event_id,trace_id,http.route,gen_ai.tool.name,app.as.grant.revoked_reason,error.type,exception.message
 sort=-timestamp
 ```
 
@@ -106,16 +106,16 @@ OAuth refresh outcomes by client family.
 
 ```text
 dataset=tracemetrics query='metric:app.oauth.token_exchange'
-fields=timestamp,metric,app.oauth.token_exchange.outcome,app.oauth.grant.shape,app.client.family,app.oauth.probe.status_code,app.oauth.probe.reason,user.id,value
-aggregate=sum(value) by app.oauth.token_exchange.outcome,app.client.family
+fields=timestamp,metric,app.as.refresh.outcome,app.as.grant.shape,app.client.family,app.as.probe.status_code,app.as.probe.reason,user.id,value
+aggregate=sum(value) by app.as.refresh.outcome,app.client.family
 ```
 
 Grant revocations for sign-out reports.
 
 ```text
 dataset=tracemetrics query='metric:app.oauth.grant_revoked user.id:"<user_id>"'
-fields=timestamp,metric,app.oauth.grant_revoked.reason,app.client.family,user.id,value
-aggregate=sum(value) by app.oauth.grant_revoked.reason,app.client.family
+fields=timestamp,metric,app.as.grant.revoked_reason,app.client.family,user.id,value
+aggregate=sum(value) by app.as.grant.revoked_reason,app.client.family
 ```
 
 Register and callback volume by client family.
@@ -216,9 +216,9 @@ Metrics: `app.oauth.token_exchange`, `app.oauth.grant_revoked`,
 `app.oauth.callback_completed`, `app.consent.skill_granted`,
 `app.oauth.register`
 
-Attributes: `app.oauth.token_exchange.outcome`, `app.oauth.grant.shape`,
-`app.oauth.probe.status_code`, `app.oauth.probe.reason`,
-`app.oauth.grant_revoked.reason`, `app.consent.skill`,
+Attributes: `app.as.refresh.outcome`, `app.as.grant.shape`,
+`app.as.probe.status_code`, `app.as.probe.reason`,
+`app.as.grant.revoked_reason`, `app.consent.skill`,
 `app.client.family`, `app.client.registration.method`, `user.id`
 
 `app.client.registration.method` is auth-path only (`cimd` | `dcr` |
@@ -227,6 +227,10 @@ attached to ordinary `/mcp` request spans. HTTPS URL `client_id` values map to
 `cimd`; opaque non-URL ids map to `dcr`; `/oauth/register` is always `dcr`.
 Named under `app.client.*` (not `app.oauth.*`) so default Sentry data scrubbing
 does not redact values via the `auth` substring in `oauth`.
+
+Diagnostic OAuth *attributes* use the `app.as.*` prefix (authorization-server)
+for the same reason, and error/description buckets avoid the substring `token`.
+Metric names remain under `app.oauth.*`.
 
 ### MCP Tool Execution
 
