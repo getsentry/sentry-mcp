@@ -5,7 +5,7 @@
  * exit code propagation, auto-detection, --verify, --timeout, and error cases.
  */
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createSpotlightBuffer } from "@spotlightjs/spotlight/sdk";
 import { Hono } from "hono";
@@ -26,7 +26,7 @@ import { TEST_TMP_DIR } from "../../constants.js";
  * delegates to the real `spawn`, so commands like `printenv`/`true` run for
  * real and exit codes propagate normally.
  */
-const spawnCapture: { env?: NodeJS.ProcessEnv } = {};
+const spawnCapture: { args?: readonly string[]; env?: NodeJS.ProcessEnv } = {};
 
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
@@ -37,6 +37,7 @@ vi.mock("node:child_process", async (importOriginal) => {
       args: readonly string[],
       options: Parameters<typeof actual.spawn>[2]
     ) => {
+      spawnCapture.args = args;
       spawnCapture.env = (options as { env?: NodeJS.ProcessEnv })?.env;
       return actual.spawn(cmd, args as string[], options);
     },
@@ -73,6 +74,7 @@ function makeContext(cwd?: string) {
 
 describe("sentry local run", () => {
   beforeEach(() => {
+    spawnCapture.args = undefined;
     spawnCapture.env = undefined;
   });
 
@@ -141,6 +143,29 @@ describe("sentry local run", () => {
       "echo",
       "ok"
     );
+  });
+
+  test("injects SENTRY_SPOTLIGHT as a Wrangler Worker binding", async () => {
+    await writeFile(join(tmpDir, "wrangler.jsonc"), "{}");
+    const fakeWrangler = join(tmpDir, "wrangler");
+    await writeFile(fakeWrangler, "#!/bin/sh\nexit 0\n");
+    await chmod(fakeWrangler, 0o755);
+
+    const func = (await runCommand.loader()) as unknown as RunFunc;
+    await func.call(
+      makeContext(),
+      { port: 0, host: "127.0.0.1", verify: false, timeout: 0 },
+      fakeWrangler,
+      "dev"
+    );
+
+    expect(spawnCapture.args).toEqual([
+      "dev",
+      "--var",
+      expect.stringMatching(
+        /^SENTRY_SPOTLIGHT:http:\/\/127\.0\.0\.1:\d+\/stream$/
+      ),
+    ]);
   });
 
   test("preserves existing SENTRY_TRACES_SAMPLE_RATE", async () => {

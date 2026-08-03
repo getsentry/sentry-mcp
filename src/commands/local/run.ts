@@ -24,6 +24,7 @@ import { CliError, EXIT, ValidationError } from "../../lib/errors.js";
 import { bold } from "../../lib/formatters/colors.js";
 import { formatEnvelopeLines } from "../../lib/formatters/local.js";
 import { logger, printLine } from "../../lib/logger.js";
+import { injectWranglerSpotlightBinding } from "../../lib/wrangler.js";
 import {
   buildApp,
   consumeSSE,
@@ -345,14 +346,22 @@ export const runCommand = buildCommand({
     url = tail.url;
 
     const spotlightUrl = `${url}/stream`;
-    logger.info(`Starting: ${bold(args.join(" "))}`);
+    const wrangler = await injectWranglerSpotlightBinding(
+      args,
+      spotlightUrl,
+      this.cwd
+    );
+    if (wrangler.injected) {
+      logger.info("Injected SENTRY_SPOTLIGHT as a Wrangler Worker binding");
+    }
+    logger.info(`Starting: ${bold(wrangler.args.join(" "))}`);
     logger.info(`SENTRY_SPOTLIGHT=${spotlightUrl}`);
 
     const childEnv = buildChildEnv(spotlightUrl, commandSource, this.cwd);
 
     let child: ChildProcess;
     try {
-      const [cmd = "", ...cmdArgs] = args;
+      const [cmd = "", ...cmdArgs] = wrangler.args;
       child = spawn(cmd, cmdArgs, {
         cwd: this.cwd,
         env: childEnv,
@@ -361,7 +370,7 @@ export const runCommand = buildCommand({
     } catch (err) {
       await tail.cleanup();
       throw new CliError(
-        `Failed to start "${args[0]}": ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to start "${wrangler.args[0]}": ${err instanceof Error ? err.message : String(err)}`,
         EXIT.GENERAL
       );
     }
@@ -483,10 +492,18 @@ async function* runWithVerify(
   });
 
   const childEnv = buildChildEnv(spotlightUrl, commandSource, cwd);
+  const wrangler = await injectWranglerSpotlightBinding(
+    args,
+    spotlightUrl,
+    cwd
+  );
+  if (wrangler.injected) {
+    logger.info("Injected SENTRY_SPOTLIGHT as a Wrangler Worker binding");
+  }
 
   let child: ChildProcess;
   try {
-    const [cmd = "", ...cmdArgs] = args;
+    const [cmd = "", ...cmdArgs] = wrangler.args;
     child = spawn(cmd, cmdArgs, {
       cwd,
       env: childEnv,
@@ -495,7 +512,7 @@ async function* runWithVerify(
   } catch (err) {
     await shutdownServer(server);
     throw new CliError(
-      `Failed to start "${args[0]}": ${err instanceof Error ? err.message : String(err)}`,
+      `Failed to start "${wrangler.args[0]}": ${err instanceof Error ? err.message : String(err)}`,
       EXIT.GENERAL
     );
   }
