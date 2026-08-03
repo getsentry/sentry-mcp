@@ -404,16 +404,27 @@ function makeProgressHandler(setMessage?: SetMessage): ProgressHandler {
   let phase: string | undefined;
   let previousWritten = 0;
   return (event) => {
-    if (event.type === "bytes") {
-      if (!progress || phase !== event.phase) {
-        phase = event.phase;
-        previousWritten = 0;
-        progress = makeByteProgress(
-          `${event.phase === "apply" ? "Applying" : "Processing"} patch(es)`,
-          event.total,
-          setMessage
-        );
-      }
+    if (
+      event.type === "bytes" &&
+      (progress === undefined || phase !== event.phase)
+    ) {
+      // New phase: spin up a fresh bar. The apply phase totals bytes across
+      // every hop's `newSize`, which for multi-hop chains far exceeds the
+      // final binary (e.g. 930 MB shown for a 310 MB install). Switch to
+      // percent-only rendering so users see a sane progress fraction rather
+      // than a scary inflated byte count. Pre-apply ("download"/"read")
+      // phases still show bytes since their totals are honest sizes.
+      phase = event.phase;
+      previousWritten = 0;
+      const isApply = event.phase === "apply";
+      progress = makeByteProgress(
+        `${isApply ? "Applying" : "Processing"} patch(es)`,
+        event.total,
+        setMessage,
+        { format: isApply ? "pct" : "bytes" }
+      );
+    }
+    if (event.type === "bytes" && progress) {
       progress.onProgress(event.written - previousWritten);
       previousWritten = event.written;
     } else if (event.type === "done") {

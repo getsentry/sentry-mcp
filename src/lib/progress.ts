@@ -21,6 +21,19 @@ import { formatBytes } from "./formatters/numbers.js";
 /** Callback that sets the surrounding spinner's message text. */
 export type SetMessage = (message: string) => void;
 
+/**
+ * How a determinate bar renders its progress fraction.
+ *
+ * - `"bytes"` (default) renders the accumulated/total byte count alongside the
+ *   bar — useful when the total is a meaningful size the user can reason about
+ *   (e.g. a full-binary download).
+ * - `"pct"` renders only the percentage — useful when the byte total is
+ *   misleading (e.g. a multi-hop patch chain whose summed `newSize` far
+ *   exceeds the final binary, so "1.5 GB / 3.1 GB" would scare the user
+ *   about an install that's actually 310 MB).
+ */
+export type ByteProgressFormat = "bytes" | "pct";
+
 export type ByteProgress = {
   /** Report `bytes` additional bytes processed since the last call. */
   onProgress: (bytes: number) => void;
@@ -38,6 +51,24 @@ function renderBar(frac: number, width = BAR_WIDTH): string {
 }
 
 /**
+ * Options for {@link makeByteProgress} beyond the first three required args.
+ *
+ * Kept as a separate options bag so the helper stays under the lint max-params
+ * budget (`useMaxParams: 4`) — four-position call sites don't change.
+ */
+export type MakeByteProgressOptions = {
+  /**
+   * Determinate render format. `"bytes"` (default) shows the accumulated/total
+   * byte count; `"pct"` shows only the percentage (no byte counter). Ignored
+   * when `totalBytes` is null — indeterminate byte counters always show the
+   * live byte total.
+   */
+  format?: ByteProgressFormat;
+  /** Injectable clock for tests. Defaults to `Date.now`. */
+  nowMs?: () => number;
+};
+
+/**
  * Create a byte-progress reporter that feeds a spinner `setMessage` callback.
  *
  * @param label - Short label prefix (e.g. "Applying 3 patch(es)").
@@ -46,23 +77,27 @@ function renderBar(frac: number, width = BAR_WIDTH): string {
  * @param setMessage - Spinner message setter (from `withProgress`). When
  *   undefined (JSON mode / non-TTY / no surrounding spinner), this is a no-op
  *   so nothing is drawn.
- * @param nowMs - Injectable clock for tests.
+ * @param options - Optional render tweaks (format, injectable clock).
  */
 export function makeByteProgress(
   label: string,
   totalBytes: number | null,
-  setMessage?: SetMessage,
-  nowMs: () => number = Date.now
+  setMessage: SetMessage | undefined,
+  options: MakeByteProgressOptions = {}
 ): ByteProgress {
+  const { format = "bytes", nowMs = Date.now } = options;
   let written = 0;
   let lastEmit = 0;
 
-  const format = (): string => {
+  const render = (): string => {
     if (totalBytes === null || totalBytes <= 0) {
       return `${label} ${formatBytes(written)}`;
     }
     const frac = Math.min(written / totalBytes, 1);
     const pct = Math.round(frac * 100);
+    if (format === "pct") {
+      return `${label} [${renderBar(frac)}] ${pct}%`;
+    }
     return (
       `${label} [${renderBar(frac)}] ` +
       `${formatBytes(written)} / ${formatBytes(totalBytes)} (${pct}%)`
@@ -72,7 +107,7 @@ export function makeByteProgress(
   const emit = (): void => {
     // Cosmetic only — a formatting or callback failure must never propagate.
     try {
-      setMessage?.(format());
+      setMessage?.(render());
     } catch {
       // ignore — progress is cosmetic
     }
