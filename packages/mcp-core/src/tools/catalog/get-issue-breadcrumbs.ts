@@ -50,6 +50,7 @@ export default defineTool({
     eventId: z
       .string()
       .trim()
+      .min(1)
       .default("latest")
       .describe("The event ID for the issue. Defaults to `latest`."),
   },

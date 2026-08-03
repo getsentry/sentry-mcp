@@ -2487,7 +2487,8 @@
         "eventId": {
           "default": "latest",
           "description": "The event ID for the issue. Defaults to `latest`.",
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         }
       }
     },
