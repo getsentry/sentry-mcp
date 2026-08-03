@@ -8,6 +8,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createSpotlightBuffer } from "@spotlightjs/spotlight/sdk";
+import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   CLIENT_SPOTLIGHT_PREFIXES,
@@ -323,6 +324,50 @@ describe("sentry local run", () => {
     const output = writes.join("");
     expect(output).toContain("Connected to existing server");
     expect(output).toContain("Hello from the server!");
+    // A healthy attach must not emit the give-up warning.
+    expect(output).not.toContain("Could not attach to the event stream");
+  });
+
+  test("warns when the existing server's stream cannot be attached", async () => {
+    // `/health` answers but `/stream` does not — e.g. an unrelated service
+    // squatting on the port. Attaching fails, and since `run` keeps the child
+    // alive the user would otherwise get no hint that events are missing.
+    const brokenApp = new Hono();
+    brokenApp.get("/health", (c) => c.text("OK"));
+    const { server, port } = await tryListen(brokenApp, 0, "127.0.0.1");
+
+    const savedFetch = globalThis.fetch;
+    const realFetch = (globalThis as { __originalFetch?: typeof fetch })
+      .__originalFetch;
+    if (realFetch) {
+      globalThis.fetch = realFetch;
+    }
+
+    const writes: string[] = [];
+    const spy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        writes.push(chunk.toString());
+        return true;
+      });
+
+    try {
+      const func = (await runCommand.loader()) as unknown as RunFunc;
+      // The child has to outlive the failed connection attempt; an
+      // instant-exit command would abort the tail before it ever reports.
+      await func.call(
+        makeContext(),
+        { port, host: "127.0.0.1", verify: false, timeout: 0 },
+        "sleep",
+        "1"
+      );
+    } finally {
+      spy.mockRestore();
+      globalThis.fetch = savedFetch;
+      await shutdownServer(server);
+    }
+
+    expect(writes.join("")).toContain("Could not attach to the event stream");
   });
 
   test("injects spotlight URL under every framework client prefix", async () => {
