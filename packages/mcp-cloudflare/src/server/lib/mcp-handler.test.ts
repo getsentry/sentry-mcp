@@ -17,6 +17,11 @@ vi.mock("@sentry/cloudflare", () => ({
 }));
 
 import mcpHandler, { handleSentryBearerMcpRequest } from "./mcp-handler";
+import {
+  OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE,
+  OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE,
+  OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE,
+} from "../oauth/telemetry";
 
 interface OAuthProps {
   id: string;
@@ -160,9 +165,9 @@ describe("MCP Handler", () => {
         1,
         {
           attributes: expect.objectContaining({
-            "app.oauth.grant_revoked.reason": "stale_props_no_refresh",
-            "app.oauth.grant.age_bucket": "1d_7d",
-            "app.oauth.upstream.expires_in_bucket": "1d_7d",
+            [OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE]: "stale_props_no_refresh",
+            [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: "1d_7d",
+            [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: "1d_7d",
           }),
         },
       );
@@ -197,9 +202,9 @@ describe("MCP Handler", () => {
         1,
         {
           attributes: expect.objectContaining({
-            "app.oauth.grant_revoked.reason": "stale_props_no_refresh",
-            "app.oauth.grant.age_bucket": "1d_7d",
-            "app.oauth.upstream.expires_in_bucket": "1d_7d",
+            [OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE]: "stale_props_no_refresh",
+            [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: "1d_7d",
+            [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: "1d_7d",
           }),
         },
       );
@@ -439,7 +444,7 @@ describe("MCP Handler", () => {
       expect(response.status).toBe(429);
       expect(await response.text()).toContain("Rate limit exceeded");
       expect(response.headers.get("x-sentry-rate-limit-scope")).toBe(
-        "sentry-token",
+        "sentry_access",
       );
     });
 

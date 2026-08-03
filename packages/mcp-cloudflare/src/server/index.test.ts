@@ -73,6 +73,11 @@ vi.mock("./utils/rate-limiter", () => ({
 }));
 
 import handler from "./index";
+import {
+  OAUTH_ERROR_ATTRIBUTE,
+  OAUTH_ERROR_REASON_ATTRIBUTE,
+  OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE,
+} from "./oauth/telemetry";
 
 describe("worker entrypoint", () => {
   const env = {
@@ -555,23 +560,23 @@ describe("worker entrypoint", () => {
 
     expect(response.status).toBe(401);
     expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
-      "app.oauth.error",
-      "invalid_token",
+      OAUTH_ERROR_ATTRIBUTE,
+      "invalid_access",
     );
     expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
-      "app.oauth.error_description",
-      "missing_or_invalid_access_token",
+      OAUTH_ERROR_REASON_ATTRIBUTE,
+      "missing_or_invalid_access",
     );
     expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
-      "app.oauth.request.token_shape",
+      OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE,
       "wrapper",
     );
     expect(mockMetricsCount).toHaveBeenCalledWith("app.server.response", 1, {
       attributes: expect.objectContaining({
         "app.client.family": "claude-code",
-        "app.oauth.error": "invalid_token",
-        "app.oauth.error_description": "missing_or_invalid_access_token",
-        "app.oauth.request.token_shape": "wrapper",
+        [OAUTH_ERROR_ATTRIBUTE]: "invalid_access",
+        [OAUTH_ERROR_REASON_ATTRIBUTE]: "missing_or_invalid_access",
+        [OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE]: "wrapper",
         "http.response.status_code": 401,
       }),
     });
