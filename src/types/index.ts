@@ -19,6 +19,15 @@ export {
   ProjectAliasesSchema,
   SentryConfigSchema,
 } from "./config.js";
+// AI Conversations types
+export type {
+  AIConversationSpan,
+  ConversationListItem,
+} from "./conversation.js";
+export {
+  AIConversationSpanSchema,
+  ConversationListItemSchema,
+} from "./conversation.js";
 // Dashboard types
 export type {
   DashboardDetail,
