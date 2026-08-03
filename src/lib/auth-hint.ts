@@ -1,13 +1,14 @@
 /**
  * One-shot env-token-ignored hint.
  *
- * When a user sets SENTRY_AUTH_TOKEN (or SENTRY_TOKEN) but also has a
- * stored OAuth login from `sentry auth login`, the CLI silently prefers
- * the stored login. Users then wonder why their valid provisioned
- * token isn't being used — this was the most painful item in the CLI
- * UX feedback issue (getsentry/cli#785 #4). The hint surfaces the
- * collision on stderr the first time the CLI reaches for auth in a
- * given process.
+ * When a user sets SENTRY_AUTH_TOKEN (or SENTRY_TOKEN) — or a `token`
+ * in `.sentryclirc`, which the env shim copies into SENTRY_AUTH_TOKEN —
+ * but also has a stored OAuth login from `sentry auth login`, the CLI
+ * silently prefers the stored login. Users then wonder why their valid
+ * provisioned token isn't being used — this was the most painful item
+ * in the CLI UX feedback issue (getsentry/cli#785 #4). The hint surfaces
+ * the collision on stderr the first time the CLI reaches for auth in a
+ * given process, naming the real source (env var vs `.sentryclirc`).
  *
  * Design notes:
  * - Fires at most once per process (module-local latch). CLI invocations
@@ -32,6 +33,7 @@ import {
 import { getUserInfo } from "./db/user.js";
 import { getEnv } from "./env.js";
 import { logger } from "./logger.js";
+import { getRcInjectedTokenSource } from "./sentryclirc.js";
 
 const log = logger.withTag("auth");
 
@@ -79,13 +81,28 @@ export function maybeWarnEnvTokenIgnored(): void {
 
   hintEmitted = true;
 
-  const envVar = getActiveEnvVarName();
   const userLabel = resolveStoredUserLabel();
 
   log.info(
-    `Detected ${envVar} env var but using stored login for ${userLabel}.\n` +
-      "  Set SENTRY_FORCE_ENV_TOKEN=1 to prefer the env var."
+    `${describeIgnoredTokenSource()} but using stored login for ${userLabel}.\n` +
+      "  Set SENTRY_FORCE_ENV_TOKEN=1 to prefer it."
   );
+}
+
+/**
+ * Describe where the ignored token came from, for the hint's first line.
+ *
+ * The `.sentryclirc` shim copies a `[auth] token` into `SENTRY_AUTH_TOKEN`,
+ * so a bare "Detected SENTRY_AUTH_TOKEN env var" message would misattribute
+ * the source — the user set a config file, not an env var (getsentry/cli#1345).
+ * When the shim was the source, name the `.sentryclirc` file instead.
+ */
+function describeIgnoredTokenSource(): string {
+  const rcSource = getRcInjectedTokenSource();
+  if (rcSource) {
+    return `Detected a token in .sentryclirc (${rcSource})`;
+  }
+  return `Detected ${getActiveEnvVarName()} env var`;
 }
 
 /**
