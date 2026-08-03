@@ -3207,6 +3207,7 @@ export class SentryApiService {
     );
     return ExternalIssueListSchema.parse(body);
   }
+
   /**
    * Retrieves issue user reports and returns the next Sentry cursor when another page exists.
    */
