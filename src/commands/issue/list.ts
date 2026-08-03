@@ -19,6 +19,7 @@ import { extractRequiredScopes } from "../../lib/api-scope.js";
 import {
   looksLikeIssueShortId,
   parseOrgProjectArg,
+  rejectIssueCommandTokenListTarget,
 } from "../../lib/arg-parsing.js";
 
 import { getActiveEnvVarName, isEnvTokenActive } from "../../lib/db/auth.js";
@@ -1531,6 +1532,10 @@ export const listCommand = buildListCommand("issue", {
       ...rawFlags,
       sort: rawFlags.sort ?? defaultIssueSort(),
     };
+
+    if (target) {
+      rejectIssueCommandTokenListTarget(target);
+    }
 
     const parsed = parseOrgProjectArg(target);
 

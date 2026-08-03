@@ -15,6 +15,7 @@ import {
   parseIssueArg,
   parseOrgProjectArg,
   parseSlashSeparatedArg,
+  rejectIssueCommandTokenListTarget,
   splitNewlineArg,
 } from "../../src/lib/arg-parsing.js";
 import { stripDsnOrgPrefix } from "../../src/lib/dsn/index.js";
@@ -413,6 +414,75 @@ describe("parseIssueArg", () => {
       expect(() => parseIssueArg("sentry/")).toThrow(
         "Missing issue ID after slash"
       );
+    });
+
+    test("issue-1 throws ValidationError for issue command token prefix", () => {
+      expect(() => parseIssueArg("issue-1")).toThrow(ValidationError);
+      expect(() => parseIssueArg("issue-1")).toThrow(
+        "looks like a command token plus a suffix"
+      );
+    });
+
+    test("my-org/issue-1 throws ValidationError for org-qualified issue command token", () => {
+      expect(() => parseIssueArg("my-org/issue-1")).toThrow(ValidationError);
+    });
+
+    test("ISSUE-1 parses as project-search (uppercase short ID, not command token)", () => {
+      expect(parseIssueArg("ISSUE-1")).toEqual({
+        type: "project-search",
+        projectSlug: "issue",
+        suffix: "1",
+      });
+    });
+
+    test("my-org/api-G parses as explicit org/project-suffix", () => {
+      expect(parseIssueArg("my-org/api-G")).toEqual({
+        type: "explicit",
+        org: "my-org",
+        project: "api",
+        suffix: "G",
+      });
+    });
+
+    test("api-G parses as project-search", () => {
+      expect(parseIssueArg("api-G")).toEqual({
+        type: "project-search",
+        projectSlug: "api",
+        suffix: "G",
+      });
+    });
+
+    test("api-1 parses as project-search for projects named api", () => {
+      expect(parseIssueArg("api-1")).toEqual({
+        type: "project-search",
+        projectSlug: "api",
+        suffix: "1",
+      });
+    });
+
+    test("release-123 parses as project-search for projects named release", () => {
+      expect(parseIssueArg("release-123")).toEqual({
+        type: "project-search",
+        projectSlug: "release",
+        suffix: "123",
+      });
+    });
+
+    test("my-org/api-1 parses as explicit for org-qualified api project", () => {
+      expect(parseIssueArg("my-org/api-1")).toEqual({
+        type: "explicit",
+        org: "my-org",
+        project: "api",
+        suffix: "1",
+      });
+    });
+
+    test("cli-g still parses as project-search", () => {
+      expect(parseIssueArg("cli-g")).toEqual({
+        type: "project-search",
+        projectSlug: "cli",
+        suffix: "G",
+      });
     });
 
     test("just slash throws error", () => {
@@ -1023,6 +1093,44 @@ describe("looksLikeIssueShortId", () => {
     test("123 (pure numeric)", () => {
       expect(looksLikeIssueShortId("123")).toBe(false);
     });
+  });
+});
+
+describe("rejectIssueCommandTokenListTarget", () => {
+  test("issue-1 throws ValidationError", () => {
+    expect(() => rejectIssueCommandTokenListTarget("issue-1")).toThrow(
+      ValidationError
+    );
+    expect(() => rejectIssueCommandTokenListTarget("issue-1")).toThrow(
+      "looks like a command token plus a suffix"
+    );
+  });
+
+  test("my-org/issue-1 throws ValidationError", () => {
+    expect(() => rejectIssueCommandTokenListTarget("my-org/issue-1")).toThrow(
+      ValidationError
+    );
+  });
+
+  test("whitespace-padded issue-1 throws ValidationError", () => {
+    expect(() => rejectIssueCommandTokenListTarget(" issue-1 ")).toThrow(
+      ValidationError
+    );
+    expect(() =>
+      rejectIssueCommandTokenListTarget(" my-org/issue-1\n")
+    ).toThrow(ValidationError);
+  });
+
+  test("api-1 does not throw", () => {
+    expect(() => rejectIssueCommandTokenListTarget("api-1")).not.toThrow();
+  });
+
+  test("my-org/cli does not throw", () => {
+    expect(() => rejectIssueCommandTokenListTarget("my-org/cli")).not.toThrow();
+  });
+
+  test("ISSUE-1 does not throw (uppercase short ID, not command token)", () => {
+    expect(() => rejectIssueCommandTokenListTarget("ISSUE-1")).not.toThrow();
   });
 });
 
