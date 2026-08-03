@@ -24,6 +24,7 @@ import {
 import { getEnv } from "./env.js";
 import { isUserError } from "./errors.js";
 import { cyan, muted } from "./formatters/colors.js";
+import { GLOBAL_FLAGS } from "./global-flags.js";
 import { cleanupPatchCache } from "./patch-cache.js";
 import { fetchLatestFromGitHub, fetchLatestNightlyVersion } from "./upgrade.js";
 
@@ -63,6 +64,97 @@ const SUPPRESSED_ARGS = new Set([
  */
 const SUPPRESSED_CLI_SUBCOMMANDS = new Set(["setup", "fix"]);
 
+/** Global value-flag names that consume the following token as their value. */
+const GLOBAL_VALUE_FLAG_NAMES = new Set(
+  GLOBAL_FLAGS.filter((f) => f.kind === "value").map((f) => f.name)
+);
+
+/**
+ * Advance past a value-taking global flag's spaced value.
+ *
+ * A value flag like `--org acme` consumes the following token as its value, so
+ * that token must not be mistaken for a command-path segment. Returns the index
+ * of the flag's value when `args[i]` is such a flag with a spaced value, or `i`
+ * itself otherwise. The caller adds 1 for the normal single-token step.
+ *
+ * @param args - CLI arguments being scanned
+ * @param i - Index of the flag token under inspection
+ * @returns The last index consumed by the flag at `i`
+ */
+function skipGlobalValueFlagValue(args: readonly string[], i: number): number {
+  const token = args[i] ?? "";
+  const name = token.startsWith("--") ? token.slice(2) : "";
+  const next = args[i + 1];
+  if (
+    GLOBAL_VALUE_FLAG_NAMES.has(name) &&
+    !token.includes("=") &&
+    next !== undefined &&
+    !next.startsWith("-")
+  ) {
+    return i + 1;
+  }
+  return i;
+}
+
+/**
+ * Locate the `cli` command group in argv, skipping any leading global flags.
+ *
+ * Global flags may precede the command (`sentry --verbose cli setup`) since
+ * they're recognized by the route scanner at any depth rather than hoisted, so
+ * `cli` is not necessarily `args[0]`. Only global flags (and the values of
+ * value-taking global flags) may precede it — the first non-flag token settles
+ * the command group, and a `--` escape ends the search.
+ *
+ * @param args - CLI arguments (`process.argv.slice(2)`-style, post-normalize)
+ * @returns The index of the `cli` token, or `undefined` when the first command
+ *   token is not `cli`
+ */
+function cliGroupIndex(args: readonly string[]): number | undefined {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = args[i] ?? "";
+    if (token === "--") {
+      return;
+    }
+    if (!token.startsWith("-")) {
+      return token === "cli" ? i : undefined;
+    }
+    i = skipGlobalValueFlagValue(args, i);
+  }
+  return;
+}
+
+/**
+ * Find the first positional (non-global-flag) token after the `cli` group at
+ * `start`, or `undefined` if there is none.
+ *
+ * Global flags may sit between `cli` and its subcommand (`sentry cli --verbose
+ * setup`) because they're recognized by the route scanner at any depth, not
+ * hoisted. This skips global flags and the value consumed by a value-taking
+ * global flag (`--org acme`) so the real subcommand is found regardless of
+ * interleaved flags. Tokens after a `--` escape are not command-path segments
+ * and stop the scan.
+ *
+ * @param args - CLI arguments (`process.argv.slice(2)`-style, post-normalize)
+ * @param start - Index of the `cli` group token
+ * @returns The `cli` subcommand token, or `undefined` when absent
+ */
+function cliSubcommandAfterGroup(
+  args: readonly string[],
+  start: number
+): string | undefined {
+  for (let i = start + 1; i < args.length; i += 1) {
+    const token = args[i] ?? "";
+    if (token === "--") {
+      return;
+    }
+    if (!token.startsWith("-")) {
+      return token;
+    }
+    i = skipGlobalValueFlagValue(args, i);
+  }
+  return;
+}
+
 /** AbortController for pending version check fetch */
 let pendingAbortController: AbortController | null = null;
 
@@ -99,9 +191,19 @@ export function shouldSuppressNotification(args: string[]): boolean {
   if (args.some((arg) => SUPPRESSED_ARGS.has(arg))) {
     return true;
   }
-  // Suppress for "cli <subcommand>" management commands (setup, fix)
-  if (args[0] === "cli" && SUPPRESSED_CLI_SUBCOMMANDS.has(args[1] ?? "")) {
-    return true;
+  // Suppress for "cli <subcommand>" management commands (setup, fix). Global
+  // flags are no longer hoisted, so they may precede `cli` (`--verbose cli
+  // setup`) or sit between `cli` and the subcommand (`cli --verbose setup`);
+  // resolve the group and its subcommand past any interleaved global flags.
+  const cliIndex = cliGroupIndex(args);
+  if (cliIndex !== undefined) {
+    const subcommand = cliSubcommandAfterGroup(args, cliIndex);
+    if (
+      subcommand !== undefined &&
+      SUPPRESSED_CLI_SUBCOMMANDS.has(subcommand)
+    ) {
+      return true;
+    }
   }
   return false;
 }
