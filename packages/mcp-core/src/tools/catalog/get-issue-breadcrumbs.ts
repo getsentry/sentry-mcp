@@ -1,5 +1,4 @@
 import { setTag } from "@sentry/core";
-import { z } from "zod";
 import { ApiNotFoundError } from "../../api-client";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { fetchAndFormatBreadcrumbs } from "../../internal/tool-helpers/breadcrumbs";
@@ -10,6 +9,7 @@ import {
   parseIssueParams,
 } from "../../internal/tool-helpers/issue";
 import {
+  ParamEventIdOrLatest,
   ParamIssueShortId,
   ParamIssueUrl,
   ParamOrganizationSlug,
@@ -33,7 +33,7 @@ export default defineTool({
     "",
     "<examples>",
     "get_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123')",
-    "get_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123', eventId='abc123')",
+    "get_issue_breadcrumbs(organizationSlug='my-org', issueId='PROJECT-123', eventId='c49541c747cb4d8aa3efb70ca5aba243')",
     "get_issue_breadcrumbs(issueUrl='https://my-org.sentry.io/issues/PROJECT-123/')",
     "</examples>",
   ].join("\n"),
@@ -42,12 +42,7 @@ export default defineTool({
     regionUrl: ParamRegionUrl.nullable().default(null),
     issueId: ParamIssueShortId.optional(),
     issueUrl: ParamIssueUrl.optional(),
-    eventId: z
-      .string()
-      .trim()
-      .min(1)
-      .default("latest")
-      .describe("The event ID for the issue. Defaults to `latest`."),
+    eventId: ParamEventIdOrLatest,
   },
   annotations: {
     readOnlyHint: true,

@@ -6,6 +6,7 @@ import { defineTool } from "../../internal/tool-helpers/define";
 import { enhanceNotFoundError } from "../../internal/tool-helpers/enhance-error";
 import { ensureIssueWithinProjectConstraint } from "../../internal/tool-helpers/issue";
 import {
+  ParamEventIdOrLatest,
   ParamIssueShortId,
   ParamOrganizationSlug,
   ParamRegionUrl,
@@ -27,7 +28,7 @@ export default defineTool({
     "",
     "<examples>",
     "get_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123')",
-    "get_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', eventId='abc123', thread=259)",
+    "get_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', eventId='c49541c747cb4d8aa3efb70ca5aba243', thread=259)",
     "get_event_stacktrace(organizationSlug='my-org', issueId='PROJECT-123', thread='main')",
     "</examples>",
     "",
@@ -41,11 +42,7 @@ export default defineTool({
     organizationSlug: ParamOrganizationSlug,
     regionUrl: ParamRegionUrl.nullable().default(null),
     issueId: ParamIssueShortId,
-    eventId: z
-      .string()
-      .trim()
-      .default("latest")
-      .describe("The event ID for the issue. Defaults to `latest`."),
+    eventId: ParamEventIdOrLatest,
     thread: z
       .union([z.number().int(), z.string().trim().min(1)])
       .optional()

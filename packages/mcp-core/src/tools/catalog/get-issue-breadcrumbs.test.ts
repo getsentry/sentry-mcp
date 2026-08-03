@@ -112,11 +112,11 @@ describe("get_issue_breadcrumbs", () => {
   it("returns breadcrumbs for an explicit event ID", async () => {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/explicit-event-id/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/c49541c747cb4d8aa3efb70ca5aba243/",
         () =>
           HttpResponse.json({
             ...eventFixture,
-            id: "explicit-event-id",
+            id: "c49541c747cb4d8aa3efb70ca5aba243",
           }),
         { once: true },
       ),
@@ -127,12 +127,12 @@ describe("get_issue_breadcrumbs", () => {
         organizationSlug: "sentry-mcp-evals",
         regionUrl: null,
         issueId: "CLOUDFLARE-MCP-41",
-        eventId: "explicit-event-id",
+        eventId: "c49541c747cb4d8aa3efb70ca5aba243",
       },
       context,
     );
 
     expect(result).toContain("# Breadcrumbs for CLOUDFLARE-MCP-41");
-    expect(result).toContain("**Event ID**: explicit-event-id");
+    expect(result).toContain("**Event ID**: c49541c747cb4d8aa3efb70ca5aba243");
   });
 });

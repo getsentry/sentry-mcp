@@ -237,7 +237,23 @@ export const ParamSentryGuide = z
       "Use either a platform (e.g., 'javascript', 'python') or platform/guide combination (e.g., 'javascript/nextjs', 'python/django').",
   );
 
-export const ParamEventId = z.string().trim().describe("The ID of the event.");
+export const ParamEventId = z
+  .string()
+  .trim()
+  .regex(
+    /^[0-9a-fA-F]{32}$/,
+    "Event ID must be a 32-character hexadecimal string",
+  )
+  .describe("The ID of the event. e.g. `c49541c747cb4d8aa3efb70ca5aba243`");
+
+/**
+ * Issue-scoped event selector used by tools that can target either a concrete
+ * event or the issue's latest event.
+ */
+export const ParamEventIdOrLatest = z
+  .union([z.literal("latest"), ParamEventId])
+  .default("latest")
+  .describe("The event ID for the issue, or `latest`. Defaults to `latest`.");
 
 export const ParamAttachmentId = z
   .string()
