@@ -1,17 +1,20 @@
 /**
- * Integration tests for top-level global-flag recognition by Stricli's patched
- * route scanner.
+ * Integration tests for top-level flag handling by Stricli's patched route
+ * scanner and application runner.
  *
  * The `@stricli/core` patch (see
  * `packages/cli/patches/@stricli%2Fcore@1.2.8.patch`) teaches `buildRouteScanner`
  * to accept a fixed allow-list of Sentry global flags (`--verbose`, `--json`,
  * `--org`, `--project`, `--log-level`, `--fields`, and the `-v` alias) at any
  * route depth, forwarding them to the leaf command instead of failing route
- * resolution. This replaces the old argv-hoisting preprocessor.
+ * resolution. It also recognizes `--version` at any depth (printing the version
+ * from `runApplication`) and exposes a `documentation.renderHelp` hook that the
+ * app uses to render `--help --json` as structured JSON. Together these replace
+ * the old `argv-glue`/`argv-hoist` preprocessors.
  *
  * These tests exercise the real `app` end-to-end via `run()` so the patch —
- * not a preprocessor — is what makes `sentry --verbose bash-hook` and
- * `sentry cli --verbose defaults` route correctly.
+ * not a preprocessor — is what makes `sentry --verbose bash-hook`,
+ * `sentry cli --version`, and `sentry issue list --help --json` behave.
  */
 
 import { mkdtempSync } from "node:fs";
@@ -21,14 +24,15 @@ import { run } from "@stricli/core";
 import { describe, expect, test } from "vitest";
 import { app } from "../../src/app.js";
 import type { SentryContext } from "../../src/context.js";
+import { CLI_VERSION } from "../../src/lib/constants.js";
 import { useTestConfigDir } from "../helpers.js";
 
-useTestConfigDir("argv-glue-integration-");
+useTestConfigDir("scanner-flags-integration-");
 
 // Empty working dir so any command that reaches target resolution finds no DSNs
 // to auto-detect and fails fast instead of making real network calls. Routing
 // has already happened by then, which is all these tests assert.
-const emptyCwd = mkdtempSync(join(tmpdir(), "argv-glue-cwd-"));
+const emptyCwd = mkdtempSync(join(tmpdir(), "scanner-flags-cwd-"));
 
 /** Run the real app with a mock context, capturing stdout and stderr. */
 async function runApp(
@@ -190,5 +194,108 @@ describe("escape sequence is still respected", () => {
     expect(stderr).not.toContain(NO_COMMAND_REGISTERED);
     expect(stderr.toLowerCase()).toContain("too many arguments");
     expect(stdout).not.toContain("_sentry_err_trap");
+  });
+});
+
+describe("--version at any route depth", () => {
+  // Stricli only prints `--version` when it is the very first token. The patch
+  // adds a `versionRequested` scanner state so `--version` at any depth (before
+  // a `--` escape) prints the version from runApplication.
+  const versionLine = `${CLI_VERSION}\n`;
+
+  test("top-level --version prints the version", async () => {
+    const { stdout } = await runApp(["--version"]);
+    expect(stdout).toBe(versionLine);
+  });
+
+  test("--version after a route group prints the version", async () => {
+    const { stdout, stderr } = await runApp(["cli", "--version"]);
+    expect(stderr).not.toContain(NO_COMMAND_REGISTERED);
+    expect(stdout).toBe(versionLine);
+  });
+
+  test("--version after a nested subcommand prints the version", async () => {
+    const { stdout, stderr } = await runApp(["issue", "list", "--version"]);
+    expect(stderr).not.toContain(NO_COMMAND_REGISTERED);
+    expect(stdout).toBe(versionLine);
+  });
+
+  test("a value flag without its value does not swallow --version", async () => {
+    // `--org --version`: `--version` must print the version, not be consumed as
+    // the value of `--org` (mirrors the `--org --help` behavior).
+    const { stdout } = await runApp(["--org", "--version"]);
+    expect(stdout).toBe(versionLine);
+  });
+
+  test("--version after a -- escape is left for the wrapped command", async () => {
+    // bash-hook takes no positionals, so a `--version` past `--` triggers a
+    // too-many-arguments error instead of printing the CLI version.
+    const { stdout, stderr } = await runApp(["bash-hook", "--", "--version"]);
+    expect(stdout).not.toBe(versionLine);
+    expect(stderr.toLowerCase()).toContain("too many arguments");
+  });
+});
+
+describe("--help --json renders structured help via renderHelp hook", () => {
+  // The patch exposes a `documentation.renderHelp` hook; app.ts uses it to emit
+  // structured JSON (identical to `sentry help --json`) for `--help --json`,
+  // instead of Stricli's text usage.
+
+  test("top-level --help --json emits the full command tree as JSON", async () => {
+    const { stdout } = await runApp(["--help", "--json"]);
+    const parsed = JSON.parse(stdout);
+    expect(parsed).toHaveProperty("routes");
+    expect(parsed).toHaveProperty("flags");
+    expect(Array.isArray(parsed.routes)).toBe(true);
+  });
+
+  test("command --help --json emits that command's metadata as JSON", async () => {
+    const { stdout } = await runApp(["issue", "list", "--help", "--json"]);
+    const parsed = JSON.parse(stdout);
+    expect(parsed).toHaveProperty("path");
+    expect(parsed.path).toContain("issue list");
+  });
+
+  test("--json --help order-insensitive still emits JSON", async () => {
+    const { stdout } = await runApp(["--json", "issue", "list", "--help"]);
+    const parsed = JSON.parse(stdout);
+    expect(parsed).toHaveProperty("path");
+    expect(parsed.path).toContain("issue list");
+  });
+
+  test("--fields narrows the JSON help output", async () => {
+    const { stdout } = await runApp([
+      "issue",
+      "list",
+      "--help",
+      "--json",
+      "--fields",
+      "path",
+    ]);
+    const parsed = JSON.parse(stdout);
+    expect(Object.keys(parsed)).toEqual(["path"]);
+  });
+
+  test("bare --help (no --json) still renders text usage", async () => {
+    const { stdout } = await runApp(["issue", "list", "--help"]);
+    expect(stdout).toContain("USAGE");
+    expect(() => JSON.parse(stdout)).toThrow();
+  });
+
+  test("an unknown subcommand under a group emits a JSON error, not the group", async () => {
+    // `issue` has a default command, so the scanner forwards `nope` to it and
+    // reaches renderHelp. The unknown token must surface as a JSON `error`
+    // rather than silently rendering the `issue` group.
+    const { stdout } = await runApp(["issue", "nope", "--help", "--json"]);
+    const parsed = JSON.parse(stdout);
+    expect(parsed).toHaveProperty("error");
+    expect(parsed.error).toContain("nope");
+  });
+
+  test("a top-level unknown command emits a JSON error", async () => {
+    const { stdout } = await runApp(["nope", "--help", "--json"]);
+    const parsed = JSON.parse(stdout);
+    expect(parsed).toHaveProperty("error");
+    expect(parsed.error).toContain("nope");
   });
 });

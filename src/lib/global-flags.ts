@@ -3,9 +3,8 @@
  *
  * Global flags are injected into every leaf command by {@link buildCommand}
  * and recognized at any argv position by Stricli's patched route scanner (a
- * top-level-flags allow-list) plus the app-boundary glue in `argv-glue.ts`.
- * This module defines the metadata once so those systems stay in sync
- * automatically — adding a flag here is all that's needed.
+ * top-level-flags allow-list). This module defines the metadata once so those
+ * systems stay in sync automatically — adding a flag here is all that's needed.
  *
  * The Stricli flag *shapes* (kind, brief, default, etc.) remain in
  * `command.ts` because they depend on Stricli types and runtime values.
