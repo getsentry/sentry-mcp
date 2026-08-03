@@ -74,24 +74,61 @@ export function createScopedAuthorizationServerMetadataResponse(
   });
 }
 
+const ROOT_AUTHORIZATION_SERVER_METADATA_PATH =
+  "/.well-known/oauth-authorization-server";
+
+// Soft-compat for broken Codex clients that drop callback `iss` after requiring
+// it when this metadata flag is advertised (Codex 0.146.0 / desktop
+// 0.146.0-alpha.9.2 via rmcp 1.8.0). Keep emitting callback `iss`; only skip
+// advertising support for now.
+// TODO(2026-10-02): set this back to true once broken Codex clients age out.
+const ADVERTISE_AUTHORIZATION_RESPONSE_ISS_PARAMETER_SUPPORTED = false;
+
 /**
- * Hook for root authorization-server metadata adjustments.
- *
- * We still emit RFC 9207 `iss` on authorization redirects, but temporarily do
- * not advertise `authorization_response_iss_parameter_supported`.
- *
- * Codex CLI 0.146.0 / desktop 0.146.0-alpha.9.2 (rmcp 1.8.0) require callback
- * `iss` only when that metadata flag is true, then drop `iss` while parsing the
- * local OAuth callback. Advertising the flag therefore breaks login for those
- * clients. Fixed Codex builds (>= 0.146.0-alpha.15) parse and validate `iss`.
- *
- * TODO(2026-10-02): Revisit re-advertising RFC 9207 support once broken Codex
- * clients are no longer common enough to protect. Keep emitting callback `iss`
- * either way so correct clients can still validate it when present.
+ * workers-oauth-provider emits root AS metadata but does not advertise RFC 9207
+ * support. When we append `iss` on authorization responses, patch the provider
+ * document so clients can discover that behavior.
  */
 export async function patchRootAuthorizationServerMetadata(
   response: Response,
-  _url: URL,
+  url: URL,
 ): Promise<Response> {
-  return response;
+  if (!ADVERTISE_AUTHORIZATION_RESPONSE_ISS_PARAMETER_SUPPORTED) {
+    return response;
+  }
+
+  if (
+    !response.ok ||
+    url.pathname !== ROOT_AUTHORIZATION_SERVER_METADATA_PATH
+  ) {
+    return response;
+  }
+
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return response;
+  }
+
+  try {
+    const metadata = (await response.clone().json()) as Record<string, unknown>;
+    if (metadata.authorization_response_iss_parameter_supported === true) {
+      return response;
+    }
+
+    const patched = {
+      ...metadata,
+      authorization_response_iss_parameter_supported: true,
+    };
+
+    const headers = new Headers(response.headers);
+    headers.set("Content-Type", "application/json");
+    return new Response(JSON.stringify(patched), {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  } catch {
+    // Leave non-JSON or unreadable provider responses alone.
+    return response;
+  }
 }
