@@ -175,6 +175,36 @@ async function startBackgroundServer(
   };
 }
 
+/**
+ * Get a live event tail on `host:port`, whichever way is available.
+ *
+ * Prefers attaching to whatever already holds the port so we never compete
+ * with it, and falls back to attaching if the bind loses a race. `run` wraps
+ * the user's dev command, so a busy port must never be fatal here.
+ */
+async function openEventTail(port: number, host: string): Promise<EventTail> {
+  const url = `http://${host}:${port}`;
+
+  if (await isServerRunning(url)) {
+    logger.info(`Connected to existing server at ${bold(url)}`);
+    return attachToExistingServer(url);
+  }
+
+  logger.info("No server detected, starting one in the background...");
+  try {
+    const bg = await startBackgroundServer(port, host);
+    logger.info(`Background server listening on ${bold(bg.url)}`);
+    return bg;
+  } catch (err) {
+    if (!(err instanceof ValidationError && err.field === "port")) {
+      throw err;
+    }
+    // Something grabbed the port between the probe and the bind.
+    logger.warn(`${err.message}; attaching to it instead`);
+    return attachToExistingServer(url);
+  }
+}
+
 /** Augment PATH with `./node_modules/.bin` for Node project scripts. */
 function augmentPathForNode(
   env: Record<string, string | undefined>,
@@ -310,17 +340,9 @@ export const runCommand = buildCommand({
     }
 
     let url = `http://${flags.host}:${flags.port}`;
-    let tail: EventTail;
 
-    if (await isServerRunning(url)) {
-      logger.info(`Connected to existing server at ${bold(url)}`);
-      tail = attachToExistingServer(url);
-    } else {
-      logger.info("No server detected, starting one in the background...");
-      tail = await startBackgroundServer(flags.port, flags.host);
-      url = tail.url;
-      logger.info(`Background server listening on ${bold(url)}`);
-    }
+    const tail = await openEventTail(flags.port, flags.host);
+    url = tail.url;
 
     const spotlightUrl = `${url}/stream`;
     logger.info(`Starting: ${bold(args.join(" "))}`);

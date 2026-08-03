@@ -6,6 +6,7 @@
  */
 
 import { createSpotlightBuffer } from "@spotlightjs/spotlight/sdk";
+import { Hono } from "hono";
 import { describe, expect, test } from "vitest";
 import {
   buildApp,
@@ -13,6 +14,7 @@ import {
   isServerRunning,
   parsePort,
   SERVER_IDENTIFIER,
+  tryListen,
 } from "../../../src/commands/local/server.js";
 import { ValidationError } from "../../../src/lib/errors.js";
 import { SENTRY_CONTENT_TYPE } from "../../../src/lib/formatters/local.js";
@@ -315,6 +317,31 @@ describe("buildApp", () => {
 });
 
 describe("isServerRunning", () => {
+  test("returns true when /health answers with an error status", async () => {
+    // Spotlight's sidecar can 5xx on /health while still holding the port and
+    // ingesting envelopes. Reporting "no server" made the CLI try to bind the
+    // port anyway and abort with "Port 8969 is in use after 3 retries".
+    const unhealthy = new Hono();
+    unhealthy.get("/health", (c) => c.text("Internal Server Error", 500));
+    const { server, port } = await tryListen(unhealthy, 0, "127.0.0.1");
+
+    const savedFetch = globalThis.fetch;
+    const realFetch = (globalThis as { __originalFetch?: typeof fetch })
+      .__originalFetch;
+    if (realFetch) {
+      globalThis.fetch = realFetch;
+    }
+
+    try {
+      await expect(isServerRunning(`http://127.0.0.1:${port}`)).resolves.toBe(
+        true
+      );
+    } finally {
+      globalThis.fetch = savedFetch;
+      await new Promise<void>((done) => server.close(() => done()));
+    }
+  });
+
   test("returns false when no server is running", async () => {
     // isServerRunning uses global fetch which is mocked in tests.
     // Verify the function handles connection errors gracefully.

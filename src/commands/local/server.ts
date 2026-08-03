@@ -376,15 +376,30 @@ export function tryListen(
 }
 
 /**
- * Check whether a server is already running on the given URL.
- * Returns `true` if the health endpoint responds successfully.
+ * Check whether something is already serving on the given URL.
+ *
+ * Any HTTP reply — including an error status — means the port is taken, so
+ * this deliberately does not require a 2xx. Spotlight's own sidecar can
+ * answer `/health` with a 5xx while still holding the port and ingesting
+ * envelopes; treating that as "nothing there" made the CLI try to bind the
+ * port anyway and abort with `Port 8969 is in use after 3 retries`, killing
+ * the user's dev command instead of attaching to the sidecar.
+ *
+ * Only a transport-level failure (connection refused, timeout) counts as
+ * "no server". If the responder turns out not to speak the envelope
+ * protocol, {@link consumeSSE} reports that when the stream fails to open.
  */
 export async function isServerRunning(url: string): Promise<boolean> {
   try {
     const res = await fetch(`${url}/health`, {
       signal: AbortSignal.timeout(2000),
     });
-    return res.ok;
+    if (!res.ok) {
+      logger.debug(
+        `Server at ${url} answered /health with HTTP ${res.status}; treating the port as occupied`
+      );
+    }
+    return true;
   } catch (err) {
     logger.debug(
       `No existing server at ${url}`,
