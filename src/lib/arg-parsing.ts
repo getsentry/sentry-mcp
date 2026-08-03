@@ -66,6 +66,32 @@ function looksLikeDisplayName(input: string): boolean {
  */
 const ISSUE_SHORT_ID_PATTERN = /^[A-Z][A-Z0-9]*(-[A-Z][A-Z0-9]*)*-[A-Z0-9]+$/;
 
+/** Detects any uppercase ASCII letter — used for mixed-case short ID recovery. */
+const HAS_UPPERCASE_ASCII_RE = /[A-Z]/;
+
+/** Detects at least one digit — used to distinguish short ID suffixes from slugs. */
+const HAS_DIGIT_RE = /\d/;
+
+/** Detects at least one ASCII letter — used for short ID suffix shape checks. */
+const HAS_LETTER_ASCII_RE = /[a-zA-Z]/;
+
+/**
+ * Matches a strict "Title Case" word: one leading uppercase letter plus at
+ * least one lowercase letter (e.g. `My`). Excludes single-letter prefixes
+ * like `P` in `P-1`, all-uppercase prefixes like `CLI`, and mixed-case
+ * prefixes like `CaM`.
+ */
+const TITLE_CASE_WORD_RE = /^[A-Z][a-z]+$/;
+
+/** Minimum parts for a dash-separated string to be considered "2-part" for the title-case guard. */
+const TWO_SEGMENT_PARTS = 2;
+
+/**
+ * Minimum dash-separated parts for ignoreCase recovery when the input has no
+ * uppercase letters (e.g. `javascript-react-mr-1b` has four parts).
+ */
+const ISSUE_SHORT_ID_MULTI_SEGMENT_PARTS = 3;
+
 /** Splits a string into lines on LF or CRLF boundaries. */
 const LINE_SPLIT_PATTERN = /\r?\n/;
 
@@ -76,6 +102,11 @@ const LINE_SPLIT_PATTERN = /\r?\n/;
  * (org/project) is expected — e.g., `sentry event view CAM-82X 95fd7f5a`.
  *
  * @param str - String to check
+ * @param opts.ignoreCase - When true, also match mixed-case and multi-segment
+ *   lowercase inputs whose final segment is alphanumeric (e.g.
+ *   `javascript-react-mr-1b`). Two-part slugs like `my-project`, letter-only
+ *   multi-segment slugs like `my-frontend-app`, and versioned project slugs
+ *   like `my-app-2` are rejected.
  * @returns true if the string matches the issue short ID pattern
  *
  * @example
@@ -84,8 +115,19 @@ const LINE_SPLIT_PATTERN = /\r?\n/;
  * looksLikeIssueShortId("SPOTLIGHT-ELECTRON-4Y") // true
  * looksLikeIssueShortId("my-project")            // false (lowercase)
  * looksLikeIssueShortId("a9b4ad2c")             // false (no dash)
+ * looksLikeIssueShortId("javascript-react-mr-1b", { ignoreCase: true }) // true
+ * looksLikeIssueShortId("my-project", { ignoreCase: true })            // false
+ * looksLikeIssueShortId("my-frontend-app", { ignoreCase: true })       // false
+ * looksLikeIssueShortId("my-app-2", { ignoreCase: true })              // false
+ * looksLikeIssueShortId("My-2", { ignoreCase: true })                  // false
  */
-export function looksLikeIssueShortId(str: string): boolean {
+export function looksLikeIssueShortId(
+  str: string,
+  opts?: { ignoreCase?: boolean }
+): boolean {
+  if (opts?.ignoreCase) {
+    return matchesIssueShortIdIgnoreCase(str);
+  }
   return ISSUE_SHORT_ID_PATTERN.test(str);
 }
 
@@ -163,6 +205,64 @@ export function rejectIssueCommandTokenListTarget(target: string): void {
   const slashIdx = prefix.lastIndexOf("/");
   const projectSegment = slashIdx === -1 ? prefix : prefix.slice(slashIdx + 1);
   rejectIssueCommandTokenWithNumericSuffix(trimmed, projectSegment, suffix);
+}
+
+/**
+ * Case-insensitive short ID match with guardrails against project-slug false positives.
+ *
+ * A fully-lowercase input is only recovered when it can't be told apart from a
+ * project slug by anything but its final segment, so the rule keys off that
+ * segment. This keeps the classification consistent for the whole class rather
+ * than carving out length-based special cases (which flipped `my-app-2b` vs
+ * `my-apps-2b` on a one-character difference).
+ *
+ * Guard tiers:
+ * 1. Two-part all-lowercase slugs (e.g. `my-project`) — rejected as project names
+ * 2. Multi-segment all-lowercase with a letter-only or digit-only final
+ *    (e.g. `my-frontend-app`, `my-app-2`) — rejected. A short-ID suffix mixes a
+ *    letter and a digit (`1b`, `4y`), so a pure-word or pure-number final marks
+ *    a project slug.
+ * 3. Title-case first segment (e.g. `My` in `My-Project`, `My-2b`, `My-App-2`) —
+ *    rejected. Real short-ID prefixes are fully uppercase or fully lowercase,
+ *    not "someone capitalized a project name" title case.
+ *
+ * All-uppercase multi-segment short IDs (e.g. `SPOTLIGHT-ELECTRON-5`) pass tier 2
+ * because Sentry project slugs are always lowercase. Mixed-case short IDs
+ * (e.g. `CaM-82x`) and lowercase multi-segment with alphanumeric finals
+ * (e.g. `javascript-react-mr-1b`, `my-app-2b`) match when uppercased.
+ *
+ * @example
+ * matchesIssueShortIdIgnoreCase("my-app-2")               // false
+ * matchesIssueShortIdIgnoreCase("my-app-2b")              // true
+ * matchesIssueShortIdIgnoreCase("My-Project")             // false
+ * matchesIssueShortIdIgnoreCase("My-2b")                  // false
+ * matchesIssueShortIdIgnoreCase("CLI-5")                  // true
+ * matchesIssueShortIdIgnoreCase("SPOTLIGHT-ELECTRON-5")   // true
+ * matchesIssueShortIdIgnoreCase("javascript-react-mr-1b") // true
+ */
+function matchesIssueShortIdIgnoreCase(str: string): boolean {
+  const parts = str.split("-");
+  const hasUppercase = HAS_UPPERCASE_ASCII_RE.test(str);
+  const multiSegment = parts.length >= ISSUE_SHORT_ID_MULTI_SEGMENT_PARTS;
+  if (!(hasUppercase || multiSegment)) {
+    return false;
+  }
+  const lastPartLower = (parts.at(-1) ?? "").toLowerCase();
+  if (multiSegment && !hasUppercase && !isAlphanumericSegment(lastPartLower)) {
+    return false;
+  }
+  if (
+    parts.length >= TWO_SEGMENT_PARTS &&
+    TITLE_CASE_WORD_RE.test(parts[0] ?? "")
+  ) {
+    return false;
+  }
+  return ISSUE_SHORT_ID_PATTERN.test(str.toUpperCase());
+}
+
+/** True when a segment contains at least one letter and one digit (e.g. `1b`, not `2` or `app`). */
+function isAlphanumericSegment(segment: string): boolean {
+  return HAS_DIGIT_RE.test(segment) && HAS_LETTER_ASCII_RE.test(segment);
 }
 
 // ---------------------------------------------------------------------------
