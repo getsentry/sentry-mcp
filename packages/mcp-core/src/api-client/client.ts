@@ -3259,7 +3259,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Event> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/events/${eventId}/`,
+      `/organizations/${encodeURIComponent(organizationSlug)}/issues/${encodeURIComponent(issueId)}/events/${encodeURIComponent(eventId)}/`,
       undefined,
       opts,
     );
