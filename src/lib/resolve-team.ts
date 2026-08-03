@@ -59,7 +59,7 @@ export type ResolveTeamOptions = {
   team?: string;
   /** Source of the auto-detected org, shown in error messages */
   detectedFrom?: string;
-  /** Usage hint shown in error messages (e.g., "sentry project create <org>/<name> <platform>") */
+  /** Usage hint shown in errors (e.g., "sentry project create <org>/<name>:<platform>") */
   usageHint: string;
   /**
    * Slug to use when auto-creating a team in an empty org.

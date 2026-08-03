@@ -104,6 +104,29 @@ describe("buildCommand", () => {
     expect(command).toBeDefined();
   });
 
+  test("retains the primary custom usage line for introspection", () => {
+    const command = buildCommand<Record<string, never>, string[]>({
+      auth: false,
+      docs: {
+        brief: "Create things",
+        customUsage: ["<name>:<kind>..."],
+      },
+      parameters: {
+        positional: {
+          kind: "array",
+          parameter: { brief: "Name and kind pairs", parse: String },
+        },
+      },
+      async *func() {
+        yield null;
+      },
+    });
+
+    expect(
+      (command as unknown as { __primaryUsage?: string }).__primaryUsage
+    ).toBe("<name>:<kind>...");
+  });
+
   test("re-exports numberParser from Stricli", () => {
     expect(numberParser).toBeDefined();
     expect(typeof numberParser).toBe("function");

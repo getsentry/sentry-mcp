@@ -234,6 +234,23 @@ const parsed = parseOrgProjectArg(targetArg);
 
 Reference: `span/list.ts`, `trace/view.ts`, `event/view.ts`
 
+### Multiple Values in Arguments
+
+Split by argument type — do not mix the conventions:
+
+- **Required positionals → space-separated variadic.** Declare the arg as
+  variadic and accept repeated tokens: `issue merge A B C`,
+  `project create web:javascript api:python-django`. Do not split positional
+  values on commas; commas may be part of the value. Every project passed to
+  `project create` requires a `name:platform` pair — there is no space-separated
+  form, with or without an explicit org. Project names cannot contain whitespace.
+- **Optional flags → comma-separated (sometimes also repeatable).** Split the
+  flag value on `,`: `--features errors,tracing`, set-commits `--path a,b`,
+  `auth login --scope a,b`. Use `value.split(",")` (repeatable array flags:
+  `flags.x.flatMap((v) => v.split(","))`).
+
+Reference: `project/create.ts`, `release/set-commits.ts` (`--path`), `auth/login.ts` (`--scope`)
+
 ### Markdown Rendering
 
 All non-trivial human output must use the markdown rendering pipeline:

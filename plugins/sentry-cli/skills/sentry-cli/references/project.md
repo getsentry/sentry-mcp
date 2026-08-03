@@ -11,9 +11,9 @@ requires:
 
 Work with Sentry projects
 
-### `sentry project create <name> <platform>`
+### `sentry project create [<org>/]<name>:<platform>...`
 
-Create a new project
+Create one or more projects
 
 **Flags:**
 - `-t, --team <value> - Team to create the project under`
@@ -22,14 +22,18 @@ Create a new project
 **Examples:**
 
 ```bash
+# Every project is a name:platform pair; project names cannot contain whitespace
 # Create a new project
-sentry project create my-new-app javascript-nextjs
+sentry project create my-new-app:javascript-nextjs
+
+# Create several projects with their own platforms
+sentry project create web:javascript api:python-django worker:node
 
 # Create under a specific org and team
-sentry project create my-org/my-new-app python --team backend-team
+sentry project create my-org/my-new-app:python --team backend-team
 
 # Preview without creating
-sentry project create my-new-app node --dry-run
+sentry project create my-new-app:node --dry-run
 ```
 
 ### `sentry project delete <org/project>`
