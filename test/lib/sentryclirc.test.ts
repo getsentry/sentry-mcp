@@ -18,6 +18,7 @@ import {
   assertRcUrlTrusted,
   CONFIG_FILENAME,
   clearSentryCliRcCache,
+  getRcInjectedTokenSource,
   loadSentryCliRc,
 } from "../../src/lib/sentryclirc.js";
 import { cleanupTestDir, createTestConfigDir } from "../helpers.js";
@@ -230,6 +231,23 @@ describe("applySentryCliRcEnvShim", () => {
 
     await applySentryCliRcEnvShim(testDir);
     expect(readEnv("SENTRY_AUTH_TOKEN")).toBe("rc-token");
+  });
+
+  test("records the rc file as the injected token source", async () => {
+    delete process.env.SENTRY_AUTH_TOKEN;
+    delete process.env.SENTRY_TOKEN;
+    writeRcFile(testDir, "[auth]\ntoken = rc-token\n");
+
+    await applySentryCliRcEnvShim(testDir);
+    expect(getRcInjectedTokenSource()).toBe(join(testDir, CONFIG_FILENAME));
+  });
+
+  test("does not record an injected source when a real env token is set", async () => {
+    process.env.SENTRY_AUTH_TOKEN = "existing-token";
+    writeRcFile(testDir, "[auth]\ntoken = rc-token\n");
+
+    await applySentryCliRcEnvShim(testDir);
+    expect(getRcInjectedTokenSource()).toBeUndefined();
   });
 
   test("does not override existing SENTRY_AUTH_TOKEN", async () => {

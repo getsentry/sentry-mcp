@@ -8,8 +8,11 @@
  *   or when SENTRY_FORCE_ENV_TOKEN is set.
  * - Repeat calls in the same process are silent.
  * - User label preference order (username > email > name > fallback).
+ * - Names the `.sentryclirc` source when the token came from the rc shim.
  */
 
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   maybeWarnEnvTokenIgnored,
@@ -17,9 +20,14 @@ import {
 } from "../../src/lib/auth-hint.js";
 import { setAuthToken } from "../../src/lib/db/auth.js";
 import { setUserInfo } from "../../src/lib/db/user.js";
+import {
+  applySentryCliRcEnvShim,
+  CONFIG_FILENAME,
+  clearSentryCliRcCache,
+} from "../../src/lib/sentryclirc.js";
 import { useTestConfigDir } from "../helpers.js";
 
-useTestConfigDir("auth-hint-");
+const getConfigDir = useTestConfigDir("auth-hint-");
 
 let savedAuthToken: string | undefined;
 let savedSentryToken: string | undefined;
@@ -32,6 +40,7 @@ beforeEach(() => {
   delete process.env.SENTRY_AUTH_TOKEN;
   delete process.env.SENTRY_TOKEN;
   delete process.env.SENTRY_FORCE_ENV_TOKEN;
+  clearSentryCliRcCache();
   resetAuthHintState();
 });
 
@@ -51,6 +60,7 @@ afterEach(() => {
   } else {
     delete process.env.SENTRY_FORCE_ENV_TOKEN;
   }
+  clearSentryCliRcCache();
 });
 
 /**
@@ -132,6 +142,29 @@ describe("maybeWarnEnvTokenIgnored", () => {
       expect(text).toContain("SENTRY_AUTH_TOKEN env var");
       expect(text).toContain("stored login for alice");
       expect(text).toContain("SENTRY_FORCE_ENV_TOKEN=1");
+    } finally {
+      cap.restore();
+    }
+  });
+
+  test("names the .sentryclirc source when the token came from the rc shim", async () => {
+    setAuthToken("stored_oauth", 3600, "refresh_a");
+    setUserInfo({ userId: "u-1", username: "alice" });
+
+    // The shim reads $SENTRY_CONFIG_DIR/.sentryclirc as a global fallback
+    // and copies its token into SENTRY_AUTH_TOKEN, recording the source.
+    const rcPath = join(getConfigDir(), CONFIG_FILENAME);
+    writeFileSync(rcPath, "[auth]\ntoken = rc-token\n", "utf-8");
+    await applySentryCliRcEnvShim(getConfigDir());
+
+    const cap = captureStderr();
+    try {
+      maybeWarnEnvTokenIgnored();
+      expect(cap.hintCalls()).toBe(1);
+      const text = cap.text();
+      expect(text).toContain(`Detected a token in .sentryclirc (${rcPath})`);
+      expect(text).not.toContain("env var");
+      expect(text).toContain("stored login for alice");
     } finally {
       cap.restore();
     }

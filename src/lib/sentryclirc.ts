@@ -324,6 +324,24 @@ export function loadSentryCliRc(cwd: string): Promise<SentryCliRcConfig> {
 }
 
 /**
+ * Path of the `.sentryclirc` file whose `token` the shim copied into
+ * `SENTRY_AUTH_TOKEN`, pinned by {@link applySentryCliRcEnvShim} at the
+ * one point it knows the provenance. `undefined` when the active env
+ * token was set by the user rather than injected from rc.
+ *
+ * Mirrors the boot-time snapshot pattern in `env-token-host.ts`
+ * (`pinnedHost` + getter): lets the synchronous env-token-ignored hint
+ * name the real source instead of claiming the user set an env var they
+ * never did, without re-awaiting the async rc loader.
+ */
+let rcInjectedTokenSource: string | undefined;
+
+/** Read the pinned rc-injected token source. See {@link rcInjectedTokenSource}. */
+export function getRcInjectedTokenSource(): string | undefined {
+  return rcInjectedTokenSource;
+}
+
+/**
  * Apply env shim for `.sentryclirc` token and URL fields.
  *
  * Maps config file values to environment variables so the existing
@@ -350,6 +368,7 @@ export async function applySentryCliRcEnvShim(cwd: string): Promise<void> {
       `Setting SENTRY_AUTH_TOKEN from ${CONFIG_FILENAME} (${config.sources.token})`
     );
     env.SENTRY_AUTH_TOKEN = config.token;
+    rcInjectedTokenSource = config.sources.token;
   }
 
   const normalizedRcUrl = config.url ? normalizeUrl(config.url) : undefined;
@@ -400,4 +419,5 @@ export function clearSentryCliRcCache(): void {
   cache.clear();
   // Reset global paths — tests change SENTRY_CONFIG_DIR between runs
   globalPaths = null;
+  rcInjectedTokenSource = undefined;
 }
