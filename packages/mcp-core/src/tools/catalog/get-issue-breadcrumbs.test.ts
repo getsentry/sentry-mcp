@@ -1,5 +1,5 @@
 import { eventFixture, mswServer } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
 import getIssueBreadcrumbs from "./get-issue-breadcrumbs.js";
 
@@ -20,6 +20,7 @@ describe("get_issue_breadcrumbs", () => {
         organizationSlug: "sentry-mcp-evals",
         regionUrl: null,
         issueId: "CLOUDFLARE-MCP-41",
+        eventId: "latest",
       },
       context,
     );
@@ -48,6 +49,7 @@ describe("get_issue_breadcrumbs", () => {
         issueUrl:
           "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41/",
         regionUrl: null,
+        eventId: "latest",
       },
       context,
     );
@@ -62,6 +64,7 @@ describe("get_issue_breadcrumbs", () => {
           organizationSlug: "sentry-mcp-evals",
           issueId: "CLOUDFLARE-MCP-41",
           regionUrl: null,
+          eventId: "latest",
         },
         {
           ...context,
@@ -96,12 +99,40 @@ describe("get_issue_breadcrumbs", () => {
         organizationSlug: "sentry-mcp-evals",
         regionUrl: null,
         issueId: "CLOUDFLARE-MCP-41",
+        eventId: "latest",
       },
       context,
     );
 
     expect(result).toContain(
-      "No breadcrumbs found in the latest event for this issue.",
+      "No breadcrumbs found in this event for the issue.",
     );
+  });
+
+  it("returns breadcrumbs for an explicit event ID", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/explicit-event-id/",
+        () =>
+          HttpResponse.json({
+            ...eventFixture,
+            id: "explicit-event-id",
+          }),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueBreadcrumbs.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: "explicit-event-id",
+      },
+      context,
+    );
+
+    expect(result).toContain("# Breadcrumbs for CLOUDFLARE-MCP-41");
+    expect(result).toContain("**Event ID**: explicit-event-id");
   });
 });
