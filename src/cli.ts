@@ -161,7 +161,7 @@ export async function runCli(cliArgs: string[]): Promise<void> {
   const { isatty } = await import("node:tty");
   const { ExitCode, run } = await import("@stricli/core");
   const { app } = await import("./app.js");
-  const { preprocessArgv } = await import("./lib/argv-hoist.js");
+  const { preprocessArgv } = await import("./lib/argv-glue.js");
   const { buildContext } = await import("./context.js");
   const { AuthError, OutputError, formatError, getExitCode } = await import(
     "./lib/errors.js"
@@ -185,15 +185,17 @@ export async function runCli(cliArgs: string[]): Promise<void> {
     shouldSuppressNotification,
   } = await import("./lib/version-check.js");
 
-  // Preprocess argv before dispatch (see preprocessArgv):
+  // Normalize argv before dispatch (see preprocessArgv). Global-flag hoisting is
+  // now handled by Stricli's patched route scanner (top-level-flags allow-list),
+  // so only two application-boundary transforms remain:
   //  - `--version` after a route group/subcommand (e.g. `sentry cli --version`)
   //    is normalized to a top-level `--version`; Stricli only handles it at the
   //    application proxy. `-v` is left alone — it's the --verbose alias.
-  //  - global flags (--verbose, -v, --log-level, --json, --fields) are hoisted
-  //    to the tail so `sentry --verbose issue list` works.
+  //  - a flag-based `--help --json` request is rewritten to the `help` command
+  //    so JSON help works for the `--help` forms agents reach for.
   // The original cliArgs are kept for post-run checks (e.g., help recovery)
   // that rely on the original token positions.
-  const hoistedArgs = preprocessArgv(cliArgs);
+  const normalizedArgs = preprocessArgv(cliArgs);
 
   // ---------------------------------------------------------------------------
   // Error-recovery middleware
@@ -616,7 +618,7 @@ export async function runCli(cliArgs: string[]): Promise<void> {
 
   // Use hoisted args so positional checks (e.g., args[0] === "cli") work
   // even when global flags precede the subcommand in the original argv.
-  const suppressNotification = shouldSuppressNotification(hoistedArgs);
+  const suppressNotification = shouldSuppressNotification(normalizedArgs);
 
   // Start background update check (non-blocking)
   if (!suppressNotification) {
@@ -624,7 +626,7 @@ export async function runCli(cliArgs: string[]): Promise<void> {
   }
 
   try {
-    await executor(hoistedArgs);
+    await executor(normalizedArgs);
 
     // When Stricli can't match a subcommand in a route group (e.g.,
     // `sentry dashboard help`), it writes "No command registered for `help`"
@@ -660,7 +662,7 @@ export async function runCli(cliArgs: string[]): Promise<void> {
     }
     process.stderr.write(`${error("Error:")} ${formatError(err)}\n`);
     process.exitCode = getExitCode(err);
-    const notification = getErrorUpdateNotification(err, hoistedArgs);
+    const notification = getErrorUpdateNotification(err, normalizedArgs);
     if (notification) {
       process.stderr.write(notification);
     }

@@ -169,14 +169,29 @@ for (const [key, patchPath] of Object.entries(patches)) {
 
 /**
  * Content assertions: verify a patch's *effect* is present in the installed
- * package, not just that the version matches. Each entry checks that a stale
- * (pre-patch) marker is absent from a given installed file. If the marker is
- * still present, the patch did not apply and we fail hard.
+ * package, not just that the version matches. Each entry checks either that a
+ * stale (pre-patch) `staleMarker` is absent or that a `requiredMarker` (added
+ * by the patch) is present in a given installed file. If the check fails, the
+ * patch did not apply and we fail hard.
  *
- * @stricli/core: the unpatched source registers `-H` as the reserved alias for
- * `--help-all` via `checkForReservedAliases(aliases, ["h", "H"])`. After our
- * patch that becomes `["h"]`. The presence of `"H"` in that call is a reliable
- * signal that the patch did NOT apply (in either the ESM or CJS bundle).
+ * @stricli/core (`-H` alias): the unpatched source registers `-H` as the
+ * reserved alias for `--help-all` via
+ * `checkForReservedAliases(aliases, ["h", "H"])`. After our patch that becomes
+ * `["h"]`. The presence of `"H"` in that call is a reliable signal that the
+ * patch did NOT apply (in either the ESM or CJS bundle).
+ *
+ * @stricli/core (top-level flags): the patch teaches `buildRouteScanner` to
+ * recognize a host-supplied allow-list of global flags (`scanner.topLevelFlags`)
+ * at any route depth, so `sentry --verbose issue list` no longer fails route
+ * resolution. The allow-list itself is passed in from the app (derived from
+ * GLOBAL_FLAGS) rather than hardcoded in the patch. This is a pure insertion, so
+ * it's guarded by a `requiredMarker` (`matchTopLevelFlag`) that must be present
+ * once patched. Its absence means global flags before a subcommand will crash.
+ *
+ * @stricli/core (`-v` version alias): the patch also drops Stricli's built-in
+ * `-v`=version alias in `runApplication` so `-v` stays the Sentry CLI's
+ * `--verbose` alias at every position; `--version` remains the version flag.
+ * The stale marker is the original `inputs[0] === "-v"` version check.
  *
  * @sentry/core and @sentry/node-core: these are tree-shaking patches that strip
  * unused re-exports (AI/integration modules) from the build barrels so esbuild
@@ -191,7 +206,12 @@ const CONTENT_ASSERTIONS: ReadonlyArray<{
   /** Installed file to inspect, relative to the resolved node_modules dir. */
   file: string;
   /** Stale marker that MUST be absent once the patch is applied. */
-  staleMarker: string;
+  staleMarker?: string;
+  /**
+   * Marker that MUST be present once the patch is applied. Used for patches
+   * that add code (pure insertions) with no stale line to key off of.
+   */
+  requiredMarker?: string;
   /** Human-readable explanation shown on failure. */
   description: string;
 }> = [
@@ -206,6 +226,30 @@ const CONTENT_ASSERTIONS: ReadonlyArray<{
     staleMarker: 'checkForReservedAliases(aliases, ["h", "H"])',
     description:
       "@stricli/core CJS: -H alias not freed (api -H/--header will crash)",
+  },
+  {
+    file: "@stricli/core/dist/index.js",
+    requiredMarker: "matchTopLevelFlag",
+    description:
+      "@stricli/core ESM: top-level-flags scanner allow-list missing (global flags before a subcommand, e.g. `sentry --verbose issue list`, will fail route resolution)",
+  },
+  {
+    file: "@stricli/core/dist/index.cjs",
+    requiredMarker: "matchTopLevelFlag",
+    description:
+      "@stricli/core CJS: top-level-flags scanner allow-list missing (global flags before a subcommand, e.g. `sentry --verbose issue list`, will fail route resolution)",
+  },
+  {
+    file: "@stricli/core/dist/index.js",
+    staleMarker: 'inputs[0] === "--version" || inputs[0] === "-v"',
+    description:
+      "@stricli/core ESM: built-in `-v`=version alias not dropped (`sentry -v <command>` prints the version instead of running the command verbosely)",
+  },
+  {
+    file: "@stricli/core/dist/index.cjs",
+    staleMarker: 'inputs[0] === "--version" || inputs[0] === "-v"',
+    description:
+      "@stricli/core CJS: built-in `-v`=version alias not dropped (`sentry -v <command>` prints the version instead of running the command verbosely)",
   },
   {
     file: "@sentry/core/build/cjs/index.js",
@@ -240,7 +284,15 @@ for (const assertion of CONTENT_ASSERTIONS) {
       throw new Error("unresolved");
     }
     const contents = await readFile(assertionPath, "utf-8");
-    if (contents.includes(assertion.staleMarker)) {
+    if (assertion.staleMarker && contents.includes(assertion.staleMarker)) {
+      errors.push(
+        `  ${assertion.description} — patch not applied to ${assertion.file} (regenerate the patch for the current dependency version)`
+      );
+    }
+    if (
+      assertion.requiredMarker &&
+      !contents.includes(assertion.requiredMarker)
+    ) {
       errors.push(
         `  ${assertion.description} — patch not applied to ${assertion.file} (regenerate the patch for the current dependency version)`
       );

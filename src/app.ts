@@ -71,6 +71,7 @@ import {
   WizardError,
 } from "./lib/errors.js";
 import { error as errorColor, warning } from "./lib/formatters/colors.js";
+import { buildTopLevelFlags } from "./lib/global-flags.js";
 import { isRouteMap, type RouteMap } from "./lib/introspect.js";
 import { buildRouteMap } from "./lib/route-map.js";
 
@@ -399,6 +400,11 @@ export const app = buildApplication(routes, {
     // `sentry monitor run <slug> -- <command>`) can pass through flags
     // like `-e` or `--verbose` to the wrapped command unambiguously.
     allowArgumentEscapeSequence: true,
+    // Recognize global flags placed before the subcommand
+    // (`sentry --verbose issue list`) at any route depth and forward them to
+    // the leaf command, via our @stricli/core route-scanner patch. Derived
+    // from GLOBAL_FLAGS so adding a global flag there is all that's needed.
+    topLevelFlags: buildTopLevelFlags(),
   },
   determineExitCode: getExitCode,
   localization: {

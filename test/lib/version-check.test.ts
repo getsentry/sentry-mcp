@@ -63,6 +63,44 @@ describe("shouldSuppressNotification", () => {
     ).toBe(true);
   });
 
+  test("suppresses cli management commands with global flags before the subcommand", () => {
+    // Global flags are no longer hoisted to the tail, so they may sit between
+    // `cli` and the subcommand. Suppression must still find `setup`/`fix`.
+    expect(shouldSuppressNotification(["cli", "--verbose", "setup"])).toBe(
+      true
+    );
+    expect(shouldSuppressNotification(["cli", "-v", "fix"])).toBe(true);
+    expect(
+      shouldSuppressNotification(["cli", "--log-level", "debug", "setup"])
+    ).toBe(true);
+    expect(shouldSuppressNotification(["cli", "--org", "acme", "setup"])).toBe(
+      true
+    );
+    expect(shouldSuppressNotification(["cli", "--org=acme", "fix"])).toBe(true);
+  });
+
+  test("suppresses cli management commands with global flags before cli", () => {
+    // Global flags can also precede the command group (`sentry --verbose cli
+    // setup`) since they're no longer hoisted; `cli` need not be args[0].
+    expect(shouldSuppressNotification(["--verbose", "cli", "setup"])).toBe(
+      true
+    );
+    expect(shouldSuppressNotification(["-v", "cli", "fix"])).toBe(true);
+    expect(shouldSuppressNotification(["--org", "acme", "cli", "setup"])).toBe(
+      true
+    );
+    expect(shouldSuppressNotification(["--org=acme", "cli", "fix"])).toBe(true);
+    expect(
+      shouldSuppressNotification(["--verbose", "cli", "--org", "acme", "setup"])
+    ).toBe(true);
+  });
+
+  test("does not suppress when a non-flag token precedes cli", () => {
+    // The first positional token settles the command group. If it isn't `cli`,
+    // a later `cli setup` is an argument, not the management command.
+    expect(shouldSuppressNotification(["issue", "cli", "setup"])).toBe(false);
+  });
+
   test("does not suppress for cli feedback", () => {
     expect(shouldSuppressNotification(["cli", "feedback"])).toBe(false);
   });
