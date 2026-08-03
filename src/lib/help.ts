@@ -116,11 +116,11 @@ function generateCommands(): HelpCommand[] {
         };
       }
 
-      // Direct command - extract placeholder from positional parameters
+      // Direct command - use any public syntax override before raw parameters
       if (isCommand(entry.target)) {
-        const placeholder = getPositionalString(
-          entry.target.parameters.positional
-        );
+        const placeholder =
+          entry.target.__primaryUsage ??
+          getPositionalString(entry.target.parameters.positional);
         const usageSuffix = placeholder ? ` ${placeholder}` : "";
         return {
           usage: `sentry ${routeName}${usageSuffix}`,

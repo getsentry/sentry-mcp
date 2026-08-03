@@ -23,6 +23,10 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { access, readFile, writeFile } from "node:fs/promises";
 import type { Token } from "marked";
 import { marked } from "marked";
+import {
+  extractCommandPathFromHeading,
+  matchExampleToCommand,
+} from "./generate-skill-markdown.js";
 import { DOCS_CONTENT, DOCS_PUBLIC } from "./paths.js";
 
 // Bootstrap: ensure the generated skill-content module exists before
@@ -296,12 +300,6 @@ sentry auth status
 \`\`\``;
 }
 
-/**
- * Regex to extract the command path from a heading like `` `sentry issue list <org/project>` ``.
- * Captures the words between `sentry` and the first `<` or closing backtick.
- */
-const CMD_HEADING_RE = /^`sentry\s+(.*?)\s*(?:<[^>]*>.*)?`$/;
-
 /** Append a code block to a map entry, creating the array if needed */
 function appendExample(
   map: Map<string, string[]>,
@@ -326,9 +324,8 @@ function collectCommandPaths(
     if (token.type !== "heading" || token.depth !== 3) {
       continue;
     }
-    const m = CMD_HEADING_RE.exec(token.text);
-    if (m) {
-      const cmdPath = `sentry ${m[1]}`;
+    const cmdPath = extractCommandPathFromHeading(token.text);
+    if (cmdPath) {
       paths.push(cmdPath);
       if (!examples.has(cmdPath)) {
         examples.set(cmdPath, []);
@@ -338,23 +335,10 @@ function collectCommandPaths(
   return paths;
 }
 
-/** Find the best command path match for a loose code block by content */
-function matchCodeToCommand(
-  code: string,
-  commandPaths: string[],
-  groupFallback: string
-): string | undefined {
-  return (
-    commandPaths.find((p) => code.includes(p)) ??
-    (code.includes(groupFallback) ? groupFallback : undefined)
-  );
-}
-
 /**
  * Walk tokens sequentially and associate each bash code block with
  * the appropriate command path — either by heading context or content matching.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sequential token walk with type narrowing
 function associateCodeBlocks(
   tokens: Token[],
   commandPaths: string[],
@@ -366,8 +350,7 @@ function associateCodeBlocks(
 
   for (const token of tokens) {
     if (token.type === "heading" && token.depth === 3) {
-      const m = CMD_HEADING_RE.exec(token.text);
-      currentCmd = m ? `sentry ${m[1]}` : null;
+      currentCmd = extractCommandPathFromHeading(token.text) ?? null;
     }
     if (token.type !== "code" || token.lang !== "bash") {
       continue;
@@ -376,7 +359,7 @@ function associateCodeBlocks(
     if (currentCmd && examples.has(currentCmd)) {
       appendExample(examples, currentCmd, code);
     } else {
-      const target = matchCodeToCommand(code, commandPaths, groupFallback);
+      const target = matchExampleToCommand(code, commandPaths, groupFallback);
       if (target) {
         appendExample(examples, target, code);
       }

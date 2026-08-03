@@ -429,11 +429,13 @@ ${caseBranches}
       # In the args state, $line[1] and $line[2] hold the parsed command
       # and subcommand. Pass them to __complete for context detection.
       local -a completions
+      local escaped_value
       while IFS=$'\\t' read -r value desc; do
+        escaped_value="\${value//:/\\\\:}"
         if [[ -n "$desc" ]]; then
-          completions+=("\${value}:\${desc}")
+          completions+=("\${escaped_value}:\${desc}")
         else
-          completions+=("\${value}")
+          completions+=("\${escaped_value}")
         fi
       done < <(
         if (( \${#words} == 0 )); then

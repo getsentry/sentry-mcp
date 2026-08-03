@@ -54,6 +54,11 @@ export type Command = {
    * reads it to populate {@link CommandInfo.jsonFields}.
    */
   __jsonSchema?: import("zod").ZodType;
+  /**
+   * Primary Stricli custom usage line, retained by `buildCommand` for
+   * introspection because Stricli does not expose it on the built command.
+   */
+  __primaryUsage?: string;
 };
 
 /** Positional parameter definitions — either fixed-length tuple or variadic array */
@@ -286,7 +291,8 @@ export function buildCommandInfo(
     brief: cmd.brief,
     fullDescription: cmd.fullDescription,
     flags: extractFlags(cmd.parameters.flags),
-    positional: getPositionalString(cmd.parameters.positional),
+    positional:
+      cmd.__primaryUsage ?? getPositionalString(cmd.parameters.positional),
     positionals: extractPositionals(cmd.parameters.positional),
     aliases: cmd.parameters.aliases ?? {},
     examples,

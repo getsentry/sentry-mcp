@@ -94,11 +94,12 @@ type BaseArgs = readonly unknown[];
 type StricliBuilderArgs<CONTEXT extends CommandContext> =
   import("@stricli/core").CommandBuilderArguments<BaseFlags, BaseArgs, CONTEXT>;
 
-/** Command documentation */
-type CommandDocumentation = {
-  readonly brief: string;
-  readonly fullDescription?: string;
-};
+/**
+ * Native Stricli documentation. When `customUsage` is present, its first line
+ * must be the canonical signature suffix used by introspection and generated
+ * docs; later lines may document equivalent forms.
+ */
+type CommandDocumentation = StricliBuilderArgs<CommandContext>["docs"];
 
 /**
  * Command function type for Sentry CLI commands.
@@ -108,8 +109,9 @@ type CommandDocumentation = {
  *
  * - **Non-streaming**: yield a single `CommandOutput<T>`, optionally
  *   return `{ hint }` for a post-output footer.
- * - **Streaming**: yield multiple values; each is rendered immediately
- *   (JSONL in `--json` mode, human text otherwise).
+ * - **Streaming**: each yield is rendered immediately. Commands that support
+ *   `--json` must yield one aggregate value when callers need one parseable
+ *   JSON document; individual JSON chunks are pretty-printed, not JSONL.
  * - **Void**: return without yielding for early exits (e.g. `--web`).
  *
  * The return value (`CommandReturn`) is captured by the wrapper and
@@ -828,6 +830,14 @@ export function buildCommand<
     parameters: mergedParams,
     func: wrappedFunc,
   } as unknown as StricliBuilderArgs<CONTEXT>);
+
+  // Stricli uses customUsage for native help but does not expose it on the
+  // built command. Preserve its primary line for introspection consumers.
+  const primaryUsage = enrichedDocs.customUsage?.[0];
+  if (primaryUsage) {
+    (cmd as unknown as Record<string, unknown>).__primaryUsage =
+      typeof primaryUsage === "string" ? primaryUsage : primaryUsage.input;
+  }
 
   // Attach the JSON schema to the built command as a non-standard property.
   // introspect.ts reads this to populate CommandInfo.jsonFields for help

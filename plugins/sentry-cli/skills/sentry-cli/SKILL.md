@@ -318,7 +318,7 @@ Work with Sentry organizations
 
 Work with Sentry projects
 
-- `sentry project create <name> <platform>` — Create a new project
+- `sentry project create [<org>/]<name>:<platform>...` — Create one or more projects
 - `sentry project delete <org/project>` — Delete a project
 - `sentry project list <org/project>` — List projects
 - `sentry project view <org/project>` — View details of a project

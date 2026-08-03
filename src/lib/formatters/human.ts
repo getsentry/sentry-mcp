@@ -2036,6 +2036,15 @@ export function formatProjectCreated(result: ProjectCreatedResult): string {
   return renderMarkdown(lines.join("\n"));
 }
 
+/** Output contract for one project creation or a multi-project batch. */
+export type ProjectCreateOutput = ProjectCreatedResult | ProjectCreatedResult[];
+
+/** Format one project creation or every result in a batch. */
+export function formatProjectCreateOutput(output: ProjectCreateOutput): string {
+  const results = Array.isArray(output) ? output : [output];
+  return results.map(formatProjectCreated).join("\n");
+}
+
 // Project Deletion Formatting
 
 /**

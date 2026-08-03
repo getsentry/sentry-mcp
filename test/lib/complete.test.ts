@@ -11,6 +11,7 @@ import {
   completeAliases,
   completeOrgSlashProject,
   completeOrgSlugs,
+  completeProjectCreateSpec,
   completeProjectSlugs,
   getCompletions,
 } from "../../src/lib/complete.js";
@@ -96,6 +97,86 @@ describe("getCompletions: context detection", () => {
     await seedOrgs([{ slug: "acme", name: "Acme Inc" }]);
     const result = getCompletions(["team", "list"], "");
     expect(result.some((c) => c.value === "acme")).toBe(true);
+  });
+
+  test("returns only valid project create prefixes and pairs", async () => {
+    await seedOrgs([{ slug: "acme", name: "Acme Inc" }]);
+    await seedProjects([
+      {
+        orgId: "1",
+        projectId: "10",
+        orgSlug: "acme",
+        projectSlug: "existing",
+        projectName: "Existing Project",
+      },
+    ]);
+    setProjectAliases(
+      { app: { orgSlug: "acme", projectSlug: "existing" } },
+      "fingerprint"
+    );
+
+    expect(getCompletions(["project", "create"], "")).toEqual([
+      { value: "acme/", description: "Acme Inc" },
+    ]);
+    expect(getCompletions(["project", "create"], "acme/new")).toEqual([]);
+    expect(getCompletions(["project", "create"], "web:java")).toContainEqual({
+      value: "web:javascript",
+      description: "Platform",
+    });
+    // Platform must always be attached with ":" — a bare positional never
+    // gets legacy space-separated platform completions.
+    expect(getCompletions(["project", "create", "web"], "java")).toEqual([]);
+  });
+
+  test("completes a new batch pair's platform regardless of preceding pairs", () => {
+    // Completion only ever looks at the current partial — a self-contained
+    // colon pair completes the same way no matter what preceded it.
+    expect(
+      getCompletions(["project", "create", "api:node"], "worker:java")
+    ).toContainEqual({
+      value: "worker:javascript",
+      description: "Platform",
+    });
+    expect(getCompletions(["project", "create", "--team"], "back")).toEqual([]);
+  });
+});
+
+describe("completeProjectCreateSpec", () => {
+  test("suggests common platforms while preserving the project name", () => {
+    const result = completeProjectCreateSpec("my-project:");
+
+    expect(result).toContainEqual({
+      value: "my-project:javascript",
+      description: "Platform",
+    });
+    expect(result.every((completion) => completion.value.includes(":"))).toBe(
+      true
+    );
+  });
+
+  test("matches every valid platform after a partial", () => {
+    const result = completeProjectCreateSpec("acme/app:nintendo");
+
+    expect(result).toEqual([
+      { value: "acme/app:nintendo-switch", description: "Platform" },
+    ]);
+  });
+
+  test("does not complete existing project names before the colon", () => {
+    expect(completeProjectCreateSpec("acme/new-project")).toEqual([]);
+  });
+
+  test("does not complete project specifications containing whitespace", () => {
+    expect(completeProjectCreateSpec("My App:java")).toEqual([]);
+  });
+
+  test.each([
+    ":java",
+    "acme/:java",
+    "/app:java",
+    "acme/app/child:java",
+  ])("does not complete a malformed project target in %s", (partial) => {
+    expect(completeProjectCreateSpec(partial)).toEqual([]);
   });
 });
 

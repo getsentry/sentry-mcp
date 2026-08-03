@@ -50,6 +50,11 @@ describe("completions", () => {
       expect(script).toContain("__complete");
     });
 
+    test("zsh script escapes colons in dynamic completion values", () => {
+      const script = getCompletionScript("zsh");
+      expect(script).toContain(`escaped_value="\${value//:/\\\\:}"`);
+    });
+
     test("fish script includes __complete callback", () => {
       const script = getCompletionScript("fish");
       expect(script).toContain("__complete");
