@@ -7,12 +7,16 @@
 
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createSpotlightBuffer } from "@spotlightjs/spotlight/sdk";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   CLIENT_SPOTLIGHT_PREFIXES,
   runCommand,
+  shutdownServer,
 } from "../../../src/commands/local/run.js";
+import { buildApp, tryListen } from "../../../src/commands/local/server.js";
 import { CliError, ValidationError } from "../../../src/lib/errors.js";
+import { SENTRY_CONTENT_TYPE } from "../../../src/lib/formatters/local.js";
 import { TEST_TMP_DIR } from "../../constants.js";
 
 /**
@@ -268,6 +272,57 @@ describe("sentry local run", () => {
       "--",
       "true"
     );
+  });
+
+  test("tails events from a server it did not start", async () => {
+    // Reproduces the case where the Spotlight desktop app (or another
+    // `sentry local serve`) already owns the port: `run` must attach as an SSE
+    // consumer instead of going silent for the whole session.
+    const buffer = createSpotlightBuffer(10);
+    const { server, port } = await tryListen(buildApp(buffer), 0, "127.0.0.1");
+
+    // preload.ts mocks fetch to block external calls; this test talks to a
+    // loopback server it just started, so it needs the real implementation.
+    const savedFetch = globalThis.fetch;
+    const realFetch = (globalThis as { __originalFetch?: typeof fetch })
+      .__originalFetch;
+    if (realFetch) {
+      globalThis.fetch = realFetch;
+    }
+
+    const writes: string[] = [];
+    const spy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        writes.push(chunk.toString());
+        return true;
+      });
+
+    try {
+      // Buffered before we attach — SSE subscribers replay from the buffer
+      // head, so this arrives regardless of connection timing.
+      await fetch(`http://127.0.0.1:${port}/stream`, {
+        method: "POST",
+        headers: { "Content-Type": SENTRY_CONTENT_TYPE },
+        body: '{"sdk":{"name":"sentry.javascript.node"}}\n{"type":"log","item_count":1,"content_type":"application/vnd.sentry.items.log+json"}\n{"items":[{"timestamp":1750000000,"level":"info","body":"Hello from the server!","attributes":{}}]}',
+      });
+
+      const func = (await runCommand.loader()) as unknown as RunFunc;
+      await func.call(
+        makeContext(),
+        { port, host: "127.0.0.1", verify: false, timeout: 0 },
+        "sleep",
+        "1"
+      );
+    } finally {
+      spy.mockRestore();
+      globalThis.fetch = savedFetch;
+      await shutdownServer(server);
+    }
+
+    const output = writes.join("");
+    expect(output).toContain("Connected to existing server");
+    expect(output).toContain("Hello from the server!");
   });
 
   test("injects spotlight URL under every framework client prefix", async () => {

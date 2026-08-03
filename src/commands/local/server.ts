@@ -434,7 +434,7 @@ const SSE_INITIAL_RETRY_MS = 1000;
 const SSE_MAX_RETRY_MS = 30_000;
 
 /** Options for consuming an SSE stream. */
-type ConsumeSSEOptions = {
+export type ConsumeSSEOptions = {
   url: string;
   activeFilters: ReadonlySet<FilterValue>;
   signal: AbortSignal;
@@ -471,7 +471,7 @@ async function sleepUnlessAborted(
  * Reconnects automatically on connection loss with exponential backoff,
  * using `Last-Event-ID` to resume from where the stream left off.
  */
-async function consumeSSE(opts: ConsumeSSEOptions): Promise<void> {
+export async function consumeSSE(opts: ConsumeSSEOptions): Promise<void> {
   const {
     url,
     activeFilters,
