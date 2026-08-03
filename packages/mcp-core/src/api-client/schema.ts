@@ -1960,7 +1960,10 @@ export const TransactionProfileSchema = z
       frames: z.array(ProfileFrameSchema),
       samples: z.array(TransactionProfileSampleSchema),
       stacks: z.array(z.array(z.number())),
-      thread_metadata: z.preprocess((value) => value ?? {}, ProfileThreadMetadataSchema),
+      thread_metadata: z.preprocess(
+        (value) => value ?? {},
+        ProfileThreadMetadataSchema,
+      ),
     }),
     transaction: z
       .object({
