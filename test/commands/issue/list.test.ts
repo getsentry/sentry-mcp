@@ -7,6 +7,8 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { listCommand } from "../../../src/commands/issue/list.js";
+// biome-ignore lint/performance/noNamespaceImport: namespace needed for vi.spyOn on mocked module
+import * as issueUtils from "../../../src/commands/issue/utils.js";
 
 vi.mock("../../../src/lib/api/issues.js", async (importOriginal) => {
   const actual =
@@ -152,6 +154,64 @@ function mockIssue(overrides?: Record<string, unknown>) {
     ...overrides,
   };
 }
+
+describe("issue list: short ID auto-recovery", () => {
+  let resolveIssueSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    resolveIssueSpy = vi.spyOn(issueUtils, "resolveIssue");
+  });
+
+  afterEach(() => {
+    resolveIssueSpy.mockRestore();
+  });
+
+  test("auto-recovers lowercase multi-segment short ID targets", async () => {
+    resolveIssueSpy.mockResolvedValue({
+      org: "test-org",
+      issue: mockIssue({ shortId: "JAVASCRIPT-REACT-MR-1B" }),
+    });
+
+    const { context } = createContext();
+    await func.call(
+      context,
+      {
+        limit: 10,
+        sort: "date",
+        period: parsePeriod("90d"),
+        json: true,
+      },
+      "javascript-react-mr-1b"
+    );
+
+    expect(resolveIssueSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ issueArg: "javascript-react-mr-1b" })
+    );
+  });
+
+  test("auto-recovers leading-slash short ID targets", async () => {
+    resolveIssueSpy.mockResolvedValue({
+      org: "test-org",
+      issue: mockIssue({ shortId: "CLI-G" }),
+    });
+
+    const { context } = createContext();
+    await func.call(
+      context,
+      {
+        limit: 10,
+        sort: "date",
+        period: parsePeriod("90d"),
+        json: true,
+      },
+      "/CLI-G"
+    );
+
+    expect(resolveIssueSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ issueArg: "CLI-G" })
+    );
+  });
+});
 
 describe("issue list: error propagation", () => {
   test("throws ApiError (not plain Error) when all fetches fail with 400", async () => {

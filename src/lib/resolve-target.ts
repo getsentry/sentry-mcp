@@ -2237,16 +2237,20 @@ export async function resolveTargetsFromParsedArg(
     }
 
     case "project-search": {
-      if (checkIssueShortId && looksLikeIssueShortId(parsed.projectSlug)) {
+      const displaySlug = parsed.originalSlug ?? parsed.projectSlug;
+
+      if (
+        checkIssueShortId &&
+        looksLikeIssueShortId(displaySlug, { ignoreCase: true })
+      ) {
         throw new ResolutionError(
-          `'${parsed.projectSlug}'`,
+          `'${displaySlug}'`,
           "looks like an issue short ID, not a project slug",
-          `sentry issue view ${parsed.projectSlug}`,
+          `sentry issue view ${displaySlug}`,
           ["To list issues in a project: sentry issue list <org>/<project>"]
         );
       }
 
-      const displaySlug = parsed.originalSlug ?? parsed.projectSlug;
       // When the input is a display name (originalSlug set, contains spaces),
       // skip the slug-based API lookup and go straight to fuzzy matching.
       const isDisplayName = parsed.originalSlug !== undefined;

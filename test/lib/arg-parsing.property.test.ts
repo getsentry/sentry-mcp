@@ -490,6 +490,53 @@ describe("looksLikeIssueShortId properties", () => {
       { numRuns: DEFAULT_NUM_RUNS }
     );
   });
+
+  test("two-part lowercase slugs do not match with ignoreCase", async () => {
+    await fcAssert(
+      property(lowercaseSlugWithDashArb, (input) => {
+        if (input.split("-").length === 2) {
+          expect(looksLikeIssueShortId(input, { ignoreCase: true })).toBe(
+            false
+          );
+        }
+      }),
+      { numRuns: DEFAULT_NUM_RUNS }
+    );
+  });
+
+  test("three-plus-part lowercase slugs without alphanumeric final segment do not match with ignoreCase", async () => {
+    await fcAssert(
+      property(lowercaseSlugWithDashArb, (input) => {
+        const parts = input.split("-");
+        const lastPart = parts.at(-1) ?? "";
+        const hasDigit = /\d/.test(lastPart);
+        const hasLetter = /[a-z]/.test(lastPart);
+        if (parts.length >= 3 && !(hasDigit && hasLetter)) {
+          expect(looksLikeIssueShortId(input, { ignoreCase: true })).toBe(
+            false
+          );
+        }
+      }),
+      { numRuns: DEFAULT_NUM_RUNS }
+    );
+  });
+
+  test("three-plus-part lowercase slugs with alphanumeric final segment match with ignoreCase", async () => {
+    await fcAssert(
+      property(lowercaseSlugWithDashArb, (input) => {
+        const parts = input.split("-");
+        const lastPart = parts.at(-1) ?? "";
+        if (
+          parts.length >= 3 &&
+          /\d/.test(lastPart) &&
+          /[a-z]/.test(lastPart)
+        ) {
+          expect(looksLikeIssueShortId(input, { ignoreCase: true })).toBe(true);
+        }
+      }),
+      { numRuns: DEFAULT_NUM_RUNS }
+    );
+  });
 });
 
 describe("parseSelector properties", () => {
