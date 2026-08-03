@@ -7,7 +7,7 @@ import {
   getOAuthErrorTelemetry,
   getOAuthGrantTelemetry,
   getOAuthGrantLifecycleTelemetry,
-  getOAuthTokenShape,
+  getOAuthBearerShape,
   OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE,
   OAUTH_GRANT_ID_HASH_ATTRIBUTE,
   OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE,
@@ -16,32 +16,32 @@ import {
 
 describe("OAuth telemetry", () => {
   it("buckets bearer token shapes without exposing token values", () => {
-    expect(getOAuthTokenShape(new Request("https://mcp.sentry.dev/mcp"))).toBe(
+    expect(getOAuthBearerShape(new Request("https://mcp.sentry.dev/mcp"))).toBe(
       "missing",
     );
     expect(
-      getOAuthTokenShape(
+      getOAuthBearerShape(
         new Request("https://mcp.sentry.dev/mcp", {
           headers: { Authorization: "Basic abc" },
         }),
       ),
     ).toBe("non_bearer");
     expect(
-      getOAuthTokenShape(
+      getOAuthBearerShape(
         new Request("https://mcp.sentry.dev/mcp", {
           headers: { Authorization: "Bearer " },
         }),
       ),
     ).toBe("empty_bearer");
     expect(
-      getOAuthTokenShape(
+      getOAuthBearerShape(
         new Request("https://mcp.sentry.dev/mcp", {
           headers: { Authorization: "Bearer user-id:grant-id:secret" },
         }),
       ),
     ).toBe("wrapper");
     expect(
-      getOAuthTokenShape(
+      getOAuthBearerShape(
         new Request("https://mcp.sentry.dev/mcp", {
           headers: { Authorization: "Bearer opaque-token" },
         }),
@@ -64,9 +64,9 @@ describe("OAuth telemetry", () => {
     );
 
     expect(telemetry).toEqual({
-      oauthError: "invalid_access",
-      oauthErrorDescription: "missing_invalid_or_expired_access",
-      oauthTokenShape: "wrapper",
+      oauthError: "invalid_bearer",
+      oauthErrorReason: "missing_invalid_or_expired_bearer",
+      oauthBearerShape: "wrapper",
     });
   });
 
@@ -91,9 +91,9 @@ describe("OAuth telemetry", () => {
     );
 
     expect(telemetry).toEqual({
-      oauthError: "invalid_access",
-      oauthErrorDescription: "invalid_access",
-      oauthTokenShape: "wrapper",
+      oauthError: "invalid_bearer",
+      oauthErrorReason: "invalid_bearer",
+      oauthBearerShape: "wrapper",
     });
   });
 
@@ -114,7 +114,7 @@ describe("OAuth telemetry", () => {
 
     expect(telemetry).toEqual({
       oauthError: "invalid_grant",
-      oauthErrorDescription: "grant_not_found",
+      oauthErrorReason: "grant_not_found",
     });
   });
 
@@ -125,7 +125,7 @@ describe("OAuth telemetry", () => {
   });
 
   it("keeps OAuth error code cardinality bounded", async () => {
-    expect(bucketOAuthErrorCode("invalid_token")).toBe("invalid_access");
+    expect(bucketOAuthErrorCode("invalid_token")).toBe("invalid_bearer");
     expect(bucketOAuthErrorCode("vendor-specific-error")).toBe("other");
 
     const telemetry = await getOAuthErrorTelemetry(
@@ -144,7 +144,7 @@ describe("OAuth telemetry", () => {
 
     expect(telemetry).toEqual({
       oauthError: "other",
-      oauthErrorDescription: "other",
+      oauthErrorReason: "other",
     });
   });
 

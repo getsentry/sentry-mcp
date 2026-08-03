@@ -1,7 +1,7 @@
 const AUTH_PARAM_SEPARATOR = /,\s*(?=[A-Za-z_][A-Za-z0-9_-]*\s*=)/;
 const AUTH_CHALLENGE = /^(\S+)(?:\s+(.+))?$/;
 
-export type OAuthTokenShape =
+export type OAuthBearerShape =
   | "missing"
   | "non_bearer"
   | "empty_bearer"
@@ -14,7 +14,7 @@ export type OAuthErrorCode =
   | "invalid_request"
   | "invalid_client"
   | "invalid_grant"
-  | "invalid_access"
+  | "invalid_bearer"
   | "invalid_target"
   | "unsupported_grant_type"
   | "invalid_client_metadata"
@@ -23,8 +23,8 @@ export type OAuthErrorCode =
 
 export type OAuthErrorTelemetry = {
   oauthError?: OAuthErrorCode;
-  oauthErrorDescription?: string;
-  oauthTokenShape?: OAuthTokenShape;
+  oauthErrorReason?: string;
+  oauthBearerShape?: OAuthBearerShape;
 };
 
 /**
@@ -35,24 +35,25 @@ export type OAuthErrorTelemetry = {
  * sensitive, replacing values with `[Filtered]`. Keep metric *names* under
  * `app.oauth.*` for continuity; put filterable dimensions under these keys.
  */
-export const OAUTH_ERROR_ATTRIBUTE = "app.as.error" as const;
-export const OAUTH_ERROR_DESCRIPTION_ATTRIBUTE =
-  "app.as.error_description" as const;
-export const OAUTH_REQUEST_CREDENTIAL_SHAPE_ATTRIBUTE =
-  "app.as.request.credential_shape" as const;
+export const ACCESS_METHOD_ATTRIBUTE = "app.access.method" as const;
+export const OAUTH_ERROR_ATTRIBUTE = "app.access.error.code" as const;
+export const OAUTH_ERROR_REASON_ATTRIBUTE =
+  "app.access.error.reason" as const;
+export const OAUTH_REQUEST_BEARER_SHAPE_ATTRIBUTE =
+  "app.access.request.bearer_shape" as const;
 export const OAUTH_REFRESH_OUTCOME_ATTRIBUTE =
-  "app.as.refresh.outcome" as const;
-export const OAUTH_GRANT_SHAPE_ATTRIBUTE = "app.as.grant.shape" as const;
-export const OAUTH_GRANT_ID_HASH_ATTRIBUTE = "app.as.grant.id_hash" as const;
+  "app.access.refresh.outcome" as const;
+export const OAUTH_GRANT_SHAPE_ATTRIBUTE = "app.access.grant.shape" as const;
+export const OAUTH_GRANT_ID_HASH_ATTRIBUTE = "app.access.grant.id_hash" as const;
 export const OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE =
-  "app.as.grant.age_bucket" as const;
+  "app.access.grant.age_bucket" as const;
 export const OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE =
-  "app.as.grant.revoked_reason" as const;
+  "app.access.grant.revoked_reason" as const;
 export const OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE =
-  "app.as.upstream.expires_in_bucket" as const;
+  "app.access.upstream.expires_in_bucket" as const;
 export const OAUTH_PROBE_STATUS_CODE_ATTRIBUTE =
-  "app.as.probe.status_code" as const;
-export const OAUTH_PROBE_REASON_ATTRIBUTE = "app.as.probe.reason" as const;
+  "app.access.probe.status_code" as const;
+export const OAUTH_PROBE_REASON_ATTRIBUTE = "app.access.probe.reason" as const;
 
 /**
  * Low-cardinality OAuth client registration method.
@@ -209,7 +210,7 @@ export function bucketOAuthErrorCode(
       return normalized;
     case "invalid_token":
       // Scrubber-safe: avoid emitting the substring "token".
-      return "invalid_access";
+      return "invalid_bearer";
     default:
       return normalized ? "other" : undefined;
   }
@@ -229,19 +230,19 @@ export function bucketOAuthErrorDescription(
 
   // Bucket values deliberately avoid the substring "token".
   if (normalized.includes("missing or invalid access token")) {
-    return "missing_or_invalid_access";
+    return "missing_or_invalid_bearer";
   }
   if (normalized.includes("missing, invalid, or expired access token")) {
-    return "missing_invalid_or_expired_access";
+    return "missing_invalid_or_expired_bearer";
   }
   if (normalized.includes("invalid access token")) {
-    return "invalid_access";
+    return "invalid_bearer";
   }
   if (normalized.includes("access token expired")) {
-    return "access_expired";
+    return "bearer_expired";
   }
   if (normalized.includes("audience does not match")) {
-    return "access_audience_mismatch";
+    return "bearer_audience_mismatch";
   }
   if (normalized.includes("grant not found")) {
     return "grant_not_found";
@@ -317,7 +318,7 @@ async function parseResponseJsonBody(
 /**
  * Classifies the bearer token shape without exposing the token value.
  */
-export function getOAuthTokenShape(request: Request): OAuthTokenShape {
+export function getOAuthBearerShape(request: Request): OAuthBearerShape {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader) {
     return "missing";
@@ -373,7 +374,7 @@ export async function getOAuthErrorTelemetry(
   const telemetry: OAuthErrorTelemetry = {};
 
   if (response.status === 401) {
-    telemetry.oauthTokenShape = getOAuthTokenShape(request);
+    telemetry.oauthBearerShape = getOAuthBearerShape(request);
   }
 
   const authenticateParams = parseAuthenticateParams(
@@ -382,12 +383,12 @@ export async function getOAuthErrorTelemetry(
   const headerError = bucketOAuthErrorCode(authenticateParams.error);
   if (headerError) {
     telemetry.oauthError = headerError;
-    telemetry.oauthErrorDescription = bucketOAuthErrorDescription(
+    telemetry.oauthErrorReason = bucketOAuthErrorDescription(
       authenticateParams.error_description,
     );
-    if (!telemetry.oauthErrorDescription) {
+    if (!telemetry.oauthErrorReason) {
       const json = await parseResponseJsonBody(response);
-      telemetry.oauthErrorDescription = bucketOAuthErrorDescription(
+      telemetry.oauthErrorReason = bucketOAuthErrorDescription(
         json?.error_description,
       );
     }
@@ -405,7 +406,7 @@ export async function getOAuthErrorTelemetry(
   }
 
   telemetry.oauthError = bodyError;
-  telemetry.oauthErrorDescription = bucketOAuthErrorDescription(
+  telemetry.oauthErrorReason = bucketOAuthErrorDescription(
     json.error_description,
   );
   return telemetry;

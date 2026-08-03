@@ -75,8 +75,8 @@ vi.mock("./utils/rate-limiter", () => ({
 import handler from "./index";
 import {
   OAUTH_ERROR_ATTRIBUTE,
-  OAUTH_ERROR_DESCRIPTION_ATTRIBUTE,
-  OAUTH_REQUEST_CREDENTIAL_SHAPE_ATTRIBUTE,
+  OAUTH_ERROR_REASON_ATTRIBUTE,
+  OAUTH_REQUEST_BEARER_SHAPE_ATTRIBUTE,
 } from "./oauth/telemetry";
 
 describe("worker entrypoint", () => {
@@ -561,22 +561,22 @@ describe("worker entrypoint", () => {
     expect(response.status).toBe(401);
     expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
       OAUTH_ERROR_ATTRIBUTE,
-      "invalid_access",
+      "invalid_bearer",
     );
     expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
-      OAUTH_ERROR_DESCRIPTION_ATTRIBUTE,
-      "missing_or_invalid_access",
+      OAUTH_ERROR_REASON_ATTRIBUTE,
+      "missing_or_invalid_bearer",
     );
     expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
-      OAUTH_REQUEST_CREDENTIAL_SHAPE_ATTRIBUTE,
+      OAUTH_REQUEST_BEARER_SHAPE_ATTRIBUTE,
       "wrapper",
     );
     expect(mockMetricsCount).toHaveBeenCalledWith("app.server.response", 1, {
       attributes: expect.objectContaining({
         "app.client.family": "claude-code",
-        [OAUTH_ERROR_ATTRIBUTE]: "invalid_access",
-        [OAUTH_ERROR_DESCRIPTION_ATTRIBUTE]: "missing_or_invalid_access",
-        [OAUTH_REQUEST_CREDENTIAL_SHAPE_ATTRIBUTE]: "wrapper",
+        [OAUTH_ERROR_ATTRIBUTE]: "invalid_bearer",
+        [OAUTH_ERROR_REASON_ATTRIBUTE]: "missing_or_invalid_bearer",
+        [OAUTH_REQUEST_BEARER_SHAPE_ATTRIBUTE]: "wrapper",
         "http.response.status_code": 401,
       }),
     });

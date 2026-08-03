@@ -6,12 +6,12 @@ import {
 import { resolveClientFamily } from "./lib/client-family";
 import {
   OAUTH_ERROR_ATTRIBUTE,
-  OAUTH_ERROR_DESCRIPTION_ATTRIBUTE,
-  OAUTH_REQUEST_CREDENTIAL_SHAPE_ATTRIBUTE,
+  OAUTH_ERROR_REASON_ATTRIBUTE,
+  OAUTH_REQUEST_BEARER_SHAPE_ATTRIBUTE,
   type OAuthErrorTelemetry,
 } from "./oauth/telemetry";
 
-export type RateLimitScope = "ip" | "user" | "sentry_access";
+export type RateLimitScope = "ip" | "user" | "sentry_bearer";
 type ResponseReason = "local_rate_limit";
 
 type TrackedRoute = {
@@ -209,17 +209,17 @@ export function annotateTrackedRequestSpan(
     activeSpan.setAttribute(OAUTH_ERROR_ATTRIBUTE, options.oauthError);
   }
 
-  if (options?.oauthErrorDescription) {
+  if (options?.oauthErrorReason) {
     activeSpan.setAttribute(
-      OAUTH_ERROR_DESCRIPTION_ATTRIBUTE,
-      options.oauthErrorDescription,
+      OAUTH_ERROR_REASON_ATTRIBUTE,
+      options.oauthErrorReason,
     );
   }
 
-  if (options?.oauthTokenShape) {
+  if (options?.oauthBearerShape) {
     activeSpan.setAttribute(
-      OAUTH_REQUEST_CREDENTIAL_SHAPE_ATTRIBUTE,
-      options.oauthTokenShape,
+      OAUTH_REQUEST_BEARER_SHAPE_ATTRIBUTE,
+      options.oauthBearerShape,
     );
   }
 }
@@ -263,7 +263,7 @@ export function extractResponseMetricOptions(
     rateLimitScope:
       rateLimitScope === "ip" ||
       rateLimitScope === "user" ||
-      rateLimitScope === "sentry_access"
+      rateLimitScope === "sentry_bearer"
         ? rateLimitScope
         : undefined,
   };
@@ -311,14 +311,14 @@ export function recordResponseMetric(
     responseAttributes[OAUTH_ERROR_ATTRIBUTE] = options.oauthError;
   }
 
-  if (options?.oauthErrorDescription) {
-    responseAttributes[OAUTH_ERROR_DESCRIPTION_ATTRIBUTE] =
-      options.oauthErrorDescription;
+  if (options?.oauthErrorReason) {
+    responseAttributes[OAUTH_ERROR_REASON_ATTRIBUTE] =
+      options.oauthErrorReason;
   }
 
-  if (options?.oauthTokenShape) {
-    responseAttributes[OAUTH_REQUEST_CREDENTIAL_SHAPE_ATTRIBUTE] =
-      options.oauthTokenShape;
+  if (options?.oauthBearerShape) {
+    responseAttributes[OAUTH_REQUEST_BEARER_SHAPE_ATTRIBUTE] =
+      options.oauthBearerShape;
   }
 
   Sentry.metrics.count(RESPONSE_METRIC_NAME, 1, {

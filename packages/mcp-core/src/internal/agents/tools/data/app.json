@@ -3,29 +3,29 @@
   "custom": true,
   "description": "Describes attributes related to client-side applications (e.g. web apps or mobile apps), plus Sentry MCP application-owned telemetry attributes.\n",
   "attributes": {
-    "app.as.error": {
+    "app.access.error.code": {
       "description": "Scrubber-safe OAuth error code returned by Sentry MCP or the OAuth provider.",
       "type": "string",
-      "note": "Emitted under app.as.* so default Sentry data scrubbing does not redact values via the auth substring in oauth. invalid_token responses are bucketed as invalid_access.",
+      "note": "Emitted under app.access.* so default Sentry data scrubbing does not redact values via the auth substring in oauth. invalid_token responses are bucketed as invalid_bearer.",
       "examples": [
-        "invalid_access",
+        "invalid_bearer",
         "invalid_grant",
         "invalid_client",
         "other"
       ]
     },
-    "app.as.error_description": {
+    "app.access.error.reason": {
       "description": "Low-cardinality scrubber-safe bucket for an OAuth error description.",
       "type": "string",
       "note": "Values deliberately avoid the substring token.",
       "examples": [
-        "missing_or_invalid_access",
-        "invalid_access",
+        "missing_or_invalid_bearer",
+        "invalid_bearer",
         "grant_not_found",
         "other"
       ]
     },
-    "app.as.grant.age_bucket": {
+    "app.access.grant.age_bucket": {
       "description": "Bounded MCP grant age at refresh or revocation.",
       "type": "string",
       "examples": [
@@ -35,14 +35,14 @@
         "unknown"
       ]
     },
-    "app.as.grant.id_hash": {
+    "app.access.grant.id_hash": {
       "description": "Deterministic non-secret fingerprint of a Sentry MCP OAuth grant ID used to correlate grant lifecycle logs.",
       "type": "string",
       "examples": [
         "a1b2c3d4"
       ]
     },
-    "app.as.grant.revoked_reason": {
+    "app.access.grant.revoked_reason": {
       "description": "Reason a Sentry MCP OAuth wrapper grant was revoked.",
       "type": "string",
       "examples": [
@@ -51,14 +51,22 @@
         "upstream_rejected_in_use"
       ]
     },
-    "app.as.grant.shape": {
+    "app.access.grant.shape": {
       "description": "Shape of the Sentry MCP OAuth grant used during refresh.",
       "type": "string",
       "examples": [
         "refreshable"
       ]
     },
-    "app.as.probe.reason": {
+    "app.access.method": {
+      "description": "How the MCP request obtained upstream Sentry access.",
+      "type": "string",
+      "examples": [
+        "oauth_grant",
+        "sentry_bearer"
+      ]
+    },
+    "app.access.probe.reason": {
       "description": "Sentry MCP bucket for an indeterminate upstream OAuth access probe.",
       "type": "string",
       "examples": [
@@ -67,7 +75,7 @@
         "unknown"
       ]
     },
-    "app.as.probe.status_code": {
+    "app.access.probe.status_code": {
       "description": "HTTP status returned by the upstream Sentry access-validity probe.",
       "type": "string",
       "examples": [
@@ -77,7 +85,7 @@
         "500"
       ]
     },
-    "app.as.refresh.outcome": {
+    "app.access.refresh.outcome": {
       "description": "Outcome bucket for a Sentry MCP OAuth refresh/token-exchange path.",
       "type": "string",
       "note": "Attached to metric app.oauth.token_exchange. Attribute key avoids oauth/token substrings for scrubber safety.",
@@ -88,7 +96,7 @@
         "verification_indeterminate"
       ]
     },
-    "app.as.request.credential_shape": {
+    "app.access.request.bearer_shape": {
       "description": "Low-cardinality shape of the bearer credential supplied to an OAuth-protected request.",
       "type": "string",
       "examples": [
@@ -99,7 +107,7 @@
         "empty_bearer"
       ]
     },
-    "app.as.upstream.expires_in_bucket": {
+    "app.access.upstream.expires_in_bucket": {
       "description": "Bounded remaining time before the original upstream Sentry expiry at refresh or revocation.",
       "type": "string",
       "examples": [
@@ -166,7 +174,7 @@
       "examples": [
         "ip",
         "user",
-        "sentry_access"
+        "sentry_bearer"
       ]
     },
     "app.referrer.family": {

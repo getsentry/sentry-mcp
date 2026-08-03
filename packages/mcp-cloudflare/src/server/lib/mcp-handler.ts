@@ -25,6 +25,7 @@ import type { ServerContext } from "@sentry/mcp-core/types";
 import { createMcpHandler } from "agents/mcp/server";
 import { annotateResponseMetric } from "../metrics";
 import {
+  ACCESS_METHOD_ATTRIBUTE,
   getOAuthGrantLifecycleTelemetry,
   getOAuthGrantTelemetry,
   OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE,
@@ -330,7 +331,10 @@ async function handleAuthenticatedMcpRequest(
 
   const activeSpan = Sentry.getActiveSpan();
   activeSpan?.setAttribute("app.transport", "http");
-  activeSpan?.setAttribute("app.auth.kind", auth.kind);
+  activeSpan?.setAttribute(
+    ACCESS_METHOD_ATTRIBUTE,
+    auth.kind === "oauth" ? "oauth_grant" : "sentry_bearer",
+  );
   activeSpan?.setAttribute("app.client.family", clientFamily);
   activeSpan?.setAttribute("app.server.mode.experimental", isExperimentalMode);
   if (utmSource) {
@@ -353,7 +357,7 @@ async function handleAuthenticatedMcpRequest(
       : {
           identifier: auth.accessToken,
           keyPrefix: "mcp:sentry-token" as const,
-          scope: "sentry_access" as const,
+          scope: "sentry_bearer" as const,
         };
   const rateLimitResult = await checkRateLimit(
     rateLimitConfig.identifier,

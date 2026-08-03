@@ -21,12 +21,13 @@ import {
 } from "./metrics";
 import { tokenExchangeCallback } from "./oauth";
 import {
+  ACCESS_METHOD_ATTRIBUTE,
   CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
   bucketOAuthErrorCode,
   bucketOAuthErrorDescription,
   getOAuthErrorTelemetry,
   OAUTH_ERROR_ATTRIBUTE,
-  OAUTH_ERROR_DESCRIPTION_ATTRIBUTE,
+  OAUTH_ERROR_REASON_ATTRIBUTE,
 } from "./oauth/telemetry";
 import { patchRootAuthorizationServerMetadata } from "./authorization-server-metadata";
 import { createProtectedResourceMetadataResponse } from "./protected-resource-metadata";
@@ -265,7 +266,7 @@ const wrappedOAuthProvider = {
       );
 
       if (sentryBearerAuth.matched) {
-        activeSpan?.setAttribute("app.auth.kind", "sentry-bearer");
+        activeSpan?.setAttribute(ACCESS_METHOD_ATTRIBUTE, "sentry_bearer");
 
         if (!sentryBearerAuth.token) {
           return finalizeResponse(
@@ -357,7 +358,7 @@ const wrappedOAuthProvider = {
           extra: {
             "http.response.status_code": status,
             [OAUTH_ERROR_ATTRIBUTE]: bucketOAuthErrorCode(code),
-            [OAUTH_ERROR_DESCRIPTION_ATTRIBUTE]:
+            [OAUTH_ERROR_REASON_ATTRIBUTE]:
               bucketOAuthErrorDescription(description),
             "app.client.family": clientFamily,
           },

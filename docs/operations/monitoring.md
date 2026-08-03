@@ -281,16 +281,17 @@ Optional local rate-limit attributes:
 
 Optional OAuth error attributes:
 
-- `app.as.error` - Bounded OAuth error code such as `invalid_access`,
+- `app.access.method` - Access path: `oauth_grant` or `sentry_bearer`
+- `app.access.error.code` - Bounded OAuth error code such as `invalid_bearer`,
   `invalid_grant`, or `other`
-- `app.as.error_description` - Low-cardinality description bucket such as
-  `invalid_access` or `grant_not_found`
-- `app.as.request.credential_shape` - 401 bearer token shape such as `missing`,
+- `app.access.error.reason` - Low-cardinality description bucket such as
+  `invalid_bearer` or `grant_not_found`
+- `app.access.request.bearer_shape` - 401 bearer token shape such as `missing`,
   `wrapper`, or `malformed`
-- `app.as.grant.id_hash` - Non-secret grant fingerprint on grant lifecycle
+- `app.access.grant.id_hash` - Non-secret grant fingerprint on grant lifecycle
   logs
-- `app.as.grant.age_bucket` - Bounded MCP grant age at refresh/revocation
-- `app.as.upstream.expires_in_bucket` - Bounded remaining time before the
+- `app.access.grant.age_bucket` - Bounded MCP grant age at refresh/revocation
+- `app.access.upstream.expires_in_bucket` - Bounded remaining time before the
   original upstream Sentry expiry at refresh/revocation
 
 Interpretation:
@@ -302,9 +303,9 @@ Interpretation:
 - Use `sum(app.server.response)` filtered by
   `app.response.reason=local_rate_limit` to measure when we rate-limited the
   customer
-- Use `sum(app.server.response)` filtered by `app.as.error=invalid_access`
-  and grouped by `app.client.family`, `app.as.error_description`, and
-  `app.as.request.credential_shape` for OAuth failure attribution
+- Use `sum(app.server.response)` filtered by `app.access.error.code=invalid_bearer`
+  and grouped by `app.client.family`, `app.access.error.reason`, and
+  `app.access.request.bearer_shape` for OAuth failure attribution
 - Upstream/provider 429s increment `app.server.response` with status `429`, but
   do not include `app.response.reason`
 
