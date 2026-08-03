@@ -407,6 +407,15 @@ Manage code mappings for stack trace linking
 
 → Full flags and examples: `references/code-mappings.md`
 
+### Conversation
+
+List and view AI conversations
+
+- `sentry conversation list <org>` — List recent AI conversations
+- `sentry conversation view <org/conversation-id>` — View an AI conversation transcript
+
+→ Full flags and examples: `references/conversation.md`
+
 ### Dart-symbol-map
 
 Work with Dart/Flutter symbol maps
