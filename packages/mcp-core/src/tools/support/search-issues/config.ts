@@ -24,8 +24,8 @@ BEHAVIOR:
 8. Sort is returned only in the sort field, never inside query
 
 SYNTAX:
-- Time ranges use relative notation: -24h, -7d, -30d
-- Comparisons: >, <, >=, <=
+- Relative date ranges use signed notation without comparison operators: lastSeen:-24h, firstSeen:-7d (never lastSeen:>-24h)
+- Comparisons (>, <, >=, <=) are for numeric fields such as userCount and timesSeen, or absolute ISO 8601 dates; do not combine them with relative durations
 - Boolean operators: AND, OR, NOT (or !)
 - Field values with spaces need quotes: environment:"dev server"
 

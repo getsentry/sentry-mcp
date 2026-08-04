@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import searchEvents from "./search-events";
-import { MAX_EVENTS_VALIDATION_ATTEMPTS } from "../support/search-events/utils";
 import { generateText } from "ai";
+import { HttpResponse, http } from "msw";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UserInputError } from "../../errors";
+import { MAX_EVENTS_VALIDATION_ATTEMPTS } from "../support/search-events/utils";
+import searchEvents from "./search-events";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -2048,6 +2048,48 @@ describe("search_events", () => {
     expect(prompt).toContain("Fix this Sentry event search request");
     expect(prompt).toContain("severity:error");
     expect(prompt).toContain('"dataset": "errors"');
+  });
+
+  it("rejects partial, conflicting, and reversed time ranges", async () => {
+    const baseParams = {
+      organizationSlug: "test-org",
+      dataset: "errors" as const,
+      query: "is:unresolved",
+      fields: ["issue", "timestamp"],
+      sort: "-timestamp",
+      projectSlug: null,
+      regionUrl: null,
+      limit: 10,
+      includeExplanation: false,
+    };
+
+    await expect(
+      searchEvents.handler(
+        { ...baseParams, start: "2026-01-01T00:00:00Z" },
+        {} as any,
+      ),
+    ).rejects.toThrow("`start` and `end` must be provided together.");
+    await expect(
+      searchEvents.handler(
+        {
+          ...baseParams,
+          period: "14d",
+          start: "2026-01-01T00:00:00Z",
+          end: "2026-01-02T00:00:00Z",
+        },
+        {} as any,
+      ),
+    ).rejects.toThrow("`period` cannot be combined with `start` and `end`.");
+    await expect(
+      searchEvents.handler(
+        {
+          ...baseParams,
+          start: "2026-01-02T00:00:00Z",
+          end: "2026-01-01T00:00:00Z",
+        },
+        {} as any,
+      ),
+    ).rejects.toThrow("`start` must be before `end`.");
   });
 
   it("should handle AI agent errors gracefully", async () => {
