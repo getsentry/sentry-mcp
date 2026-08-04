@@ -112,7 +112,7 @@
     "fast-check": "^4.8.0",
     "fflate": "^0.8.3",
     "fossilize": "^0.10.1",
-    "hono": "^4.12.27",
+    "hono": "^4.12.34",
     "http-cache-semantics": "^4.2.0",
     "ignore": "^7.0.5",
     "image-size": "^2.0.2",
