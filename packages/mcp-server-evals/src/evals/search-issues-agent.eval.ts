@@ -1,7 +1,6 @@
 import { SentryApiService } from "@sentry/mcp-core/api-client";
 import { searchIssuesAgent } from "@sentry/mcp-core/tools/search-issues/agent";
-import { describeEval } from "vitest-evals";
-import { ToolCallScorer } from "vitest-evals";
+import { describeEval, ToolCallScorer } from "vitest-evals";
 import { StructuredOutputScorer } from "./utils/structuredOutputScorer";
 import "../setup-env";
 
@@ -49,8 +48,35 @@ describeEval("search-issues-agent", {
         expectedTools: [],
         expected: {
           query:
-            /(?=.*is:unresolved)(?=.*error\.handled:false)(?=.*lastSeen:-24h)/,
+            /(?=.*is:unresolved)(?=.*error\.handled:false)(?=.*lastSeen:-24h)(?!.*lastSeen:>-)/,
           sort: /date|user/,
+        },
+      },
+      {
+        // Relative duration must not get a comparison operator.
+        input: "errors seen in the last 24 hours",
+        expectedTools: [],
+        expected: {
+          query: /(?=.*lastSeen:-24h)(?!.*lastSeen:>-)/,
+          sort: "date",
+        },
+      },
+      {
+        // Multi-day relative window should stay signed, not operator-prefixed.
+        input: "regressions from the last 3 days",
+        expectedTools: [],
+        expected: {
+          query: /(?=.*is:regressed)(?=.*lastSeen:-3d)(?!.*lastSeen:>-)/,
+          sort: "date",
+        },
+      },
+      {
+        // "new issues" should use firstSeen, still without comparison operators.
+        input: "new issues from the past week",
+        expectedTools: [],
+        expected: {
+          query: /(?=.*firstSeen:-7d)(?!.*firstSeen:>-)/,
+          sort: /date|new/,
         },
       },
       {

@@ -146,6 +146,13 @@ describe("search_issues", () => {
       - Get more details about a specific issue: Use get_sentry_resource with the issue ID or issue URL
       - Update issue status: Use the Sentry tool \`update_issue\` to resolve or assign issues
       - View event counts: Use search_events for aggregated statistics
+
+
+      ## Executed Search
+
+      - Query: \`is:unresolved\`
+      - Sort: date
+      - Time range: Last 30d
       "
     `);
   });

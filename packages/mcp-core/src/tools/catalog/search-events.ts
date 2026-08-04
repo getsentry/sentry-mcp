@@ -495,12 +495,11 @@ export default defineTool({
     ) {
       throw new UserInputError("`start` must be before `end`.");
     }
-    const explicitTimeParams =
+    const explicitAbsoluteTimeParams =
       params.start && params.end
         ? { start: params.start, end: params.end }
-        : params.period
-          ? { statsPeriod: params.period }
-          : undefined;
+        : undefined;
+    const hasExplicitPeriod = params.period !== undefined;
 
     setTag("organization.slug", organizationSlug);
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
@@ -562,7 +561,9 @@ export default defineTool({
           dataset: inputDataset,
           fields: params.fields,
           sort: params.sort,
-          timeParams: explicitTimeParams,
+          timeParams:
+            explicitAbsoluteTimeParams ??
+            (hasExplicitPeriod ? { statsPeriod: params.period } : undefined),
           environment: params.environment,
         }),
         organizationSlug,
@@ -601,8 +602,16 @@ export default defineTool({
       explanation = parsed.explanation;
       environment = params.environment ?? parsed.environment;
 
-      timeParams = explicitTimeParams ??
-        parseAgentTimeRange(parsed.timeRange) ?? { statsPeriod: "14d" };
+      // Absolute bounds are always authoritative. Relative period stays on the
+      // prior trust path so natural-language time phrases can still win over a
+      // leftover/default period on agent-translated requests.
+      timeParams =
+        explicitAbsoluteTimeParams ??
+        (shouldTrustExplicitSearchParams && hasExplicitPeriod
+          ? { statsPeriod: params.period }
+          : (parseAgentTimeRange(parsed.timeRange) ?? {
+              statsPeriod: params.period ?? "14d",
+            }));
 
       if (dataset === "replays") {
         fields = [];
@@ -620,7 +629,9 @@ export default defineTool({
         ? explicitStructuredTraceQuery
         : (params.query ?? "");
       sortParam = explicitSort || defaultSortForDataset(dataset);
-      timeParams = explicitTimeParams ?? { statsPeriod: "14d" };
+      timeParams = explicitAbsoluteTimeParams ?? {
+        statsPeriod: params.period ?? "14d",
+      };
       fields =
         dataset === "replays"
           ? []
@@ -797,8 +808,8 @@ export default defineTool({
               },
               parsed,
             ));
-            if (explicitTimeParams) {
-              timeParams = explicitTimeParams;
+            if (explicitAbsoluteTimeParams) {
+              timeParams = explicitAbsoluteTimeParams;
             }
             validationExplanation = parsed.explanation || validationExplanation;
             sentryQuery = applyEnvironmentToEventsQuery(
