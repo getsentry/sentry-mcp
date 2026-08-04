@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   matchToLogicType,
+  normalizeMetricDataset,
   normalizeProjectList,
   parseJsonObjectList,
   parseMatchMode,
@@ -208,6 +209,50 @@ describe("normalizeProjectList", () => {
   });
 });
 
+describe("normalizeMetricDataset", () => {
+  test.each([
+    ["error", "errors"],
+    ["transaction", "transactions"],
+    ["session", "sessions"],
+    ["metric", "metrics"],
+    ["error-events", "errors"],
+    ["transaction-like", "transactions"],
+  ])('maps alias "%s" to "%s"', (input, expected) => {
+    expect(normalizeMetricDataset(input)).toBe(expected);
+  });
+
+  test("is case-insensitive and trims whitespace", () => {
+    expect(normalizeMetricDataset("ERROR-EVENTS")).toBe("errors");
+    expect(normalizeMetricDataset("  Transaction-Like  ")).toBe("transactions");
+  });
+
+  test.each([
+    "errors",
+    "transactions",
+    "sessions",
+    "events",
+    "spans",
+    "metrics",
+  ])('passes canonical value "%s" through unchanged', (value) => {
+    expect(normalizeMetricDataset(value)).toBe(value);
+  });
+
+  test("lowercases unknown values but leaves them otherwise unchanged", () => {
+    expect(normalizeMetricDataset("Unknown")).toBe("unknown");
+  });
+
+  test.each([
+    "tracemetrics",
+    "metricsenhanced",
+    "eap",
+    "events_analytics_platform",
+  ])('does not rewrite distinct dataset "%s" onto another dataset', (value) => {
+    // These denote different datasets in the metric-alert path; aliasing them
+    // would silently ship the wrong dataset. They should not be rewritten.
+    expect(normalizeMetricDataset(value)).toBe(value);
+  });
+});
+
 describe("validateMetricDataset", () => {
   const valid = [
     "errors",
@@ -223,6 +268,23 @@ describe("validateMetricDataset", () => {
       expect(() => validateMetricDataset(dataset)).not.toThrow();
     });
   }
+
+  test.each([
+    "error",
+    "error-events",
+    "transaction-like",
+    "METRIC",
+  ])('passes for alias "%s"', (dataset) => {
+    expect(() => validateMetricDataset(dataset)).not.toThrow();
+  });
+
+  test.each([
+    "tracemetrics",
+    "eap",
+    "events_analytics_platform",
+  ])('throws for non-aliased dataset "%s"', (dataset) => {
+    expect(() => validateMetricDataset(dataset)).toThrow(ValidationError);
+  });
 
   test("throws for unknown dataset", () => {
     try {

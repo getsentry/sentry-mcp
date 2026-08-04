@@ -13,6 +13,7 @@ import { CommandOutput } from "../../../lib/formatters/output.js";
 import { DRY_RUN_ALIASES, DRY_RUN_FLAG } from "../../../lib/mutate-command.js";
 import { resolveOrg } from "../../../lib/resolve-target.js";
 import {
+  normalizeMetricDataset,
   normalizeProjectList,
   parseJsonObjectList,
   validateMetricDataset,
@@ -128,7 +129,7 @@ export const createCommand = buildCommand({
         kind: "parsed",
         parse: String,
         brief:
-          "Dataset (errors, transactions, sessions, events, spans, metrics)",
+          "Dataset: errors (error-events), transactions (transaction-like), sessions, events, spans, metrics",
       },
       "time-window": {
         kind: "parsed",
@@ -177,7 +178,7 @@ export const createCommand = buildCommand({
       throw new ValidationError("aggregate cannot be empty.", "aggregate");
     }
 
-    const dataset = flags.dataset.trim().toLowerCase();
+    const dataset = normalizeMetricDataset(flags.dataset);
     validateMetricDataset(dataset);
     validateMetricTimeWindow(flags["time-window"]);
 
