@@ -3,7 +3,7 @@ title: Agentic Usage
 description: Enable AI coding agents to use the Sentry CLI
 ---
 
-AI coding agents like Claude Code — and any agent that reads skills from `~/.agents` (such as Cursor) — can use the Sentry CLI through the skill system. This allows agents to interact with Sentry directly from your development environment.
+AI coding agents can use the Sentry CLI through the skill system. The CLI detects and supports Claude Code, Cursor, Windsurf, GitHub Copilot, Gemini CLI, OpenAI Codex, Goose, Amp, Augment, OpenCode, and any agent that reads skills from `~/.agents`. This allows agents to interact with Sentry directly from your development environment.
 
 ## Automatic Installation
 
@@ -49,4 +49,4 @@ The skill uses your existing CLI authentication, so you'll need to run `sentry a
 ## Requirements
 
 - An authenticated Sentry CLI installation (`sentry auth login`)
-- An AI coding agent that supports the skills system (e.g., Claude Code, or any agent that reads from `~/.agents` such as Cursor)
+- An AI coding agent that supports the skills system (e.g., Claude Code, Cursor, Windsurf, GitHub Copilot, Gemini CLI, Codex, Goose, Amp, Augment, OpenCode, or any agent that reads from `~/.agents`)

@@ -24,7 +24,7 @@ which is especially useful in CI/CD pipelines and Dockerfiles:
 
 ```bash
 # Pin to a specific stable version
-SENTRY_VERSION=0.19.0 curl https://cli.sentry.dev/install -fsS | bash
+SENTRY_VERSION=0.40.0 curl https://cli.sentry.dev/install -fsS | bash
 
 # Pin to nightly
 SENTRY_VERSION=nightly curl https://cli.sentry.dev/install -fsS | bash
@@ -75,7 +75,7 @@ brew install getsentry/tools/sentry
 
 ## Package Managers
 
-Install globally with your preferred package manager (the npm/pnpm/yarn packages require **Node.js 22.15+**):
+Install globally with your preferred package manager (the npm packages require **Node.js 20+**; on **22.15+** the built-in `node:sqlite` is used, on 20–22.14 a bundled WASM fallback is used transparently):
 
 <PackageManagerCode
   npm="npm install -g sentry"
