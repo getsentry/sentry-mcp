@@ -3259,7 +3259,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Event> {
     const body = await this.requestJSON(
-      `/organizations/${encodeURIComponent(organizationSlug)}/issues/${encodeURIComponent(issueId)}/events/${encodeURIComponent(eventId)}/`,
+      `/organizations/${encodeURIComponent(organizationSlug)}/issues/${encodeURIComponent(issueId)}/events/${encodeURIComponent(eventId)}/?llmFormat=markdown`,
       undefined,
       opts,
     );
@@ -4076,7 +4076,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<AutofixRunState> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
+      `/organizations/${organizationSlug}/issues/${issueId}/autofix/?llmFormat=markdown`,
       undefined,
       opts,
     );
