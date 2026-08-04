@@ -152,8 +152,7 @@ describe("search_issues", () => {
 
       - Query: \`is:unresolved\`
       - Sort: date
-      - Time range: Last 30d
-      "
+      - Time range: Last 30d"
     `);
   });
 
