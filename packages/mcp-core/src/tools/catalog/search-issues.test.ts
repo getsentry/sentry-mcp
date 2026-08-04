@@ -213,6 +213,34 @@ describe("search_issues", () => {
     expect(result).toContain("Test Error");
   });
 
+  it("uses a safe inline-code fence for executed queries with backticks", async () => {
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
+    process.env.OPENROUTER_API_KEY = "";
+
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/*/issues/", () =>
+        HttpResponse.json([]),
+      ),
+    );
+
+    const result = await searchIssues.handler(
+      {
+        organizationSlug: "test-org",
+        query: "has:error `token`",
+        sort: "date",
+        projectSlugOrId: null,
+        regionUrl: null,
+        limit: 10,
+        period: "30d",
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    expect(result).toContain("- Query: `` has:error `token` ``");
+  });
+
   it("omits update_issue guidance when update_issue is unavailable in the session", async () => {
     process.env.OPENAI_API_KEY = "";
     process.env.ANTHROPIC_API_KEY = "";

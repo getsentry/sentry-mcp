@@ -1,4 +1,5 @@
 import type { SentryApiService } from "../../../api-client";
+import { formatInlineCode } from "../../../internal/tool-helpers/formatting";
 import { formatToolCallInstruction } from "../../../internal/tool-helpers/tool-call-formatting";
 import { formatUserGeoSummary } from "../../../internal/user-formatting";
 import { logInfo } from "../../../telem/logging";
@@ -30,17 +31,6 @@ export interface ExecutedSearch {
   fields?: string[];
   sort?: string;
   timeRange?: SearchTimeRange;
-}
-
-function formatInlineCode(value: string): string {
-  const backtickRuns = value.match(/`+/g) ?? [];
-  const fenceLength =
-    backtickRuns.reduce((max, run) => Math.max(max, run.length), 0) + 1;
-  const fence = "`".repeat(fenceLength);
-  const needsPadding = value.startsWith("`") || value.endsWith("`");
-  return needsPadding
-    ? `${fence} ${value} ${fence}`
-    : `${fence}${value}${fence}`;
 }
 
 function formatExecutedTimeRange(timeRange?: SearchTimeRange): string {

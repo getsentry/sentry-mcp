@@ -5,6 +5,7 @@ import { UserInputError } from "../../errors";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
+import { formatInlineCode } from "../../internal/tool-helpers/formatting";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
 import type { ServerContext } from "../../types";
 import { isNumericId, validateSlugOrId } from "../../utils/slug-validation";
@@ -223,7 +224,7 @@ export default defineTool({
       "statsPeriod" in timeParams
         ? `Last ${timeParams.statsPeriod}`
         : `${timeParams.start} to ${timeParams.end}`;
-    const executedSearch = `## Executed Search\n\n- Query: \`${query}\`\n- Sort: ${sort}\n- Time range: ${executedTimeRange}\n\n`;
+    const executedSearch = `## Executed Search\n\n- Query: ${formatInlineCode(query)}\n- Sort: ${sort}\n- Time range: ${executedTimeRange}\n\n`;
     let output = "";
 
     if (params.includeExplanation && explanation) {
