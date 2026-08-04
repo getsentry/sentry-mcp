@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import pkg from "../../package.json";
@@ -50,4 +50,20 @@ describe("package.json exports (dual ESM/CJS)", () => {
     expect(typeof mod.createSentrySDK).toBe("function");
     expect(typeof mod.default).toBe("function");
   });
+
+  // The ESM entry must be link-safe on the oldest supported runtime: named
+  // imports of version-gated builtin exports (zstd* landed in Node 22.15)
+  // fail at LINK time on older Node — before any code runs — taking the whole
+  // module down. The build shims node:zlib through a namespace import; this
+  // guards against a regression (e.g. a new dep importing from bare "zlib",
+  // which the shim must also cover).
+  test.runIf(built)(
+    "built ESM entry has no link-fatal named zlib imports",
+    () => {
+      const src = readFileSync(resolve("dist/index.mjs"), "utf-8");
+      const namedZlibImport =
+        /import\s*\{[^}]*zstd[^}]*\}\s*from\s*["'](?:node:)?zlib["']/;
+      expect(src).not.toMatch(namedZlibImport);
+    }
+  );
 });

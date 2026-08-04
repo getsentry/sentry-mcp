@@ -170,7 +170,9 @@ const REQUIRE_ALIAS_FILTER =
   /(?:db[\\/](?:index|schema|sqlite)|list-command|telemetry)\.ts$/;
 const REQUIRE_ALIAS_RE = /\b_require\(/g;
 const IDENTIFIER_FILTER_RE = /^[A-Za-z_$][\w$]*$/;
-const NODE_ZLIB_RE = /^node:zlib$/;
+// Match both the prefixed and bare specifiers — bundled dependencies (e.g.
+// binpatch) import from "zlib", which esbuild also treats as external builtin.
+const NODE_ZLIB_RE = /^(?:node:)?zlib$/;
 const ANY_RE = /.*/;
 
 /** Transform _require() → require() so esbuild resolves lazy relative requires. */
