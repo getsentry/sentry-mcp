@@ -164,7 +164,7 @@ export const ENV_VAR_REGISTRY: readonly EnvVarEntry[] = [
   {
     name: "SENTRY_VERSION",
     description:
-      "Pin a specific version for the [install script](./getting-started/#install-script). Accepts a version number (e.g., `0.19.0`) or `nightly`. The `--version` flag takes precedence if both are set.\n\nThis is useful in CI/CD pipelines and Dockerfiles where you want reproducible installations without inline flags.",
+      "Pin a specific version for the [install script](./getting-started/#install-script). Accepts a version number (e.g., `0.40.0`) or `nightly`. The `--version` flag takes precedence if both are set.\n\nThis is useful in CI/CD pipelines and Dockerfiles where you want reproducible installations without inline flags.",
     example: "nightly",
     installOnly: true,
   },
