@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "deploy": "wrangler deploy"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.41.5",
@@ -14,5 +15,8 @@
     "astro": "^7.1.1",
     "sharp": "^0.35.0",
     "shiki": "^3.21.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.118.0"
   }
 }
