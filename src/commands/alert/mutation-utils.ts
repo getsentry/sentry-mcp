@@ -13,6 +13,33 @@ const METRIC_DATASET_VALUES = new Set([
   "spans",
   "metrics",
 ]);
+
+/**
+ * Maps user-provided dataset aliases to canonical metric alert dataset values.
+ *
+ * Only aliases that resolve to a value already accepted by the metric alert API
+ * are listed here: the singular forms (`error` → `errors`) and the dashboard
+ * terminology for the error/transaction datasets (`error-events` → `errors`,
+ * `transaction-like` → `transactions`). This lets users copying from dashboard
+ * docs avoid a validation error without changing which dataset is sent.
+ *
+ * Names that denote a *distinct* dataset in the metric alert path — e.g.
+ * `tracemetrics`, `metricsenhanced`, `eap`, `events_analytics_platform` — are
+ * deliberately NOT aliased here. Rewriting them onto `metrics`/`spans` would
+ * silently send the wrong dataset in the create/edit payload (the CLI's
+ * canonical `metrics` is session/crash-rate, not trace metrics), with no
+ * validation error to catch it.
+ */
+const METRIC_DATASET_ALIASES: Record<string, string> = {
+  // Singular forms
+  error: "errors",
+  transaction: "transactions",
+  session: "sessions",
+  metric: "metrics",
+  // Dashboard terminology for the error/transaction datasets
+  "error-events": "errors",
+  "transaction-like": "transactions",
+};
 const METRIC_TIME_WINDOWS = new Set([
   1, 5, 10, 15, 30, 60, 120, 240, 360, 720, 1440,
 ]);
@@ -172,9 +199,22 @@ export function normalizeProjectList(
   return values.length > 0 ? values : undefined;
 }
 
+/**
+ * Normalise a user-provided `--dataset` value to the canonical metric alert
+ * dataset name accepted by the Sentry API.
+ *
+ * Resolves known aliases (e.g. `error-events` → `errors`, `transaction` →
+ * `transactions`) so that values copied from dashboard docs or using singular
+ * forms work without manual translation.
+ */
+export function normalizeMetricDataset(dataset: string): string {
+  const lower = dataset.trim().toLowerCase();
+  return METRIC_DATASET_ALIASES[lower] ?? lower;
+}
+
 /** Validate that `dataset` is one of the allowed Sentry metric alert dataset values. */
 export function validateMetricDataset(dataset: string): void {
-  const normalized = dataset.trim().toLowerCase();
+  const normalized = normalizeMetricDataset(dataset);
   if (METRIC_DATASET_VALUES.has(normalized)) {
     return;
   }

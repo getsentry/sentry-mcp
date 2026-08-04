@@ -14,6 +14,7 @@ import { ValidationError } from "../../../lib/errors.js";
 import { CommandOutput } from "../../../lib/formatters/output.js";
 import { resolveOrgOptionalProjectFromArg } from "../../../lib/resolve-target.js";
 import {
+  normalizeMetricDataset,
   normalizeProjectList,
   parseJsonObjectList,
   parseStatusFlag,
@@ -92,7 +93,7 @@ function applyMetricCoreFields(
     body.aggregate = flags.aggregate;
   }
   if (flags.dataset !== undefined) {
-    const dataset = flags.dataset.trim().toLowerCase();
+    const dataset = normalizeMetricDataset(flags.dataset);
     validateMetricDataset(dataset);
     body.dataset = dataset;
   }
@@ -133,7 +134,7 @@ function validateMetricBody(
     );
   }
   if (flags.dataset !== undefined) {
-    validateMetricDataset(String(body.dataset));
+    validateMetricDataset(normalizeMetricDataset(String(body.dataset)));
   }
   if (flags["time-window"] !== undefined) {
     validateMetricTimeWindow(Number(body.timeWindow));
@@ -212,7 +213,7 @@ export const editCommand = buildCommand({
         parse: String,
         optional: true,
         brief:
-          "Dataset (errors, transactions, sessions, events, spans, metrics)",
+          "Dataset: errors (error-events), transactions (transaction-like), sessions, events, spans, metrics",
       },
       "time-window": {
         kind: "parsed",
