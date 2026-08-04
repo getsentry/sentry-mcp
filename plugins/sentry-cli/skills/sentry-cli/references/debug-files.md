@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-debug-files
-version: 0.40.0-dev.0
+version: 0.41.0
 description: Work with debug information files
 requires:
   bins: ["sentry"]
