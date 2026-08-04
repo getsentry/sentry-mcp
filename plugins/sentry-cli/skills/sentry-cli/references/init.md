@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-init
-version: 0.41.0
+version: 0.42.0-dev.0
 description: Initialize Sentry in your project (experimental)
 requires:
   bins: ["sentry"]

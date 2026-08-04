@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-conversation
-version: 0.41.0
+version: 0.42.0-dev.0
 description: List and view AI conversations
 requires:
   bins: ["sentry"]
