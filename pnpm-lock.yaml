@@ -104,7 +104,7 @@ catalogs:
       version: 8.0.0
     hono:
       specifier: ^4.12.34
-      version: 4.13.0
+      version: 4.12.34
     lint-staged:
       specifier: ^15.5.2
       version: 15.5.2
@@ -284,7 +284,7 @@ importers:
         version: 2.1.1
       hono:
         specifier: 'catalog:'
-        version: 4.13.0
+        version: 4.12.34
       lucide-react:
         specifier: 'catalog:'
         version: 0.503.0(react@19.2.8)
@@ -3835,8 +3835,8 @@ packages:
   headers-polyfill@4.0.3:
     resolution: {integrity: sha512-IScLbePpkvO846sIwOtOTDjutRMWdXdJmXdMvk6gCBHxFO8d+QKOQedyZSxFTTFYRSmlgSTDtXqqq4pcenBXLQ==}
 
-  hono@4.13.0:
-    resolution: {integrity: sha512-jhunvfHWxd7J5EFfSgH4xsYJzSe/lfqbUCxiyyeaQasUsXeEHXtzVid+7EOGByc5JnFa23SSFL3Y2RV/z1T+eQ==}
+  hono@4.12.34:
+    resolution: {integrity: sha512-GqXJqY/xJkJmuloTrnV1ZEXG3fqte+VjkUqoRNZXcrUidiUOP4fMSIHHY4tsqZBK++kVyWmt/AAfSUuy57/eSA==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -6413,9 +6413,9 @@ snapshots:
   '@esbuild/win32-x64@0.28.1':
     optional: true
 
-  '@hono/node-server@1.19.9(hono@4.13.0)':
+  '@hono/node-server@1.19.9(hono@4.12.34)':
     dependencies:
-      hono: 4.13.0
+      hono: 4.12.34
 
   '@img/colour@1.1.0': {}
 
@@ -6703,7 +6703,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)':
     dependencies:
-      '@hono/node-server': 1.19.9(hono@4.13.0)
+      '@hono/node-server': 1.19.9(hono@4.12.34)
       ajv: 8.17.1
       ajv-formats: 3.0.1(ajv@8.17.1)
       content-type: 1.0.5
@@ -6713,7 +6713,7 @@ snapshots:
       eventsource-parser: 3.1.0
       express: 5.2.1
       express-rate-limit: 8.2.1(express@5.2.1)
-      hono: 4.13.0
+      hono: 4.12.34
       jose: 6.2.4
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
@@ -8374,7 +8374,7 @@ snapshots:
 
   headers-polyfill@4.0.3: {}
 
-  hono@4.13.0: {}
+  hono@4.12.34: {}
 
   hookable@5.5.3: {}
 
@@ -10468,7 +10468,7 @@ snapshots:
       '@silvia-odwyer/photon-node': 0.3.4
       chalk: 5.4.1
       fs-extra: 11.3.0
-      hono: 4.13.0
+      hono: 4.12.34
       jsdoc-api: 9.3.4
       just-filter-object: 3.2.0
       just-map-values: 3.2.0
