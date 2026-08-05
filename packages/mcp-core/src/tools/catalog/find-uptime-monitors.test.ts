@@ -23,10 +23,6 @@ describe("find_uptime_monitors", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         regionUrl: null,
-        projectSlug: null,
-        environment: null,
-        owner: null,
-        query: null,
         limit: 10,
       },
       context,
@@ -42,7 +38,6 @@ describe("find_uptime_monitors", () => {
         "hasMore": false,
         "monitors": [
           {
-            "downtimeThreshold": 3,
             "environment": "production",
             "id": "4509100000001001",
             "intervalSeconds": 60,
@@ -50,12 +45,8 @@ describe("find_uptime_monitors", () => {
             "name": "API Health",
             "owner": "the-goats",
             "projectSlug": "cloudflare-mcp",
-            "recoveryThreshold": 1,
-            "responseCaptureEnabled": true,
             "status": "active",
-            "timeoutMs": 5000,
-            "traceSampling": false,
-            "uptimeStatus": 1,
+            "uptimeStatus": "ok",
             "url": "https://example.com/health",
             "webUrl": "https://sentry-mcp-evals.sentry.io/monitors/4509100000001001/",
           },

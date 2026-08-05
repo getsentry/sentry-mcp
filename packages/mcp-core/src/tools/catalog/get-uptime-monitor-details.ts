@@ -18,17 +18,20 @@ import {
   getUptimeOwnerName,
 } from "./support/uptime-monitors";
 
-function formatCheck(check: {
-  timestamp?: string;
-  scheduledCheckTime?: string;
-  checkStatus?: string;
-  checkStatusReason?: string | null;
-  httpStatusCode?: number | null;
-  durationMs?: number;
-  regionName?: string;
-  region?: string;
-  environment?: string;
-}): string {
+function formatCheck(
+  check: {
+    timestamp?: string;
+    scheduledCheckTime?: string;
+    checkStatus?: string;
+    checkStatusReason?: string | null;
+    httpStatusCode?: number | null;
+    durationMs?: number;
+    regionName?: string;
+    region?: string;
+    environment?: string;
+  },
+  monitorEnvironment: string | null | undefined,
+): string {
   const time =
     formatDate(check.timestamp) ??
     formatDate(check.scheduledCheckTime) ??
@@ -43,7 +46,13 @@ function formatCheck(check: {
     check.durationMs === undefined ? "" : `, ${check.durationMs}ms`;
   const region = check.regionName || check.region;
   const regionPart = region ? `, ${region}` : "";
-  const environment = check.environment ? `, ${check.environment}` : "";
+  // Only print environment when it differs from the monitor-level value.
+  const checkEnvironment = check.environment?.trim();
+  const monitorEnv = monitorEnvironment?.trim() || null;
+  const environment =
+    checkEnvironment && checkEnvironment !== monitorEnv
+      ? `, ${checkEnvironment}`
+      : "";
   return `- ${time}: ${status}${reason}${http}${duration}${regionPart}${environment}`;
 }
 
@@ -61,6 +70,8 @@ export default defineTool({
     "",
     "This is separate from cron monitors (`get_monitor_details`).",
     "",
+    "Request bodies are never returned. Sensitive header values are redacted.",
+    "",
     "<examples>",
     "get_uptime_monitor_details(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345')",
     "get_uptime_monitor_details(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', period='7d', checkLimit=20)",
@@ -77,25 +88,21 @@ export default defineTool({
       .describe("Uptime monitor ID (detector id)."),
     period: ParamPeriod.describe(
       "Relative time range for recent checks. Defaults to `24h` when `start` and `end` are omitted.",
-    )
-      .nullable()
-      .default(null),
+    ).optional(),
     start: z
       .string()
       .datetime()
       .describe(
         "Absolute start time. Must be provided with `end`; do not combine with `period`.",
       )
-      .nullable()
-      .default(null),
+      .optional(),
     end: z
       .string()
       .datetime()
       .describe(
         "Absolute end time. Must be provided with `start`; do not combine with `period`.",
       )
-      .nullable()
-      .default(null),
+      .optional(),
     checkLimit: z
       .number()
       .int()
@@ -124,8 +131,8 @@ export default defineTool({
       project: { slug: params.projectSlug },
     });
 
-    const start = params.start ?? undefined;
-    const end = params.end ?? undefined;
+    const start = params.start;
+    const end = params.end;
     if ((start && !end) || (!start && end)) {
       throw new UserInputError("`start` and `end` must be provided together.");
     }
@@ -171,23 +178,26 @@ export default defineTool({
       `**ID**: ${monitor.id}`,
       `**Project**: ${monitor.projectSlug}`,
       `**Status**: ${monitor.status}`,
-      uptimeStatus ? `**Uptime Status**: ${uptimeStatus}` : null,
+      `**Uptime Status**: ${uptimeStatus}`,
       `**URL**: ${monitor.url}`,
       monitor.method ? `**Method**: ${monitor.method}` : null,
       `**Interval**: ${monitor.intervalSeconds}s`,
       `**Timeout**: ${monitor.timeoutMs}ms`,
       monitor.environment ? `**Environment**: ${monitor.environment}` : null,
       owner ? `**Owner**: ${owner}` : null,
-      monitor.recoveryThreshold !== undefined
+      monitor.recoveryThreshold !== undefined &&
+      monitor.recoveryThreshold !== null
         ? `**Recovery Threshold**: ${monitor.recoveryThreshold}`
         : null,
-      monitor.downtimeThreshold !== undefined
+      monitor.downtimeThreshold !== undefined &&
+      monitor.downtimeThreshold !== null
         ? `**Downtime Threshold**: ${monitor.downtimeThreshold}`
         : null,
-      monitor.traceSampling !== undefined
+      monitor.traceSampling !== undefined && monitor.traceSampling !== null
         ? `**Trace Sampling**: ${monitor.traceSampling}`
         : null,
-      monitor.responseCaptureEnabled !== undefined
+      monitor.responseCaptureEnabled !== undefined &&
+      monitor.responseCaptureEnabled !== null
         ? `**Response Capture**: ${monitor.responseCaptureEnabled}`
         : null,
       `**Web URL**: [Open Monitor](${webUrl})`,
@@ -196,16 +206,12 @@ export default defineTool({
     const headerLines = formatUptimeHeadersForOutput(monitor.headers);
     if (headerLines.length > 0) {
       output.push("", "## Headers", "", ...headerLines);
-      output.push(
-        "",
-        "_Sensitive header values are redacted. Request body is omitted from this view._",
-      );
     } else if (monitor.body) {
       output.push(
         "",
         "## Request Payload",
         "",
-        "Request body is configured but omitted from this view to avoid leaking secrets.",
+        "Request body is configured but omitted from this view.",
       );
     }
 
@@ -224,15 +230,15 @@ export default defineTool({
     output.push(
       checks.length === 0
         ? "No checks found in this time range."
-        : checks.slice(0, params.checkLimit).map(formatCheck).join("\n"),
+        : checks
+            .slice(0, params.checkLimit)
+            .map((check) => formatCheck(check, monitor.environment))
+            .join("\n"),
     );
 
     output.push("", "## Response Notes", "");
     output.push(
       `- Search related issues with \`search_issues\` query \`uptime_rule:${monitor.id}\`.`,
-    );
-    output.push(
-      "- Request body is never included in this response. Sensitive header values are redacted.",
     );
 
     return `${output.join("\n")}\n`;

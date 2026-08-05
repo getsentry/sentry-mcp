@@ -119,25 +119,36 @@ export function formatUptimeHeadersForOutput(headers: unknown): string[] {
   return lines;
 }
 
-export const uptimeMonitorSummarySchema = z.object({
+export const uptimeStatusSchema = z.enum(["ok", "failed", "unknown"]);
+
+/** Compact list item for discovery. Omits config detail agents rarely need in lists. */
+export const uptimeMonitorListItemSchema = z.object({
   id: z.string(),
   name: z.string(),
   projectSlug: z.string(),
   status: z.string(),
-  uptimeStatus: z.union([z.number(), z.string(), z.null()]),
+  uptimeStatus: uptimeStatusSchema,
   url: z.string(),
-  method: z.string().nullable(),
+  method: z.string().optional(),
   intervalSeconds: z.number(),
-  timeoutMs: z.number(),
-  environment: z.string().nullable(),
-  owner: z.string().nullable(),
-  recoveryThreshold: z.number().nullable(),
-  downtimeThreshold: z.number().nullable(),
-  traceSampling: z.boolean().nullable(),
-  responseCaptureEnabled: z.boolean().nullable(),
+  environment: z.string().optional(),
+  owner: z.string().optional(),
   webUrl: z.string().url(),
 });
 
+/**
+ * Mutation/detail summary: list fields plus config knobs useful after create/update.
+ * Optional fields are omitted when absent instead of returned as null.
+ */
+export const uptimeMonitorSummarySchema = uptimeMonitorListItemSchema.extend({
+  timeoutMs: z.number(),
+  recoveryThreshold: z.number().optional(),
+  downtimeThreshold: z.number().optional(),
+  traceSampling: z.boolean().optional(),
+  responseCaptureEnabled: z.boolean().optional(),
+});
+
+export type UptimeMonitorListItem = z.infer<typeof uptimeMonitorListItemSchema>;
 export type UptimeMonitorSummary = z.infer<typeof uptimeMonitorSummarySchema>;
 
 export function getUptimeOwnerName(
@@ -150,39 +161,70 @@ export function getUptimeOwnerName(
   return formatted === "unknown" ? null : formatted;
 }
 
-export function toUptimeMonitorSummary(
-  monitor: UptimeMonitor,
-  webUrl: string,
-): UptimeMonitorSummary {
-  return {
-    id: String(monitor.id),
-    name: monitor.name,
-    projectSlug: monitor.projectSlug,
-    status: monitor.status,
-    uptimeStatus: monitor.uptimeStatus ?? null,
-    url: monitor.url,
-    method: monitor.method ?? null,
-    intervalSeconds: monitor.intervalSeconds,
-    timeoutMs: monitor.timeoutMs,
-    environment: monitor.environment ?? null,
-    owner: getUptimeOwnerName(monitor),
-    recoveryThreshold: monitor.recoveryThreshold ?? null,
-    downtimeThreshold: monitor.downtimeThreshold ?? null,
-    traceSampling: monitor.traceSampling ?? null,
-    responseCaptureEnabled: monitor.responseCaptureEnabled ?? null,
-    webUrl,
-  };
-}
-
-export function formatUptimeStatus(value: unknown): string | null {
+export function formatUptimeStatus(
+  value: unknown,
+): "ok" | "failed" | "unknown" {
   if (value === 1 || value === "1" || value === "ok") {
     return "ok";
   }
   if (value === 2 || value === "2" || value === "failed") {
     return "failed";
   }
+  return "unknown";
+}
+
+function optionalString(value: string | null | undefined): string | undefined {
   if (value === undefined || value === null) {
-    return null;
+    return undefined;
   }
-  return String(value);
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+export function toUptimeMonitorListItem(
+  monitor: UptimeMonitor,
+  webUrl: string,
+): UptimeMonitorListItem {
+  return {
+    id: String(monitor.id),
+    name: monitor.name,
+    projectSlug: monitor.projectSlug,
+    status: monitor.status,
+    uptimeStatus: formatUptimeStatus(monitor.uptimeStatus),
+    url: monitor.url,
+    ...(monitor.method ? { method: monitor.method } : {}),
+    intervalSeconds: monitor.intervalSeconds,
+    ...(optionalString(monitor.environment)
+      ? { environment: optionalString(monitor.environment) }
+      : {}),
+    ...(getUptimeOwnerName(monitor)
+      ? { owner: getUptimeOwnerName(monitor)! }
+      : {}),
+    webUrl,
+  };
+}
+
+export function toUptimeMonitorSummary(
+  monitor: UptimeMonitor,
+  webUrl: string,
+): UptimeMonitorSummary {
+  return {
+    ...toUptimeMonitorListItem(monitor, webUrl),
+    timeoutMs: monitor.timeoutMs,
+    ...(monitor.recoveryThreshold !== undefined &&
+    monitor.recoveryThreshold !== null
+      ? { recoveryThreshold: monitor.recoveryThreshold }
+      : {}),
+    ...(monitor.downtimeThreshold !== undefined &&
+    monitor.downtimeThreshold !== null
+      ? { downtimeThreshold: monitor.downtimeThreshold }
+      : {}),
+    ...(monitor.traceSampling !== undefined && monitor.traceSampling !== null
+      ? { traceSampling: monitor.traceSampling }
+      : {}),
+    ...(monitor.responseCaptureEnabled !== undefined &&
+    monitor.responseCaptureEnabled !== null
+      ? { responseCaptureEnabled: monitor.responseCaptureEnabled }
+      : {}),
+  };
 }

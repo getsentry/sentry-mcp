@@ -26,6 +26,12 @@ export const updateUptimeMonitorOutputSchema = z.object({
   monitor: uptimeMonitorSummarySchema,
 });
 
+function hasDefinedUpdate(
+  value: unknown,
+): value is Exclude<typeof value, undefined> {
+  return value !== undefined;
+}
+
 export default defineTool({
   name: "update_uptime_monitor",
   skills: ["project-management"],
@@ -40,13 +46,12 @@ export default defineTool({
     "",
     "Be careful when using this tool!",
     "",
-    "To clear nullable fields: pass empty string for `owner`, `environment`, or `body`; pass `{}` for `assertion`.",
-    "Omit a field (or pass null) to leave it unchanged.",
+    "Omit a field to leave it unchanged. Pass explicit `null` to clear `owner`, `environment`, or `body`.",
     "",
     "<examples>",
     "update_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', status='disabled')",
     "update_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', intervalSeconds=300, timeoutMs=8000)",
-    "update_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', owner='')",
+    "update_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', owner=null)",
     "</examples>",
   ].join("\n"),
   inputSchema: {
@@ -58,45 +63,35 @@ export default defineTool({
       .trim()
       .min(1)
       .describe("Uptime monitor ID (detector id)."),
-    name: z.string().trim().min(1).max(128).nullable().default(null),
-    url: z.string().url().nullable().default(null),
-    intervalSeconds: ParamUptimeIntervalSeconds.nullable().default(null),
-    timeoutMs: ParamUptimeTimeoutMs.nullable().default(null),
-    method: ParamUptimeHttpMethod.nullable().default(null),
-    headers: ParamUptimeHeaders.nullable().default(null),
+    name: z.string().trim().min(1).max(128).optional(),
+    url: z.string().url().optional(),
+    intervalSeconds: ParamUptimeIntervalSeconds.optional(),
+    timeoutMs: ParamUptimeTimeoutMs.optional(),
+    method: ParamUptimeHttpMethod.optional(),
+    headers: ParamUptimeHeaders.optional(),
     body: z
       .string()
       .nullable()
-      .default(null)
-      .describe("Request body. Pass an empty string to clear the body."),
-    assertion: z
-      .unknown()
-      .nullable()
-      .default(null)
+      .optional()
+      .describe("Request body. Pass `null` to clear the body."),
+    status: ParamUptimeMonitorStatus.optional(),
+    owner: ParamUptimeOwner.nullable()
+      .optional()
       .describe(
-        "Assertion JSON. Pass an empty object `{}` to clear assertions.",
-      ),
-    status: ParamUptimeMonitorStatus.nullable().default(null),
-    owner: z
-      .union([ParamUptimeOwner, z.literal("")])
-      .nullable()
-      .default(null)
-      .describe(
-        "Owner actor in `user:ID` or `team:ID` format. Pass an empty string to clear the owner.",
+        "Owner actor in `user:ID` or `team:ID` format. Pass `null` to clear the owner.",
       ),
     environment: z
       .string()
       .trim()
+      .min(1)
       .max(64)
       .nullable()
-      .default(null)
-      .describe(
-        "Environment name. Pass an empty string to clear the environment.",
-      ),
-    traceSampling: z.boolean().nullable().default(null),
-    responseCaptureEnabled: z.boolean().nullable().default(null),
-    recoveryThreshold: z.number().int().min(1).nullable().default(null),
-    downtimeThreshold: z.number().int().min(1).nullable().default(null),
+      .optional()
+      .describe("Environment name. Pass `null` to clear the environment."),
+    traceSampling: z.boolean().optional(),
+    responseCaptureEnabled: z.boolean().optional(),
+    recoveryThreshold: z.number().int().min(1).optional(),
+    downtimeThreshold: z.number().int().min(1).optional(),
   },
   annotations: {
     readOnlyHint: false,
@@ -120,33 +115,22 @@ export default defineTool({
       project: { slug: params.projectSlug },
     });
 
-    // null/default = omit. Empty string clears owner/environment/body.
-    // Empty object clears assertion.
-    const clearOwner = params.owner === "";
-    const clearEnvironment = params.environment === "";
-    const clearBody = params.body === "";
-    const clearAssertion =
-      params.assertion !== null &&
-      typeof params.assertion === "object" &&
-      !Array.isArray(params.assertion) &&
-      Object.keys(params.assertion as Record<string, unknown>).length === 0;
-
+    // omitted = unchanged; explicit null clears owner/environment/body.
     const hasUpdate =
-      params.name !== null ||
-      params.url !== null ||
-      params.intervalSeconds !== null ||
-      params.timeoutMs !== null ||
-      params.method !== null ||
-      params.headers !== null ||
-      params.body !== null ||
-      params.assertion !== null ||
-      params.status !== null ||
-      params.owner !== null ||
-      params.environment !== null ||
-      params.traceSampling !== null ||
-      params.responseCaptureEnabled !== null ||
-      params.recoveryThreshold !== null ||
-      params.downtimeThreshold !== null;
+      hasDefinedUpdate(params.name) ||
+      hasDefinedUpdate(params.url) ||
+      hasDefinedUpdate(params.intervalSeconds) ||
+      hasDefinedUpdate(params.timeoutMs) ||
+      hasDefinedUpdate(params.method) ||
+      hasDefinedUpdate(params.headers) ||
+      hasDefinedUpdate(params.body) ||
+      hasDefinedUpdate(params.status) ||
+      hasDefinedUpdate(params.owner) ||
+      hasDefinedUpdate(params.environment) ||
+      hasDefinedUpdate(params.traceSampling) ||
+      hasDefinedUpdate(params.responseCaptureEnabled) ||
+      hasDefinedUpdate(params.recoveryThreshold) ||
+      hasDefinedUpdate(params.downtimeThreshold);
 
     if (!hasUpdate) {
       throw new UserInputError(
@@ -158,21 +142,20 @@ export default defineTool({
       organizationSlug,
       projectSlug: params.projectSlug,
       uptimeMonitorId: params.uptimeMonitorId,
-      name: params.name ?? undefined,
-      url: params.url ?? undefined,
-      intervalSeconds: params.intervalSeconds ?? undefined,
-      timeoutMs: params.timeoutMs ?? undefined,
-      method: params.method ?? undefined,
-      headers: params.headers ?? undefined,
-      body: clearBody ? null : (params.body ?? undefined),
-      assertion: clearAssertion ? null : (params.assertion ?? undefined),
-      status: params.status ?? undefined,
-      owner: clearOwner ? null : (params.owner ?? undefined),
-      environment: clearEnvironment ? null : (params.environment ?? undefined),
-      traceSampling: params.traceSampling ?? undefined,
-      responseCaptureEnabled: params.responseCaptureEnabled ?? undefined,
-      recoveryThreshold: params.recoveryThreshold ?? undefined,
-      downtimeThreshold: params.downtimeThreshold ?? undefined,
+      name: params.name,
+      url: params.url,
+      intervalSeconds: params.intervalSeconds,
+      timeoutMs: params.timeoutMs,
+      method: params.method,
+      headers: params.headers,
+      body: params.body,
+      status: params.status,
+      owner: params.owner,
+      environment: params.environment,
+      traceSampling: params.traceSampling,
+      responseCaptureEnabled: params.responseCaptureEnabled,
+      recoveryThreshold: params.recoveryThreshold,
+      downtimeThreshold: params.downtimeThreshold,
     });
 
     return structuredResult({

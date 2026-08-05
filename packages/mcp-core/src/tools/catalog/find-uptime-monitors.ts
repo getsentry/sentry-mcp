@@ -11,12 +11,12 @@ import {
 import type { ServerContext } from "../../types";
 import { assertProjectRefWithinConstraint } from "./support/project-constraints";
 import {
-  toUptimeMonitorSummary,
-  uptimeMonitorSummarySchema,
+  toUptimeMonitorListItem,
+  uptimeMonitorListItemSchema,
 } from "./support/uptime-monitors";
 
 export const findUptimeMonitorsOutputSchema = z.object({
-  monitors: z.array(uptimeMonitorSummarySchema),
+  monitors: z.array(uptimeMonitorListItemSchema),
   hasMore: z.boolean(),
 });
 
@@ -43,27 +43,28 @@ export default defineTool({
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
     regionUrl: ParamRegionUrl.nullable().default(null),
-    projectSlug: ParamProjectSlugOrAll.nullable().default(null),
+    // `all` means no project filter (same convention as find_monitors/find_releases).
+    projectSlug: ParamProjectSlugOrAll.optional(),
     environment: z
       .string()
       .trim()
+      .min(1)
       .describe("Optional environment name to limit monitors.")
-      .nullable()
-      .default(null),
+      .optional(),
     owner: z
       .string()
       .trim()
+      .min(1)
       .describe(
         "Optional owner filter, such as `user:123`, `team:456`, `myteams`, or `unassigned`.",
       )
-      .nullable()
-      .default(null),
+      .optional(),
     query: z
       .string()
       .trim()
+      .min(1)
       .describe("Optional search query for monitor name or URL.")
-      .nullable()
-      .default(null),
+      .optional(),
     limit: z
       .number()
       .int()
@@ -104,9 +105,9 @@ export default defineTool({
     const monitors = await apiService.listUptimeMonitors({
       organizationSlug,
       projectSlug,
-      environment: params.environment ?? undefined,
-      owner: params.owner ?? undefined,
-      query: params.query ?? undefined,
+      environment: params.environment,
+      owner: params.owner,
+      query: params.query,
       limit: params.limit + 1,
     });
 
@@ -114,7 +115,7 @@ export default defineTool({
       monitors: monitors
         .slice(0, params.limit)
         .map((monitor) =>
-          toUptimeMonitorSummary(
+          toUptimeMonitorListItem(
             monitor,
             apiService.getUptimeMonitorUrl(organizationSlug, monitor.id),
           ),

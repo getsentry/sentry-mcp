@@ -341,7 +341,7 @@
   },
   {
     "name": "create_uptime_monitor",
-    "description": "Create a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Start monitoring a URL for availability\n- Create a new uptime check with interval and timeout\n\nBe careful when using this tool!\n\nRequired fields match Sentry's uptime API: name, url, intervalSeconds, timeoutMs.\n\n<examples>\ncreate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='API Health', url='https://api.example.com/health', intervalSeconds=60, timeoutMs=5000)\ncreate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='Checkout', url='https://example.com/checkout', intervalSeconds=300, timeoutMs=10000, method='GET', environment='production')\n</examples>\n\n<hints>\n- intervalSeconds must be one of 60, 300, 600, 1200, 1800, 3600.\n- timeoutMs must be between 1000 and 60000.\n- owner format is `user:ID` or `team:ID`.\n- Advanced assertions can be passed as JSON via `assertion` when needed.\n</hints>",
+    "description": "Create a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Start monitoring a URL for availability\n- Create a new uptime check with interval and timeout\n\nBe careful when using this tool!\n\nRequired fields match Sentry's uptime API: name, url, intervalSeconds, timeoutMs.\n\n<examples>\ncreate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='API Health', url='https://api.example.com/health', intervalSeconds=60, timeoutMs=5000)\ncreate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='Checkout', url='https://example.com/checkout', intervalSeconds=300, timeoutMs=10000, method='GET', environment='production')\n</examples>\n\n<hints>\n- intervalSeconds must be one of 60, 300, 600, 1200, 1800, 3600.\n- timeoutMs must be between 1000 and 60000.\n- owner format is `user:ID` or `team:ID`.\n- Advanced response assertions are not supported in this MVP; configure them in the Sentry UI if needed.\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -390,163 +390,65 @@
           "description": "Request timeout in milliseconds (1000-60000)."
         },
         "method": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "enum": [
-                "GET",
-                "POST",
-                "HEAD",
-                "PUT",
-                "DELETE",
-                "PATCH",
-                "OPTIONS"
-              ],
-              "description": "HTTP method used for the uptime check request."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "enum": ["GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS"],
+          "description": "HTTP method used for the uptime check request."
         },
         "headers": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "array",
-              "items": {
-                "type": "array",
-                "items": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ]
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
               },
-              "description": "Optional HTTP headers as an array of [name, value] pairs, e.g. [[\"Accept\",\"application/json\"]]."
-            },
-            {
-              "type": "null"
-            }
-          ]
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "description": "Optional HTTP headers as an array of [name, value] pairs, e.g. [[\"Accept\",\"application/json\"]]."
         },
         "body": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "description": "Optional request body for methods that support a body."
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "assertion": {
-          "default": null,
-          "anyOf": [
-            {
-              "description": "Optional assertion JSON payload accepted by Sentry uptime monitors."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "description": "Optional request body for methods that support a body."
         },
         "status": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "enum": ["active", "disabled"],
-              "description": "Monitor status. `disabled` stops checks and does not count against quota."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "enum": ["active", "disabled"],
+          "description": "Monitor status. `disabled` stops checks and does not count against quota."
         },
         "owner": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^(user|team):.+$",
-              "description": "Owner actor in `user:ID` or `team:ID` format."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(user|team):.+$",
+          "description": "Owner actor in `user:ID` or `team:ID` format."
         },
         "environment": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "maxLength": 64,
-              "description": "Optional environment name for created uptime issues."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Optional environment name for created uptime issues."
         },
         "traceSampling": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "boolean",
-              "description": "Whether check requests may be considered for tracing."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "boolean",
+          "description": "Whether check requests may be considered for tracing."
         },
         "responseCaptureEnabled": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "boolean",
-              "description": "Capture response body/headers on failures."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "boolean",
+          "description": "Capture response body/headers on failures."
         },
         "recoveryThreshold": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991,
-              "description": "Consecutive successful checks required to recover."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "Consecutive successful checks required to recover."
         },
         "downtimeThreshold": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991,
-              "description": "Consecutive failed checks required to mark down."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "Consecutive failed checks required to mark down."
         }
       },
       "required": [
@@ -576,100 +478,42 @@
               "type": "string"
             },
             "uptimeStatus": {
-              "anyOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "type": "string",
+              "enum": ["ok", "failed", "unknown"]
             },
             "url": {
               "type": "string"
             },
             "method": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "type": "string"
             },
             "intervalSeconds": {
               "type": "number"
             },
-            "timeoutMs": {
-              "type": "number"
-            },
             "environment": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "type": "string"
             },
             "owner": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "recoveryThreshold": {
-              "anyOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "downtimeThreshold": {
-              "anyOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "traceSampling": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "responseCaptureEnabled": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "type": "string"
             },
             "webUrl": {
               "type": "string",
               "format": "uri"
+            },
+            "timeoutMs": {
+              "type": "number"
+            },
+            "recoveryThreshold": {
+              "type": "number"
+            },
+            "downtimeThreshold": {
+              "type": "number"
+            },
+            "traceSampling": {
+              "type": "boolean"
+            },
+            "responseCaptureEnabled": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -679,16 +523,9 @@
             "status",
             "uptimeStatus",
             "url",
-            "method",
             "intervalSeconds",
-            "timeoutMs",
-            "environment",
-            "owner",
-            "recoveryThreshold",
-            "downtimeThreshold",
-            "traceSampling",
-            "responseCaptureEnabled",
-            "webUrl"
+            "webUrl",
+            "timeoutMs"
           ],
           "additionalProperties": false
         }
@@ -2155,52 +1992,23 @@
           ]
         },
         "projectSlug": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug."
         },
         "environment": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "description": "Optional environment name to limit monitors."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional environment name to limit monitors."
         },
         "owner": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "description": "Optional owner filter, such as `user:123`, `team:456`, `myteams`, or `unassigned`."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional owner filter, such as `user:123`, `team:456`, `myteams`, or `unassigned`."
         },
         "query": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "description": "Optional search query for monitor name or URL."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional search query for monitor name or URL."
         },
         "limit": {
           "default": 10,
@@ -2233,96 +2041,23 @@
                 "type": "string"
               },
               "uptimeStatus": {
-                "anyOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "string",
+                "enum": ["ok", "failed", "unknown"]
               },
               "url": {
                 "type": "string"
               },
               "method": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "string"
               },
               "intervalSeconds": {
                 "type": "number"
               },
-              "timeoutMs": {
-                "type": "number"
-              },
               "environment": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "string"
               },
               "owner": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "recoveryThreshold": {
-                "anyOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "downtimeThreshold": {
-                "anyOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "traceSampling": {
-                "anyOf": [
-                  {
-                    "type": "boolean"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "responseCaptureEnabled": {
-                "anyOf": [
-                  {
-                    "type": "boolean"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "string"
               },
               "webUrl": {
                 "type": "string",
@@ -2336,15 +2071,7 @@
               "status",
               "uptimeStatus",
               "url",
-              "method",
               "intervalSeconds",
-              "timeoutMs",
-              "environment",
-              "owner",
-              "recoveryThreshold",
-              "downtimeThreshold",
-              "traceSampling",
-              "responseCaptureEnabled",
               "webUrl"
             ],
             "additionalProperties": false
@@ -3992,7 +3719,7 @@
   },
   {
     "name": "get_uptime_monitor_details",
-    "description": "Get details for a Sentry uptime monitor, including recent checks.\n\nUse this tool when you need to:\n- Inspect an uptime monitor's URL, interval, thresholds, and status\n- Review recent HTTP check results (success/failure, status code, duration)\n- Debug why an uptime monitor is failing\n\nThis is separate from cron monitors (`get_monitor_details`).\n\n<examples>\nget_uptime_monitor_details(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345')\nget_uptime_monitor_details(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', period='7d', checkLimit=20)\n</examples>",
+    "description": "Get details for a Sentry uptime monitor, including recent checks.\n\nUse this tool when you need to:\n- Inspect an uptime monitor's URL, interval, thresholds, and status\n- Review recent HTTP check results (success/failure, status code, duration)\n- Debug why an uptime monitor is failing\n\nThis is separate from cron monitors (`get_monitor_details`).\n\nRequest bodies are never returned. Sensitive header values are redacted.\n\n<examples>\nget_uptime_monitor_details(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345')\nget_uptime_monitor_details(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', period='7d', checkLimit=20)\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -4022,45 +3749,21 @@
           "description": "Uptime monitor ID (detector id)."
         },
         "period": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^\\d+[hdw]$",
-              "description": "Relative time range for recent checks. Defaults to `24h` when `start` and `end` are omitted."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "pattern": "^\\d+[hdw]$",
+          "description": "Relative time range for recent checks. Defaults to `24h` when `start` and `end` are omitted."
         },
         "start": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-              "description": "Absolute start time. Must be provided with `end`; do not combine with `period`."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "description": "Absolute start time. Must be provided with `end`; do not combine with `period`."
         },
         "end": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-              "description": "Absolute end time. Must be provided with `start`; do not combine with `period`."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "description": "Absolute end time. Must be provided with `start`; do not combine with `period`."
         },
         "checkLimit": {
           "default": 10,
@@ -5196,7 +4899,7 @@
   },
   {
     "name": "update_uptime_monitor",
-    "description": "Update a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Change URL, interval, timeout, method, headers, or body\n- Enable or disable a monitor (`status`)\n- Update owner, environment, or failure thresholds\n\nBe careful when using this tool!\n\nTo clear nullable fields: pass empty string for `owner`, `environment`, or `body`; pass `{}` for `assertion`.\nOmit a field (or pass null) to leave it unchanged.\n\n<examples>\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', status='disabled')\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', intervalSeconds=300, timeoutMs=8000)\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', owner='')\n</examples>",
+    "description": "Update a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Change URL, interval, timeout, method, headers, or body\n- Enable or disable a monitor (`status`)\n- Update owner, environment, or failure thresholds\n\nBe careful when using this tool!\n\nOmit a field to leave it unchanged. Pass explicit `null` to clear `owner`, `environment`, or `body`.\n\n<examples>\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', status='disabled')\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', intervalSeconds=300, timeoutMs=8000)\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', owner=null)\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -5226,105 +4929,48 @@
           "description": "Uptime monitor ID (detector id)."
         },
         "name": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
         },
         "url": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "uri"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "format": "uri"
         },
         "intervalSeconds": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991,
-              "description": "Seconds between checks. Allowed values: 60, 300, 600, 1200, 1800, 3600."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "Seconds between checks. Allowed values: 60, 300, 600, 1200, 1800, 3600."
         },
         "timeoutMs": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "integer",
-              "minimum": 1000,
-              "maximum": 60000,
-              "description": "Request timeout in milliseconds (1000-60000)."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000,
+          "description": "Request timeout in milliseconds (1000-60000)."
         },
         "method": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "enum": [
-                "GET",
-                "POST",
-                "HEAD",
-                "PUT",
-                "DELETE",
-                "PATCH",
-                "OPTIONS"
-              ],
-              "description": "HTTP method used for the uptime check request."
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "enum": ["GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS"],
+          "description": "HTTP method used for the uptime check request."
         },
         "headers": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "array",
-              "items": {
-                "type": "array",
-                "items": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ]
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
               },
-              "description": "Optional HTTP headers as an array of [name, value] pairs, e.g. [[\"Accept\",\"application/json\"]]."
-            },
-            {
-              "type": "null"
-            }
-          ]
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "description": "Optional HTTP headers as an array of [name, value] pairs, e.g. [[\"Accept\",\"application/json\"]]."
         },
         "body": {
-          "default": null,
-          "description": "Request body. Pass an empty string to clear the body.",
+          "description": "Request body. Pass `null` to clear the body.",
           "anyOf": [
             {
               "type": "string"
@@ -5334,46 +4980,19 @@
             }
           ]
         },
-        "assertion": {
-          "default": null,
-          "description": "Assertion JSON. Pass an empty object `{}` to clear assertions.",
-          "anyOf": [
-            {},
-            {
-              "type": "null"
-            }
-          ]
-        },
         "status": {
-          "default": null,
+          "type": "string",
+          "enum": ["active", "disabled"],
+          "description": "Monitor status. `disabled` stops checks and does not count against quota."
+        },
+        "owner": {
+          "description": "Owner actor in `user:ID` or `team:ID` format. Pass `null` to clear the owner.",
           "anyOf": [
             {
               "type": "string",
-              "enum": ["active", "disabled"],
-              "description": "Monitor status. `disabled` stops checks and does not count against quota."
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "owner": {
-          "default": null,
-          "description": "Owner actor in `user:ID` or `team:ID` format. Pass an empty string to clear the owner.",
-          "anyOf": [
-            {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "minLength": 1,
-                  "pattern": "^(user|team):.+$",
-                  "description": "Owner actor in `user:ID` or `team:ID` format."
-                },
-                {
-                  "type": "string",
-                  "const": ""
-                }
-              ]
+              "minLength": 1,
+              "pattern": "^(user|team):.+$",
+              "description": "Owner actor in `user:ID` or `team:ID` format."
             },
             {
               "type": "null"
@@ -5381,11 +5000,11 @@
           ]
         },
         "environment": {
-          "default": null,
-          "description": "Environment name. Pass an empty string to clear the environment.",
+          "description": "Environment name. Pass `null` to clear the environment.",
           "anyOf": [
             {
               "type": "string",
+              "minLength": 1,
               "maxLength": 64
             },
             {
@@ -5394,52 +5013,20 @@
           ]
         },
         "traceSampling": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "boolean"
         },
         "responseCaptureEnabled": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "boolean"
         },
         "recoveryThreshold": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
         },
         "downtimeThreshold": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9007199254740991
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
         }
       },
       "required": ["organizationSlug", "projectSlug", "uptimeMonitorId"]
@@ -5463,100 +5050,42 @@
               "type": "string"
             },
             "uptimeStatus": {
-              "anyOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "type": "string",
+              "enum": ["ok", "failed", "unknown"]
             },
             "url": {
               "type": "string"
             },
             "method": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "type": "string"
             },
             "intervalSeconds": {
               "type": "number"
             },
-            "timeoutMs": {
-              "type": "number"
-            },
             "environment": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "type": "string"
             },
             "owner": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "recoveryThreshold": {
-              "anyOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "downtimeThreshold": {
-              "anyOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "traceSampling": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "responseCaptureEnabled": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "type": "string"
             },
             "webUrl": {
               "type": "string",
               "format": "uri"
+            },
+            "timeoutMs": {
+              "type": "number"
+            },
+            "recoveryThreshold": {
+              "type": "number"
+            },
+            "downtimeThreshold": {
+              "type": "number"
+            },
+            "traceSampling": {
+              "type": "boolean"
+            },
+            "responseCaptureEnabled": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -5566,16 +5095,9 @@
             "status",
             "uptimeStatus",
             "url",
-            "method",
             "intervalSeconds",
-            "timeoutMs",
-            "environment",
-            "owner",
-            "recoveryThreshold",
-            "downtimeThreshold",
-            "traceSampling",
-            "responseCaptureEnabled",
-            "webUrl"
+            "webUrl",
+            "timeoutMs"
           ],
           "additionalProperties": false
         }

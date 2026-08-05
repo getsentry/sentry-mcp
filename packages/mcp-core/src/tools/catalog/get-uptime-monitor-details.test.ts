@@ -20,8 +20,6 @@ describe("get_uptime_monitor_details", () => {
         projectSlug: "cloudflare-mcp",
         uptimeMonitorId: "4509100000001001",
         period: "24h",
-        start: null,
-        end: null,
         checkLimit: 10,
       },
       context,
@@ -51,17 +49,14 @@ describe("get_uptime_monitor_details", () => {
       - Accept: application/json
       - Authorization: [REDACTED]
 
-      _Sensitive header values are redacted. Request body is omitted from this view._
-
       ## Recent Checks
 
-      - 2025-04-14T02:00:13.000Z: success, HTTP 200, 142ms, US East, production
-      - 2025-04-14T01:59:13.000Z: failure_incident (timeout), 5000ms, US East, production
+      - 2025-04-14T02:00:13.000Z: success, HTTP 200, 142ms, US East
+      - 2025-04-14T01:59:13.000Z: failure_incident (timeout), 5000ms, US East
 
       ## Response Notes
 
       - Search related issues with \`search_issues\` query \`uptime_rule:4509100000001001\`.
-      - Request body is never included in this response. Sensitive header values are redacted.
       "
     `);
     expect(String(result)).not.toContain("secret-token");
@@ -101,8 +96,6 @@ describe("get_uptime_monitor_details", () => {
         projectSlug: "cloudflare-mcp",
         uptimeMonitorId: "4509100000001001",
         period: "24h",
-        start: null,
-        end: null,
         checkLimit: 10,
       },
       context,

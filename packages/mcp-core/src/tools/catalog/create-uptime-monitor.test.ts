@@ -63,16 +63,7 @@ describe("create_uptime_monitor", () => {
         intervalSeconds: 300,
         timeoutMs: 8000,
         method: "GET",
-        headers: null,
-        body: null,
-        assertion: null,
-        status: null,
-        owner: null,
         environment: "production",
-        traceSampling: null,
-        responseCaptureEnabled: null,
-        recoveryThreshold: null,
-        downtimeThreshold: null,
       },
       context,
     );
@@ -87,6 +78,7 @@ describe("create_uptime_monitor", () => {
     });
     expect(requestBody).not.toHaveProperty("interval_seconds");
     expect(requestBody).not.toHaveProperty("timeout_ms");
+    expect(requestBody).not.toHaveProperty("assertion");
 
     assertStructuredOnlyResult(result);
     const structuredContent = getStructuredContent(result);
@@ -102,14 +94,13 @@ describe("create_uptime_monitor", () => {
           "intervalSeconds": 300,
           "method": "GET",
           "name": "Checkout Health",
-          "owner": null,
           "projectSlug": "cloudflare-mcp",
           "recoveryThreshold": 1,
           "responseCaptureEnabled": true,
           "status": "active",
           "timeoutMs": 8000,
           "traceSampling": false,
-          "uptimeStatus": 1,
+          "uptimeStatus": "ok",
           "url": "https://example.com/checkout",
           "webUrl": "https://sentry-mcp-evals.sentry.io/monitors/4509100000001002/",
         },

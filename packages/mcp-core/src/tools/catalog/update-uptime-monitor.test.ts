@@ -25,21 +25,7 @@ describe("update_uptime_monitor", () => {
         regionUrl: null,
         projectSlug: "cloudflare-mcp",
         uptimeMonitorId: "4509100000001001",
-        name: null,
-        url: null,
-        intervalSeconds: null,
-        timeoutMs: null,
-        method: null,
-        headers: null,
-        body: null,
-        assertion: null,
         status: "disabled",
-        owner: null,
-        environment: null,
-        traceSampling: null,
-        responseCaptureEnabled: null,
-        recoveryThreshold: null,
-        downtimeThreshold: null,
       },
       context,
     );
@@ -68,7 +54,7 @@ describe("update_uptime_monitor", () => {
           "status": "disabled",
           "timeoutMs": 5000,
           "traceSampling": false,
-          "uptimeStatus": 1,
+          "uptimeStatus": "ok",
           "url": "https://example.com/health",
           "webUrl": "https://sentry-mcp-evals.sentry.io/monitors/4509100000001001/",
         },
@@ -76,7 +62,7 @@ describe("update_uptime_monitor", () => {
     `);
   });
 
-  it("clears owner when empty string is provided", async () => {
+  it("clears owner when null is provided", async () => {
     let requestBody: Record<string, unknown> | null = null;
     mswServer.use(
       http.put(
@@ -113,21 +99,7 @@ describe("update_uptime_monitor", () => {
         regionUrl: null,
         projectSlug: "cloudflare-mcp",
         uptimeMonitorId: "4509100000001001",
-        name: null,
-        url: null,
-        intervalSeconds: null,
-        timeoutMs: null,
-        method: null,
-        headers: null,
-        body: null,
-        assertion: null,
-        status: null,
-        owner: "",
-        environment: null,
-        traceSampling: null,
-        responseCaptureEnabled: null,
-        recoveryThreshold: null,
-        downtimeThreshold: null,
+        owner: null,
       },
       context,
     );
@@ -135,8 +107,22 @@ describe("update_uptime_monitor", () => {
     expect(requestBody).toEqual({ owner: null });
     assertStructuredOnlyResult(result);
     expect(
-      (getStructuredContent(result) as { monitor: { owner: string | null } })
-        .monitor.owner,
-    ).toBeNull();
+      (getStructuredContent(result) as { monitor: { owner?: string } }).monitor
+        .owner,
+    ).toBeUndefined();
+  });
+
+  it("rejects empty updates", async () => {
+    await expect(
+      updateUptimeMonitor.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          regionUrl: null,
+          projectSlug: "cloudflare-mcp",
+          uptimeMonitorId: "4509100000001001",
+        },
+        context,
+      ),
+    ).rejects.toThrow("Provide at least one field to update");
   });
 });

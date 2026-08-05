@@ -49,7 +49,7 @@ export default defineTool({
     "- intervalSeconds must be one of 60, 300, 600, 1200, 1800, 3600.",
     "- timeoutMs must be between 1000 and 60000.",
     "- owner format is `user:ID` or `team:ID`.",
-    "- Advanced assertions can be passed as JSON via `assertion` when needed.",
+    "- Advanced response assertions are not supported in this MVP; configure them in the Sentry UI if needed.",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -60,53 +60,41 @@ export default defineTool({
     url: z.string().url().describe("URL to check."),
     intervalSeconds: ParamUptimeIntervalSeconds,
     timeoutMs: ParamUptimeTimeoutMs.default(5000),
-    method: ParamUptimeHttpMethod.nullable().default(null),
-    headers: ParamUptimeHeaders.nullable().default(null),
+    method: ParamUptimeHttpMethod.optional(),
+    headers: ParamUptimeHeaders.optional(),
     body: z
       .string()
       .describe("Optional request body for methods that support a body.")
-      .nullable()
-      .default(null),
-    assertion: z
-      .unknown()
-      .describe(
-        "Optional assertion JSON payload accepted by Sentry uptime monitors.",
-      )
-      .nullable()
-      .default(null),
-    status: ParamUptimeMonitorStatus.nullable().default(null),
-    owner: ParamUptimeOwner.nullable().default(null),
+      .optional(),
+    status: ParamUptimeMonitorStatus.optional(),
+    owner: ParamUptimeOwner.optional(),
     environment: z
       .string()
       .trim()
+      .min(1)
       .max(64)
       .describe("Optional environment name for created uptime issues.")
-      .nullable()
-      .default(null),
+      .optional(),
     traceSampling: z
       .boolean()
       .describe("Whether check requests may be considered for tracing.")
-      .nullable()
-      .default(null),
+      .optional(),
     responseCaptureEnabled: z
       .boolean()
       .describe("Capture response body/headers on failures.")
-      .nullable()
-      .default(null),
+      .optional(),
     recoveryThreshold: z
       .number()
       .int()
       .min(1)
       .describe("Consecutive successful checks required to recover.")
-      .nullable()
-      .default(null),
+      .optional(),
     downtimeThreshold: z
       .number()
       .int()
       .min(1)
       .describe("Consecutive failed checks required to mark down.")
-      .nullable()
-      .default(null),
+      .optional(),
   },
   annotations: {
     readOnlyHint: false,
@@ -135,17 +123,16 @@ export default defineTool({
       url: params.url,
       intervalSeconds: params.intervalSeconds,
       timeoutMs: params.timeoutMs,
-      method: params.method ?? undefined,
-      headers: params.headers ?? undefined,
-      body: params.body ?? undefined,
-      assertion: params.assertion ?? undefined,
-      status: params.status ?? undefined,
-      owner: params.owner ?? undefined,
-      environment: params.environment ?? undefined,
-      traceSampling: params.traceSampling ?? undefined,
-      responseCaptureEnabled: params.responseCaptureEnabled ?? undefined,
-      recoveryThreshold: params.recoveryThreshold ?? undefined,
-      downtimeThreshold: params.downtimeThreshold ?? undefined,
+      method: params.method,
+      headers: params.headers,
+      body: params.body,
+      status: params.status,
+      owner: params.owner,
+      environment: params.environment,
+      traceSampling: params.traceSampling,
+      responseCaptureEnabled: params.responseCaptureEnabled,
+      recoveryThreshold: params.recoveryThreshold,
+      downtimeThreshold: params.downtimeThreshold,
     });
 
     return structuredResult({
