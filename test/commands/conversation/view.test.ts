@@ -195,6 +195,7 @@ describe("viewCommand.func", () => {
     getConversationSpansSpy.mockResolvedValue({
       spans: sampleSpans,
       truncated: false,
+      title: null,
     });
 
     const { context, stdoutWrite } = createMockContext();
@@ -218,6 +219,7 @@ describe("viewCommand.func", () => {
     getConversationSpansSpy.mockResolvedValue({
       spans: sampleSpans,
       truncated: false,
+      title: null,
     });
 
     const { context } = createMockContext();
@@ -286,6 +288,7 @@ describe("viewCommand.func", () => {
     getConversationSpansSpy.mockResolvedValue({
       spans: sampleSpans,
       truncated: false,
+      title: null,
     });
 
     const { context, stdoutWrite } = createMockContext();
@@ -305,6 +308,7 @@ describe("viewCommand.func", () => {
     getConversationSpansSpy.mockResolvedValue({
       spans: sampleSpans,
       truncated: false,
+      title: null,
     });
 
     const { context, stdoutWrite } = createMockContext();
@@ -320,6 +324,7 @@ describe("viewCommand.func", () => {
     getConversationSpansSpy.mockResolvedValue({
       spans: sampleSpans,
       truncated: true,
+      title: null,
     });
 
     const { context, stdoutWrite } = createMockContext();
@@ -335,6 +340,7 @@ describe("viewCommand.func", () => {
     getConversationSpansSpy.mockResolvedValue({
       spans: sampleSpans,
       truncated: false,
+      title: null,
     });
 
     const { context, stdoutWrite } = createMockContext();
@@ -352,6 +358,7 @@ describe("viewCommand.func", () => {
     getConversationSpansSpy.mockResolvedValue({
       spans: sampleSpans,
       truncated: true,
+      title: null,
     });
 
     const { context, stdoutWrite } = createMockContext();
@@ -366,6 +373,7 @@ describe("viewCommand.func", () => {
     getConversationSpansSpy.mockResolvedValue({
       spans: [],
       truncated: false,
+      title: null,
     });
 
     const { context, stdoutWrite } = createMockContext();

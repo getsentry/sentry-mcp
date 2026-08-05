@@ -5,6 +5,7 @@
  * src/lib/api/conversations.ts, covering:
  * - listConversations sends correct params
  * - listConversations parses link header for pagination
+ * - getConversationSpans parses the details envelope and extracts spans
  * - getConversationSpans paginates through multiple pages
  * - getConversationSpans returns truncated=true when pagination limit reached
  * - getConversationSpans returns truncated=false when all pages fetched
@@ -260,8 +261,20 @@ describe("getConversationSpans", () => {
     };
   }
 
+  /** Details envelope returned by the conversation details endpoint. */
+  function makeEnvelope(
+    spans: ReturnType<typeof makeSpan>[],
+    title: string | null = "Test conversation"
+  ) {
+    return {
+      conversationId: CONV_ID,
+      title,
+      spans,
+    };
+  }
+
   test("hits /organizations/{org}/ai-conversations/{conversationId}/ with GET", async () => {
-    const { getCapturedUrl, getCapturedMethod } = mockOk([]);
+    const { getCapturedUrl, getCapturedMethod } = mockOk(makeEnvelope([]));
 
     await getConversationSpans(ORG, CONV_ID);
 
@@ -272,7 +285,7 @@ describe("getConversationSpans", () => {
   });
 
   test("sends default per_page=1000 and statsPeriod=30d", async () => {
-    const { getCapturedUrl } = mockOk([]);
+    const { getCapturedUrl } = mockOk(makeEnvelope([]));
 
     await getConversationSpans(ORG, CONV_ID);
 
@@ -281,25 +294,34 @@ describe("getConversationSpans", () => {
     expect(url).toContain("statsPeriod=30d");
   });
 
-  test("returns spans from a single page", async () => {
+  test("returns spans from a single page envelope", async () => {
     const spans = [makeSpan("span-1-aabb1122")];
-    mockOk(spans);
+    mockOk(makeEnvelope(spans, "Refund flow"));
 
     const result = await getConversationSpans(ORG, CONV_ID);
 
     expect(result.spans).toHaveLength(1);
     expect(result.spans[0].span_id).toBe("span-1-aabb1122");
+    expect(result.title).toBe("Refund flow");
     expect(result.truncated).toBe(false);
+  });
+
+  test("rejects a bare span array (pre-envelope response shape)", async () => {
+    mockOk([makeSpan("span-1-aabb1122")]);
+
+    await expect(getConversationSpans(ORG, CONV_ID)).rejects.toThrow(
+      /Unexpected response format/
+    );
   });
 
   test("paginates through multiple pages", async () => {
     const { getCapturedUrls } = mockSequential([
       {
-        body: [makeSpan("span-page-1-aa11")],
+        body: makeEnvelope([makeSpan("span-page-1-aa11")], "Multi-page"),
         headers: linkHeader("page-2-cursor"),
       },
       {
-        body: [makeSpan("span-page-2-bb22")],
+        body: makeEnvelope([makeSpan("span-page-2-bb22")], "Multi-page"),
         // No Link header → last page
       },
     ]);
@@ -309,6 +331,8 @@ describe("getConversationSpans", () => {
     expect(result.spans).toHaveLength(2);
     expect(result.spans[0].span_id).toBe("span-page-1-aa11");
     expect(result.spans[1].span_id).toBe("span-page-2-bb22");
+    // Title is taken from the first page
+    expect(result.title).toBe("Multi-page");
     expect(result.truncated).toBe(false);
     expect(getCapturedUrls()).toHaveLength(2);
     // Second request should include cursor
@@ -318,7 +342,7 @@ describe("getConversationSpans", () => {
   test("returns truncated=true when pagination limit reached", async () => {
     // Create responses that always have more pages
     const responses = Array.from({ length: MAX_PAGINATION_PAGES }, (_, i) => ({
-      body: [makeSpan(`span-${i}-aabb1122`)],
+      body: makeEnvelope([makeSpan(`span-${i}-aabb1122`)]),
       headers: linkHeader("always-more-cursor"),
     }));
 
@@ -331,15 +355,16 @@ describe("getConversationSpans", () => {
   });
 
   test("returns truncated=false when all pages fetched before limit", async () => {
-    mockOk([makeSpan("only-page-span1")]);
+    mockOk(makeEnvelope([makeSpan("only-page-span1")], null));
 
     const result = await getConversationSpans(ORG, CONV_ID);
 
     expect(result.truncated).toBe(false);
+    expect(result.title).toBeNull();
   });
 
   test("uses custom options when provided", async () => {
-    const { getCapturedUrl } = mockOk([]);
+    const { getCapturedUrl } = mockOk(makeEnvelope([]));
 
     await getConversationSpans(ORG, CONV_ID, {
       statsPeriod: "7d",
@@ -354,8 +379,12 @@ describe("getConversationSpans", () => {
   });
 
   test("encodes conversationId in URL", async () => {
-    const { getCapturedUrl } = mockOk([]);
     const specialId = "conv/with special";
+    const { getCapturedUrl } = mockOk({
+      conversationId: specialId,
+      title: null,
+      spans: [],
+    });
 
     await getConversationSpans(ORG, specialId);
 
