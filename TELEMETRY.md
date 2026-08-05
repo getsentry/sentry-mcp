@@ -58,7 +58,7 @@ the pivots and recipes below.
 | `app.access.probe.reason` | indeterminate probe bucket | metrics | upstream instability |
 | `app.upstream.host` | configured Sentry host | tags, spans | host-specific behavior |
 | `app.server.version` | MCP server package version | tags, spans | release/version behavior |
-| `app.utm_source` | sanitized in-product `utm_source` query param | spans | in-product attribution |
+| `app.utm_source` | sanitized `X-Sentry-Utm-Source` header or `utm_source` query param | spans | in-product / plugin attribution |
 | `app.referrer.family` | low-cardinality bucket of the `Referer` host | spans | external traffic attribution |
 | `gen_ai.provider.name` | GenAI provider | spans, tags | provider-specific model behavior |
 | `gen_ai.request.model` | requested GenAI model | spans | model-specific behavior |

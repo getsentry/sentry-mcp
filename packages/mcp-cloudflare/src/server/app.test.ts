@@ -220,6 +220,31 @@ describe("app", () => {
         bearer_methods_supported: ["header"],
       });
     });
+
+    // Regression: Claude plugin ships ?utm_source=plugin on the MCP URL.
+    // PRM must round-trip that exact resource so clients don't invent a bare
+    // /mcp identifier that later disagrees with the authorize request.
+    it("should preserve plugin utm_source on the base /mcp resource", async () => {
+      const res = await app.request(
+        "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp?utm_source=plugin",
+        { headers: TEST_HEADERS },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json).toEqual({
+        resource: "https://mcp.sentry.dev/mcp?utm_source=plugin",
+        authorization_servers: ["https://mcp.sentry.dev"],
+        scopes_supported: [
+          "org:read",
+          "project:write",
+          "team:write",
+          "event:write",
+        ],
+        bearer_methods_supported: ["header"],
+      });
+    });
   });
 
   describe("GET /.well-known/oauth-authorization-server/mcp", () => {
@@ -271,6 +296,27 @@ describe("app", () => {
         "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp%2Fsentry%2Fmcp-server%3Fexperimental%3D1",
       );
       expect(json.issuer).toBe("https://mcp.sentry.dev/mcp/sentry/mcp-server");
+      expect(
+        json.authorization_response_iss_parameter_supported,
+      ).toBeUndefined();
+    });
+
+    // Regression: path-scoped AS metadata is a Claude/compat discovery path.
+    // RFC 8414 forbids query components on issuer, but the authorize endpoint
+    // must still carry the full plugin resource (including utm_source).
+    it("should advertise a query-free issuer while binding authorize to utm_source=plugin", async () => {
+      const res = await app.request(
+        "https://mcp.sentry.dev/.well-known/oauth-authorization-server/mcp?utm_source=plugin",
+        { headers: TEST_HEADERS },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.issuer).toBe("https://mcp.sentry.dev/mcp");
+      expect(json.authorization_endpoint).toBe(
+        "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp%3Futm_source%3Dplugin",
+      );
       expect(
         json.authorization_response_iss_parameter_supported,
       ).toBeUndefined();

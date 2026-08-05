@@ -389,6 +389,30 @@ describe("worker entrypoint", () => {
     );
   });
 
+  // Regression: unauthenticated plugin MCP URLs must challenge with PRM that
+  // preserves ?utm_source=plugin so OAuth discovery keeps the same resource.
+  it("patches plugin utm_source MCP 401 responses with query-preserving protected resource metadata", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": 'Bearer error="invalid_token"',
+        },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp?utm_source=plugin"),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("WWW-Authenticate")).toBe(
+      'Bearer error="invalid_token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp?utm_source=plugin"',
+    );
+  });
+
   it("patches organization-scoped MCP 401 responses with path-specific protected resource metadata", async () => {
     mockOAuthProviderFetch.mockResolvedValueOnce(
       new Response("unauthorized", {
