@@ -186,7 +186,8 @@ export default defineTool({
         fallback: () => ({
           query: params.query ?? "",
           fields: RECOMMENDED_FIELDS,
-          sort: params.sort ?? "-timestamp",
+          // Treat empty string like missing so fallback matches direct mode.
+          sort: params.sort || "-timestamp",
           timeRange: { statsPeriod: params.period ?? "14d" },
           explanation: "",
         }),
@@ -226,7 +227,8 @@ export default defineTool({
       // Direct mode: use provided params as-is
       query = params.query ?? "";
       fields = RECOMMENDED_FIELDS;
-      sortParam = params.sort ?? "-timestamp";
+      // Empty string is allowed by the schema; treat it like missing.
+      sortParam = params.sort || "-timestamp";
       timeParams = { statsPeriod: params.period ?? "14d" };
     }
 

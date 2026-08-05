@@ -193,6 +193,47 @@ describe("search_issue_events", () => {
     expect(result).toContain("No results found");
   });
 
+  it("defaults empty-string sort during provider fallback", async () => {
+    mockGenerateText.mockRejectedValue(
+      new APICallError({
+        message: "AI provider unavailable",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        requestBodyValues: {},
+        statusCode: 503,
+        isRetryable: true,
+      }),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe("environment:production");
+          expect(url.searchParams.get("sort")).toBe("-timestamp");
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const result = await searchIssueEvents.handler(
+      {
+        organizationSlug: "test-org",
+        issueId: "MCP-41",
+        query: "environment:production",
+        sort: "",
+        period: "7d",
+        projectSlug: null,
+        regionUrl: null,
+        limit: 50,
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    expect(result).toContain("No results found");
+  });
+
   it("should include user geo details in formatted event output", async () => {
     mockGenerateText.mockResolvedValue(
       mockAIResponse("", ["id", "timestamp", "title", "user"], "-timestamp"),

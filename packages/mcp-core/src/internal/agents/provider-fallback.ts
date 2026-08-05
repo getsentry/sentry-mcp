@@ -1,12 +1,12 @@
 import { LLMProviderError } from "../../errors";
-import { logError } from "../../telem/logging";
+import { logWarn } from "../../telem/logging";
 
 /**
  * Run an optional embedded-agent rewrite and fall back to the caller's direct
  * behavior when the upstream AI provider is unavailable.
  *
- * Provider failures are operationally visible in logs, but do not fail the
- * parent MCP tool. Unexpected application errors still bubble normally.
+ * Provider failures are expected operational outages: log a warning and continue
+ * with the caller's direct behavior. Unexpected application errors still bubble.
  */
 export async function withProviderFallback<T>({
   operation,
@@ -26,7 +26,7 @@ export async function withProviderFallback<T>({
       throw error;
     }
 
-    logError(error, {
+    logWarn(error, {
       loggerScope: ["agents", "provider-fallback"],
       contexts: {
         aiProviderFallback: {
