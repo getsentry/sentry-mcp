@@ -49,6 +49,10 @@ describe("get_uptime_monitor_details", () => {
       - Accept: application/json
       - Authorization: [REDACTED]
 
+      ## Request Payload
+
+      Request body is configured but omitted from this view.
+
       ## Recent Checks
 
       - 2025-04-14T02:00:13.000Z: success, HTTP 200, 142ms, US East
@@ -61,6 +65,9 @@ describe("get_uptime_monitor_details", () => {
     `);
     expect(String(result)).not.toContain("secret-token");
     expect(String(result)).not.toContain("should-not-appear");
+    expect(String(result)).toContain(
+      "Request body is configured but omitted from this view.",
+    );
   });
 
   it("skips malformed short header arrays", async () => {

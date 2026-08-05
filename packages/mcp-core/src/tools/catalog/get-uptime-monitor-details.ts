@@ -206,7 +206,8 @@ export default defineTool({
     const headerLines = formatUptimeHeadersForOutput(monitor.headers);
     if (headerLines.length > 0) {
       output.push("", "## Headers", "", ...headerLines);
-    } else if (monitor.body) {
+    }
+    if (monitor.body) {
       output.push(
         "",
         "## Request Payload",
