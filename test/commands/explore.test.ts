@@ -327,13 +327,13 @@ describe("sentry explore", () => {
 
       await func.call(
         context,
-        { ...DEFAULT_FLAGS, dataset: "transactions" },
+        { ...DEFAULT_FLAGS, dataset: "spans" },
         "test-org/"
       );
 
       expect(queryEventsSpy).toHaveBeenCalledWith(
         "test-org",
-        expect.objectContaining({ dataset: "transactions" })
+        expect.objectContaining({ dataset: "spans" })
       );
     });
 

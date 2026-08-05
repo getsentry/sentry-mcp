@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { MetricMeta } from "../../src/lib/api/discover.js";
+import type { MetricMeta } from "../../src/lib/api/explore.js";
 import { ResolutionError } from "../../src/lib/errors.js";
 import {
   makeTracemetricsAggregate,
