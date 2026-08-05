@@ -1,16 +1,16 @@
 /**
- * Tests for the discover/explore API helper.
+ * Tests for the explore API helper.
  *
  * Verifies URL construction, query parameter encoding (especially repeated
  * `field` params), schema validation, and pagination cursor extraction.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { queryEvents } from "../../../src/lib/api/discover.js";
+import { queryEvents } from "../../../src/lib/api/explore.js";
 import { mockFetch, useTestConfigDir } from "../../helpers.js";
 
 describe("queryEvents", () => {
-  useTestConfigDir("discover-test-");
+  useTestConfigDir("explore-test-");
 
   let originalFetch: typeof globalThis.fetch;
   let capturedUrl = "";

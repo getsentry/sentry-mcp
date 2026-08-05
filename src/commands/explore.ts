@@ -90,16 +90,10 @@ const DATASET_ALIASES: Record<string, string> = {
   log: "logs",
   replays: "replays",
   replay: "replays",
-  // Deprecated but still functional — hidden from help
-  transactions: "transactions",
-  transaction: "transactions",
-  discover: "discover",
 };
 
 /**
  * User-facing dataset names shown in `--help` and validation errors.
- * Deprecated datasets (transactions, discover) are omitted from the display
- * list but still work as `--dataset` values via `DATASET_ALIASES`.
  *
  * Set preserves insertion order for the join-based help/error rendering.
  */
