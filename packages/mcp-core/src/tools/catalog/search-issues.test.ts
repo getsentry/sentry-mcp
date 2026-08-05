@@ -1,5 +1,5 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
-import { generateText } from "ai";
+import { APICallError, generateText, RetryError } from "ai";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import searchIssues from "./search-issues";
@@ -148,6 +148,91 @@ describe("search_issues", () => {
       - View event counts: Use search_events for aggregated statistics
       "
     `);
+  });
+
+  it("falls back to the original query when the AI provider is unavailable", async () => {
+    mockGenerateText.mockRejectedValue(
+      new APICallError({
+        message: "Workspace budget exceeded",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        requestBodyValues: {},
+        statusCode: 402,
+        isRetryable: false,
+      }),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe("is:unresolved");
+          expect(url.searchParams.get("sort")).toBe("freq");
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const result = await searchIssues.handler(
+      {
+        organizationSlug: "test-org",
+        query: "is:unresolved",
+        sort: "freq",
+        projectSlugOrId: null,
+        regionUrl: null,
+        limit: 10,
+        period: "30d",
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    expect(result).toContain("No issues found");
+  });
+
+  it("falls back when the AI SDK wraps a provider outage in RetryError", async () => {
+    const serverError = new APICallError({
+      message: "Internal server error",
+      url: "https://openrouter.ai/api/v1/chat/completions",
+      requestBodyValues: {},
+      statusCode: 503,
+      isRetryable: true,
+    });
+    mockGenerateText.mockRejectedValue(
+      new RetryError({
+        message: "Failed after 3 attempts. Last error: Internal server error",
+        reason: "maxRetriesExceeded",
+        errors: [serverError, serverError, serverError],
+      }),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe("is:unresolved");
+          expect(url.searchParams.get("sort")).toBe("date");
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const result = await searchIssues.handler(
+      {
+        organizationSlug: "test-org",
+        query: "is:unresolved",
+        sort: "date",
+        projectSlugOrId: null,
+        regionUrl: null,
+        limit: 10,
+        period: "30d",
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    expect(result).toContain("No issues found");
   });
 
   it("should search issues with direct query syntax (no agent)", async () => {

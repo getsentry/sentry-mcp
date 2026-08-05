@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import searchEvents from "./search-events";
 import { MAX_EVENTS_VALIDATION_ATTEMPTS } from "../support/search-events/utils";
-import { generateText } from "ai";
+import { APICallError, generateText } from "ai";
 import { UserInputError } from "../../errors";
 
 // Mock the AI SDK
@@ -125,6 +125,57 @@ describe("search_events", () => {
     process.env.OPENROUTER_API_KEY = "";
     mockGenerateText.mockResolvedValue(mockAIResponse("errors"));
     mockValidEventsValidation();
+  });
+
+  it("falls back to the original query when the AI provider is unavailable", async () => {
+    mockGenerateText.mockRejectedValue(
+      new APICallError({
+        message: "Workspace budget exceeded",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        requestBodyValues: {},
+        statusCode: 402,
+        isRetryable: false,
+      }),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("errors");
+          expect(url.searchParams.get("query")).toBe("level:error");
+          expect(url.searchParams.get("sort")).toBe("-timestamp");
+          return HttpResponse.json({ data: [] });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "errors",
+        query: "level:error",
+        fields: null,
+        sort: null,
+        environment: null,
+        period: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        accessToken: "test-token",
+        userId: "user-123",
+        clientId: "client-123",
+        grantedSkills: new Set(),
+        constraints: {},
+        sentryHost: "sentry.io",
+      },
+    );
+
+    expect(result).toContain("No results found");
   });
 
   it("should handle spans dataset queries", async () => {

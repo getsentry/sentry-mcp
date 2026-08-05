@@ -1568,7 +1568,8 @@ describe("buildServer", () => {
       );
       const span = startedSpans[0];
       expect(span?.setStatus).toHaveBeenCalledWith({ code: 2 });
-      expect(span?.recordException).toHaveBeenCalledWith(expect.any(Error));
+      // Expected validation failures mark the span failed without recording an exception.
+      expect(span?.recordException).not.toHaveBeenCalled();
     });
 
     it("execute_sentry_tool injects constrained arguments for catalog-only tools", async () => {

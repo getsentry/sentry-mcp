@@ -2,6 +2,7 @@ import { getActiveSpan, setTag, startSpan } from "@sentry/core";
 import { z } from "zod";
 import { UserInputError } from "../../errors";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
+import { withProviderFallback } from "../../internal/agents/provider-fallback";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import {
@@ -519,21 +520,37 @@ export default defineTool({
       shouldTrustStructuredTraceSearch && hasExplicitFields && hasExplicitSort;
 
     if (hasAgentProvider() && !canRunWithoutAgent) {
-      const agentResult = await searchEventsAgent({
-        query: buildSearchRepairPrompt({
-          query: params.query,
+      const parsed = await withProviderFallback<SearchEventsAgentResult>({
+        operation: "search_events.rewrite",
+        fallback: () => ({
           dataset: inputDataset,
-          fields: params.fields,
-          sort: params.sort,
-          statsPeriod: params.period,
-          environment: params.environment,
+          query: params.query ?? "",
+          fields:
+            inputDataset === "replays"
+              ? []
+              : (params.fields ?? defaultFieldsForDataset(inputDataset)),
+          sort: explicitSort || defaultSortForDataset(inputDataset),
+          environment: params.environment ?? null,
+          timeRange: { statsPeriod: params.period ?? "14d" },
+          explanation: "",
         }),
-        organizationSlug,
-        apiService,
-        projectId,
+        run: async () =>
+          (
+            await searchEventsAgent({
+              query: buildSearchRepairPrompt({
+                query: params.query,
+                dataset: inputDataset,
+                fields: params.fields,
+                sort: params.sort,
+                statsPeriod: params.period,
+                environment: params.environment,
+              }),
+              organizationSlug,
+              apiService,
+              projectId,
+            })
+          ).result,
       });
-
-      const parsed = agentResult.result;
       const shouldTrustExplicitSearchParams =
         shouldTrustStructuredTraceSearch ||
         (hasStructuredQuery && parsed.dataset === inputDataset);
@@ -707,6 +724,7 @@ export default defineTool({
         );
       }
 
+      let providerUnavailableDuringValidationRepair = false;
       for (
         let attempt = 0;
         attempt < MAX_EVENTS_VALIDATION_ATTEMPTS && !lastValidation.valid;
@@ -721,23 +739,45 @@ export default defineTool({
             },
           },
           async () => {
-            const agentResult = await searchEventsAgent({
-              query: buildValidationFailureRepairPrompt({
-                originalQuery: params.query,
+            const parsed = await withProviderFallback<SearchEventsAgentResult>({
+              operation: "search_events.validation_repair",
+              fallback: () => ({
                 dataset,
                 query: sentryQuery,
                 fields,
                 sort: sortParam,
-                environment,
-                timeParams,
-                validation: formatEventsValidationResults(lastValidation),
+                environment: environment ?? null,
+                timeRange:
+                  "statsPeriod" in timeParams
+                    ? { statsPeriod: timeParams.statsPeriod ?? "14d" }
+                    : {
+                        start: timeParams.start ?? "",
+                        end: timeParams.end ?? "",
+                      },
+                explanation: "",
               }),
-              organizationSlug,
-              apiService,
-              projectId,
+              onFallback: () => {
+                providerUnavailableDuringValidationRepair = true;
+              },
+              run: async () =>
+                (
+                  await searchEventsAgent({
+                    query: buildValidationFailureRepairPrompt({
+                      originalQuery: params.query,
+                      dataset,
+                      query: sentryQuery,
+                      fields,
+                      sort: sortParam,
+                      environment,
+                      timeParams,
+                      validation: formatEventsValidationResults(lastValidation),
+                    }),
+                    organizationSlug,
+                    apiService,
+                    projectId,
+                  })
+                ).result,
             });
-
-            const parsed = agentResult.result;
             if (!parsed.sort?.trim()) {
               throw new UserInputError(
                 `Search validation repair failed: agent response missing required 'sort' parameter. Received: ${JSON.stringify(parsed, null, 2)}.`,
@@ -786,9 +826,16 @@ export default defineTool({
             });
           },
         );
+
+        if (providerUnavailableDuringValidationRepair) {
+          break;
+        }
       }
 
-      if (!lastValidation.valid) {
+      if (
+        !lastValidation.valid &&
+        !providerUnavailableDuringValidationRepair
+      ) {
         const formatted = formatEventsValidationResults(lastValidation);
         throw new UserInputError(
           formatted
