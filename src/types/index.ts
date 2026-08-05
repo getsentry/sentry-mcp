@@ -21,10 +21,12 @@ export {
 } from "./config.js";
 // AI Conversations types
 export type {
+  AIConversationDetails,
   AIConversationSpan,
   ConversationListItem,
 } from "./conversation.js";
 export {
+  AIConversationDetailsSchema,
   AIConversationSpanSchema,
   ConversationListItemSchema,
 } from "./conversation.js";

@@ -1,14 +1,16 @@
 /**
  * AI Conversation types and Zod schemas.
  *
- * Schemas for the conversation list items and the raw conversation spans
- * returned by the Sentry Explore AI-conversations endpoints.
+ * Schemas for conversation list items, the details envelope, and raw
+ * conversation spans returned by the Sentry Explore AI-conversations endpoints.
  */
 
 import { z } from "zod";
 
 export const ConversationListItemSchema = z.object({
   conversationId: z.string(),
+  /** Stored conversation title when available (added by ai-monitoring list API). */
+  title: z.string().nullable().optional(),
   flow: z.array(z.string()),
   errors: z.number(),
   llmCalls: z.number(),
@@ -80,3 +82,22 @@ export const AIConversationSpanSchema = z
   .passthrough();
 
 export type AIConversationSpan = z.infer<typeof AIConversationSpanSchema>;
+
+/**
+ * Conversation details envelope returned by
+ * `GET /organizations/{org}/ai-conversations/{conversationId}/`.
+ *
+ * As of getsentry/sentry#121143 the endpoint always returns this object
+ * (conversation-level metadata + a page of spans) instead of a bare span
+ * array. Pagination still uses the `Link` header; each page is an envelope
+ * whose `spans` field holds that page's rows.
+ */
+export const AIConversationDetailsSchema = z
+  .object({
+    conversationId: z.string(),
+    title: z.string().nullable(),
+    spans: z.array(AIConversationSpanSchema),
+  })
+  .passthrough();
+
+export type AIConversationDetails = z.infer<typeof AIConversationDetailsSchema>;
