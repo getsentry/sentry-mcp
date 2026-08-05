@@ -242,7 +242,7 @@ sentry span list my-org/my-project/abc123def456...
 
 ### Dataset names for the Events API
 
-When querying the Events API (directly or via `sentry api`), valid dataset values are: `spans`, `transactions`, `logs`, `errors`, `discover`.
+When querying the Events API (directly or via `sentry api`), valid dataset values are: `spans`, `logs`, `errors`, `tracemetrics`, `profile_functions`, and `uptime_results`.
 
 ## Common Mistakes
 
