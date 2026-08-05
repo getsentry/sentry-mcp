@@ -8,6 +8,11 @@ import findDashboards from "./find-dashboards";
 import getDashboardDetails from "./get-dashboard-details";
 import findMonitors from "./find-monitors";
 import getMonitorDetails from "./get-monitor-details";
+import findUptimeMonitors from "./find-uptime-monitors";
+import getUptimeMonitorDetails from "./get-uptime-monitor-details";
+import createUptimeMonitor from "./create-uptime-monitor";
+import updateUptimeMonitor from "./update-uptime-monitor";
+import deleteUptimeMonitor from "./delete-uptime-monitor";
 import findAlertRules from "./find-alert-rules";
 import getAlertRule from "./get-alert-rule";
 import getIssueDetails from "./get-issue-details";
@@ -66,6 +71,11 @@ const catalogTools = {
   get_dashboard_details: getDashboardDetails,
   find_monitors: findMonitors,
   get_monitor_details: getMonitorDetails,
+  find_uptime_monitors: findUptimeMonitors,
+  get_uptime_monitor_details: getUptimeMonitorDetails,
+  create_uptime_monitor: createUptimeMonitor,
+  update_uptime_monitor: updateUptimeMonitor,
+  delete_uptime_monitor: deleteUptimeMonitor,
   find_alert_rules: findAlertRules,
   get_alert_rule: getAlertRule,
   get_issue_details: getIssueDetails,

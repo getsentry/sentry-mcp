@@ -1,20 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
-  validateSentryHostThrows,
-  validateAndParseSentryUrlThrows,
-  validateOpenAiBaseUrlThrows,
-  getIssueUrl,
+  extractConversationIdFromSearchQuery,
+  getAIConversationUrl,
+  getEventsExplorerUrl,
   getIssuesSearchUrl,
+  getIssueUrl,
+  getMonitorUrl,
   getPreprodSnapshotUrl,
+  getReleaseUrl,
   getReplaysSearchUrl,
   getReplayUrl,
-  getReleaseUrl,
-  getMonitorUrl,
-  getTraceUrl,
-  getEventsExplorerUrl,
-  getAIConversationUrl,
-  extractConversationIdFromSearchQuery,
   getTraceMetricsExploreUrl,
+  getTraceUrl,
+  getUptimeMonitorUrl,
+  validateAndParseSentryUrlThrows,
+  validateOpenAiBaseUrlThrows,
+  validateSentryHostThrows,
 } from "./url-utils";
 
 describe("url-utils", () => {
@@ -570,6 +571,19 @@ describe("url-utils", () => {
           mode: "samples",
         },
       ]);
+    });
+  });
+
+  describe("getUptimeMonitorUrl", () => {
+    it("builds saas and self-hosted monitor urls", () => {
+      expect(getUptimeMonitorUrl("sentry.io", "my-org", "12345")).toBe(
+        "https://my-org.sentry.io/monitors/12345/",
+      );
+      expect(
+        getUptimeMonitorUrl("sentry.internal:9000", "my-org", "12345", "http"),
+      ).toBe(
+        "http://sentry.internal:9000/organizations/my-org/monitors/12345/",
+      );
     });
   });
 });

@@ -1,0 +1,162 @@
+import { setTag } from "@sentry/core";
+import { z } from "zod";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { structuredResult } from "../../internal/tool-helpers/results";
+import {
+  ParamOrganizationSlug,
+  ParamProjectSlug,
+  ParamRegionUrl,
+} from "../../schema";
+import type { ServerContext } from "../../types";
+import { assertProjectRefWithinConstraint } from "./support/project-constraints";
+import {
+  ParamUptimeHeaders,
+  ParamUptimeHttpMethod,
+  ParamUptimeIntervalSeconds,
+  ParamUptimeMonitorStatus,
+  ParamUptimeTimeoutMs,
+  toUptimeMonitorSummary,
+  uptimeMonitorSummarySchema,
+} from "./support/uptime-monitors";
+
+export const createUptimeMonitorOutputSchema = z.object({
+  monitor: uptimeMonitorSummarySchema,
+});
+
+export default defineTool({
+  name: "create_uptime_monitor",
+  skills: ["project-management"],
+  requiredScopes: ["project:write"],
+  description: [
+    "Create a Sentry HTTP uptime monitor.",
+    "",
+    "Use this tool when you need to:",
+    "- Start monitoring a URL for availability",
+    "- Create a new uptime check with interval and timeout",
+    "",
+    "Be careful when using this tool!",
+    "",
+    "Required fields match Sentry's uptime API: name, url, intervalSeconds, timeoutMs.",
+    "",
+    "<examples>",
+    "create_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='API Health', url='https://api.example.com/health', intervalSeconds=60, timeoutMs=5000)",
+    "create_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='Checkout', url='https://example.com/checkout', intervalSeconds=300, timeoutMs=10000, method='GET', environment='production')",
+    "</examples>",
+    "",
+    "<hints>",
+    "- intervalSeconds must be one of 60, 300, 600, 1200, 1800, 3600.",
+    "- timeoutMs must be between 1000 and 60000.",
+    "- owner format is `user:ID` or `team:ID`.",
+    "- Advanced assertions can be passed as JSON via `assertion` when needed.",
+    "</hints>",
+  ].join("\n"),
+  inputSchema: {
+    organizationSlug: ParamOrganizationSlug,
+    regionUrl: ParamRegionUrl.nullable().default(null),
+    projectSlug: ParamProjectSlug,
+    name: z.string().trim().min(1).max(128).describe("Monitor display name."),
+    url: z.string().url().describe("URL to check."),
+    intervalSeconds: ParamUptimeIntervalSeconds,
+    timeoutMs: ParamUptimeTimeoutMs.default(5000),
+    method: ParamUptimeHttpMethod.nullable().default(null),
+    headers: ParamUptimeHeaders.nullable().default(null),
+    body: z
+      .string()
+      .describe("Optional request body for methods that support a body.")
+      .nullable()
+      .default(null),
+    assertion: z
+      .unknown()
+      .describe(
+        "Optional assertion JSON payload accepted by Sentry uptime monitors.",
+      )
+      .nullable()
+      .default(null),
+    status: ParamUptimeMonitorStatus.nullable().default(null),
+    owner: z
+      .string()
+      .trim()
+      .describe("Optional owner actor, e.g. `user:123` or `team:456`.")
+      .nullable()
+      .default(null),
+    environment: z
+      .string()
+      .trim()
+      .max(64)
+      .describe("Optional environment name for created uptime issues.")
+      .nullable()
+      .default(null),
+    traceSampling: z
+      .boolean()
+      .describe("Whether check requests may be considered for tracing.")
+      .nullable()
+      .default(null),
+    responseCaptureEnabled: z
+      .boolean()
+      .describe("Capture response body/headers on failures.")
+      .nullable()
+      .default(null),
+    recoveryThreshold: z
+      .number()
+      .int()
+      .min(1)
+      .describe("Consecutive successful checks required to recover.")
+      .nullable()
+      .default(null),
+    downtimeThreshold: z
+      .number()
+      .int()
+      .min(1)
+      .describe("Consecutive failed checks required to mark down.")
+      .nullable()
+      .default(null),
+  },
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
+  },
+  outputSchema: createUptimeMonitorOutputSchema,
+  async handler(params, context: ServerContext) {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl ?? undefined,
+    });
+    const organizationSlug = params.organizationSlug;
+    setTag("organization.slug", organizationSlug);
+    setTag("project.slug", params.projectSlug);
+
+    assertProjectRefWithinConstraint({
+      resourceLabel: "Uptime monitor",
+      scopedProjectSlug: context.constraints.projectSlug,
+      project: { slug: params.projectSlug },
+    });
+
+    const monitor = await apiService.createUptimeMonitor({
+      organizationSlug,
+      projectSlug: params.projectSlug,
+      name: params.name,
+      url: params.url,
+      intervalSeconds: params.intervalSeconds,
+      timeoutMs: params.timeoutMs,
+      method: params.method ?? undefined,
+      headers: params.headers ?? undefined,
+      body: params.body ?? undefined,
+      assertion: params.assertion ?? undefined,
+      status: params.status ?? undefined,
+      owner: params.owner ?? undefined,
+      environment: params.environment ?? undefined,
+      traceSampling: params.traceSampling ?? undefined,
+      responseCaptureEnabled: params.responseCaptureEnabled ?? undefined,
+      recoveryThreshold: params.recoveryThreshold ?? undefined,
+      downtimeThreshold: params.downtimeThreshold ?? undefined,
+    });
+
+    return structuredResult({
+      monitor: toUptimeMonitorSummary(
+        monitor,
+        apiService.getUptimeMonitorUrl(organizationSlug, monitor.id),
+      ),
+    });
+  },
+});

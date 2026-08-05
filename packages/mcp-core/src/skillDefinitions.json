@@ -2,10 +2,10 @@
   {
     "id": "inspect",
     "name": "Inspect Issues & Events",
-    "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, monitors, profiles, documentation, and project metadata",
+    "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, cron monitors, uptime monitors, profiles, documentation, and project metadata",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 35,
+    "toolCount": 37,
     "tools": [
       {
         "name": "find_alert_rules",
@@ -41,6 +41,11 @@
         "name": "find_teams",
         "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
         "requiredScopes": ["team:read"]
+      },
+      {
+        "name": "find_uptime_monitors",
+        "description": "Find Sentry uptime monitors.\n\nUse this tool when you need to:\n- List HTTP uptime monitors in an organization\n- Find a monitor by name or URL before getting details\n- Check monitor status, owner, project, interval, or target URL\n- When `hasMore` is true, narrow results with project, environment, owner, or query filters\n\nThis is separate from cron monitors (`find_monitors`).\n\n<examples>\nfind_uptime_monitors(organizationSlug='my-organization')\nfind_uptime_monitors(organizationSlug='my-organization', projectSlug='backend', query='api')\n</examples>",
+        "requiredScopes": ["org:read", "project:read"]
       },
       {
         "name": "get_ai_conversation_details",
@@ -151,6 +156,11 @@
         "name": "get_trace_details",
         "description": "Get detailed information about a specific Sentry trace by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific trace ID (e.g., 'a4d1aae7216b47ff8117cf4e09ce9d0a')\n- Ask to 'show me trace [TRACE-ID]', 'explain trace [TRACE-ID]'\n- Want high-level overview and link to view trace details in Sentry\n- Need trace statistics and span breakdown\n- Want an overview first, then a guided pivot into additional spans or events\n\nDO NOT USE for:\n- General searching for traces (use search_events with trace queries)\n- Complete span enumeration or branch-by-branch reconstruction (use search_events scoped to the trace)\n\nTRIGGER PATTERNS:\n- 'Show me trace abc123' → use get_trace_details\n- 'Explain trace a4d1aae7216b47ff8117cf4e09ce9d0a' → use get_trace_details\n- 'What is trace [trace-id]' → use get_trace_details\n\n<examples>\n### Get trace overview\n```\nget_trace_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\n```\n\n### Focus a single span\n```\nget_trace_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a', spanId='aa8e7f3384ef4ff5')\n```\n</examples>\n\n<hints>\n- Trace IDs are 32-character hexadecimal strings\n- This returns a condensed trace overview, not a full span dump\n- Provide `spanId` to focus on a single span within the trace\n- If the response says it shows a subset of spans, use search_events to inspect the rest of the trace\n</hints>",
         "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "get_uptime_monitor_details",
+        "description": "Get details for a Sentry uptime monitor, including recent checks.\n\nUse this tool when you need to:\n- Inspect an uptime monitor's URL, interval, thresholds, and status\n- Review recent HTTP check results (success/failure, status code, duration)\n- Debug why an uptime monitor is failing\n\nThis is separate from cron monitors (`get_monitor_details`).\n\n<examples>\nget_uptime_monitor_details(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345')\nget_uptime_monitor_details(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', period='7d', checkLimit=20)\n</examples>",
+        "requiredScopes": ["project:read"]
       },
       {
         "name": "search_ai_conversations",
@@ -383,10 +393,10 @@
   {
     "id": "project-management",
     "name": "Manage Projects & Teams",
-    "description": "Create and modify projects, teams, and DSNs",
+    "description": "Create and modify projects, teams, DSNs, and uptime monitors",
     "defaultEnabled": false,
     "order": 5,
-    "toolCount": 12,
+    "toolCount": 15,
     "tools": [
       {
         "name": "add_team_to_project",
@@ -407,6 +417,16 @@
         "name": "create_team",
         "description": "Create a new team in Sentry.\n\nUSE THIS TOOL WHEN USERS WANT TO:\n- 'Create a new team'\n- 'Set up a team called [X]'\n- 'I need a team for my project'\n\nBe careful when using this tool!\n\n<examples>\n### Create a new team\n```\ncreate_team(organizationSlug='my-organization', name='the-goats')\n```\n</examples>\n\n<hints>\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n</hints>",
         "requiredScopes": ["team:write"]
+      },
+      {
+        "name": "create_uptime_monitor",
+        "description": "Create a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Start monitoring a URL for availability\n- Create a new uptime check with interval and timeout\n\nBe careful when using this tool!\n\nRequired fields match Sentry's uptime API: name, url, intervalSeconds, timeoutMs.\n\n<examples>\ncreate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='API Health', url='https://api.example.com/health', intervalSeconds=60, timeoutMs=5000)\ncreate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='Checkout', url='https://example.com/checkout', intervalSeconds=300, timeoutMs=10000, method='GET', environment='production')\n</examples>\n\n<hints>\n- intervalSeconds must be one of 60, 300, 600, 1200, 1800, 3600.\n- timeoutMs must be between 1000 and 60000.\n- owner format is `user:ID` or `team:ID`.\n- Advanced assertions can be passed as JSON via `assertion` when needed.\n</hints>",
+        "requiredScopes": ["project:write"]
+      },
+      {
+        "name": "delete_uptime_monitor",
+        "description": "Delete a Sentry HTTP uptime monitor.\n\nUse this tool when you need to permanently remove an uptime monitor.\n\nBe careful when using this tool! Deletion cannot be undone.\n\n<examples>\ndelete_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345')\n</examples>",
+        "requiredScopes": ["project:write"]
       },
       {
         "name": "find_dsns",
@@ -441,6 +461,11 @@
       {
         "name": "update_project",
         "description": "Update project metadata in Sentry, such as name, slug, and platform.\n\nBe careful when using this tool!\n\nUse this tool when you need to:\n- Update a project's name or slug to fix onboarding mistakes\n- Change the platform assigned to a project\n\n<examples>\n### Update a project's name and slug\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')\n```\n\n### Update platform\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', platform='python')\n```\n\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Team access changes are handled by separate project-management tools.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- When updating the slug, the project will be accessible at the new slug after the update\n- Do not update the slug from a project-scoped session; reconnect with an organization-scoped or unconstrained session first.\n</hints>",
+        "requiredScopes": ["project:write"]
+      },
+      {
+        "name": "update_uptime_monitor",
+        "description": "Update a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Change URL, interval, timeout, method, headers, or body\n- Enable or disable a monitor (`status`)\n- Update owner, environment, or failure thresholds\n\nBe careful when using this tool!\n\n<examples>\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', status='disabled')\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', intervalSeconds=300, timeoutMs=8000)\n</examples>",
         "requiredScopes": ["project:write"]
       },
       {

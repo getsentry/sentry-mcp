@@ -1,0 +1,25 @@
+{
+  "id": "4509100000001001",
+  "projectSlug": "cloudflare-mcp",
+  "environment": "production",
+  "name": "API Health",
+  "status": "active",
+  "uptimeStatus": 1,
+  "mode": 1,
+  "owner": {
+    "type": "team",
+    "id": "4509109078196224",
+    "name": "the-goats"
+  },
+  "recoveryThreshold": 1,
+  "downtimeThreshold": 3,
+  "url": "https://example.com/health",
+  "method": "GET",
+  "body": null,
+  "headers": [],
+  "intervalSeconds": 60,
+  "timeoutMs": 5000,
+  "traceSampling": false,
+  "responseCaptureEnabled": true,
+  "assertion": null
+}
