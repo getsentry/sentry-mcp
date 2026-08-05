@@ -5,7 +5,7 @@ import { USER_AGENT } from "../../version";
 import type { ProviderOptions } from "./types";
 
 const DEFAULT_OPENROUTER_MODEL = "openai/gpt-5.6-luna";
-const DEFAULT_OPENROUTER_REASONING_EFFORT = "medium";
+const DEFAULT_OPENROUTER_REASONING_EFFORT = "high";
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 // Matches @ai-sdk/openai chat providerOptions.openai.reasoningEffort.
