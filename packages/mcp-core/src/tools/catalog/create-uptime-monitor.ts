@@ -15,6 +15,7 @@ import {
   ParamUptimeHttpMethod,
   ParamUptimeIntervalSeconds,
   ParamUptimeMonitorStatus,
+  ParamUptimeOwner,
   ParamUptimeTimeoutMs,
   toUptimeMonitorSummary,
   uptimeMonitorSummarySchema,
@@ -74,12 +75,7 @@ export default defineTool({
       .nullable()
       .default(null),
     status: ParamUptimeMonitorStatus.nullable().default(null),
-    owner: z
-      .string()
-      .trim()
-      .describe("Optional owner actor, e.g. `user:123` or `team:456`.")
-      .nullable()
-      .default(null),
+    owner: ParamUptimeOwner.nullable().default(null),
     environment: z
       .string()
       .trim()

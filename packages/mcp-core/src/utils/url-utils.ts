@@ -448,12 +448,13 @@ export function getUptimeMonitorUrl(
   uptimeMonitorId: string | number,
   protocol: SentryProtocol = "https",
 ): string {
-  const encodedOrg = encodeURIComponent(organizationSlug);
   const encodedId = encodeURIComponent(String(uptimeMonitorId));
-  if (isSentryHost(host)) {
-    return `${protocol}://${encodedOrg}.${host}/monitors/${encodedId}/`;
-  }
-  return `${protocol}://${host}/organizations/${encodedOrg}/monitors/${encodedId}/`;
+  return getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    `/monitors/${encodedId}/`,
+    protocol,
+  );
 }
 
 export function getReleaseUrl(

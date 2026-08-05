@@ -1,3 +1,5 @@
+import { mswServer } from "@sentry/mcp-server-mocks";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import {
   assertStructuredOnlyResult,
@@ -72,5 +74,69 @@ describe("update_uptime_monitor", () => {
         },
       }
     `);
+  });
+
+  it("clears owner when empty string is provided", async () => {
+    let requestBody: Record<string, unknown> | null = null;
+    mswServer.use(
+      http.put(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/uptime/4509100000001001/",
+        async ({ request }) => {
+          requestBody = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json({
+            id: "4509100000001001",
+            projectSlug: "cloudflare-mcp",
+            environment: "production",
+            name: "API Health",
+            status: "active",
+            uptimeStatus: 1,
+            owner: null,
+            recoveryThreshold: 1,
+            downtimeThreshold: 3,
+            url: "https://example.com/health",
+            method: "GET",
+            body: null,
+            headers: [],
+            intervalSeconds: 60,
+            timeoutMs: 5000,
+            traceSampling: false,
+            responseCaptureEnabled: true,
+            assertion: null,
+          });
+        },
+      ),
+    );
+
+    const result = await updateUptimeMonitor.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        projectSlug: "cloudflare-mcp",
+        uptimeMonitorId: "4509100000001001",
+        name: null,
+        url: null,
+        intervalSeconds: null,
+        timeoutMs: null,
+        method: null,
+        headers: null,
+        body: null,
+        assertion: null,
+        status: null,
+        owner: "",
+        environment: null,
+        traceSampling: null,
+        responseCaptureEnabled: null,
+        recoveryThreshold: null,
+        downtimeThreshold: null,
+      },
+      context,
+    );
+
+    expect(requestBody).toEqual({ owner: null });
+    assertStructuredOnlyResult(result);
+    expect(
+      (getStructuredContent(result) as { monitor: { owner: string | null } })
+        .monitor.owner,
+    ).toBeNull();
   });
 });

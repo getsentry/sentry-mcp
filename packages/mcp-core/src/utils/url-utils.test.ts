@@ -585,5 +585,14 @@ describe("url-utils", () => {
         "http://sentry.internal:9000/organizations/my-org/monitors/12345/",
       );
     });
+
+    it("normalizes regional saas hosts to sentry.io web urls", () => {
+      expect(getUptimeMonitorUrl("us.sentry.io", "my-org", "12345")).toBe(
+        "https://my-org.sentry.io/monitors/12345/",
+      );
+      expect(getUptimeMonitorUrl("de.sentry.io", "my-org", "12345")).toBe(
+        "https://my-org.sentry.io/monitors/12345/",
+      );
+    });
   });
 });

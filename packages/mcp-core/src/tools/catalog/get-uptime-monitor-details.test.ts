@@ -1,3 +1,5 @@
+import { mswServer } from "@sentry/mcp-server-mocks";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import getUptimeMonitorDetails from "./get-uptime-monitor-details.js";
 
@@ -10,7 +12,7 @@ const context = {
 };
 
 describe("get_uptime_monitor_details", () => {
-  it("serializes uptime monitor details", async () => {
+  it("serializes uptime monitor details without leaking secrets", async () => {
     const result = await getUptimeMonitorDetails.handler(
       {
         organizationSlug: "sentry-mcp-evals",
@@ -44,6 +46,13 @@ describe("get_uptime_monitor_details", () => {
       **Response Capture**: true
       **Web URL**: [Open Monitor](https://sentry-mcp-evals.sentry.io/monitors/4509100000001001/)
 
+      ## Headers
+
+      - Accept: application/json
+      - Authorization: [REDACTED]
+
+      _Sensitive header values are redacted. Request body is omitted from this view._
+
       ## Recent Checks
 
       - 2025-04-14T02:00:13.000Z: success, HTTP 200, 142ms, US East, production
@@ -52,7 +61,54 @@ describe("get_uptime_monitor_details", () => {
       ## Response Notes
 
       - Search related issues with \`search_issues\` query \`uptime_rule:4509100000001001\`.
+      - Request body is never included in this response. Sensitive header values are redacted.
       "
     `);
+    expect(String(result)).not.toContain("secret-token");
+    expect(String(result)).not.toContain("should-not-appear");
+  });
+
+  it("skips malformed short header arrays", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/uptime/4509100000001001/",
+        () =>
+          HttpResponse.json({
+            id: "4509100000001001",
+            projectSlug: "cloudflare-mcp",
+            environment: null,
+            name: "API Health",
+            status: "active",
+            uptimeStatus: 1,
+            url: "https://example.com/health",
+            method: "GET",
+            body: null,
+            headers: [["Authorization"], ["X-Custom", "ok"]],
+            intervalSeconds: 60,
+            timeoutMs: 5000,
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/uptime/4509100000001001/checks/",
+        () => HttpResponse.json([]),
+      ),
+    );
+
+    const result = await getUptimeMonitorDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        projectSlug: "cloudflare-mcp",
+        uptimeMonitorId: "4509100000001001",
+        period: "24h",
+        start: null,
+        end: null,
+        checkLimit: 10,
+      },
+      context,
+    );
+
+    expect(String(result)).toContain("- X-Custom: ok");
+    expect(String(result)).not.toContain("undefined");
   });
 });

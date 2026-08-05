@@ -465,7 +465,7 @@
       },
       {
         "name": "update_uptime_monitor",
-        "description": "Update a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Change URL, interval, timeout, method, headers, or body\n- Enable or disable a monitor (`status`)\n- Update owner, environment, or failure thresholds\n\nBe careful when using this tool!\n\n<examples>\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', status='disabled')\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', intervalSeconds=300, timeoutMs=8000)\n</examples>",
+        "description": "Update a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Change URL, interval, timeout, method, headers, or body\n- Enable or disable a monitor (`status`)\n- Update owner, environment, or failure thresholds\n\nBe careful when using this tool!\n\nTo clear nullable fields: pass empty string for `owner`, `environment`, or `body`; pass `{}` for `assertion`.\nOmit a field (or pass null) to leave it unchanged.\n\n<examples>\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', status='disabled')\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', intervalSeconds=300, timeoutMs=8000)\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', owner='')\n</examples>",
         "requiredScopes": ["project:write"]
       },
       {

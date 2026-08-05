@@ -15,8 +15,17 @@
   "downtimeThreshold": 3,
   "url": "https://example.com/health",
   "method": "GET",
-  "body": null,
-  "headers": [],
+  "body": "{\"token\":\"should-not-appear\"}",
+  "headers": [
+    [
+      "Accept",
+      "application/json"
+    ],
+    [
+      "Authorization",
+      "Bearer secret-token"
+    ]
+  ],
   "intervalSeconds": 60,
   "timeoutMs": 5000,
   "traceSampling": false,

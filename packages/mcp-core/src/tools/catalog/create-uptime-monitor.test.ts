@@ -116,4 +116,9 @@ describe("create_uptime_monitor", () => {
       }
     `);
   });
+
+  it("rejects empty owner in the input schema", () => {
+    const result = createUptimeMonitor.inputSchema.owner.safeParse("   ");
+    expect(result.success).toBe(false);
+  });
 });

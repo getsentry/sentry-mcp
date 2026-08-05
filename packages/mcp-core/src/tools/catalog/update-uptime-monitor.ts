@@ -16,6 +16,7 @@ import {
   ParamUptimeHttpMethod,
   ParamUptimeIntervalSeconds,
   ParamUptimeMonitorStatus,
+  ParamUptimeOwner,
   ParamUptimeTimeoutMs,
   toUptimeMonitorSummary,
   uptimeMonitorSummarySchema,
@@ -39,9 +40,13 @@ export default defineTool({
     "",
     "Be careful when using this tool!",
     "",
+    "To clear nullable fields: pass empty string for `owner`, `environment`, or `body`; pass `{}` for `assertion`.",
+    "Omit a field (or pass null) to leave it unchanged.",
+    "",
     "<examples>",
     "update_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', status='disabled')",
     "update_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', intervalSeconds=300, timeoutMs=8000)",
+    "update_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', owner='')",
     "</examples>",
   ].join("\n"),
   inputSchema: {
@@ -59,11 +64,35 @@ export default defineTool({
     timeoutMs: ParamUptimeTimeoutMs.nullable().default(null),
     method: ParamUptimeHttpMethod.nullable().default(null),
     headers: ParamUptimeHeaders.nullable().default(null),
-    body: z.string().nullable().default(null),
-    assertion: z.unknown().nullable().default(null),
+    body: z
+      .string()
+      .nullable()
+      .default(null)
+      .describe("Request body. Pass an empty string to clear the body."),
+    assertion: z
+      .unknown()
+      .nullable()
+      .default(null)
+      .describe(
+        "Assertion JSON. Pass an empty object `{}` to clear assertions.",
+      ),
     status: ParamUptimeMonitorStatus.nullable().default(null),
-    owner: z.string().trim().nullable().default(null),
-    environment: z.string().trim().max(64).nullable().default(null),
+    owner: z
+      .union([ParamUptimeOwner, z.literal("")])
+      .nullable()
+      .default(null)
+      .describe(
+        "Owner actor in `user:ID` or `team:ID` format. Pass an empty string to clear the owner.",
+      ),
+    environment: z
+      .string()
+      .trim()
+      .max(64)
+      .nullable()
+      .default(null)
+      .describe(
+        "Environment name. Pass an empty string to clear the environment.",
+      ),
     traceSampling: z.boolean().nullable().default(null),
     responseCaptureEnabled: z.boolean().nullable().default(null),
     recoveryThreshold: z.number().int().min(1).nullable().default(null),
@@ -90,6 +119,17 @@ export default defineTool({
       scopedProjectSlug: context.constraints.projectSlug,
       project: { slug: params.projectSlug },
     });
+
+    // null/default = omit. Empty string clears owner/environment/body.
+    // Empty object clears assertion.
+    const clearOwner = params.owner === "";
+    const clearEnvironment = params.environment === "";
+    const clearBody = params.body === "";
+    const clearAssertion =
+      params.assertion !== null &&
+      typeof params.assertion === "object" &&
+      !Array.isArray(params.assertion) &&
+      Object.keys(params.assertion as Record<string, unknown>).length === 0;
 
     const hasUpdate =
       params.name !== null ||
@@ -124,11 +164,11 @@ export default defineTool({
       timeoutMs: params.timeoutMs ?? undefined,
       method: params.method ?? undefined,
       headers: params.headers ?? undefined,
-      body: params.body ?? undefined,
-      assertion: params.assertion ?? undefined,
+      body: clearBody ? null : (params.body ?? undefined),
+      assertion: clearAssertion ? null : (params.assertion ?? undefined),
       status: params.status ?? undefined,
-      owner: params.owner ?? undefined,
-      environment: params.environment ?? undefined,
+      owner: clearOwner ? null : (params.owner ?? undefined),
+      environment: clearEnvironment ? null : (params.environment ?? undefined),
       traceSampling: params.traceSampling ?? undefined,
       responseCaptureEnabled: params.responseCaptureEnabled ?? undefined,
       recoveryThreshold: params.recoveryThreshold ?? undefined,

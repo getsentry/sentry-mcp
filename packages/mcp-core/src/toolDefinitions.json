@@ -426,7 +426,7 @@
                   }
                 ]
               },
-              "description": "Optional HTTP headers as an array of [name, value] pairs, e.g. [[\"Authorization\",\"Bearer ...\"]]."
+              "description": "Optional HTTP headers as an array of [name, value] pairs, e.g. [[\"Accept\",\"application/json\"]]."
             },
             {
               "type": "null"
@@ -474,7 +474,9 @@
           "anyOf": [
             {
               "type": "string",
-              "description": "Optional owner actor, e.g. `user:123` or `team:456`."
+              "minLength": 1,
+              "pattern": "^(user|team):.+$",
+              "description": "Owner actor in `user:ID` or `team:ID` format."
             },
             {
               "type": "null"
@@ -5194,7 +5196,7 @@
   },
   {
     "name": "update_uptime_monitor",
-    "description": "Update a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Change URL, interval, timeout, method, headers, or body\n- Enable or disable a monitor (`status`)\n- Update owner, environment, or failure thresholds\n\nBe careful when using this tool!\n\n<examples>\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', status='disabled')\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', intervalSeconds=300, timeoutMs=8000)\n</examples>",
+    "description": "Update a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Change URL, interval, timeout, method, headers, or body\n- Enable or disable a monitor (`status`)\n- Update owner, environment, or failure thresholds\n\nBe careful when using this tool!\n\nTo clear nullable fields: pass empty string for `owner`, `environment`, or `body`; pass `{}` for `assertion`.\nOmit a field (or pass null) to leave it unchanged.\n\n<examples>\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', status='disabled')\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', intervalSeconds=300, timeoutMs=8000)\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', owner='')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -5313,7 +5315,7 @@
                   }
                 ]
               },
-              "description": "Optional HTTP headers as an array of [name, value] pairs, e.g. [[\"Authorization\",\"Bearer ...\"]]."
+              "description": "Optional HTTP headers as an array of [name, value] pairs, e.g. [[\"Accept\",\"application/json\"]]."
             },
             {
               "type": "null"
@@ -5322,6 +5324,7 @@
         },
         "body": {
           "default": null,
+          "description": "Request body. Pass an empty string to clear the body.",
           "anyOf": [
             {
               "type": "string"
@@ -5333,6 +5336,7 @@
         },
         "assertion": {
           "default": null,
+          "description": "Assertion JSON. Pass an empty object `{}` to clear assertions.",
           "anyOf": [
             {},
             {
@@ -5355,9 +5359,21 @@
         },
         "owner": {
           "default": null,
+          "description": "Owner actor in `user:ID` or `team:ID` format. Pass an empty string to clear the owner.",
           "anyOf": [
             {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^(user|team):.+$",
+                  "description": "Owner actor in `user:ID` or `team:ID` format."
+                },
+                {
+                  "type": "string",
+                  "const": ""
+                }
+              ]
             },
             {
               "type": "null"
@@ -5366,6 +5382,7 @@
         },
         "environment": {
           "default": null,
+          "description": "Environment name. Pass an empty string to clear the environment.",
           "anyOf": [
             {
               "type": "string",

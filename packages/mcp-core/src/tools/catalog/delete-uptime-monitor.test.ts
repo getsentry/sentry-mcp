@@ -1,3 +1,5 @@
+import { mswServer } from "@sentry/mcp-server-mocks";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import {
   assertStructuredOnlyResult,
@@ -39,5 +41,35 @@ describe("delete_uptime_monitor", () => {
         "uptimeMonitorId": "4509100000001001",
       }
     `);
+  });
+
+  it("treats a second delete 404 as success", async () => {
+    mswServer.use(
+      http.delete(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/uptime/4509100000001001/",
+        () => new HttpResponse(null, { status: 404 }),
+      ),
+    );
+
+    const result = await deleteUptimeMonitor.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        projectSlug: "cloudflare-mcp",
+        uptimeMonitorId: "4509100000001001",
+      },
+      context,
+    );
+
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toEqual({
+      success: true,
+      uptimeMonitorId: "4509100000001001",
+      projectSlug: "cloudflare-mcp",
+    });
+  });
+
+  it("claims idempotency", () => {
+    expect(deleteUptimeMonitor.annotations.idempotentHint).toBe(true);
   });
 });

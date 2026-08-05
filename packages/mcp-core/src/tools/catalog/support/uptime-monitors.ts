@@ -54,8 +54,70 @@ export const ParamUptimeTimeoutMs = z
 export const ParamUptimeHeaders = z
   .array(z.tuple([z.string(), z.string()]))
   .describe(
-    'Optional HTTP headers as an array of [name, value] pairs, e.g. [["Authorization","Bearer ..."]].',
+    'Optional HTTP headers as an array of [name, value] pairs, e.g. [["Accept","application/json"]].',
   );
+
+/** Owner actor for create/update. Empty/whitespace rejected. */
+export const ParamUptimeOwner = z
+  .string()
+  .trim()
+  .min(1)
+  .regex(
+    /^(user|team):.+$/,
+    "owner must use `user:ID` or `team:ID` format (e.g. `user:123` or `team:456`).",
+  )
+  .describe("Owner actor in `user:ID` or `team:ID` format.");
+
+const SENSITIVE_HEADER_NAMES = new Set([
+  "authorization",
+  "proxy-authorization",
+  "cookie",
+  "set-cookie",
+  "x-api-key",
+  "x-auth-token",
+  "x-access-token",
+  "x-csrf-token",
+  "x-sentry-auth",
+]);
+
+export function isSensitiveHeaderName(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  if (SENSITIVE_HEADER_NAMES.has(normalized)) {
+    return true;
+  }
+  return (
+    normalized.includes("authorization") ||
+    normalized.includes("api-key") ||
+    normalized.includes("access-token") ||
+    normalized.includes("secret") ||
+    normalized.includes("password")
+  );
+}
+
+/**
+ * Format headers for tool output without leaking secrets.
+ * Malformed short arrays are skipped. Sensitive values are redacted.
+ */
+export function formatUptimeHeadersForOutput(headers: unknown): string[] {
+  if (!Array.isArray(headers) || headers.length === 0) {
+    return [];
+  }
+
+  const lines: string[] = [];
+  for (const header of headers) {
+    if (!Array.isArray(header) || header.length < 2) {
+      continue;
+    }
+    const name = header[0];
+    const value = header[1];
+    if (typeof name !== "string" || typeof value !== "string") {
+      continue;
+    }
+    const displayValue = isSensitiveHeaderName(name) ? "[REDACTED]" : value;
+    lines.push(`- ${name}: ${displayValue}`);
+  }
+  return lines;
+}
 
 export const uptimeMonitorSummarySchema = z.object({
   id: z.string(),

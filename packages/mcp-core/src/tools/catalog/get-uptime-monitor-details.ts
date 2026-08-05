@@ -10,13 +10,10 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import type { ServerContext } from "../../types";
-import {
-  compactLines,
-  formatDate,
-  formatUnknown,
-} from "./support/api-formatting";
+import { compactLines, formatDate } from "./support/api-formatting";
 import { assertProjectRefWithinConstraint } from "./support/project-constraints";
 import {
+  formatUptimeHeadersForOutput,
   formatUptimeStatus,
   getUptimeOwnerName,
 } from "./support/uptime-monitors";
@@ -196,16 +193,20 @@ export default defineTool({
       `**Web URL**: [Open Monitor](${webUrl})`,
     ]);
 
-    if (monitor.headers && monitor.headers.length > 0) {
-      output.push("", "## Headers", "");
-      for (const header of monitor.headers) {
-        const [name, value] = header;
-        output.push(`- ${name}: ${value}`);
-      }
-    }
-
-    if (monitor.body) {
-      output.push("", "## Body", "", "```", monitor.body, "```");
+    const headerLines = formatUptimeHeadersForOutput(monitor.headers);
+    if (headerLines.length > 0) {
+      output.push("", "## Headers", "", ...headerLines);
+      output.push(
+        "",
+        "_Sensitive header values are redacted. Request body is omitted from this view._",
+      );
+    } else if (monitor.body) {
+      output.push(
+        "",
+        "## Request Payload",
+        "",
+        "Request body is configured but omitted from this view to avoid leaking secrets.",
+      );
     }
 
     if (monitor.assertion !== undefined && monitor.assertion !== null) {
@@ -230,11 +231,9 @@ export default defineTool({
     output.push(
       `- Search related issues with \`search_issues\` query \`uptime_rule:${monitor.id}\`.`,
     );
-    if (monitor.assertion !== undefined && monitor.assertion !== null) {
-      output.push(
-        `- Assertion payload is included as returned by Sentry: ${formatUnknown(monitor.assertion)}.`,
-      );
-    }
+    output.push(
+      "- Request body is never included in this response. Sensitive header values are redacted.",
+    );
 
     return `${output.join("\n")}\n`;
   },
