@@ -86,6 +86,10 @@ import type {
   MonitorSchema,
   MonitorStatsSchema,
   MonitorStatSchema,
+  UptimeCheckListSchema,
+  UptimeCheckSchema,
+  UptimeMonitorListSchema,
+  UptimeMonitorSchema,
   MetricAlertRuleListSchema,
   MetricAlertRuleSchema,
   OrganizationListSchema,
@@ -141,6 +145,8 @@ export type IssueComment = z.infer<typeof IssueCommentSchema>;
 export type Monitor = z.infer<typeof MonitorSchema>;
 export type MonitorCheckIn = z.infer<typeof MonitorCheckInSchema>;
 export type MonitorStat = z.infer<typeof MonitorStatSchema>;
+export type UptimeMonitor = z.infer<typeof UptimeMonitorSchema>;
+export type UptimeCheck = z.infer<typeof UptimeCheckSchema>;
 
 // Individual event types
 export type ErrorEvent = z.infer<typeof ErrorEventSchema>;
@@ -187,6 +193,8 @@ export type IssueCommentList = z.infer<typeof IssueCommentListSchema>;
 export type MonitorList = z.infer<typeof MonitorListSchema>;
 export type MonitorCheckInList = z.infer<typeof MonitorCheckInListSchema>;
 export type MonitorStats = z.infer<typeof MonitorStatsSchema>;
+export type UptimeMonitorList = z.infer<typeof UptimeMonitorListSchema>;
+export type UptimeCheckList = z.infer<typeof UptimeCheckListSchema>;
 export type EventAttachmentList = z.infer<typeof EventAttachmentListSchema>;
 export type TagList = z.infer<typeof TagListSchema>;
 export type ClientKeyList = z.infer<typeof ClientKeyListSchema>;

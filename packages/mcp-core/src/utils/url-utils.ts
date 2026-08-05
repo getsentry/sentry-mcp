@@ -1,9 +1,9 @@
+import type { SentryProtocol } from "../types";
 import {
+  type EventsDataset,
   isMetricsDataset,
   isProfilesDataset,
-  type EventsDataset,
 } from "./events-datasets";
-import type { SentryProtocol } from "../types";
 
 /**
  * Determines if a Sentry instance is SaaS or self-hosted based on the host.
@@ -436,6 +436,27 @@ export function getMonitorUrl(
  * @param releaseVersion Release version identifier
  * @returns The complete release URL
  */
+/**
+ * Generates a Sentry uptime monitor URL.
+ *
+ * Uses the monitors UI path (`/monitors/{id}/`), which is the current home for
+ * uptime detectors in Sentry.
+ */
+export function getUptimeMonitorUrl(
+  host: string,
+  organizationSlug: string,
+  uptimeMonitorId: string | number,
+  protocol: SentryProtocol = "https",
+): string {
+  const encodedId = encodeURIComponent(String(uptimeMonitorId));
+  return getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    `/monitors/${encodedId}/`,
+    protocol,
+  );
+}
+
 export function getReleaseUrl(
   host: string,
   organizationSlug: string,

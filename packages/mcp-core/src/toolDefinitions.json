@@ -340,6 +340,259 @@
     "surface": "catalog"
   },
   {
+    "name": "create_uptime_monitor",
+    "description": "Create a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Start monitoring a URL for availability\n- Create a new uptime check with interval and timeout\n\nBe careful when using this tool!\n\nRequired fields match Sentry's uptime API: name, url, intervalSeconds, timeoutMs.\nAdvanced response assertions are not supported in this MVP; configure them in the Sentry UI if needed.\n\n<examples>\ncreate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='API Health', url='https://api.example.com/health', intervalSeconds=60, timeoutMs=5000)\ncreate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='Checkout', url='https://example.com/checkout', intervalSeconds=300, timeoutMs=10000, method='GET', environment='production')\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Monitor display name."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to check."
+        },
+        "intervalSeconds": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "Seconds between checks. Allowed values: 60, 300, 600, 1200, 1800, 3600."
+        },
+        "timeoutMs": {
+          "default": 5000,
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000,
+          "description": "Request timeout in milliseconds (1000-60000)."
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS"],
+          "description": "HTTP method used for the uptime check request."
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "description": "Optional HTTP headers as an array of [name, value] pairs, e.g. [[\"Accept\",\"application/json\"]]."
+        },
+        "body": {
+          "type": "string",
+          "description": "Optional request body for methods that support a body."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "disabled"],
+          "description": "Monitor status. `disabled` stops checks and does not count against quota."
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(user|team):.+$",
+          "description": "Owner actor in `user:ID` or `team:ID` format."
+        },
+        "environment": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Optional environment name for created uptime issues."
+        },
+        "traceSampling": {
+          "type": "boolean",
+          "description": "Whether check requests may be considered for tracing."
+        },
+        "responseCaptureEnabled": {
+          "type": "boolean",
+          "description": "Capture response body/headers on failures."
+        },
+        "recoveryThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "Consecutive successful checks required to recover."
+        },
+        "downtimeThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "Consecutive failed checks required to mark down."
+        }
+      },
+      "required": [
+        "organizationSlug",
+        "projectSlug",
+        "name",
+        "url",
+        "intervalSeconds"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "monitor": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "projectSlug": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "uptimeStatus": {
+              "type": "string",
+              "enum": ["ok", "failed", "unknown"]
+            },
+            "url": {
+              "type": "string"
+            },
+            "method": {
+              "type": "string"
+            },
+            "intervalSeconds": {
+              "type": "number"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "string"
+            },
+            "webUrl": {
+              "type": "string",
+              "format": "uri"
+            },
+            "timeoutMs": {
+              "type": "number"
+            },
+            "recoveryThreshold": {
+              "type": "number"
+            },
+            "downtimeThreshold": {
+              "type": "number"
+            },
+            "traceSampling": {
+              "type": "boolean"
+            },
+            "responseCaptureEnabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "projectSlug",
+            "status",
+            "uptimeStatus",
+            "url",
+            "intervalSeconds",
+            "webUrl",
+            "timeoutMs"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["monitor"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["project:write"],
+    "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
+    "name": "delete_uptime_monitor",
+    "description": "Delete a Sentry HTTP uptime monitor.\n\nUse this tool when you need to permanently remove an uptime monitor.\n\nBe careful when using this tool! Deletion cannot be undone.\n\n<examples>\ndelete_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345')\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "uptimeMonitorId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Uptime monitor ID (detector id)."
+        }
+      },
+      "required": ["organizationSlug", "projectSlug", "uptimeMonitorId"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "const": true
+        },
+        "uptimeMonitorId": {
+          "type": "string"
+        },
+        "projectSlug": {
+          "type": "string"
+        }
+      },
+      "required": ["success", "uptimeMonitorId", "projectSlug"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["project:write"],
+    "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
     "name": "execute_sentry_tool",
     "description": "Execute an available Sentry MCP tool discovered through search_sentry_tools.\n\nUse this tool when you need to:\n- Call a Sentry operation returned by search_sentry_tools\n- Execute a tool by name using arguments that match its returned schema\n\n<examples>\nexecute_sentry_tool(name='find_projects', arguments={ organizationSlug: 'my-org' })\nexecute_sentry_tool(name='whoami', arguments={})\n</examples>\n\n<hints>\n- Use search_sentry_tools first if you are not sure which name or arguments to pass.\n- Arguments are validated against the target tool's schema before execution.\n- Active organization, project, and region constraints are injected automatically.\n</hints>",
     "inputSchema": {
@@ -1714,6 +1967,125 @@
     },
     "requiredScopes": ["team:read"],
     "skills": ["inspect", "triage", "project-management"],
+    "surface": "catalog"
+  },
+  {
+    "name": "find_uptime_monitors",
+    "description": "Find Sentry uptime monitors.\n\nUse this tool when you need to:\n- List HTTP uptime monitors in an organization\n- Find a monitor by name or URL before getting details\n- Check monitor status, owner, project, interval, or target URL\n- When `hasMore` is true, narrow results with project, environment, owner, or query filters\n\nThis is separate from cron monitors (`find_monitors`).\n\n<examples>\nfind_uptime_monitors(organizationSlug='my-organization')\nfind_uptime_monitors(organizationSlug='my-organization', projectSlug='backend', query='api')\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug."
+        },
+        "environment": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional environment name to limit monitors."
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional owner filter, such as `user:123`, `team:456`, `myteams`, or `unassigned`."
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional search query for monitor name or URL."
+        },
+        "limit": {
+          "default": 10,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 99,
+          "description": "Maximum number of monitors to return."
+        }
+      },
+      "required": ["organizationSlug"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "monitors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "projectSlug": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "uptimeStatus": {
+                "type": "string",
+                "enum": ["ok", "failed", "unknown"]
+              },
+              "url": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string"
+              },
+              "intervalSeconds": {
+                "type": "number"
+              },
+              "environment": {
+                "type": "string"
+              },
+              "owner": {
+                "type": "string"
+              },
+              "webUrl": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "projectSlug",
+              "status",
+              "uptimeStatus",
+              "url",
+              "intervalSeconds",
+              "webUrl"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      },
+      "required": ["monitors", "hasMore"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["org:read", "project:read"],
+    "skills": ["inspect"],
     "surface": "catalog"
   },
   {
@@ -3346,6 +3718,68 @@
     "surface": "catalog"
   },
   {
+    "name": "get_uptime_monitor_details",
+    "description": "Get details for a Sentry uptime monitor, including recent checks.\n\nUse this tool when you need to:\n- Inspect an uptime monitor's URL, interval, thresholds, and status\n- Review recent HTTP check results (success/failure, status code, duration)\n- Debug why an uptime monitor is failing\n\nThis is separate from cron monitors (`get_monitor_details`).\n\nRequest bodies are never returned. Sensitive header values are redacted.\n\n<examples>\nget_uptime_monitor_details(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345')\nget_uptime_monitor_details(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', period='7d', checkLimit=20)\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "uptimeMonitorId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Uptime monitor ID (detector id)."
+        },
+        "period": {
+          "type": "string",
+          "pattern": "^\\d+[hdw]$",
+          "description": "Relative time range for recent checks. Defaults to `24h` when `start` and `end` are omitted."
+        },
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "description": "Absolute start time. Must be provided with `end`; do not combine with `period`."
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "description": "Absolute end time. Must be provided with `start`; do not combine with `period`."
+        },
+        "checkLimit": {
+          "default": 10,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 50,
+          "description": "Maximum number of recent checks to include."
+        }
+      },
+      "required": ["organizationSlug", "projectSlug", "uptimeMonitorId"]
+    },
+    "requiredScopes": ["project:read"],
+    "skills": ["inspect"],
+    "surface": "catalog"
+  },
+  {
     "name": "remove_team_from_project",
     "description": "Revoke a team's access to an existing Sentry project.\n\nUse this tool when you need to:\n- Remove a team from a project\n- Revoke team access without changing project metadata\n- Check project team assignments before removing access\n\nBe careful when using this tool because it revokes project access.\n\n<examples>\nremove_team_from_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- The team must already be assigned to the project.\n- This tool will not remove the last team assigned to a project.\n</hints>",
     "inputSchema": {
@@ -4457,6 +4891,218 @@
         }
       },
       "required": ["project"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["project:write"],
+    "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
+    "name": "update_uptime_monitor",
+    "description": "Update a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Change URL, interval, timeout, method, headers, or body\n- Enable or disable a monitor (`status`)\n- Update owner, environment, or failure thresholds\n\nBe careful when using this tool!\n\nOmit a field to leave it unchanged. Pass explicit `null` to clear `owner`, `environment`, or `body`.\n\n<examples>\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', status='disabled')\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', intervalSeconds=300, timeoutMs=8000)\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', owner=null)\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "uptimeMonitorId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Uptime monitor ID (detector id)."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "intervalSeconds": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "Seconds between checks. Allowed values: 60, 300, 600, 1200, 1800, 3600."
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000,
+          "description": "Request timeout in milliseconds (1000-60000)."
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS"],
+          "description": "HTTP method used for the uptime check request."
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "description": "Optional HTTP headers as an array of [name, value] pairs, e.g. [[\"Accept\",\"application/json\"]]."
+        },
+        "body": {
+          "description": "Request body. Pass `null` to clear the body.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "disabled"],
+          "description": "Monitor status. `disabled` stops checks and does not count against quota."
+        },
+        "owner": {
+          "description": "Owner actor in `user:ID` or `team:ID` format. Pass `null` to clear the owner.",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(user|team):.+$",
+              "description": "Owner actor in `user:ID` or `team:ID` format."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "environment": {
+          "description": "Environment name. Pass `null` to clear the environment.",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "traceSampling": {
+          "type": "boolean"
+        },
+        "responseCaptureEnabled": {
+          "type": "boolean"
+        },
+        "recoveryThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "downtimeThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["organizationSlug", "projectSlug", "uptimeMonitorId"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "monitor": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "projectSlug": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "uptimeStatus": {
+              "type": "string",
+              "enum": ["ok", "failed", "unknown"]
+            },
+            "url": {
+              "type": "string"
+            },
+            "method": {
+              "type": "string"
+            },
+            "intervalSeconds": {
+              "type": "number"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "string"
+            },
+            "webUrl": {
+              "type": "string",
+              "format": "uri"
+            },
+            "timeoutMs": {
+              "type": "number"
+            },
+            "recoveryThreshold": {
+              "type": "number"
+            },
+            "downtimeThreshold": {
+              "type": "number"
+            },
+            "traceSampling": {
+              "type": "boolean"
+            },
+            "responseCaptureEnabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "projectSlug",
+            "status",
+            "uptimeStatus",
+            "url",
+            "intervalSeconds",
+            "webUrl",
+            "timeoutMs"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["monitor"],
       "additionalProperties": false
     },
     "requiredScopes": ["project:write"],

@@ -29,7 +29,7 @@ export const SKILLS: Record<Skill, SkillDefinition> = {
     id: "inspect",
     name: "Inspect Issues & Events",
     description:
-      "Read-only access to core Sentry data: issues, events, traces, replays, releases, monitors, profiles, documentation, and project metadata",
+      "Read-only access to core Sentry data: issues, events, traces, replays, releases, cron monitors, uptime monitors, profiles, documentation, and project metadata",
     defaultEnabled: true,
     order: 1,
   },
@@ -60,7 +60,7 @@ export const SKILLS: Record<Skill, SkillDefinition> = {
   "project-management": {
     id: "project-management",
     name: "Manage Projects & Teams",
-    description: "Create and modify projects, teams, and DSNs",
+    description: "Create and modify projects, teams, DSNs, and uptime monitors",
     defaultEnabled: false,
     order: 5,
   },

@@ -1,9 +1,20 @@
 import { z } from "zod";
 import { DEFAULT_SEARCH_ISSUES_PERIOD } from "../constants";
+import { ConfigurationError } from "../errors";
+import { logIssue, logWarn } from "../telem/logging";
+import type { SentryProtocol } from "../types";
 import {
-  getContinuousProfileUrl as getContinuousProfileUrlUtil,
+  type EventsDataset,
+  isMetricsDataset,
+  isProfilesDataset,
+  normalizeEventsDataset,
+} from "../utils/events-datasets";
+import { isNumericId } from "../utils/slug-validation";
+import {
+  type DashboardUrlOptions,
   getAIConversationsUrl as getAIConversationsUrlUtil,
   getAIConversationUrl as getAIConversationUrlUtil,
+  getContinuousProfileUrl as getContinuousProfileUrlUtil,
   getDashboardUrl as getDashboardUrlUtil,
   getIssueUrl as getIssueUrlUtil,
   getMonitorUrl as getMonitorUrlUtil,
@@ -11,92 +22,92 @@ import {
   getProfileUrl as getProfileUrlUtil,
   getProfilingExplorerUrl,
   getReleaseUrl as getReleaseUrlUtil,
-  getReplayUrl as getReplayUrlUtil,
   getReplaysSearchUrl as getReplaysSearchUrlUtil,
+  getReplayUrl as getReplayUrlUtil,
   getTraceMetricsExploreUrl,
   getTraceUrl as getTraceUrlUtil,
+  getUptimeMonitorUrl as getUptimeMonitorUrlUtil,
   isSentryHost,
-  type DashboardUrlOptions,
   type TraceMetricIdentifier,
 } from "../utils/url-utils";
-import { isNumericId } from "../utils/slug-validation";
+import { USER_AGENT } from "../version";
 import { apiPath } from "./api-path";
+import { ApiNotFoundError, ApiValidationError, createApiError } from "./errors";
 import {
-  isMetricsDataset,
-  isProfilesDataset,
-  normalizeEventsDataset,
-  type EventsDataset,
-} from "../utils/events-datasets";
-import { logIssue, logWarn } from "../telem/logging";
-import {
-  OrganizationListSchema,
-  OrganizationSchema,
+  AIConversationDetailsResponseSchema,
+  AIConversationSummaryListSchema,
+  ApiErrorSchema,
+  AutofixRunSchema,
+  AutofixRunStateSchema,
+  ClientKeyListSchema,
   ClientKeySchema,
-  TeamListSchema,
-  TeamSchema,
-  ProjectListSchema,
-  ProjectRepositoryMappingSchema,
-  ProjectSchema,
   CommitListSchema,
+  DashboardListSchema,
+  DashboardSchema,
   DeployListSchema,
-  MonitorCheckInListSchema,
-  MonitorListSchema,
-  MonitorSchema,
-  MonitorStatsSchema,
-  RepositoryListSchema,
-  ReleaseDetailsSchema,
-  ReleaseListSchema,
+  ErrorsSearchResponseSchema,
+  EventAttachmentListSchema,
+  EventSchema,
+  ExternalIssueListSchema,
+  FlamegraphSchema,
   IssueActivityListResponseSchema,
+  IssueAlertRuleListSchema,
   IssueCommentListSchema,
   IssueCommentSchema,
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
-  ExternalIssueListSchema,
-  EventSchema,
-  EventAttachmentListSchema,
-  ErrorsSearchResponseSchema,
-  SpansSearchResponseSchema,
-  TagListSchema,
-  ApiErrorSchema,
-  ClientKeyListSchema,
-  AutofixRunSchema,
-  AutofixRunStateSchema,
-  DashboardListSchema,
-  DashboardSchema,
-  TraceMetaSchema,
-  TraceSchema,
-  UserSchema,
-  UserRegionsSchema,
-  IssueAlertRuleListSchema,
   MetricAlertRuleListSchema,
   MetricAlertRuleSchema,
-  FlamegraphSchema,
+  MonitorCheckInListSchema,
+  MonitorListSchema,
+  MonitorSchema,
+  MonitorStatsSchema,
+  OrganizationListSchema,
+  OrganizationSchema,
   ProfileChunkResponseSchema,
-  TransactionProfileSchema,
+  ProjectListSchema,
+  ProjectRepositoryMappingSchema,
+  ProjectSchema,
+  ReleaseDetailsSchema,
+  ReleaseListSchema,
   ReplayDetailsSchema,
-  ReplayListResponseSchema,
   ReplayIdsByResourceSchema,
+  ReplayListResponseSchema,
   ReplayRecordingSegmentsSchema,
+  RepositoryListSchema,
+  SpansSearchResponseSchema,
   StacktraceLinkSchema,
-  AIConversationSummaryListSchema,
-  AIConversationDetailsResponseSchema,
+  TagListSchema,
+  TeamListSchema,
+  TeamSchema,
+  TraceMetaSchema,
+  TraceSchema,
+  TransactionProfileSchema,
+  UptimeCheckListSchema,
+  UptimeMonitorListSchema,
+  UptimeMonitorSchema,
+  UserRegionsSchema,
   UserReportListSchema,
+  UserSchema,
 } from "./schema";
-import { ConfigurationError } from "../errors";
-import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
-import { USER_AGENT } from "../version";
-import type { SentryProtocol } from "../types";
 import type {
+  AIConversationDetails,
+  AIConversationSpanList,
+  AIConversationSummary,
   AutofixRun,
   AutofixRunState,
   ClientKey,
   ClientKeyList,
+  CommitList,
   Dashboard,
   DashboardListItem,
+  DeployList,
   Event,
   EventAttachment,
   EventAttachmentList,
+  ExternalIssueList,
+  Flamegraph,
   Issue,
   IssueActivityList,
   IssueAlertRule,
@@ -105,38 +116,35 @@ import type {
   IssueCommentList,
   IssueList,
   IssueTagValues,
-  ExternalIssueList,
-  CommitList,
-  DeployList,
+  MetricAlertRule,
+  MetricAlertRuleList,
   Monitor,
   MonitorCheckInList,
   MonitorList,
   MonitorStats,
-  MetricAlertRule,
-  MetricAlertRuleList,
   OrganizationList,
+  ProfileChunk,
   Project,
   ProjectList,
   ReleaseDetails,
   ReleaseList,
+  ReplayDetails,
+  ReplayList,
+  ReplayRecordingSegments,
+  StacktraceLink,
   TagList,
   Team,
   TeamList,
   Trace,
   TraceMeta,
-  User,
-  Flamegraph,
-  ProfileChunk,
   TransactionProfile,
-  ReplayDetails,
-  ReplayList,
-  ReplayRecordingSegments,
-  StacktraceLink,
-  AIConversationSummary,
-  AIConversationDetails,
-  AIConversationSpanList,
+  UptimeCheckList,
+  UptimeMonitor,
+  UptimeMonitorList,
+  User,
   UserReportList,
 } from "./types";
+
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
 // import { logger } from "@sentry/node";
@@ -243,6 +251,7 @@ function getNextCursor(linkHeader: string | null): string | null {
 
 type RequestOptions = {
   host?: string;
+  allowStatuses?: number[];
 };
 
 export type TraceItemType = "spans" | "logs" | "tracemetrics";
@@ -1047,6 +1056,18 @@ export class SentryApiService {
       monitorSlug,
       this.protocol,
       projectSlug,
+    );
+  }
+
+  getUptimeMonitorUrl(
+    organizationSlug: string,
+    uptimeMonitorId: string | number,
+  ): string {
+    return getUptimeMonitorUrlUtil(
+      this.host,
+      organizationSlug,
+      uptimeMonitorId,
+      this.protocol,
     );
   }
 
@@ -2751,6 +2772,332 @@ export class SentryApiService {
       opts,
     );
     return MonitorStatsSchema.parse(body);
+  }
+
+  /**
+   * List uptime monitors for an organization.
+   *
+   * GET /organizations/{org}/uptime/
+   * Source: src/sentry/uptime/endpoints/organiation_uptime_alert_index.py
+   */
+  async listUptimeMonitors(
+    {
+      organizationSlug,
+      projectSlug,
+      environment,
+      owner,
+      query,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      environment?: string;
+      owner?: string;
+      query?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<UptimeMonitorList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlug) {
+      // OrganizationEndpoint filter params accept project IDs via `project`.
+      const project = await this.getProject(
+        {
+          organizationSlug,
+          projectSlugOrId: projectSlug,
+        },
+        opts,
+      );
+      searchQuery.append("project", String(project.id));
+    }
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    if (owner) {
+      searchQuery.append("owner", owner);
+    }
+    if (query) {
+      searchQuery.set("query", query);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const path = apiPath`/organizations/${organizationSlug}/uptime/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return UptimeMonitorListSchema.parse(body);
+  }
+
+  /**
+   * Get a single uptime monitor.
+   *
+   * GET /projects/{org}/{project}/uptime/{id}/
+   * Source: src/sentry/uptime/endpoints/project_uptime_alert_details.py
+   */
+  async getUptimeMonitorDetails(
+    {
+      organizationSlug,
+      projectSlug,
+      uptimeMonitorId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      uptimeMonitorId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<UptimeMonitor> {
+    const body = await this.requestJSON(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/uptime/${uptimeMonitorId}/`,
+      undefined,
+      opts,
+    );
+    return UptimeMonitorSchema.parse(body);
+  }
+
+  /**
+   * List recent uptime checks for a monitor.
+   *
+   * GET /projects/{org}/{project}/uptime/{id}/checks/
+   * Source: src/sentry/uptime/endpoints/project_uptime_alert_checks_index.py
+   */
+  async listUptimeMonitorChecks(
+    {
+      organizationSlug,
+      projectSlug,
+      uptimeMonitorId,
+      statsPeriod,
+      start,
+      end,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      uptimeMonitorId: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<UptimeCheckList> {
+    const searchQuery = new URLSearchParams();
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+    const normalizedStatsPeriod = normalizeStatsPeriod(statsPeriod);
+    const effectiveStatsPeriod =
+      start || end ? normalizedStatsPeriod : (normalizedStatsPeriod ?? "24h");
+    if (effectiveStatsPeriod) {
+      parseStatsPeriod(effectiveStatsPeriod);
+    }
+    this.applyTimeParams(searchQuery, effectiveStatsPeriod, start, end);
+
+    const path =
+      apiPath`/projects/${organizationSlug}/${projectSlug}/uptime/${uptimeMonitorId}/checks/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return UptimeCheckListSchema.parse(body);
+  }
+
+  /**
+   * Create an uptime monitor.
+   *
+   * POST /projects/{org}/{project}/uptime/
+   * Source: src/sentry/uptime/endpoints/project_uptime_alert_index.py
+   * Body fields verified from UptimeMonitorValidator (camelCase via CamelSnakeSerializer).
+   */
+  async createUptimeMonitor(
+    {
+      organizationSlug,
+      projectSlug,
+      name,
+      url,
+      intervalSeconds,
+      timeoutMs,
+      method,
+      headers,
+      body,
+      assertion,
+      status,
+      owner,
+      environment,
+      traceSampling,
+      responseCaptureEnabled,
+      recoveryThreshold,
+      downtimeThreshold,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      name: string;
+      url: string;
+      intervalSeconds: number;
+      timeoutMs: number;
+      method?: string;
+      headers?: Array<[string, string]>;
+      body?: string | null;
+      assertion?: unknown | null;
+      status?: "active" | "disabled";
+      owner?: string | null;
+      environment?: string | null;
+      traceSampling?: boolean;
+      responseCaptureEnabled?: boolean;
+      recoveryThreshold?: number;
+      downtimeThreshold?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<UptimeMonitor> {
+    const payload: Record<string, unknown> = {
+      name,
+      url,
+      intervalSeconds,
+      timeoutMs,
+    };
+    if (method !== undefined) payload.method = method;
+    if (headers !== undefined) payload.headers = headers;
+    if (body !== undefined) payload.body = body;
+    if (assertion !== undefined) payload.assertion = assertion;
+    if (status !== undefined) payload.status = status;
+    if (owner !== undefined) payload.owner = owner;
+    if (environment !== undefined) payload.environment = environment;
+    if (traceSampling !== undefined) payload.traceSampling = traceSampling;
+    if (responseCaptureEnabled !== undefined) {
+      payload.responseCaptureEnabled = responseCaptureEnabled;
+    }
+    if (recoveryThreshold !== undefined) {
+      payload.recoveryThreshold = recoveryThreshold;
+    }
+    if (downtimeThreshold !== undefined) {
+      payload.downtimeThreshold = downtimeThreshold;
+    }
+
+    const responseBody = await this.requestJSON(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/uptime/`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      opts,
+    );
+    return UptimeMonitorSchema.parse(responseBody);
+  }
+
+  /**
+   * Update an uptime monitor.
+   *
+   * PUT /projects/{org}/{project}/uptime/{id}/
+   * Source: src/sentry/uptime/endpoints/project_uptime_alert_details.py
+   */
+  async updateUptimeMonitor(
+    {
+      organizationSlug,
+      projectSlug,
+      uptimeMonitorId,
+      name,
+      url,
+      intervalSeconds,
+      timeoutMs,
+      method,
+      headers,
+      body,
+      assertion,
+      status,
+      owner,
+      environment,
+      traceSampling,
+      responseCaptureEnabled,
+      recoveryThreshold,
+      downtimeThreshold,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      uptimeMonitorId: string;
+      name?: string;
+      url?: string;
+      intervalSeconds?: number;
+      timeoutMs?: number;
+      method?: string;
+      headers?: Array<[string, string]>;
+      body?: string | null;
+      assertion?: unknown | null;
+      status?: "active" | "disabled";
+      owner?: string | null;
+      environment?: string | null;
+      traceSampling?: boolean;
+      responseCaptureEnabled?: boolean;
+      recoveryThreshold?: number;
+      downtimeThreshold?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<UptimeMonitor> {
+    const payload: Record<string, unknown> = {};
+    if (name !== undefined) payload.name = name;
+    if (url !== undefined) payload.url = url;
+    if (intervalSeconds !== undefined)
+      payload.intervalSeconds = intervalSeconds;
+    if (timeoutMs !== undefined) payload.timeoutMs = timeoutMs;
+    if (method !== undefined) payload.method = method;
+    if (headers !== undefined) payload.headers = headers;
+    if (body !== undefined) payload.body = body;
+    if (assertion !== undefined) payload.assertion = assertion;
+    if (status !== undefined) payload.status = status;
+    if (owner !== undefined) payload.owner = owner;
+    if (environment !== undefined) payload.environment = environment;
+    if (traceSampling !== undefined) payload.traceSampling = traceSampling;
+    if (responseCaptureEnabled !== undefined) {
+      payload.responseCaptureEnabled = responseCaptureEnabled;
+    }
+    if (recoveryThreshold !== undefined) {
+      payload.recoveryThreshold = recoveryThreshold;
+    }
+    if (downtimeThreshold !== undefined) {
+      payload.downtimeThreshold = downtimeThreshold;
+    }
+
+    const responseBody = await this.requestJSON(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/uptime/${uptimeMonitorId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      },
+      opts,
+    );
+    return UptimeMonitorSchema.parse(responseBody);
+  }
+
+  /**
+   * Delete an uptime monitor.
+   *
+   * DELETE /projects/{org}/{project}/uptime/{id}/
+   * Source: src/sentry/uptime/endpoints/project_uptime_alert_details.py
+   * Returns 202 with empty body.
+   */
+  async deleteUptimeMonitor(
+    {
+      organizationSlug,
+      projectSlug,
+      uptimeMonitorId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      uptimeMonitorId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    // Treat 404 as success so repeated deletes are idempotent.
+    await this.request(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/uptime/${uptimeMonitorId}/`,
+      {
+        method: "DELETE",
+      },
+      { ...opts, allowStatuses: [404] },
+    );
   }
 
   /**
