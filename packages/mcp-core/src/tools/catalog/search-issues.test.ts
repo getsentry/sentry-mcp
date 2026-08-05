@@ -1,10 +1,10 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { generateText } from "ai";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import searchIssues from "./search-issues";
-import { prepareToolParams } from "../catalog-runtime/availability";
 import type { ServerContext } from "../../types";
+import { prepareToolParams } from "../catalog-runtime/availability";
+import searchIssues from "./search-issues";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -146,7 +146,13 @@ describe("search_issues", () => {
       - Get more details about a specific issue: Use get_sentry_resource with the issue ID or issue URL
       - Update issue status: Use the Sentry tool \`update_issue\` to resolve or assign issues
       - View event counts: Use search_events for aggregated statistics
-      "
+
+
+      ## Executed Search
+
+      - Query: \`is:unresolved\`
+      - Sort: date
+      - Time range: Last 30d"
     `);
   });
 
@@ -205,6 +211,34 @@ describe("search_issues", () => {
     expect(mockGenerateText).not.toHaveBeenCalled();
     expect(result).toContain("PROJ-123");
     expect(result).toContain("Test Error");
+  });
+
+  it("uses a safe inline-code fence for executed queries with backticks", async () => {
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
+    process.env.OPENROUTER_API_KEY = "";
+
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/*/issues/", () =>
+        HttpResponse.json([]),
+      ),
+    );
+
+    const result = await searchIssues.handler(
+      {
+        organizationSlug: "test-org",
+        query: "has:error `token`",
+        sort: "date",
+        projectSlugOrId: null,
+        regionUrl: null,
+        limit: 10,
+        period: "30d",
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    expect(result).toContain("- Query: `` has:error `token` ``");
   });
 
   it("omits update_issue guidance when update_issue is unavailable in the session", async () => {
@@ -673,6 +707,46 @@ describe("search_issues", () => {
     expect(result).toContain("PROJ-123");
     expect(result).toContain("Test Error");
     expect(result).toContain("unresolved");
+  });
+
+  it("rejects partial, conflicting, and reversed time ranges", async () => {
+    const baseParams = {
+      organizationSlug: "test-org",
+      query: "is:unresolved",
+      sort: "date" as const,
+      projectSlugOrId: null,
+      regionUrl: null,
+      limit: 10,
+      includeExplanation: false,
+    };
+
+    await expect(
+      searchIssues.handler(
+        { ...baseParams, start: "2026-01-01T00:00:00Z" },
+        mockContext,
+      ),
+    ).rejects.toThrow("`start` and `end` must be provided together.");
+    await expect(
+      searchIssues.handler(
+        {
+          ...baseParams,
+          period: "30d",
+          start: "2026-01-01T00:00:00Z",
+          end: "2026-01-02T00:00:00Z",
+        },
+        mockContext,
+      ),
+    ).rejects.toThrow("`period` cannot be combined with `start` and `end`.");
+    await expect(
+      searchIssues.handler(
+        {
+          ...baseParams,
+          start: "2026-01-02T00:00:00Z",
+          end: "2026-01-01T00:00:00Z",
+        },
+        mockContext,
+      ),
+    ).rejects.toThrow("`start` must be before `end`.");
   });
 
   it("should validate project slug format", async () => {

@@ -1,16 +1,18 @@
 import { getActiveSpan, setTag } from "@sentry/core";
 import { z } from "zod";
 import { SEARCH_ISSUES_PERIOD_VALUES } from "../../constants";
+import { UserInputError } from "../../errors";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
+import { formatInlineCode } from "../../internal/tool-helpers/formatting";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
 import type { ServerContext } from "../../types";
 import { isNumericId, validateSlugOrId } from "../../utils/slug-validation";
 import { searchIssuesAgent } from "../support/search-issues/agent";
 import {
-  formatIssueResults,
   formatExplanation,
+  formatIssueResults,
 } from "../support/search-issues/formatters";
 
 const ProjectSlugOrIdSchema = z.string().trim().superRefine(validateSlugOrId);
@@ -97,9 +99,23 @@ export default defineTool({
       .describe("Maximum number of issues to return (1-100)"),
     period: z
       .enum(SEARCH_ISSUES_PERIOD_VALUES)
-      .default("30d")
+      .optional()
       .describe(
-        "Time window for issue search results. Controls which issues are returned based on when they had activity. Default 30d is a balance between coverage and query performance; use 24h for very recent issues or 90d for broader historical searches.",
+        "Relative time window for issue activity. Defaults to 30d when start/end are omitted. Do not combine with start/end.",
+      ),
+    start: z
+      .string()
+      .datetime()
+      .optional()
+      .describe(
+        "Absolute ISO 8601 start time. Must be provided with end; do not combine with period.",
+      ),
+    end: z
+      .string()
+      .datetime()
+      .optional()
+      .describe(
+        "Absolute ISO 8601 end time. Must be provided with start; do not combine with period.",
       ),
     includeExplanation: z
       .boolean()
@@ -117,6 +133,26 @@ export default defineTool({
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
     });
+
+    if ((params.start && !params.end) || (!params.start && params.end)) {
+      throw new UserInputError("`start` and `end` must be provided together.");
+    }
+    if (params.period && (params.start || params.end)) {
+      throw new UserInputError(
+        "`period` cannot be combined with `start` and `end`.",
+      );
+    }
+    if (
+      params.start &&
+      params.end &&
+      Date.parse(params.start) >= Date.parse(params.end)
+    ) {
+      throw new UserInputError("`start` must be before `end`.");
+    }
+    const timeParams =
+      params.start && params.end
+        ? { start: params.start, end: params.end }
+        : { statsPeriod: params.period ?? "30d" };
 
     setTag("organization.slug", params.organizationSlug);
     if (params.projectSlugOrId) {
@@ -175,7 +211,7 @@ export default defineTool({
       query,
       sortBy: sort,
       limit: params.limit,
-      statsPeriod: params.period,
+      ...timeParams,
     });
 
     getActiveSpan()?.setAttribute(
@@ -184,6 +220,11 @@ export default defineTool({
     );
 
     // Build output with explanation first (if requested and NL was used), then results
+    const executedTimeRange =
+      "statsPeriod" in timeParams
+        ? `Last ${timeParams.statsPeriod}`
+        : `${timeParams.start} to ${timeParams.end}`;
+    const executedSearch = `## Executed Search\n\n- Query: ${formatInlineCode(query)}\n- Sort: ${sort}\n- Time range: ${executedTimeRange}\n\n`;
     let output = "";
 
     if (params.includeExplanation && explanation) {
@@ -195,6 +236,7 @@ export default defineTool({
       output += `Sentry query: \`${query}\``;
       output += `\nSort: ${sort}`;
       output += `\n\n`;
+      output += executedSearch;
 
       if (explanation) {
         output += formatExplanation(explanation);
@@ -216,7 +258,7 @@ export default defineTool({
         directToolNames: context.directToolNames,
       });
     } else {
-      output = formatIssueResults({
+      output = `${formatIssueResults({
         issues,
         organizationSlug: params.organizationSlug,
         projectSlugOrId: params.projectSlugOrId ?? undefined,
@@ -229,7 +271,7 @@ export default defineTool({
         experimentalMode: context.experimentalMode ?? false,
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
-      });
+      })}\n\n${executedSearch.trimEnd()}`;
     }
 
     return output;

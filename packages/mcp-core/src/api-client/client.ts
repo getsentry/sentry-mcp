@@ -3085,7 +3085,9 @@ export class SentryApiService {
       query,
       sortBy,
       limit = 10,
-      statsPeriod = DEFAULT_SEARCH_ISSUES_PERIOD,
+      statsPeriod,
+      start,
+      end,
     }: {
       organizationSlug: string;
       projectId?: string;
@@ -3099,6 +3101,10 @@ export class SentryApiService {
        * but large windows risk timeouts on busy orgs.
        */
       statsPeriod?: string;
+      /** Absolute start time (ISO 8601). Must be paired with end. */
+      start?: string;
+      /** Absolute end time (ISO 8601). Must be paired with start. */
+      end?: string;
     },
     opts?: RequestOptions,
   ): Promise<IssueList> {
@@ -3110,7 +3116,12 @@ export class SentryApiService {
     const queryParams = new URLSearchParams();
     queryParams.set("limit", String(limit));
     if (sortBy) queryParams.set("sort", sortBy);
-    queryParams.set("statsPeriod", statsPeriod ?? DEFAULT_SEARCH_ISSUES_PERIOD);
+    this.applyTimeParams(
+      queryParams,
+      statsPeriod ?? (start || end ? undefined : DEFAULT_SEARCH_ISSUES_PERIOD),
+      start,
+      end,
+    );
     queryParams.set("query", sentryQuery.join(" "));
 
     if (projectId) {

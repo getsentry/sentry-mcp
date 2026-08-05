@@ -12,10 +12,10 @@ import {
 } from "../../schema";
 import type { ServerContext } from "../../types";
 import {
-  PUBLIC_EVENTS_DATASETS,
-  type PublicEventsDataset,
   isMetricsDataset,
   normalizeEventsDataset,
+  PUBLIC_EVENTS_DATASETS,
+  type PublicEventsDataset,
 } from "../../utils/events-datasets";
 import { extractConversationIdFromSearchQuery } from "../../utils/url-utils";
 import {
@@ -292,7 +292,7 @@ function buildSearchRepairPrompt(params: {
   dataset: PublicEventsDataset | "replays";
   fields?: string[] | null;
   sort?: string | null;
-  statsPeriod?: string;
+  timeParams?: { statsPeriod?: string; start?: string; end?: string };
   environment?: string | string[] | null;
 }): string {
   return [
@@ -311,7 +311,7 @@ function buildSearchRepairPrompt(params: {
         dataset: params.dataset,
         fields: params.fields ?? null,
         sort: params.sort ?? null,
-        statsPeriod: params.statsPeriod ?? null,
+        timeRange: params.timeParams ?? null,
         environment: params.environment ?? null,
       },
       null,
@@ -438,7 +438,23 @@ export default defineTool({
       .describe(
         "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead.",
       ),
-    period: ParamPeriod.optional(),
+    period: ParamPeriod.optional().describe(
+      "Relative time range. Defaults to 14d when start/end are omitted. Do not combine with start/end.",
+    ),
+    start: z
+      .string()
+      .datetime()
+      .optional()
+      .describe(
+        "Absolute ISO 8601 start time. Must be provided with end; do not combine with period.",
+      ),
+    end: z
+      .string()
+      .datetime()
+      .optional()
+      .describe(
+        "Absolute ISO 8601 end time. Must be provided with start; do not combine with period.",
+      ),
     regionUrl: ParamRegionUrl.nullable().default(null),
     limit: z
       .number()
@@ -463,6 +479,27 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
     const organizationSlug = params.organizationSlug;
+
+    if ((params.start && !params.end) || (!params.start && params.end)) {
+      throw new UserInputError("`start` and `end` must be provided together.");
+    }
+    if (params.period && (params.start || params.end)) {
+      throw new UserInputError(
+        "`period` cannot be combined with `start` and `end`.",
+      );
+    }
+    if (
+      params.start &&
+      params.end &&
+      Date.parse(params.start) >= Date.parse(params.end)
+    ) {
+      throw new UserInputError("`start` must be before `end`.");
+    }
+    const explicitAbsoluteTimeParams =
+      params.start && params.end
+        ? { start: params.start, end: params.end }
+        : undefined;
+    const hasExplicitPeriod = params.period !== undefined;
 
     setTag("organization.slug", organizationSlug);
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
@@ -506,7 +543,6 @@ export default defineTool({
     const hasExplicitDataset = params.dataset !== undefined;
     const hasExplicitFields = hasFields(params.fields);
     const hasExplicitSort = explicitSort !== undefined;
-    const hasExplicitPeriod = params.period !== undefined;
     const hasExplicitTraceItemDataset =
       hasExplicitDataset && isTraceItemDataset(inputDataset);
     const shouldTrustStructuredTraceSearch =
@@ -525,7 +561,9 @@ export default defineTool({
           dataset: inputDataset,
           fields: params.fields,
           sort: params.sort,
-          statsPeriod: params.period,
+          timeParams:
+            explicitAbsoluteTimeParams ??
+            (hasExplicitPeriod ? { statsPeriod: params.period } : undefined),
           environment: params.environment,
         }),
         organizationSlug,
@@ -564,10 +602,16 @@ export default defineTool({
       explanation = parsed.explanation;
       environment = params.environment ?? parsed.environment;
 
+      // Absolute bounds are always authoritative. Relative period stays on the
+      // prior trust path so natural-language time phrases can still win over a
+      // leftover/default period on agent-translated requests.
       timeParams =
-        shouldTrustExplicitSearchParams && hasExplicitPeriod
+        explicitAbsoluteTimeParams ??
+        (shouldTrustExplicitSearchParams && hasExplicitPeriod
           ? { statsPeriod: params.period }
-          : (parseAgentTimeRange(parsed.timeRange) ?? { statsPeriod: "14d" });
+          : (parseAgentTimeRange(parsed.timeRange) ?? {
+              statsPeriod: params.period ?? "14d",
+            }));
 
       if (dataset === "replays") {
         fields = [];
@@ -585,7 +629,9 @@ export default defineTool({
         ? explicitStructuredTraceQuery
         : (params.query ?? "");
       sortParam = explicitSort || defaultSortForDataset(dataset);
-      timeParams = { statsPeriod: params.period ?? "14d" };
+      timeParams = explicitAbsoluteTimeParams ?? {
+        statsPeriod: params.period ?? "14d",
+      };
       fields =
         dataset === "replays"
           ? []
@@ -762,6 +808,9 @@ export default defineTool({
               },
               parsed,
             ));
+            if (explicitAbsoluteTimeParams) {
+              timeParams = explicitAbsoluteTimeParams;
+            }
             validationExplanation = parsed.explanation || validationExplanation;
             sentryQuery = applyEnvironmentToEventsQuery(
               dataset,
