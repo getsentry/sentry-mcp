@@ -706,6 +706,38 @@ describe("oauth authorize routes", () => {
         expect(html).not.toContain("Session scope");
       });
 
+      // Regression: Claude plugin MCP URL is /mcp?utm_source=plugin. The AS
+      // must accept that exact resource indicator and must not emit
+      // invalid_target just because the issuer is query-free.
+      it("should allow request with plugin utm_source resource parameter", async () => {
+        mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp?utm_source=plugin",
+        });
+        mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+          clientId: "test-client",
+          clientName: "Test Client",
+          redirectUris: ["https://example.com/callback"],
+        });
+
+        const url = new URL("http://localhost/oauth/authorize");
+        url.searchParams.set(
+          "resource",
+          "http://localhost/mcp?utm_source=plugin",
+        );
+
+        const request = new Request(url, { method: "GET" });
+        const response = await app.fetch(request, testEnv as Env);
+
+        expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).toContain("<form");
+        expect(html).not.toContain("invalid_target");
+        expect(html).not.toContain("Session scope");
+      });
+
       it("should allow request with organization-scoped resource parameter", async () => {
         mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
           clientId: "test-client",
@@ -972,6 +1004,40 @@ describe("oauth authorize routes", () => {
 
         expect(response.status).toBe(302);
         const location = response.headers.get("location");
+        expect(location).toContain("sentry.io");
+      });
+
+      // Regression: consent approval must also accept the plugin-attributed
+      // resource and continue upstream rather than redirecting invalid_target.
+      it("should allow approval with plugin utm_source resource parameter", async () => {
+        const oauthReqInfo = {
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp?utm_source=plugin",
+        };
+        const formData = new FormData();
+        const signedState = await signState(
+          {
+            req: { oauthReqInfo },
+            iat: Date.now(),
+            exp: Date.now() + 10 * 60 * 1000,
+          },
+          testEnv.COOKIE_SECRET!,
+        );
+        formData.append("state", signedState);
+
+        const request = new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        });
+        const response = await app.fetch(request, testEnv as Env);
+
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        expect(location).toBeTruthy();
+        const locationUrl = new URL(location!);
+        expect(locationUrl.searchParams.get("error")).not.toBe("invalid_target");
         expect(location).toContain("sentry.io");
       });
 
