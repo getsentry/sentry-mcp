@@ -100,7 +100,7 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow(/configuration or account issue/);
+    ).rejects.toThrow(/configuration, quota, or account issue/);
   });
 
   it("throws LLMProviderError for invalid API key (401)", async () => {
@@ -151,10 +151,10 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow(/configuration or account issue/);
+    ).rejects.toThrow(/configuration, quota, or account issue/);
   });
 
-  it("re-throws 5xx APICallErrors unchanged (system errors)", async () => {
+  it("throws LLMProviderError for 5xx provider outages", async () => {
     const serverError = new APICallError({
       message: "Internal server error",
       url: "https://api.openai.com/v1/chat/completions",
@@ -172,7 +172,7 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow(APICallError);
+    ).rejects.toThrow(LLMProviderError);
 
     await expect(
       callEmbeddedAgent({
@@ -181,10 +181,10 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow("Internal server error");
+    ).rejects.toThrow(/currently unavailable.*Internal server error/);
   });
 
-  it("re-throws APICallErrors without status code unchanged", async () => {
+  it("throws LLMProviderError for provider APICallErrors without status code", async () => {
     // Some errors may not have a status code (e.g., network errors)
     const networkError = new APICallError({
       message: "Network error",
@@ -202,7 +202,46 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow(APICallError);
+    ).rejects.toThrow(LLMProviderError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(/currently unavailable.*Network error/);
+  });
+
+  it("throws LLMProviderError for provider budget/quota failures", async () => {
+    const budgetError = new APICallError({
+      message: "Workspace monthly budget of $15000.00 exceeded. Contact your org admin.",
+      url: "https://openrouter.ai/api/v1/chat/completions",
+      requestBodyValues: {},
+      statusCode: 402,
+      isRetryable: false,
+    });
+
+    mockGenerateText.mockRejectedValue(budgetError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(LLMProviderError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(/quota, or account issue/);
   });
 
   it("re-throws non-APICallError errors unchanged", async () => {

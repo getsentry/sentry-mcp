@@ -9,7 +9,7 @@ import {
   ApiServerError,
   isApiAuthenticationErrorDeep,
 } from "../api-client";
-import { logIssue } from "../telem/logging";
+import { logIssue, logWarn } from "../telem/logging";
 import { APICallError, NoObjectGeneratedError } from "ai";
 import type { TransportType } from "../types";
 
@@ -70,6 +70,39 @@ const GENERIC_CONFIG_ERROR_MESSAGE = [
   "The service operator has been notified. Please try again later.",
 ].join("\n\n");
 
+const GENERIC_AI_PROVIDER_ERROR_MESSAGE = [
+  "**Feature Unavailable**",
+  "AI-powered features are temporarily unavailable because the upstream AI provider rejected or could not complete this request.",
+  "Other Sentry MCP tools that do not require AI should still work. Please try again later.",
+].join("\n\n");
+
+/**
+ * Expected/user-facing tool failures that should return a formatted MCP error
+ * response without creating a Sentry issue or recording a span exception.
+ *
+ * Includes AI provider outages (budget exhaustion, rate limits, region blocks,
+ * 5xx/network failures from the upstream LLM) so tool calls degrade cleanly.
+ */
+export function isExpectedToolError(error: unknown): boolean {
+  if (
+    isUserInputError(error) ||
+    isConfigurationError(error) ||
+    isLLMProviderError(error) ||
+    isApiClientError(error) ||
+    isApiAuthenticationErrorDeep(error)
+  ) {
+    return true;
+  }
+
+  // AI SDK provider failures are expected at the tool boundary once converted
+  // or handled as availability issues. Includes 4xx, 5xx, and transport errors.
+  if (isAPICallError(error)) {
+    return true;
+  }
+
+  return NoObjectGeneratedError.isInstance(error);
+}
+
 /**
  * Format a server-side configuration error for user display.
  *
@@ -91,13 +124,43 @@ function formatServerConfigError(
 }
 
 /**
+ * Format an AI provider availability failure for user display.
+ *
+ * These are expected operational failures (budget limits, rate limits, region
+ * restrictions, provider outages). Always log as a warning — never create a
+ * Sentry issue per request — and hide provider internals on HTTP transport.
+ */
+function formatAiProviderError(
+  error: Error,
+  detailedParts: string[],
+  options?: { transport?: TransportType },
+): string {
+  logWarn(error, {
+    loggerScope: ["error-handling", "llm-provider"],
+    contexts: {
+      aiProvider: {
+        errorType: error.name,
+        transport: options?.transport ?? null,
+      },
+    },
+  });
+
+  if (options?.transport === "http") {
+    return GENERIC_AI_PROVIDER_ERROR_MESSAGE;
+  }
+  return detailedParts.join("\n\n");
+}
+
+/**
  * Format an error for user display with markdown formatting.
  * This is used by tool handlers to format errors for MCP responses.
  *
- * When transport is "http", config/provider errors are logged to Sentry
- * and a generic message is returned (users can't fix server-side config).
+ * When transport is "http", server configuration errors create a Sentry issue
+ * and return a generic message (users can't fix server-side config).
+ * AI provider outages are different: they always log as warnings and return a
+ * graceful availability message so a provider budget/outage does not flood issues.
  * When transport is "stdio" or undefined, detailed messages are returned
- * (users can fix their own config).
+ * (operators/users can fix their own config).
  *
  * SECURITY: Only return trusted error messages to prevent prompt injection vulnerabilities.
  * We trust: Sentry API errors, our own UserInputError/ConfigurationError messages, and system templates.
@@ -129,13 +192,13 @@ export async function formatErrorForUser(
   }
 
   if (isLLMProviderError(error)) {
-    return formatServerConfigError(
+    return formatAiProviderError(
       error,
       [
         "**AI Provider Error**",
         "The AI provider service is not available for this request.",
         error.message,
-        "This is a service availability issue that cannot be resolved by retrying.",
+        "This is a service availability issue. Other non-AI tools should still work.",
       ],
       options,
     );
@@ -143,33 +206,27 @@ export async function formatErrorForUser(
 
   // Handle AI SDK APICallError that wasn't converted to LLMProviderError.
   // This is a defensive layer - ideally callEmbeddedAgent converts these.
+  // Treat all provider API failures as availability issues so tool calls
+  // degrade gracefully instead of creating per-request Sentry issues.
   if (isAPICallError(error)) {
     const statusCode = error.statusCode;
-    // 4xx errors are user-facing (account issues, rate limits, invalid keys)
-    if (statusCode && statusCode >= 400 && statusCode < 500) {
-      return formatServerConfigError(
-        error,
-        [
-          "**AI Provider Error**",
-          "The AI provider service returned an error.",
-          error.message,
-          "This may be a configuration or account issue. Please check your AI provider settings.",
-        ],
-        options,
-      );
-    }
-    // 5xx errors - always log to Sentry regardless of transport
-    const eventId = logIssue(error);
-    const parts = [
-      "**AI Provider Error**",
-      "An unexpected error occurred with the AI provider.",
-      error.message,
-    ];
-    if (eventId) {
-      parts.push(`**Event ID**: ${eventId}`);
-    }
-    parts.push("Please contact support if the problem persists.");
-    return parts.join("\n\n");
+    const detail =
+      statusCode && statusCode >= 500
+        ? "The AI provider is currently unavailable."
+        : statusCode && statusCode >= 400
+          ? "The AI provider rejected this request."
+          : "The AI provider could not complete this request.";
+
+    return formatAiProviderError(
+      error,
+      [
+        "**AI Provider Error**",
+        detail,
+        error.message,
+        "This is a service availability issue. Other non-AI tools should still work.",
+      ],
+      options,
+    );
   }
 
   // Defensive: NoObjectGeneratedError is normally handled in callEmbeddedAgent,

@@ -28,34 +28,34 @@ ApiError (base class)
   - Parameter validation failures
   - Any user-correctable error
 - `ConfigurationError` - Missing/invalid configuration
-- `LLMProviderError` - LLM provider availability issues (e.g., region restrictions)
+- `LLMProviderError` - LLM provider availability issues (e.g., region restrictions, budget/quota exhaustion, provider outages)
   - OpenAI rejecting requests from unsupported regions
-  - Provider service availability issues that cannot be resolved by retrying
+  - Provider service availability issues (4xx quota/config and 5xx/network failures)
+  - Returned as graceful tool errors; do **not** create per-request Sentry issues
 
 ### AI SDK Error Classes (from ai package)
 
 - `APICallError` - Errors from LLM provider API calls (OpenAI, Anthropic, etc.)
-  - 4xx errors (account issues, rate limits, invalid keys) → Converted to `LLMProviderError`, NOT sent to Sentry
-  - 5xx errors (server errors) → System errors, SENT to Sentry
+  - 4xx errors (account issues, rate limits, invalid keys, budget exhaustion) → Converted to `LLMProviderError`, NOT sent to Sentry as issues
+  - 5xx / network errors (provider down) → Also converted to `LLMProviderError` so tools degrade gracefully instead of flooding issues
 
 **Conversion Flow:**
-- `callEmbeddedAgent` converts user-facing `APICallError` (4xx) → `LLMProviderError` immediately after the AI SDK call
+- `callEmbeddedAgent` converts provider `APICallError` (4xx, 5xx, and missing status) → `LLMProviderError` immediately after the AI SDK call
 - Defensive handling in `handleAgentToolError` and `formatErrorForUser` for any that slip through
+- HTTP transport returns a generic "AI-powered features temporarily unavailable" message and logs a warning only
 
 ### Error Categories
 
-**User-Facing Errors (Should NOT create Sentry issues):**
+**User-Facing / Expected Errors (Should NOT create Sentry issues):**
 - All `ApiClientError` subclasses
 - `UserInputError`
-- `ConfigurationError`
+- `ConfigurationError` (except HTTP transport, which notifies operators once via `logIssue` with a generic user message)
 - `LLMProviderError`
-- `APICallError` with 4xx status codes (converted to `LLMProviderError`)
+- `APICallError` from the upstream AI provider (converted to `LLMProviderError` / logged as warnings)
 
 **System Errors (Should be captured by Sentry):**
 - `ApiServerError`
-- `APICallError` with 5xx status codes
-- Network failures
-- Unexpected runtime errors
+- Unexpected runtime errors outside the AI provider boundary
 
 ## Critical Principles
 
@@ -334,7 +334,8 @@ When running in Cloudflare Workers:
 - **LLMProviderError to Agent:** `{ error: "AI Provider Error: {message}. This is a service availability issue that cannot be resolved by retrying." }`
 - **ApiClientError to Agent:** `{ error: "Input Error: {toUserMessage()}. You may be able to resolve this by addressing the concern and trying again." }`
 - **ApiServerError to Agent:** `{ error: "Server Error (5xx): {message}. Event ID: {eventId}. This is a system error that cannot be resolved by retrying." }`
-- **LLMProviderError to MCP User:** Formatted with "**AI Provider Error**" header
+- **LLMProviderError to MCP User (stdio):** Formatted with "**AI Provider Error**" header + details; logged as warning only
+- **LLMProviderError to MCP User (http):** Generic "**Feature Unavailable**" AI-powered features message; logged as warning only (no issue)
 - **ApiClientError to MCP User:** Formatted with "**Input Error**" header and toUserMessage()
 - **ApiServerError to MCP User:** Formatted with "**Error**" header + Event ID (logged to Sentry)
 

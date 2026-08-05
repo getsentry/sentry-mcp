@@ -132,8 +132,9 @@ export async function callEmbeddedAgent<
       );
     }
 
-    // Handle LLM provider errors with user-friendly messages
-    // These are user-facing errors that should NOT be reported to Sentry
+    // Handle LLM provider errors with user-friendly messages.
+    // These are operational availability failures that should NOT create Sentry
+    // issues per request (budget exhaustion, rate limits, provider outages).
     if (APICallError.isInstance(error)) {
       // OpenAI region restriction error - provide specific helpful message
       if (
@@ -143,20 +144,32 @@ export async function callEmbeddedAgent<
           "The AI provider (OpenAI) does not support requests from your region. " +
             "This is a restriction imposed by OpenAI on certain countries and territories. " +
             "Please contact support if you believe this is an error.",
+          { cause: error },
         );
       }
 
-      // All 4xx errors are user-facing (account issues, rate limits, invalid keys, etc.)
-      // These should be shown to the user, not reported to Sentry
       const statusCode = error.statusCode;
+
+      // 4xx: account/config/budget/rate-limit style failures
       if (statusCode && statusCode >= 400 && statusCode < 500) {
         throw new LLMProviderError(
-          `The AI provider returned an error: ${error.message}. This may be a configuration or account issue. Please check your AI provider settings.`,
+          `The AI provider returned an error: ${error.message}. This may be a configuration, quota, or account issue with the upstream AI provider.`,
+          { cause: error },
+        );
+      }
+
+      // 5xx / missing status (network, timeouts): treat as provider outage so
+      // tool handlers can return a graceful availability error instead of a
+      // system exception flood.
+      if (!statusCode || statusCode >= 500) {
+        throw new LLMProviderError(
+          `The AI provider is currently unavailable${statusCode ? ` (HTTP ${statusCode})` : ""}: ${error.message}. Please try again later.`,
+          { cause: error },
         );
       }
     }
 
-    // Re-throw 5xx and other errors to be handled by the caller (logged to Sentry)
+    // Re-throw unexpected errors to be handled by the caller (logged to Sentry)
     throw error;
   }
 }

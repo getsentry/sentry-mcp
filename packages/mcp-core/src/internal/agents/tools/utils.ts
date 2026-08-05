@@ -82,30 +82,22 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
     };
   }
 
-  // Handle AI SDK APICallError that wasn't converted to LLMProviderError
-  // This is a defensive layer - ideally callEmbeddedAgent converts these
+  // Handle AI SDK APICallError that wasn't converted to LLMProviderError.
+  // Defensive layer: all provider API failures are availability issues and
+  // must not create per-request Sentry issues during an outage.
   if (APICallError.isInstance(error)) {
     const statusCode = error.statusCode;
-    // 4xx errors are user-facing (account issues, rate limits, invalid keys)
-    if (statusCode && statusCode >= 400 && statusCode < 500) {
-      logWarn(error, {
-        loggerScope: ["agent-tools", "api-call"],
-        contexts: {
-          agentTool: {
-            errorType: "APICallError",
-            statusCode,
-          },
+    logWarn(error, {
+      loggerScope: ["agent-tools", "api-call"],
+      contexts: {
+        agentTool: {
+          errorType: "APICallError",
+          statusCode: statusCode ?? null,
         },
-      });
-      return {
-        error: `AI Provider Error: ${error.message}. This may be a configuration or account issue.`,
-      };
-    }
-    // 5xx errors - log to Sentry
-    const eventId = logIssue(error);
-    const eventIdPart = eventId ? ` Event ID: ${eventId}.` : "";
+      },
+    });
     return {
-      error: `AI Provider Error: An unexpected error occurred with the AI provider.${eventIdPart} This is a system error that cannot be resolved by retrying.`,
+      error: `AI Provider Error: ${error.message}. This is a service availability issue with the upstream AI provider. Other non-AI tools should still work.`,
     };
   }
 
