@@ -1,13 +1,16 @@
-import type { EmbeddedAgentProvider, AgentProviderType } from "./types";
+import { ConfigurationError } from "../../errors";
+import { getAnthropicModel, setAnthropicBaseUrl } from "./anthropic-provider";
 import {
   getAzureOpenAIApiSurface,
   getAzureOpenAIModel,
   setAzureOpenAIBaseUrl,
 } from "./azure-openai-provider";
 import { getOpenAIModel, setOpenAIBaseUrl } from "./openai-provider";
-import { getAnthropicModel, setAnthropicBaseUrl } from "./anthropic-provider";
-import { getOpenRouterModel } from "./openrouter-provider";
-import { ConfigurationError } from "../../errors";
+import {
+  getOpenRouterModel,
+  getOpenRouterProviderOptions,
+} from "./openrouter-provider";
+import type { AgentProviderType, EmbeddedAgentProvider } from "./types";
 
 // Module-level state for explicit provider selection
 let configuredProvider: AgentProviderType | undefined;
@@ -128,12 +131,7 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
         type: "openrouter",
         label: "openrouter",
         getModel: getOpenRouterModel,
-        getProviderOptions: () => ({
-          openai: {
-            structuredOutputs: false,
-            strictJsonSchema: false,
-          },
-        }),
+        getProviderOptions: getOpenRouterProviderOptions,
       };
   }
 }
