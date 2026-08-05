@@ -1,50 +1,51 @@
-import whoami from "./whoami";
+import type { ToolConfig } from "../types";
+import addIssueNote from "./add-issue-note";
+import addTeamToProject from "./add-team-to-project";
+import analyzeIssueWithSeer from "./analyze-issue-with-seer";
+import createDsn from "./create-dsn";
+import createProject from "./create-project";
+import createTeam from "./create-team";
+import findAlertRules from "./find-alert-rules";
+import findDashboards from "./find-dashboards";
+import findDsns from "./find-dsns";
+import findMonitors from "./find-monitors";
 import findOrganizations from "./find-organizations";
-import findTeams from "./find-teams";
 import findProjects from "./find-projects";
 import findReleases from "./find-releases";
-import getReleaseDetails from "./get-release-details";
-import findDashboards from "./find-dashboards";
-import getDashboardDetails from "./get-dashboard-details";
-import findMonitors from "./find-monitors";
-import getMonitorDetails from "./get-monitor-details";
-import findAlertRules from "./find-alert-rules";
+import findTeams from "./find-teams";
+import getAIConversationDetails from "./get-ai-conversation-details";
 import getAlertRule from "./get-alert-rule";
-import getIssueDetails from "./get-issue-details";
+import getDashboardDetails from "./get-dashboard-details";
+import getDoc from "./get-doc";
+import getEventAttachment from "./get-event-attachment";
 import getEventStacktrace from "./get-event-stacktrace";
 import getIssueActivity from "./get-issue-activity";
 import getIssueBreadcrumbs from "./get-issue-breadcrumbs";
+import getIssueDetails from "./get-issue-details";
 import getIssueTagValues from "./get-issue-tag-values";
 import getIssueUserReports from "./get-issue-user-reports";
-import getTraceDetails from "./get-trace-details";
-import getSpanDetails from "./get-span-details";
-import getReplayDetails from "./get-replay-details";
-import getEventAttachment from "./get-event-attachment";
-import updateIssue from "./update-issue";
-import searchEvents from "./search-events";
-import createTeam from "./create-team";
-import createProject from "./create-project";
-import updateProject from "./update-project";
-import addTeamToProject from "./add-team-to-project";
-import removeTeamFromProject from "./remove-team-from-project";
-import createDsn from "./create-dsn";
-import findDsns from "./find-dsns";
-import updateDsn from "./update-dsn";
-import analyzeIssueWithSeer from "./analyze-issue-with-seer";
-import searchDocs from "./search-docs";
-import getDoc from "./get-doc";
-import searchIssues from "./search-issues";
-import searchIssueEvents from "./search-issue-events";
+import getLatestBaseSnapshot from "./get-latest-base-snapshot";
+import getMonitorDetails from "./get-monitor-details";
 import getProfile from "./get-profile";
 import getProfileDetails from "./get-profile-details";
+import getReleaseDetails from "./get-release-details";
+import getReplayDetails from "./get-replay-details";
 import getSentryResource from "./get-sentry-resource";
 import getSnapshot from "./get-snapshot";
 import getSnapshotImage from "./get-snapshot-image";
-import getLatestBaseSnapshot from "./get-latest-base-snapshot";
-import getAIConversationDetails from "./get-ai-conversation-details";
+import getSpanDetails from "./get-span-details";
+import getTraceDetails from "./get-trace-details";
+import inspectReplayTimeline from "./inspect-replay-timeline";
+import removeTeamFromProject from "./remove-team-from-project";
 import searchAIConversations from "./search-ai-conversations";
-import addIssueNote from "./add-issue-note";
-import type { ToolConfig } from "../types";
+import searchDocs from "./search-docs";
+import searchEvents from "./search-events";
+import searchIssueEvents from "./search-issue-events";
+import searchIssues from "./search-issues";
+import updateDsn from "./update-dsn";
+import updateIssue from "./update-issue";
+import updateProject from "./update-project";
+import whoami from "./whoami";
 
 /**
  * Catalog of ordinary Sentry MCP operations.
@@ -77,6 +78,7 @@ const catalogTools = {
   get_trace_details: getTraceDetails,
   get_span_details: getSpanDetails,
   get_replay_details: getReplayDetails,
+  inspect_replay_timeline: inspectReplayTimeline,
   get_event_attachment: getEventAttachment,
   update_issue: updateIssue,
   search_events: searchEvents,
