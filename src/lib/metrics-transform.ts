@@ -6,7 +6,7 @@
  * querying `dataset=tracemetrics`: `aggregation(value,name,type,unit)`.
  */
 
-import type { MetricMeta } from "./api/discover.js";
+import type { MetricMeta } from "./api/explore.js";
 import { ResolutionError } from "./errors.js";
 import { fuzzyMatch } from "./fuzzy.js";
 
