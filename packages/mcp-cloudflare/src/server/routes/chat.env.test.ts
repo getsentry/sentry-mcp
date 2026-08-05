@@ -69,4 +69,31 @@ describe("syncOpenRouterEnvFromBindings", () => {
 
     expect(process.env.OPENROUTER_API_KEY).toBe("from-binding");
   });
+
+  it("clears stale model and effort when bindings are removed", () => {
+    process.env.OPENROUTER_API_KEY = "from-process";
+    process.env.OPENROUTER_MODEL = "stale-model";
+    process.env.OPENROUTER_REASONING_EFFORT = "stale-effort";
+
+    expect(
+      syncOpenRouterEnvFromBindings({
+        OPENROUTER_API_KEY: "from-binding",
+      }),
+    ).toBe(true);
+
+    expect(process.env.OPENROUTER_API_KEY).toBe("from-binding");
+    expect(process.env.OPENROUTER_MODEL).toBeUndefined();
+    expect(process.env.OPENROUTER_REASONING_EFFORT).toBeUndefined();
+  });
+
+  it("preserves empty-string reasoning effort as omit-provider-option", () => {
+    expect(
+      syncOpenRouterEnvFromBindings({
+        OPENROUTER_API_KEY: "from-binding",
+        OPENROUTER_REASONING_EFFORT: "",
+      }),
+    ).toBe(true);
+
+    expect(process.env.OPENROUTER_REASONING_EFFORT).toBe("");
+  });
 });

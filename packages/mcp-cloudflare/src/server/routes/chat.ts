@@ -42,11 +42,18 @@ export function syncOpenRouterEnvFromBindings(
   }
 
   process.env.OPENROUTER_API_KEY = openRouterApiKey;
+
+  // Always mirror or clear optional bindings so a reused worker isolate cannot
+  // keep a previous request's model/effort after the binding is removed.
   if (env.OPENROUTER_MODEL) {
     process.env.OPENROUTER_MODEL = env.OPENROUTER_MODEL;
+  } else {
+    delete process.env.OPENROUTER_MODEL;
   }
   if (env.OPENROUTER_REASONING_EFFORT !== undefined) {
     process.env.OPENROUTER_REASONING_EFFORT = env.OPENROUTER_REASONING_EFFORT;
+  } else {
+    delete process.env.OPENROUTER_REASONING_EFFORT;
   }
 
   return true;
