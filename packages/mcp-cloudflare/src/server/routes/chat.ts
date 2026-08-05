@@ -25,6 +25,33 @@ import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
 
+/**
+ * Ensure OpenRouter provider helpers can read worker bindings via process.env.
+ * Returns false when no API key is available from either source.
+ */
+export function syncOpenRouterEnvFromBindings(
+  env: Pick<
+    Env,
+    "OPENROUTER_API_KEY" | "OPENROUTER_MODEL" | "OPENROUTER_REASONING_EFFORT"
+  >,
+): boolean {
+  const openRouterApiKey =
+    env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY;
+  if (!openRouterApiKey) {
+    return false;
+  }
+
+  process.env.OPENROUTER_API_KEY = openRouterApiKey;
+  if (env.OPENROUTER_MODEL) {
+    process.env.OPENROUTER_MODEL = env.OPENROUTER_MODEL;
+  }
+  if (env.OPENROUTER_REASONING_EFFORT !== undefined) {
+    process.env.OPENROUTER_REASONING_EFFORT = env.OPENROUTER_REASONING_EFFORT;
+  }
+
+  return true;
+}
+
 async function refreshTokenIfNeeded(
   c: Context<{ Bindings: Env }>,
 ): Promise<{ token: string; authData: AuthData } | null> {
@@ -96,9 +123,9 @@ async function refreshTokenIfNeeded(
 }
 
 export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
-  // Validate that we have an OpenRouter API key (process.env is populated from
-  // worker bindings via nodejs_compat_populate_process_env).
-  if (!c.env.OPENROUTER_API_KEY && !process.env.OPENROUTER_API_KEY) {
+  // OpenRouter helpers in mcp-core only read process.env. Bridge worker
+  // bindings first so validation and provider calls stay in sync.
+  if (!syncOpenRouterEnvFromBindings(c.env)) {
     logIssue("OPENROUTER_API_KEY is not configured", {
       loggerScope: ["cloudflare", "chat"],
     });
