@@ -42,7 +42,8 @@ ApiError (base class)
 **Conversion Flow:**
 - `callEmbeddedAgent` converts provider `APICallError` (4xx, 5xx, and missing status) → `LLMProviderError` immediately after the AI SDK call
 - Defensive handling in `handleAgentToolError` and `formatErrorForUser` for any that slip through
-- HTTP transport returns a generic "AI-powered features temporarily unavailable" message and logs a warning only
+- AI-powered search tools catch `LLMProviderError`, log it at error level, skip query rewriting, and continue with the caller's original query/default parameters
+- The generic formatted provider error remains a last-resort boundary for callers that do not implement a direct fallback
 
 ### Error Categories
 
@@ -335,7 +336,8 @@ When running in Cloudflare Workers:
 - **ApiClientError to Agent:** `{ error: "Input Error: {toUserMessage()}. You may be able to resolve this by addressing the concern and trying again." }`
 - **ApiServerError to Agent:** `{ error: "Server Error (5xx): {message}. Event ID: {eventId}. This is a system error that cannot be resolved by retrying." }`
 - **LLMProviderError to MCP User (stdio):** Formatted with "**AI Provider Error**" header + details; logged as warning only
-- **LLMProviderError to MCP User (http):** Generic "**Feature Unavailable**" AI-powered features message; logged as warning only (no issue)
+- **LLMProviderError in AI-powered search tools:** Not returned to the MCP user; logged at error level, then the tool executes normally with the original query/default parameters
+- **Unhandled LLMProviderError to MCP User (http):** Generic "**Feature Unavailable**" AI-powered features message as a last-resort boundary
 - **ApiClientError to MCP User:** Formatted with "**Input Error**" header and toUserMessage()
 - **ApiServerError to MCP User:** Formatted with "**Error**" header + Event ID (logged to Sentry)
 

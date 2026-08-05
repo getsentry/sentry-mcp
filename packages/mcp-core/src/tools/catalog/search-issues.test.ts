@@ -1,5 +1,5 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
-import { generateText } from "ai";
+import { APICallError, generateText } from "ai";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import searchIssues from "./search-issues";
@@ -148,6 +148,46 @@ describe("search_issues", () => {
       - View event counts: Use search_events for aggregated statistics
       "
     `);
+  });
+
+  it("falls back to the original query when the AI provider is unavailable", async () => {
+    mockGenerateText.mockRejectedValue(
+      new APICallError({
+        message: "Workspace budget exceeded",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        requestBodyValues: {},
+        statusCode: 402,
+        isRetryable: false,
+      }),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe("is:unresolved");
+          expect(url.searchParams.get("sort")).toBe("freq");
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const result = await searchIssues.handler(
+      {
+        organizationSlug: "test-org",
+        query: "is:unresolved",
+        sort: "freq",
+        projectSlugOrId: null,
+        regionUrl: null,
+        limit: 10,
+        period: "30d",
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    expect(result).toContain("No issues found");
   });
 
   it("should search issues with direct query syntax (no agent)", async () => {

@@ -11,6 +11,7 @@ import {
   ParamProjectSlug,
 } from "../../schema";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
+import { withProviderFallback } from "../../internal/agents/provider-fallback";
 import { UserInputError } from "../../errors";
 import { searchIssueEventsAgent } from "../support/search-issue-events/agent";
 import { formatErrorResults } from "../support/search-events/formatters";
@@ -177,18 +178,32 @@ export default defineTool({
 
     if (hasAgentProvider()) {
       // Agent mode: repair either natural language or already-structured params.
-      const agentResult = await searchIssueEventsAgent({
-        query: buildIssueEventSearchRepairPrompt({
-          query: params.query,
-          sort: params.sort,
-          statsPeriod: params.period,
+      // If the optional AI provider is unavailable, execute the direct request.
+      const parsed = await withProviderFallback<
+        Awaited<ReturnType<typeof searchIssueEventsAgent>>["result"]
+      >({
+        operation: "search_issue_events.rewrite",
+        fallback: () => ({
+          query: params.query ?? "",
+          fields: RECOMMENDED_FIELDS,
+          sort: params.sort ?? "-timestamp",
+          timeRange: { statsPeriod: params.period ?? "14d" },
+          explanation: "",
         }),
-        organizationSlug,
-        apiService,
-        projectId,
+        run: async () =>
+          (
+            await searchIssueEventsAgent({
+              query: buildIssueEventSearchRepairPrompt({
+                query: params.query,
+                sort: params.sort,
+                statsPeriod: params.period,
+              }),
+              organizationSlug,
+              apiService,
+              projectId,
+            })
+          ).result,
       });
-
-      const parsed = agentResult.result;
 
       if (!parsed.sort) {
         throw new UserInputError(
