@@ -694,6 +694,17 @@ describe("validateResourceParameter", () => {
       expect(result).toBe(true);
     });
 
+    // Regression: Claude plugin attribution URL must remain a valid RFC 8707
+    // resource even though path-scoped AS metadata advertises a query-free
+    // issuer (RFC 8414 forbids query components on issuer).
+    it("should allow plugin utm_source resource parameter", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/mcp?utm_source=plugin",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
     it("should allow resource with different port when both match", () => {
       const result = validateResourceParameter(
         "https://mcp.sentry.dev:8443/mcp",
