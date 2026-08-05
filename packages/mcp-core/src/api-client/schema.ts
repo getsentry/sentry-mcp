@@ -57,15 +57,6 @@ export const UserSchema = z
   })
   .passthrough();
 
-export const UserRegionsSchema = z.object({
-  regions: z.array(
-    z.object({
-      name: z.string(),
-      url: z.string().url(),
-    }),
-  ),
-});
-
 /**
  * Schema for Sentry organization API responses.
  *
