@@ -67,17 +67,31 @@ describe("formatConversationTable", () => {
 
   test("renders the full column set on wide terminals", () => {
     setTerminalWidth(200);
-    const items = [makeListItem()];
+    const items = [makeListItem({ title: "Refund a duplicate charge" })];
     const result = formatConversationTable(items);
     // The table shrinks columns to terminal width, so long values may be
     // truncated with "…"; assert on surviving prefixes and the token count.
     expect(result).toContain("conv-");
+    expect(result).toContain("Refund");
     expect(result).toContain("test@");
     expect(result).toContain("Hello");
     expect(result).toContain("500");
     // Wide mode keeps the Tools/Errs/User columns.
     expect(result).toContain("Tools");
     expect(result).toContain("User");
+    expect(result).toContain("Title");
+  });
+
+  test("keeps Title column on narrow terminals", () => {
+    setTerminalWidth(80);
+    const items = [makeListItem({ title: "Refund a duplicate charge" })];
+    const result = formatConversationTable(items);
+    expect(result).toContain("Title");
+    expect(result).toContain("Refund");
+    expect(result).toContain("conv-");
+    // Tools/Errs/User still dropped on narrow terminals.
+    expect(result).not.toContain("Tools");
+    expect(result).not.toContain("User");
   });
 
   test("drops Tools/Errs/User columns on narrow terminals", () => {
@@ -204,6 +218,16 @@ describe("buildTranscriptResult", () => {
     expect(result.endTimestamp).toBe(1_716_500_010);
   });
 
+  test("includes title when provided", () => {
+    const result = buildTranscriptResult(
+      "conv-123",
+      "my-org",
+      [makeSpan()],
+      "Refund a duplicate charge"
+    );
+    expect(result.title).toBe("Refund a duplicate charge");
+  });
+
   test("returns zero timestamps for empty spans", () => {
     const result = buildTranscriptResult("conv-123", "my-org", []);
     expect(result.startTimestamp).toBe(0);
@@ -227,6 +251,7 @@ describe("formatTranscriptResult", () => {
     const result: TranscriptResult = {
       conversationId: "conv-123",
       org: "my-org",
+      title: null,
       turns: [],
       totalTokens: 0,
       spanCount: 0,
@@ -237,6 +262,23 @@ describe("formatTranscriptResult", () => {
     const output = formatTranscriptResult(result);
     expect(output).toContain("No spans found");
     expect(output).toContain("conv-123");
+  });
+
+  test("includes title in empty-span message when present", () => {
+    const result: TranscriptResult = {
+      conversationId: "conv-123",
+      org: "my-org",
+      title: "Refund a duplicate charge",
+      turns: [],
+      totalTokens: 0,
+      spanCount: 0,
+      projects: [],
+      startTimestamp: 0,
+      endTimestamp: 0,
+    };
+    const output = formatTranscriptResult(result);
+    expect(output).toContain("conv-123");
+    expect(output).toContain("Refund a duplicate charge");
   });
 
   test("renders transcript header and turns", () => {
@@ -251,10 +293,23 @@ describe("formatTranscriptResult", () => {
     expect(output).toContain("Turn 1");
   });
 
+  test("keeps conversation ID in heading and shows title in table", () => {
+    const transcript = buildTranscriptResult(
+      "conv-123",
+      "my-org",
+      [makeSpan()],
+      "Refund a duplicate charge"
+    );
+    const output = formatTranscriptResult(transcript);
+    expect(output).toContain("AI Conversation: conv-123");
+    expect(output).toContain("Refund a duplicate charge");
+  });
+
   test("shows truncation warning", () => {
     const result: TranscriptResult = {
       conversationId: "conv-123",
       org: "my-org",
+      title: null,
       turns: [],
       totalTokens: 0,
       spanCount: 1,

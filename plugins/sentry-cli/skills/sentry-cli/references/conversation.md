@@ -27,6 +27,7 @@ List recent AI conversations
 | Field | Type | Description |
 |-------|------|-------------|
 | `conversationId` | string |  |
+| `title` | string \| null |  |
 | `flow` | array |  |
 | `errors` | number |  |
 | `llmCalls` | number |  |
