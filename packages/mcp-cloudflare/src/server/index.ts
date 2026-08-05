@@ -5,7 +5,7 @@ import { SCOPES } from "../constants";
 import app from "./app";
 import {
   UTM_SOURCE_ATTRIBUTE,
-  resolveUtmSourceFromUrl,
+  resolveUtmSourceFromRequest,
 } from "./lib/attribution";
 import { resolveClientFamily } from "./lib/client-family";
 import { redirectUriHasUserInfo } from "./lib/html-utils";
@@ -252,9 +252,11 @@ const wrappedOAuthProvider = {
     const activeSpan = Sentry.getActiveSpan();
     activeSpan?.setAttribute("app.client.family", clientFamily);
     // Set utm_source early on /mcp requests so the attribute is present even
-    // if the request is rejected before reaching mcp-handler.ts.
+    // if the request is rejected before reaching mcp-handler.ts. Prefer the
+    // attribution header so clients can avoid folding tags into the OAuth
+    // resource URL; fall back to ?utm_source= for existing configs.
     if (url.pathname.startsWith("/mcp")) {
-      const utmSource = resolveUtmSourceFromUrl(url);
+      const utmSource = resolveUtmSourceFromRequest(request, url);
       if (utmSource) {
         activeSpan?.setAttribute(UTM_SOURCE_ATTRIBUTE, utmSource);
       }

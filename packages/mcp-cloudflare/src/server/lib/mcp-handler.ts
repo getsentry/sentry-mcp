@@ -37,7 +37,10 @@ import {
   checkRateLimit,
 } from "../utils/rate-limiter";
 import { setSentryUserFromRequest } from "../utils/sentry-user";
-import { UTM_SOURCE_ATTRIBUTE, resolveUtmSourceFromUrl } from "./attribution";
+import {
+  UTM_SOURCE_ATTRIBUTE,
+  resolveUtmSourceFromRequest,
+} from "./attribution";
 import { resolveClientFamily } from "./client-family";
 import { verifyConstraintsAccess } from "./constraint-utils";
 
@@ -319,8 +322,8 @@ async function handleAuthenticatedMcpRequest(
   // Check for experimental mode query parameter
   const isExperimentalMode = url.searchParams.get("experimental") === "1";
 
-  // Read utm_source for attribution tracking
-  const utmSource = resolveUtmSourceFromUrl(url);
+  // Read utm_source for attribution tracking (header preferred, query fallback)
+  const utmSource = resolveUtmSourceFromRequest(request, url);
 
   const sentryHost = env.SENTRY_HOST || "sentry.io";
   const clientFamily = resolveClientFamily(request.headers.get("user-agent"));

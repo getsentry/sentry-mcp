@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/cloudflare";
 import {
   UTM_SOURCE_ATTRIBUTE,
-  resolveUtmSourceFromUrl,
+  resolveUtmSourceFromRequest,
 } from "./lib/attribution";
 import { resolveClientFamily } from "./lib/client-family";
 import {
@@ -95,7 +95,7 @@ function getMcpRequestAttributes(request: Request, url: URL) {
   return {
     clientFamily: resolveClientFamily(request.headers.get("user-agent")),
     experimentalMode: url.searchParams.get("experimental") === "1",
-    utmSource: resolveUtmSourceFromUrl(url),
+    utmSource: resolveUtmSourceFromRequest(request, url),
   };
 }
 
