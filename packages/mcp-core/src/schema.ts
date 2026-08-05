@@ -7,7 +7,7 @@
  */
 import { z } from "zod";
 import { SENTRY_GUIDES } from "./constants";
-import { validateSlug } from "./utils/slug-validation";
+import { validateResourceId, validateSlug } from "./utils/slug-validation";
 
 // Sentry slug lookups can be exact and case-sensitive on legacy instances.
 // Preserve caller casing for resource slugs; only trim and validate shape.
@@ -67,6 +67,7 @@ export const ParamIssueUrl = z
 export const ParamReplayId = z
   .string()
   .trim()
+  .superRefine(validateResourceId)
   .describe("The replay ID. e.g. `7e07485f-12f9-416b-8b14-26260799b51f`");
 
 export const ParamReplayUrl = z
@@ -237,9 +238,26 @@ export const ParamSentryGuide = z
       "Use either a platform (e.g., 'javascript', 'python') or platform/guide combination (e.g., 'javascript/nextjs', 'python/django').",
   );
 
-export const ParamEventId = z.string().trim().describe("The ID of the event.");
+export const ParamEventId = z
+  .string()
+  .trim()
+  .regex(
+    /^[0-9a-fA-F]{32}$/,
+    "Event ID must be a 32-character hexadecimal string",
+  )
+  .describe("The ID of the event. e.g. `c49541c747cb4d8aa3efb70ca5aba243`");
+
+/**
+ * Issue-scoped event selector used by tools that can target either a concrete
+ * event or the issue's latest event.
+ */
+export const ParamEventIdOrLatest = z
+  .union([z.literal("latest"), ParamEventId])
+  .default("latest")
+  .describe("The event ID for the issue, or `latest`. Defaults to `latest`.");
 
 export const ParamAttachmentId = z
   .string()
   .trim()
+  .superRefine(validateResourceId)
   .describe("The ID of the attachment to download.");

@@ -77,6 +77,54 @@ export function validateSlug(val: string, ctx: z.RefinementCtx): void {
 }
 
 /**
+ * Validates a Sentry resource identifier (event, attachment, replay, profile,
+ * client key, dashboard) to prevent path traversal.
+ *
+ * Uses the same character set as slugs, which accommodates every identifier
+ * format the API returns: numeric IDs, 32-character hex IDs, hyphenated UUIDs,
+ * `PROJECT-1Z43` short IDs, and the literal `latest`. Rejecting `/`, `\` and `%`
+ * outright means a traversal or double-encoded payload never reaches the API
+ * client, and requiring a leading alphanumeric blocks a bare `..`.
+ *
+ * The API client percent-encodes path segments regardless (see
+ * `api-client/api-path.ts`); this layer exists so callers get an actionable
+ * validation error instead of a confusing upstream 404.
+ *
+ * @example
+ * ```typescript
+ * const EventId = z.string()
+ *   .trim()
+ *   .superRefine(validateResourceId)
+ *   .describe("The ID of the event");
+ * ```
+ */
+export function validateResourceId(val: string, ctx: z.RefinementCtx): void {
+  if (val.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "ID cannot be empty",
+    });
+    return;
+  }
+
+  if (val.length > MAX_SLUG_LENGTH) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `ID exceeds maximum length of ${MAX_SLUG_LENGTH} characters`,
+    });
+    return;
+  }
+
+  if (!VALID_SLUG_PATTERN.test(val)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        "ID must contain only alphanumeric characters, hyphens, underscores, and dots, and must start with an alphanumeric character",
+    });
+  }
+}
+
+/**
  * Validates a parameter that can be either a slug or numeric ID.
  * Designed to be used with Zod's superRefine() method.
  *

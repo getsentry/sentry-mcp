@@ -73,6 +73,11 @@ vi.mock("./utils/rate-limiter", () => ({
 }));
 
 import handler from "./index";
+import {
+  OAUTH_ERROR_ATTRIBUTE,
+  OAUTH_ERROR_REASON_ATTRIBUTE,
+  OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE,
+} from "./oauth/telemetry";
 
 describe("worker entrypoint", () => {
   const env = {
@@ -194,7 +199,7 @@ describe("worker entrypoint", () => {
     );
   });
 
-  it("patches root authorization server metadata with RFC 9207 iss support", async () => {
+  it("does not advertise RFC 9207 iss support on root authorization server metadata", async () => {
     mockOAuthProviderFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -224,7 +229,6 @@ describe("worker entrypoint", () => {
       authorization_endpoint: "https://mcp.sentry.dev/oauth/authorize",
       token_endpoint: "https://mcp.sentry.dev/oauth/token",
       client_id_metadata_document_supported: true,
-      authorization_response_iss_parameter_supported: true,
     });
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
@@ -382,6 +386,30 @@ describe("worker entrypoint", () => {
     expect(response.status).toBe(401);
     expect(response.headers.get("WWW-Authenticate")).toBe(
       'Bearer error="invalid_token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry/mcp-server?experimental=1"',
+    );
+  });
+
+  // Regression: unauthenticated plugin MCP URLs must challenge with PRM that
+  // preserves ?utm_source=plugin so OAuth discovery keeps the same resource.
+  it("patches plugin utm_source MCP 401 responses with query-preserving protected resource metadata", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": 'Bearer error="invalid_token"',
+        },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp?utm_source=plugin"),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("WWW-Authenticate")).toBe(
+      'Bearer error="invalid_token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp?utm_source=plugin"',
     );
   });
 
@@ -556,23 +584,23 @@ describe("worker entrypoint", () => {
 
     expect(response.status).toBe(401);
     expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
-      "app.oauth.error",
-      "invalid_token",
+      OAUTH_ERROR_ATTRIBUTE,
+      "invalid_access",
     );
     expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
-      "app.oauth.error_description",
-      "missing_or_invalid_access_token",
+      OAUTH_ERROR_REASON_ATTRIBUTE,
+      "missing_or_invalid_access",
     );
     expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
-      "app.oauth.request.token_shape",
+      OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE,
       "wrapper",
     );
     expect(mockMetricsCount).toHaveBeenCalledWith("app.server.response", 1, {
       attributes: expect.objectContaining({
         "app.client.family": "claude-code",
-        "app.oauth.error": "invalid_token",
-        "app.oauth.error_description": "missing_or_invalid_access_token",
-        "app.oauth.request.token_shape": "wrapper",
+        [OAUTH_ERROR_ATTRIBUTE]: "invalid_access",
+        [OAUTH_ERROR_REASON_ATTRIBUTE]: "missing_or_invalid_access",
+        [OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE]: "wrapper",
         "http.response.status_code": 401,
       }),
     });

@@ -14,7 +14,14 @@ import type { z } from "zod";
 import type { WorkerProps } from "../types";
 import { setSentryUserFromRequest } from "../utils/sentry-user";
 import { TokenResponseSchema } from "./constants";
-import { getOAuthGrantLifecycleTelemetry } from "./telemetry";
+import {
+  OAUTH_GRANT_SHAPE_ATTRIBUTE,
+  OAUTH_PROBE_REASON_ATTRIBUTE,
+  OAUTH_PROBE_STATUS_CODE_ATTRIBUTE,
+  OAUTH_REFRESH_OUTCOME_ATTRIBUTE,
+  getClientRegistrationMethodTelemetry,
+  getOAuthGrantLifecycleTelemetry,
+} from "./telemetry";
 
 function escapeHtml(value: string): string {
   return value
@@ -451,7 +458,7 @@ function recordTokenExchangeOutcome(
 ): void {
   Sentry.metrics.count("app.oauth.token_exchange", 1, {
     attributes: {
-      "app.oauth.token_exchange.outcome": outcome,
+      [OAUTH_REFRESH_OUTCOME_ATTRIBUTE]: outcome,
       ...attributes,
     },
   });
@@ -589,8 +596,9 @@ export async function tokenExchangeCallback(
     const remainingMs = expiresAt - Date.now();
     if (remainingMs > SAFE_WINDOW_MS) {
       recordTokenExchangeOutcome("cached_valid_local", {
-        "app.oauth.grant.shape": "refreshable",
+        [OAUTH_GRANT_SHAPE_ATTRIBUTE]: "refreshable",
         "app.client.family": clientFamily,
+        ...getClientRegistrationMethodTelemetry(props.clientId),
         ...getOAuthGrantLifecycleTelemetry(props),
       });
       return buildSuccessfulTokenExchangeResult(
@@ -611,15 +619,16 @@ export async function tokenExchangeCallback(
   // Metric attribute (not span attribute): Sentry.getActiveSpan() is
   // undefined inside tokenExchangeCallback.
   const outcomeAttributes: Record<string, string> = {
-    "app.oauth.grant.shape": "refreshable",
+    [OAUTH_GRANT_SHAPE_ATTRIBUTE]: "refreshable",
     "app.client.family": clientFamily,
+    ...getClientRegistrationMethodTelemetry(props.clientId),
     ...getOAuthGrantLifecycleTelemetry(props),
   };
   if (typeof status === "number") {
-    outcomeAttributes["app.oauth.probe.status_code"] = String(status);
+    outcomeAttributes[OAUTH_PROBE_STATUS_CODE_ATTRIBUTE] = String(status);
   }
   if (reason) {
-    outcomeAttributes["app.oauth.probe.reason"] = reason;
+    outcomeAttributes[OAUTH_PROBE_REASON_ATTRIBUTE] = reason;
   }
   switch (outcome) {
     case "cached_valid_probed": {

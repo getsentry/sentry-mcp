@@ -9,6 +9,7 @@ import {
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
+import { validateResourceId } from "../../utils/slug-validation";
 
 export default defineTool({
   name: "update_dsn",
@@ -54,6 +55,7 @@ export default defineTool({
     keyId: z
       .string()
       .trim()
+      .superRefine(validateResourceId)
       .describe(
         "The ID of the DSN (client key) to update. Use find_dsns() to retrieve this ID first.",
       ),

@@ -17,8 +17,12 @@ export function startMockServer(options?: {
 
   mswServer.listen({
     onUnhandledRequest: (req: any, print: any) => {
-      // Ignore OpenAI requests if specified (default behavior for AI agent tests)
-      if (ignoreOpenAI && req.url.startsWith("https://api.openai.com/")) {
+      // Ignore LLM provider requests if specified (default behavior for AI agent tests)
+      if (
+        ignoreOpenAI &&
+        (req.url.startsWith("https://api.openai.com/") ||
+          req.url.startsWith("https://openrouter.ai/"))
+      ) {
         return;
       }
 

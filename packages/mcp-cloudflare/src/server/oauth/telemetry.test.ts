@@ -2,40 +2,46 @@ import { describe, expect, it } from "vitest";
 import {
   bucketOAuthErrorCode,
   bucketOAuthErrorDescription,
+  CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+  getClientRegistrationMethodTelemetry,
   getOAuthErrorTelemetry,
   getOAuthGrantTelemetry,
   getOAuthGrantLifecycleTelemetry,
-  getOAuthTokenShape,
+  getOAuthBearerShape,
+  OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE,
+  OAUTH_GRANT_ID_HASH_ATTRIBUTE,
+  OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE,
+  resolveClientRegistrationMethod,
 } from "./telemetry";
 
 describe("OAuth telemetry", () => {
   it("buckets bearer token shapes without exposing token values", () => {
-    expect(getOAuthTokenShape(new Request("https://mcp.sentry.dev/mcp"))).toBe(
+    expect(getOAuthBearerShape(new Request("https://mcp.sentry.dev/mcp"))).toBe(
       "missing",
     );
     expect(
-      getOAuthTokenShape(
+      getOAuthBearerShape(
         new Request("https://mcp.sentry.dev/mcp", {
           headers: { Authorization: "Basic abc" },
         }),
       ),
-    ).toBe("non_bearer");
+    ).toBe("non_scheme");
     expect(
-      getOAuthTokenShape(
+      getOAuthBearerShape(
         new Request("https://mcp.sentry.dev/mcp", {
           headers: { Authorization: "Bearer " },
         }),
       ),
-    ).toBe("empty_bearer");
+    ).toBe("empty_scheme");
     expect(
-      getOAuthTokenShape(
+      getOAuthBearerShape(
         new Request("https://mcp.sentry.dev/mcp", {
           headers: { Authorization: "Bearer user-id:grant-id:secret" },
         }),
       ),
     ).toBe("wrapper");
     expect(
-      getOAuthTokenShape(
+      getOAuthBearerShape(
         new Request("https://mcp.sentry.dev/mcp", {
           headers: { Authorization: "Bearer opaque-token" },
         }),
@@ -58,9 +64,9 @@ describe("OAuth telemetry", () => {
     );
 
     expect(telemetry).toEqual({
-      oauthError: "invalid_token",
-      oauthErrorDescription: "missing_invalid_or_expired_access_token",
-      oauthTokenShape: "wrapper",
+      oauthError: "invalid_access",
+      oauthErrorReason: "missing_invalid_or_expired_access",
+      oauthBearerShape: "wrapper",
     });
   });
 
@@ -85,9 +91,9 @@ describe("OAuth telemetry", () => {
     );
 
     expect(telemetry).toEqual({
-      oauthError: "invalid_token",
-      oauthErrorDescription: "invalid_access_token",
-      oauthTokenShape: "wrapper",
+      oauthError: "invalid_access",
+      oauthErrorReason: "invalid_access",
+      oauthBearerShape: "wrapper",
     });
   });
 
@@ -108,7 +114,7 @@ describe("OAuth telemetry", () => {
 
     expect(telemetry).toEqual({
       oauthError: "invalid_grant",
-      oauthErrorDescription: "grant_not_found",
+      oauthErrorReason: "grant_not_found",
     });
   });
 
@@ -119,7 +125,7 @@ describe("OAuth telemetry", () => {
   });
 
   it("keeps OAuth error code cardinality bounded", async () => {
-    expect(bucketOAuthErrorCode("invalid_token")).toBe("invalid_token");
+    expect(bucketOAuthErrorCode("invalid_token")).toBe("invalid_access");
     expect(bucketOAuthErrorCode("vendor-specific-error")).toBe("other");
 
     const telemetry = await getOAuthErrorTelemetry(
@@ -138,7 +144,7 @@ describe("OAuth telemetry", () => {
 
     expect(telemetry).toEqual({
       oauthError: "other",
-      oauthErrorDescription: "other",
+      oauthErrorReason: "other",
     });
   });
 
@@ -148,10 +154,10 @@ describe("OAuth telemetry", () => {
     const other = getOAuthGrantTelemetry("other-grant-id");
 
     expect(first).toEqual(second);
-    expect(first["app.oauth.grant.id_hash"]).toMatch(/^[0-9a-f]{8}$/);
-    expect(first["app.oauth.grant.id_hash"]).not.toBe("grant-id");
-    expect(other["app.oauth.grant.id_hash"]).not.toBe(
-      first["app.oauth.grant.id_hash"],
+    expect(first[OAUTH_GRANT_ID_HASH_ATTRIBUTE]).toMatch(/^[0-9a-f]{8}$/);
+    expect(first[OAUTH_GRANT_ID_HASH_ATTRIBUTE]).not.toBe("grant-id");
+    expect(other[OAUTH_GRANT_ID_HASH_ATTRIBUTE]).not.toBe(
+      first[OAUTH_GRANT_ID_HASH_ATTRIBUTE],
     );
     expect(JSON.stringify(first)).not.toContain("grant-id");
   });
@@ -165,12 +171,38 @@ describe("OAuth telemetry", () => {
         upstreamExpiresAt: now + 3 * 24 * 60 * 60 * 1000,
       }),
     ).toEqual({
-      "app.oauth.grant.age_bucket": "1d_7d",
-      "app.oauth.upstream.expires_in_bucket": "1d_7d",
+      [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: "1d_7d",
+      [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: "1d_7d",
     });
     expect(getOAuthGrantLifecycleTelemetry({})).toEqual({
-      "app.oauth.grant.age_bucket": "unknown",
-      "app.oauth.upstream.expires_in_bucket": "unknown",
+      [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: "unknown",
+      [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: "unknown",
+    });
+  });
+
+  it("classifies client_ids as CIMD, DCR, or unknown", () => {
+    expect(
+      resolveClientRegistrationMethod(
+        "https://claude.ai/oauth/claude-code-client-metadata",
+      ),
+    ).toBe("cimd");
+    expect(
+      resolveClientRegistrationMethod("  https://example.com/meta  "),
+    ).toBe("cimd");
+    expect(resolveClientRegistrationMethod("opaque-client-id")).toBe("dcr");
+    expect(resolveClientRegistrationMethod("http://example.com/meta")).toBe(
+      "unknown",
+    );
+    expect(resolveClientRegistrationMethod("")).toBe("unknown");
+    expect(resolveClientRegistrationMethod("   ")).toBe("unknown");
+    expect(resolveClientRegistrationMethod(undefined)).toBe("unknown");
+    expect(resolveClientRegistrationMethod(null)).toBe("unknown");
+    expect(
+      getClientRegistrationMethodTelemetry(
+        "https://claude.ai/oauth/claude-code-client-metadata",
+      ),
+    ).toEqual({
+      [CLIENT_REGISTRATION_METHOD_ATTRIBUTE]: "cimd",
     });
   });
 });

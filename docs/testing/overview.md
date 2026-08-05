@@ -279,7 +279,7 @@ describeEval("tool-name", {
 ### Running Evals
 
 ```bash
-# Requires OPENAI_API_KEY in .env
+# Requires OPENROUTER_API_KEY in .env
 pnpm eval
 
 # Run specific eval

@@ -1507,7 +1507,7 @@ export const restHandlers = buildHandlers([
   // Step 1 (metadata), so the attachment is rendered as an image not a blob.
   {
     method: "get",
-    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/octet-stream-event-id/attachments/",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/d49541c747cb4d8aa3efb70ca5aba244/attachments/",
     fetch: () =>
       HttpResponse.json([
         {
@@ -1524,7 +1524,7 @@ export const restHandlers = buildHandlers([
   },
   {
     method: "get",
-    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/octet-stream-event-id/attachments/456/",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/d49541c747cb4d8aa3efb70ca5aba244/attachments/456/",
     fetch: () => {
       const mockBlob = new Blob(["fake image data"], { type: "image/png" });
       return new HttpResponse(mockBlob, {
