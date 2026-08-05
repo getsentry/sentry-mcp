@@ -1,5 +1,5 @@
 import { getActiveSpan } from "@sentry/core";
-import { APICallError, tool } from "ai";
+import { APICallError, RetryError, tool } from "ai";
 import { z } from "zod";
 import { ApiClientError, ApiServerError } from "../../../api-client";
 import { LLMProviderError, UserInputError } from "../../../errors";
@@ -82,16 +82,21 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
     };
   }
 
-  // Handle AI SDK APICallError that wasn't converted to LLMProviderError.
-  // Defensive layer: all provider API failures are availability issues and
-  // must not create per-request Sentry issues during an outage.
-  if (APICallError.isInstance(error)) {
-    const statusCode = error.statusCode;
+  // Handle AI SDK APICallError / RetryError that weren't converted to
+  // LLMProviderError. Defensive layer: all provider API failures are
+  // availability issues and must not create per-request Sentry issues during
+  // an outage. RetryError is what the AI SDK throws after exhausting retries.
+  if (APICallError.isInstance(error) || RetryError.isInstance(error)) {
+    const statusCode = APICallError.isInstance(error)
+      ? error.statusCode
+      : undefined;
     logWarn(error, {
       loggerScope: ["agent-tools", "api-call"],
       contexts: {
         agentTool: {
-          errorType: "APICallError",
+          errorType: APICallError.isInstance(error)
+            ? "APICallError"
+            : "RetryError",
           statusCode: statusCode ?? null,
         },
       },

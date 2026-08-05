@@ -10,7 +10,7 @@ import {
   isApiAuthenticationErrorDeep,
 } from "../api-client";
 import { logIssue, logWarn } from "../telem/logging";
-import { APICallError, NoObjectGeneratedError } from "ai";
+import { APICallError, NoObjectGeneratedError, RetryError } from "ai";
 import type { TransportType } from "../types";
 
 /**
@@ -95,8 +95,9 @@ export function isExpectedToolError(error: unknown): boolean {
   }
 
   // AI SDK provider failures are expected at the tool boundary once converted
-  // or handled as availability issues. Includes 4xx, 5xx, and transport errors.
-  if (isAPICallError(error)) {
+  // or handled as availability issues. Includes 4xx, 5xx, transport errors, and
+  // RetryError wrappers emitted after the SDK exhausts retries.
+  if (isAPICallError(error) || RetryError.isInstance(error)) {
     return true;
   }
 
@@ -204,12 +205,12 @@ export async function formatErrorForUser(
     );
   }
 
-  // Handle AI SDK APICallError that wasn't converted to LLMProviderError.
-  // This is a defensive layer - ideally callEmbeddedAgent converts these.
-  // Treat all provider API failures as availability issues so tool calls
-  // degrade gracefully instead of creating per-request Sentry issues.
-  if (isAPICallError(error)) {
-    const statusCode = error.statusCode;
+  // Handle AI SDK APICallError / RetryError that weren't converted to
+  // LLMProviderError. This is a defensive layer - ideally callEmbeddedAgent
+  // converts these. Treat all provider API failures as availability issues so
+  // tool calls degrade gracefully instead of creating per-request Sentry issues.
+  if (isAPICallError(error) || RetryError.isInstance(error)) {
+    const statusCode = isAPICallError(error) ? error.statusCode : undefined;
     const detail =
       statusCode && statusCode >= 500
         ? "The AI provider is currently unavailable."

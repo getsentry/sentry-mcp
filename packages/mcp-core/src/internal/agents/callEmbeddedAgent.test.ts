@@ -3,6 +3,7 @@ import {
   generateText,
   APICallError,
   NoObjectGeneratedError,
+  RetryError,
   type LanguageModelUsage,
 } from "ai";
 import { z } from "zod";
@@ -242,6 +243,70 @@ describe("callEmbeddedAgent", () => {
         schema: testSchema,
       }),
     ).rejects.toThrow(/quota, or account issue/);
+  });
+
+  it("throws LLMProviderError for RetryError-wrapped provider outages", async () => {
+    // After maxRetries, the AI SDK wraps retryable 5xx/network failures.
+    const serverError = new APICallError({
+      message: "Internal server error",
+      url: "https://api.openai.com/v1/chat/completions",
+      requestBodyValues: {},
+      statusCode: 503,
+      isRetryable: true,
+    });
+    const retryError = new RetryError({
+      message: "Failed after 3 attempts. Last error: Internal server error",
+      reason: "maxRetriesExceeded",
+      errors: [serverError, serverError, serverError],
+    });
+
+    mockGenerateText.mockRejectedValue(retryError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(LLMProviderError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(/currently unavailable.*Internal server error/);
+  });
+
+  it("throws LLMProviderError for RetryError without an APICallError cause", async () => {
+    const retryError = new RetryError({
+      message: "Failed after 3 attempts. Last error: socket hang up",
+      reason: "maxRetriesExceeded",
+      errors: [new Error("socket hang up")],
+    });
+
+    mockGenerateText.mockRejectedValue(retryError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(LLMProviderError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(/currently unavailable.*socket hang up/);
   });
 
   it("re-throws non-APICallError errors unchanged", async () => {

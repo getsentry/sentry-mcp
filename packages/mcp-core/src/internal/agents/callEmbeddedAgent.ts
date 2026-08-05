@@ -4,12 +4,81 @@ import {
   type Tool,
   APICallError,
   NoObjectGeneratedError,
+  RetryError,
   stepCountIs,
 } from "ai";
 import { getAgentProvider } from "./provider-factory";
 import { UserInputError, LLMProviderError } from "../../errors";
 import { logWarn } from "../../telem/logging";
 import type { z } from "zod";
+
+/**
+ * Resolve the underlying provider failure from an AI SDK error.
+ *
+ * After retries, the SDK wraps retryable 5xx/network failures in RetryError.
+ * Prefer the last error, then walk earlier errors for the first APICallError.
+ */
+function resolveProviderApiCallError(error: unknown): APICallError | null {
+  if (APICallError.isInstance(error)) {
+    return error;
+  }
+
+  if (!RetryError.isInstance(error)) {
+    return null;
+  }
+
+  if (APICallError.isInstance(error.lastError)) {
+    return error.lastError;
+  }
+
+  for (let i = error.errors.length - 1; i >= 0; i--) {
+    const candidate = error.errors[i];
+    if (APICallError.isInstance(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function toLLMProviderError(
+  error: APICallError,
+  originalError: unknown = error,
+): LLMProviderError {
+  // OpenAI region restriction error - provide specific helpful message
+  if (error.message.includes("Country, region, or territory not supported")) {
+    return new LLMProviderError(
+      "The AI provider (OpenAI) does not support requests from your region. " +
+        "This is a restriction imposed by OpenAI on certain countries and territories. " +
+        "Please contact support if you believe this is an error.",
+      { cause: originalError },
+    );
+  }
+
+  const statusCode = error.statusCode;
+
+  // 4xx: account/config/budget/rate-limit style failures
+  if (statusCode && statusCode >= 400 && statusCode < 500) {
+    return new LLMProviderError(
+      `The AI provider returned an error: ${error.message}. This may be a configuration, quota, or account issue with the upstream AI provider.`,
+      { cause: originalError },
+    );
+  }
+
+  // 5xx / missing status (network, timeouts): treat as provider outage so
+  // tool handlers can fall back instead of failing the parent MCP tool.
+  if (!statusCode || statusCode >= 500) {
+    return new LLMProviderError(
+      `The AI provider is currently unavailable${statusCode ? ` (HTTP ${statusCode})` : ""}: ${error.message}. Please try again later.`,
+      { cause: originalError },
+    );
+  }
+
+  return new LLMProviderError(
+    `The AI provider returned an error: ${error.message}. This may be a configuration, quota, or account issue with the upstream AI provider.`,
+    { cause: originalError },
+  );
+}
 
 export type ToolCall = {
   toolName: string;
@@ -135,38 +204,20 @@ export async function callEmbeddedAgent<
     // Handle LLM provider errors with user-friendly messages.
     // These are operational availability failures that should NOT create Sentry
     // issues per request (budget exhaustion, rate limits, provider outages).
-    if (APICallError.isInstance(error)) {
-      // OpenAI region restriction error - provide specific helpful message
-      if (
-        error.message.includes("Country, region, or territory not supported")
-      ) {
-        throw new LLMProviderError(
-          "The AI provider (OpenAI) does not support requests from your region. " +
-            "This is a restriction imposed by OpenAI on certain countries and territories. " +
-            "Please contact support if you believe this is an error.",
-          { cause: error },
-        );
-      }
+    // Also unwrap RetryError: after maxRetries the AI SDK wraps retryable
+    // 5xx/network failures so bare APICallError checks alone would miss them.
+    const providerError = resolveProviderApiCallError(error);
+    if (providerError) {
+      throw toLLMProviderError(providerError, error);
+    }
 
-      const statusCode = error.statusCode;
-
-      // 4xx: account/config/budget/rate-limit style failures
-      if (statusCode && statusCode >= 400 && statusCode < 500) {
-        throw new LLMProviderError(
-          `The AI provider returned an error: ${error.message}. This may be a configuration, quota, or account issue with the upstream AI provider.`,
-          { cause: error },
-        );
-      }
-
-      // 5xx / missing status (network, timeouts): treat as provider outage so
-      // tool handlers can return a graceful availability error instead of a
-      // system exception flood.
-      if (!statusCode || statusCode >= 500) {
-        throw new LLMProviderError(
-          `The AI provider is currently unavailable${statusCode ? ` (HTTP ${statusCode})` : ""}: ${error.message}. Please try again later.`,
-          { cause: error },
-        );
-      }
+    // RetryError without an underlying APICallError is still a provider outage
+    // (timeouts/network after retries) and should degrade the same way.
+    if (RetryError.isInstance(error)) {
+      throw new LLMProviderError(
+        `The AI provider is currently unavailable: ${error.message}. Please try again later.`,
+        { cause: error },
+      );
     }
 
     // Re-throw unexpected errors to be handled by the caller (logged to Sentry)

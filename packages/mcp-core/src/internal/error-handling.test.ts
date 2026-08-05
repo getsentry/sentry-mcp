@@ -8,7 +8,7 @@ import {
   ConfigurationError,
   LLMProviderError,
 } from "../errors";
-import { APICallError } from "ai";
+import { APICallError, RetryError } from "ai";
 
 vi.mock("../telem/logging", () => ({
   logIssue: vi.fn(() => "mock-event-id"),
@@ -174,6 +174,33 @@ describe("formatErrorForUser", () => {
       const result = await formatErrorForUser(error, { transport: "stdio" });
       expect(result).toContain("currently unavailable");
       expect(result).toContain("Internal server error");
+      expect(logIssue).not.toHaveBeenCalled();
+      expect(logWarn).toHaveBeenCalled();
+    });
+  });
+
+  describe("RetryError", () => {
+    const error = new RetryError({
+      message: "Failed after 3 attempts. Last error: Internal server error",
+      reason: "maxRetriesExceeded",
+      errors: [
+        new APICallError({
+          message: "Internal server error",
+          url: "https://api.openai.com/v1/chat/completions",
+          requestBodyValues: {},
+          statusCode: 503,
+          isRetryable: true,
+        }),
+      ],
+    });
+
+    it("is treated as an expected tool error", () => {
+      expect(isExpectedToolError(error)).toBe(true);
+    });
+
+    it("returns graceful availability message without creating an issue", async () => {
+      const result = await formatErrorForUser(error, { transport: "http" });
+      expect(result).toContain("AI-powered features are temporarily unavailable");
       expect(logIssue).not.toHaveBeenCalled();
       expect(logWarn).toHaveBeenCalled();
     });
