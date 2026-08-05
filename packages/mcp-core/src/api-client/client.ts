@@ -20,6 +20,7 @@ import {
   type TraceMetricIdentifier,
 } from "../utils/url-utils";
 import { isNumericId } from "../utils/slug-validation";
+import { apiPath } from "./api-path";
 import {
   isMetricsDataset,
   isProfilesDataset,
@@ -1587,7 +1588,7 @@ export class SentryApiService {
    */
   async getOrganization(organizationSlug: string, opts?: RequestOptions) {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/`,
+      apiPath`/organizations/${organizationSlug}/`,
       undefined,
       opts,
     );
@@ -1615,7 +1616,8 @@ export class SentryApiService {
       queryParams.set("query", params.query);
     }
     const queryString = queryParams.toString();
-    const path = `/organizations/${organizationSlug}/teams/?${queryString}`;
+    const teamsPath = apiPath`/organizations/${organizationSlug}/teams/`;
+    const path = `${teamsPath}?${queryString}`;
 
     const body = await this.requestJSON(path, undefined, opts);
     return TeamListSchema.parse(body);
@@ -1642,7 +1644,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Team> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/teams/`,
+      apiPath`/organizations/${organizationSlug}/teams/`,
       {
         method: "POST",
         body: JSON.stringify({ name }),
@@ -1673,7 +1675,8 @@ export class SentryApiService {
       queryParams.set("query", params.query);
     }
     const queryString = queryParams.toString();
-    const path = `/organizations/${organizationSlug}/projects/?${queryString}`;
+    const projectsPath = apiPath`/organizations/${organizationSlug}/projects/`;
+    const path = `${projectsPath}?${queryString}`;
 
     const body = await this.requestJSON(path, undefined, opts);
     return ProjectListSchema.parse(body);
@@ -1708,7 +1711,8 @@ export class SentryApiService {
     }
 
     const response = await this.request(
-      `/organizations/${organizationSlug}/dashboards/?${queryParams.toString()}`,
+      apiPath`/organizations/${organizationSlug}/dashboards/` +
+        `?${queryParams.toString()}`,
       undefined,
       opts,
     );
@@ -1731,7 +1735,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Dashboard> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/dashboards/${dashboardId}/`,
+      apiPath`/organizations/${organizationSlug}/dashboards/${dashboardId}/`,
       undefined,
       opts,
     );
@@ -1758,7 +1762,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Project> {
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlugOrId}/`,
+      apiPath`/projects/${organizationSlug}/${projectSlugOrId}/`,
       undefined,
       opts,
     );
@@ -1803,7 +1807,7 @@ export class SentryApiService {
     }
 
     const body = await this.requestJSON(
-      `/teams/${organizationSlug}/${teamSlug}/projects/`,
+      apiPath`/teams/${organizationSlug}/${teamSlug}/projects/`,
       {
         method: "POST",
         body: JSON.stringify(createData),
@@ -1848,7 +1852,7 @@ export class SentryApiService {
     if (platform) updateData.platform = platform;
 
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/`,
       {
         method: "PUT",
         body: JSON.stringify(updateData),
@@ -1882,7 +1886,8 @@ export class SentryApiService {
       }
 
       const response = await this.request(
-        `/organizations/${organizationSlug}/repos/?${params.toString()}`,
+        apiPath`/organizations/${organizationSlug}/repos/` +
+          `?${params.toString()}`,
         { method: "GET" },
         opts,
       );
@@ -1909,7 +1914,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ) {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/code-mappings/bulk/`,
+      apiPath`/organizations/${organizationSlug}/code-mappings/bulk/`,
       {
         method: "POST",
         body: JSON.stringify({
@@ -1979,7 +1984,8 @@ export class SentryApiService {
       }
 
       const response = await this.request(
-        `/organizations/${organizationSlug}/workflows/?${searchQuery.toString()}`,
+        apiPath`/organizations/${organizationSlug}/workflows/` +
+          `?${searchQuery.toString()}`,
         undefined,
         opts,
       );
@@ -2020,7 +2026,8 @@ export class SentryApiService {
     searchQuery.set("per_page", "1");
 
     const response = await this.request(
-      `/organizations/${organizationSlug}/workflows/?${searchQuery.toString()}`,
+      apiPath`/organizations/${organizationSlug}/workflows/` +
+        `?${searchQuery.toString()}`,
       undefined,
       opts,
     );
@@ -2110,7 +2117,7 @@ export class SentryApiService {
     }
 
     const queryString = searchQuery.toString();
-    const path = `/organizations/${organizationSlug}/alert-rules/`;
+    const path = apiPath`/organizations/${organizationSlug}/alert-rules/`;
     const response = await this.request(
       `${path}${queryString ? `?${queryString}` : ""}`,
       undefined,
@@ -2133,7 +2140,7 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<MetricAlertRule> {
-    const path = `/organizations/${organizationSlug}/alert-rules/${encodeURIComponent(String(ruleId))}/`;
+    const path = apiPath`/organizations/${organizationSlug}/alert-rules/${ruleId}/`;
     const body = await this.requestJSON(path, undefined, opts);
     return MetricAlertRuleSchema.parse(body);
   }
@@ -2173,7 +2180,8 @@ export class SentryApiService {
     }
 
     const response = await this.request(
-      `/organizations/${organizationSlug}/combined-rules/?${searchQuery.toString()}`,
+      apiPath`/organizations/${organizationSlug}/combined-rules/` +
+        `?${searchQuery.toString()}`,
       undefined,
       opts,
     );
@@ -2213,7 +2221,8 @@ export class SentryApiService {
       }
 
       const response = await this.request(
-        `/projects/${organizationSlug}/${projectSlug}/teams/?${queryParams.toString()}`,
+        apiPath`/projects/${organizationSlug}/${projectSlug}/teams/` +
+          `?${queryParams.toString()}`,
         undefined,
         opts,
       );
@@ -2247,7 +2256,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<void> {
     await this.request(
-      `/projects/${organizationSlug}/${projectSlug}/teams/${teamSlug}/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/teams/${teamSlug}/`,
       {
         method: "POST",
         body: JSON.stringify({}),
@@ -2278,7 +2287,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<void> {
     await this.request(
-      `/projects/${organizationSlug}/${projectSlug}/teams/${teamSlug}/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/teams/${teamSlug}/`,
       {
         method: "DELETE",
       },
@@ -2321,7 +2330,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<ClientKey> {
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/keys/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/keys/`,
       {
         method: "POST",
         body: JSON.stringify({
@@ -2383,7 +2392,7 @@ export class SentryApiService {
     }
 
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/keys/${keyId}/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/keys/${keyId}/`,
       {
         method: "PUT",
         body: JSON.stringify(updateData),
@@ -2413,7 +2422,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<ClientKeyList> {
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/keys/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/keys/`,
       undefined,
       opts,
     );
@@ -2467,8 +2476,8 @@ export class SentryApiService {
     }
 
     const path = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/releases/`
-      : `/organizations/${organizationSlug}/releases/`;
+      ? apiPath`/projects/${organizationSlug}/${projectSlug}/releases/`
+      : apiPath`/organizations/${organizationSlug}/releases/`;
 
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
@@ -2497,10 +2506,9 @@ export class SentryApiService {
       searchQuery.set("health", "1");
     }
 
-    const encodedVersion = encodeURIComponent(releaseVersion);
     const path = projectSlugOrId
-      ? `/projects/${organizationSlug}/${projectSlugOrId}/releases/${encodedVersion}/`
-      : `/organizations/${organizationSlug}/releases/${encodedVersion}/`;
+      ? apiPath`/projects/${organizationSlug}/${projectSlugOrId}/releases/${releaseVersion}/`
+      : apiPath`/organizations/${organizationSlug}/releases/${releaseVersion}/`;
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,
@@ -2534,8 +2542,7 @@ export class SentryApiService {
       searchQuery.set("per_page", String(limit));
     }
 
-    const encodedVersion = encodeURIComponent(releaseVersion);
-    const path = `/organizations/${organizationSlug}/releases/${encodedVersion}/deploys/`;
+    const path = apiPath`/organizations/${organizationSlug}/releases/${releaseVersion}/deploys/`;
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,
@@ -2563,10 +2570,9 @@ export class SentryApiService {
       searchQuery.set("per_page", String(limit));
     }
 
-    const encodedVersion = encodeURIComponent(releaseVersion);
     const path = projectSlugOrId
-      ? `/projects/${organizationSlug}/${projectSlugOrId}/releases/${encodedVersion}/commits/`
-      : `/organizations/${organizationSlug}/releases/${encodedVersion}/commits/`;
+      ? apiPath`/projects/${organizationSlug}/${projectSlugOrId}/releases/${releaseVersion}/commits/`
+      : apiPath`/organizations/${organizationSlug}/releases/${releaseVersion}/commits/`;
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,
@@ -2612,8 +2618,9 @@ export class SentryApiService {
 
     const body = await this.requestJSON(
       searchQuery.toString()
-        ? `/organizations/${organizationSlug}/monitors/?${searchQuery.toString()}`
-        : `/organizations/${organizationSlug}/monitors/`,
+        ? apiPath`/organizations/${organizationSlug}/monitors/` +
+            `?${searchQuery.toString()}`
+        : apiPath`/organizations/${organizationSlug}/monitors/`,
       undefined,
       opts,
     );
@@ -2639,10 +2646,9 @@ export class SentryApiService {
       searchQuery.append("environment", environment);
     }
 
-    const encodedMonitor = encodeURIComponent(monitorSlug);
     const path = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/monitors/${encodedMonitor}/`
-      : `/organizations/${organizationSlug}/monitors/${encodedMonitor}/`;
+      ? apiPath`/projects/${organizationSlug}/${projectSlug}/monitors/${monitorSlug}/`
+      : apiPath`/organizations/${organizationSlug}/monitors/${monitorSlug}/`;
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,
@@ -2688,10 +2694,9 @@ export class SentryApiService {
     }
     this.applyTimeParams(searchQuery, effectiveStatsPeriod, start, end);
 
-    const encodedMonitor = encodeURIComponent(monitorSlug);
     const path = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/monitors/${encodedMonitor}/checkins/`
-      : `/organizations/${organizationSlug}/monitors/${encodedMonitor}/checkins/`;
+      ? apiPath`/projects/${organizationSlug}/${projectSlug}/monitors/${monitorSlug}/checkins/`
+      : apiPath`/organizations/${organizationSlug}/monitors/${monitorSlug}/checkins/`;
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,
@@ -2737,10 +2742,9 @@ export class SentryApiService {
       rollup,
     );
 
-    const encodedMonitor = encodeURIComponent(monitorSlug);
     const path = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/monitors/${encodedMonitor}/stats/`
-      : `/organizations/${organizationSlug}/monitors/${encodedMonitor}/stats/`;
+      ? apiPath`/projects/${organizationSlug}/${projectSlug}/monitors/${monitorSlug}/stats/`
+      : apiPath`/organizations/${organizationSlug}/monitors/${monitorSlug}/stats/`;
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,
@@ -2815,8 +2819,9 @@ export class SentryApiService {
 
     const body = await this.requestJSON(
       searchQuery.toString()
-        ? `/organizations/${organizationSlug}/tags/?${searchQuery.toString()}`
-        : `/organizations/${organizationSlug}/tags/`,
+        ? apiPath`/organizations/${organizationSlug}/tags/` +
+            `?${searchQuery.toString()}`
+        : apiPath`/organizations/${organizationSlug}/tags/`,
       undefined,
       opts,
     );
@@ -2880,8 +2885,9 @@ export class SentryApiService {
 
     const body = await this.requestJSON(
       searchQuery.toString()
-        ? `/organizations/${organizationSlug}/replays/?${searchQuery.toString()}`
-        : `/organizations/${organizationSlug}/replays/`,
+        ? apiPath`/organizations/${organizationSlug}/replays/` +
+            `?${searchQuery.toString()}`
+        : apiPath`/organizations/${organizationSlug}/replays/`,
       undefined,
       opts,
     );
@@ -2999,7 +3005,8 @@ export class SentryApiService {
     }
 
     const response = await this.request(
-      `/organizations/${organizationSlug}/events/validate/?${queryParams.toString()}`,
+      apiPath`/organizations/${organizationSlug}/events/validate/` +
+        `?${queryParams.toString()}`,
       undefined,
       { ...opts, allowStatuses: [400] },
     );
@@ -3031,7 +3038,9 @@ export class SentryApiService {
     }
     this.applyTimeParams(queryParams, statsPeriod, start, end);
 
-    const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
+    const url =
+      apiPath`/organizations/${organizationSlug}/trace-items/attributes/` +
+      `?${queryParams.toString()}`;
 
     const body = await this.requestJSON(url, undefined, opts);
     return TraceItemAttributeListSchema.parse(body);
@@ -3109,7 +3118,9 @@ export class SentryApiService {
     }
     queryParams.append("collapse", "unhandled");
 
-    const apiUrl = `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/issues/` +
+      `?${queryParams.toString()}`;
 
     const body = await this.requestJSON(apiUrl, undefined, opts);
     return IssueListSchema.parse(body);
@@ -3126,7 +3137,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Issue> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/`,
       undefined,
       opts,
     );
@@ -3171,7 +3182,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<IssueTagValues> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/tags/${tagKey}/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/tags/${tagKey}/`,
       undefined,
       opts,
     );
@@ -3201,7 +3212,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<ExternalIssueList> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/external-issues/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/external-issues/`,
       undefined,
       opts,
     );
@@ -3233,7 +3244,7 @@ export class SentryApiService {
       searchQuery.set("per_page", String(limit));
     }
 
-    const path = `/organizations/${organizationSlug}/issues/${issueId}/user-reports/`;
+    const path = apiPath`/organizations/${organizationSlug}/issues/${issueId}/user-reports/`;
     const response = await this.request(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,
@@ -3259,7 +3270,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Event> {
     const body = await this.requestJSON(
-      `/organizations/${encodeURIComponent(organizationSlug)}/issues/${encodeURIComponent(issueId)}/events/${encodeURIComponent(eventId)}/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/events/${eventId}/`,
       undefined,
       opts,
     );
@@ -3394,7 +3405,8 @@ export class SentryApiService {
     if (sdkName) query.set("sdkName", sdkName);
 
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/stacktrace-link/?${query.toString()}`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/stacktrace-link/` +
+        `?${query.toString()}`,
       { signal },
       opts,
     );
@@ -3454,7 +3466,9 @@ export class SentryApiService {
       params.append("full", "true");
     }
 
-    const apiUrl = `/organizations/${organizationSlug}/issues/${issueId}/events/?${params.toString()}`;
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/events/` +
+      `?${params.toString()}`;
     return await this.requestJSON(apiUrl, undefined, opts);
   }
 
@@ -3471,7 +3485,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<EventAttachmentList> {
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
       undefined,
       opts,
     );
@@ -3500,7 +3514,7 @@ export class SentryApiService {
   }> {
     // Get the attachment metadata first
     const attachmentsData = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
       undefined,
       opts,
     );
@@ -3515,7 +3529,9 @@ export class SentryApiService {
     }
 
     // Download the actual file content
-    const downloadUrl = `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/${attachmentId}/?download=1`;
+    const downloadUrl =
+      apiPath`/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/${attachmentId}/` +
+      `?download=1`;
     const downloadResponse = await this.request(
       downloadUrl,
       { method: "GET" },
@@ -3550,7 +3566,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<ReplayDetails> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/replays/${replayId}/`,
+      apiPath`/organizations/${organizationSlug}/replays/${replayId}/`,
       undefined,
       opts,
     );
@@ -3578,7 +3594,8 @@ export class SentryApiService {
     queryParams.append("project", "-1");
 
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/replay-count/?${queryParams.toString()}`,
+      apiPath`/organizations/${organizationSlug}/replay-count/` +
+        `?${queryParams.toString()}`,
       undefined,
       opts,
     );
@@ -3600,7 +3617,8 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<ReplayRecordingSegments> {
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlugOrId}/replays/${replayId}/recording-segments/?download=true`,
+      apiPath`/projects/${organizationSlug}/${projectSlugOrId}/replays/${replayId}/recording-segments/` +
+        `?download=true`,
       undefined,
       opts,
     );
@@ -3658,7 +3676,7 @@ export class SentryApiService {
     }
 
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/`,
       {
         method: "PUT",
         body: JSON.stringify(updateData),
@@ -3681,7 +3699,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<IssueComment> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/notes/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/notes/`,
       {
         method: "POST",
         body: JSON.stringify({ text }),
@@ -3702,7 +3720,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<IssueActivityList> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/activities/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/activities/`,
       undefined,
       opts,
     );
@@ -3726,7 +3744,7 @@ export class SentryApiService {
       searchQuery.set("per_page", String(limit));
     }
 
-    const path = `/organizations/${organizationSlug}/issues/${issueId}/notes/`;
+    const path = apiPath`/organizations/${organizationSlug}/issues/${issueId}/notes/`;
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,
@@ -3799,7 +3817,9 @@ export class SentryApiService {
     queryParams.set("query", sentryQuery.join(" "));
     // if (projectSlug) queryParams.set("project", projectSlug);
 
-    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/events/` +
+      `?${queryParams.toString()}`;
 
     const body = await this.requestJSON(apiUrl, undefined, opts);
     // TODO(dcramer): If you're using an older version of Sentry this API had a breaking change
@@ -3854,7 +3874,9 @@ export class SentryApiService {
     queryParams.set("query", sentryQuery.join(" "));
     // if (projectSlug) queryParams.set("project", projectSlug);
 
-    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/events/` +
+      `?${queryParams.toString()}`;
 
     const body = await this.requestJSON(apiUrl, undefined, opts);
     return SpansSearchResponseSchema.parse(body).data;
@@ -4031,7 +4053,9 @@ export class SentryApiService {
       });
     }
 
-    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/events/` +
+      `?${queryParams.toString()}`;
     return await this.requestJSON(apiUrl, undefined, opts);
   }
 
@@ -4051,7 +4075,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<AutofixRun> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
       {
         method: "POST",
         body: JSON.stringify({
@@ -4076,7 +4100,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<AutofixRunState> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
       undefined,
       opts,
     );
@@ -4121,7 +4145,8 @@ export class SentryApiService {
     queryParams.set("statsPeriod", statsPeriod);
 
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/trace-meta/${traceId}/?${queryParams.toString()}`,
+      apiPath`/organizations/${organizationSlug}/trace-meta/${traceId}/` +
+        `?${queryParams.toString()}`,
       undefined,
       opts,
     );
@@ -4177,7 +4202,8 @@ export class SentryApiService {
     queryParams.set("statsPeriod", statsPeriod);
 
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/trace/${traceId}/?${queryParams.toString()}`,
+      apiPath`/organizations/${organizationSlug}/trace/${traceId}/` +
+        `?${queryParams.toString()}`,
       undefined,
       opts,
     );
@@ -4233,7 +4259,8 @@ export class SentryApiService {
       }
 
       const response = await this.request(
-        `/organizations/${organizationSlug}/ai-conversations/${encodeURIComponent(conversationId)}/?${queryParams.toString()}`,
+        apiPath`/organizations/${organizationSlug}/ai-conversations/${conversationId}/` +
+          `?${queryParams.toString()}`,
         undefined,
         opts,
       );
@@ -4314,7 +4341,8 @@ export class SentryApiService {
     }
 
     const response = await this.request(
-      `/organizations/${organizationSlug}/ai-conversations/?${queryParams.toString()}`,
+      apiPath`/organizations/${organizationSlug}/ai-conversations/` +
+        `?${queryParams.toString()}`,
       undefined,
       opts,
     );
@@ -4382,7 +4410,9 @@ export class SentryApiService {
     );
     queryParams.set("statsPeriod", statsPeriod);
 
-    const path = `/organizations/${organizationSlug}/profiling/flamegraph/?${queryParams.toString()}`;
+    const path =
+      apiPath`/organizations/${organizationSlug}/profiling/flamegraph/` +
+      `?${queryParams.toString()}`;
     const body = await this.requestJSON(path, undefined, opts);
     return FlamegraphSchema.parse(body);
   }
@@ -4399,7 +4429,7 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<TransactionProfile> {
-    const path = `/projects/${organizationSlug}/${projectSlugOrId}/profiling/profiles/${profileId}/`;
+    const path = apiPath`/projects/${organizationSlug}/${projectSlugOrId}/profiling/profiles/${profileId}/`;
     const body = await this.requestJSON(path, undefined, opts);
     return TransactionProfileSchema.parse(body);
   }
@@ -4461,7 +4491,9 @@ export class SentryApiService {
     queryParams.set("start", start);
     queryParams.set("end", end);
 
-    const path = `/organizations/${organizationSlug}/profiling/chunks/?${queryParams.toString()}`;
+    const path =
+      apiPath`/organizations/${organizationSlug}/profiling/chunks/` +
+      `?${queryParams.toString()}`;
     const body = await this.requestJSON(path, undefined, opts);
 
     // Normalize the Sentry {chunk: ...} wrapper to the internal chunks array.
@@ -4504,7 +4536,9 @@ export class SentryApiService {
     if (compactMetadata) {
       params.set("compact_metadata", "true");
     }
-    const path = `/organizations/${encodeURIComponent(organizationSlug)}/preprodartifacts/snapshots/${encodeURIComponent(snapshotId)}/?${params.toString()}`;
+    const path =
+      apiPath`/organizations/${organizationSlug}/preprodartifacts/snapshots/${snapshotId}/` +
+      `?${params.toString()}`;
     return this.requestJSON(path);
   }
 
@@ -4517,7 +4551,7 @@ export class SentryApiService {
     snapshotId: string;
     imageIdentifier: string;
   }): Promise<unknown> {
-    const path = `/organizations/${encodeURIComponent(organizationSlug)}/preprodartifacts/snapshots/${encodeURIComponent(snapshotId)}/images/${encodeURIComponent(imageIdentifier)}/`;
+    const path = apiPath`/organizations/${organizationSlug}/preprodartifacts/snapshots/${snapshotId}/images/${imageIdentifier}/`;
     return this.requestJSON(path);
   }
 
@@ -4566,7 +4600,9 @@ export class SentryApiService {
     if (project) params.set("project", project);
     if (projectSlug) params.set("projectSlug", projectSlug);
     if (compactMetadata) params.set("compact_metadata", "true");
-    const path = `/organizations/${encodeURIComponent(organizationSlug)}/preprodartifacts/snapshots/latest-base/?${params.toString()}`;
+    const path =
+      apiPath`/organizations/${organizationSlug}/preprodartifacts/snapshots/latest-base/` +
+      `?${params.toString()}`;
     return this.requestJSON(path);
   }
 }

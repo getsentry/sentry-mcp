@@ -7,7 +7,7 @@
  */
 import { z } from "zod";
 import { SENTRY_GUIDES } from "./constants";
-import { validateSlug } from "./utils/slug-validation";
+import { validateResourceId, validateSlug } from "./utils/slug-validation";
 
 // Sentry slug lookups can be exact and case-sensitive on legacy instances.
 // Preserve caller casing for resource slugs; only trim and validate shape.
@@ -67,6 +67,7 @@ export const ParamIssueUrl = z
 export const ParamReplayId = z
   .string()
   .trim()
+  .superRefine(validateResourceId)
   .describe("The replay ID. e.g. `7e07485f-12f9-416b-8b14-26260799b51f`");
 
 export const ParamReplayUrl = z
@@ -258,4 +259,5 @@ export const ParamEventIdOrLatest = z
 export const ParamAttachmentId = z
   .string()
   .trim()
+  .superRefine(validateResourceId)
   .describe("The ID of the attachment to download.");
