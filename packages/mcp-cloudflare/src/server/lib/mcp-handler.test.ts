@@ -63,6 +63,7 @@ function createMcpRequest(
     path?: string;
     id?: number | string;
     bearerToken?: string;
+    headers?: Record<string, string>;
   } = {},
 ): Request {
   const { path = "/mcp", id = 1, bearerToken } = options;
@@ -72,6 +73,7 @@ function createMcpRequest(
     Accept: "application/json, text/event-stream",
     "CF-Connecting-IP": "192.0.2.1",
     Host: "localhost",
+    ...options.headers,
   };
   if (bearerToken) {
     headers.Authorization = `Bearer ${bearerToken}`;
@@ -345,14 +347,18 @@ describe("MCP Handler", () => {
       expect(toolNames).toContain("update_issue");
     });
 
-    it("passes Sentry-Bearer direct tokens to upstream Sentry API calls", async () => {
-      const request = createMcpRequest("tools/call", {
-        name: "execute_sentry_tool",
-        arguments: {
-          name: "whoami",
-          arguments: {},
+    it("passes direct tokens and sanitized UTM source to upstream Sentry API calls", async () => {
+      const request = createMcpRequest(
+        "tools/call",
+        {
+          name: "execute_sentry_tool",
+          arguments: {
+            name: "whoami",
+            arguments: {},
+          },
         },
-      });
+        { headers: { "X-Sentry-Utm-Source": "plugin" } },
+      );
       const ctx = {
         waitUntil: vi.fn(),
         passThroughOnException: vi.fn(),

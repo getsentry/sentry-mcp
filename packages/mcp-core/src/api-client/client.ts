@@ -496,6 +496,7 @@ export class SentryApiService {
   private clientId: string | null;
   private clientName: string | null;
   private clientFamily: string | null;
+  private utmSource: string | null;
   protected host: string;
   protected protocol: SentryProtocol;
   protected apiPrefix: string;
@@ -511,6 +512,7 @@ export class SentryApiService {
    * @param config.clientId DCR-registered OAuth client ID
    * @param config.clientName DCR-registered OAuth client name
    * @param config.clientFamily Bucketed client family (e.g. "claude-code", "cursor")
+   * @param config.utmSource Sanitized MCP request attribution source
    */
   constructor({
     accessToken = null,
@@ -519,6 +521,7 @@ export class SentryApiService {
     clientId = null,
     clientName = null,
     clientFamily = null,
+    utmSource = null,
   }: {
     accessToken?: string | null;
     host?: string;
@@ -526,11 +529,13 @@ export class SentryApiService {
     clientId?: string | null;
     clientName?: string | null;
     clientFamily?: string | null;
+    utmSource?: string | null;
   }) {
     this.accessToken = accessToken;
     this.clientId = clientId;
     this.clientName = clientName;
     this.clientFamily = clientFamily;
+    this.utmSource = utmSource;
     this.host = host;
     this.protocol = protocol;
     this.apiPrefix = `${protocol}://${host}/api/0`;
@@ -704,6 +709,9 @@ export class SentryApiService {
     }
     if (this.clientFamily) {
       headers["X-Sentry-MCP-Client-Family"] = this.clientFamily;
+    }
+    if (this.utmSource) {
+      headers["X-Sentry-MCP-Utm-Source"] = this.utmSource;
     }
 
     // Check if fetch is available, otherwise provide a helpful error message

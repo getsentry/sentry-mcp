@@ -442,6 +442,7 @@ async function handleAuthenticatedMcpRequest(
     clientId: auth.kind === "oauth" ? auth.clientId : undefined,
     clientName: auth.kind === "oauth" ? auth.clientName : undefined,
     clientFamily,
+    utmSource,
     accessToken: auth.accessToken,
     grantedSkills: auth.grantedSkills,
     constraints,

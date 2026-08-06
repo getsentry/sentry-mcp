@@ -764,6 +764,7 @@ describe("request headers", () => {
       clientId: "abc123",
       clientName: "Claude Code",
       clientFamily: "claude-code",
+      utmSource: "plugin",
     });
 
     await apiService.getAuthenticatedUser();
@@ -775,6 +776,7 @@ describe("request headers", () => {
     expect(requestInit.headers["X-Sentry-MCP-Client-Family"]).toBe(
       "claude-code",
     );
+    expect(requestInit.headers["X-Sentry-MCP-Utm-Source"]).toBe("plugin");
   });
 
   it("should not send MCP client headers when clientId and clientName are not set", async () => {
@@ -804,6 +806,7 @@ describe("request headers", () => {
     expect(requestInit.headers["X-Sentry-MCP-Client-Id"]).toBeUndefined();
     expect(requestInit.headers["X-Sentry-MCP-Client-Name"]).toBeUndefined();
     expect(requestInit.headers["X-Sentry-MCP-Client-Family"]).toBeUndefined();
+    expect(requestInit.headers["X-Sentry-MCP-Utm-Source"]).toBeUndefined();
   });
 });
 
