@@ -5,6 +5,7 @@
  * https://datatracker.ietf.org/doc/html/rfc8628
  */
 
+import { safeParse } from "valibot";
 import type { TokenResponse } from "../types/index.js";
 import {
   DeviceCodeResponseSchema,
@@ -298,17 +299,17 @@ function requestDeviceCode(scope: string = SCOPES) {
       );
     }
 
-    const result = DeviceCodeResponseSchema.safeParse(data);
+    const result = safeParse(DeviceCodeResponseSchema, data);
     if (!result.success) {
       throw new ApiError(
         "Invalid response from device authorization endpoint",
         response.status,
-        result.error.errors.map((e) => e.message).join(", "),
+        result.issues.map((i) => i.message).join(", "),
         "/oauth/device/code/"
       );
     }
 
-    return result.data;
+    return result.output;
   });
 }
 
@@ -344,17 +345,17 @@ function pollForToken(deviceCode: string): Promise<TokenResponse> {
     }
 
     // Try to parse as success response first
-    const tokenResult = TokenResponseSchema.safeParse(data);
+    const tokenResult = safeParse(TokenResponseSchema, data);
     if (tokenResult.success) {
-      return tokenResult.data;
+      return tokenResult.output;
     }
 
     // Try to parse as error response
-    const errorResult = TokenErrorResponseSchema.safeParse(data);
+    const errorResult = safeParse(TokenErrorResponseSchema, data);
     if (errorResult.success) {
       throw new DeviceFlowError(
-        errorResult.data.error,
-        errorResult.data.error_description
+        errorResult.output.error,
+        errorResult.output.error_description
       );
     }
 
@@ -530,10 +531,10 @@ export function refreshAccessToken(
       let errorDetail = "Token refresh failed";
       try {
         const errorData = await response.json();
-        const errorResult = TokenErrorResponseSchema.safeParse(errorData);
+        const errorResult = safeParse(TokenErrorResponseSchema, errorData);
         if (errorResult.success) {
           errorDetail =
-            errorResult.data.error_description ?? errorResult.data.error;
+            errorResult.output.error_description ?? errorResult.output.error;
         }
       } catch {
         // Ignore JSON parse errors
@@ -558,17 +559,17 @@ export function refreshAccessToken(
       );
     }
 
-    const result = TokenResponseSchema.safeParse(data);
+    const result = safeParse(TokenResponseSchema, data);
 
     if (!result.success) {
       throw new ApiError(
         "Invalid response from token refresh endpoint",
         response.status,
-        result.error.errors.map((e) => e.message).join(", "),
+        result.issues.map((i) => i.message).join(", "),
         "/oauth/token/"
       );
     }
 
-    return result.data;
+    return result.output;
   });
 }
