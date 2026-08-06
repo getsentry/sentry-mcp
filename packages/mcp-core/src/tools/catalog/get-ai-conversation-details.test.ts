@@ -121,7 +121,6 @@ function mockConversationEndpoint(
         expect(url.searchParams.get("statsPeriod")).toBe("30d");
         expect(url.searchParams.get("per_page")).toBe("1000");
         expect(url.searchParams.get("project")).toBe("-1");
-        expect(url.searchParams.get("apiVersion")).toBe("2");
         return HttpResponse.json({ conversationId, title, spans });
       },
     ),
@@ -548,7 +547,6 @@ describe("get_ai_conversation_details", () => {
           );
           expect(url.searchParams.get("end")).toBe("2026-05-23T02:34:56.137Z");
           expect(url.searchParams.get("project")).toBe("4510944073809921");
-          expect(url.searchParams.get("apiVersion")).toBe("2");
           return HttpResponse.json({
             conversationId: "conv-123",
             title: null,
@@ -584,7 +582,6 @@ describe("get_ai_conversation_details", () => {
             "2026-05-23T00:23:27.667Z",
           );
           expect(url.searchParams.get("end")).toBe("2026-05-23T02:34:56.137Z");
-          expect(url.searchParams.get("apiVersion")).toBe("2");
           return HttpResponse.json({
             conversationId: "conv-empty",
             title: null,
