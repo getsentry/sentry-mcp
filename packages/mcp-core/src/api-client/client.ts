@@ -4216,8 +4216,6 @@ export class SentryApiService {
     for (let page = 0; page < maxPages; page++) {
       const queryParams = new URLSearchParams();
       queryParams.set("per_page", String(perPage));
-      // Temporary: drop when Sentry defaults conversation details to the v2 envelope.
-      queryParams.set("apiVersion", "2");
       this.applyTimeParams(
         queryParams,
         start || end ? undefined : statsPeriod,
