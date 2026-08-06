@@ -1,96 +1,103 @@
 /**
  * Configuration Types
  *
- * Types and Zod schemas for the Sentry CLI configuration file.
+ * Types and Valibot schemas for the Sentry CLI configuration file.
  */
 
-import { z } from "zod";
+import {
+  type InferOutput,
+  number,
+  object,
+  optional,
+  record,
+  string,
+} from "valibot";
 import { CachedDsnEntrySchema } from "../lib/dsn/types.js";
 
 /**
  * Schema for cached project information
  */
-export const CachedProjectSchema = z.object({
-  orgSlug: z.string(),
-  orgName: z.string(),
-  projectSlug: z.string(),
-  projectName: z.string(),
-  projectId: z.string().optional(),
-  cachedAt: z.number(),
+export const CachedProjectSchema = object({
+  orgSlug: string(),
+  orgName: string(),
+  projectSlug: string(),
+  projectName: string(),
+  projectId: optional(string()),
+  cachedAt: number(),
 });
 
-export type CachedProject = z.infer<typeof CachedProjectSchema>;
+export type CachedProject = InferOutput<typeof CachedProjectSchema>;
 
 /**
  * Schema for project alias entry (used for short issue ID resolution)
  */
-export const ProjectAliasEntrySchema = z.object({
-  orgSlug: z.string(),
-  projectSlug: z.string(),
+export const ProjectAliasEntrySchema = object({
+  orgSlug: string(),
+  projectSlug: string(),
 });
 
-export type ProjectAliasEntry = z.infer<typeof ProjectAliasEntrySchema>;
+export type ProjectAliasEntry = InferOutput<typeof ProjectAliasEntrySchema>;
 
 /**
  * Schema for cached project aliases (A, B, C... -> org/project mapping).
  * Scoped by DSN fingerprint to prevent cross-project conflicts in monorepos.
  */
-export const ProjectAliasesSchema = z.object({
+export const ProjectAliasesSchema = object({
   /** Map of alias letter to project info */
-  aliases: z.record(ProjectAliasEntrySchema),
+  aliases: record(string(), ProjectAliasEntrySchema),
   /** Timestamp when aliases were set */
-  cachedAt: z.number(),
+  cachedAt: number(),
   /**
    * Fingerprint of detected DSNs for validation.
    * Format: sorted comma-separated list of "orgId:projectId" pairs.
    * Aliases only valid when current DSN detection matches this fingerprint.
    */
-  dsnFingerprint: z.string().optional(),
+  dsnFingerprint: optional(string()),
 });
 
-export type ProjectAliases = z.infer<typeof ProjectAliasesSchema>;
+export type ProjectAliases = InferOutput<typeof ProjectAliasesSchema>;
 
 /**
  * Schema for authentication configuration
  */
-export const AuthConfigSchema = z.object({
-  token: z.string().optional(),
-  refreshToken: z.string().optional(),
-  expiresAt: z.number().optional(),
-  issuedAt: z.number().optional(),
+export const AuthConfigSchema = object({
+  token: optional(string()),
+  refreshToken: optional(string()),
+  expiresAt: optional(number()),
+  issuedAt: optional(number()),
 });
 
 /**
  * Schema for default organization/project settings
  */
-export const DefaultsConfigSchema = z.object({
-  organization: z.string().optional(),
-  project: z.string().optional(),
+export const DefaultsConfigSchema = object({
+  organization: optional(string()),
+  project: optional(string()),
 });
 
 /**
  * Schema for the full Sentry CLI configuration file
  */
-export const SentryConfigSchema = z.object({
-  auth: AuthConfigSchema.optional(),
-  defaults: DefaultsConfigSchema.optional(),
+export const SentryConfigSchema = object({
+  auth: optional(AuthConfigSchema),
+  defaults: optional(DefaultsConfigSchema),
   /**
    * Cache of DSN -> project info mappings
    * Key format: "{orgId}:{projectId}"
    */
-  projectCache: z.record(CachedProjectSchema).optional(),
+  projectCache: optional(record(string(), CachedProjectSchema)),
   /**
    * Cache of detected DSNs per directory
    * Key: absolute directory path
    * Value: cached DSN entry with source and resolution info
    */
-  dsnCache: z.record(CachedDsnEntrySchema).optional(),
+  dsnCache: optional(record(string(), CachedDsnEntrySchema)),
   /**
    * Cached project aliases for short issue ID resolution.
    * Scoped by DSN fingerprint to prevent cross-project conflicts.
    * Set by `issue list` when multiple projects are detected.
    */
-  projectAliases: ProjectAliasesSchema.optional(),
+  projectAliases: optional(ProjectAliasesSchema),
 });
 
-export type SentryConfig = z.infer<typeof SentryConfigSchema>;
+export type SentryConfig = InferOutput<typeof SentryConfigSchema>;
