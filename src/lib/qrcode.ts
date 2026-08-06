@@ -6,22 +6,22 @@
  */
 
 import qrcodeTerminal from "qrcode-terminal";
-import { z } from "zod";
+import { boolean, type InferOutput, object, optional, parse } from "valibot";
 
 // Schema & Types
 
 /**
  * QR code generation options schema
  */
-export const QRCodeOptionsSchema = z.object({
+export const QRCodeOptionsSchema = object({
   /**
    * Use compact (small) QR code rendering.
    * Recommended for terminal display.
    */
-  small: z.boolean().default(true),
+  small: optional(boolean(), true),
 });
 
-export type QRCodeOptions = z.infer<typeof QRCodeOptionsSchema>;
+export type QRCodeOptions = InferOutput<typeof QRCodeOptionsSchema>;
 
 // Public API
 
@@ -42,7 +42,7 @@ export function generateQRCode(
   data: string,
   options?: Partial<QRCodeOptions>
 ): Promise<string> {
-  const opts = QRCodeOptionsSchema.parse(options ?? {});
+  const opts = parse(QRCodeOptionsSchema, options ?? {});
 
   return new Promise((resolve) => {
     qrcodeTerminal.generate(data, { small: opts.small }, (qrcode) => {

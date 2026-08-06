@@ -1,10 +1,11 @@
 /**
  * OAuth Schema Tests
  *
- * Validates that Zod schemas correctly handle real-world API responses,
+ * Validates that Valibot schemas correctly handle real-world API responses,
  * including nullable fields that the Sentry API may return.
  */
 
+import { safeParse } from "valibot";
 import { describe, expect, test } from "vitest";
 import { TokenResponseSchema } from "../../src/types/oauth.js";
 
@@ -24,11 +25,11 @@ describe("TokenResponseSchema", () => {
       user: { id: "48168", name: null, email: "user@example.com" },
     };
 
-    const result = TokenResponseSchema.safeParse(response);
+    const result = safeParse(TokenResponseSchema, response);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.user?.name).toBeNull();
-      expect(result.data.user?.email).toBe("user@example.com");
+      expect(result.output.user?.name).toBeNull();
+      expect(result.output.user?.email).toBe("user@example.com");
     }
   });
 
@@ -38,11 +39,11 @@ describe("TokenResponseSchema", () => {
       user: { id: "48168", name: "Jane Doe", email: null },
     };
 
-    const result = TokenResponseSchema.safeParse(response);
+    const result = safeParse(TokenResponseSchema, response);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.user?.name).toBe("Jane Doe");
-      expect(result.data.user?.email).toBeNull();
+      expect(result.output.user?.name).toBe("Jane Doe");
+      expect(result.output.user?.email).toBeNull();
     }
   });
 
@@ -52,15 +53,15 @@ describe("TokenResponseSchema", () => {
       user: { id: "48168", name: null, email: null },
     };
 
-    const result = TokenResponseSchema.safeParse(response);
+    const result = safeParse(TokenResponseSchema, response);
     expect(result.success).toBe(true);
   });
 
   test("accepts response without user field", () => {
-    const result = TokenResponseSchema.safeParse(baseTokenResponse);
+    const result = safeParse(TokenResponseSchema, baseTokenResponse);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.user).toBeUndefined();
+      expect(result.output.user).toBeUndefined();
     }
   });
 
@@ -75,13 +76,13 @@ describe("TokenResponseSchema", () => {
       },
     };
 
-    const result = TokenResponseSchema.safeParse(response);
+    const result = safeParse(TokenResponseSchema, response);
     expect(result.success).toBe(true);
   });
 
   test("rejects response missing access_token", () => {
     const { access_token: _, ...noToken } = baseTokenResponse;
-    const result = TokenResponseSchema.safeParse(noToken);
+    const result = safeParse(TokenResponseSchema, noToken);
     expect(result.success).toBe(false);
   });
 });

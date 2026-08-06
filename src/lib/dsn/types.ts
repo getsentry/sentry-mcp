@@ -4,7 +4,7 @@
  * All types related to DSN parsing, detection, and caching.
  */
 
-import { z } from "zod";
+import { array, number, object, optional, picklist, string } from "valibot";
 
 /**
  * Source where DSN was detected from
@@ -92,24 +92,24 @@ export type CachedDsnEntry = {
   cachedAt: number;
 };
 
-/** Zod schema for ResolvedProjectInfo */
-export const ResolvedProjectInfoSchema = z.object({
-  orgSlug: z.string(),
-  orgName: z.string(),
-  projectSlug: z.string(),
-  projectName: z.string(),
+/** Valibot schema for ResolvedProjectInfo */
+export const ResolvedProjectInfoSchema = object({
+  orgSlug: string(),
+  orgName: string(),
+  projectSlug: string(),
+  projectName: string(),
 });
 
-/** Zod schema for cached DSN entries (for config validation) */
-export const CachedDsnEntrySchema = z.object({
-  dsn: z.string(),
-  projectId: z.string(),
-  orgId: z.string().optional(),
-  source: z.enum(["env", "env_file", "config", "code", "inferred"]),
-  sourcePath: z.string().optional(),
-  resolved: ResolvedProjectInfoSchema.optional(),
-  allResolved: z.array(ResolvedProjectInfoSchema).optional(),
-  cachedAt: z.number(),
+/** Valibot schema for cached DSN entries (for config validation) */
+export const CachedDsnEntrySchema = object({
+  dsn: string(),
+  projectId: string(),
+  orgId: optional(string()),
+  source: picklist(["env", "env_file", "config", "code", "inferred"]),
+  sourcePath: optional(string()),
+  resolved: optional(ResolvedProjectInfoSchema),
+  allResolved: optional(array(ResolvedProjectInfoSchema)),
+  cachedAt: number(),
 });
 
 /**
