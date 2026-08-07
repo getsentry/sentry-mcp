@@ -31,6 +31,7 @@
  */
 
 import {
+  API_MAX_PER_PAGE,
   findProjectsBySlug,
   listOrganizations,
   type PaginatedResponse,
@@ -465,7 +466,7 @@ export async function handleOrgAll<TEntity, TWithOrg>(
     () =>
       config.listPaginated(org, {
         cursor,
-        perPage: flags.limit,
+        perPage: Math.min(flags.limit, API_MAX_PER_PAGE),
       })
   );
 
