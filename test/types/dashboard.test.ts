@@ -5,6 +5,7 @@
  * in src/types/dashboard.ts.
  */
 
+import { safeParse } from "valibot";
 import { describe, expect, test } from "vitest";
 import { ValidationError } from "../../src/lib/errors.js";
 import {
@@ -134,13 +135,13 @@ describe("SPAN_AGGREGATE_FUNCTIONS", () => {
     expect(SPAN_AGGREGATE_FUNCTIONS).not.toContain("spm");
   });
 
-  test("zod schema validates known functions", () => {
-    expect(SpanAggregateFunctionSchema.safeParse("count").success).toBe(true);
-    expect(SpanAggregateFunctionSchema.safeParse("p95").success).toBe(true);
+  test("valibot schema validates known functions", () => {
+    expect(safeParse(SpanAggregateFunctionSchema, "count").success).toBe(true);
+    expect(safeParse(SpanAggregateFunctionSchema, "p95").success).toBe(true);
   });
 
-  test("zod schema rejects unknown functions", () => {
-    expect(SpanAggregateFunctionSchema.safeParse("bogus").success).toBe(false);
+  test("valibot schema rejects unknown functions", () => {
+    expect(safeParse(SpanAggregateFunctionSchema, "bogus").success).toBe(false);
   });
 });
 
@@ -165,12 +166,12 @@ describe("DISCOVER_AGGREGATE_FUNCTIONS", () => {
     }
   });
 
-  test("zod schema validates discover functions", () => {
-    expect(DiscoverAggregateFunctionSchema.safeParse("apdex").success).toBe(
+  test("valibot schema validates discover functions", () => {
+    expect(safeParse(DiscoverAggregateFunctionSchema, "apdex").success).toBe(
       true
     );
     expect(
-      DiscoverAggregateFunctionSchema.safeParse("failure_rate").success
+      safeParse(DiscoverAggregateFunctionSchema, "failure_rate").success
     ).toBe(true);
   });
 });
@@ -207,14 +208,14 @@ describe("IS_FILTER_VALUES", () => {
     }
   });
 
-  test("zod schema validates known values", () => {
-    expect(IsFilterValueSchema.safeParse("unresolved").success).toBe(true);
-    expect(IsFilterValueSchema.safeParse("escalating").success).toBe(true);
-    expect(IsFilterValueSchema.safeParse("assigned").success).toBe(true);
+  test("valibot schema validates known values", () => {
+    expect(safeParse(IsFilterValueSchema, "unresolved").success).toBe(true);
+    expect(safeParse(IsFilterValueSchema, "escalating").success).toBe(true);
+    expect(safeParse(IsFilterValueSchema, "assigned").success).toBe(true);
   });
 
-  test("zod schema rejects unknown values", () => {
-    expect(IsFilterValueSchema.safeParse("bogus").success).toBe(false);
+  test("valibot schema rejects unknown values", () => {
+    expect(safeParse(IsFilterValueSchema, "bogus").success).toBe(false);
   });
 });
 
@@ -229,27 +230,27 @@ describe("DashboardWidgetInputSchema", () => {
   };
 
   test("accepts minimal widget and defaults widgetType to spans", () => {
-    const result = DashboardWidgetInputSchema.safeParse(minimalWidget);
+    const result = safeParse(DashboardWidgetInputSchema, minimalWidget);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.widgetType).toBe("spans");
+      expect(result.output.widgetType).toBe("spans");
     }
   });
 
   test("accepts explicit widgetType", () => {
-    const result = DashboardWidgetInputSchema.safeParse({
+    const result = safeParse(DashboardWidgetInputSchema, {
       ...minimalWidget,
       widgetType: "error-events",
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.widgetType).toBe("error-events");
+      expect(result.output.widgetType).toBe("error-events");
     }
   });
 
   test("accepts all valid widgetType values", () => {
     for (const wt of WIDGET_TYPES) {
-      const result = DashboardWidgetInputSchema.safeParse({
+      const result = safeParse(DashboardWidgetInputSchema, {
         ...minimalWidget,
         widgetType: wt,
       });
@@ -259,7 +260,7 @@ describe("DashboardWidgetInputSchema", () => {
 
   test("accepts all valid displayType values", () => {
     for (const dt of DISPLAY_TYPES) {
-      const result = DashboardWidgetInputSchema.safeParse({
+      const result = safeParse(DashboardWidgetInputSchema, {
         title: "Test",
         displayType: dt,
       });
@@ -268,7 +269,7 @@ describe("DashboardWidgetInputSchema", () => {
   });
 
   test("rejects invalid displayType", () => {
-    const result = DashboardWidgetInputSchema.safeParse({
+    const result = safeParse(DashboardWidgetInputSchema, {
       ...minimalWidget,
       displayType: "chart",
     });
@@ -276,7 +277,7 @@ describe("DashboardWidgetInputSchema", () => {
   });
 
   test("rejects invalid widgetType", () => {
-    const result = DashboardWidgetInputSchema.safeParse({
+    const result = safeParse(DashboardWidgetInputSchema, {
       ...minimalWidget,
       widgetType: "span",
     });
@@ -284,34 +285,34 @@ describe("DashboardWidgetInputSchema", () => {
   });
 
   test("rejects missing title", () => {
-    const result = DashboardWidgetInputSchema.safeParse({
+    const result = safeParse(DashboardWidgetInputSchema, {
       displayType: "line",
     });
     expect(result.success).toBe(false);
   });
 
   test("rejects missing displayType", () => {
-    const result = DashboardWidgetInputSchema.safeParse({
+    const result = safeParse(DashboardWidgetInputSchema, {
       title: "My Widget",
     });
     expect(result.success).toBe(false);
   });
 
   test("preserves extra fields via passthrough", () => {
-    const result = DashboardWidgetInputSchema.safeParse({
+    const result = safeParse(DashboardWidgetInputSchema, {
       ...minimalWidget,
       customField: "hello",
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect((result.data as Record<string, unknown>).customField).toBe(
+      expect((result.output as Record<string, unknown>).customField).toBe(
         "hello"
       );
     }
   });
 
   test("accepts widget with queries", () => {
-    const result = DashboardWidgetInputSchema.safeParse({
+    const result = safeParse(DashboardWidgetInputSchema, {
       ...minimalWidget,
       queries: [
         {
@@ -879,7 +880,7 @@ describe("stripWidgetServerFields", () => {
 
 describe("EventsStatsDataPointSchema", () => {
   test("parses valid data point", () => {
-    const result = EventsStatsDataPointSchema.safeParse([
+    const result = safeParse(EventsStatsDataPointSchema, [
       1_700_000_000,
       [{ count: 42 }],
     ]);
@@ -887,7 +888,7 @@ describe("EventsStatsDataPointSchema", () => {
   });
 
   test("rejects invalid data point", () => {
-    const result = EventsStatsDataPointSchema.safeParse([
+    const result = safeParse(EventsStatsDataPointSchema, [
       "not-a-number",
       [{ count: 42 }],
     ]);
@@ -897,7 +898,7 @@ describe("EventsStatsDataPointSchema", () => {
 
 describe("EventsStatsSeriesSchema", () => {
   test("parses simple series", () => {
-    const result = EventsStatsSeriesSchema.safeParse({
+    const result = safeParse(EventsStatsSeriesSchema, {
       data: [
         [1_700_000_000, [{ count: 10 }]],
         [1_700_003_600, [{ count: 20 }]],
@@ -913,7 +914,7 @@ describe("EventsStatsSeriesSchema", () => {
   });
 
   test("parses series with optional fields missing", () => {
-    const result = EventsStatsSeriesSchema.safeParse({
+    const result = safeParse(EventsStatsSeriesSchema, {
       data: [[1_700_000_000, [{ count: 5 }]]],
     });
     expect(result.success).toBe(true);
@@ -922,7 +923,7 @@ describe("EventsStatsSeriesSchema", () => {
 
 describe("EventsTableResponseSchema", () => {
   test("parses table response", () => {
-    const result = EventsTableResponseSchema.safeParse({
+    const result = safeParse(EventsTableResponseSchema, {
       data: [
         { endpoint: "/api/users", "count()": 100 },
         { endpoint: "/api/orders", "count()": 50 },
@@ -936,7 +937,7 @@ describe("EventsTableResponseSchema", () => {
   });
 
   test("parses empty table response", () => {
-    const result = EventsTableResponseSchema.safeParse({
+    const result = safeParse(EventsTableResponseSchema, {
       data: [],
       meta: { fields: {}, units: {} },
     });

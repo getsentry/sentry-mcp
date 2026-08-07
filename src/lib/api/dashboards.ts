@@ -14,7 +14,7 @@ import {
 // biome-ignore lint/performance/noNamespaceImport: Sentry SDK recommends namespace import
 import * as Sentry from "@sentry/node-core/light";
 
-import { z } from "zod";
+import { array, safeParse } from "valibot";
 
 import {
   type DashboardDetail,
@@ -194,7 +194,7 @@ export async function listDashboardRevisionsPaginated(
   const { data, headers } = await apiRequestToRegion<DashboardRevision[]>(
     regionUrl,
     `/organizations/${orgSlug}/dashboards/${dashboardId}/revisions/`,
-    { params, schema: z.array(DashboardRevisionSchema) }
+    { params, schema: array(DashboardRevisionSchema) }
   );
 
   const { nextCursor, prevCursor } = parseLinkHeader(
@@ -363,13 +363,13 @@ function parseEventsStatsResponse(
   const series: TimeseriesResult["series"] = [];
 
   // Try parsing as a single series first (simple query, no grouping)
-  const singleResult = EventsStatsSeriesSchema.safeParse(raw);
+  const singleResult = safeParse(EventsStatsSeriesSchema, raw);
   if (singleResult.success) {
     for (const axis of yAxis) {
       series.push({
         label: axis,
-        values: extractTimeseriesValues(singleResult.data),
-        unit: singleResult.data.meta?.units?.[axis] ?? null,
+        values: extractTimeseriesValues(singleResult.output),
+        unit: singleResult.output.meta?.units?.[axis] ?? null,
       });
     }
     return { type: "timeseries", series };
@@ -389,12 +389,12 @@ function parseEventsStatsResponse(
     });
 
     for (const [groupLabel, groupData] of entries) {
-      const parsed = EventsStatsSeriesSchema.safeParse(groupData);
+      const parsed = safeParse(EventsStatsSeriesSchema, groupData);
       if (parsed.success) {
         series.push({
           label: groupLabel,
-          values: extractTimeseriesValues(parsed.data),
-          unit: parsed.data.meta?.units?.[yAxis[0] ?? ""] ?? null,
+          values: extractTimeseriesValues(parsed.output),
+          unit: parsed.output.meta?.units?.[yAxis[0] ?? ""] ?? null,
         });
       }
     }

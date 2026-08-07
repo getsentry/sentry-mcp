@@ -1,87 +1,96 @@
 /**
- * AI Conversation types and Zod schemas.
+ * AI Conversation types and Valibot schemas.
  *
  * Schemas for conversation list items, the details envelope, and raw
  * conversation spans returned by the Sentry Explore AI-conversations endpoints.
  */
 
-import { z } from "zod";
+import {
+  array,
+  boolean,
+  type InferOutput,
+  looseObject,
+  nullable,
+  number,
+  object,
+  optional,
+  string,
+  union,
+} from "valibot";
 
-export const ConversationListItemSchema = z.object({
-  conversationId: z.string(),
+export const ConversationListItemSchema = object({
+  conversationId: string(),
   /** Stored conversation title when available (added by ai-monitoring list API). */
-  title: z.string().nullable().optional(),
-  flow: z.array(z.string()),
-  errors: z.number(),
-  llmCalls: z.number(),
-  toolCalls: z.number(),
-  totalTokens: z.number(),
-  totalCost: z.number(),
-  startTimestamp: z.number(),
-  endTimestamp: z.number(),
-  traceCount: z.number(),
-  traceIds: z.array(z.string()),
-  firstInput: z.string().nullable(),
-  lastOutput: z.string().nullable(),
-  user: z
-    .object({
-      id: z.string().nullable(),
-      email: z.string().nullable(),
-      username: z.string().nullable(),
-      ip_address: z.string().nullable(),
-    })
-    .nullable()
-    .optional(),
-  toolNames: z.array(z.string()),
-  toolErrors: z.number(),
+  title: optional(nullable(string())),
+  flow: array(string()),
+  errors: number(),
+  llmCalls: number(),
+  toolCalls: number(),
+  totalTokens: number(),
+  totalCost: number(),
+  startTimestamp: number(),
+  endTimestamp: number(),
+  traceCount: number(),
+  traceIds: array(string()),
+  firstInput: nullable(string()),
+  lastOutput: nullable(string()),
+  user: optional(
+    nullable(
+      object({
+        id: nullable(string()),
+        email: nullable(string()),
+        username: nullable(string()),
+        ip_address: nullable(string()),
+      })
+    )
+  ),
+  toolNames: array(string()),
+  toolErrors: number(),
 });
 
-export type ConversationListItem = z.infer<typeof ConversationListItemSchema>;
+export type ConversationListItem = InferOutput<
+  typeof ConversationListItemSchema
+>;
 
-const NullableString = z.string().nullable().optional();
-const NullableStringOrNumber = z
-  .union([z.string(), z.number()])
-  .nullable()
-  .optional();
+const NullableString = optional(nullable(string()));
+const NullableStringOrNumber = optional(nullable(union([string(), number()])));
 
-export const AIConversationSpanSchema = z
-  .object({
-    "gen_ai.conversation.id": z.string(),
-    span_id: z.string(),
-    trace: z.string(),
-    parent_span: z.string().nullable().optional(),
-    "precise.start_ts": z.number(),
-    "precise.finish_ts": z.number(),
-    project: z.string(),
-    "project.id": z.union([z.string(), z.number()]),
-    "span.name": NullableString,
-    "span.status": NullableString,
-    "span.op": NullableString,
-    "span.description": NullableString,
-    "span.duration": z.number().optional(),
-    transaction: NullableString,
-    is_transaction: z.boolean().optional(),
-    "gen_ai.cost.total_tokens": NullableStringOrNumber,
-    "gen_ai.operation.type": NullableString,
-    "gen_ai.input.messages": NullableString,
-    "gen_ai.output.messages": NullableString,
-    "gen_ai.system_instructions": NullableString,
-    "gen_ai.tool.definitions": NullableString,
-    "gen_ai.request.messages": NullableString,
-    "gen_ai.response.object": NullableString,
-    "gen_ai.response.text": NullableString,
-    "gen_ai.tool.name": NullableString,
-    "gen_ai.tool.call.arguments": NullableString,
-    "gen_ai.tool.input": NullableString,
-    "gen_ai.usage.total_tokens": NullableStringOrNumber,
-    "gen_ai.request.model": NullableString,
-    "gen_ai.response.model": NullableString,
-    "gen_ai.agent.name": NullableString,
-    "user.email": NullableString,
-  })
-  .passthrough();
+export const AIConversationSpanSchema = looseObject({
+  "gen_ai.conversation.id": string(),
+  span_id: string(),
+  trace: string(),
+  parent_span: optional(nullable(string())),
+  "precise.start_ts": number(),
+  "precise.finish_ts": number(),
+  project: string(),
+  "project.id": union([string(), number()]),
+  "span.name": NullableString,
+  "span.status": NullableString,
+  "span.op": NullableString,
+  "span.description": NullableString,
+  "span.duration": optional(number()),
+  transaction: NullableString,
+  is_transaction: optional(boolean()),
+  "gen_ai.cost.total_tokens": NullableStringOrNumber,
+  "gen_ai.operation.type": NullableString,
+  "gen_ai.input.messages": NullableString,
+  "gen_ai.output.messages": NullableString,
+  "gen_ai.system_instructions": NullableString,
+  "gen_ai.tool.definitions": NullableString,
+  "gen_ai.request.messages": NullableString,
+  "gen_ai.response.object": NullableString,
+  "gen_ai.response.text": NullableString,
+  "gen_ai.tool.name": NullableString,
+  "gen_ai.tool.call.arguments": NullableString,
+  "gen_ai.tool.input": NullableString,
+  "gen_ai.usage.total_tokens": NullableStringOrNumber,
+  "gen_ai.request.model": NullableString,
+  "gen_ai.response.model": NullableString,
+  "gen_ai.agent.name": NullableString,
+  "user.email": NullableString,
+});
 
-export type AIConversationSpan = z.infer<typeof AIConversationSpanSchema>;
+export type AIConversationSpan = InferOutput<typeof AIConversationSpanSchema>;
 
 /**
  * Conversation details envelope returned by
@@ -92,12 +101,12 @@ export type AIConversationSpan = z.infer<typeof AIConversationSpanSchema>;
  * array. Pagination still uses the `Link` header; each page is an envelope
  * whose `spans` field holds that page's rows.
  */
-export const AIConversationDetailsSchema = z
-  .object({
-    conversationId: z.string(),
-    title: z.string().nullable(),
-    spans: z.array(AIConversationSpanSchema),
-  })
-  .passthrough();
+export const AIConversationDetailsSchema = looseObject({
+  conversationId: string(),
+  title: nullable(string()),
+  spans: array(AIConversationSpanSchema),
+});
 
-export type AIConversationDetails = z.infer<typeof AIConversationDetailsSchema>;
+export type AIConversationDetails = InferOutput<
+  typeof AIConversationDetailsSchema
+>;

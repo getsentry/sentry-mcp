@@ -6,6 +6,7 @@
  * (backward compatibility), and present values must be carried through.
  */
 
+import { safeParse } from "valibot";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   ChunkServerOptionsSchema,
@@ -34,24 +35,24 @@ const BASE = {
 
 describe("ChunkServerOptionsSchema", () => {
   test("parses a response that omits maxFileSize and maxWait", () => {
-    const result = ChunkServerOptionsSchema.safeParse(BASE);
+    const result = safeParse(ChunkServerOptionsSchema, BASE);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.maxFileSize).toBeUndefined();
-      expect(result.data.maxWait).toBeUndefined();
+      expect(result.output.maxFileSize).toBeUndefined();
+      expect(result.output.maxWait).toBeUndefined();
     }
   });
 
   test("carries through present maxFileSize and maxWait", () => {
-    const result = ChunkServerOptionsSchema.safeParse({
+    const result = safeParse(ChunkServerOptionsSchema, {
       ...BASE,
       maxFileSize: 2_147_483_648,
       maxWait: 300,
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.maxFileSize).toBe(2_147_483_648);
-      expect(result.data.maxWait).toBe(300);
+      expect(result.output.maxFileSize).toBe(2_147_483_648);
+      expect(result.output.maxWait).toBe(300);
     }
   });
 });

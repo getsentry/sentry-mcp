@@ -53,7 +53,7 @@ export type Command = {
    * Non-standard property — Stricli doesn't know about it, but introspection
    * reads it to populate {@link CommandInfo.jsonFields}.
    */
-  __jsonSchema?: import("zod").ZodType;
+  __jsonSchema?: import("valibot").GenericSchema;
   /**
    * Primary Stricli custom usage line, retained by `buildCommand` for
    * introspection because Stricli does not expose it on the built command.

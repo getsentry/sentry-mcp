@@ -1,10 +1,25 @@
 /**
  * Seer API Types
  *
- * Zod schemas and TypeScript types for Sentry's Seer Autofix API.
+ * Valibot schemas and TypeScript types for Sentry's Seer Autofix API.
  */
 
-import { z } from "zod";
+import {
+  array,
+  boolean,
+  type InferOutput,
+  literal,
+  looseObject,
+  nullable,
+  number,
+  object,
+  optional,
+  picklist,
+  record,
+  safeParse,
+  string,
+  unknown,
+} from "valibot";
 
 // Status Constants
 
@@ -39,194 +54,192 @@ export type StoppingPoint = (typeof STOPPING_POINTS)[number];
 
 // Progress Message
 
-export const ProgressMessageSchema = z.object({
-  message: z.string(),
-  timestamp: z.string(),
-  type: z.string().optional(),
+export const ProgressMessageSchema = object({
+  message: string(),
+  timestamp: string(),
+  type: optional(string()),
 });
 
-export type ProgressMessage = z.infer<typeof ProgressMessageSchema>;
+export type ProgressMessage = InferOutput<typeof ProgressMessageSchema>;
 
 // Relevant Code File
 
-export const RelevantCodeFileSchema = z.object({
-  file_path: z.string(),
-  repo_name: z.string(),
+export const RelevantCodeFileSchema = object({
+  file_path: string(),
+  repo_name: string(),
 });
 
-export type RelevantCodeFile = z.infer<typeof RelevantCodeFileSchema>;
+export type RelevantCodeFile = InferOutput<typeof RelevantCodeFileSchema>;
 
 // Reproduction Step
 
-export const ReproductionStepSchema = z.object({
-  title: z.string(),
-  code_snippet_and_analysis: z.string(),
-  is_most_important_event: z.boolean().optional(),
-  relevant_code_file: RelevantCodeFileSchema.optional(),
-  timeline_item_type: z.string().optional(),
+export const ReproductionStepSchema = object({
+  title: string(),
+  code_snippet_and_analysis: string(),
+  is_most_important_event: optional(boolean()),
+  relevant_code_file: optional(RelevantCodeFileSchema),
+  timeline_item_type: optional(string()),
 });
 
-export type ReproductionStep = z.infer<typeof ReproductionStepSchema>;
+export type ReproductionStep = InferOutput<typeof ReproductionStepSchema>;
 
 // Root Cause
 
-export const RootCauseSchema = z.object({
-  id: z.number(),
-  description: z.string(),
-  relevant_repos: z.array(z.string()).optional(),
-  reproduction_urls: z.array(z.string()).optional(),
-  root_cause_reproduction: z.array(ReproductionStepSchema).optional(),
+export const RootCauseSchema = object({
+  id: number(),
+  description: string(),
+  relevant_repos: optional(array(string())),
+  reproduction_urls: optional(array(string())),
+  root_cause_reproduction: optional(array(ReproductionStepSchema)),
 });
 
-export type RootCause = z.infer<typeof RootCauseSchema>;
+export type RootCause = InferOutput<typeof RootCauseSchema>;
 
 // Root Cause Selection
 
-export const RootCauseSelectionSchema = z.object({
-  cause_id: z.number(),
-  instruction: z.string().nullable().optional(),
+export const RootCauseSelectionSchema = object({
+  cause_id: number(),
+  instruction: optional(nullable(string())),
 });
 
-export type RootCauseSelection = z.infer<typeof RootCauseSelectionSchema>;
+export type RootCauseSelection = InferOutput<typeof RootCauseSelectionSchema>;
 
 // Autofix Step
 
-export const AutofixStepSchema = z
-  .object({
-    id: z.string(),
-    key: z.string(),
-    status: z.string(),
-    title: z.string(),
-    progress: z.array(ProgressMessageSchema).optional(),
-    causes: z.array(RootCauseSchema).optional(),
-    selection: RootCauseSelectionSchema.optional(),
-  })
-  .passthrough(); // Allow additional fields like artifacts
+export const AutofixStepSchema = looseObject({
+  id: string(),
+  key: string(),
+  status: string(),
+  title: string(),
+  progress: optional(array(ProgressMessageSchema)),
+  causes: optional(array(RootCauseSchema)),
+  selection: optional(RootCauseSelectionSchema),
+});
 
-export type AutofixStep = z.infer<typeof AutofixStepSchema>;
+export type AutofixStep = InferOutput<typeof AutofixStepSchema>;
 
 // Repository Info
 
-export const RepositoryInfoSchema = z.object({
-  integration_id: z.number().optional(),
-  url: z.string().optional(),
-  external_id: z.string(),
-  name: z.string(),
-  provider: z.string().optional(),
-  default_branch: z.string().optional(),
-  is_readable: z.boolean().optional(),
-  is_writeable: z.boolean().optional(),
+export const RepositoryInfoSchema = object({
+  integration_id: optional(number()),
+  url: optional(string()),
+  external_id: string(),
+  name: string(),
+  provider: optional(string()),
+  default_branch: optional(string()),
+  is_readable: optional(boolean()),
+  is_writeable: optional(boolean()),
 });
 
-export type RepositoryInfo = z.infer<typeof RepositoryInfoSchema>;
+export type RepositoryInfo = InferOutput<typeof RepositoryInfoSchema>;
 
 // Codebase Info
 
-export const CodebaseInfoSchema = z.object({
-  repo_external_id: z.string(),
-  file_changes: z.array(z.unknown()).optional(),
-  is_readable: z.boolean().optional(),
-  is_writeable: z.boolean().optional(),
+export const CodebaseInfoSchema = object({
+  repo_external_id: string(),
+  file_changes: optional(array(unknown())),
+  is_readable: optional(boolean()),
+  is_writeable: optional(boolean()),
 });
 
-export type CodebaseInfo = z.infer<typeof CodebaseInfoSchema>;
+export type CodebaseInfo = InferOutput<typeof CodebaseInfoSchema>;
 
 // PR Info (from completed fix)
 
-export const PullRequestInfoSchema = z.object({
-  pr_number: z.number().optional(),
-  pr_url: z.string().optional(),
-  repo_name: z.string().optional(),
+export const PullRequestInfoSchema = object({
+  pr_number: optional(number()),
+  pr_url: optional(string()),
+  repo_name: optional(string()),
 });
 
-export type PullRequestInfo = z.infer<typeof PullRequestInfoSchema>;
+export type PullRequestInfo = InferOutput<typeof PullRequestInfoSchema>;
 
 // Solution Artifact (from plan command)
 
 /** A single step in the solution plan */
-export const SolutionStepSchema = z.object({
-  title: z.string(),
-  description: z.string(),
+export const SolutionStepSchema = object({
+  title: string(),
+  description: string(),
 });
 
-export type SolutionStep = z.infer<typeof SolutionStepSchema>;
+export type SolutionStep = InferOutput<typeof SolutionStepSchema>;
 
 /** Solution data containing the plan to fix the issue */
-export const SolutionDataSchema = z.object({
-  one_line_summary: z.string(),
-  steps: z.array(SolutionStepSchema),
+export const SolutionDataSchema = object({
+  one_line_summary: string(),
+  steps: array(SolutionStepSchema),
 });
 
-export type SolutionData = z.infer<typeof SolutionDataSchema>;
+export type SolutionData = InferOutput<typeof SolutionDataSchema>;
 
 /** Solution artifact from the autofix response */
-export const SolutionArtifactSchema = z.object({
-  key: z.literal("solution"),
+export const SolutionArtifactSchema = object({
+  key: literal("solution"),
   data: SolutionDataSchema,
-  reason: z.string().optional(),
+  reason: optional(string()),
 });
 
-export type SolutionArtifact = z.infer<typeof SolutionArtifactSchema>;
+export type SolutionArtifact = InferOutput<typeof SolutionArtifactSchema>;
 
 // Autofix State
 
-export const AutofixStateSchema = z
-  .object({
-    /** @deprecated Use sentry_run_id instead. */
-    run_id: z.number().optional(),
-    /** Null for legacy runs predating this field. */
-    sentry_run_id: z.string().nullable().optional(),
-    status: z.string(),
-    updated_at: z.string().optional(),
-    request: z
-      .object({
-        organization_id: z.number().optional(),
-        project_id: z.number().optional(),
-        repos: z.array(z.unknown()).optional(),
-      })
-      .optional(),
-    codebases: z.record(z.string(), CodebaseInfoSchema).optional(),
-    steps: z.array(AutofixStepSchema).optional(),
-    repositories: z.array(RepositoryInfoSchema).optional(),
-    coding_agents: z.record(z.string(), z.unknown()).optional(),
-    created_at: z.string().optional(),
-    completed_at: z.string().optional(),
-  })
-  .passthrough(); // Allow additional fields like blocks
+export const AutofixStateSchema = looseObject({
+  /** @deprecated Use sentry_run_id instead. */
+  run_id: optional(number()),
+  /** Null for legacy runs predating this field. */
+  sentry_run_id: optional(nullable(string())),
+  status: string(),
+  updated_at: optional(string()),
+  request: optional(
+    object({
+      organization_id: optional(number()),
+      project_id: optional(number()),
+      repos: optional(array(unknown())),
+    })
+  ),
+  codebases: optional(record(string(), CodebaseInfoSchema)),
+  steps: optional(array(AutofixStepSchema)),
+  repositories: optional(array(RepositoryInfoSchema)),
+  coding_agents: optional(record(string(), unknown())),
+  created_at: optional(string()),
+  completed_at: optional(string()),
+});
 
-export type AutofixState = z.infer<typeof AutofixStateSchema>;
+export type AutofixState = InferOutput<typeof AutofixStateSchema>;
 
 // Autofix Response (GET /issues/{id}/autofix/)
 
-export const AutofixResponseSchema = z.object({
-  autofix: AutofixStateSchema.nullable(),
+export const AutofixResponseSchema = object({
+  autofix: nullable(AutofixStateSchema),
 });
 
-export type AutofixResponse = z.infer<typeof AutofixResponseSchema>;
+export type AutofixResponse = InferOutput<typeof AutofixResponseSchema>;
 
 // Update Payloads
 
-export const SelectRootCausePayloadSchema = z.object({
-  type: z.literal("select_root_cause"),
-  cause_id: z.number(),
-  stopping_point: z.enum(["solution", "code_changes", "open_pr"]).optional(),
+export const SelectRootCausePayloadSchema = object({
+  type: literal("select_root_cause"),
+  cause_id: number(),
+  stopping_point: optional(picklist(["solution", "code_changes", "open_pr"])),
 });
 
-export type SelectRootCausePayload = z.infer<
+export type SelectRootCausePayload = InferOutput<
   typeof SelectRootCausePayloadSchema
 >;
 
-export const SelectSolutionPayloadSchema = z.object({
-  type: z.literal("select_solution"),
+export const SelectSolutionPayloadSchema = object({
+  type: literal("select_solution"),
 });
 
-export type SelectSolutionPayload = z.infer<typeof SelectSolutionPayloadSchema>;
+export type SelectSolutionPayload = InferOutput<
+  typeof SelectSolutionPayloadSchema
+>;
 
-export const CreatePrPayloadSchema = z.object({
-  type: z.literal("create_pr"),
+export const CreatePrPayloadSchema = object({
+  type: literal("create_pr"),
 });
 
-export type CreatePrPayload = z.infer<typeof CreatePrPayloadSchema>;
+export type CreatePrPayload = InferOutput<typeof CreatePrPayloadSchema>;
 
 export type AutofixUpdatePayload =
   | SelectRootCausePayload
@@ -375,9 +388,9 @@ function findSolutionInArtifacts(
 ): SolutionArtifact | null {
   for (const artifact of artifacts) {
     if (artifact.key === "solution") {
-      const result = SolutionArtifactSchema.safeParse(artifact);
+      const result = safeParse(SolutionArtifactSchema, artifact);
       if (result.success) {
-        return result.data;
+        return result.output;
       }
     }
   }

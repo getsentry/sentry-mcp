@@ -1,12 +1,30 @@
 /**
  * Dashboard types and schemas
  *
- * Zod schemas and TypeScript types for Sentry Dashboard API responses.
+ * Valibot schemas and TypeScript types for Sentry Dashboard API responses.
  * Includes utility functions for stripping server-generated fields
  * before PUT requests, and strict input validation for user-authored widgets.
  */
 
-import { z } from "zod";
+import {
+  array,
+  boolean,
+  getDotPath,
+  type InferOutput,
+  looseObject,
+  nullable,
+  nullish,
+  number,
+  object,
+  optional,
+  picklist,
+  record,
+  safeParse,
+  string,
+  tuple,
+  union,
+  unknown,
+} from "valibot";
 
 import { ValidationError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
@@ -68,94 +86,88 @@ export type DisplayType = (typeof DISPLAY_TYPES)[number];
 // ---------------------------------------------------------------------------
 
 /** Schema for a single query within a dashboard widget */
-export const DashboardWidgetQuerySchema = z
-  .object({
-    id: z.string().optional(),
-    name: z.string().optional(),
-    conditions: z.string().optional(),
-    columns: z.array(z.string()).optional(),
-    aggregates: z.array(z.string()).optional(),
-    fieldAliases: z.array(z.string()).optional(),
-    orderby: z.string().optional(),
-    fields: z.array(z.string()).optional(),
-    widgetId: z.string().optional(),
-    dateCreated: z.string().optional(),
-  })
-  .passthrough();
+export const DashboardWidgetQuerySchema = looseObject({
+  id: optional(string()),
+  name: optional(string()),
+  conditions: optional(string()),
+  columns: optional(array(string())),
+  aggregates: optional(array(string())),
+  fieldAliases: optional(array(string())),
+  orderby: optional(string()),
+  fields: optional(array(string())),
+  widgetId: optional(string()),
+  dateCreated: optional(string()),
+});
 
 /** Schema for widget layout position */
-export const DashboardWidgetLayoutSchema = z
-  .object({
-    x: z.number(),
-    y: z.number(),
-    w: z.number(),
-    h: z.number(),
-    minH: z.number().optional(),
-    isResizable: z.boolean().optional(),
-  })
-  .passthrough();
+export const DashboardWidgetLayoutSchema = looseObject({
+  x: number(),
+  y: number(),
+  w: number(),
+  h: number(),
+  minH: optional(number()),
+  isResizable: optional(boolean()),
+});
 
 /** Schema for a single dashboard widget */
-export const DashboardWidgetSchema = z
-  .object({
-    id: z.string().optional(),
-    title: z.string(),
-    displayType: z.string(),
-    widgetType: z.string().optional(),
-    interval: z.string().optional(),
-    queries: z.array(DashboardWidgetQuerySchema).optional(),
-    layout: DashboardWidgetLayoutSchema.optional(),
-    thresholds: z.unknown().optional(),
-    limit: z.number().nullable().optional(),
-    dashboardId: z.string().optional(),
-    dateCreated: z.string().optional(),
-  })
-  .passthrough();
+export const DashboardWidgetSchema = looseObject({
+  id: optional(string()),
+  title: string(),
+  displayType: string(),
+  widgetType: optional(string()),
+  interval: optional(string()),
+  queries: optional(array(DashboardWidgetQuerySchema)),
+  layout: optional(DashboardWidgetLayoutSchema),
+  thresholds: optional(unknown()),
+  limit: optional(nullable(number())),
+  dashboardId: optional(string()),
+  dateCreated: optional(string()),
+});
 
 /** Schema for dashboard list items (lightweight, from GET /dashboards/) */
-export const DashboardListItemSchema = z
-  .object({
-    id: z.string(),
-    title: z.string(),
-    dateCreated: z.string().optional(),
-    createdBy: z
-      .object({
-        name: z.string().optional(),
-        email: z.string().optional(),
-      })
-      .optional(),
-    widgetDisplay: z.array(z.string()).optional(),
-  })
-  .passthrough();
+export const DashboardListItemSchema = looseObject({
+  id: string(),
+  title: string(),
+  dateCreated: optional(string()),
+  createdBy: optional(
+    object({
+      name: optional(string()),
+      email: optional(string()),
+    })
+  ),
+  widgetDisplay: optional(array(string())),
+});
 
 /** Schema for full dashboard detail (from GET /dashboards/{id}/) */
-export const DashboardDetailSchema = z
-  .object({
-    id: z.string(),
-    title: z.string(),
-    widgets: z.array(DashboardWidgetSchema).optional(),
-    dateCreated: z.string().optional(),
-    createdBy: z
-      .object({
-        name: z.string().optional(),
-        email: z.string().optional(),
-      })
-      .optional(),
-    projects: z.array(z.number()).optional(),
-    environment: z.array(z.string()).optional(),
-    period: z.string().nullable().optional(),
-  })
-  .passthrough();
+export const DashboardDetailSchema = looseObject({
+  id: string(),
+  title: string(),
+  widgets: optional(array(DashboardWidgetSchema)),
+  dateCreated: optional(string()),
+  createdBy: optional(
+    object({
+      name: optional(string()),
+      email: optional(string()),
+    })
+  ),
+  projects: optional(array(number())),
+  environment: optional(array(string())),
+  period: optional(nullable(string())),
+});
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type DashboardWidgetQuery = z.infer<typeof DashboardWidgetQuerySchema>;
-export type DashboardWidgetLayout = z.infer<typeof DashboardWidgetLayoutSchema>;
-export type DashboardWidget = z.infer<typeof DashboardWidgetSchema>;
-export type DashboardListItem = z.infer<typeof DashboardListItemSchema>;
-export type DashboardDetail = z.infer<typeof DashboardDetailSchema>;
+export type DashboardWidgetQuery = InferOutput<
+  typeof DashboardWidgetQuerySchema
+>;
+export type DashboardWidgetLayout = InferOutput<
+  typeof DashboardWidgetLayoutSchema
+>;
+export type DashboardWidget = InferOutput<typeof DashboardWidgetSchema>;
+export type DashboardListItem = InferOutput<typeof DashboardListItemSchema>;
+export type DashboardDetail = InferOutput<typeof DashboardDetailSchema>;
 
 // ---------------------------------------------------------------------------
 // Strict input schema for user-authored widgets
@@ -168,18 +180,16 @@ export type DashboardDetail = z.infer<typeof DashboardDetailSchema>;
  *
  * Use DashboardWidgetSchema (permissive) for parsing server responses.
  */
-export const DashboardWidgetInputSchema = z
-  .object({
-    title: z.string(),
-    displayType: z.enum(DISPLAY_TYPES),
-    widgetType: z.enum(WIDGET_TYPES).default(DEFAULT_WIDGET_TYPE),
-    interval: z.string().optional(),
-    queries: z.array(DashboardWidgetQuerySchema).optional(),
-    layout: DashboardWidgetLayoutSchema.optional(),
-    thresholds: z.unknown().optional(),
-    limit: z.number().nullable().optional(),
-  })
-  .passthrough();
+export const DashboardWidgetInputSchema = looseObject({
+  title: string(),
+  displayType: picklist(DISPLAY_TYPES),
+  widgetType: optional(picklist(WIDGET_TYPES), DEFAULT_WIDGET_TYPE),
+  interval: optional(string()),
+  queries: optional(array(DashboardWidgetQuerySchema)),
+  layout: optional(DashboardWidgetLayoutSchema),
+  thresholds: optional(unknown()),
+  limit: optional(nullable(number())),
+});
 
 /**
  * Parse and validate user-authored widget JSON with strict enum checks.
@@ -189,19 +199,20 @@ export const DashboardWidgetInputSchema = z
  * @returns Validated widget with widgetType defaulted to "spans" if omitted
  */
 export function parseWidgetInput(raw: unknown): DashboardWidget {
-  const result = DashboardWidgetInputSchema.safeParse(raw);
+  const result = safeParse(DashboardWidgetInputSchema, raw);
   if (result.success) {
-    return result.data;
+    return result.output;
   }
 
-  const issues = result.error.issues.map((issue) => {
-    if (issue.path.includes("displayType")) {
+  const issues = result.issues.map((issue) => {
+    const path = getDotPath(issue) ?? "";
+    if (path.includes("displayType")) {
       return `Invalid displayType. Valid values: ${DISPLAY_TYPES.join(", ")}`;
     }
-    if (issue.path.includes("widgetType")) {
+    if (path.includes("widgetType")) {
       return `Invalid widgetType. Valid values: ${WIDGET_TYPES.join(", ")}`;
     }
-    return `${issue.path.join(".")}: ${issue.message}`;
+    return `${path}: ${issue.message}`;
   });
   throw new ValidationError(
     `Invalid widget definition:\n${issues.join("\n")}`,
@@ -235,7 +246,7 @@ export const AGGREGATE_ALIASES: Record<string, string> = {
  * Canonical aggregate functions for the spans dataset (default for dashboard widgets).
  * These are the function names the dashboard UI can render in the "Visualize" dropdown.
  *
- * Source: https://github.com/getsentry/sentry/blob/master/static/app/utils/fields/index.ts (AggregationKey enum)
+ * Source: https://github.com/getsentry/sentry/blob/master/src/sentry/search/events/constants.py
  * Dataset: https://github.com/getsentry/sentry/blob/master/src/sentry/search/events/datasets/spans_indexed.py
  */
 export const SPAN_AGGREGATE_FUNCTIONS = [
@@ -263,7 +274,7 @@ export type SpanAggregateFunction = (typeof SPAN_AGGREGATE_FUNCTIONS)[number];
  * Additional aggregate functions from the discover dataset.
  * Available when widgetType is "discover" or "error-events".
  *
- * Source: https://github.com/getsentry/sentry/blob/master/static/app/utils/fields/index.ts (AggregationKey enum)
+ * Source: https://github.com/getsentry/sentry/blob/master/src/sentry/search/events/constants.py
  * Dataset: https://github.com/getsentry/sentry/blob/master/src/sentry/search/events/datasets/discover.py
  */
 export const DISCOVER_AGGREGATE_FUNCTIONS = [
@@ -290,11 +301,11 @@ export const DISCOVER_AGGREGATE_FUNCTIONS = [
 export type DiscoverAggregateFunction =
   (typeof DISCOVER_AGGREGATE_FUNCTIONS)[number];
 
-/** Zod schema for validating a span aggregate function name */
-export const SpanAggregateFunctionSchema = z.enum(SPAN_AGGREGATE_FUNCTIONS);
+/** Valibot schema for validating a span aggregate function name */
+export const SpanAggregateFunctionSchema = picklist(SPAN_AGGREGATE_FUNCTIONS);
 
-/** Zod schema for validating a discover aggregate function name */
-export const DiscoverAggregateFunctionSchema = z.enum(
+/** Valibot schema for validating a discover aggregate function name */
+export const DiscoverAggregateFunctionSchema = picklist(
   DISCOVER_AGGREGATE_FUNCTIONS
 );
 
@@ -337,8 +348,8 @@ export const IS_FILTER_VALUES = [
 
 export type IsFilterValue = (typeof IS_FILTER_VALUES)[number];
 
-/** Zod schema for validating an `is:` filter value */
-export const IsFilterValueSchema = z.enum(IS_FILTER_VALUES);
+/** Valibot schema for validating an `is:` filter value */
+export const IsFilterValueSchema = picklist(IS_FILTER_VALUES);
 
 // ---------------------------------------------------------------------------
 // Aggregate & sort parsing (quote-free CLI shorthand)
@@ -876,12 +887,14 @@ export function prepareDashboardForUpdate(dashboard: DashboardDetail): {
  * Single data point from the events-stats API.
  * Format: [timestamp_epoch_seconds, [{count: value}]]
  */
-export const EventsStatsDataPointSchema = z.tuple([
-  z.number(),
-  z.array(z.object({ count: z.number() })),
+export const EventsStatsDataPointSchema = tuple([
+  number(),
+  array(object({ count: number() })),
 ]);
 
-export type EventsStatsDataPoint = z.infer<typeof EventsStatsDataPointSchema>;
+export type EventsStatsDataPoint = InferOutput<
+  typeof EventsStatsDataPointSchema
+>;
 
 /**
  * A single time-series from events-stats.
@@ -889,40 +902,37 @@ export type EventsStatsDataPoint = z.infer<typeof EventsStatsDataPointSchema>;
  * In simple queries this is the top-level response.
  * In grouped queries (`topEvents > 0`) each group key maps to one of these.
  */
-export const EventsStatsSeriesSchema = z
-  .object({
-    data: z.array(EventsStatsDataPointSchema),
-    order: z.number().optional(),
-    start: z.union([z.string(), z.number()]).optional(),
-    end: z.union([z.string(), z.number()]).optional(),
-    meta: z
-      .object({
-        fields: z.record(z.string()).optional(),
-        units: z.record(z.string().nullable()).optional(),
-      })
-      .passthrough()
-      .optional(),
-  })
-  .passthrough();
+export const EventsStatsSeriesSchema = looseObject({
+  data: array(EventsStatsDataPointSchema),
+  order: optional(number()),
+  start: optional(union([string(), number()])),
+  end: optional(union([string(), number()])),
+  meta: optional(
+    looseObject({
+      fields: optional(record(string(), string())),
+      units: optional(record(string(), nullable(string()))),
+    })
+  ),
+});
 
-export type EventsStatsSeries = z.infer<typeof EventsStatsSeriesSchema>;
+export type EventsStatsSeries = InferOutput<typeof EventsStatsSeriesSchema>;
 
 /**
  * Response from `GET /organizations/{org}/events/` (table format).
  *
  * Used by table, big_number, and top_n widget types.
  */
-export const EventsTableResponseSchema = z.object({
-  data: z.array(z.record(z.unknown())),
-  meta: z
-    .object({
-      fields: z.record(z.string()).optional(),
-      units: z.record(z.string().nullable()).optional(),
+export const EventsTableResponseSchema = object({
+  data: array(record(string(), unknown())),
+  meta: optional(
+    object({
+      fields: optional(record(string(), string())),
+      units: optional(record(string(), nullable(string()))),
     })
-    .optional(),
+  ),
 });
 
-export type EventsTableResponse = z.infer<typeof EventsTableResponseSchema>;
+export type EventsTableResponse = InferOutput<typeof EventsTableResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // Widget data result types — discriminated union for all widget outputs
@@ -1041,25 +1051,21 @@ export const TABLE_DISPLAY_TYPES = new Set(["table", "top_n"]);
 // ---------------------------------------------------------------------------
 
 /** Schema for the createdBy field in a dashboard revision */
-const DashboardRevisionCreatedBySchema = z
-  .object({
-    id: z.string().optional(),
-    name: z.string().nullish(),
-    email: z.string().nullish(),
-    avatarType: z.string().nullish(),
-    avatarUrl: z.string().nullish(),
-  })
-  .passthrough();
+const DashboardRevisionCreatedBySchema = looseObject({
+  id: optional(string()),
+  name: nullish(string()),
+  email: nullish(string()),
+  avatarType: nullish(string()),
+  avatarUrl: nullish(string()),
+});
 
 /** Schema for a dashboard revision (from GET /dashboards/{id}/revisions/) */
-export const DashboardRevisionSchema = z
-  .object({
-    id: z.string(),
-    title: z.string(),
-    dateCreated: z.string(),
-    createdBy: DashboardRevisionCreatedBySchema.nullable(),
-    source: z.string(),
-  })
-  .passthrough();
+export const DashboardRevisionSchema = looseObject({
+  id: string(),
+  title: string(),
+  dateCreated: string(),
+  createdBy: nullable(DashboardRevisionCreatedBySchema),
+  source: string(),
+});
 
-export type DashboardRevision = z.infer<typeof DashboardRevisionSchema>;
+export type DashboardRevision = InferOutput<typeof DashboardRevisionSchema>;

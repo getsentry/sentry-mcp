@@ -1,86 +1,111 @@
-import { z } from "zod";
+import {
+  array,
+  boolean,
+  description,
+  fallback,
+  type GenericSchema,
+  type InferOutput,
+  looseObject,
+  nullable,
+  nullish,
+  number,
+  object,
+  optional,
+  pipe,
+  record,
+  string,
+  union,
+  unknown,
+} from "valibot";
 
 export type ReplayTags = Record<string, string[]>;
 
 /**
  * User geo metadata attached to a replay.
  */
-export const ReplayGeoSchema = z
-  .object({
-    city: z.string().nullish().describe("City"),
-    country_code: z.string().nullish().describe("Country code"),
-    region: z.string().nullish().describe("Region"),
-    subdivision: z.string().nullish().describe("Subdivision"),
-  })
-  .passthrough();
+export const ReplayGeoSchema = pipe(
+  looseObject({
+    city: nullish(string()),
+    country_code: nullish(string()),
+    region: nullish(string()),
+    subdivision: nullish(string()),
+  }),
+  description("User geo metadata")
+);
 
 /**
  * User metadata attached to a replay.
  */
-export const ReplayUserSchema = z
-  .object({
-    id: z.string().nullish().describe("User ID"),
-    username: z.string().nullish().describe("Username"),
-    email: z.string().nullish().describe("Email"),
-    ip: z.string().nullish().describe("IP address"),
-    display_name: z.string().nullish().describe("Display name"),
-    geo: ReplayGeoSchema.nullish().describe("Geo metadata"),
-  })
-  .passthrough();
+export const ReplayUserSchema = pipe(
+  looseObject({
+    id: nullish(string()),
+    username: nullish(string()),
+    email: nullish(string()),
+    ip: nullish(string()),
+    display_name: nullish(string()),
+    geo: nullish(ReplayGeoSchema),
+  }),
+  description("User metadata")
+);
 
 /**
  * Browser metadata attached to a replay.
  */
-export const ReplayBrowserSchema = z
-  .object({
-    name: z.string().nullish().describe("Browser name"),
-    version: z.string().nullish().describe("Browser version"),
-  })
-  .passthrough();
+export const ReplayBrowserSchema = pipe(
+  looseObject({
+    name: nullish(string()),
+    version: nullish(string()),
+  }),
+  description("Browser metadata")
+);
 
 /**
  * Operating system metadata attached to a replay.
  */
-export const ReplayOsSchema = z
-  .object({
-    name: z.string().nullish().describe("OS name"),
-    version: z.string().nullish().describe("OS version"),
-  })
-  .passthrough();
+export const ReplayOsSchema = pipe(
+  looseObject({
+    name: nullish(string()),
+    version: nullish(string()),
+  }),
+  description("Operating system metadata")
+);
 
 /**
  * SDK metadata attached to a replay.
  */
-export const ReplaySdkSchema = z
-  .object({
-    name: z.string().nullish().describe("SDK name"),
-    version: z.string().nullish().describe("SDK version"),
-  })
-  .passthrough();
+export const ReplaySdkSchema = pipe(
+  looseObject({
+    name: nullish(string()),
+    version: nullish(string()),
+  }),
+  description("SDK metadata")
+);
 
 /**
  * Device metadata attached to a replay.
  */
-export const ReplayDeviceSchema = z
-  .object({
-    brand: z.string().nullish().describe("Device brand"),
-    family: z.string().nullish().describe("Device family"),
-    model: z.string().nullish().describe("Device model"),
-    model_id: z.string().nullish().describe("Device model identifier"),
-    name: z.string().nullish().describe("Device name"),
-  })
-  .passthrough();
+export const ReplayDeviceSchema = pipe(
+  looseObject({
+    brand: nullish(string()),
+    family: nullish(string()),
+    model: nullish(string()),
+    model_id: nullish(string()),
+    name: nullish(string()),
+  }),
+  description("Device metadata")
+);
 
 /**
  * OTA update metadata attached to a replay.
  */
-export const ReplayOtaUpdatesSchema = z
-  .object({
-    channel: z.string().nullish().describe("OTA update channel"),
-    runtime_version: z.string().nullish().describe("OTA runtime version"),
-    update_id: z.string().nullish().describe("OTA update ID"),
-  })
-  .passthrough();
+export const ReplayOtaUpdatesSchema = pipe(
+  looseObject({
+    channel: nullish(string()),
+    runtime_version: nullish(string()),
+    update_id: nullish(string()),
+  }),
+  description("OTA update metadata")
+);
 
 /**
  * Replay tags keyed by tag name.
@@ -88,10 +113,10 @@ export const ReplayOtaUpdatesSchema = z
  * Archived replay rows sometimes return an empty array instead of a tag map,
  * so the schema falls back to an empty tag object for those placeholders.
  */
-export const ReplayTagsSchema = z
-  .record(z.array(z.string()))
-  .catch({})
-  .describe("Replay tags") as z.ZodType<ReplayTags>;
+export const ReplayTagsSchema = pipe(
+  fallback(record(string(), array(string())), {}),
+  description("Replay tags")
+) as GenericSchema<unknown, ReplayTags>;
 
 /**
  * Known root fields that the replay list endpoint accepts in repeated `field=`
@@ -133,43 +158,43 @@ export const REPLAY_LIST_FIELDS = [
   "warning_ids",
 ] as const;
 
-function replayNullableNumber(description: string) {
-  return z.number().nullable().optional().describe(description);
+function replayNullableNumber(descriptionText: string) {
+  return pipe(optional(nullable(number())), description(descriptionText));
 }
 
-function replayNullableString(description: string) {
-  return z.string().nullable().optional().describe(description);
+function replayNullableString(descriptionText: string) {
+  return pipe(optional(nullable(string())), description(descriptionText));
 }
 
-function replayNullableBoolean(description: string) {
-  return z.boolean().nullable().optional().describe(description);
+function replayNullableBoolean(descriptionText: string) {
+  return pipe(optional(nullable(boolean())), description(descriptionText));
 }
 
-function replayNullishObject<T extends z.ZodTypeAny>(
+function replayNullishObject<T extends GenericSchema>(
   schema: T,
-  description: string
+  descriptionText: string
 ) {
-  return schema.nullish().describe(description);
+  return pipe(nullish(schema), description(descriptionText));
 }
 
 function replayStringArray() {
-  return z.array(z.string());
+  return array(string());
 }
 
 function replayStringArrayWithFallback() {
-  return replayStringArray().catch([]);
+  return fallback(replayStringArray(), []);
 }
 
 function buildReplayListItemShape<
-  TErrorIds extends z.ZodTypeAny,
-  TInfoIds extends z.ZodTypeAny,
-  TOtaUpdates extends z.ZodTypeAny,
-  TProjectId extends z.ZodTypeAny,
-  TReleases extends z.ZodTypeAny,
-  TTags extends z.ZodTypeAny,
-  TTraceIds extends z.ZodTypeAny,
-  TUrls extends z.ZodTypeAny,
-  TWarningIds extends z.ZodTypeAny,
+  TErrorIds extends GenericSchema,
+  TInfoIds extends GenericSchema,
+  TOtaUpdates extends GenericSchema,
+  TProjectId extends GenericSchema,
+  TReleases extends GenericSchema,
+  TTags extends GenericSchema,
+  TTraceIds extends GenericSchema,
+  TUrls extends GenericSchema,
+  TWarningIds extends GenericSchema,
 >(fields: {
   errorIds: TErrorIds;
   infoIds: TInfoIds;
@@ -195,26 +220,29 @@ function buildReplayListItemShape<
     dist: replayNullableString("Distribution"),
     duration: replayNullableNumber("Replay duration in seconds"),
     environment: replayNullableString("Environment"),
-    error_ids: fields.errorIds.describe("Linked error IDs"),
+    error_ids: pipe(fields.errorIds, description("Linked error IDs")),
     finished_at: replayNullableString("Replay finish timestamp"),
     has_viewed: replayNullableBoolean(
       "Whether the current user has viewed the replay"
     ),
-    id: z.string().describe("Replay ID"),
-    info_ids: fields.infoIds.describe("Linked info event IDs"),
+    id: pipe(string(), description("Replay ID")),
+    info_ids: pipe(fields.infoIds, description("Linked info event IDs")),
     is_archived: replayNullableBoolean("Archived flag"),
     os: replayNullishObject(ReplayOsSchema, "Operating system metadata"),
-    ota_updates: fields.otaUpdates.describe("OTA update metadata"),
+    ota_updates: pipe(fields.otaUpdates, description("OTA update metadata")),
     platform: replayNullableString("Platform"),
-    project_id: fields.projectId.describe("Numeric project ID"),
-    releases: fields.releases.describe("Associated releases"),
+    project_id: pipe(fields.projectId, description("Numeric project ID")),
+    releases: pipe(fields.releases, description("Associated releases")),
     sdk: replayNullishObject(ReplaySdkSchema, "SDK metadata"),
     started_at: replayNullableString("Replay start timestamp"),
-    tags: fields.tags.describe("Replay tags"),
-    trace_ids: fields.traceIds.describe("Linked trace IDs"),
-    urls: fields.urls.describe("Visited URLs"),
+    tags: pipe(fields.tags, description("Replay tags")),
+    trace_ids: pipe(fields.traceIds, description("Linked trace IDs")),
+    urls: pipe(fields.urls, description("Visited URLs")),
     user: replayNullishObject(ReplayUserSchema, "User metadata"),
-    warning_ids: fields.warningIds.describe("Linked warning event IDs"),
+    warning_ids: pipe(
+      fields.warningIds,
+      description("Linked warning event IDs")
+    ),
   };
 }
 
@@ -223,57 +251,59 @@ function buildReplayListItemShape<
  *
  * Duration is in seconds, matching the backend replay interchange format.
  */
-export const ReplayListItemSchema = z
-  .object(
-    buildReplayListItemShape({
-      errorIds: replayStringArrayWithFallback(),
-      infoIds: replayStringArrayWithFallback(),
-      otaUpdates: replayNullishObject(
-        ReplayOtaUpdatesSchema,
-        "OTA update metadata"
-      ),
-      projectId: z.union([z.string(), z.number()]).nullable().optional(),
-      releases: replayStringArrayWithFallback(),
-      tags: ReplayTagsSchema,
-      traceIds: replayStringArrayWithFallback(),
-      urls: replayStringArrayWithFallback(),
-      warningIds: replayStringArrayWithFallback(),
-    })
-  )
-  .passthrough()
-  .describe("Replay list row");
+const ReplayListItemSchemaBase = looseObject(
+  buildReplayListItemShape({
+    errorIds: replayStringArrayWithFallback(),
+    infoIds: replayStringArrayWithFallback(),
+    otaUpdates: replayNullishObject(
+      ReplayOtaUpdatesSchema,
+      "OTA update metadata"
+    ),
+    projectId: optional(nullable(union([string(), number()]))),
+    releases: replayStringArrayWithFallback(),
+    tags: ReplayTagsSchema,
+    traceIds: replayStringArrayWithFallback(),
+    urls: replayStringArrayWithFallback(),
+    warningIds: replayStringArrayWithFallback(),
+  })
+);
+export const ReplayListItemSchema = pipe(
+  ReplayListItemSchemaBase,
+  description("Replay list row")
+);
 
 /**
  * Click selector summaries attached to replay detail responses.
  */
-export const ReplayClickSchema = z
-  .record(z.unknown())
-  .describe("Replay click selector summary");
+export const ReplayClickSchema = pipe(
+  record(string(), unknown()),
+  description("Replay click selector summary")
+);
 
 /**
  * Full replay metadata returned by the replay detail endpoint.
  */
-export const ReplayDetailsSchema = ReplayListItemSchema.extend({
-  clicks: z
-    .array(ReplayClickSchema)
-    .optional()
-    .describe("Replay click summaries"),
-  replay_type: z.string().nullable().optional().describe("Replay type"),
-}).describe("Replay details");
+export const ReplayDetailsSchema = pipe(
+  looseObject({
+    ...ReplayListItemSchemaBase.entries,
+    clicks: pipe(
+      optional(array(ReplayClickSchema)),
+      description("Replay click summaries")
+    ),
+    replay_type: pipe(optional(nullable(string())), description("Replay type")),
+  }),
+  description("Replay details")
+);
 
 /** Envelope returned by the replay index endpoint. */
-export const ReplayListResponseSchema = z
-  .object({
-    data: z.array(ReplayListItemSchema),
-  })
-  .passthrough();
+export const ReplayListResponseSchema = looseObject({
+  data: array(ReplayListItemSchema),
+});
 
 /** Envelope returned by the replay detail endpoint. */
-export const ReplayDetailsResponseSchema = z
-  .object({
-    data: ReplayDetailsSchema,
-  })
-  .passthrough();
+export const ReplayDetailsResponseSchema = looseObject({
+  data: ReplayDetailsSchema,
+});
 
 /**
  * Documentation-oriented replay list schema used for `--help` and SKILL docs.
@@ -281,103 +311,138 @@ export const ReplayDetailsResponseSchema = z
  * Keeps the field types explicit even though the runtime parser accepts a few
  * legacy/nullish payload variants from archived replay rows.
  */
-export const ReplayListItemOutputSchema = z
-  .object(
-    buildReplayListItemShape({
-      errorIds: replayStringArray(),
-      infoIds: replayStringArray(),
-      otaUpdates: ReplayOtaUpdatesSchema.nullish(),
-      projectId: z.string().nullable().optional(),
-      releases: replayStringArray(),
-      tags: z.record(z.array(z.string())),
-      traceIds: replayStringArray(),
-      urls: replayStringArray(),
-      warningIds: replayStringArray(),
-    })
-  )
-  .describe("Replay list row");
+const ReplayListItemOutputSchemaBase = object(
+  buildReplayListItemShape({
+    errorIds: replayStringArray(),
+    infoIds: replayStringArray(),
+    otaUpdates: nullish(ReplayOtaUpdatesSchema),
+    projectId: optional(nullable(string())),
+    releases: replayStringArray(),
+    tags: record(string(), array(string())),
+    traceIds: replayStringArray(),
+    urls: replayStringArray(),
+    warningIds: replayStringArray(),
+  })
+);
+export const ReplayListItemOutputSchema = pipe(
+  ReplayListItemOutputSchemaBase,
+  description("Replay list row")
+);
 
 /** Documentation-oriented replay detail schema used for command metadata. */
-export const ReplayDetailsOutputSchema = ReplayListItemOutputSchema.extend({
-  clicks: z
-    .array(ReplayClickSchema)
-    .optional()
-    .describe("Replay click summaries"),
-  replay_type: z.string().nullable().optional().describe("Replay type"),
-}).describe("Replay details");
+export const ReplayDetailsOutputSchema = pipe(
+  object({
+    ...ReplayListItemOutputSchemaBase.entries,
+    clicks: pipe(
+      optional(array(ReplayClickSchema)),
+      description("Replay click summaries")
+    ),
+    replay_type: pipe(optional(nullable(string())), description("Replay type")),
+  }),
+  description("Replay details")
+);
 
 /** A summarized replay activity event extracted from recording segments. */
-export const ReplayActivityEventSchema = z
-  .object({
-    timestampMs: z
-      .number()
-      .nullable()
-      .describe("Milliseconds since UNIX epoch for the activity event"),
-    label: z.string().describe("Activity label"),
-    details: z.array(z.string()).describe("Supplemental activity details"),
-  })
-  .describe("Summarized replay activity event");
+export const ReplayActivityEventSchema = pipe(
+  object({
+    timestampMs: pipe(
+      nullable(number()),
+      description("Milliseconds since UNIX epoch for the activity event")
+    ),
+    label: pipe(string(), description("Activity label")),
+    details: pipe(
+      array(string()),
+      description("Supplemental activity details")
+    ),
+  }),
+  description("Summarized replay activity event")
+);
 
 /** Related issue metadata extracted from replay-linked event IDs. */
-export const ReplayRelatedIssueSchema = z
-  .object({
-    eventId: z.string().describe("Replay-linked event ID"),
-    issueId: z.string().nullable().optional().describe("Resolved issue ID"),
-    shortId: z
-      .string()
-      .nullable()
-      .optional()
-      .describe("Resolved issue short ID"),
-    title: z.string().nullable().optional().describe("Resolved issue title"),
-  })
-  .describe("Replay-related issue");
+export const ReplayRelatedIssueSchema = pipe(
+  object({
+    eventId: pipe(string(), description("Replay-linked event ID")),
+    issueId: pipe(
+      optional(nullable(string())),
+      description("Resolved issue ID")
+    ),
+    shortId: pipe(
+      optional(nullable(string())),
+      description("Resolved issue short ID")
+    ),
+    title: pipe(
+      optional(nullable(string())),
+      description("Resolved issue title")
+    ),
+  }),
+  description("Replay-related issue")
+);
 
 /** Related trace metadata extracted from replay trace IDs. */
-export const ReplayRelatedTraceSchema = z
-  .object({
-    traceId: z.string().describe("Replay-linked trace ID"),
-    errorCount: z.number().nullable().optional().describe("Trace error count"),
-    logCount: z.number().nullable().optional().describe("Trace log count"),
-    performanceIssueCount: z
-      .number()
-      .nullable()
-      .optional()
-      .describe("Trace performance issue count"),
-    spanCount: z.number().nullable().optional().describe("Trace span count"),
-  })
-  .describe("Replay-related trace");
+export const ReplayRelatedTraceSchema = pipe(
+  object({
+    traceId: pipe(string(), description("Replay-linked trace ID")),
+    errorCount: pipe(
+      optional(nullable(number())),
+      description("Trace error count")
+    ),
+    logCount: pipe(
+      optional(nullable(number())),
+      description("Trace log count")
+    ),
+    performanceIssueCount: pipe(
+      optional(nullable(number())),
+      description("Trace performance issue count")
+    ),
+    spanCount: pipe(
+      optional(nullable(number())),
+      description("Trace span count")
+    ),
+  }),
+  description("Replay-related trace")
+);
 
 /** Replay view output with related context and summarized activity. */
-export const ReplayViewOutputSchema = ReplayDetailsOutputSchema.extend({
-  org: z.string().describe("Organization slug"),
-  activity: z
-    .array(ReplayActivityEventSchema)
-    .describe("Summarized replay activity"),
-  relatedIssues: z
-    .array(ReplayRelatedIssueSchema)
-    .describe("Replay-related issues"),
-  relatedTraces: z
-    .array(ReplayRelatedTraceSchema)
-    .describe("Replay-related traces"),
-}).describe("Replay view output");
+export const ReplayViewOutputSchema = pipe(
+  object({
+    ...ReplayDetailsOutputSchema.entries,
+    org: pipe(string(), description("Organization slug")),
+    activity: pipe(
+      array(ReplayActivityEventSchema),
+      description("Summarized replay activity")
+    ),
+    relatedIssues: pipe(
+      array(ReplayRelatedIssueSchema),
+      description("Replay-related issues")
+    ),
+    relatedTraces: pipe(
+      array(ReplayRelatedTraceSchema),
+      description("Replay-related traces")
+    ),
+  }),
+  description("Replay view output")
+);
 
 /** Replay IDs keyed by resource identifier (issue ID, trace ID, replay ID). */
-export const ReplayIdsByResourceSchema = z
-  .record(z.string(), z.array(z.string()))
-  .describe("Replay IDs grouped by resource identifier");
+export const ReplayIdsByResourceSchema = pipe(
+  record(string(), array(string())),
+  description("Replay IDs grouped by resource identifier")
+);
 
-export type ReplayGeo = z.infer<typeof ReplayGeoSchema>;
-export type ReplayUser = z.infer<typeof ReplayUserSchema>;
-export type ReplayBrowser = z.infer<typeof ReplayBrowserSchema>;
-export type ReplayOs = z.infer<typeof ReplayOsSchema>;
-export type ReplaySdk = z.infer<typeof ReplaySdkSchema>;
-export type ReplayDevice = z.infer<typeof ReplayDeviceSchema>;
-export type ReplayOtaUpdates = z.infer<typeof ReplayOtaUpdatesSchema>;
-export type ReplayListItem = z.infer<typeof ReplayListItemSchema>;
-export type ReplayDetails = z.infer<typeof ReplayDetailsSchema>;
-export type ReplayListResponse = z.infer<typeof ReplayListResponseSchema>;
-export type ReplayDetailsResponse = z.infer<typeof ReplayDetailsResponseSchema>;
-export type ReplayIdsByResource = z.infer<typeof ReplayIdsByResourceSchema>;
-export type ReplayActivityEvent = z.infer<typeof ReplayActivityEventSchema>;
-export type ReplayRelatedIssue = z.infer<typeof ReplayRelatedIssueSchema>;
-export type ReplayRelatedTrace = z.infer<typeof ReplayRelatedTraceSchema>;
+export type ReplayGeo = InferOutput<typeof ReplayGeoSchema>;
+export type ReplayUser = InferOutput<typeof ReplayUserSchema>;
+export type ReplayBrowser = InferOutput<typeof ReplayBrowserSchema>;
+export type ReplayOs = InferOutput<typeof ReplayOsSchema>;
+export type ReplaySdk = InferOutput<typeof ReplaySdkSchema>;
+export type ReplayDevice = InferOutput<typeof ReplayDeviceSchema>;
+export type ReplayOtaUpdates = InferOutput<typeof ReplayOtaUpdatesSchema>;
+export type ReplayListItem = InferOutput<typeof ReplayListItemSchema>;
+export type ReplayDetails = InferOutput<typeof ReplayDetailsSchema>;
+export type ReplayListResponse = InferOutput<typeof ReplayListResponseSchema>;
+export type ReplayDetailsResponse = InferOutput<
+  typeof ReplayDetailsResponseSchema
+>;
+export type ReplayIdsByResource = InferOutput<typeof ReplayIdsByResourceSchema>;
+export type ReplayActivityEvent = InferOutput<typeof ReplayActivityEventSchema>;
+export type ReplayRelatedIssue = InferOutput<typeof ReplayRelatedIssueSchema>;
+export type ReplayRelatedTrace = InferOutput<typeof ReplayRelatedTraceSchema>;

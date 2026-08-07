@@ -25,7 +25,17 @@ import {
   zstdCompress as zstdCompressCb,
 } from "node:zlib";
 import pLimit from "p-limit";
-import { z } from "zod";
+import {
+  array,
+  type GenericSchema,
+  type InferOutput,
+  nullish,
+  number,
+  object,
+  optional,
+  picklist,
+  string,
+} from "valibot";
 import { ApiError } from "../errors.js";
 import { logger } from "../logger.js";
 import { resolveOrgRegion } from "../region.js";
@@ -45,46 +55,46 @@ const log = logger.withTag("api.chunk-upload");
 // ── Schemas ─────────────────────────────────────────────────────────
 
 /** Server-provided chunk upload configuration. */
-export const ChunkServerOptionsSchema = z.object({
+export const ChunkServerOptionsSchema = object({
   /** Absolute URL to upload chunks to. */
-  url: z.string(),
+  url: string(),
   /** Maximum size of a single chunk in bytes. */
-  chunkSize: z.number(),
+  chunkSize: number(),
   /** Maximum number of chunks per upload request. */
-  chunksPerRequest: z.number(),
+  chunksPerRequest: number(),
   /** Maximum total request body size in bytes. */
-  maxRequestSize: z.number(),
+  maxRequestSize: number(),
   /**
    * Maximum size of a single uploaded file in bytes. Omitted or `0` means the
    * server advertises no per-file cap, in which case the client falls back to
    * {@link DEFAULT_MAX_DIF_SIZE}.
    */
-  maxFileSize: z.number().optional(),
+  maxFileSize: optional(number()),
   /**
    * Maximum time, in seconds, the server is willing to spend assembling an
    * upload. Omitted or `0` means no server-imposed cap; a non-zero value clamps
    * the caller's requested wait. Mirrors the legacy `dif_upload` `max_wait`
    * semantics.
    */
-  maxWait: z.number().optional(),
+  maxWait: optional(number()),
   /** Hash algorithm for chunk checksums (always "sha1"). */
-  hashAlgorithm: z.string(),
+  hashAlgorithm: string(),
   /** Maximum concurrent upload requests. */
-  concurrency: z.number(),
+  concurrency: number(),
   /** Supported compression methods (e.g., ["gzip"]). */
-  compression: z.array(z.string()),
+  compression: array(string()),
 });
 
-export type ChunkServerOptions = z.infer<typeof ChunkServerOptionsSchema>;
+export type ChunkServerOptions = InferOutput<typeof ChunkServerOptionsSchema>;
 
 /** Response from an assemble endpoint (shared by artifact bundle and DIF). */
-export const AssembleResponseSchema = z.object({
-  state: z.enum(["not_found", "created", "assembling", "ok", "error"]),
-  missingChunks: z.array(z.string()).optional(),
-  detail: z.string().nullable().optional(),
+export const AssembleResponseSchema = object({
+  state: picklist(["not_found", "created", "assembling", "ok", "error"]),
+  missingChunks: optional(array(string())),
+  detail: nullish(string()),
 });
 
-export type AssembleResponse = z.infer<typeof AssembleResponseSchema>;
+export type AssembleResponse = InferOutput<typeof AssembleResponseSchema>;
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -494,7 +504,7 @@ export async function uploadMissingBufferChunks(params: {
  * @param params.endpoint - The endpoint path to POST to
  * @param params.body - The request body to send on each poll
  * @param params.entityName - Human-readable name for error messages
- * @param params.schema - Zod schema for the response (defaults to {@link AssembleResponseSchema})
+ * @param params.schema - Valibot schema for the response (defaults to {@link AssembleResponseSchema})
  * @param params.waitForOk - Keep polling on `"created"`, returning only on `"ok"`
  * @param params.deadlineMs - Override the default poll timeout window
  */
@@ -503,7 +513,7 @@ export async function pollAssembly(params: {
   endpoint: string;
   body: unknown;
   entityName: string;
-  schema?: z.ZodType<AssembleResponse>;
+  schema?: GenericSchema<unknown, AssembleResponse>;
   waitForOk?: boolean;
   deadlineMs?: number;
 }): Promise<void> {
