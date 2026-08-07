@@ -807,6 +807,7 @@ describe("project create", () => {
     expect(err.message).toContain("Common platforms:");
     expect(err.message).toContain("javascript-nextjs");
     expect(err.message).toContain("python");
+    expect(err.message).toContain("Run 'sentry platform list'");
     // There is no space-separated form at all, so it must never be suggested.
     expect(err.message).not.toContain(" <platform>");
   });

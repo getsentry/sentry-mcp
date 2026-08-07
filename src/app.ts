@@ -35,6 +35,8 @@ import { monitorRoute } from "./commands/monitor/index.js";
 import { listCommand as monitorListCommand } from "./commands/monitor/list.js";
 import { orgRoute } from "./commands/org/index.js";
 import { listCommand as orgListCommand } from "./commands/org/list.js";
+import { platformRoute } from "./commands/platform/index.js";
+import { listCommand as platformListCommand } from "./commands/platform/list.js";
 import { proguardRoute } from "./commands/proguard/index.js";
 import { projectRoute } from "./commands/project/index.js";
 import { listCommand as projectListCommand } from "./commands/project/list.js";
@@ -88,6 +90,7 @@ const PLURAL_TO_SINGULAR: Record<string, string> = {
   events: "event",
   issues: "issue",
   orgs: "org",
+  platforms: "platform",
   projects: "project",
   releases: "release",
   repos: "repo",
@@ -115,6 +118,7 @@ export const routes = buildRouteMap({
     "debug-files": debugFilesRoute,
     dashboard: dashboardRoute,
     org: orgRoute,
+    platform: platformRoute,
     project: projectRoute,
     proguard: proguardRoute,
     "react-native": reactNativeRoute,
@@ -148,6 +152,7 @@ export const routes = buildRouteMap({
     dashboards: dashboardListCommand,
     issues: issueListCommand,
     orgs: orgListCommand,
+    platforms: platformListCommand,
     projects: projectListCommand,
     replays: replayListCommand,
     releases: releaseListCommand,
@@ -172,6 +177,7 @@ export const routes = buildRouteMap({
       events: true,
       issues: true,
       orgs: true,
+      platforms: true,
       projects: true,
       replays: true,
       releases: true,
