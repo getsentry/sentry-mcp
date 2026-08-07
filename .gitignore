@@ -13,6 +13,9 @@ dist-bin
 dist-build
 *.tgz
 
+# e2e bundle build lock (see test/e2e/bundle-setup.ts)
+.bundle-build.lock
+
 # fossilize build cache
 .node-cache
 
