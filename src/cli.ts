@@ -247,6 +247,9 @@ export async function runCli(cliArgs: string[]): Promise<void> {
     "./lib/auto-auth.js"
   );
   const { getEnvLogLevel, setLogLevel } = await import("./lib/logger.js");
+  const { scheduleInitForceExitIfRequested } = await import(
+    "./lib/init/force-exit.js"
+  );
   const { isTrialEligible, promptAndStartTrial } = await import(
     "./lib/seer-trial.js"
   );
@@ -722,6 +725,9 @@ export async function runCli(cliArgs: string[]): Promise<void> {
   } finally {
     // Abort any pending version check to allow clean exit
     abortPendingVersionCheck();
+    // Runs after auto-auth, scope recovery, and command retry have reached a
+    // terminal result, so the init-specific macOS timer cannot interrupt them.
+    scheduleInitForceExitIfRequested();
   }
 
   // Show update notification after command completes
