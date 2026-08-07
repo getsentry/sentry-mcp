@@ -8,7 +8,8 @@ import {
   type ListProjectReplayRecordingSegmentsResponse,
   listProjectReplayRecordingSegments,
 } from "@sentry/api";
-import { zListProjectReplayRecordingSegmentsResponse } from "@sentry/api/zod";
+import { vListProjectReplayRecordingSegmentsResponse } from "@sentry/api/valibot";
+import { safeParse } from "valibot";
 import type { z } from "zod";
 import {
   REPLAY_LIST_FIELDS,
@@ -123,16 +124,16 @@ type FetchReplayRecordingSegmentsPageOptions = {
  * its object boundary. The SDK invokes response validators outside its normal
  * error-result path, so convert Zod failures to the CLI's API error type here.
  */
+// biome-ignore lint/suspicious/useAwait: the SDK's responseValidator hook requires a Promise-returning function
 async function validateReplayRecordingSegmentsResponse(
   data: unknown
 ): Promise<void> {
-  const result =
-    await zListProjectReplayRecordingSegmentsResponse.safeParseAsync(data);
+  const result = safeParse(vListProjectReplayRecordingSegmentsResponse, data);
   if (!result.success) {
     throw new ApiError(
       "Unexpected replay recording segments response",
       0,
-      result.error.message
+      result.issues.map((issue) => issue.message).join(", ")
     );
   }
 }

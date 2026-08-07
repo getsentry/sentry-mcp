@@ -50,7 +50,7 @@ const INK_APP_PATH = join(ROOT_DIR, "dist/ink-app.js");
 
 describe("npm bundle", () => {
   beforeAll(async () => {
-    await ensureBundleBuilt({ clean: true });
+    await ensureBundleBuilt();
   }, 60_000); // Bundle can take a while
 
   test("bundle file exists", () => {
