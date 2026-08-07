@@ -10,6 +10,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { safeParse } from "valibot";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ApiError, ValidationError } from "../../../src/lib/errors.js";
 
@@ -361,13 +362,13 @@ describe("snapshots", () => {
     // The server returns snake_case; the schema must accept it and reject
     // camelCase, guarding against the C1 regression.
     expect(
-      LatestBaseSnapshotSchema.safeParse({
+      safeParse(LatestBaseSnapshotSchema, {
         head_artifact_id: "art-1",
         image_count: 5,
       }).success
     ).toBe(true);
     expect(
-      LatestBaseSnapshotSchema.safeParse({
+      safeParse(LatestBaseSnapshotSchema, {
         headArtifactId: "art-1",
         imageCount: 5,
       }).success

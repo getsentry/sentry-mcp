@@ -6,6 +6,7 @@
  * interval schedule shapes and nullable threshold fields.
  */
 
+import { safeParse } from "valibot";
 import { describe, expect, test } from "vitest";
 import { SentryMonitorSchema } from "../../../src/types/sentry.js";
 
@@ -51,26 +52,28 @@ const intervalMonitor = {
 
 describe("SentryMonitorSchema", () => {
   test("accepts a crontab monitor response", () => {
-    const result = SentryMonitorSchema.safeParse(crontabMonitor);
+    const result = safeParse(SentryMonitorSchema, crontabMonitor);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.slug).toBe("nightly-job");
-      expect(result.data.config?.schedule).toBe("0 0 * * *");
+      expect(result.output.slug).toBe("nightly-job");
+      expect(result.output.config?.schedule).toBe("0 0 * * *");
       // unknown fields are preserved via passthrough
-      expect((result.data as Record<string, unknown>).isUpserting).toBe(false);
+      expect((result.output as Record<string, unknown>).isUpserting).toBe(
+        false
+      );
     }
   });
 
   test("accepts an interval monitor with tuple schedule", () => {
-    const result = SentryMonitorSchema.safeParse(intervalMonitor);
+    const result = safeParse(SentryMonitorSchema, intervalMonitor);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.config?.schedule).toEqual([1, "hour"]);
+      expect(result.output.config?.schedule).toEqual([1, "hour"]);
     }
   });
 
   test("rejects a monitor missing required core identifiers", () => {
-    const result = SentryMonitorSchema.safeParse({
+    const result = safeParse(SentryMonitorSchema, {
       slug: "no-id",
       name: "No ID",
       status: "active",

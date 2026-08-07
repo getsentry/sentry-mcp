@@ -12,7 +12,7 @@
  * - Multiple files are sent in a single assemble request
  */
 
-import { z } from "zod";
+import { type InferOutput, record, string } from "valibot";
 import { ApiError } from "../errors.js";
 import { logger } from "../logger.js";
 import { resolveOrgRegion } from "../region.js";
@@ -59,9 +59,9 @@ export type ProguardUploadOptions = {
  * DIF assemble response — keyed by overall checksum, each value has
  * the same shape as the standard assemble response.
  */
-const DifAssembleResponseSchema = z.record(z.string(), AssembleResponseSchema);
+const DifAssembleResponseSchema = record(string(), AssembleResponseSchema);
 
-type DifAssembleResponse = z.infer<typeof DifAssembleResponseSchema>;
+type DifAssembleResponse = InferOutput<typeof DifAssembleResponseSchema>;
 
 // ── Internal types ──────────────────────────────────────────────────
 

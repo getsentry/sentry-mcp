@@ -19,7 +19,7 @@
  * formatter — there is no divergent-data path.
  */
 
-import type { ZodType } from "zod";
+import { type GenericSchema, getDescription } from "valibot";
 import type { Writer } from "../../types/index.js";
 import { plainSafeMuted } from "./human.js";
 import { filterFields, formatJson } from "./json.js";
@@ -144,7 +144,7 @@ export type OutputConfig<T> = {
    * - `sentry help <cmd>`: structured field documentation
    * - `generate-skill.ts`: SKILL.md field tables for AI agents
    */
-  schema?: ZodType;
+  schema?: GenericSchema;
 };
 
 /**
@@ -343,41 +343,78 @@ export type SchemaFieldInfo = {
   name: string;
   /** Human-readable type string (e.g. "string", "number", "object", "string | null") */
   type: string;
-  /** Description from `z.describe()` */
+  /** Description from valibot's `description()` pipe action */
   description?: string;
   /** Whether the field is optional in the schema */
   optional: boolean;
 };
 
-/** Leaf-type name mapping for {@link zodTypeToString} */
-const ZOD_TYPE_MAP: Record<string, string> = {
-  ZodString: "string",
-  ZodNumber: "number",
-  ZodBoolean: "boolean",
-  ZodObject: "object",
-  ZodArray: "array",
-  ZodRecord: "object",
-  ZodNull: "null",
-  ZodUnknown: "unknown",
-  ZodAny: "any",
-  ZodEnum: "string",
-  ZodLiteral: "string",
+/** Minimal structural view of a valibot schema's runtime shape. */
+type ValibotSchemaNode = {
+  type: string;
+  /** Inner schema for wrapper types (optional / nullable / nullish). */
+  wrapped?: ValibotSchemaNode;
+  /** Member schemas for union / picklist. */
+  options?: unknown[];
+  /** Item schema for array. */
+  item?: ValibotSchemaNode;
+  /** Field schemas for object / loose_object. */
+  entries?: Record<string, ValibotSchemaNode>;
+  /**
+   * Pipe steps for a `SchemaWithPipe` (e.g. `pipe(string(), description(...))`
+   * or the `pipe(unknown(), transform(Number), number())` coercion pattern).
+   * Each step carries a `kind` of `"schema"`, `"validation"`, `"transformation"`,
+   * or `"metadata"`.
+   */
+  pipe?: Array<{ type: string; kind: string }>;
 };
 
 /**
- * Resolve a `ZodUnion` into a deduplicated `" | "`-joined type string.
- *
- * Used by auto-generated `@sentry/api/zod` schemas that represent nullable
- * fields as `z.union([z.string(), z.null()])` instead of `z.string().nullable()`.
+ * Resolve a piped schema (`pipe(...)`) to the node whose `type` reflects its
+ * output — the last step with `kind === "schema"`. For the coercion pattern
+ * `pipe(unknown(), transform(Number), number())` this is `number()`, not the
+ * leading `unknown()`. Non-piped schemas are returned unchanged.
  */
-function resolveZodUnion(options: ZodType[]): {
+function unwrapPipe(schema: ValibotSchemaNode): ValibotSchemaNode {
+  if (!schema.pipe?.length) {
+    return schema;
+  }
+  const schemaSteps = schema.pipe.filter((step) => step.kind === "schema");
+  const last = schemaSteps.at(-1);
+  return (last as ValibotSchemaNode | undefined) ?? schema;
+}
+
+/** Leaf-type name mapping for {@link valibotTypeToString}. */
+const VALIBOT_TYPE_MAP: Record<string, string> = {
+  string: "string",
+  number: "number",
+  boolean: "boolean",
+  object: "object",
+  loose_object: "object",
+  array: "array",
+  record: "object",
+  null: "null",
+  unknown: "unknown",
+  any: "any",
+  picklist: "string",
+  enum: "string",
+  literal: "string",
+};
+
+/**
+ * Resolve a valibot `union` into a deduplicated `" | "`-joined type string.
+ *
+ * Used by auto-generated `@sentry/api/valibot` schemas that represent nullable
+ * fields as `union([string(), null_()])` instead of `nullable(string())`.
+ */
+function resolveValibotUnion(options: ValibotSchemaNode[]): {
   type: string;
   optional: boolean;
 } {
   let optional = false;
   const parts: string[] = [];
   for (const opt of options) {
-    const resolved = zodTypeToString(opt);
+    const resolved = valibotTypeToString(opt);
     if (resolved.optional) {
       optional = true;
     }
@@ -389,80 +426,99 @@ function resolveZodUnion(options: ZodType[]): {
 }
 
 /**
- * Map a Zod type's internal `typeName` to a human-readable string.
+ * Map a valibot schema's runtime `type` to a human-readable string.
  *
- * Unwraps wrapper types (Optional, Nullable, Default) and builds a
- * composite type string (e.g. "string | null" for ZodNullable<ZodString>).
- * Delegates ZodUnion handling to {@link resolveZodUnion}.
+ * Unwraps wrapper types (optional, nullable, nullish) and builds a composite
+ * type string (e.g. "string | null" for `nullable(string())`). Delegates
+ * union handling to {@link resolveValibotUnion}.
  */
-function zodTypeToString(schema: ZodType): { type: string; optional: boolean } {
-  const def = (schema as { _def?: { typeName?: string; innerType?: ZodType } })
-    ._def;
-  if (!def?.typeName) {
+function valibotTypeToString(input: ValibotSchemaNode): {
+  type: string;
+  optional: boolean;
+} {
+  // Resolve `pipe(...)` schemas (incl. the coercion pattern) to their output
+  // schema before inspecting the type.
+  const schema = input ? unwrapPipe(input) : input;
+  if (!schema?.type) {
     return { type: "unknown", optional: false };
   }
 
-  // Unwrap wrapper types recursively
-  if (def.typeName === "ZodOptional" && def.innerType) {
-    const inner = zodTypeToString(def.innerType);
+  // Unwrap wrapper types recursively.
+  if (schema.type === "optional" && schema.wrapped) {
+    const inner = valibotTypeToString(schema.wrapped);
     return { type: inner.type, optional: true };
   }
-  if (def.typeName === "ZodNullable" && def.innerType) {
-    const inner = zodTypeToString(def.innerType);
+  if (schema.type === "nullable" && schema.wrapped) {
+    const inner = valibotTypeToString(schema.wrapped);
     const nullableType = inner.type.includes(" | null")
       ? inner.type
       : `${inner.type} | null`;
     return { type: nullableType, optional: inner.optional };
   }
-  if (def.typeName === "ZodDefault" && def.innerType) {
-    return zodTypeToString(def.innerType);
+  if (schema.type === "nullish" && schema.wrapped) {
+    const inner = valibotTypeToString(schema.wrapped);
+    const nullableType = inner.type.includes(" | null")
+      ? inner.type
+      : `${inner.type} | null`;
+    return { type: nullableType, optional: true };
   }
-  if (def.typeName === "ZodUnion") {
-    const options = (def as { options?: ZodType[] }).options;
-    if (options?.length) {
-      return resolveZodUnion(options);
-    }
+  if (schema.type === "union" && schema.options?.length) {
+    return resolveValibotUnion(schema.options as ValibotSchemaNode[]);
   }
 
-  return { type: ZOD_TYPE_MAP[def.typeName] ?? "unknown", optional: false };
+  return { type: VALIBOT_TYPE_MAP[schema.type] ?? "unknown", optional: false };
 }
 
 /**
- * Extract field metadata from a Zod object schema.
+ * Extract field metadata from a valibot object schema.
  *
  * Returns an array of {@link SchemaFieldInfo} describing each top-level
  * field's name, type, description, and optionality. Returns an empty
  * array for non-object schemas.
  *
- * @param schema - A Zod schema (typically `z.object({...})`)
+ * @param schema - A valibot schema (typically `object({...})`)
  */
-export function extractSchemaFields(schema: ZodType): SchemaFieldInfo[] {
-  const def = (
-    schema as {
-      _def?: { typeName?: string };
-      shape?: Record<string, ZodType>;
-    }
-  )._def;
+export function extractSchemaFields(schema: GenericSchema): SchemaFieldInfo[] {
+  const node = schema as unknown as ValibotSchemaNode;
 
-  if (def?.typeName !== "ZodObject") {
+  if (node.type !== "object" && node.type !== "loose_object") {
     return [];
   }
 
-  const shape = (schema as { shape?: Record<string, ZodType> }).shape;
-  if (!shape) {
+  const entries = node.entries;
+  if (!entries) {
     return [];
   }
 
-  return Object.entries(shape).map(([name, fieldSchema]) => {
-    const { type, optional } = zodTypeToString(fieldSchema);
-    const fieldDef = (fieldSchema as { description?: string }).description;
+  return Object.entries(entries).map(([name, fieldSchema]) => {
+    const { type, optional } = valibotTypeToString(fieldSchema);
     return {
       name,
       type,
-      description: fieldDef,
+      description: findDescription(fieldSchema),
       optional,
     };
   });
+}
+
+/**
+ * Find a `description()` pipe action for a field schema.
+ *
+ * `getDescription` does not recurse, and the description may sit under one or
+ * more wrapper schemas — e.g. `optional(nullable(pipe(string(), description(...))))`
+ * places it two `.wrapped` levels down. Walk the wrapper chain until a
+ * description is found.
+ */
+function findDescription(schema: ValibotSchemaNode): string | undefined {
+  let node: ValibotSchemaNode | undefined = schema;
+  while (node) {
+    const description = getDescription(node as unknown as GenericSchema);
+    if (description !== undefined) {
+      return description;
+    }
+    node = node.wrapped;
+  }
+  return;
 }
 
 /**

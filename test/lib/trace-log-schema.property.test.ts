@@ -16,6 +16,7 @@ import {
   string,
   tuple,
 } from "fast-check";
+import { safeParse } from "valibot";
 import { describe, expect, test } from "vitest";
 import {
   DetailedSentryLogSchema,
@@ -64,7 +65,7 @@ describe("property: TraceLogSchema coercion", () => {
   test("always parses successfully with number or string numeric fields", () => {
     fcAssert(
       property(traceLogEntryArb, (entry) => {
-        const result = TraceLogSchema.safeParse(entry);
+        const result = safeParse(TraceLogSchema, entry);
         expect(result.success).toBe(true);
       }),
       { numRuns: DEFAULT_NUM_RUNS }
@@ -74,16 +75,16 @@ describe("property: TraceLogSchema coercion", () => {
   test("coerced output has number types for numeric fields (when present)", () => {
     fcAssert(
       property(traceLogEntryArb, (entry) => {
-        const result = TraceLogSchema.safeParse(entry);
+        const result = safeParse(TraceLogSchema, entry);
         if (!result.success) return;
 
-        expect(typeof result.data["project.id"]).toBe("number");
+        expect(typeof result.output["project.id"]).toBe("number");
 
-        if (result.data.severity_number !== undefined) {
-          expect(typeof result.data.severity_number).toBe("number");
+        if (result.output.severity_number !== undefined) {
+          expect(typeof result.output.severity_number).toBe("number");
         }
-        if (result.data.timestamp_precise !== undefined) {
-          expect(typeof result.data.timestamp_precise).toBe("number");
+        if (result.output.timestamp_precise !== undefined) {
+          expect(typeof result.output.timestamp_precise).toBe("number");
         }
       }),
       { numRuns: DEFAULT_NUM_RUNS }
@@ -99,10 +100,10 @@ describe("property: TraceLogSchema coercion", () => {
       timestamp: "2025-01-30T14:32:15+00:00",
       extra_field: "should be preserved",
     };
-    const result = TraceLogSchema.safeParse(entry);
+    const result = safeParse(TraceLogSchema, entry);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect((result.data as Record<string, unknown>).extra_field).toBe(
+      expect((result.output as Record<string, unknown>).extra_field).toBe(
         "should be preserved"
       );
     }
@@ -114,7 +115,7 @@ describe("property: TraceLogsResponseSchema", () => {
     fcAssert(
       property(traceLogEntryArb, (entry) => {
         const response = { data: [entry] };
-        const result = TraceLogsResponseSchema.safeParse(response);
+        const result = safeParse(TraceLogsResponseSchema, response);
         expect(result.success).toBe(true);
       }),
       { numRuns: DEFAULT_NUM_RUNS }
@@ -122,12 +123,12 @@ describe("property: TraceLogsResponseSchema", () => {
   });
 
   test("accepts response with empty data array", () => {
-    const result = TraceLogsResponseSchema.safeParse({ data: [] });
+    const result = safeParse(TraceLogsResponseSchema, { data: [] });
     expect(result.success).toBe(true);
   });
 
   test("accepts response with optional meta", () => {
-    const result = TraceLogsResponseSchema.safeParse({
+    const result = safeParse(TraceLogsResponseSchema, {
       data: [],
       meta: { fields: { id: "string" }, units: {} },
     });
@@ -144,10 +145,10 @@ describe("property: SentryLogSchema coercion", () => {
           timestamp: "2025-01-30T14:32:15+00:00",
           timestamp_precise: tsPrecise,
         };
-        const result = SentryLogSchema.safeParse(entry);
+        const result = safeParse(SentryLogSchema, entry);
         expect(result.success).toBe(true);
         if (result.success) {
-          expect(typeof result.data.timestamp_precise).toBe("number");
+          expect(typeof result.output.timestamp_precise).toBe("number");
         }
       }),
       { numRuns: DEFAULT_NUM_RUNS }
@@ -164,10 +165,10 @@ describe("property: DetailedSentryLogSchema coercion", () => {
           timestamp: "2025-01-30T14:32:15+00:00",
           timestamp_precise: tsPrecise,
         };
-        const result = DetailedSentryLogSchema.safeParse(entry);
+        const result = safeParse(DetailedSentryLogSchema, entry);
         expect(result.success).toBe(true);
         if (result.success) {
-          expect(typeof result.data.timestamp_precise).toBe("number");
+          expect(typeof result.output.timestamp_precise).toBe("number");
         }
       }),
       { numRuns: DEFAULT_NUM_RUNS }

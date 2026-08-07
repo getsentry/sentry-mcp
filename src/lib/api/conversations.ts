@@ -6,13 +6,13 @@
  *
  * The `/organizations/{org}/ai-conversations/` endpoints are PRIVATE and not
  * yet in `@sentry/api` (getsentry/sentry-api-schema). Call them via
- * `apiRequestToRegion` with local Zod schemas (same pattern as `logs.ts` /
+ * `apiRequestToRegion` with local Valibot schemas (same pattern as `logs.ts` /
  * `traces.ts`). Details response shape is documented on
  * `AIConversationDetailsSchema`. Pagination uses `parseLinkHeader`. Revisit
  * once these endpoints land in `@sentry/api`.
  */
 
-import { z } from "zod";
+import { array } from "valibot";
 
 import {
   type AIConversationDetails,
@@ -73,7 +73,7 @@ export async function listConversations(
   const { data, headers } = await apiRequestToRegion<ConversationListItem[]>(
     regionUrl,
     `/organizations/${orgSlug}/ai-conversations/`,
-    { params, schema: z.array(ConversationListItemSchema) }
+    { params, schema: array(ConversationListItemSchema) }
   );
 
   const { nextCursor } = parseLinkHeader(headers.get("link") ?? null);
