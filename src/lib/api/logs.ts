@@ -26,7 +26,10 @@ import { isAllDigits } from "../utils.js";
 import {
   API_MAX_PER_PAGE,
   apiRequestToRegion,
+  autoPaginate,
   getOrgSdkConfig,
+  parseLinkHeader,
+  unwrapPaginatedResult,
   unwrapResult,
 } from "./infrastructure.js";
 import { getTraceItemDetail } from "./traces.js";
@@ -188,32 +191,44 @@ export async function listLogs(
       ]
     : LOG_FIELDS;
 
-  const result = await listOrganizationEvents({
-    ...config,
-    path: { organization_id_or_slug: orgSlug },
-    query: {
-      dataset: "logs",
-      field: fields,
-      project: numericProjectId === undefined ? undefined : [numericProjectId],
-      query: fullQuery || undefined,
-      per_page: options.limit || API_MAX_PER_PAGE,
-      statsPeriod:
-        options.start || options.end
-          ? undefined
-          : (options.statsPeriod ?? "30d"),
-      start: options.start,
-      end: options.end,
-      sort: toApiSort(options.sort),
-    },
-  });
+  const limit = options.limit ?? API_MAX_PER_PAGE;
+  const perPage = Math.min(limit, API_MAX_PER_PAGE);
 
-  const data = unwrapResult(result, "Failed to list logs");
-  const logsResponse = safeParseResponse(
-    LogsResponseSchema,
-    data,
-    "Failed to list logs"
-  );
-  return logsResponse.data;
+  const { data } = await autoPaginate(async (cursor) => {
+    const result = await listOrganizationEvents({
+      ...config,
+      path: { organization_id_or_slug: orgSlug },
+      query: {
+        dataset: "logs",
+        field: fields,
+        project:
+          numericProjectId === undefined ? undefined : [numericProjectId],
+        query: fullQuery || undefined,
+        per_page: perPage,
+        cursor,
+        statsPeriod:
+          options.start || options.end
+            ? undefined
+            : (options.statsPeriod ?? "30d"),
+        start: options.start,
+        end: options.end,
+        sort: toApiSort(options.sort),
+      } as Parameters<typeof listOrganizationEvents>[0]["query"],
+    });
+
+    const { data: raw, nextCursor } = unwrapPaginatedResult<unknown>(
+      result,
+      "Failed to list logs"
+    );
+    const logsResponse = safeParseResponse(
+      LogsResponseSchema,
+      raw,
+      "Failed to list logs"
+    );
+    return { data: logsResponse.data, nextCursor };
+  }, limit);
+
+  return data;
 }
 
 /** All fields to request for detailed log view */
@@ -388,11 +403,13 @@ export async function listTraceLogs(
   options: ListTraceLogsOptions = {}
 ): Promise<TraceLog[]> {
   const regionUrl = await resolveOrgRegion(orgSlug);
+  const limit = options.limit ?? API_MAX_PER_PAGE;
+  const perPage = Math.min(limit, API_MAX_PER_PAGE);
 
-  const { data: response } = await apiRequestToRegion<{ data: TraceLog[] }>(
-    regionUrl,
-    `/organizations/${orgSlug}/trace-logs/`,
-    {
+  const { data } = await autoPaginate(async (cursor) => {
+    const { data: response, headers } = await apiRequestToRegion<{
+      data: TraceLog[];
+    }>(regionUrl, `/organizations/${orgSlug}/trace-logs/`, {
       params: {
         traceId,
         statsPeriod:
@@ -401,15 +418,19 @@ export async function listTraceLogs(
             : (options.statsPeriod ?? "14d"),
         start: options.start,
         end: options.end,
-        per_page: options.limit ?? API_MAX_PER_PAGE,
+        per_page: perPage,
+        cursor,
         query: options.query,
         sort: toApiSort(options.sort),
       },
       schema: TraceLogsResponseSchema,
-    }
-  );
+    });
 
-  return response.data;
+    const { nextCursor } = parseLinkHeader(headers.get("link") ?? null);
+    return { data: response.data, nextCursor };
+  }, limit);
+
+  return data;
 }
 
 /**

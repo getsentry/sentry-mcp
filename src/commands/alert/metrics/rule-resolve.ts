@@ -129,10 +129,12 @@ export async function resolveMetricAlertRule(
   for (const orgSlug of orgSlugs) {
     const rules = await listAllMetricRulesForOrg(orgSlug);
     for (const r of rules) {
-      allNames.push(r.name);
+      if (r.name) {
+        allNames.push(r.name);
+      }
     }
     const exact = rules.find(
-      (rule) => rule.name.toLowerCase() === ref.toLowerCase()
+      (rule) => rule.name && rule.name.toLowerCase() === ref.toLowerCase()
     );
     if (exact) {
       hits.push({ orgSlug, rule: exact });

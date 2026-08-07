@@ -12,6 +12,7 @@
 
 import type { SentryContext } from "../../context.js";
 import {
+  API_MAX_PER_PAGE,
   findProjectsBySlug,
   getProject,
   listOrganizations,
@@ -451,7 +452,7 @@ export async function handleOrgAll(
     () =>
       listProjectsPaginated(org, {
         cursor,
-        perPage: flags.limit,
+        perPage: Math.min(flags.limit, API_MAX_PER_PAGE),
       })
   );
 

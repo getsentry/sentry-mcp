@@ -48,6 +48,7 @@ import {
 import {
   listAllMetricRulesForOrg,
   parseMetricRuleArg,
+  resolveMetricAlertRule,
 } from "../../../src/commands/alert/metrics/rule-resolve.js";
 import { MAX_PAGINATION_PAGES } from "../../../src/lib/api/infrastructure.js";
 import type {
@@ -246,6 +247,47 @@ describe("listAllIssueRulesForTarget", () => {
     expect(fakeLog.warn.mock.calls[0]?.[0]).toContain(
       "Pagination limit reached for issue alert rules in test-org/test-project."
     );
+  });
+});
+
+describe("resolveMetricAlertRule name matching with null names", () => {
+  const HINT_METRIC = "sentry alert metrics view <target>";
+
+  test("resolves a named rule when a sibling rule has a null name", async () => {
+    const namedRule = { ...metricRule("1"), name: "Prod Errors" };
+    const nullNamed = {
+      ...metricRule("2"),
+      name: null,
+    } as unknown as MetricAlertRule;
+    mockListMetricAlertsPaginated.mockResolvedValueOnce({
+      data: [nullNamed, namedRule],
+      nextCursor: undefined,
+    });
+
+    const resolution = await resolveMetricAlertRule(
+      ["test-org"],
+      "Prod Errors",
+      HINT_METRIC
+    );
+
+    expect(resolution.rule.id).toBe("1");
+  });
+
+  test("does not throw a TypeError when every rule name is null", async () => {
+    const nullNamed = {
+      ...metricRule("1"),
+      name: null,
+    } as unknown as MetricAlertRule;
+    mockListMetricAlertsPaginated.mockResolvedValueOnce({
+      data: [nullNamed],
+      nextCursor: undefined,
+    });
+
+    // Null names are skipped, so the ref matches nothing and we get the
+    // domain-level "not found" error rather than a TypeError on toLowerCase().
+    await expect(
+      resolveMetricAlertRule(["test-org"], "missing", HINT_METRIC)
+    ).rejects.not.toThrow(TypeError);
   });
 });
 

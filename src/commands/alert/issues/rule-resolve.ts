@@ -133,10 +133,12 @@ export async function resolveIssueAlertRule(
   for (const target of targets) {
     const rules = await listAllIssueRulesForTarget(target);
     for (const r of rules) {
-      allRuleNames.push(r.name);
+      if (r.name) {
+        allRuleNames.push(r.name);
+      }
     }
     const exact = rules.find(
-      (rule) => rule.name.toLowerCase() === ref.toLowerCase()
+      (rule) => rule.name && rule.name.toLowerCase() === ref.toLowerCase()
     );
     if (exact) {
       hits.push({ target, rule: exact });

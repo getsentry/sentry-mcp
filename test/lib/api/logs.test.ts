@@ -168,6 +168,69 @@ describe("listLogs", () => {
     expect(url).toContain("project=12345");
     expect(url).not.toContain("project%3A12345");
   });
+
+  test("caps per_page at API_MAX_PER_PAGE when limit exceeds the API max", async () => {
+    const captured = captureRequest(EMPTY_LOGS);
+
+    await listLogs("test-org", "my-project", { limit: 200 });
+
+    expect(captured.url()).toContain("per_page=100");
+  });
+
+  test("sends the requested limit as per_page when below the API max", async () => {
+    const captured = captureRequest(EMPTY_LOGS);
+
+    await listLogs("test-org", "my-project", { limit: 50 });
+
+    expect(captured.url()).toContain("per_page=50");
+  });
+
+  test("defaults per_page to API_MAX_PER_PAGE when no limit is given", async () => {
+    const captured = captureRequest(EMPTY_LOGS);
+
+    await listLogs("test-org", "my-project");
+
+    expect(captured.url()).toContain("per_page=100");
+  });
+
+  test("auto-paginates to fill a limit above API_MAX_PER_PAGE", async () => {
+    const makeRows = (n: number, offset: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        "sentry.item_id": `log-${offset + i}`,
+        timestamp: "2025-01-30T14:32:15+00:00",
+        timestamp_precise: 1_770_060_419_044_800_300,
+        message: `msg ${offset + i}`,
+        severity: "info",
+        trace: "abc123def456abc123def456abc12345",
+      }));
+
+    const responses = [
+      {
+        body: { data: makeRows(100, 0), meta: { fields: {} } },
+        link: `<https://sentry.io/next/>; rel="next"; results="true"; cursor="0:100:0"`,
+      },
+      {
+        body: { data: makeRows(50, 100), meta: { fields: {} } },
+        link: `<https://sentry.io/next/>; rel="next"; results="false"; cursor=""`,
+      },
+    ];
+    const urls: string[] = [];
+    let call = 0;
+    globalThis.fetch = mockFetch(async (input: RequestInfo | URL) => {
+      urls.push(typeof input === "string" ? input : (input as Request).url);
+      const resp = responses[call]!;
+      call += 1;
+      return new Response(JSON.stringify(resp.body), {
+        status: 200,
+        headers: { "Content-Type": "application/json", Link: resp.link },
+      });
+    });
+
+    const logs = await listLogs("test-org", "my-project", { limit: 150 });
+
+    expect(logs).toHaveLength(150);
+    expect(urls).toHaveLength(2);
+  });
 });
 
 describe("getLogs", () => {
