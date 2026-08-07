@@ -1303,6 +1303,27 @@ type MultiSelectPromptOptionData = Extract<
   ActivePrompt,
   { kind: "multiselect" }
 >["options"][number];
+type CenteredSelectLayout = {
+  labelWidth: number;
+  width: number;
+};
+
+function getCenteredSelectLayout(
+  options: SelectPromptOptionData[]
+): CenteredSelectLayout {
+  const labelWidth = Math.max(
+    0,
+    ...options.map((option) => stringWidth(option.label))
+  );
+  const hintWidth = Math.max(
+    0,
+    ...options.map((option) => stringWidth(option.hint ?? ""))
+  );
+  return {
+    labelWidth,
+    width: 2 + labelWidth + (hintWidth > 0 ? hintWidth + 1 : 0),
+  };
+}
 
 /**
  * Rows unavailable to option lists: workflow chrome reserves the tab/shortcut
@@ -1486,6 +1507,13 @@ function SelectPrompt({
 }): React.ReactNode {
   const isCentered = alignment === "center";
   const promptWidth = isCentered ? "100%" : undefined;
+  const { columns } = useInkFrameSize();
+  const centeredLayout = isCentered
+    ? getCenteredSelectLayout(prompt.options)
+    : null;
+  const centeredOptionsWidth = centeredLayout
+    ? Math.min(centeredLayout.width, getPromptContentWidth(columns, alignment))
+    : undefined;
   const totalCount = prompt.options.length;
   const [highlighted, setHighlighted] = useState<number>(() =>
     Math.min(Math.max(prompt.initialIndex, 0), Math.max(0, totalCount - 1))
@@ -1566,19 +1594,25 @@ function SelectPrompt({
           ) : null}
         </Box>
       )}
-      <Box flexDirection="column" width={promptWidth}>
-        {visibleOptions.map((option, visibleIndex) => {
-          const idx = windowStart + visibleIndex;
-          const isCursor = idx === highlighted;
-          return (
-            <SelectPromptOptionRow
-              centered={isCentered}
-              isCursor={isCursor}
-              key={option.value}
-              option={option}
-            />
-          );
-        })}
+      <Box
+        justifyContent={isCentered ? "center" : "flex-start"}
+        width={promptWidth}
+      >
+        <Box flexDirection="column" width={centeredOptionsWidth}>
+          {visibleOptions.map((option, visibleIndex) => {
+            const idx = windowStart + visibleIndex;
+            const isCursor = idx === highlighted;
+            return (
+              <SelectPromptOptionRow
+                centered={isCentered}
+                centeredLabelWidth={centeredLayout?.labelWidth}
+                isCursor={isCursor}
+                key={option.value}
+                option={option}
+              />
+            );
+          })}
+        </Box>
       </Box>
     </Box>
   );
@@ -1586,26 +1620,26 @@ function SelectPrompt({
 
 function SelectPromptOptionRow({
   centered,
+  centeredLabelWidth,
   isCursor,
   option,
 }: {
   centered: boolean;
+  centeredLabelWidth?: number;
   isCursor: boolean;
   option: SelectPromptOptionData;
 }): React.ReactNode {
   if (centered) {
     return (
-      <Box
-        flexDirection="row"
-        height={1}
-        justifyContent="center"
-        overflow="hidden"
-        width="100%"
-      >
-        <Text color={ACCENT}>
-          {isCursor ? `${ICONS.triangleSmallRight} ` : "  "}
-        </Text>
-        <Text bold={isCursor}>{option.label}</Text>
+      <Box flexDirection="row" height={1} overflow="hidden" width="100%">
+        <Box flexShrink={0} width={2}>
+          <Text color={ACCENT}>
+            {isCursor ? ICONS.triangleSmallRight : " "}
+          </Text>
+        </Box>
+        <Box flexShrink={0} width={centeredLabelWidth}>
+          <Text bold={isCursor}>{option.label}</Text>
+        </Box>
         {option.hint !== undefined && option.hint !== "" ? (
           <Text color={MUTED}> {option.hint}</Text>
         ) : null}
