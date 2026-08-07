@@ -328,6 +328,48 @@ describe("handleOrgAll", () => {
     expect(result.items[0]!.orgSlug).toBe("my-org");
   });
 
+  test("caps perPage at API_MAX_PER_PAGE when limit exceeds it", async () => {
+    const listPaginated = vi.fn(() =>
+      Promise.resolve({ data: [] as FakeEntity[], nextCursor: undefined })
+    );
+    const config = makeConfig({ listPaginated });
+
+    await handleOrgAll({
+      config,
+      org: "my-org",
+      flags: { limit: 200, json: true },
+      contextKey: "key",
+      cursor: undefined,
+      direction: "next",
+    });
+
+    expect(listPaginated).toHaveBeenCalledWith(
+      "my-org",
+      expect.objectContaining({ perPage: 100 })
+    );
+  });
+
+  test("passes limit through as perPage when below API_MAX_PER_PAGE", async () => {
+    const listPaginated = vi.fn(() =>
+      Promise.resolve({ data: [] as FakeEntity[], nextCursor: undefined })
+    );
+    const config = makeConfig({ listPaginated });
+
+    await handleOrgAll({
+      config,
+      org: "my-org",
+      flags: { limit: 25, json: true },
+      contextKey: "key",
+      cursor: undefined,
+      direction: "next",
+    });
+
+    expect(listPaginated).toHaveBeenCalledWith(
+      "my-org",
+      expect.objectContaining({ perPage: 25 })
+    );
+  });
+
   test("returns ListResult with hasMore=false when no nextCursor", async () => {
     const config = makeConfig({
       listPaginated: vi.fn(() =>
