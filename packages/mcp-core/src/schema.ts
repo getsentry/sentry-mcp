@@ -177,8 +177,9 @@ export const ParamIssueIgnoreMode = z
 export const ParamAssignedTo = z
   .string()
   .trim()
+  .nullable()
   .describe(
-    "The assignee in format 'user:ID' or 'team:ID_OR_SLUG' where ID is numeric. Example: 'user:123456', 'team:789', or 'team:my-team-slug'. Use `execute_sentry_tool(name='whoami', arguments={})` to find your user ID.",
+    "The assignee in format 'user:ID' or 'team:ID_OR_SLUG' where ID is numeric. Example: 'user:123456', 'team:789', or 'team:my-team-slug'. Use null to clear the assignee. Use `execute_sentry_tool(name='whoami', arguments={})` to find your user ID.",
   );
 
 export const ParamIgnoreDurationMinutes = z

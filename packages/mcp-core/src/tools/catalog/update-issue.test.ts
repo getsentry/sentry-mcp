@@ -96,6 +96,76 @@ describe("update_issue", () => {
     `);
   });
 
+  it("clears issue assignment", async () => {
+    const currentIssue = createIssue();
+    const updatedIssue = createIssue({ assignedTo: null });
+    let requestBody: unknown;
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        async ({ request }) => {
+          requestBody = await request.json();
+          return HttpResponse.json(updatedIssue);
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: undefined,
+        assignedTo: null,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(requestBody).toEqual({ assignedTo: "" });
+    expect(result).toContain("**Assigned To**: Jane Developer → **Unassigned**");
+    expect(result).toContain("**Assigned To**: Unassigned");
+  });
+
+  it("skips clearing assignment when the issue is already unassigned", async () => {
+    let putCalled = false;
+    const currentIssue = createIssue({ assignedTo: null });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => {
+          putCalled = true;
+          return HttpResponse.json(currentIssue);
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: undefined,
+        assignedTo: null,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(putCalled).toBe(false);
+    expect(result).toContain("No changes were needed.");
+  });
+
   it("skips status updates when the requested status is already set", async () => {
     let putCalled = false;
     const currentIssue = createIssue({

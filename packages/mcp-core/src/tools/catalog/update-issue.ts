@@ -339,9 +339,12 @@ function buildNoChangesOutput(params: {
 
 function isAssigneeAlreadySet(
   issue: Issue,
-  requestedAssignee: string | undefined,
+  requestedAssignee: string | null | undefined,
   currentUserId: string | null | undefined,
 ): boolean {
+  if (requestedAssignee === null) {
+    return !issue.assignedTo;
+  }
   if (!requestedAssignee || !issue.assignedTo) {
     return false;
   }
@@ -628,6 +631,7 @@ export default defineTool({
     "```",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='resolved')",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', assignedTo='user:123456')",
+    "update_issue(organizationSlug='my-org', issueId='PROJECT-123', assignedTo=null)",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored')",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='forever')",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='untilOccurrenceCount', ignoreCount=100, ignoreWindowMinutes=60)",
@@ -638,7 +642,7 @@ export default defineTool({
     "<hints>",
     "- Provide `issueUrl` or `organizationSlug` + `issueId`.",
     "- At least one of `status` or `assignedTo` is required.",
-    "- `assignedTo` format: `user:ID` or `team:ID_OR_SLUG`.",
+    "- `assignedTo` format: `user:ID` or `team:ID_OR_SLUG`. Use `null` to clear the assignee.",
     "- Use `execute_sentry_tool(name='whoami', arguments={})` to find your user ID for self-assignment.",
     "- Status values: `resolved`, `resolvedInNextRelease`, `unresolved`, `ignored`.",
     "- `status='ignored'` defaults to `ignoreMode='untilEscalating'`.",
@@ -688,7 +692,7 @@ export default defineTool({
     }
 
     // Validate that at least one update parameter is provided
-    if (!params.status && !params.assignedTo) {
+    if (params.status === undefined && params.assignedTo === undefined) {
       throw new UserInputError(
         "At least one of `status` or `assignedTo` must be provided to update the issue",
       );
@@ -762,7 +766,11 @@ export default defineTool({
       currentIssue.shortId,
     );
 
-    if (!updateStatus && !updateAssignedTo && !updateIgnore) {
+    if (
+      !updateStatus &&
+      updateAssignedTo === undefined &&
+      !updateIgnore
+    ) {
       const commentResult = await tryPostReasonComment(
         apiService,
         orgSlug,
@@ -834,7 +842,7 @@ export default defineTool({
       }
     }
 
-    if (updateAssignedTo && assignmentChanged) {
+    if (updateAssignedTo !== undefined && assignmentChanged) {
       const oldAssignee = formatAssignedTo(currentIssue.assignedTo ?? null);
       const newAssignee =
         params.assignedTo === "me"
