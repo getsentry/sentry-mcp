@@ -40,6 +40,28 @@ describe("matchExampleToCommand", () => {
     ).toBe("sentry project create");
   });
 
+  test("maps bare group examples to the default subcommand", () => {
+    expect(
+      matchExampleToCommand(
+        "sentry auth\nsentry auth --token YOUR_SENTRY_API_TOKEN",
+        ["sentry auth login", "sentry auth logout", "sentry auth status"],
+        "sentry auth",
+        "sentry auth login"
+      )
+    ).toBe("sentry auth login");
+  });
+
+  test("prefers longer command paths over shorter prefixes", () => {
+    expect(
+      matchExampleToCommand(
+        "sentry auth login --token TOKEN",
+        ["sentry auth login", "sentry auth status"],
+        "sentry auth",
+        "sentry auth login"
+      )
+    ).toBe("sentry auth login");
+  });
+
   test("the generated project reference retains create examples", async () => {
     const reference = await readFile(
       "plugins/sentry-cli/skills/sentry-cli/references/project.md",

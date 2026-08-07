@@ -549,7 +549,7 @@ describe("sentry cli setup", () => {
       // Should show welcome message, not "Setup complete!"
       expect(combined).toContain("Installed sentry v");
       expect(combined).toContain("Get started:");
-      expect(combined).toContain("sentry auth login");
+      expect(combined).toContain("sentry auth");
       expect(combined).toContain("sentry --help");
       expect(combined).toContain("cli.sentry.dev");
       expect(combined).not.toContain("Setup complete!");
@@ -642,7 +642,7 @@ describe("sentry cli setup", () => {
       expect(combined).toContain("Binary: Installed to");
       // But welcome/getting-started is suppressed for upgrades
       expect(combined).not.toContain("Get started:");
-      expect(combined).not.toContain("sentry auth login");
+      expect(combined).not.toContain("Authenticate with Sentry");
     });
 
     test("--install with --quiet suppresses all output", async () => {

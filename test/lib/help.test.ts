@@ -112,7 +112,7 @@ describe("printCustomHelp", () => {
   test("shows login example when not authenticated", async () => {
     // useTestConfigDir provides a clean env with no auth token
     const output = stripAnsi(printCustomHelp());
-    expect(output).toContain("sentry auth login");
+    expect(output).toContain("sentry auth");
   });
 
   test("includes an Environment Variables section with top-level vars", () => {

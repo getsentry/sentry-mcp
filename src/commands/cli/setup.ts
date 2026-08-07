@@ -315,8 +315,8 @@ function printWelcomeMessage(
   emit(`Installed sentry v${version} to ${binaryPath}`);
   emit("");
   emit("Get started:");
-  emit("  sentry auth login  Authenticate with Sentry");
-  emit("  sentry --help      See all available commands");
+  emit("  sentry auth     Authenticate with Sentry");
+  emit("  sentry --help   See all available commands");
   emit("");
   emit("https://cli.sentry.dev");
 }

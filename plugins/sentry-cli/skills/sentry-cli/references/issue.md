@@ -236,6 +236,10 @@ Mark an issue as resolved
 **Flags:**
 - `-i, --in <value> - Resolve in a release, next release, or commit ('<version>' | '@next' | '@commit' | '@commit:<repo>@<sha>')`
 
+### `sentry issue unresolve <issue>`
+
+Reopen a resolved issue
+
 **Examples:**
 
 ```bash
@@ -264,10 +268,6 @@ sentry issue resolve CLI-G5 --in @commit:getsentry/cli@abc123def
 sentry issue unresolve CLI-G5
 sentry issue reopen CLI-G5   # alias
 ```
-
-### `sentry issue unresolve <issue>`
-
-Reopen a resolved issue
 
 ### `sentry issue archive <issue>`
 

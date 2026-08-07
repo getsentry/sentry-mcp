@@ -60,6 +60,34 @@ import {
   isRouteMap,
 } from "../src/lib/introspect.js";
 
+/**
+ * Resolve the default subcommand name for a route map, if configured.
+ *
+ * Hidden dispatcher routes (e.g. auth's `default`) map bare group examples
+ * onto the user-facing command they primarily document (login).
+ */
+function findDefaultCommandName(routeMap: RouteMap): string | undefined {
+  if (!routeMap.getDefaultCommand) {
+    return;
+  }
+  const defaultCmd = routeMap.getDefaultCommand();
+  if (!defaultCmd) {
+    return;
+  }
+  for (const sub of routeMap.getAllEntries()) {
+    if (sub.target === defaultCmd) {
+      const name = sub.name.original;
+      // Auth uses a hidden "default" dispatcher; bare `sentry auth` examples
+      // document the login path.
+      if (name === "default") {
+        return "login";
+      }
+      return name;
+    }
+  }
+  return;
+}
+
 const SKILL_DIR = "plugins/sentry-cli/skills/sentry-cli";
 const OUTPUT_PATH = `${SKILL_DIR}/SKILL.md`;
 const REFERENCES_DIR = `${SKILL_DIR}/references`;
@@ -290,10 +318,10 @@ npm install -g sentry
 
 \`\`\`bash
 # OAuth login (recommended)
-sentry auth login
+sentry auth
 
 # Or use an API token
-sentry auth login --token YOUR_SENTRY_API_TOKEN
+sentry auth --token YOUR_SENTRY_API_TOKEN
 
 # Check auth status
 sentry auth status
@@ -341,10 +369,14 @@ function collectCommandPaths(
  */
 function associateCodeBlocks(
   tokens: Token[],
-  commandPaths: string[],
-  commandGroup: string,
-  examples: Map<string, string[]>
+  context: {
+    commandPaths: string[];
+    commandGroup: string;
+    examples: Map<string, string[]>;
+    defaultCommandPath?: string;
+  }
 ): void {
+  const { commandPaths, commandGroup, examples, defaultCommandPath } = context;
   const groupFallback = `sentry ${commandGroup}`;
   let currentCmd: string | null = null;
 
@@ -359,7 +391,12 @@ function associateCodeBlocks(
     if (currentCmd && examples.has(currentCmd)) {
       appendExample(examples, currentCmd, code);
     } else {
-      const target = matchExampleToCommand(code, commandPaths, groupFallback);
+      const target = matchExampleToCommand(
+        code,
+        commandPaths,
+        groupFallback,
+        defaultCommandPath
+      );
       if (target) {
         appendExample(examples, target, code);
       }
@@ -377,7 +414,8 @@ function associateCodeBlocks(
  * by matching code blocks to commands via heading context or content analysis.
  */
 async function loadCommandExamples(
-  commandGroup: string
+  commandGroup: string,
+  defaultCommandName?: string
 ): Promise<Map<string, string[]>> {
   const docContent = await loadDoc(`commands/${commandGroup}.md`);
   if (!docContent) {
@@ -387,7 +425,15 @@ async function loadCommandExamples(
   const tokens = marked.lexer(docContent);
   const examples = new Map<string, string[]>();
   const commandPaths = collectCommandPaths(tokens, examples);
-  associateCodeBlocks(tokens, commandPaths, commandGroup, examples);
+  const defaultCommandPath = defaultCommandName
+    ? `sentry ${commandGroup} ${defaultCommandName}`
+    : undefined;
+  associateCodeBlocks(tokens, {
+    commandPaths,
+    commandGroup,
+    examples,
+    defaultCommandPath,
+  });
   return examples;
 }
 
@@ -435,7 +481,13 @@ async function extractRoutes(routeMap: RouteMap): Promise<RouteInfo[]> {
     }
     const routeName = entry.name.original;
     const target = entry.target;
-    const docExamples = await loadCommandExamples(routeName);
+    const defaultCommandName = isRouteMap(target)
+      ? findDefaultCommandName(target)
+      : undefined;
+    const docExamples = await loadCommandExamples(
+      routeName,
+      defaultCommandName
+    );
     if (isRouteMap(target)) {
       result.push({
         name: routeName,

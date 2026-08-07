@@ -847,5 +847,10 @@ export function buildCommand<
       outputConfig.schema;
   }
 
+  // Expose the unwrapped generator for internal dispatchers (e.g. bare
+  // `sentry auth`) that must run a subcommand without re-entering the
+  // telemetry / auth-guard / rc-trust / output pipeline.
+  (cmd as unknown as Record<string, unknown>).__rawFunc = originalFunc;
+
   return cmd;
 }

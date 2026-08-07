@@ -26,19 +26,19 @@ Authenticate with Sentry
 **Examples:**
 
 ```bash
-sentry auth login
+sentry auth
 
-sentry auth login --token YOUR_SENTRY_API_TOKEN
+sentry auth --token YOUR_SENTRY_API_TOKEN
 
-sentry auth login --read-only
+sentry auth --read-only
 
-sentry auth login --scope project:read --scope org:read
-sentry auth login --scope project:read,event:read
+sentry auth --scope project:read --scope org:read
+sentry auth --scope project:read,event:read
 
-sentry auth login --url https://sentry.example.com
-SENTRY_URL=https://sentry.example.com sentry auth login
+sentry auth --url https://sentry.example.com
+SENTRY_URL=https://sentry.example.com sentry auth
 
-sentry auth login --token YOUR_TOKEN --url https://sentry.example.com
+sentry auth --token YOUR_TOKEN --url https://sentry.example.com
 ```
 
 ### `sentry auth logout`

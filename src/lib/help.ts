@@ -135,7 +135,7 @@ function generateCommands(): HelpCommand[] {
     });
 }
 
-const EXAMPLE_LOGGED_OUT = "sentry auth login";
+const EXAMPLE_LOGGED_OUT = "sentry auth";
 const EXAMPLE_LOGGED_IN = "sentry issue list";
 const DOCS_URL = "https://cli.sentry.dev/getting-started/";
 
