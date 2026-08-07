@@ -15,7 +15,17 @@
 import { createWriteStream } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { z } from "zod";
+import {
+  array,
+  boolean,
+  type InferOutput,
+  nullable,
+  nullish,
+  number,
+  object,
+  string,
+  tuple,
+} from "valibot";
 import { customFetch } from "../custom-ca.js";
 import { getAuthToken } from "../db/auth.js";
 import { ApiError, TimeoutError, ValidationError } from "../errors.js";
@@ -44,15 +54,15 @@ export type BuildFormat = "ipa" | "apk";
 /**
  * Response from `organizations/{org}/preprodartifacts/{id}/install-details/`.
  */
-export const BuildInstallDetailsSchema = z.object({
+export const BuildInstallDetailsSchema = object({
   /** Whether the build has a downloadable/installable artifact. */
-  isInstallable: z.boolean(),
+  isInstallable: boolean(),
   /** Absolute URL to download the artifact, or `null` when unavailable. */
-  installUrl: z.string().nullable(),
+  installUrl: nullable(string()),
 });
 
 /** Install/download details for a preprod build artifact. */
-export type BuildInstallDetails = z.infer<typeof BuildInstallDetailsSchema>;
+export type BuildInstallDetails = InferOutput<typeof BuildInstallDetailsSchema>;
 
 /**
  * Fetch install/download details for a preprod build artifact.
@@ -197,8 +207,9 @@ export type BuildUploadOptions = {
  * Build assemble response — the shared assemble shape plus `artifactUrl`, which
  * is populated once the build has been fully assembled.
  */
-const BuildAssembleResponseSchema = AssembleResponseSchema.extend({
-  artifactUrl: z.string().nullable().optional(),
+const BuildAssembleResponseSchema = object({
+  ...AssembleResponseSchema.entries,
+  artifactUrl: nullish(string()),
 });
 
 /** Construct the single-object assemble request body for a build. */
@@ -328,11 +339,11 @@ export const SNAPSHOT_ARCHIVE_TIMEOUT_MS = 300_000;
  * `camelCase` rename on the Rust `LatestBaseSnapshotResponse`); callers get the
  * camelCase {@link LatestBaseSnapshot} after mapping.
  */
-export const LatestBaseSnapshotSchema = z.object({
+export const LatestBaseSnapshotSchema = object({
   /** Artifact ID of the baseline snapshot. */
-  head_artifact_id: z.string(),
+  head_artifact_id: string(),
   /** Number of images in the snapshot. */
-  image_count: z.number(),
+  image_count: number(),
 });
 
 /** Latest baseline snapshot for an app (camelCase, for callers). */
@@ -370,7 +381,7 @@ export async function getLatestBaseSnapshot(
       `organizations/${org}/preprodartifacts/snapshots/latest-base/`,
       {
         params: { app_id: appId, branch: opts.branch, project: opts.project },
-        schema: LatestBaseSnapshotSchema.nullable(),
+        schema: nullable(LatestBaseSnapshotSchema),
       }
     );
     return data
@@ -385,20 +396,20 @@ export async function getLatestBaseSnapshot(
 }
 
 /** Objectstore config within the snapshots upload-options response. */
-const ObjectstoreUploadOptionsSchema = z.object({
-  url: z.string(),
-  scopes: z.array(z.tuple([z.string(), z.string()])),
-  authToken: z.string().nullish(),
-  expirationPolicy: z.string(),
+const ObjectstoreUploadOptionsSchema = object({
+  url: string(),
+  scopes: array(tuple([string(), string()])),
+  authToken: nullish(string()),
+  expirationPolicy: string(),
 });
 
 /** Response from `.../snapshots/upload-options/`. */
-const SnapshotsUploadOptionsSchema = z.object({
+const SnapshotsUploadOptionsSchema = object({
   objectstore: ObjectstoreUploadOptionsSchema,
 });
 
 /** Snapshot upload options (objectstore config), for the caller. */
-export type SnapshotsUploadOptions = z.infer<
+export type SnapshotsUploadOptions = InferOutput<
   typeof SnapshotsUploadOptionsSchema
 >;
 
@@ -422,14 +433,14 @@ export async function fetchSnapshotsUploadOptions(
 }
 
 /** Response from the create-snapshot endpoint. */
-const CreateSnapshotResponseSchema = z.object({
-  artifactId: z.string(),
-  imageCount: z.number(),
-  snapshotUrl: z.string().nullish(),
+const CreateSnapshotResponseSchema = object({
+  artifactId: string(),
+  imageCount: number(),
+  snapshotUrl: nullish(string()),
 });
 
 /** Result of creating a preprod snapshot. */
-export type CreateSnapshotResponse = z.infer<
+export type CreateSnapshotResponse = InferOutput<
   typeof CreateSnapshotResponseSchema
 >;
 
@@ -460,7 +471,7 @@ export async function createPreprodSnapshot(
   return data;
 }
 
-const SnapshotArchiveStatusSchema = z.object({ ready: z.boolean() });
+const SnapshotArchiveStatusSchema = object({ ready: boolean() });
 
 /**
  * Check whether a snapshot's downloadable archive has been built.

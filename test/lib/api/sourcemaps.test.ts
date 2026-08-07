@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync, zstdDecompressSync } from "node:zlib";
+import { safeParse } from "valibot";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   buildArtifactBundle,
@@ -215,7 +216,7 @@ describe("buildArtifactBundle", () => {
 
 describe("ChunkServerOptionsSchema", () => {
   test("accepts compression: [] (server opt-out)", () => {
-    const result = ChunkServerOptionsSchema.safeParse({
+    const result = safeParse(ChunkServerOptionsSchema, {
       url: "https://example.com/api/0/organizations/o/chunk-upload/",
       chunkSize: 8_388_608,
       chunksPerRequest: 64,
@@ -228,7 +229,7 @@ describe("ChunkServerOptionsSchema", () => {
   });
 
   test("accepts compression with zstd + gzip advertised", () => {
-    const result = ChunkServerOptionsSchema.safeParse({
+    const result = safeParse(ChunkServerOptionsSchema, {
       url: "https://example.com/api/0/organizations/o/chunk-upload/",
       chunkSize: 8_388_608,
       chunksPerRequest: 64,
@@ -239,7 +240,7 @@ describe("ChunkServerOptionsSchema", () => {
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(pickUploadEncoding(result.data.compression)).toBe("zstd");
+      expect(pickUploadEncoding(result.output.compression)).toBe("zstd");
     }
   });
 });

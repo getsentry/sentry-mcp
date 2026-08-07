@@ -8,7 +8,7 @@
 import { listOrganizationEvents } from "@sentry/api";
 // biome-ignore lint/performance/noNamespaceImport: Sentry SDK recommends namespace import
 import * as Sentry from "@sentry/node-core/light";
-import type { z } from "zod";
+import { type GenericSchema, safeParse } from "valibot";
 
 import {
   DetailedLogsResponseSchema,
@@ -87,28 +87,35 @@ function assertObjectResponse(data: unknown, context: string): void {
 }
 
 /**
- * Safe-parse an API response with a Zod schema, throwing {@link ApiError}
- * on validation failure instead of leaking a raw `ZodError`.
+ * Safe-parse an API response with a valibot schema, throwing {@link ApiError}
+ * on validation failure instead of leaking raw validation issues.
  */
 function safeParseResponse<T>(
-  schema: z.ZodType<T>,
+  schema: GenericSchema<unknown, T>,
   data: unknown,
   context: string
 ): T {
   assertObjectResponse(data, context);
-  const result = schema.safeParse(data);
+  const result = safeParse(schema, data);
   if (!result.success) {
-    Sentry.setContext("zod_validation", {
+    // Strip valibot issues to metadata only (path/type/message) before
+    // attaching to Sentry — full issues embed the raw failing `input` value.
+    Sentry.setContext("schema_validation", {
       context,
-      issues: result.error.issues.slice(0, 10),
+      issues: result.issues.slice(0, 10).map((i) => ({
+        // Strip raw input from path items — only keep structural path keys.
+        path: i.path?.map((p) => ({ key: p.key, type: p.type })),
+        type: i.type,
+        message: i.message,
+      })),
     });
     throw new ApiError(
       `${context}: unexpected response format`,
       0,
-      result.error.message
+      result.issues.map((issue) => issue.message).join(", ")
     );
   }
-  return result.data;
+  return result.output;
 }
 
 type ListLogsOptions = {

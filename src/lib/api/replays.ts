@@ -9,8 +9,7 @@ import {
   listProjectReplayRecordingSegments,
 } from "@sentry/api";
 import { vListProjectReplayRecordingSegmentsResponse } from "@sentry/api/valibot";
-import { safeParse } from "valibot";
-import type { z } from "zod";
+import { type GenericSchema, safeParse } from "valibot";
 import {
   REPLAY_LIST_FIELDS,
   type ReplayDetails,
@@ -207,7 +206,10 @@ async function fetchReplayPage(
         start: options.start,
         end: options.end,
       },
-      schema: ReplayListResponseSchema as z.ZodType<ReplayListResponse>,
+      schema: ReplayListResponseSchema as GenericSchema<
+        unknown,
+        ReplayListResponse
+      >,
     }
   );
 
@@ -251,7 +253,10 @@ export async function getReplay(
     regionUrl,
     `/organizations/${orgSlug}/replays/${replayId}/`,
     {
-      schema: ReplayDetailsResponseSchema as z.ZodType<ReplayDetailsResponse>,
+      schema: ReplayDetailsResponseSchema as GenericSchema<
+        unknown,
+        ReplayDetailsResponse
+      >,
     }
   );
   return normalizeReplayProjectId(data.data);

@@ -6,6 +6,7 @@
  * pattern as api-client.seer.test.ts.
  */
 
+import { number, object, string } from "valibot";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { resolveEventInOrg } from "../../src/lib/api/events.js";
 import { unwrapResult } from "../../src/lib/api/infrastructure.js";
@@ -1459,10 +1460,9 @@ describe("infrastructure.ts", () => {
       }
     });
 
-    test("throws ApiError on Zod validation failure", async () => {
-      const { z } = await import("zod");
-      const schema = z.object({
-        required_field: z.string(),
+    test("throws ApiError on schema validation failure", async () => {
+      const schema = object({
+        required_field: string(),
       });
 
       globalThis.fetch = mockFetch(
@@ -1485,10 +1485,9 @@ describe("infrastructure.ts", () => {
     });
 
     test("returns validated data when schema passes", async () => {
-      const { z } = await import("zod");
-      const schema = z.object({
-        name: z.string(),
-        count: z.number(),
+      const schema = object({
+        name: string(),
+        count: number(),
       });
 
       globalThis.fetch = mockFetch(

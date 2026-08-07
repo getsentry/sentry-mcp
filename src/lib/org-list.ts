@@ -307,11 +307,11 @@ export type OrgListConfig<TEntity, TWithOrg> = ListCommandMeta & {
   listForProject?: (orgSlug: string, projectSlug: string) => Promise<TEntity[]>;
 
   /**
-   * Zod schema describing the JSON output shape of each list item.
+   * Valibot schema describing the JSON output shape of each list item.
    * Forwarded to `OutputConfig.schema` by `buildOrgListCommand` so
    * `--help`, `sentry help`, and SKILL.md can document available fields.
    */
-  schema?: import("zod").ZodType;
+  schema?: import("valibot").GenericSchema;
 };
 
 /** Extract a specific variant from the {@link ParsedOrgProject} union by its `type` discriminant. */

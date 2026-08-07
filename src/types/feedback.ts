@@ -3,8 +3,21 @@
  */
 
 import type { EventAttachmentDetailsResponse } from "@sentry/api";
-import { zEventAttachmentDetailsResponse } from "@sentry/api/zod";
-import { z } from "zod";
+import { vEventAttachmentDetailsResponse } from "@sentry/api/valibot";
+import {
+  array,
+  boolean,
+  description,
+  literal,
+  looseObject,
+  nullable,
+  number,
+  object,
+  optional,
+  pipe,
+  string,
+  unknown,
+} from "valibot";
 import type { SentryEvent, SentryIssue } from "./sentry.js";
 import { SentryIssueSchema } from "./sentry.js";
 
@@ -87,63 +100,81 @@ export type FeedbackViewResult = {
 };
 
 /** Documentation schema for Feedback metadata. */
-export const FeedbackMetadataSchema = z
-  .object({
-    message: z.string().describe("Feedback message"),
-    contact_email: z
-      .string()
-      .nullable()
-      .optional()
-      .describe("End-user email address"),
-    name: z.string().nullable().optional().describe("End-user display name"),
-    title: z.string().optional().describe("Feedback title"),
-    value: z.string().optional().describe("Feedback display value"),
-    initial_priority: z
-      .number()
-      .optional()
-      .describe("Initial priority assigned when the feedback was created"),
-    source: z
-      .string()
-      .nullable()
-      .optional()
-      .describe("Feedback capture source"),
-    summary: z.string().nullable().optional().describe("AI-generated summary"),
-    sdk: z
-      .object({
-        name: z.string().describe("SDK name"),
-        name_normalized: z.string().optional().describe("Normalized SDK name"),
-      })
-      .optional()
-      .describe("SDK that captured the feedback"),
-    associated_event_id: z
-      .string()
-      .optional()
-      .describe("Associated error event ID"),
-  })
-  .passthrough()
-  .describe("Feedback metadata");
+export const FeedbackMetadataSchema = pipe(
+  looseObject({
+    message: pipe(string(), description("Feedback message")),
+    contact_email: optional(
+      nullable(pipe(string(), description("End-user email address")))
+    ),
+    name: optional(
+      nullable(pipe(string(), description("End-user display name")))
+    ),
+    title: optional(pipe(string(), description("Feedback title"))),
+    value: optional(pipe(string(), description("Feedback display value"))),
+    initial_priority: optional(
+      pipe(
+        number(),
+        description("Initial priority assigned when the feedback was created")
+      )
+    ),
+    source: optional(
+      nullable(pipe(string(), description("Feedback capture source")))
+    ),
+    summary: optional(
+      nullable(pipe(string(), description("AI-generated summary")))
+    ),
+    sdk: optional(
+      pipe(
+        object({
+          name: pipe(string(), description("SDK name")),
+          name_normalized: optional(
+            pipe(string(), description("Normalized SDK name"))
+          ),
+        }),
+        description("SDK that captured the feedback")
+      )
+    ),
+    associated_event_id: optional(
+      pipe(string(), description("Associated error event ID"))
+    ),
+  }),
+  description("Feedback metadata")
+);
 
 /** Documentation schema for a modern Feedback issue. */
-export const SentryFeedbackSchema = SentryIssueSchema.extend({
-  issueCategory: z.literal("feedback").describe("Issue category discriminator"),
-  issueType: z.literal("feedback").describe("Issue type discriminator"),
-  metadata: FeedbackMetadataSchema,
-  hasSeen: z
-    .boolean()
-    .optional()
-    .describe("Whether the feedback has been read"),
-  latestEventHasAttachments: z
-    .boolean()
-    .optional()
-    .describe("Whether the latest event has attachments"),
-}).describe("Sentry User Feedback");
+export const SentryFeedbackSchema = pipe(
+  looseObject({
+    ...SentryIssueSchema.entries,
+    issueCategory: pipe(
+      literal("feedback"),
+      description("Issue category discriminator")
+    ),
+    issueType: pipe(
+      literal("feedback"),
+      description("Issue type discriminator")
+    ),
+    metadata: FeedbackMetadataSchema,
+    hasSeen: optional(
+      pipe(boolean(), description("Whether the feedback has been read"))
+    ),
+    latestEventHasAttachments: optional(
+      pipe(boolean(), description("Whether the latest event has attachments"))
+    ),
+  }),
+  description("Sentry User Feedback")
+);
 
 /** Documentation schema for flattened `feedback view` JSON output. */
-export const FeedbackViewOutputSchema = SentryFeedbackSchema.extend({
-  org: z.string().nullable().describe("Organization slug"),
-  event: z.unknown().nullable().describe("Latest feedback event"),
-  replayIds: z.array(z.string()).describe("Related Session Replay IDs"),
-  attachments: z
-    .array(zEventAttachmentDetailsResponse)
-    .describe("Attachments on the latest feedback event"),
-}).describe("Feedback view output");
+export const FeedbackViewOutputSchema = pipe(
+  looseObject({
+    ...SentryFeedbackSchema.entries,
+    org: pipe(nullable(string()), description("Organization slug")),
+    event: pipe(nullable(unknown()), description("Latest feedback event")),
+    replayIds: pipe(array(string()), description("Related Session Replay IDs")),
+    attachments: pipe(
+      array(vEventAttachmentDetailsResponse),
+      description("Attachments on the latest feedback event")
+    ),
+  }),
+  description("Feedback view output")
+);

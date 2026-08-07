@@ -9,7 +9,16 @@
  * Auth: requires `org:ci` scope.
  */
 
-import { z } from "zod";
+import {
+  array,
+  type InferOutput,
+  minLength,
+  nullish,
+  number,
+  object,
+  pipe,
+  string,
+} from "valibot";
 
 import { logger } from "../logger.js";
 import { resolveOrgRegion } from "../region.js";
@@ -20,34 +29,34 @@ const log = logger.withTag("api.code-mappings");
 // Schemas
 
 /** A single code mapping entry. */
-export const CodeMappingSchema = z.object({
-  stackRoot: z.string().min(1),
-  sourceRoot: z.string().min(1),
+export const CodeMappingSchema = object({
+  stackRoot: pipe(string(), minLength(1)),
+  sourceRoot: pipe(string(), minLength(1)),
 });
 
-export type CodeMapping = z.infer<typeof CodeMappingSchema>;
+export type CodeMapping = InferOutput<typeof CodeMappingSchema>;
 
 /** Per-mapping result from the server. */
-const CodeMappingResultSchema = z.object({
-  stackRoot: z.string(),
-  sourceRoot: z.string(),
-  status: z.string(),
-  detail: z.string().nullable().optional(),
+const CodeMappingResultSchema = object({
+  stackRoot: string(),
+  sourceRoot: string(),
+  status: string(),
+  detail: nullish(string()),
 });
 
 /** Bulk upload response from the server. */
-const BulkCodeMappingsResponseSchema = z.object({
-  created: z.number(),
-  updated: z.number(),
-  errors: z.number(),
-  mappings: z.array(CodeMappingResultSchema),
+const BulkCodeMappingsResponseSchema = object({
+  created: number(),
+  updated: number(),
+  errors: number(),
+  mappings: array(CodeMappingResultSchema),
 });
 
-export type BulkCodeMappingsResponse = z.infer<
+export type BulkCodeMappingsResponse = InferOutput<
   typeof BulkCodeMappingsResponseSchema
 >;
 
-export type CodeMappingResult = z.infer<typeof CodeMappingResultSchema>;
+export type CodeMappingResult = InferOutput<typeof CodeMappingResultSchema>;
 
 // Constants
 

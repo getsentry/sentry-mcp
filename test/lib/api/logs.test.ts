@@ -4,7 +4,7 @@
  * CLI-20C: self-hosted instances can return non-object data (plain text, HTML)
  * from the /events/?dataset=logs endpoint when the logs dataset is unsupported
  * or a reverse proxy intercepts the request. Previously this crashed with an
- * unhandled ZodError; now it throws a descriptive ApiError.
+ * unhandled schema validation error; now it throws a descriptive ApiError.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest";

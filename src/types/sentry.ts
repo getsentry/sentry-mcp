@@ -8,7 +8,7 @@
  * This keeps all SDK-documented fields available with correct types while making
  * non-core fields optional for flexibility (test mocks, partial API responses).
  *
- * Internal types not covered by the SDK (Region, User, logs) use Zod schemas
+ * Internal types not covered by the SDK (Region, User, logs) use Valibot schemas
  * for runtime validation. Event entry types (exceptions, breadcrumbs, etc.)
  * are plain TypeScript interfaces since they are only used for type annotations.
  */
@@ -24,11 +24,33 @@ import type {
   BaseTeam as SdkTeam,
 } from "@sentry/api";
 import {
-  zBaseTeam,
-  zGetOrganizationIssueResponse,
-  zGroupEventsResponseDict,
-} from "@sentry/api/zod";
-import { z } from "zod";
+  vBaseTeam,
+  vGetOrganizationIssueResponse,
+  vGroupEventsResponseDict,
+} from "@sentry/api/valibot";
+import {
+  array,
+  boolean,
+  description,
+  type InferOutput,
+  literal,
+  looseObject,
+  nullable,
+  nullish,
+  number,
+  object,
+  optional,
+  partial,
+  pick,
+  pipe,
+  record,
+  string,
+  transform,
+  union,
+  unknown,
+  url,
+  variant,
+} from "valibot";
 
 // SDK-derived types
 
@@ -172,7 +194,7 @@ export type SentryIssue = Omit<Partial<SdkIssueDetail>, "metadata"> & {
 };
 
 /**
- * Zod schema describing the key fields of a {@link SentryIssue} for JSON output.
+ * Valibot schema describing the key fields of a {@link SentryIssue} for JSON output.
  *
  * This is a documentation-oriented schema — it describes the commonly-available
  * fields that appear in `--json` output, used by the help system and SKILL.md
@@ -183,7 +205,7 @@ export type SentryIssue = Omit<Partial<SdkIssueDetail>, "metadata"> & {
  * present in most responses; optionality reflects the TypeScript type.
  */
 /**
- * Derived from the auto-generated `zGetOrganizationIssueResponse` schema.
+ * Derived from the auto-generated `vGetOrganizationIssueResponse` schema.
  *
  * The generated schema makes all API-documented fields required. We widen it
  * with `.partial()` so only the core identifiers (id, shortId, title) are
@@ -191,76 +213,112 @@ export type SentryIssue = Omit<Partial<SdkIssueDetail>, "metadata"> & {
  * Extra fields not in the OpenAPI spec (substatus, priority, isUnhandled,
  * seerFixabilityScore) are added via `.extend()`.
  */
-export const SentryIssueSchema = zGetOrganizationIssueResponse
-  .pick({
-    id: true,
-    shortId: true,
-    title: true,
-    culprit: true,
-    count: true,
-    userCount: true,
-    firstSeen: true,
-    lastSeen: true,
-    level: true,
-    status: true,
-    permalink: true,
-    project: true,
-    metadata: true,
-    assignedTo: true,
-  })
-  .partial()
-  .extend({
-    id: z.string().describe("Numeric issue ID"),
-    shortId: z.string().describe("Human-readable short ID (e.g. PROJ-ABC)"),
-    title: z.string().describe("Issue title"),
-    culprit: zGetOrganizationIssueResponse.shape.culprit
-      .optional()
-      .describe("Culprit string"),
-    count: zGetOrganizationIssueResponse.shape.count
-      .optional()
-      .describe("Total event count"),
-    userCount: zGetOrganizationIssueResponse.shape.userCount
-      .optional()
-      .describe("Number of affected users"),
-    firstSeen: zGetOrganizationIssueResponse.shape.firstSeen
-      .optional()
-      .describe("First occurrence (ISO 8601)"),
-    lastSeen: zGetOrganizationIssueResponse.shape.lastSeen
-      .optional()
-      .describe("Most recent occurrence (ISO 8601)"),
-    level: zGetOrganizationIssueResponse.shape.level
-      .optional()
-      .describe("Severity level"),
-    status: zGetOrganizationIssueResponse.shape.status
-      .optional()
-      .describe("Issue status"),
-    permalink: zGetOrganizationIssueResponse.shape.permalink
-      .optional()
-      .describe("URL to the issue in Sentry"),
-    project: zGetOrganizationIssueResponse.shape.project
-      .optional()
-      .describe("Project info"),
-    metadata: zGetOrganizationIssueResponse.shape.metadata
-      .optional()
-      .describe("Issue metadata"),
-    assignedTo: zGetOrganizationIssueResponse.shape.assignedTo
-      .optional()
-      .describe("Assigned user or team"),
-    priority: z.string().optional().describe("Triage priority"),
-    platform: z.string().optional().describe("Platform"),
-    substatus: z.string().nullable().optional().describe("Issue substatus"),
-    isUnhandled: z
-      .boolean()
-      .optional()
-      .describe("Whether the issue is unhandled"),
-    seerFixabilityScore: z
-      .number()
-      .nullable()
-      .optional()
-      .describe("Seer AI fixability score (0-1)"),
-  })
-  .passthrough()
-  .describe("Sentry issue");
+export const SentryIssueSchema = pipe(
+  looseObject({
+    ...partial(
+      pick(vGetOrganizationIssueResponse, [
+        "id",
+        "shortId",
+        "title",
+        "culprit",
+        "count",
+        "userCount",
+        "firstSeen",
+        "lastSeen",
+        "level",
+        "status",
+        "permalink",
+        "project",
+        "metadata",
+        "assignedTo",
+      ])
+    ).entries,
+    id: pipe(string(), description("Numeric issue ID")),
+    shortId: pipe(
+      string(),
+      description("Human-readable short ID (e.g. PROJ-ABC)")
+    ),
+    title: pipe(string(), description("Issue title")),
+    culprit: optional(
+      pipe(
+        vGetOrganizationIssueResponse.entries.culprit,
+        description("Culprit string")
+      )
+    ),
+    count: optional(
+      pipe(
+        vGetOrganizationIssueResponse.entries.count,
+        description("Total event count")
+      )
+    ),
+    userCount: optional(
+      pipe(
+        vGetOrganizationIssueResponse.entries.userCount,
+        description("Number of affected users")
+      )
+    ),
+    firstSeen: optional(
+      pipe(
+        vGetOrganizationIssueResponse.entries.firstSeen,
+        description("First occurrence (ISO 8601)")
+      )
+    ),
+    lastSeen: optional(
+      pipe(
+        vGetOrganizationIssueResponse.entries.lastSeen,
+        description("Most recent occurrence (ISO 8601)")
+      )
+    ),
+    level: optional(
+      pipe(
+        vGetOrganizationIssueResponse.entries.level,
+        description("Severity level")
+      )
+    ),
+    status: optional(
+      pipe(
+        vGetOrganizationIssueResponse.entries.status,
+        description("Issue status")
+      )
+    ),
+    permalink: optional(
+      pipe(
+        vGetOrganizationIssueResponse.entries.permalink,
+        description("URL to the issue in Sentry")
+      )
+    ),
+    project: optional(
+      pipe(
+        vGetOrganizationIssueResponse.entries.project,
+        description("Project info")
+      )
+    ),
+    metadata: optional(
+      pipe(
+        vGetOrganizationIssueResponse.entries.metadata,
+        description("Issue metadata")
+      )
+    ),
+    assignedTo: optional(
+      pipe(
+        vGetOrganizationIssueResponse.entries.assignedTo,
+        description("Assigned user or team")
+      )
+    ),
+    priority: optional(pipe(string(), description("Triage priority"))),
+    platform: optional(pipe(string(), description("Platform"))),
+    substatus: optional(
+      pipe(nullable(string()), description("Issue substatus"))
+    ),
+    isUnhandled: optional(
+      pipe(boolean(), description("Whether the issue is unhandled"))
+    ),
+    seerFixabilityScore: optional(
+      pipe(nullable(number()), description("Seer AI fixability score (0-1)"))
+    ),
+  }),
+  description("Sentry issue")
+);
 
 /**
  * Documentation-oriented schema for `issue view` JSON output.
@@ -270,26 +328,36 @@ export const SentryIssueSchema = zGetOrganizationIssueResponse
  * schema describes that flattened shape for `--help`, `sentry help issue view`,
  * and SKILL.md field table generation.
  */
-export const IssueViewOutputSchema = SentryIssueSchema.extend({
-  event: z
-    .unknown()
-    .nullable()
-    .optional()
-    .describe("Latest event for the issue (full detail)"),
-  org: z.string().nullable().optional().describe("Organization slug"),
-  replayIds: z
-    .array(z.string())
-    .optional()
-    .describe("Related Session Replay IDs"),
-  trace: z
-    .object({
-      traceId: z.string().describe("Trace ID from the latest event"),
-      spans: z.array(z.unknown()).describe("Span tree data"),
-    })
-    .nullable()
-    .optional()
-    .describe("Trace context from the latest event's span tree"),
-}).describe("Issue view output");
+export const IssueViewOutputSchema = pipe(
+  looseObject({
+    ...SentryIssueSchema.entries,
+    event: optional(
+      pipe(
+        nullable(unknown()),
+        description("Latest event for the issue (full detail)")
+      )
+    ),
+    org: optional(pipe(nullable(string()), description("Organization slug"))),
+    replayIds: optional(
+      pipe(array(string()), description("Related Session Replay IDs"))
+    ),
+    trace: optional(
+      pipe(
+        nullable(
+          object({
+            traceId: pipe(
+              string(),
+              description("Trace ID from the latest event")
+            ),
+            spans: pipe(array(unknown()), description("Span tree data")),
+          })
+        ),
+        description("Trace context from the latest event's span tree")
+      )
+    ),
+  }),
+  description("Issue view output")
+);
 
 // Event
 
@@ -390,54 +458,73 @@ export type IssueEvent = {
 };
 
 /**
- * Zod schema for {@link IssueEvent} — used for `--fields` documentation in `--help`.
+ * Valibot schema for {@link IssueEvent} — used for `--fields` documentation in `--help`.
  *
- * Derived from the auto-generated `zGroupEventsResponseDict` element schema.
+ * Derived from the auto-generated `vGroupEventsResponseDict` element schema.
  * All generated fields are widened to optional via `.partial()`, then the core
  * identifiers (id, event.type, eventID) are re-required via `.extend()`.
  */
-const _IssueEventElement = zGroupEventsResponseDict.element;
-export const IssueEventSchema = _IssueEventElement
-  .partial()
-  .extend({
-    id: z.string().describe("Internal event ID"),
-    "event.type": z
-      .string()
-      .describe("Event type (error, default, transaction)"),
-    groupID: _IssueEventElement.shape.groupID
-      .optional()
-      .describe("Group (issue) ID"),
-    eventID: z.string().describe("UUID-format event ID"),
-    projectID: _IssueEventElement.shape.projectID
-      .optional()
-      .describe("Project ID"),
-    message: _IssueEventElement.shape.message
-      .optional()
-      .describe("Event message"),
-    title: _IssueEventElement.shape.title.optional().describe("Event title"),
-    location: _IssueEventElement.shape.location
-      .optional()
-      .describe("Source location (file:line)"),
-    culprit: _IssueEventElement.shape.culprit
-      .optional()
-      .describe("Culprit function/module"),
-    user: _IssueEventElement.shape.user.optional().describe("User context"),
-    tags: _IssueEventElement.shape.tags.optional().describe("Event tags"),
-    platform: _IssueEventElement.shape.platform
-      .optional()
-      .describe("Platform (python, javascript, etc.)"),
-    dateCreated: _IssueEventElement.shape.dateCreated
-      .optional()
-      .describe("ISO 8601 creation timestamp"),
-    crashFile: _IssueEventElement.shape.crashFile
-      .optional()
-      .describe("Crash file URL"),
-    metadata: _IssueEventElement.shape.metadata
-      .optional()
-      .describe("Event metadata"),
-  })
-  .passthrough()
-  .describe("Issue event (list endpoint)");
+const _IssueEventElement = vGroupEventsResponseDict.item;
+export const IssueEventSchema = pipe(
+  looseObject({
+    ...partial(_IssueEventElement).entries,
+    id: pipe(string(), description("Internal event ID")),
+    "event.type": pipe(
+      string(),
+      description("Event type (error, default, transaction)")
+    ),
+    groupID: optional(
+      pipe(_IssueEventElement.entries.groupID, description("Group (issue) ID"))
+    ),
+    eventID: pipe(string(), description("UUID-format event ID")),
+    projectID: optional(
+      pipe(_IssueEventElement.entries.projectID, description("Project ID"))
+    ),
+    message: optional(
+      pipe(_IssueEventElement.entries.message, description("Event message"))
+    ),
+    title: optional(
+      pipe(_IssueEventElement.entries.title, description("Event title"))
+    ),
+    location: optional(
+      pipe(
+        _IssueEventElement.entries.location,
+        description("Source location (file:line)")
+      )
+    ),
+    culprit: optional(
+      pipe(
+        _IssueEventElement.entries.culprit,
+        description("Culprit function/module")
+      )
+    ),
+    user: optional(
+      pipe(_IssueEventElement.entries.user, description("User context"))
+    ),
+    tags: optional(
+      pipe(_IssueEventElement.entries.tags, description("Event tags"))
+    ),
+    platform: optional(
+      pipe(
+        _IssueEventElement.entries.platform,
+        description("Platform (python, javascript, etc.)")
+      )
+    ),
+    dateCreated: optional(
+      pipe(
+        _IssueEventElement.entries.dateCreated,
+        description("ISO 8601 creation timestamp")
+      )
+    ),
+    crashFile: optional(
+      pipe(_IssueEventElement.entries.crashFile, description("Crash file URL"))
+    ),
+    metadata: optional(
+      pipe(_IssueEventElement.entries.metadata, description("Event metadata"))
+    ),
+  }),
+  description("Issue event (list endpoint)")
+);
 
 // Project Keys (DSN)
 
@@ -458,24 +545,24 @@ export type ProjectKey = Partial<SdkProjectKey> & {
   };
 };
 
-// Internal types with Zod schemas (runtime-validated, not in @sentry/api)
+// Internal types with Valibot schemas (runtime-validated, not in @sentry/api)
 
 // Region
 
 /** A Sentry region (e.g., US, EU) */
-export const RegionSchema = z.object({
-  name: z.string(),
-  url: z.string().url(),
+export const RegionSchema = object({
+  name: string(),
+  url: pipe(string(), url()),
 });
 
-export type Region = z.infer<typeof RegionSchema>;
+export type Region = InferOutput<typeof RegionSchema>;
 
 /** Response from /api/0/users/me/regions/ endpoint */
-export const UserRegionsResponseSchema = z.object({
-  regions: z.array(RegionSchema),
+export const UserRegionsResponseSchema = object({
+  regions: array(RegionSchema),
 });
 
-export type UserRegionsResponse = z.infer<typeof UserRegionsResponseSchema>;
+export type UserRegionsResponse = InferOutput<typeof UserRegionsResponseSchema>;
 
 // User
 
@@ -487,16 +574,14 @@ export type UserRegionsResponse = z.infer<typeof UserRegionsResponseSchema>;
  * Note: `@sentry/api` doesn't export types for the `/auth/` endpoint —
  * it's undocumented, so we define this schema manually.
  */
-export const SentryUserSchema = z
-  .object({
-    id: z.string(),
-    email: z.string().nullish(),
-    username: z.string().nullish(),
-    name: z.string().nullish(),
-  })
-  .passthrough();
+export const SentryUserSchema = looseObject({
+  id: string(),
+  email: nullish(string()),
+  username: nullish(string()),
+  name: nullish(string()),
+});
 
-export type SentryUser = z.infer<typeof SentryUserSchema>;
+export type SentryUser = InferOutput<typeof SentryUserSchema>;
 
 // Plain TypeScript interfaces (type annotations only, no runtime validation)
 
@@ -545,30 +630,33 @@ export type ReplayContext = {
 };
 
 /** High-level metadata returned by the organization trace-meta endpoint. */
-export const TraceMetaSchema = z
-  .object({
-    logs: z.number().describe("Log entry count"),
-    errors: z.number().describe("Error count"),
-    performance_issues: z.number().describe("Performance issue count"),
-    span_count: z.number().describe("Span count"),
-    transaction_child_count_map: z
-      .array(
-        z.object({
-          "transaction.event_id": z
-            .string()
-            .nullable()
-            .describe("Transaction event ID"),
-          "count()": z.number().describe("Transaction child count"),
+export const TraceMetaSchema = pipe(
+  object({
+    logs: pipe(number(), description("Log entry count")),
+    errors: pipe(number(), description("Error count")),
+    performance_issues: pipe(number(), description("Performance issue count")),
+    span_count: pipe(number(), description("Span count")),
+    transaction_child_count_map: pipe(
+      array(
+        object({
+          "transaction.event_id": pipe(
+            nullable(string()),
+            description("Transaction event ID")
+          ),
+          "count()": pipe(number(), description("Transaction child count")),
         })
-      )
-      .describe("Per-transaction child counts"),
-    span_count_map: z
-      .record(z.string(), z.number())
-      .describe("Span counts grouped by operation"),
-  })
-  .describe("Trace metadata");
+      ),
+      description("Per-transaction child counts")
+    ),
+    span_count_map: pipe(
+      record(string(), number()),
+      description("Span counts grouped by operation")
+    ),
+  }),
+  description("Trace metadata")
+);
 
-export type TraceMeta = z.infer<typeof TraceMetaSchema>;
+export type TraceMeta = InferOutput<typeof TraceMetaSchema>;
 
 export const ISSUE_PRIORITIES = ["high", "medium", "low"] as const;
 export type IssuePriority = (typeof ISSUE_PRIORITIES)[number];
@@ -618,24 +706,22 @@ export type SentryDeploy = Partial<SdkDeployResponse> & {
 // Span (for trace tree display)
 
 /** A single span in a trace */
-export const SpanSchema = z
-  .object({
-    span_id: z.string(),
-    parent_span_id: z.string().nullable().optional(),
-    trace_id: z.string().optional(),
-    op: z.string().optional(),
-    description: z.string().nullable().optional(),
-    /** Start time as Unix timestamp (seconds with fractional ms) */
-    start_timestamp: z.number(),
-    /** End time as Unix timestamp (seconds with fractional ms) */
-    timestamp: z.number(),
-    status: z.string().optional(),
-    data: z.record(z.unknown()).optional(),
-    tags: z.record(z.string()).optional(),
-  })
-  .passthrough();
+export const SpanSchema = looseObject({
+  span_id: string(),
+  parent_span_id: optional(nullable(string())),
+  trace_id: optional(string()),
+  op: optional(string()),
+  description: optional(nullable(string())),
+  /** Start time as Unix timestamp (seconds with fractional ms) */
+  start_timestamp: number(),
+  /** End time as Unix timestamp (seconds with fractional ms) */
+  timestamp: number(),
+  status: optional(string()),
+  data: optional(record(string(), unknown())),
+  tags: optional(record(string(), string())),
+});
 
-export type Span = z.infer<typeof SpanSchema>;
+export type Span = InferOutput<typeof SpanSchema>;
 
 /**
  * Span from /trace/{traceId}/ endpoint with nested children.
@@ -803,111 +889,117 @@ export type RequestEntry = {
  * Individual log entry from the logs dataset.
  * Fields match the Sentry Explore/Events API response for dataset=logs.
  */
-export const SentryLogSchema = z
-  .object({
+export const SentryLogSchema = pipe(
+  looseObject({
     /** Unique identifier for deduplication */
-    "sentry.item_id": z.string().describe("Unique log entry ID"),
+    "sentry.item_id": pipe(string(), description("Unique log entry ID")),
     /** ISO timestamp of the log entry */
-    timestamp: z.string().describe("Log timestamp (ISO 8601)"),
+    timestamp: pipe(string(), description("Log timestamp (ISO 8601)")),
     /** Nanosecond-precision timestamp for accurate ordering and filtering.
      * Coerced from string because the API may return large integers as strings
      * to avoid precision loss beyond Number.MAX_SAFE_INTEGER. */
-    timestamp_precise: z.coerce
-      .number()
-      .describe("Nanosecond-precision timestamp"),
+    timestamp_precise: pipe(
+      unknown(),
+      transform(Number),
+      number(),
+      description("Nanosecond-precision timestamp")
+    ),
     /** Log message content */
-    message: z.string().nullable().optional().describe("Log message"),
+    message: optional(nullable(pipe(string(), description("Log message")))),
     /** Log severity level (error, warning, info, debug, etc.) */
-    severity: z
-      .string()
-      .nullable()
-      .optional()
-      .describe("Severity level (error, warning, info, debug)"),
+    severity: optional(
+      nullable(
+        pipe(
+          string(),
+          description("Severity level (error, warning, info, debug)")
+        )
+      )
+    ),
     /** Trace ID for correlation with traces */
-    trace: z
-      .string()
-      .nullable()
-      .optional()
-      .describe("Trace ID for correlation"),
-  })
-  .passthrough();
+    trace: optional(
+      nullable(pipe(string(), description("Trace ID for correlation")))
+    ),
+  }),
+  description("Sentry log")
+);
 
-export type SentryLog = z.infer<typeof SentryLogSchema>;
+export type SentryLog = InferOutput<typeof SentryLogSchema>;
 
 /** Response from the logs events endpoint */
-export const LogsResponseSchema = z.object({
-  data: z.array(SentryLogSchema),
-  meta: z
-    .object({
-      fields: z.record(z.string()).optional(),
+export const LogsResponseSchema = object({
+  data: array(SentryLogSchema),
+  meta: optional(
+    looseObject({
+      fields: optional(record(string(), string())),
     })
-    .passthrough()
-    .optional(),
+  ),
 });
 
-export type LogsResponse = z.infer<typeof LogsResponseSchema>;
+export type LogsResponse = InferOutput<typeof LogsResponseSchema>;
 
 /**
  * Detailed log entry with all available fields from the logs dataset.
  * Used by the `log view` command for comprehensive log display.
  */
-export const DetailedSentryLogSchema = z
-  .object({
+export const DetailedSentryLogSchema = pipe(
+  looseObject({
     /** Unique identifier for deduplication */
-    "sentry.item_id": z.string(),
+    "sentry.item_id": string(),
     /** ISO timestamp of the log entry */
-    timestamp: z.string(),
+    timestamp: string(),
     /** Nanosecond-precision timestamp for accurate ordering.
      * Coerced from string because the API may return large integers as strings
      * to avoid precision loss beyond Number.MAX_SAFE_INTEGER. */
-    timestamp_precise: z.coerce.number(),
+    timestamp_precise: pipe(unknown(), transform(Number), number()),
     /** Log message content */
-    message: z.string().nullable().optional(),
+    message: optional(nullable(string())),
     /** Log severity level (error, warning, info, debug, etc.) */
-    severity: z.string().nullable().optional(),
+    severity: optional(nullable(string())),
     /** Trace ID for correlation with traces */
-    trace: z.string().nullable().optional(),
+    trace: optional(nullable(string())),
     /** Project slug */
-    project: z.string().nullable().optional(),
+    project: optional(nullable(string())),
     /** Environment name */
-    environment: z.string().nullable().optional(),
+    environment: optional(nullable(string())),
     /** Release version */
-    release: z.string().nullable().optional(),
+    release: optional(nullable(string())),
     /** SDK name */
-    "sdk.name": z.string().nullable().optional(),
+    "sdk.name": optional(nullable(string())),
     /** SDK version */
-    "sdk.version": z.string().nullable().optional(),
+    "sdk.version": optional(nullable(string())),
     /** Span ID for correlation with spans */
-    span_id: z.string().nullable().optional(),
+    span_id: optional(nullable(string())),
     /** Function name where log was emitted */
-    "code.function": z.string().nullable().optional(),
+    "code.function": optional(nullable(string())),
     /** File path where log was emitted */
-    "code.file.path": z.string().nullable().optional(),
+    "code.file.path": optional(nullable(string())),
     /** Line number where log was emitted */
-    "code.line.number": z.string().nullable().optional(),
+    "code.line.number": optional(nullable(string())),
     /** OpenTelemetry span kind */
-    "sentry.otel.kind": z.string().nullable().optional(),
+    "sentry.otel.kind": optional(nullable(string())),
     /** OpenTelemetry status code */
-    "sentry.otel.status_code": z.string().nullable().optional(),
+    "sentry.otel.status_code": optional(nullable(string())),
     /** OpenTelemetry instrumentation scope name */
-    "sentry.otel.instrumentation_scope.name": z.string().nullable().optional(),
-  })
-  .passthrough();
+    "sentry.otel.instrumentation_scope.name": optional(nullable(string())),
+  }),
+  description("Detailed Sentry log")
+);
 
-export type DetailedSentryLog = z.infer<typeof DetailedSentryLogSchema>;
+export type DetailedSentryLog = InferOutput<typeof DetailedSentryLogSchema>;
 
 /** Response from the detailed log query endpoint */
-export const DetailedLogsResponseSchema = z.object({
-  data: z.array(DetailedSentryLogSchema),
-  meta: z
-    .object({
-      fields: z.record(z.string()).optional(),
+export const DetailedLogsResponseSchema = object({
+  data: array(DetailedSentryLogSchema),
+  meta: optional(
+    looseObject({
+      fields: optional(record(string(), string())),
     })
-    .passthrough()
-    .optional(),
+  ),
 });
 
-export type DetailedLogsResponse = z.infer<typeof DetailedLogsResponseSchema>;
+export type DetailedLogsResponse = InferOutput<
+  typeof DetailedLogsResponseSchema
+>;
 
 // Trace-item detail types (from /projects/{org}/{project}/trace-items/{itemId}/ endpoint)
 
@@ -919,29 +1011,27 @@ export type DetailedLogsResponse = z.infer<typeof DetailedLogsResponseSchema>;
  *
  * The endpoint is EXPERIMENTAL and not yet in @sentry/api (getsentry/sentry-api-schema).
  */
-export const TraceItemAttributeSchema = z.discriminatedUnion("type", [
-  z.object({ name: z.string(), type: z.literal("str"), value: z.string() }),
-  z.object({ name: z.string(), type: z.literal("int"), value: z.number() }),
-  z.object({ name: z.string(), type: z.literal("float"), value: z.number() }),
-  z.object({ name: z.string(), type: z.literal("bool"), value: z.boolean() }),
+export const TraceItemAttributeSchema = variant("type", [
+  object({ name: string(), type: literal("str"), value: string() }),
+  object({ name: string(), type: literal("int"), value: number() }),
+  object({ name: string(), type: literal("float"), value: number() }),
+  object({ name: string(), type: literal("bool"), value: boolean() }),
   // "array" is gated by organizations:trace-item-details-array-fields in Sentry backend
-  z.object({
-    name: z.string(),
-    type: z.literal("array"),
-    value: z.array(z.unknown()),
+  object({
+    name: string(),
+    type: literal("array"),
+    value: array(unknown()),
   }),
 ]);
-export type TraceItemAttribute = z.infer<typeof TraceItemAttributeSchema>;
+export type TraceItemAttribute = InferOutput<typeof TraceItemAttributeSchema>;
 
 /** Response from GET /projects/{org}/{project}/trace-items/{itemId}/ (logs and spans) */
-export const TraceItemDetailSchema = z
-  .object({
-    itemId: z.string(),
-    timestamp: z.string(),
-    attributes: z.array(TraceItemAttributeSchema),
-  })
-  .passthrough(); // preserves meta, links, and any future fields returned by the endpoint
-export type TraceItemDetail = z.infer<typeof TraceItemDetailSchema>;
+export const TraceItemDetailSchema = looseObject({
+  itemId: string(),
+  timestamp: string(),
+  attributes: array(TraceItemAttributeSchema),
+}); // preserves meta, links, and any future fields returned by the endpoint
+export type TraceItemDetail = InferOutput<typeof TraceItemDetailSchema>;
 
 // Trace-log types (from /organizations/{org}/trace-logs/ endpoint)
 
@@ -957,50 +1047,48 @@ export type TraceItemDetail = z.infer<typeof TraceItemDetailSchema>;
  * - Includes `project.id` (integer) and `severity_number`
  * - `timestamp_precise` is a nanosecond integer (same as Explore/Events logs)
  */
-export const TraceLogSchema = z
-  .object({
+export const TraceLogSchema = pipe(
+  looseObject({
     /** Unique identifier for this log entry */
-    id: z.string(),
+    id: string(),
     /** Numeric ID of the project this log belongs to.
      * Coerced from string because some API responses return numeric IDs as strings. */
-    "project.id": z.coerce.number(),
+    "project.id": pipe(unknown(), transform(Number), number()),
     /** The 32-character hex trace ID this log is associated with */
-    trace: z.string(),
+    trace: string(),
     /** Numeric OTel severity level (e.g., 9 = INFO, 13 = WARN, 17 = ERROR).
      * Optional because not all log entries include this field.
      * Coerced from string for resilience against API format variations. */
-    severity_number: z.coerce.number().optional(),
+    severity_number: optional(pipe(unknown(), transform(Number), number())),
     /** Severity label (e.g., "info", "warn", "error") */
-    severity: z.string(),
+    severity: string(),
     /** ISO 8601 timestamp */
-    timestamp: z.string(),
+    timestamp: string(),
     /** High-precision timestamp in nanoseconds.
      * Optional because some API responses may omit it.
      * Coerced from string because nanosecond timestamps (≈1.7e18 in 2026)
      * exceed Number.MAX_SAFE_INTEGER and APIs may return them as strings. */
-    timestamp_precise: z.coerce.number().optional(),
+    timestamp_precise: optional(pipe(unknown(), transform(Number), number())),
     /** Log message content */
-    message: z.string().nullable().optional(),
-  })
-  .passthrough();
+    message: optional(nullable(string())),
+  }),
+  description("Trace log")
+);
 
-export type TraceLog = z.infer<typeof TraceLogSchema>;
+export type TraceLog = InferOutput<typeof TraceLogSchema>;
 
 /** Response from the trace-logs endpoint */
-export const TraceLogsResponseSchema = z
-  .object({
-    data: z.array(TraceLogSchema),
-    meta: z
-      .object({
-        fields: z.record(z.string()).optional(),
-        units: z.record(z.string()).optional(),
-      })
-      .passthrough()
-      .optional(),
-  })
-  .passthrough();
+export const TraceLogsResponseSchema = looseObject({
+  data: array(TraceLogSchema),
+  meta: optional(
+    looseObject({
+      fields: optional(record(string(), string())),
+      units: optional(record(string(), string())),
+    })
+  ),
+});
 
-export type TraceLogsResponse = z.infer<typeof TraceLogsResponseSchema>;
+export type TraceLogsResponse = InferOutput<typeof TraceLogsResponseSchema>;
 
 // Transaction (for trace listing)
 
@@ -1008,104 +1096,118 @@ export type TraceLogsResponse = z.infer<typeof TraceLogsResponseSchema>;
  * Transaction list item from the Explore/Events API (dataset=transactions).
  * Fields match the response when querying trace, id, transaction, timestamp, etc.
  */
-export const TransactionListItemSchema = z
-  .object({
+export const TransactionListItemSchema = pipe(
+  looseObject({
     /** Trace ID this transaction belongs to */
-    trace: z.string().describe("Trace ID"),
+    trace: pipe(string(), description("Trace ID")),
     /** Event ID of the transaction */
-    id: z.string().describe("Event ID"),
+    id: pipe(string(), description("Event ID")),
     /** Transaction name (e.g., "GET /api/users") */
-    transaction: z.string().describe("Transaction name"),
+    transaction: pipe(string(), description("Transaction name")),
     /** ISO timestamp of the transaction */
-    timestamp: z.string().describe("Timestamp (ISO 8601)"),
+    timestamp: pipe(string(), description("Timestamp (ISO 8601)")),
     /** Transaction duration in milliseconds */
-    "transaction.duration": z.number().describe("Duration (ms)"),
+    "transaction.duration": pipe(number(), description("Duration (ms)")),
     /** Project slug */
-    project: z.string().describe("Project slug"),
-  })
-  .passthrough();
+    project: pipe(string(), description("Project slug")),
+  }),
+  description("Transaction list item")
+);
 
-export type TransactionListItem = z.infer<typeof TransactionListItemSchema>;
+export type TransactionListItem = InferOutput<typeof TransactionListItemSchema>;
 
 /** Response from the transactions events endpoint */
-export const TransactionsResponseSchema = z.object({
-  data: z.array(TransactionListItemSchema),
-  meta: z
-    .object({
-      fields: z.record(z.string()).optional(),
+export const TransactionsResponseSchema = object({
+  data: array(TransactionListItemSchema),
+  meta: optional(
+    looseObject({
+      fields: optional(record(string(), string())),
     })
-    .passthrough()
-    .optional(),
+  ),
 });
 
-export type TransactionsResponse = z.infer<typeof TransactionsResponseSchema>;
+export type TransactionsResponse = InferOutput<
+  typeof TransactionsResponseSchema
+>;
 
 /** A single span item from the EAP spans search endpoint */
-export const SpanListItemSchema = z
-  .object({
-    id: z.string().describe("Span ID"),
-    parent_span: z.string().nullable().optional().describe("Parent span ID"),
-    "span.op": z
-      .string()
-      .nullable()
-      .optional()
-      .describe("Span operation (e.g. http.client, db)"),
-    description: z.string().nullable().optional().describe("Span description"),
-    "span.duration": z.number().nullable().optional().describe("Duration (ms)"),
-    timestamp: z.string().describe("Timestamp (ISO 8601)"),
-    project: z.string().describe("Project slug"),
-    transaction: z.string().nullable().optional().describe("Transaction name"),
-    trace: z.string().describe("Trace ID"),
-  })
-  .passthrough();
+export const SpanListItemSchema = pipe(
+  looseObject({
+    id: pipe(string(), description("Span ID")),
+    parent_span: optional(
+      nullable(pipe(string(), description("Parent span ID")))
+    ),
+    "span.op": optional(
+      nullable(
+        pipe(string(), description("Span operation (e.g. http.client, db)"))
+      )
+    ),
+    description: optional(
+      nullable(pipe(string(), description("Span description")))
+    ),
+    "span.duration": optional(
+      nullable(pipe(number(), description("Duration (ms)")))
+    ),
+    timestamp: pipe(string(), description("Timestamp (ISO 8601)")),
+    project: pipe(string(), description("Project slug")),
+    transaction: optional(
+      nullable(pipe(string(), description("Transaction name")))
+    ),
+    trace: pipe(string(), description("Trace ID")),
+  }),
+  description("Span list item")
+);
 
-export type SpanListItem = z.infer<typeof SpanListItemSchema>;
+export type SpanListItem = InferOutput<typeof SpanListItemSchema>;
 
 /** Response from the spans events endpoint */
-export const SpansResponseSchema = z.object({
-  data: z.array(SpanListItemSchema),
-  meta: z
-    .object({
-      fields: z.record(z.string()).optional(),
+export const SpansResponseSchema = object({
+  data: array(SpanListItemSchema),
+  meta: optional(
+    looseObject({
+      fields: optional(record(string(), string())),
     })
-    .passthrough()
-    .optional(),
+  ),
 });
 
-export type SpansResponse = z.infer<typeof SpansResponseSchema>;
+export type SpansResponse = InferOutput<typeof SpansResponseSchema>;
 
 // Repository
 
 /** Repository provider (e.g., GitHub, GitLab) */
-export const RepositoryProviderSchema = z.object({
-  id: z.string(),
-  name: z.string(),
+export const RepositoryProviderSchema = object({
+  id: string(),
+  name: string(),
 });
 
-export type RepositoryProvider = z.infer<typeof RepositoryProviderSchema>;
+export type RepositoryProvider = InferOutput<typeof RepositoryProviderSchema>;
 
 /** A repository connected to a Sentry organization */
-export const SentryRepositorySchema = z
-  .object({
+export const SentryRepositorySchema = pipe(
+  looseObject({
     // Core identifiers (required)
-    id: z.string().describe("Repository ID"),
-    name: z.string().describe("Repository name"),
-    url: z.string().nullable().describe("Repository URL"),
-    provider: RepositoryProviderSchema.describe("Version control provider"),
-    status: z.string().describe("Integration status"),
+    id: pipe(string(), description("Repository ID")),
+    name: pipe(string(), description("Repository name")),
+    url: pipe(nullable(string()), description("Repository URL")),
+    provider: pipe(
+      RepositoryProviderSchema,
+      description("Version control provider")
+    ),
+    status: pipe(string(), description("Integration status")),
     // Optional metadata
-    dateCreated: z.string().optional().describe("Creation date (ISO 8601)"),
-    integrationId: z.string().optional().describe("Integration ID"),
-    externalSlug: z
-      .string()
-      .nullable()
-      .optional()
-      .describe("External slug (e.g. org/repo)"),
-    externalId: z.string().nullable().optional().describe("External ID"),
-  })
-  .passthrough();
+    dateCreated: optional(
+      pipe(string(), description("Creation date (ISO 8601)"))
+    ),
+    integrationId: optional(pipe(string(), description("Integration ID"))),
+    externalSlug: optional(
+      nullable(pipe(string(), description("External slug (e.g. org/repo)")))
+    ),
+    externalId: optional(nullable(pipe(string(), description("External ID")))),
+  }),
+  description("Sentry repository")
+);
 
-export type SentryRepository = z.infer<typeof SentryRepositorySchema>;
+export type SentryRepository = InferOutput<typeof SentryRepositorySchema>;
 
 // Cron Monitor
 
@@ -1117,45 +1219,59 @@ export type SentryRepository = z.infer<typeof SentryRepositorySchema>;
  * `[value, unit]` tuple (when `"interval"`). Other fields are nullable because
  * the API returns `null` for unset thresholds.
  */
-export const MonitorConfigSchema = z
-  .object({
-    schedule_type: z
-      .string()
-      .optional()
-      .describe("Schedule type: 'crontab' or 'interval'"),
-    schedule: z
-      .union([z.string(), z.array(z.union([z.string(), z.number()]))])
-      .optional()
-      .describe("Crontab string or [value, unit] interval tuple"),
-    timezone: z
-      .string()
-      .nullable()
-      .optional()
-      .describe("Schedule timezone (tz database string)"),
-    checkin_margin: z
-      .number()
-      .nullable()
-      .optional()
-      .describe("Allowed minutes after the expected check-in time"),
-    max_runtime: z
-      .number()
-      .nullable()
-      .optional()
-      .describe("Allowed minutes a check-in may run before timing out"),
-    failure_issue_threshold: z
-      .number()
-      .nullable()
-      .optional()
-      .describe("Consecutive failures before an issue is created"),
-    recovery_threshold: z
-      .number()
-      .nullable()
-      .optional()
-      .describe("Consecutive successes before an issue is resolved"),
-  })
-  .passthrough();
+export const MonitorConfigSchema = pipe(
+  looseObject({
+    schedule_type: optional(
+      pipe(string(), description("Schedule type: 'crontab' or 'interval'"))
+    ),
+    schedule: optional(
+      pipe(
+        union([string(), array(union([string(), number()]))]),
+        description("Crontab string or [value, unit] interval tuple")
+      )
+    ),
+    timezone: optional(
+      nullable(
+        pipe(string(), description("Schedule timezone (tz database string)"))
+      )
+    ),
+    checkin_margin: optional(
+      nullable(
+        pipe(
+          number(),
+          description("Allowed minutes after the expected check-in time")
+        )
+      )
+    ),
+    max_runtime: optional(
+      nullable(
+        pipe(
+          number(),
+          description("Allowed minutes a check-in may run before timing out")
+        )
+      )
+    ),
+    failure_issue_threshold: optional(
+      nullable(
+        pipe(
+          number(),
+          description("Consecutive failures before an issue is created")
+        )
+      )
+    ),
+    recovery_threshold: optional(
+      nullable(
+        pipe(
+          number(),
+          description("Consecutive successes before an issue is resolved")
+        )
+      )
+    ),
+  }),
+  description("Monitor configuration")
+);
 
-export type MonitorConfig = z.infer<typeof MonitorConfigSchema>;
+export type MonitorConfig = InferOutput<typeof MonitorConfigSchema>;
 
 /**
  * A cron monitor configured in a Sentry organization.
@@ -1165,67 +1281,77 @@ export type MonitorConfig = z.infer<typeof MonitorConfigSchema>;
  * identifiers (id, slug, name, status) are required; richer fields are widened
  * to optional and `.passthrough()` preserves any unmodeled API fields.
  */
-export const SentryMonitorSchema = z
-  .object({
-    id: z.string().describe("Monitor ID"),
-    slug: z.string().describe("Monitor slug"),
-    name: z.string().describe("Monitor name"),
-    status: z.string().describe("Monitor status (e.g. active, disabled)"),
-    isMuted: z.boolean().optional().describe("Whether the monitor is muted"),
-    config: MonitorConfigSchema.optional().describe("Schedule configuration"),
-    dateCreated: z.string().optional().describe("Creation date (ISO 8601)"),
-    project: z
-      .object({
-        id: z.string().optional().describe("Project ID"),
-        slug: z.string().optional().describe("Project slug"),
-        name: z.string().optional().describe("Project name"),
-      })
-      .passthrough()
-      .optional()
-      .describe("Owning project"),
-  })
-  .passthrough();
+export const SentryMonitorSchema = pipe(
+  looseObject({
+    id: pipe(string(), description("Monitor ID")),
+    slug: pipe(string(), description("Monitor slug")),
+    name: pipe(string(), description("Monitor name")),
+    status: pipe(
+      string(),
+      description("Monitor status (e.g. active, disabled)")
+    ),
+    isMuted: optional(
+      pipe(boolean(), description("Whether the monitor is muted"))
+    ),
+    config: optional(
+      pipe(MonitorConfigSchema, description("Schedule configuration"))
+    ),
+    dateCreated: optional(
+      pipe(string(), description("Creation date (ISO 8601)"))
+    ),
+    project: optional(
+      pipe(
+        looseObject({
+          id: optional(pipe(string(), description("Project ID"))),
+          slug: optional(pipe(string(), description("Project slug"))),
+          name: optional(pipe(string(), description("Project name"))),
+        }),
+        description("Owning project")
+      )
+    ),
+  }),
+  description("Sentry monitor")
+);
 
-export type SentryMonitor = z.infer<typeof SentryMonitorSchema>;
+export type SentryMonitor = InferOutput<typeof SentryMonitorSchema>;
 
 // Team
 
 /**
  * A team in a Sentry organization.
  *
- * Derived from the auto-generated `zBaseTeam` schema, picking only the
+ * Derived from the auto-generated `vBaseTeam` schema, picking only the
  * fields used in CLI output. All picked fields are widened to optional via
  * `.partial()`, then core identifiers (id, slug, name) are re-required.
  */
-export const SentryTeamSchema = zBaseTeam
-  .pick({
-    id: true,
-    slug: true,
-    name: true,
-    dateCreated: true,
-    isMember: true,
-    teamRole: true,
-    memberCount: true,
-  })
-  .partial()
-  .extend({
-    id: z.string().describe("Team ID"),
-    slug: z.string().describe("Team slug"),
-    name: z.string().describe("Team name"),
-    dateCreated: zBaseTeam.shape.dateCreated
-      .optional()
-      .describe("Creation date (ISO 8601)"),
-    isMember: zBaseTeam.shape.isMember
-      .optional()
-      .describe("Whether you are a member"),
-    teamRole: zBaseTeam.shape.teamRole
-      .optional()
-      .describe("Your role in the team"),
-    memberCount: zBaseTeam.shape.memberCount
-      .optional()
-      .describe("Number of members"),
-  })
-  .passthrough();
+export const SentryTeamSchema = looseObject({
+  ...partial(
+    pick(vBaseTeam, [
+      "id",
+      "slug",
+      "name",
+      "dateCreated",
+      "isMember",
+      "teamRole",
+      "memberCount",
+    ])
+  ).entries,
+  id: pipe(string(), description("Team ID")),
+  slug: pipe(string(), description("Team slug")),
+  name: pipe(string(), description("Team name")),
+  dateCreated: optional(
+    pipe(vBaseTeam.entries.dateCreated, description("Creation date (ISO 8601)"))
+  ),
+  isMember: optional(
+    pipe(vBaseTeam.entries.isMember, description("Whether you are a member"))
+  ),
+  teamRole: optional(
+    pipe(vBaseTeam.entries.teamRole, description("Your role in the team"))
+  ),
+  memberCount: optional(
+    pipe(vBaseTeam.entries.memberCount, description("Number of members"))
+  ),
+});
 
 /**
  * A Sentry team.
@@ -1250,43 +1376,49 @@ export type SentryTeam = Partial<SdkTeam> & {
 // Product Trials
 
 /** A product trial from the customer endpoint */
-export const ProductTrialSchema = z.object({
-  /** Trial category (e.g., "seerUsers", "seerAutofix") */
-  category: z.string().describe("Trial category (e.g. seerUsers, seerAutofix)"),
-  /** ISO date when the trial started, null if not started */
-  startDate: z.string().nullable().describe("Start date (ISO 8601)"),
-  /** ISO date when the trial ends, null if not started */
-  endDate: z.string().nullable().describe("End date (ISO 8601)"),
-  /** Reason code for the trial */
-  reasonCode: z.number().describe("Reason code"),
-  /** Whether the trial has been activated */
-  isStarted: z.boolean().describe("Whether the trial has started"),
-  /** Duration of the trial in days, null if unknown */
-  lengthDays: z.number().nullable().describe("Trial duration in days"),
-});
+export const ProductTrialSchema = pipe(
+  object({
+    /** Trial category (e.g., "seerUsers", "seerAutofix") */
+    category: pipe(
+      string(),
+      description("Trial category (e.g. seerUsers, seerAutofix)")
+    ),
+    /** ISO date when the trial started, null if not started */
+    startDate: pipe(nullable(string()), description("Start date (ISO 8601)")),
+    /** ISO date when the trial ends, null if not started */
+    endDate: pipe(nullable(string()), description("End date (ISO 8601)")),
+    /** Reason code for the trial */
+    reasonCode: pipe(number(), description("Reason code")),
+    /** Whether the trial has been activated */
+    isStarted: pipe(boolean(), description("Whether the trial has started")),
+    /** Duration of the trial in days, null if unknown */
+    lengthDays: pipe(nullable(number()), description("Trial duration in days")),
+  }),
+  description("Product trial")
+);
 
-export type ProductTrial = z.infer<typeof ProductTrialSchema>;
+export type ProductTrial = InferOutput<typeof ProductTrialSchema>;
 
 /** Subset of plan details needed for plan trial display */
-export const PlanDetailsSubsetSchema = z.object({
+export const PlanDetailsSubsetSchema = object({
   /** Human-readable plan name (e.g., "Developer", "Business") */
-  name: z.string(),
+  name: string(),
   /** Plan ID of the trial plan (e.g., "am3_t"), null if no trial plan */
-  trialPlan: z.string().nullable().optional(),
+  trialPlan: optional(nullable(string())),
 });
 
 /** Subset of customer data needed for trial availability checks */
-export const CustomerTrialInfoSchema = z.object({
+export const CustomerTrialInfoSchema = object({
   /** Available and active product trials for the organization */
-  productTrials: z.array(ProductTrialSchema).nullable().optional(),
+  productTrials: optional(nullable(array(ProductTrialSchema))),
   /** Whether the organization can start a plan-level trial */
-  canTrial: z.boolean().optional(),
+  canTrial: optional(boolean()),
   /** Whether the organization is currently on a plan trial */
-  isTrial: z.boolean().optional(),
+  isTrial: optional(boolean()),
   /** ISO date when the plan trial ends, null if not on trial */
-  trialEnd: z.string().nullable().optional(),
+  trialEnd: optional(nullable(string())),
   /** Plan details with trial plan info */
-  planDetails: PlanDetailsSubsetSchema.optional(),
+  planDetails: optional(PlanDetailsSubsetSchema),
 });
 
-export type CustomerTrialInfo = z.infer<typeof CustomerTrialInfoSchema>;
+export type CustomerTrialInfo = InferOutput<typeof CustomerTrialInfoSchema>;

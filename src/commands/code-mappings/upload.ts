@@ -16,6 +16,7 @@
 
 import { readFile } from "node:fs/promises";
 
+import { getDotPath, safeParse } from "valibot";
 import type { SentryContext } from "../../context.js";
 import {
   CodeMappingSchema,
@@ -141,17 +142,20 @@ async function readAndValidateMappings(
   // Validate each entry
   const mappings: Array<{ stackRoot: string; sourceRoot: string }> = [];
   for (let i = 0; i < parsed.length; i++) {
-    const result = CodeMappingSchema.safeParse(parsed[i]);
+    const result = safeParse(CodeMappingSchema, parsed[i]);
     if (!result.success) {
-      const issues = result.error.issues
-        .map((iss) => `${iss.path.join(".")}: ${iss.message}`)
+      const issues = result.issues
+        .map((iss) => {
+          const dotPath = getDotPath(iss);
+          return dotPath ? `${dotPath}: ${iss.message}` : iss.message;
+        })
         .join(", ");
       throw new ValidationError(
         `Invalid code mapping at index ${i}: ${issues}`,
         "path"
       );
     }
-    mappings.push(result.data);
+    mappings.push(result.output);
   }
 
   return mappings;
