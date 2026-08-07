@@ -5,7 +5,7 @@ import {
   listTeams,
 } from "../api-client.js";
 import { getAuthToken } from "../db/auth.js";
-import { ApiError, WizardError } from "../errors.js";
+import { ApiError, AuthError, HostScopeError, WizardError } from "../errors.js";
 import { buildOrgNotFoundError, resolveOrCreateTeam } from "../resolve-team.js";
 import { slugify } from "../utils.js";
 import { WizardCancelledError } from "./clack-utils.js";
@@ -80,6 +80,10 @@ async function withPreflightHandling(
       ui.feedback("cancelled");
       process.exitCode = 0;
       return null;
+    }
+
+    if (error instanceof AuthError || error instanceof HostScopeError) {
+      throw error;
     }
 
     const message = error instanceof Error ? error.message : String(error);
@@ -316,6 +320,9 @@ async function resolveExistingProjectChoice(opts: {
  * format() instead of collapsing to its bare message + status line.
  */
 function toPreflightWizardError(error: unknown): WizardError {
+  if (error instanceof AuthError || error instanceof HostScopeError) {
+    throw error;
+  }
   if (error instanceof WizardError) {
     return error;
   }
