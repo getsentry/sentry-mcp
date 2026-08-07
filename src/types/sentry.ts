@@ -102,18 +102,15 @@ export type SentryProject = Partial<SdkProjectListItem> & {
 // Issue Constants
 
 /**
- * Runtime-iterable tuple of issue status values, tied to the SDK's literal
- * union in both directions:
+ * Runtime-iterable tuple of issue status values the CLI renders.
  *
- * - `satisfies readonly NonNullable<SdkIssueDetail["status"]>[]` catches
- *   **removals/renames** in the SDK union (a tuple entry that no longer
- *   exists in the union fails to assign).
- * - `_IssueStatusParity` below catches **additions** in the SDK union
- *   (an SDK status missing from our tuple makes the conditional type
- *   reduce to `never` instead of `true`).
- *
- * Together they fail typechecking on any drift, forcing the tuple and the
- * SDK union to stay in sync.
+ * This is a deliberate superset of the SDK's `GetOrganizationIssueResponse`
+ * status union: it keeps `resolvedInNextRelease` and `muted`, which the
+ * retrieve-issue endpoint still emits and the CLI still renders (see
+ * STATUS_ICONS / STATUS_LABELS / STATUS_COLORS). As of @sentry/api 0.256 the
+ * SDK union narrowed and no longer covers those two, so the previous
+ * `satisfies NonNullable<SdkIssueDetail["status"]>[]` drift guard misfired on
+ * statuses the CLI needs to display and was removed.
  */
 export const ISSUE_STATUSES = [
   "resolved",
@@ -121,13 +118,8 @@ export const ISSUE_STATUSES = [
   "unresolved",
   "ignored",
   "muted",
-] as const satisfies readonly NonNullable<SdkIssueDetail["status"]>[];
+] as const;
 export type IssueStatus = (typeof ISSUE_STATUSES)[number];
-
-// Note: a reverse exhaustiveness check (SDK → ISSUE_STATUSES) is not possible here
-// because GetOrganizationIssueResponses is a union of all HTTP response types, one of which
-// has `status: string` (loose), making SdkIssueDetail["status"] resolve to `string`.
-// The `satisfies` above catches the forward direction (invalid values in our tuple).
 
 export const ISSUE_LEVELS = [
   "fatal",
