@@ -329,6 +329,50 @@ describe("Ink App snapshot", () => {
     expect(hasForcedWhiteForeground(withoutFeedbackBanner(frame))).toBe(false);
   });
 
+  test("centered select options share aligned label and hint columns", async () => {
+    const options = [
+      { value: "short", label: "Short", hint: "short-slug" },
+      { value: "empower", label: "Empower Plant", hint: "demo" },
+      { value: "sdks", label: "Sentry SDKs", hint: "sentry-sdks" },
+    ];
+    const store = new WizardStore({ bannerRows: [], layout: "intro" });
+    store.setPrompt({
+      kind: "select",
+      message: "Choose a project",
+      options,
+      initialIndex: 0,
+      resolve: ignorePromptResolution,
+    });
+
+    const frame = stripAnsi((await renderApp(store, 80)).allOutput());
+    const lines = frame.split(LINE_SPLIT_RE);
+    const renderedOptions = options.map(({ label, hint }) => {
+      const line = lines.find((candidate) => candidate.includes(label));
+      if (!line) {
+        throw new Error(`Missing rendered option: ${label}`);
+      }
+      const hintColumn = line.indexOf(hint);
+      if (hintColumn < 0) {
+        throw new Error(`Missing rendered hint: ${hint}`);
+      }
+      return {
+        hintColumn,
+        labelColumn: line.indexOf(label),
+      };
+    });
+
+    expect(renderedOptions.map(({ labelColumn }) => labelColumn)).toEqual([
+      renderedOptions[0]?.labelColumn,
+      renderedOptions[0]?.labelColumn,
+      renderedOptions[0]?.labelColumn,
+    ]);
+    expect(renderedOptions.map(({ hintColumn }) => hintColumn)).toEqual([
+      renderedOptions[0]?.hintColumn,
+      renderedOptions[0]?.hintColumn,
+      renderedOptions[0]?.hintColumn,
+    ]);
+  });
+
   test("workflow screen hides logo and shows feedback banner", async () => {
     const store = new WizardStore({
       bannerRows: TEST_BANNER_ROWS,
