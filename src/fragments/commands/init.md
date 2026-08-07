@@ -2,7 +2,7 @@
 
 > **Experimental:** `sentry init` is experimental and may modify your source files. Always review changes before committing.
 
-**Prerequisites:** You must be authenticated first. Run `sentry auth` if you haven't already.
+**Authentication:** Interactive runs start the OAuth login flow automatically when credentials are missing or the stored session has expired. Non-interactive and CI runs must authenticate before running `sentry init`.
 
 ## Examples
 
