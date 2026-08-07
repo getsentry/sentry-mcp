@@ -144,8 +144,18 @@ describe("routes with defaultCommand", () => {
     }
   });
 
-  test("auth route group has defaultCommand (status)", () => {
+  test("auth route group has defaultCommand (smart default)", () => {
     expect(routesWithDefault.has("auth")).toBe(true);
+    const authEntry = routes
+      .getAllEntries()
+      .find((e) => e.name.original === "auth");
+    const authMap = authEntry?.target as unknown as RouteMap;
+    const defaultCmd = authMap.getDefaultCommand?.();
+    const defaultEntry = authMap
+      .getAllEntries()
+      .find((e) => e.target === defaultCmd);
+    expect(defaultEntry?.name.original).toBe("default");
+    expect(defaultEntry?.hidden).toBe(true);
   });
 
   test("route groups without defaultCommand", () => {

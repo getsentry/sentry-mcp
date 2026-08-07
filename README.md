@@ -52,7 +52,7 @@ bunx sentry --help
 
 ```bash
 # Authenticate with Sentry
-sentry auth login
+sentry auth
 
 # List issues (auto-detects project from your codebase)
 sentry issue list

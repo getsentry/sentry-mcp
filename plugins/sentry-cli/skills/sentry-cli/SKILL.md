@@ -284,8 +284,8 @@ npm install -g sentry
 ### Authentication
 
 ```bash
-sentry auth login
-sentry auth login --token YOUR_SENTRY_API_TOKEN
+sentry auth
+sentry auth --token YOUR_SENTRY_API_TOKEN
 sentry auth status
 sentry auth logout
 ```

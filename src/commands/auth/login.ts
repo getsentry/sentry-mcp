@@ -54,7 +54,7 @@ import { registerLoginTrustAnchor } from "../../lib/token-host.js";
 const log = logger.withTag("auth.login");
 
 /** Format a {@link LoginResult} for human-readable terminal output. */
-function formatLoginResult(result: LoginResult): string {
+export function formatLoginResult(result: LoginResult): string {
   const lines: string[] = [];
   lines.push(
     success(

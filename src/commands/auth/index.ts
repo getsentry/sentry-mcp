@@ -1,4 +1,5 @@
 import { buildRouteMap } from "../../lib/route-map.js";
+import { authDefaultCommand } from "./default.js";
 import { loginCommand } from "./login.js";
 import { logoutCommand } from "./logout.js";
 import { refreshCommand } from "./refresh.js";
@@ -8,6 +9,8 @@ import { whoamiCommand } from "./whoami.js";
 
 export const authRoute = buildRouteMap({
   routes: {
+    // Hidden smart default: login when logged out, status when logged in.
+    default: authDefaultCommand,
     login: loginCommand,
     logout: logoutCommand,
     refresh: refreshCommand,
@@ -15,14 +18,16 @@ export const authRoute = buildRouteMap({
     token: tokenCommand,
     whoami: whoamiCommand,
   },
-  defaultCommand: "status",
+  defaultCommand: "default",
   docs: {
     brief: "Authenticate with Sentry",
     fullDescription:
-      "Manage authentication with Sentry. Use 'sentry auth login' to authenticate, " +
-      "'sentry auth logout' to remove credentials, 'sentry auth refresh' to manually refresh your OAuth access token, " +
-      "'sentry auth status' to check your authentication status, " +
-      "'sentry auth whoami' to show your current user identity, " +
-      "and 'sentry auth token' to print your token for use in scripts.",
+      "Manage authentication with Sentry. Use 'sentry auth' to log in when logged out " +
+      "or show status when logged in. Explicit subcommands: 'sentry auth login', " +
+      "'sentry auth logout', 'sentry auth refresh', 'sentry auth status', " +
+      "'sentry auth whoami', and 'sentry auth token'.",
+    hideRoute: {
+      default: true,
+    },
   },
 });
