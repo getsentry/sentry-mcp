@@ -80,8 +80,10 @@ import type {
 
 /** Sentry blurple — primary brand accent. */
 const ACCENT = "#7553FF";
-const MUTED = "gray";
-const MUTED_DIM = "#555555";
+/** De-emphasized text that still clears dark terminal backgrounds. */
+const MUTED = "#898294";
+/** Lowest-contrast treatment for borders, counters, and supporting details. */
+const MUTED_DIM = "#68616F";
 /** Sentry purple — spinners, in-progress states. */
 const PRIMARY = "#8B6AC8";
 
@@ -89,6 +91,7 @@ const COLOR_INFO = "#9C84D4";
 const COLOR_WARN = "#FDB81B";
 const COLOR_ERROR = "#fe4144";
 const COLOR_SUCCESS = "#83da90";
+const ACTIVE_TASK_PULSE_INTERVAL_MS = 600;
 
 const ICON_BY_SEVERITY: Record<LogSeverity, { glyph: string; color?: string }> =
   {
@@ -107,6 +110,7 @@ const ICONS = {
   squareFilled: "\u25FC",
   squareOpen: "\u25FB",
   triangleRight: "\u25B6",
+  triangleRightOutline: "\u25B7",
   triangleSmallRight: "\u25B8",
   bullet: "\u2022",
 } as const;
@@ -551,8 +555,6 @@ function ActionList<T extends string>({
     <Box flexDirection="column" width={listWidth}>
       {choices.map((choice, index) => {
         const isCursor = index === highlighted;
-        // biome-ignore lint/nursery/noLeakedRender: variable assignment, not JSX expression
-        const labelColor = isCursor ? undefined : MUTED;
         if (centered) {
           return (
             <Box
@@ -564,12 +566,8 @@ function ActionList<T extends string>({
               <Text color={ACCENT}>
                 {isCursor ? `${ICONS.triangleSmallRight} ` : "  "}
               </Text>
-              <Text bold={isCursor} color={labelColor}>
-                {choice.label}
-              </Text>
-              {choice.hint ? (
-                <Text color={MUTED_DIM}> {choice.hint}</Text>
-              ) : null}
+              <Text bold={isCursor}>{choice.label}</Text>
+              {choice.hint ? <Text color={MUTED}> {choice.hint}</Text> : null}
             </Box>
           );
         }
@@ -580,10 +578,8 @@ function ActionList<T extends string>({
                 {isCursor ? ICONS.triangleSmallRight : " "}
               </Text>
             </Box>
-            <Text bold={isCursor} color={labelColor}>
-              {choice.label}
-            </Text>
-            {choice.hint ? <Text color={MUTED_DIM}> {choice.hint}</Text> : null}
+            <Text bold={isCursor}>{choice.label}</Text>
+            {choice.hint ? <Text color={MUTED}> {choice.hint}</Text> : null}
           </Box>
         );
       })}
@@ -862,7 +858,7 @@ function ProgressPanel({ steps }: { steps: StepEntry[] }): React.ReactNode {
   const totalCount = steps.length;
 
   const headerRight = totalCount > 0 ? `${completedCount}/${totalCount}` : "";
-  const badgeColor = completedCount === totalCount ? COLOR_SUCCESS : MUTED_DIM;
+  const badgeColor = completedCount === totalCount ? COLOR_SUCCESS : MUTED;
 
   return (
     <Box
@@ -873,7 +869,7 @@ function ProgressPanel({ steps }: { steps: StepEntry[] }): React.ReactNode {
       paddingX={1}
     >
       <Box justifyContent="space-between">
-        <Text bold color={MUTED}>
+        <Text bold color={ACCENT}>
           {ICONS.diamondOpen} Tasks
         </Text>
         {headerRight ? <Text color={badgeColor}>{headerRight}</Text> : null}
@@ -884,7 +880,7 @@ function ProgressPanel({ steps }: { steps: StepEntry[] }): React.ReactNode {
           <Text color={PRIMARY}>
             <Spinner type="dots" />
           </Text>
-          <Text dimColor>Analyzing project...</Text>
+          <Text>Analyzing project...</Text>
         </Box>
       ) : null}
       {steps.map((entry) => (
@@ -895,61 +891,81 @@ function ProgressPanel({ steps }: { steps: StepEntry[] }): React.ReactNode {
 }
 
 function ProgressRow({ entry }: { entry: StepEntry }): React.ReactNode {
-  const { glyph, glyphColor, labelColor, dimLabel } = progressStyle(entry);
+  const { boldLabel, glyph, glyphColor, labelColor } = progressStyle(entry);
   return (
     <Box flexDirection="row" flexShrink={0}>
       <Box flexShrink={0} width={3}>
-        <Text color={glyphColor}>{glyph}</Text>
+        {entry.status === "in_progress" ? (
+          <ActiveTaskGlyph />
+        ) : (
+          <Text color={glyphColor}>{glyph}</Text>
+        )}
       </Box>
-      <Text color={labelColor} dimColor={dimLabel}>
+      <Text bold={boldLabel} color={labelColor}>
         {entry.label}
       </Text>
     </Box>
   );
 }
 
+function ActiveTaskGlyph(): React.ReactNode {
+  const [isFilled, setIsFilled] = useState(true);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setIsFilled((current) => !current);
+    }, ACTIVE_TASK_PULSE_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  return isFilled ? (
+    <Text color={PRIMARY}>{ICONS.triangleRight}</Text>
+  ) : (
+    <Text color={PRIMARY}>{ICONS.triangleRightOutline}</Text>
+  );
+}
+
 function progressStyle(entry: StepEntry): {
+  boldLabel: boolean;
   glyph: string;
   glyphColor: string;
   labelColor?: string;
-  dimLabel: boolean;
 } {
   if (entry.status === "in_progress") {
     return {
+      boldLabel: true,
       glyph: ICONS.triangleRight,
       glyphColor: PRIMARY,
-      dimLabel: false,
     };
   }
   if (entry.status === "completed") {
     return {
+      boldLabel: false,
       glyph: ICONS.squareFilled,
       glyphColor: COLOR_SUCCESS,
       labelColor: MUTED,
-      dimLabel: false,
     };
   }
   if (entry.status === "failed") {
     return {
+      boldLabel: true,
       glyph: "\u2716",
       glyphColor: COLOR_ERROR,
       labelColor: COLOR_ERROR,
-      dimLabel: false,
     };
   }
   if (entry.status === "skipped") {
     return {
+      boldLabel: false,
       glyph: "\u25CC",
       glyphColor: MUTED_DIM,
-      labelColor: MUTED_DIM,
-      dimLabel: true,
+      labelColor: MUTED,
     };
   }
   return {
+    boldLabel: false,
     glyph: ICONS.squareOpen,
-    glyphColor: MUTED_DIM,
-    labelColor: MUTED,
-    dimLabel: true,
+    glyphColor: MUTED,
   };
 }
 
@@ -1577,7 +1593,6 @@ function SelectPromptOptionRow({
   isCursor: boolean;
   option: SelectPromptOptionData;
 }): React.ReactNode {
-  const labelColor = isCursor ? undefined : MUTED;
   if (centered) {
     return (
       <Box
@@ -1590,11 +1605,9 @@ function SelectPromptOptionRow({
         <Text color={ACCENT}>
           {isCursor ? `${ICONS.triangleSmallRight} ` : "  "}
         </Text>
-        <Text bold={isCursor} color={labelColor}>
-          {option.label}
-        </Text>
+        <Text bold={isCursor}>{option.label}</Text>
         {option.hint !== undefined && option.hint !== "" ? (
-          <Text color={MUTED_DIM}> {option.hint}</Text>
+          <Text color={MUTED}> {option.hint}</Text>
         ) : null}
       </Box>
     );
@@ -1604,11 +1617,9 @@ function SelectPromptOptionRow({
       <Box flexShrink={0} width={3}>
         <Text color={ACCENT}>{isCursor ? ICONS.triangleSmallRight : " "}</Text>
       </Box>
-      <Text bold={isCursor} color={labelColor}>
-        {option.label}
-      </Text>
+      <Text bold={isCursor}>{option.label}</Text>
       {option.hint !== undefined && option.hint !== "" ? (
-        <Text color={MUTED_DIM}> {option.hint}</Text>
+        <Text color={MUTED}> {option.hint}</Text>
       ) : null}
     </Box>
   );
@@ -1863,7 +1874,7 @@ function MultiSelectPromptOptionRow({
   option: MultiSelectPromptOptionData;
 }): React.ReactNode {
   const marker = isSelected ? ICONS.squareFilled : ICONS.squareOpen;
-  const markerColor = isSelected ? COLOR_SUCCESS : MUTED_DIM;
+  const markerColor = isSelected ? COLOR_SUCCESS : MUTED;
   if (centered) {
     return (
       <Box
@@ -1879,7 +1890,7 @@ function MultiSelectPromptOptionRow({
         <Text color={markerColor}>{marker} </Text>
         <Text bold={isCursor}>{option.label}</Text>
         {option.hint !== undefined && option.hint !== "" ? (
-          <Text color={MUTED_DIM}> {option.hint}</Text>
+          <Text color={MUTED}> {option.hint}</Text>
         ) : null}
       </Box>
     );
@@ -1892,7 +1903,7 @@ function MultiSelectPromptOptionRow({
       <Text color={markerColor}>{marker} </Text>
       <Text bold={isCursor}>{option.label}</Text>
       {option.hint !== undefined && option.hint !== "" ? (
-        <Text color={MUTED_DIM}> {option.hint}</Text>
+        <Text color={MUTED}> {option.hint}</Text>
       ) : null}
     </Box>
   );

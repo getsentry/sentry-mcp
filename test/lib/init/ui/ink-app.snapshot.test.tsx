@@ -13,7 +13,7 @@ import { Readable, Writable } from "node:stream";
 import { setTimeout as sleep } from "node:timers/promises";
 import { render } from "ink";
 import { createElement } from "react";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   bannerLinesWidth,
   FULL_BANNER_LINES,
@@ -140,6 +140,27 @@ async function renderApp(
   return out;
 }
 
+async function renderActiveTaskFrameAfter(elapsedMs: number): Promise<string> {
+  const out = new CaptureStream(120, 40);
+  const stdin = makeStdin();
+  const store = new WizardStore();
+  store.setStepStatus("detect-platform", "in_progress");
+  const instance = render(createElement(App, { store }), {
+    stdout: out as unknown as NodeJS.WriteStream,
+    stderr: out as unknown as NodeJS.WriteStream,
+    stdin: stdin as unknown as NodeJS.ReadStream,
+    patchConsole: false,
+    exitOnCtrlC: false,
+  });
+
+  try {
+    await vi.advanceTimersByTimeAsync(elapsedMs);
+  } finally {
+    instance.unmount();
+  }
+  return stripAnsi(out.allOutput());
+}
+
 function hasForcedWhiteForeground(output: string): boolean {
   return (
     output.includes(`${ANSI_ESCAPE_PREFIX}37m`) ||
@@ -245,6 +266,19 @@ describe("Ink App snapshot", () => {
     const frame = stripAnsi((await renderApp(store, 120)).allOutput());
     expect(frame).toContain("Did you know?");
     expect(frame.indexOf("Tasks")).toBeLessThan(frame.indexOf("Did you know?"));
+  });
+
+  test("pulses the active task arrow without changing its width", async () => {
+    vi.useFakeTimers();
+    try {
+      const initialFrame = await renderActiveTaskFrameAfter(1);
+      expect(initialFrame).toContain("▶  Detecting platform");
+
+      const pulsedFrame = await renderActiveTaskFrameAfter(601);
+      expect(pulsedFrame).toContain("▷  Detecting platform");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("renders single-column layout at narrow width", async () => {
