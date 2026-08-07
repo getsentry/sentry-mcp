@@ -11,7 +11,15 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { initCommand } from "../../src/commands/init.js";
 // biome-ignore lint/performance/noNamespaceImport: spyOn requires object reference
 import * as projectsApi from "../../src/lib/api/projects.js";
-import { ContextError, ValidationError } from "../../src/lib/errors.js";
+// biome-ignore lint/performance/noNamespaceImport: spyOn requires object reference
+import * as authModule from "../../src/lib/db/auth.js";
+import {
+  AuthError,
+  ContextError,
+  ValidationError,
+} from "../../src/lib/errors.js";
+// biome-ignore lint/performance/noNamespaceImport: spyOn requires object reference
+import * as forceExitModule from "../../src/lib/init/force-exit.js";
 // biome-ignore lint/performance/noNamespaceImport: spyOn requires object reference
 import * as prefetchNs from "../../src/lib/init/org-prefetch.js";
 import { resetPrefetch } from "../../src/lib/init/org-prefetch.js";
@@ -30,6 +38,8 @@ let capturedArgs: Record<string, unknown> | undefined;
 let runWizardSpy: ReturnType<typeof spyOn>;
 let findProjectsSpy: ReturnType<typeof spyOn>;
 let warmSpy: ReturnType<typeof spyOn>;
+let refreshTokenSpy: ReturnType<typeof spyOn>;
+let requestForceExitSpy: ReturnType<typeof spyOn>;
 
 const func = (await initCommand.loader()) as unknown as (
   this: {
@@ -79,12 +89,19 @@ beforeEach(() => {
     // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op mock
     () => {}
   );
+  refreshTokenSpy = vi
+    .spyOn(authModule, "refreshToken")
+    .mockResolvedValue({ token: "oauth-token", refreshed: false });
+  requestForceExitSpy = vi.spyOn(forceExitModule, "requestInitForceExit");
 });
 
 afterEach(() => {
   runWizardSpy.mockRestore();
   findProjectsSpy.mockRestore();
   warmSpy.mockRestore();
+  refreshTokenSpy.mockRestore();
+  requestForceExitSpy.mockRestore();
+  forceExitModule.scheduleInitForceExitIfRequested();
   resetPrefetch();
 });
 
@@ -264,6 +281,35 @@ describe("init command func", () => {
       await func.call(ctx, { yes: false, "dry-run": true });
       expect(capturedArgs?.dryRun).toBe(true);
       expect(runWizardSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("authentication preflight", () => {
+    test("refreshes auth before background work and wizard startup", async () => {
+      const ctx = makeContext();
+
+      await func.call(ctx, DEFAULT_FLAGS);
+
+      expect(refreshTokenSpy).toHaveBeenCalledTimes(1);
+      const refreshOrder = refreshTokenSpy.mock.invocationCallOrder[0];
+      const warmOrder = warmSpy.mock.invocationCallOrder[0];
+      const forceExitOrder = requestForceExitSpy.mock.invocationCallOrder[0];
+      const wizardOrder = runWizardSpy.mock.invocationCallOrder[0];
+      expect(refreshOrder).toBeLessThan(warmOrder ?? 0);
+      expect(refreshOrder).toBeLessThan(forceExitOrder ?? 0);
+      expect(forceExitOrder).toBeLessThan(wizardOrder ?? 0);
+    });
+
+    test("propagates AuthError before background work or wizard startup", async () => {
+      const authError = new AuthError("expired");
+      refreshTokenSpy.mockRejectedValueOnce(authError);
+      const ctx = makeContext();
+
+      await expect(func.call(ctx, DEFAULT_FLAGS)).rejects.toBe(authError);
+
+      expect(warmSpy).not.toHaveBeenCalled();
+      expect(requestForceExitSpy).not.toHaveBeenCalled();
+      expect(runWizardSpy).not.toHaveBeenCalled();
     });
   });
 

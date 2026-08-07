@@ -21,9 +21,9 @@
  * `process.platform === "darwin"`. It comes with a side cost — opening a
  * second `tty.ReadStream` leaks a libuv handle that keeps the event loop
  * alive after the wizard completes (upstream oven-sh/bun#29126), so the
- * `initCommand.func` caller pairs this install with a
- * `setTimeout(process.exit, 100).unref()` safety net to force-exit on
- * macOS once the wizard returns.
+ * outer CLI pipeline pairs init with a
+ * `setTimeout(process.exit, 100).unref()` safety net after recovery
+ * middleware finishes.
  */
 
 import { openSync } from "node:fs";

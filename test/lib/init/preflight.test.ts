@@ -46,7 +46,12 @@ vi.mock("../../../src/lib/dsn/index.js", async (importOriginal) => {
 
 // biome-ignore lint/performance/noNamespaceImport: spyOn requires object reference
 import * as dsnIndex from "../../../src/lib/dsn/index.js";
-import { ApiError, WizardError } from "../../../src/lib/errors.js";
+import {
+  ApiError,
+  AuthError,
+  HostScopeError,
+  WizardError,
+} from "../../../src/lib/errors.js";
 
 vi.mock("../../../src/lib/init/org-prefetch.js", async (importOriginal) => {
   const actual =
@@ -640,6 +645,20 @@ describe("resolveInitContext", () => {
         c.kind === "log.error"
     );
     expect(errorCall?.message).toBe("custom preflight failure");
+  });
+
+  test.each([
+    ["AuthError", new AuthError("expired")],
+    ["HostScopeError", new HostScopeError("host mismatch")],
+  ])("propagates %s without turning it into a wizard failure", async (_, error) => {
+    listTeamsSpy.mockRejectedValueOnce(error);
+
+    const { ui, calls } = createMockUI();
+    await expect(resolveInitContext(makeOptions(), ui)).rejects.toBe(error);
+
+    expect(calls.some((call) => call.kind === "log.error")).toBe(false);
+    expect(calls.some((call) => call.kind === "cancel")).toBe(false);
+    expect(calls.some((call) => call.kind === "feedback")).toBe(false);
   });
 
   test("surfaces a non-API error message from implicit team resolution", async () => {
