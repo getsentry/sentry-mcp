@@ -2,7 +2,7 @@
 
 > **Experimental:** `sentry init` is experimental and may modify your source files. Always review changes before committing.
 
-**Prerequisites:** You must be authenticated first. Run `sentry auth login` if you haven't already.
+**Prerequisites:** You must be authenticated first. Run `sentry auth` if you haven't already.
 
 ## Examples
 

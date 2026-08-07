@@ -5,8 +5,11 @@
 ### OAuth login (recommended)
 
 ```bash
-sentry auth login
+sentry auth
 ```
+
+Bare `sentry auth` logs in when you're logged out and shows status when you're
+already authenticated. `sentry auth login` always starts the login flow.
 
 1. A URL and device code will be displayed
 2. Open the URL in your browser
@@ -18,7 +21,7 @@ sentry auth login
 ### Token login
 
 ```bash
-sentry auth login --token YOUR_SENTRY_API_TOKEN
+sentry auth --token YOUR_SENTRY_API_TOKEN
 ```
 
 ### Read-only OAuth login
@@ -27,7 +30,7 @@ Request only read-only scopes — useful for tokens handed to AI agents or
 CI jobs that should not mutate Sentry state:
 
 ```bash
-sentry auth login --read-only
+sentry auth --read-only
 ```
 
 ### Custom OAuth scopes
@@ -35,8 +38,8 @@ sentry auth login --read-only
 Request specific scopes (repeatable, comma-separated):
 
 ```bash
-sentry auth login --scope project:read --scope org:read
-sentry auth login --scope project:read,event:read
+sentry auth --scope project:read --scope org:read
+sentry auth --scope project:read,event:read
 ```
 
 ### Self-hosted Sentry
@@ -44,14 +47,14 @@ sentry auth login --scope project:read,event:read
 Use `--url` (recommended) or the `SENTRY_URL` environment variable:
 
 ```bash
-sentry auth login --url https://sentry.example.com
-SENTRY_URL=https://sentry.example.com sentry auth login
+sentry auth --url https://sentry.example.com
+SENTRY_URL=https://sentry.example.com sentry auth
 ```
 
 For token-based auth with self-hosted:
 
 ```bash
-sentry auth login --token YOUR_TOKEN --url https://sentry.example.com
+sentry auth --token YOUR_TOKEN --url https://sentry.example.com
 ```
 
 See [Self-Hosted Sentry](../self-hosted/) for details.

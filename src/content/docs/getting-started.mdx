@@ -106,7 +106,7 @@ Or run directly without installing:
 The easiest way to authenticate is via OAuth device flow:
 
 ```bash
-sentry auth login
+sentry auth
 ```
 
 You'll be given a URL and a code to enter. Once you authorize the application
@@ -120,7 +120,7 @@ Sentry CLI configuration directory (`~/.sentry/` by default, overridable with
 Alternatively, you can use an API token directly:
 
 ```bash
-sentry auth login --token YOUR_SENTRY_API_TOKEN
+sentry auth --token YOUR_SENTRY_API_TOKEN
 ```
 
 You can create API tokens in your [Sentry account settings](https://sentry.io/settings/account/api/auth-tokens/).
@@ -149,7 +149,7 @@ sentry auth logout
 Using a self-hosted Sentry instance? Set `SENTRY_URL` to point at it:
 
 ```bash
-SENTRY_URL=https://sentry.example.com sentry auth login
+SENTRY_URL=https://sentry.example.com sentry auth
 ```
 
 See the [Self-Hosted](../self-hosted/) guide for full setup details.
