@@ -452,6 +452,14 @@ Manage Sentry dashboards
 
 → Full flags and examples: `references/dashboard.md`
 
+### Platform
+
+List valid Sentry platform identifiers
+
+- `sentry platform list` — List all valid Sentry platform identifiers
+
+→ Full flags and examples: `references/platform.md`
+
 ### Proguard
 
 Work with ProGuard/R8 mapping files
