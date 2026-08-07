@@ -18,10 +18,20 @@ export function extractCommandPathFromHeading(
 export function matchExampleToCommand(
   code: string,
   commandPaths: readonly string[],
-  groupFallback: string
+  groupFallback: string,
+  defaultCommandPath?: string
 ): string | undefined {
-  return (
-    commandPaths.find((path) => code.includes(path)) ??
-    (code.includes(groupFallback) ? groupFallback : undefined)
-  );
+  // Prefer the longest path so `sentry auth login` wins over bare `sentry auth`
+  // when both would otherwise match via includes().
+  const byLengthDesc = [...commandPaths].sort((a, b) => b.length - a.length);
+  const matched = byLengthDesc.find((path) => code.includes(path));
+  if (matched) {
+    return matched;
+  }
+  if (!code.includes(groupFallback)) {
+    return;
+  }
+  // Bare group examples (`sentry auth`) belong on the default subcommand when
+  // one exists (login), not on a synthetic group-only path.
+  return defaultCommandPath ?? groupFallback;
 }
