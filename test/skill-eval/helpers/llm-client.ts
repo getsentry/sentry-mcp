@@ -13,8 +13,8 @@ import type {
 
 /** Default agent models — the target models for the skill (OpenRouter slugs). */
 export const DEFAULT_AGENT_MODELS = [
-  "anthropic/claude-sonnet-4.6",
-  "anthropic/claude-opus-4.6",
+  "anthropic/claude-sonnet-5",
+  "openai/gpt-5.6-luna",
 ];
 
 /** Default judge model — cheap and fast, just needs to grade command plans. */
