@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-snapshots
-version: 0.42.1
+version: 0.43.0-dev.0
 description: Manage and compare snapshots
 requires:
   bins: ["sentry"]
