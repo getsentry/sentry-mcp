@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-platform
-version: 0.42.2
+version: 0.43.0-dev.0
 description: List valid Sentry platform identifiers
 requires:
   bins: ["sentry"]
