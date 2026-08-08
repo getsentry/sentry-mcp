@@ -41,4 +41,12 @@ describe("getSentryConfig", () => {
 
     expect(config.release).toBeUndefined();
   });
+
+  it("forwards the Spotlight URL from the Worker environment", () => {
+    const config = getSentryConfig(
+      createEnv({ SENTRY_SPOTLIGHT: "http://localhost:8969/stream" }),
+    );
+
+    expect(config.spotlight).toBe("http://localhost:8969/stream");
+  });
 });
