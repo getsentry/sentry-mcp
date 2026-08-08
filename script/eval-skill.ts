@@ -2,23 +2,23 @@
 /**
  * Evaluate SKILL.md effectiveness by testing LLM command planning.
  *
- * Sends test prompts to agent models (Opus 4.6 + Sonnet 4.6) with SKILL.md
+ * Sends test prompts to agent models (Sonnet 5 + GPT-5.6 Luna) with SKILL.md
  * as context, then grades the planned commands on efficiency criteria.
  * Commands are verified against the real CLI binary (via `-h`) to ground
  * the LLM judge with empirical results.
  *
  * Requires an eval provider credential: OPENROUTER_API_KEY (preferred) or
  * ANTHROPIC_API_KEY. OpenRouter is used when its key is set; default model IDs
- * are OpenRouter slugs (e.g. `anthropic/claude-sonnet-4.6`).
+ * are OpenRouter slugs (e.g. `anthropic/claude-sonnet-5`).
  *
  * Usage:
  *   tsx script/eval-skill.ts
- *   EVAL_AGENT_MODELS=anthropic/claude-sonnet-4.6 tsx script/eval-skill.ts
+ *   EVAL_AGENT_MODELS=anthropic/claude-sonnet-5 tsx script/eval-skill.ts
  *
  * Environment variables:
  *   OPENROUTER_API_KEY  - OpenRouter API key (preferred)
  *   ANTHROPIC_API_KEY   - Anthropic API key (fallback when no OpenRouter key)
- *   EVAL_AGENT_MODELS   - Comma-separated model IDs (default: sonnet-4.6, opus-4.6)
+ *   EVAL_AGENT_MODELS   - Comma-separated model IDs (default: sonnet-5, gpt-5.6-luna)
  *   EVAL_JUDGE_MODEL    - Judge model ID (default: haiku-4.5)
  *   EVAL_THRESHOLD      - Minimum pass rate 0-1 (default: 0.75)
  *   SENTRY_CLI_BINARY   - Path to pre-built binary (falls back to tsx src/bin.ts)

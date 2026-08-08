@@ -22,10 +22,10 @@ import type { CaseResult, TestCase } from "../skill-eval/helpers/types.js";
 const SKILL_PATH = "plugins/sentry-cli/skills/sentry-cli/SKILL.md";
 const DEFAULT_THRESHOLD = 0.75;
 
-/** Models under test — env-overridable, defaults to sonnet + opus. */
+/** Models under test — env-overridable, defaults to sonnet-5 + gpt-5.6-luna. */
 const AGENT_MODELS = process.env.EVAL_AGENT_MODELS
   ? process.env.EVAL_AGENT_MODELS.split(",").map((m) => m.trim())
-  : ["anthropic/claude-sonnet-4.6", "anthropic/claude-opus-4.6"];
+  : ["anthropic/claude-sonnet-5", "openai/gpt-5.6-luna"];
 
 const provider = resolveEvalProvider();
 
