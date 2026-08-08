@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-issue
-version: 0.43.0-dev.0
+version: 0.42.2
 description: Manage Sentry issues
 requires:
   bins: ["sentry"]
