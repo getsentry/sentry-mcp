@@ -137,6 +137,17 @@ async function anthropicChat({
   messages,
   maxTokens,
 }: ChatArgs): Promise<string> {
+  // Anthropic direct path only supports Anthropic models; strip the
+  // OpenRouter-style `anthropic/` prefix and reject anything else.
+  let anthropicModel = model;
+  if (model.startsWith("anthropic/")) {
+    anthropicModel = model.slice("anthropic/".length);
+  } else if (model.startsWith("openai/")) {
+    throw new Error(
+      `Anthropic direct provider cannot serve OpenAI model "${model}"`
+    );
+  }
+
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const client = new Anthropic({ apiKey, baseURL });
 
@@ -146,7 +157,7 @@ async function anthropicChat({
     .map((m) => ({ role: "user" as const, content: m.content }));
 
   const response = await client.messages.create({
-    model,
+    model: anthropicModel,
     max_tokens: maxTokens,
     system,
     messages: userMsgs,
