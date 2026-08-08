@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-log
-version: 0.42.2
+version: 0.43.0-dev.0
 description: View Sentry logs
 requires:
   bins: ["sentry"]
