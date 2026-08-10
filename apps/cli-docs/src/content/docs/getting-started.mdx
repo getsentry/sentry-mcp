@@ -24,7 +24,7 @@ which is especially useful in CI/CD pipelines and Dockerfiles:
 
 ```bash
 # Pin to a specific stable version
-SENTRY_VERSION=0.42.2 curl https://cli.sentry.dev/install -fsS | bash
+SENTRY_VERSION=0.40.0 curl https://cli.sentry.dev/install -fsS | bash
 
 # Pin to nightly
 SENTRY_VERSION=nightly curl https://cli.sentry.dev/install -fsS | bash
@@ -33,27 +33,6 @@ SENTRY_VERSION=nightly curl https://cli.sentry.dev/install -fsS | bash
 The `--version` flag takes precedence over `SENTRY_VERSION` if both are set.
 The chosen channel is persisted so that `sentry cli upgrade` automatically
 tracks the same channel on future updates.
-
-### Installer Flags
-
-The install script accepts additional flags to customize behavior:
-
-```bash
-# Skip shell config modifications (~/.zshrc, ~/.bashrc, etc.)
-curl https://cli.sentry.dev/install -fsS | bash -s -- --no-modify-path
-
-# Skip shell completion installation
-curl https://cli.sentry.dev/install -fsS | bash -s -- --no-completions
-
-# Skip AI agent skill installation
-curl https://cli.sentry.dev/install -fsS | bash -s -- --no-agent-skills
-```
-
-You can also set `SENTRY_INSTALL_DIR` to override the binary installation directory:
-
-```bash
-SENTRY_INSTALL_DIR=~/.local/bin curl https://cli.sentry.dev/install -fsS | bash
-```
 
 ### Supported Platforms
 
@@ -133,9 +112,8 @@ sentry auth
 You'll be given a URL and a code to enter. Once you authorize the application
 in your browser, the CLI stores the OAuth credentials. When the server provides
 a refresh token, the CLI refreshes the access token automatically. Persist the
-Sentry CLI configuration directory (`$XDG_CONFIG_HOME/sentry/`, defaulting to
-`~/.config/sentry/`, overridable with `SENTRY_CONFIG_DIR`) across runs to keep
-automatic refresh working.
+Sentry CLI configuration directory (`~/.sentry/` by default, overridable with
+`SENTRY_CONFIG_DIR`) across runs to keep automatic refresh working.
 
 ### API Token
 
@@ -178,7 +156,7 @@ See the [Self-Hosted](../self-hosted/) guide for full setup details.
 
 ## Configuration
 
-Credentials are stored in a SQLite database under `$XDG_CONFIG_HOME/sentry/` (defaulting to `~/.config/sentry/`) with restricted file permissions (mode 600) for security. See [Configuration](../configuration/) for environment variables and customization options.
+Credentials are stored in a SQLite database at `~/.sentry/` with restricted file permissions (mode 600) for security. See [Configuration](../configuration/) for environment variables and customization options.
 
 ## Next Steps
 

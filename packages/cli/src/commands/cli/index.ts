@@ -1,5 +1,4 @@
 import { buildRouteMap } from "../../lib/route-map.js";
-import { completionCommand } from "./completion.js";
 import { defaultsCommand } from "./defaults.js";
 import { feedbackCommand } from "./feedback.js";
 import { fixCommand } from "./fix.js";
@@ -10,7 +9,6 @@ import { upgradeCommand } from "./upgrade.js";
 
 export const cliRoute = buildRouteMap({
   routes: {
-    completion: completionCommand,
     defaults: defaultsCommand,
     feedback: feedbackCommand,
     fix: fixCommand,

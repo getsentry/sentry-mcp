@@ -19,6 +19,8 @@ import {
   ValidationError,
 } from "../../src/lib/errors.js";
 // biome-ignore lint/performance/noNamespaceImport: spyOn requires object reference
+import * as forceExitModule from "../../src/lib/init/force-exit.js";
+// biome-ignore lint/performance/noNamespaceImport: spyOn requires object reference
 import * as prefetchNs from "../../src/lib/init/org-prefetch.js";
 import { resetPrefetch } from "../../src/lib/init/org-prefetch.js";
 // biome-ignore lint/performance/noNamespaceImport: spyOn requires object reference
@@ -37,6 +39,7 @@ let runWizardSpy: ReturnType<typeof spyOn>;
 let findProjectsSpy: ReturnType<typeof spyOn>;
 let warmSpy: ReturnType<typeof spyOn>;
 let refreshTokenSpy: ReturnType<typeof spyOn>;
+let requestForceExitSpy: ReturnType<typeof spyOn>;
 
 const func = (await initCommand.loader()) as unknown as (
   this: {
@@ -89,6 +92,7 @@ beforeEach(() => {
   refreshTokenSpy = vi
     .spyOn(authModule, "refreshToken")
     .mockResolvedValue({ token: "oauth-token", refreshed: false });
+  requestForceExitSpy = vi.spyOn(forceExitModule, "requestInitForceExit");
 });
 
 afterEach(() => {
@@ -96,6 +100,8 @@ afterEach(() => {
   findProjectsSpy.mockRestore();
   warmSpy.mockRestore();
   refreshTokenSpy.mockRestore();
+  requestForceExitSpy.mockRestore();
+  forceExitModule.scheduleInitForceExitIfRequested();
   resetPrefetch();
 });
 
@@ -183,14 +189,13 @@ describe("init command func", () => {
       const ctx = makeContext();
       await func.call(ctx, {
         ...DEFAULT_FLAGS,
-        features: ["errors,tracing,replay,agent-tracing,mcp-observability"],
+        features: ["errors,tracing,replay,sourcemaps"],
       });
       expect(capturedArgs?.features).toEqual([
         "errorMonitoring",
         "performanceMonitoring",
         "sessionReplay",
-        "aiMonitoring",
-        "mcpObservability",
+        "sourceMaps",
       ]);
     });
 
@@ -199,15 +204,14 @@ describe("init command func", () => {
       await func.call(ctx, {
         ...DEFAULT_FLAGS,
         features: [
-          "errorMonitoring,performanceMonitoring,sessionReplay,aiMonitoring,mcpObservability",
+          "errorMonitoring,performanceMonitoring,sessionReplay,sourceMaps",
         ],
       });
       expect(capturedArgs?.features).toEqual([
         "errorMonitoring",
         "performanceMonitoring",
         "sessionReplay",
-        "aiMonitoring",
-        "mcpObservability",
+        "sourceMaps",
       ]);
     });
 
@@ -219,44 +223,11 @@ describe("init command func", () => {
       });
       await expect(promise).rejects.toThrow(ValidationError);
       await expect(promise).rejects.toThrow(
-        "Supported features: errors, tracing, logs, replay, profiling, crons, agent-tracing, mcp-observability"
+        "Supported features: errors, tracing, logs, replay, metrics, profiling, sourcemaps, crons, ai-monitoring, user-feedback"
       );
       expect(runWizardSpy).not.toHaveBeenCalled();
       expect(findProjectsSpy).not.toHaveBeenCalled();
       expect(warmSpy).not.toHaveBeenCalled();
-    });
-
-    test.each([
-      "user-feedback",
-      "userFeedback",
-    ])("rejects %s because init cannot configure User Feedback placement", async (feature) => {
-      const ctx = makeContext();
-      const promise = func.call(ctx, {
-        ...DEFAULT_FLAGS,
-        features: [feature],
-      });
-      await expect(promise).rejects.toThrow(ValidationError);
-      await expect(promise).rejects.toThrow(
-        `Unknown init feature "${feature}"`
-      );
-      expect(runWizardSpy).not.toHaveBeenCalled();
-    });
-
-    test.each([
-      "metrics",
-      "sourcemaps",
-      "attachments",
-    ])("rejects %s because init does not yet automate its setup", async (feature) => {
-      const ctx = makeContext();
-      const promise = func.call(ctx, {
-        ...DEFAULT_FLAGS,
-        features: [feature],
-      });
-      await expect(promise).rejects.toThrow(ValidationError);
-      await expect(promise).rejects.toThrow(
-        `Unknown init feature "${feature}"`
-      );
-      expect(runWizardSpy).not.toHaveBeenCalled();
     });
 
     test("passes undefined when features not provided", async () => {
@@ -322,9 +293,11 @@ describe("init command func", () => {
       expect(refreshTokenSpy).toHaveBeenCalledTimes(1);
       const refreshOrder = refreshTokenSpy.mock.invocationCallOrder[0];
       const warmOrder = warmSpy.mock.invocationCallOrder[0];
+      const forceExitOrder = requestForceExitSpy.mock.invocationCallOrder[0];
       const wizardOrder = runWizardSpy.mock.invocationCallOrder[0];
       expect(refreshOrder).toBeLessThan(warmOrder ?? 0);
-      expect(refreshOrder).toBeLessThan(wizardOrder ?? 0);
+      expect(refreshOrder).toBeLessThan(forceExitOrder ?? 0);
+      expect(forceExitOrder).toBeLessThan(wizardOrder ?? 0);
     });
 
     test("propagates AuthError before background work or wizard startup", async () => {
@@ -335,6 +308,7 @@ describe("init command func", () => {
       await expect(func.call(ctx, DEFAULT_FLAGS)).rejects.toBe(authError);
 
       expect(warmSpy).not.toHaveBeenCalled();
+      expect(requestForceExitSpy).not.toHaveBeenCalled();
       expect(runWizardSpy).not.toHaveBeenCalled();
     });
   });

@@ -453,19 +453,6 @@ export function parsePositionalArgs(args: string[]): ParsedPositionalArgs {
     };
   }
 
-  // Detect issue short ID as second arg (e.g., "my-org/my-project BRUNCHIE-APP-29").
-  // Auto-redirect to that issue's latest event instead of treating the short
-  // ID as an event hex ID (which would fail validation).
-  if (looksLikeIssueShortId(second)) {
-    const extraEventIds = args.length > 2 ? args.slice(2) : undefined;
-    return {
-      eventId: LATEST_EVENT_SENTINEL,
-      targetArg: first,
-      issueShortId: second,
-      extraEventIds,
-    };
-  }
-
   // Two or more args - first is target, second is event ID.
   // Any additional args are extra event IDs (from newline-separated input).
   const extraEventIds = args.length > 2 ? args.slice(2) : undefined;
@@ -703,10 +690,6 @@ async function tryEventFallbacks(
   // Track whether the search completed so we can skip the org in cross-org
   // only when we got a definitive "not found" (not a transient failure).
   let sameOrgSearched = false;
-  // Track rate-limit separately: a 429 means the org is reachable but throttled.
-  // Retrying it immediately in the cross-org fallback would just hit the same
-  // limit again, producing consecutive identical HTTP requests (CLI-2Y1).
-  let orgRateLimited = false;
   try {
     const resolved = await resolveEventInOrg(org, eventId);
     sameOrgSearched = true;
@@ -721,20 +704,15 @@ async function tryEventFallbacks(
     if (sameOrgError instanceof AuthError) {
       throw sameOrgError;
     }
-    if (sameOrgError instanceof ApiError && sameOrgError.status === 429) {
-      // Rate-limited — exclude the org from cross-org search; an immediate
-      // retry against the same endpoint would hit the same limit.
-      orgRateLimited = true;
-    }
-    logger.debug("Same-org event lookup failed", sameOrgError);
+    // Transient failure — don't mark org as searched so cross-org retries it
   }
 
   // Cross-org fallback: the event may exist in a different organization.
-  // Exclude the org when the same-org search completed (returned null) OR
-  // when it was rate-limited — either way, re-querying it immediately is futile.
+  // Only exclude the org if the same-org search completed successfully
+  // (returned null). If it threw a transient error, let cross-org retry it.
   try {
     const crossOrg = await findEventAcrossOrgs(eventId, {
-      excludeOrgs: sameOrgSearched || orgRateLimited ? [org] : undefined,
+      excludeOrgs: sameOrgSearched ? [org] : undefined,
     });
     if (crossOrg) {
       // Use project-scoped phrasing when found in same org (different project)
@@ -910,12 +888,9 @@ async function resolveIssueShortcut(
   // alongside a hex event ID. Resolve the issue to get org/project.
   if (issueShortId) {
     // Use the explicit org from the parsed target if available (e.g.,
-    // "figma/" → org-all, or "figma/project" → explicit, both carry the
-    // org), otherwise fall back to auto-detection via DSN/env/config.
-    const explicitOrg =
-      parsed.type === "org-all" || parsed.type === "explicit"
-        ? parsed.org
-        : undefined;
+    // "figma/" → org-all with org "figma"), otherwise fall back to
+    // auto-detection via DSN/env/config.
+    const explicitOrg = parsed.type === "org-all" ? parsed.org : undefined;
     const resolved = await resolveOrg({ org: explicitOrg, cwd });
     if (!resolved) {
       throw new ContextError(

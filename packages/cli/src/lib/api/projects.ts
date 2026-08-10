@@ -73,7 +73,6 @@ export async function listProjects(orgSlug: string): Promise<SentryProject[]> {
 
   // Populate project cache for shell completions (best-effort).
   // Mirrors how listOrganizations() calls setOrgRegions().
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const orgs = getCachedOrganizations();
     const orgName = orgs.find((o) => o.slug === orgSlug)?.name ?? orgSlug;
@@ -174,7 +173,6 @@ function seedProjectCaches(
   project: SentryProject,
   dsn: string | null
 ): void {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const orgName = resolveOrgDisplayName(orgSlug, project.organization?.name);
     cacheProjectsForOrg(orgSlug, orgName, [
@@ -184,7 +182,6 @@ function seedProjectCaches(
     // Best-effort — don't let cache failures break project creation
   }
   if (dsn) {
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       const publicKey = extractPublicKeyFromDsn(dsn);
       if (publicKey) {
@@ -207,7 +204,6 @@ function seedProjectCaches(
  * DSN format: https://<public_key>@<host>/<project_id>
  */
 function extractPublicKeyFromDsn(dsn: string): string | null {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const url = new URL(dsn);
     return url.username || null;
@@ -504,7 +500,6 @@ export async function findProjectByDsnKey(
   const results = await Promise.all(
     regions.map((region) =>
       limit(async () => {
-        // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
         try {
           // Same `?query=dsn:` escape hatch as above (see the region-fallback
           // branch) — internal search param, no typed SDK operation yet.
@@ -632,7 +627,6 @@ export async function tryGetPrimaryDsn(
   orgSlug: string,
   projectSlug: string
 ): Promise<string | null> {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const keys = await getProjectKeys(orgSlug, projectSlug);
     const activeKey = keys.find((k) => k.isActive);

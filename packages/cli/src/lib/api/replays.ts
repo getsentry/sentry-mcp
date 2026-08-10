@@ -27,10 +27,10 @@ import { resolveOrgRegion } from "../region.js";
 import {
   API_MAX_PER_PAGE,
   apiRequestToRegion,
+  autoPaginate,
   getOrgSdkConfig,
   MAX_PAGINATION_PAGES,
   type PaginatedResponse,
-  paginate,
   parseLinkHeader,
   unwrapPaginatedResult,
 } from "./infrastructure.js";
@@ -229,12 +229,15 @@ export async function listReplays(
   orgSlug: string,
   options: ListReplaysOptions = {}
 ): Promise<PaginatedResponse<ReplayListItem[]>> {
+  const limit = options.limit ?? 25;
+  const perPage = Math.min(limit, API_MAX_PER_PAGE);
   const regionUrl = await resolveOrgRegion(orgSlug);
-  return paginate(
-    options,
-    (perPage, cursor) =>
+
+  return autoPaginate(
+    (cursor) =>
       fetchReplayPage(regionUrl, orgSlug, { options, perPage, cursor }),
-    25
+    limit,
+    options.cursor
   );
 }
 

@@ -16,7 +16,7 @@ import {
   updateOrganizationRelease,
 } from "@sentry/api";
 import type { SentryDeploy, SentryRelease } from "../../types/index.js";
-import { ApiError, ValidationError, validationError } from "../errors.js";
+import { ApiError, ValidationError } from "../errors.js";
 import { getHeadCommit, getRepositoryName } from "../git.js";
 import { resolveOrgRegion } from "../region.js";
 import {
@@ -381,7 +381,6 @@ async function getPreviousReleaseCommit(
   orgSlug: string,
   version: string
 ): Promise<string | undefined> {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const regionUrl = await resolveOrgRegion(orgSlug);
     const encodedVersion = encodeURIComponent(version);
@@ -438,13 +437,8 @@ export async function setCommitsAuto(
 ): Promise<SentryRelease> {
   const localRepo = getRepositoryName(cwd);
   if (!localRepo) {
-    throw validationError(
-      "Could not determine the repository from the local git remote. --auto matches the 'origin' remote against your Sentry repositories, so it needs a git checkout with an 'origin' remote configured.",
-      [
-        "git remote add origin <url>",
-        "sentry release set-commits <version> --local",
-        "sentry release set-commits <version> --commit owner/repo@abc123",
-      ],
+    throw new ValidationError(
+      "Could not determine repository name from local git remote.",
       "repository"
     );
   }

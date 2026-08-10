@@ -6,8 +6,6 @@
  * - `defaults.project` — default project slug
  * - `defaults.telemetry` — telemetry preference (`"on"` / `"off"`)
  * - `defaults.url` — Sentry instance URL (for self-hosted)
- * - `defaults.agent-skills` — agent skill install preference (`"on"` / `"off"`)
- * - `defaults.graphics` — inline terminal graphics preference (`"on"` / `"off"`)
  */
 
 import { getDatabase } from "./index.js";
@@ -19,8 +17,6 @@ const DEFAULTS_TELEMETRY = "defaults.telemetry";
 const DEFAULTS_URL = "defaults.url";
 const DEFAULTS_HEADERS = "defaults.headers";
 const DEFAULTS_CA_CERT = "defaults.ca-cert";
-const DEFAULTS_AGENT_SKILLS = "defaults.agent-skills";
-const DEFAULTS_GRAPHICS = "defaults.graphics";
 
 /** All metadata keys used for defaults (for bulk operations) */
 const ALL_DEFAULTS_KEYS = [
@@ -30,8 +26,6 @@ const ALL_DEFAULTS_KEYS = [
   DEFAULTS_URL,
   DEFAULTS_HEADERS,
   DEFAULTS_CA_CERT,
-  DEFAULTS_AGENT_SKILLS,
-  DEFAULTS_GRAPHICS,
 ];
 
 /** State of all persistent defaults */
@@ -48,14 +42,10 @@ export type DefaultsState = {
   headers: string | null;
   /** Path to a PEM file with custom CA certificates, or null if unset */
   "ca-cert": string | null;
-  /** Agent skill install preference: "on", "off", or null (= default enabled) */
-  "agent-skills": "on" | "off" | null;
-  /** Inline terminal graphics preference: "on", "off", or null (= default enabled) */
-  graphics: "on" | "off" | null;
 };
 
-/** Parse a raw "on" / "off" metadata value to a typed "on" | "off" | null. */
-function parseOnOffValue(val: string | undefined): "on" | "off" | null {
+/** Parse a raw telemetry metadata value to a typed "on" | "off" | null. */
+function parseTelemetryValue(val: string | undefined): "on" | "off" | null {
   if (val === "on") {
     return "on";
   }
@@ -102,44 +92,6 @@ export function getTelemetryPreference(): boolean | undefined {
   return;
 }
 
-/**
- * Get the persistent agent skill install preference.
- *
- * @returns `true` if explicitly enabled, `false` if explicitly disabled,
- *   `undefined` if no preference is stored (callers should default to enabled)
- */
-export function getAgentSkillsPreference(): boolean | undefined {
-  const db = getDatabase();
-  const m = getMetadata(db, [DEFAULTS_AGENT_SKILLS]);
-  const val = m.get(DEFAULTS_AGENT_SKILLS);
-  if (val === "on") {
-    return true;
-  }
-  if (val === "off") {
-    return false;
-  }
-  return;
-}
-
-/**
- * Get the persistent inline-graphics preference.
- *
- * @returns `true` if explicitly enabled, `false` if explicitly disabled,
- *   `undefined` if no preference is stored (callers should default to enabled)
- */
-export function getGraphicsPreference(): boolean | undefined {
-  const db = getDatabase();
-  const m = getMetadata(db, [DEFAULTS_GRAPHICS]);
-  const val = m.get(DEFAULTS_GRAPHICS);
-  if (val === "on") {
-    return true;
-  }
-  if (val === "off") {
-    return false;
-  }
-  return;
-}
-
 /** Get the default Sentry instance URL, or null if not set. */
 export function getDefaultUrl(): string | null {
   const db = getDatabase();
@@ -174,15 +126,14 @@ export function getDefaultCaCert(): string | null {
 export function getAllDefaults(): DefaultsState {
   const db = getDatabase();
   const m = getMetadata(db, ALL_DEFAULTS_KEYS);
+  const telVal = m.get(DEFAULTS_TELEMETRY);
   return {
     organization: m.get(DEFAULTS_ORG) ?? null,
     project: m.get(DEFAULTS_PROJECT) ?? null,
-    telemetry: parseOnOffValue(m.get(DEFAULTS_TELEMETRY)),
+    telemetry: parseTelemetryValue(telVal),
     url: m.get(DEFAULTS_URL) ?? null,
     headers: m.get(DEFAULTS_HEADERS) ?? null,
     "ca-cert": m.get(DEFAULTS_CA_CERT) ?? null,
-    "agent-skills": parseOnOffValue(m.get(DEFAULTS_AGENT_SKILLS)),
-    graphics: parseOnOffValue(m.get(DEFAULTS_GRAPHICS)),
   };
 }
 
@@ -220,32 +171,6 @@ export function setTelemetryPreference(enabled: boolean | null): void {
     clearMetadata(db, [DEFAULTS_TELEMETRY]);
   } else {
     setMetadata(db, { [DEFAULTS_TELEMETRY]: enabled ? "on" : "off" });
-  }
-}
-
-/**
- * Set or clear the persistent agent skill install preference.
- * Pass `null` to remove the preference (callers will default to enabled).
- */
-export function setAgentSkillsPreference(enabled: boolean | null): void {
-  const db = getDatabase();
-  if (enabled === null) {
-    clearMetadata(db, [DEFAULTS_AGENT_SKILLS]);
-  } else {
-    setMetadata(db, { [DEFAULTS_AGENT_SKILLS]: enabled ? "on" : "off" });
-  }
-}
-
-/**
- * Set or clear the persistent inline-graphics preference.
- * Pass `null` to remove the preference (callers will default to enabled).
- */
-export function setGraphicsPreference(enabled: boolean | null): void {
-  const db = getDatabase();
-  if (enabled === null) {
-    clearMetadata(db, [DEFAULTS_GRAPHICS]);
-  } else {
-    setMetadata(db, { [DEFAULTS_GRAPHICS]: enabled ? "on" : "off" });
   }
 }
 

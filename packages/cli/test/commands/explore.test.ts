@@ -441,17 +441,17 @@ describe("sentry explore", () => {
   });
 
   describe("sort handling", () => {
-    test("auto-sorts errors by first aggregate descending", async () => {
+    test("auto-sorts by first aggregate descending for non-spans", async () => {
       resolveTargetSpy.mockResolvedValue({ org: "test-org" });
       const { context } = createContext();
 
       await func.call(context, DEFAULT_FLAGS, "test-org/");
 
-      // Default fields are ["title", "count()"]; the errors dataset accepts
-      // sort and needs a stable order for correct cursor pagination (#1519).
+      // Default fields are ["title", "count()"], so sort should be omitted
+      // for non-spans datasets (errors is the default)
       expect(queryEventsSpy).toHaveBeenCalledWith(
         "test-org",
-        expect.objectContaining({ sort: "-count()" })
+        expect.objectContaining({ sort: undefined })
       );
     });
 
@@ -471,44 +471,19 @@ describe("sentry explore", () => {
       );
     });
 
-    test("omits sort for metrics dataset even when auto-detected", async () => {
+    test("omits sort for non-spans dataset even when auto-detected", async () => {
       resolveTargetSpy.mockResolvedValue({ org: "test-org" });
       const { context } = createContext();
 
       await func.call(
         context,
-        {
-          ...DEFAULT_FLAGS,
-          dataset: "tracemetrics",
-          field: ["sum(value,llm.token_usage,distribution,none)"],
-        },
+        { ...DEFAULT_FLAGS, dataset: "errors" },
         "test-org/"
       );
 
-      // metrics/logs reject sort with 400, so it stays unset.
       expect(queryEventsSpy).toHaveBeenCalledWith(
         "test-org",
         expect.objectContaining({ sort: undefined })
-      );
-    });
-
-    test("applies auto-derived sort on errors for grouped aggregates", async () => {
-      resolveTargetSpy.mockResolvedValue({ org: "test-org" });
-      const { context } = createContext();
-
-      await func.call(
-        context,
-        {
-          ...DEFAULT_FLAGS,
-          dataset: "errors",
-          field: ["task.name", "failure.node", "count()"],
-        },
-        "test-org/"
-      );
-
-      expect(queryEventsSpy).toHaveBeenCalledWith(
-        "test-org",
-        expect.objectContaining({ sort: "-count()", dataset: "errors" })
       );
     });
 
@@ -911,46 +886,17 @@ describe("sentry explore", () => {
   });
 
   describe("validation", () => {
-    test("translates --environment into query filter terms on non-replay datasets", async () => {
+    test("rejects --environment on non-replay datasets", async () => {
       resolveTargetSpy.mockResolvedValue({ org: "test-org" });
-      queryEventsSpy.mockResolvedValue({
-        data: MOCK_EVENTS_RESPONSE,
-        nextCursor: undefined,
-      });
       const { context } = createContext();
 
-      await func.call(
-        context,
-        { ...DEFAULT_FLAGS, environment: ["production"] },
-        "test-org/"
-      );
-
-      expect(queryEventsSpy).toHaveBeenCalledWith(
-        "test-org",
-        expect.objectContaining({ query: "environment:production" })
-      );
-    });
-
-    test("translates multiple --environment values into environment:[...] syntax", async () => {
-      resolveTargetSpy.mockResolvedValue({ org: "test-org" });
-      queryEventsSpy.mockResolvedValue({
-        data: MOCK_EVENTS_RESPONSE,
-        nextCursor: undefined,
-      });
-      const { context } = createContext();
-
-      await func.call(
-        context,
-        { ...DEFAULT_FLAGS, environment: ["production", "canary"] },
-        "test-org/"
-      );
-
-      expect(queryEventsSpy).toHaveBeenCalledWith(
-        "test-org",
-        expect.objectContaining({
-          query: "environment:[production,canary]",
-        })
-      );
+      await expect(
+        func.call(
+          context,
+          { ...DEFAULT_FLAGS, environment: ["production"] },
+          "test-org/"
+        )
+      ).rejects.toThrow(ValidationError);
     });
 
     test("rejects replay detail-only fields on the replay dataset", async () => {

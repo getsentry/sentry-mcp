@@ -30,20 +30,18 @@ import {
   type SourceStrategy,
   type StableChainInfo,
 } from "binpatch";
-import { prerelease as semverPrerelease, valid as semverValid } from "semver";
 import {
   compareVersions,
-  getGitHubReleasesUrl,
+  GITHUB_RELEASES_URL,
   getPlatformBinaryName,
   isDowngrade,
   isNightlyVersion,
-  PRIMARY_UPGRADE_SOURCE,
-  type UpgradeSource,
 } from "./binary.js";
 import { CLI_VERSION } from "./constants.js";
 import { customFetch } from "./custom-ca.js";
 import { getConfigDir } from "./db/index.js";
 import { formatBytes } from "./formatters/numbers.js";
+import { GHCR_REPO } from "./ghcr.js";
 import { logger } from "./logger.js";
 import { makeByteProgress, type SetMessage } from "./progress.js";
 import { withTracing, withTracingSpan } from "./telemetry.js";
@@ -70,62 +68,10 @@ export type DeltaResult = {
   chainLength: number;
 };
 
+// GHCR publishes nightlies to ghcr.io/getsentry/cli (see src/lib/ghcr.ts
+// GHCR_REPO). Importing as a named import keeps a single source of truth and
+// avoids the silent 404 introduced when this was a string literal.
 const log = logger.withTag("delta-upgrade");
-
-const NORMALIZED_RELEASE_SOURCE = Symbol("normalizedReleaseSource");
-
-/** Stable GitHub releases normalized for one explicit upgrade source. */
-export type NormalizedGitHubReleases = GitHubRelease[] & {
-  /** Stable key for the source that produced these normalized tags. */
-  readonly [NORMALIZED_RELEASE_SOURCE]: string;
-};
-
-function upgradeSourceKey(source: UpgradeSource): string {
-  return `${source.githubRepo}\0${source.ghcrRepo}\0${source.tagPrefix}`;
-}
-
-/** Return whether a normalized release list belongs to the selected source. */
-export function isNormalizedForSource(
-  releases: GitHubRelease[],
-  source: UpgradeSource
-): boolean {
-  return (
-    (releases as Partial<NormalizedGitHubReleases>)[
-      NORMALIZED_RELEASE_SOURCE
-    ] === upgradeSourceKey(source)
-  );
-}
-
-/** Filter and normalize raw stable GitHub releases for one upgrade source. */
-export function normalizeStableReleases(
-  releases: unknown[],
-  source: UpgradeSource
-): NormalizedGitHubReleases {
-  const normalized = releases
-    .filter(isGitHubRelease)
-    .filter((release) => !(release.draft || release.prerelease))
-    .filter((release) => release.tag_name.startsWith(source.tagPrefix))
-    .map((release) => ({
-      ...release,
-      tag_name: release.tag_name.slice(source.tagPrefix.length),
-    }))
-    .filter(
-      (release) =>
-        semverValid(release.tag_name) !== null &&
-        semverPrerelease(release.tag_name) === null
-    ) as NormalizedGitHubReleases;
-  Object.defineProperty(normalized, NORMALIZED_RELEASE_SOURCE, {
-    value: upgradeSourceKey(source),
-  });
-  return normalized;
-}
-
-function getPrimaryUpgradeSource(): UpgradeSource {
-  if (!PRIMARY_UPGRADE_SOURCE) {
-    throw new Error("No primary upgrade source is configured");
-  }
-  return PRIMARY_UPGRADE_SOURCE;
-}
 
 const instrument: InstrumentHook = (name, fn) =>
   withTracing(name, "http.client", fn);
@@ -173,48 +119,20 @@ function getPatchCache(): PatchCache {
   return instrumentCache(makeCache(join(getConfigDir(), "patch-cache")));
 }
 
-function stableSource(source: UpgradeSource): SourceStrategy {
-  const releasesUrl = getGitHubReleasesUrl(source);
-  const sourceFetch: typeof customFetch = async (input, init) => {
-    const response = await customFetch(input, init);
-    if (!(response.ok && String(input).startsWith(`${releasesUrl}?`))) {
-      return response;
-    }
-    const data: unknown = await response.json();
-    if (!Array.isArray(data)) {
-      return new Response(JSON.stringify(data), response);
-    }
-    const releases = normalizeStableReleases(data, source);
-    return new Response(JSON.stringify(releases), response);
-  };
-
+function stableSource(): SourceStrategy {
   return githubReleaseSource({
-    releasesUrl,
+    releasesUrl: GITHUB_RELEASES_URL,
     binaryName: getPlatformBinaryName(),
     userAgent: `sentry-cli/${CLI_VERSION}`,
-    fetch: sourceFetch,
+    fetch: customFetch,
     instrument,
   });
 }
 
-function isGitHubRelease(value: unknown): value is GitHubRelease & {
-  draft?: boolean;
-  prerelease?: boolean;
-} {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "tag_name" in value &&
-    typeof value.tag_name === "string" &&
-    "assets" in value &&
-    Array.isArray(value.assets)
-  );
-}
-
-function nightlySource(source: UpgradeSource): SourceStrategy {
+function nightlySource(): SourceStrategy {
   return ghcrSource({
     registry: "https://ghcr.io",
-    repo: source.ghcrRepo,
+    repo: GHCR_REPO,
     binaryName: getPlatformBinaryName(),
     targetTag: (version) => `nightly-${version}`,
     compareVersions,
@@ -235,32 +153,28 @@ export function canAttemptDelta(targetVersion: string): boolean {
 }
 
 export async function fetchRecentReleases(
-  signal?: AbortSignal,
-  source: UpgradeSource = getPrimaryUpgradeSource()
-): Promise<NormalizedGitHubReleases> {
+  signal?: AbortSignal
+): Promise<GitHubRelease[]> {
   try {
-    const response = await customFetch(
-      `${getGitHubReleasesUrl(source)}?per_page=12`,
-      {
-        headers: {
-          Accept: "application/vnd.github.v3+json",
-          "User-Agent": `sentry-cli/${CLI_VERSION}`,
-        },
-        signal,
-      }
-    );
+    const response = await customFetch(`${GITHUB_RELEASES_URL}?per_page=12`, {
+      headers: {
+        Accept: "application/vnd.github.v3+json",
+        "User-Agent": `sentry-cli/${CLI_VERSION}`,
+      },
+      signal,
+    });
     if (!response.ok) {
-      return normalizeStableReleases([], source);
+      return [];
     }
     const data = await response.json();
     if (!Array.isArray(data)) {
       log.debug("GitHub releases response is not an array", typeof data);
-      return normalizeStableReleases([], source);
+      return [];
     }
-    return normalizeStableReleases(data, source);
+    return data as GitHubRelease[];
   } catch (error) {
     log.debug("Failed to fetch recent releases from GitHub", error);
-    return normalizeStableReleases([], source);
+    return [];
   }
 }
 
@@ -356,14 +270,9 @@ export function validateChainStep(
 export function resolveStableChain(
   currentVersion: string,
   targetVersion: string,
-  signal?: AbortSignal,
-  source: UpgradeSource = getPrimaryUpgradeSource()
+  signal?: AbortSignal
 ): Promise<PatchChain | null> {
-  return stableSource(source).resolveChain(
-    currentVersion,
-    targetVersion,
-    signal
-  );
+  return stableSource().resolveChain(currentVersion, targetVersion, signal);
 }
 
 export async function resolveNightlyChain(opts: {
@@ -373,12 +282,10 @@ export async function resolveNightlyChain(opts: {
   fullGzSize: number;
   preloadedTags?: string[];
   signal?: AbortSignal;
-  source?: UpgradeSource;
 }): Promise<PatchChain | null> {
-  const { source = getPrimaryUpgradeSource() } = opts;
   const client = new OciClient({
     registry: "https://ghcr.io",
-    repo: source.ghcrRepo,
+    repo: GHCR_REPO,
     userAgent: `sentry-cli/${CLI_VERSION}`,
     fetch: customFetch,
   });
@@ -395,7 +302,6 @@ export async function resolveNightlyChain(opts: {
   }
 
   let manifests: OciManifest[];
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     manifests = await Promise.all(
       chainTags.map((tag) => client.fetchManifest(opts.token, tag, opts.signal))
@@ -582,11 +488,10 @@ export function resolveStableDelta(
   oldBinaryPath: string,
   destPath: string,
   offline?: boolean,
-  setMessage?: SetMessage,
-  source: UpgradeSource = getPrimaryUpgradeSource()
+  setMessage?: SetMessage
 ): Promise<DeltaResult | null> {
   return resolveDelta(
-    stableSource(source),
+    stableSource(),
     targetVersion,
     oldBinaryPath,
     destPath,
@@ -601,11 +506,10 @@ export function resolveNightlyDelta(
   oldBinaryPath: string,
   destPath: string,
   offline?: boolean,
-  setMessage?: SetMessage,
-  source: UpgradeSource = getPrimaryUpgradeSource()
+  setMessage?: SetMessage
 ): Promise<DeltaResult | null> {
   return resolveDelta(
-    nightlySource(source),
+    nightlySource(),
     targetVersion,
     oldBinaryPath,
     destPath,
@@ -620,8 +524,7 @@ export function attemptDeltaUpgrade(
   oldBinaryPath: string,
   destPath: string,
   offline?: boolean,
-  setMessage?: SetMessage,
-  source: UpgradeSource = getPrimaryUpgradeSource()
+  setMessage?: SetMessage
 ): Promise<DeltaResult | null> {
   if (!canAttemptDelta(targetVersion)) {
     return Promise.resolve(null);
@@ -636,7 +539,7 @@ export function attemptDeltaUpgrade(
       let chainSource: string | undefined;
       try {
         const resolved = await resolveDelta(
-          channel === "nightly" ? nightlySource(source) : stableSource(source),
+          channel === "nightly" ? nightlySource() : stableSource(),
           targetVersion,
           oldBinaryPath,
           destPath,
@@ -710,16 +613,14 @@ async function prefetch(
 
 export function prefetchNightlyPatches(
   targetVersion: string,
-  signal?: AbortSignal,
-  source: UpgradeSource = getPrimaryUpgradeSource()
+  signal?: AbortSignal
 ): Promise<void> {
-  return prefetch(nightlySource(source), targetVersion, signal);
+  return prefetch(nightlySource(), targetVersion, signal);
 }
 
 export function prefetchStablePatches(
   targetVersion: string,
-  signal?: AbortSignal,
-  source: UpgradeSource = getPrimaryUpgradeSource()
+  signal?: AbortSignal
 ): Promise<void> {
-  return prefetch(stableSource(source), targetVersion, signal);
+  return prefetch(stableSource(), targetVersion, signal);
 }

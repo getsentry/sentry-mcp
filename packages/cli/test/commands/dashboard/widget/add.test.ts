@@ -282,6 +282,26 @@ describe("dashboard widget add", () => {
     expect(addedWidget.widgetType).toBe("error-events");
   });
 
+  test("resolves dataset alias 'transactions' to 'transaction-like'", async () => {
+    const { context } = createMockContext();
+    const func = await addCommand.loader();
+    await func.call(
+      context,
+      {
+        json: false,
+        display: "line",
+        dataset: "transactions",
+        query: ["count"],
+      },
+      "123",
+      "Transactions Over Time"
+    );
+
+    const body = updateDashboardSpy.mock.calls[0]?.[2];
+    const addedWidget = body.widgets.at(-1);
+    expect(addedWidget.widgetType).toBe("transaction-like");
+  });
+
   test("resolves dataset alias 'metricsEnhanced' to 'tracemetrics'", async () => {
     const { context } = createMockContext();
     const func = await addCommand.loader();
@@ -303,7 +323,7 @@ describe("dashboard widget add", () => {
   });
 
   test("dataset alias is resolved BEFORE dataset-aware aggregate validation", async () => {
-    // last_seen is only valid for error-events. With the alias
+    // failure_rate is only valid for error-events/discover. With the alias
     // "errors", dataset-aware validation must see "error-events" (canonical)
     // before deciding whether to accept the aggregate.
     const { context } = createMockContext();
@@ -314,16 +334,16 @@ describe("dashboard widget add", () => {
         json: false,
         display: "big_number",
         dataset: "errors",
-        query: ["last_seen"],
+        query: ["failure_rate"],
       },
       "123",
-      "Last Seen"
+      "Failure Rate"
     );
 
     const body = updateDashboardSpy.mock.calls[0]?.[2];
     const addedWidget = body.widgets.at(-1);
     expect(addedWidget.widgetType).toBe("error-events");
-    expect(addedWidget.queries[0].aggregates).toEqual(["last_seen()"]);
+    expect(addedWidget.queries[0].aggregates).toEqual(["failure_rate()"]);
   });
 
   test("case-insensitive dataset values are accepted", async () => {

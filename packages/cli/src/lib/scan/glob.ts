@@ -3,7 +3,8 @@
  *
  * Accepts one or more glob patterns (picomatch syntax) and yields
  * files under `cwd` matching at least one `patterns` entry and no
- * `exclude` entry. Matching uses the `picomatch` package.
+ * `exclude` entry. Matching uses the `picomatch` package
+ * (already a devDep, already used in `script/node-polyfills.ts`).
  *
  * ### Pattern semantics
  *

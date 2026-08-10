@@ -5,10 +5,7 @@
  * The next normal CLI run reads, emits as Sentry metrics, and deletes.
  */
 
-import { logger } from "../logger.js";
 import { getDatabase } from "./index.js";
-
-const log = logger.withTag("completion-telemetry");
 
 /** A queued completion telemetry entry. */
 export type CompletionTelemetryEntry = {
@@ -36,8 +33,8 @@ export function queueCompletionTelemetry(entry: {
     db.query(
       "INSERT INTO completion_telemetry_queue (command_path, duration_ms, result_count) VALUES (?, ?, ?)"
     ).run(entry.commandPath, Math.round(entry.durationMs), entry.resultCount);
-  } catch (error) {
-    log.debug("Failed to queue completion telemetry", error);
+  } catch {
+    // Best-effort — never fail completion for telemetry
   }
 }
 
@@ -70,8 +67,7 @@ export function drainCompletionTelemetry(): CompletionTelemetryEntry[] {
       durationMs: row.duration_ms,
       resultCount: row.result_count,
     }));
-  } catch (error) {
-    log.debug("Failed to drain completion telemetry", error);
+  } catch {
     return [];
   }
 }

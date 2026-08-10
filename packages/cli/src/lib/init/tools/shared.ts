@@ -17,7 +17,6 @@ export function safePath(cwd: string, relative: string): string {
   }
 
   let realCwd: string;
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     realCwd = fs.realpathSync(normalizedCwd);
   } catch {
@@ -51,38 +50,25 @@ export function safePath(cwd: string, relative: string): string {
 }
 
 /**
- * Resolve a tool cwd inside the selected project root, or reject it.
- *
- * The returned real path pins any safe cwd symlink before tool execution.
+ * Reject tool executions whose requested cwd escapes the selected project root.
  */
 export function validateToolSandbox(
   payload: Pick<ToolPayload, "cwd">,
   directory: string
-): { cwd: string } | ToolResult {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
-  try {
-    const realDirectory = fs.realpathSync(path.resolve(directory));
-    const realCwd = fs.realpathSync(path.resolve(payload.cwd));
-    const relativeCwd = path.relative(realDirectory, realCwd);
-    const isInsideDirectory =
-      relativeCwd === "" ||
-      (relativeCwd !== ".." &&
-        !relativeCwd.startsWith(`..${path.sep}`) &&
-        !path.isAbsolute(relativeCwd));
-
-    if (isInsideDirectory && fs.statSync(realCwd).isDirectory()) {
-      // Execute against the resolved directory so a symlinked cwd cannot be
-      // retargeted between this boundary check and the tool implementation.
-      return { cwd: realCwd };
-    }
-  } catch {
-    // Missing or unreadable roots fail closed at the shared tool boundary.
+): ToolResult | undefined {
+  const normalizedCwd = path.resolve(payload.cwd);
+  const normalizedDir = path.resolve(directory);
+  if (
+    normalizedCwd !== normalizedDir &&
+    !normalizedCwd.startsWith(normalizedDir + path.sep)
+  ) {
+    return {
+      ok: false,
+      error: `Blocked: cwd "${payload.cwd}" is outside project directory "${directory}"`,
+    };
   }
 
-  return {
-    ok: false,
-    error: `Blocked: cwd "${payload.cwd}" is outside project directory "${directory}" or cannot be resolved`,
-  };
+  return;
 }
 
 /**

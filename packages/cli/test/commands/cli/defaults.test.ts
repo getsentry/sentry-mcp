@@ -9,14 +9,12 @@ import chalk from "chalk";
 import { describe, expect, test } from "vitest";
 import {
   clearAllDefaults,
-  getAgentSkillsPreference,
   getAllDefaults,
   getDefaultHeaders,
   getDefaultOrganization,
   getDefaultProject,
   getDefaultUrl,
   getTelemetryPreference,
-  setAgentSkillsPreference,
   setDefaultOrganization,
   setDefaultProject,
   setDefaultUrl,
@@ -91,24 +89,6 @@ describe("defaults storage", () => {
     expect(getTelemetryPreference()).toBeUndefined();
   });
 
-  test("getAgentSkillsPreference returns undefined when not set", () => {
-    expect(getAgentSkillsPreference()).toBeUndefined();
-  });
-
-  test("setAgentSkillsPreference stores on/off", () => {
-    setAgentSkillsPreference(false);
-    expect(getAgentSkillsPreference()).toBe(false);
-
-    setAgentSkillsPreference(true);
-    expect(getAgentSkillsPreference()).toBe(true);
-  });
-
-  test("setAgentSkillsPreference(null) clears preference", () => {
-    setAgentSkillsPreference(false);
-    setAgentSkillsPreference(null);
-    expect(getAgentSkillsPreference()).toBeUndefined();
-  });
-
   test("getDefaultUrl returns null when not set", () => {
     expect(getDefaultUrl()).toBeNull();
   });
@@ -128,7 +108,6 @@ describe("defaults storage", () => {
     setDefaultOrganization("test-org");
     setDefaultProject("test-project");
     setTelemetryPreference(false);
-    setAgentSkillsPreference(false);
     setDefaultUrl("https://sentry.example.com");
 
     const state = getAllDefaults();
@@ -136,11 +115,9 @@ describe("defaults storage", () => {
       organization: "test-org",
       project: "test-project",
       telemetry: "off",
-      "agent-skills": "off",
       url: "https://sentry.example.com",
       headers: null,
       "ca-cert": null,
-      graphics: null,
     });
   });
 
@@ -150,11 +127,9 @@ describe("defaults storage", () => {
       organization: null,
       project: null,
       telemetry: null,
-      "agent-skills": null,
       url: null,
       headers: null,
       "ca-cert": null,
-      graphics: null,
     });
   });
 
@@ -416,7 +391,6 @@ describe("formatDefaultsResult", () => {
         organization: "my-org",
         project: "my-proj",
         telemetry: "off",
-        graphics: "off",
         url: "https://sentry.example.com",
       },
       telemetryEffective: { enabled: false, source: "preference" },
@@ -425,7 +399,6 @@ describe("formatDefaultsResult", () => {
     expect(plain).toContain("my-org");
     expect(plain).toContain("my-proj");
     expect(plain).toContain("off");
-    expect(plain).toContain("Graphics");
     expect(plain).toContain("sentry.example.com");
   });
 

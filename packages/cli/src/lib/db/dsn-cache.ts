@@ -119,7 +119,6 @@ function rowToCachedDsnEntry(row: DsnCacheRow): CachedDsnEntry {
 
   // Parse allResolved from all_dsns_json for inferred sources
   if (row.source === "inferred" && row.all_dsns_json) {
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       entry.allResolved = JSON.parse(
         row.all_dsns_json
@@ -241,7 +240,6 @@ async function validateDirMtime(
   fullPath: string,
   cachedMtime: number
 ): Promise<boolean> {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const stats = await stat(fullPath);
     return Math.floor(stats.mtimeMs) === cachedMtime;
@@ -258,7 +256,6 @@ async function validateFileMtime(
   fullPath: string,
   cachedMtime: number
 ): Promise<boolean> {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const stats = await stat(fullPath);
     if (!stats.isFile()) {

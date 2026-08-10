@@ -10,14 +10,14 @@
  * 2. `new CliError(... "Try:" ...)` — ad-hoc "Try:" strings
  *    → Should use ResolutionError with structured hint/suggestions
  *
- * Silent catch blocks used to be checked here via a ratchet baseline. That
- * check now lives in the Biome plugin `lint-rules/no-silent-catch.grit`, whose
- * grandfathered backlog is pinned inline with `// biome-ignore lint/plugin`
- * comments (an unused suppression is itself reported, so the backlog can only
- * shrink). See #1531.
+ * 3. Silent catch blocks — `catch { ... }` whose body has no logging, no
+ *    re-throw, and at most a bare `return`. Errors must be surfaced via
+ *    `log.debug`/`log.warn` (or re-thrown) per AGENTS.md. Biome's
+ *    `noEmptyBlockStatements` only catches syntactically empty `catch {}`;
+ *    this catches comment-only and return-only blocks too.
  *
  * Usage:
- *   tsx script/check-error-patterns.ts   # check (fails CI on any violation)
+ *   tsx script/check-error-patterns.ts
  *
  * Exit codes:
  *   0 - No anti-patterns found
@@ -27,10 +27,25 @@
 import { readFile } from "node:fs/promises";
 import { glob } from "tinyglobby";
 
-export type Violation = { file: string; line: number; message: string };
+type Violation = { file: string; line: number; message: string };
 
 const CONTEXT_ERROR_RE = /new ContextError\(/g;
 const TRY_PATTERN_RE = /["'`]Try:/;
+
+const files = await glob("src/**/*.ts");
+
+/** Hard violations — these fail CI. */
+const violations: Violation[] = [];
+
+/**
+ * Advisory silent-catch findings. Reported as warnings but do NOT fail CI yet:
+ * the repo has a pre-existing backlog of intentional best-effort catches (e.g.
+ * UI teardown, cleanup paths). The check surfaces them for incremental cleanup
+ * and so new ones are visible in review. Set SENTRY_STRICT_SILENT_CATCH=1 to
+ * promote them to hard failures once the backlog is cleared.
+ */
+const silentCatchWarnings: Violation[] = [];
+const STRICT_SILENT_CATCH = process.env.SENTRY_STRICT_SILENT_CATCH === "1";
 
 /** Characters that open a nesting level in JavaScript source. */
 function isOpener(ch: string): boolean {
@@ -210,11 +225,7 @@ function extractSecondArg(content: string, startIdx: number): string | null {
  * Detect `new ContextError(` where the second argument contains `\n`.
  * This catches resolution-failure prose stuffed into the command parameter.
  */
-export function findContextErrorNewlines(
-  content: string,
-  filePath: string
-): Violation[] {
-  const found: Violation[] = [];
+function checkContextErrorNewlines(content: string, filePath: string): void {
   let match = CONTEXT_ERROR_RE.exec(content);
   while (match !== null) {
     const startIdx = match.index + match[0].length;
@@ -222,7 +233,7 @@ export function findContextErrorNewlines(
 
     if (secondArg?.includes("\\n")) {
       const line = content.slice(0, match.index).split("\n").length;
-      found.push({
+      violations.push({
         file: filePath,
         line,
         message:
@@ -231,18 +242,13 @@ export function findContextErrorNewlines(
     }
     match = CONTEXT_ERROR_RE.exec(content);
   }
-  return found;
 }
 
 /**
  * Detect `new CliError(... "Try:" ...)` — ad-hoc "Try:" strings that bypass
  * the structured ResolutionError pattern.
  */
-export function findAdHocTryPatterns(
-  content: string,
-  filePath: string
-): Violation[] {
-  const found: Violation[] = [];
+function checkAdHocTryPatterns(content: string, filePath: string): void {
   const lines = content.split("\n");
   let inCliError = false;
 
@@ -252,7 +258,7 @@ export function findAdHocTryPatterns(
       inCliError = true;
     }
     if (inCliError && TRY_PATTERN_RE.test(line)) {
-      found.push({
+      violations.push({
         file: filePath,
         line: i + 1,
         message:
@@ -265,46 +271,119 @@ export function findAdHocTryPatterns(
       inCliError = false;
     }
   }
-  return found;
 }
 
-/** Scan the given files and collect violations. */
-export async function scanFiles(files: string[]): Promise<Violation[]> {
-  const violations: Violation[] = [];
-  for (const filePath of files) {
-    const content = await readFile(filePath, "utf-8");
-    violations.push(...findContextErrorNewlines(content, filePath));
-    violations.push(...findAdHocTryPatterns(content, filePath));
-  }
-  return violations;
-}
+/** Matches the start of a catch block in both statement and promise form. */
+const CATCH_RE =
+  /\bcatch\s*(?:\(\s*(\w+)[^)]*\)\s*)?\{|\.catch\(\s*(?:\(\s*(\w+)[^)]*\)|(\w+))\s*=>\s*\{/g;
 
-async function main(): Promise<void> {
-  const files = await glob("src/**/*.ts");
-  const violations = await scanFiles(files);
+/** Tokens inside a catch body that prove the error is surfaced (not silenced). */
+const SURFACING_RE =
+  /\b(?:log|logger|console)\s*\.|[^.]\bthrow\b|captureException|reportError/;
 
-  if (violations.length > 0) {
-    console.error(
-      `✗ Found ${violations.length} error class anti-pattern(s):\n`
-    );
-    for (const v of violations) {
-      console.error(`  ${v.file}:${v.line}`);
-      console.error(`    ${v.message}\n`);
+/** A catch body consisting solely of a single `return ...;` statement. */
+const RETURN_ONLY_RE = /^return\b[^;]*;?$/;
+
+/**
+ * Return the source of a balanced `{...}` block given the index of its opening
+ * brace, skipping strings so braces inside literals don't break depth tracking.
+ */
+function readBlock(content: string, openBraceIdx: number): string {
+  let depth = 0;
+  let i = openBraceIdx;
+  while (i < content.length) {
+    const { next, ch } = advanceToken(content, i);
+    if (ch === "{") {
+      depth += 1;
+    } else if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return content.slice(openBraceIdx + 1, i);
+      }
     }
-    console.error(
-      "Fix: Use ResolutionError for resolution failures, ValidationError for input errors."
-    );
-    console.error(
-      "See ContextError JSDoc in src/lib/errors.ts for usage guidance.\n"
-    );
-    process.exit(1);
+    i = next;
   }
+  return content.slice(openBraceIdx + 1);
+}
 
-  console.log("✓ No error class anti-patterns found.");
+/**
+ * Strip line and block comments from a snippet so comment-only catch bodies are
+ * treated as empty.
+ */
+function stripComments(snippet: string): string {
+  return snippet.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+}
+
+/**
+ * Detect silent catch blocks: catch bodies that, after removing comments, are
+ * empty or contain only a bare `return;`/`return <value>;` with no logging or
+ * re-throw. These hide errors and violate the AGENTS.md no-silent-catch rule.
+ */
+function checkSilentCatch(content: string, filePath: string): void {
+  let match = CATCH_RE.exec(content);
+  while (match !== null) {
+    const openBraceIdx = match.index + match[0].length - 1;
+    const errorParam = match[1] ?? match[2] ?? match[3];
+    const body = readBlock(content, openBraceIdx);
+    const code = stripComments(body).trim();
+    // A body that references the caught error identifier (forwarding it to a
+    // handler, attaching it, etc.) is not "silent" even if it lacks an explicit
+    // log/throw — avoids false positives like `return handleFetchError(error)`.
+    const usesError =
+      errorParam !== undefined && new RegExp(`\\b${errorParam}\\b`).test(code);
+    const returnOnly = RETURN_ONLY_RE.test(code);
+    const silent =
+      !(SURFACING_RE.test(code) || usesError) &&
+      (code.length === 0 || returnOnly);
+    if (silent) {
+      const line = content.slice(0, match.index).split("\n").length;
+      const target = STRICT_SILENT_CATCH ? violations : silentCatchWarnings;
+      target.push({
+        file: filePath,
+        line,
+        message:
+          "Silent catch block. Add log.debug()/log.warn() or re-throw — errors must not vanish (AGENTS.md).",
+      });
+    }
+    match = CATCH_RE.exec(content);
+  }
+}
+
+for (const filePath of files) {
+  const content = await readFile(filePath, "utf-8");
+  checkContextErrorNewlines(content, filePath);
+  checkAdHocTryPatterns(content, filePath);
+  checkSilentCatch(content, filePath);
+}
+
+if (silentCatchWarnings.length > 0) {
+  console.warn(
+    `⚠ ${silentCatchWarnings.length} silent catch block(s) found (advisory; not failing CI).`
+  );
+  console.warn(
+    "  Add log.debug()/log.warn() or re-throw. Run with SENTRY_STRICT_SILENT_CATCH=1 to enforce.\n"
+  );
+  for (const v of silentCatchWarnings) {
+    console.warn(`  ${v.file}:${v.line}`);
+  }
+  console.warn("");
+}
+
+if (violations.length === 0) {
+  console.log("✓ No error class anti-patterns found");
   process.exit(0);
 }
 
-// Only run when invoked directly, not when imported by tests.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
-  await main();
+console.error(`✗ Found ${violations.length} error class anti-pattern(s):\n`);
+for (const v of violations) {
+  console.error(`  ${v.file}:${v.line}`);
+  console.error(`    ${v.message}\n`);
 }
+console.error(
+  "Fix: Use ResolutionError for resolution failures, ValidationError for input errors."
+);
+console.error(
+  "See ContextError JSDoc in src/lib/errors.ts for usage guidance."
+);
+
+process.exit(1);

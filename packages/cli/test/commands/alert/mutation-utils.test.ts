@@ -6,7 +6,6 @@ import {
   parseJsonObjectList,
   parseMatchMode,
   parseStatusFlag,
-  resolveMetricDataset,
   statusToMetricValue,
   triggerLogicType,
   validateIssueRuleArrays,
@@ -213,21 +212,23 @@ describe("normalizeProjectList", () => {
 describe("normalizeMetricDataset", () => {
   test.each([
     ["error", "errors"],
+    ["transaction", "transactions"],
     ["session", "sessions"],
     ["metric", "metrics"],
-    ["span", "spans"],
     ["error-events", "errors"],
+    ["transaction-like", "transactions"],
   ])('maps alias "%s" to "%s"', (input, expected) => {
     expect(normalizeMetricDataset(input)).toBe(expected);
   });
 
   test("is case-insensitive and trims whitespace", () => {
     expect(normalizeMetricDataset("ERROR-EVENTS")).toBe("errors");
-    expect(normalizeMetricDataset("  Error-Events  ")).toBe("errors");
+    expect(normalizeMetricDataset("  Transaction-Like  ")).toBe("transactions");
   });
 
   test.each([
     "errors",
+    "transactions",
     "sessions",
     "events",
     "spans",
@@ -252,51 +253,15 @@ describe("normalizeMetricDataset", () => {
   });
 });
 
-describe("resolveMetricDataset", () => {
-  test("passes canonical datasets through with the query untouched", () => {
-    expect(resolveMetricDataset("spans", "environment:prod")).toEqual({
-      dataset: "spans",
-      query: "environment:prod",
-    });
-  });
-
-  test("resolves aliases without a notice", () => {
-    expect(resolveMetricDataset("span", "environment:prod")).toEqual({
-      dataset: "spans",
-      query: "environment:prod",
-    });
-  });
-
-  test.each([
-    "transaction",
-    "transactions",
-    "Transactions",
-    "  TRANSACTION ",
-  ])('routes "%s" to spans and adds is_transaction:true with a notice', (input) => {
-    const result = resolveMetricDataset(input, "environment:prod");
-    expect(result.dataset).toBe("spans");
-    expect(result.query).toBe("environment:prod is_transaction:true");
-    expect(result.notice).toContain("spans");
-    expect(result.notice).toContain("is_transaction:true");
-  });
-
-  test("adds the filter to an empty query", () => {
-    const result = resolveMetricDataset("transactions", "");
-    expect(result.dataset).toBe("spans");
-    expect(result.query).toBe("is_transaction:true");
-  });
-
-  test("does not duplicate an existing is_transaction:true filter", () => {
-    const result = resolveMetricDataset(
-      "transactions",
-      "environment:prod is_transaction:true"
-    );
-    expect(result.query).toBe("environment:prod is_transaction:true");
-  });
-});
-
 describe("validateMetricDataset", () => {
-  const valid = ["errors", "sessions", "events", "spans", "metrics"];
+  const valid = [
+    "errors",
+    "transactions",
+    "sessions",
+    "events",
+    "spans",
+    "metrics",
+  ];
 
   for (const dataset of valid) {
     test(`passes for "${dataset}"`, () => {
@@ -307,8 +272,8 @@ describe("validateMetricDataset", () => {
   test.each([
     "error",
     "error-events",
+    "transaction-like",
     "METRIC",
-    "span",
   ])('passes for alias "%s"', (dataset) => {
     expect(() => validateMetricDataset(dataset)).not.toThrow();
   });
@@ -317,9 +282,7 @@ describe("validateMetricDataset", () => {
     "tracemetrics",
     "eap",
     "events_analytics_platform",
-    "transactions",
-    "transaction-like",
-  ])('throws for obsolete or non-aliased dataset "%s"', (dataset) => {
+  ])('throws for non-aliased dataset "%s"', (dataset) => {
     expect(() => validateMetricDataset(dataset)).toThrow(ValidationError);
   });
 

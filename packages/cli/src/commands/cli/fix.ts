@@ -18,7 +18,6 @@ import {
 import { OutputError } from "../../lib/errors.js";
 import { formatFixResult } from "../../lib/formatters/human.js";
 import { CommandOutput } from "../../lib/formatters/output.js";
-import { logger } from "../../lib/logger.js";
 import { getRealUsername } from "../../lib/utils.js";
 
 type FixFlags = {
@@ -252,8 +251,6 @@ async function checkOwnership(
  * Uses `execFileSync` (not `execSync`) so the username is passed as a
  * separate argument — the shell never interpolates it, preventing injection.
  */
-const log = logger.withTag("cli.fix");
-
 function resolveUid(username: string): number | null {
   try {
     const result = execFileSync("id", ["-u", "--", username], {
@@ -262,8 +259,7 @@ function resolveUid(username: string): number | null {
     });
     const uid = Number(result.trim());
     return Number.isNaN(uid) ? null : uid;
-  } catch (error) {
-    log.debug(`Failed to resolve UID for user "${username}"`, error);
+  } catch {
     return null;
   }
 }

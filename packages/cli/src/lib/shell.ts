@@ -8,7 +8,6 @@
 import { existsSync } from "node:fs";
 import { access, readFile, writeFile } from "node:fs/promises";
 import { basename, delimiter, join } from "node:path";
-import { samePath } from "./binary.js";
 import { logger } from "./logger.js";
 import { whichSync } from "./which.js";
 
@@ -172,9 +171,8 @@ export function isInPath(
   if (!pathEnv) {
     return false;
   }
-  // samePath handles case-insensitive filesystems (Windows, macOS), where a
-  // PATH entry can differ in casing from a computed directory yet be the same.
-  return pathEnv.split(delimiter).some((p) => samePath(p, directory));
+  const paths = pathEnv.split(delimiter);
+  return paths.includes(directory);
 }
 
 /**
@@ -200,7 +198,6 @@ async function addToShellConfig(
   );
 
   if (!exists) {
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       await writeFile(configFile, `# sentry\n${command}\n`, "utf-8");
       return {
@@ -230,7 +227,6 @@ async function addToShellConfig(
     };
   }
 
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const newContent = content.endsWith("\n")
       ? `${content}\n# sentry\n${command}\n`

@@ -50,14 +50,14 @@ const ALPHA_THRESHOLD = 128;
  * downscaled so the sixel fits a typical terminal and stays small. Height is
  * scaled proportionally.
  */
-export const DEFAULT_MAX_WIDTH = 800;
+const DEFAULT_MAX_WIDTH = 800;
 
 /**
  * Default cap on the rendered pixel height. Long screenshots (narrow but very
  * tall) would otherwise skip width-based downscaling entirely and produce a
  * huge escape sequence with heavy CPU/memory cost, so height is bounded too.
  */
-export const DEFAULT_MAX_HEIGHT = 2000;
+const DEFAULT_MAX_HEIGHT = 2000;
 
 /**
  * Hard ceiling on either declared image dimension, checked from the header
@@ -527,23 +527,19 @@ function colorsInBand(plane: IndexedPlane, y0: number): number[] {
  *
  * @param img - Decoded RGBA image.
  * @param maxWidth - Cap on rendered pixel width; wider images are downscaled.
- *   Omit to use the default ceiling.
- * @param preserveDimensions - Preserve explicitly supplied dimensions above the
- *   default ceilings. Callers must bound image dimensions first.
+ *   The effective cap is the smaller of this and {@link DEFAULT_MAX_WIDTH}, so
+ *   passing the terminal's pixel width keeps the image from overflowing while
+ *   still bounding the escape-sequence size. Omit to use the default ceiling.
  */
 export function encodeImageToSixel(
   img: DecodedImage,
-  maxWidth?: number,
-  preserveDimensions = false
+  maxWidth?: number
 ): string | undefined {
-  const effectiveMaxWidth = preserveDimensions
-    ? (maxWidth ?? DEFAULT_MAX_WIDTH)
-    : Math.min(maxWidth ?? DEFAULT_MAX_WIDTH, DEFAULT_MAX_WIDTH);
-  const scaled = downscale(
-    img,
-    effectiveMaxWidth,
-    preserveDimensions ? img.height : DEFAULT_MAX_HEIGHT
+  const effectiveMaxWidth = Math.min(
+    maxWidth ?? DEFAULT_MAX_WIDTH,
+    DEFAULT_MAX_WIDTH
   );
+  const scaled = downscale(img, effectiveMaxWidth, DEFAULT_MAX_HEIGHT);
   const palette = buildPalette(scaled, PALETTE_SIZE);
   if (palette.length === 0) {
     return;

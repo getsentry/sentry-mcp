@@ -90,73 +90,36 @@ export type WizardLog = {
 
 /** Single option in a `select` / `multiselect` prompt. */
 export type SelectOption<T extends string> = {
-  /** Machine-readable value returned when the user chooses this option. */
   value: T;
-  /** User-facing option label. */
   label: string;
-  /** Optional secondary copy rendered beside the label; omitted by default. */
   hint?: string;
-};
-
-/** Option in a multiselect prompt, optionally carrying supporting copy or a fixed selection. */
-export type MultiSelectOption<T extends string> = SelectOption<T> & {
-  /** Product-oriented copy rendered below the label; omitted by default. */
-  description?: string;
-  /** When true, keeps the option selected and skips it during toggles. Defaults to false. */
-  locked?: boolean;
-};
-
-/** Supporting row rendered beneath a prompt title. */
-export type PromptDetail = {
-  /** Text displayed on its own row. */
-  text: string;
-  /** Semantic color treatment for the row. Defaults to `muted`. */
-  tone?: "muted" | "success";
 };
 
 /** Args for `select`. */
 export type SelectOptions<T extends string> = {
-  /** Prompt title shown above the choices. */
   message: string;
-  /** Supporting rows rendered below the title; omitted by default. */
-  details?: PromptDetail[];
-  /** Explanatory copy rendered between details and actions; omitted by default. */
-  footer?: PromptDetail;
-  /** Choices presented to the user in display order. */
   options: SelectOption<T>[];
-  /** Initially highlighted value. Defaults to the first option. */
   initialValue?: T;
 };
 
 /** Args for `multiselect`. */
 export type MultiSelectOptions<T extends string> = {
-  /** Prompt title shown above the choices. */
   message: string;
-  /** Supporting rows rendered above a visually separated option list; omitted by default. */
-  details?: PromptDetail[];
-  /** Choices presented to the user in display order. */
-  options: MultiSelectOption<T>[];
-  /** Values selected when the prompt mounts. Defaults to an empty list. */
+  options: SelectOption<T>[];
   initialValues?: T[];
-  /** Whether at least one value is required before continuing. Defaults to false. */
   required?: boolean;
 };
 
 /** Args for `confirm`. */
 export type ConfirmOptions = {
-  /** Confirmation question shown to the user. */
   message: string;
-  /** Initially highlighted answer. Defaults to false. */
   initialValue?: boolean;
 };
 
 /** Args for the richer Ink-only welcome screen. */
 export type WelcomeOptions = {
-  /** Heading shown on the welcome screen. */
   title: string;
-  /** Supporting paragraphs shown below the heading. */
   body: string[];
-  /** Final call-to-action copy shown above the Continue action. */
   punchline: string;
 };
 
@@ -182,68 +145,6 @@ export type WizardSummary = {
   changedFiles?: { action: string; path: string }[];
   /** AI-generated per-feature blurbs personalised to the analysed project. */
   featureBlurbs?: { label: string; blurb: string }[];
-  /**
-   * Structured data for the interactive completion screen (InkUI only).
-   * `LoggingUI` ignores it — the flat `fields` above cover the non-TTY case.
-   */
-  completion?: WizardCompletion;
-};
-
-/**
- * Everything the interactive exit screen needs to turn "we changed some files"
- * into "go see your first error" — one first-error hero plus a menu of next
- * steps (open Issues, install the MCP / agent plugin, read the docs).
- */
-export type WizardCompletion = {
-  /** Human-facing project name shown in the header. */
-  projectName: string;
-  /** Enabled-feature display labels, e.g. ["Errors", "Tracing", "Replay"]. */
-  features: string[];
-  /**
-   * AI-written one-liner per enabled feature ("what we set up"). Empty when
-   * the blurb agent didn't run; the screen then falls back to plain labels.
-   */
-  featureBlurbs: { label: string; blurb: string }[];
-  /** Number of files the wizard created/edited. */
-  changedFileCount: number;
-  /** Project-scoped Issues stream — the primary call-to-action. */
-  issuesUrl?: string;
-  /**
-   * Verification outcome. `received` is true when init's verify step caught an
-   * event; `eventUrl` deep-links that exact event when its id was captured.
-   */
-  verification: { received: boolean; eventUrl?: string };
-  /** Command that installs the Sentry coding-agent plugin. */
-  agentInstallCommand?: string;
-  /** Best-effort "start your app" command shown in the recipe, e.g. "pnpm dev". */
-  startCommand?: string;
-};
-
-/**
- * A completion-screen interaction worth recording on the run's telemetry.
- * `open-sentry` covers both the "View my first event" / "Open my Issues feed"
- * menu item and the `o` shortcut; the agent-plugin events track the install
- * toggle (a queued click is the "did they choose to install the plugin" signal).
- */
-export type CompletionActionEvent =
-  | "open-sentry"
-  | "agent-plugin-queued"
-  | "agent-plugin-unqueued";
-
-/**
- * Side-effectful actions the completion screen invokes. Provided by `InkUI`
- * (which lives in the main bundle) so the pre-bundled Ink sidecar never has to
- * import Node built-ins (browser launch) or the Sentry SDK itself.
- */
-export type CompletionActions = {
-  /** Open a URL in the user's browser. Best-effort, non-blocking. */
-  openUrl: (url: string) => void;
-  /**
-   * Record a completion-screen interaction on the run's telemetry. Bound by
-   * `InkUI` so the Ink sidecar never imports Sentry; the tags land on the
-   * active `cli.command` transaction like the rest of the `wizard.*` tags.
-   */
-  track: (event: CompletionActionEvent) => void;
 };
 
 /**

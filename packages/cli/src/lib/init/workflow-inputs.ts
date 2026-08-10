@@ -1,12 +1,9 @@
+import fs from "node:fs";
+import path from "node:path";
+import { isLikelyBinary } from "../scan/index.js";
 import { MAX_FILE_BYTES } from "./constants.js";
 import { detectSentry } from "./tools/detect-sentry.js";
 import { listDir } from "./tools/list-dir.js";
-import {
-  closeProjectFile,
-  type OpenedProjectFile,
-  openProjectFile,
-  projectFileChanged,
-} from "./tools/project-file.js";
 import type { DirEntry } from "./types.js";
 
 /**
@@ -122,72 +119,35 @@ export async function preReadCommonFiles(
     if (totalBytes >= MAX_PREREAD_TOTAL_BYTES) {
       break;
     }
-    const result = await readCommonConfigFile(directory, filePath);
-    if (result.status === "unreadable") {
+    try {
+      const absPath = path.join(directory, filePath);
+      const stat = await fs.promises.stat(absPath);
+      // Guard against FIFOs / sockets / devices — `fs.readFile` on a
+      // FIFO blocks indefinitely waiting for a writer. `stat` follows
+      // symlinks, so a symlink → FIFO is also caught here.
+      if (!stat.isFile()) {
+        cache[filePath] = null;
+        continue;
+      }
+      if (stat.size > MAX_FILE_BYTES) {
+        continue;
+      }
+      const buffer = await fs.promises.readFile(absPath);
+      if (isLikelyBinary(buffer)) {
+        cache[filePath] = null;
+        continue;
+      }
+      const content = buffer.toString("utf-8");
+      if (totalBytes + content.length <= MAX_PREREAD_TOTAL_BYTES) {
+        cache[filePath] = content;
+        totalBytes += content.length;
+      }
+    } catch {
       cache[filePath] = null;
-      continue;
-    }
-    if (
-      result.status === "read" &&
-      totalBytes + result.bytes <= MAX_PREREAD_TOTAL_BYTES
-    ) {
-      cache[filePath] = result.content;
-      totalBytes += result.bytes;
     }
   }
 
   return cache;
-}
-
-type CommonConfigRead =
-  | { status: "skipped" | "unreadable" }
-  | { bytes: number; content: string; status: "read" };
-
-async function readCommonConfigFile(
-  directory: string,
-  filePath: string
-): Promise<CommonConfigRead> {
-  let opened: OpenedProjectFile | undefined;
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
-  try {
-    const result = await openProjectFile(directory, filePath);
-    if ("error" in result) {
-      return { status: "unreadable" };
-    }
-    opened = result;
-    if (opened.stat.size > MAX_FILE_BYTES) {
-      return { status: "skipped" };
-    }
-
-    const buffer = Buffer.alloc(opened.stat.size);
-    let bytesRead = 0;
-    while (bytesRead < buffer.length) {
-      const readResult = await opened.handle.read(
-        buffer,
-        bytesRead,
-        buffer.length - bytesRead,
-        bytesRead
-      );
-      if (readResult.bytesRead === 0) {
-        return { status: "unreadable" };
-      }
-      bytesRead += readResult.bytesRead;
-    }
-    if (projectFileChanged(opened.stat, await opened.handle.stat())) {
-      return { status: "unreadable" };
-    }
-    return {
-      bytes: bytesRead,
-      content: buffer.subarray(0, bytesRead).toString("utf-8"),
-      status: "read",
-    };
-  } catch {
-    return { status: "unreadable" };
-  } finally {
-    if (opened) {
-      await closeProjectFile(opened.handle);
-    }
-  }
 }
 
 /**

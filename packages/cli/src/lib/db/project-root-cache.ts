@@ -113,7 +113,6 @@ export async function setCachedProjectRoot(
 
   // Get current mtime of the cwd directory
   let cwdMtime: number;
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const stats = await stat(cwd);
     cwdMtime = Math.floor(stats.mtimeMs);

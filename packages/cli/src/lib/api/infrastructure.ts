@@ -446,37 +446,6 @@ export async function autoPaginate<T>(
 }
 
 /**
- * Wire a single-page fetcher into a limit-bounded, auto-paginating list call.
- *
- * Centralizes the two things every list endpoint kept re-deriving by hand and
- * occasionally got wrong (see #1458): capping `per_page` at
- * {@link API_MAX_PER_PAGE} and threading `limit` plus the initial cursor into
- * {@link autoPaginate}. Callers still own region resolution and
- * endpoint-specific query building inside `fetchPage`.
- *
- * @param options - Caller list options; `limit` bounds total rows, `cursor` is the start cursor
- * @param fetchPage - Fetches one page given the capped `perPage` and a page cursor
- * @param defaultLimit - Applied when `options.limit` is undefined
- * @returns Accumulated items with optional nextCursor
- */
-export function paginate<T>(
-  options: { limit?: number; cursor?: string },
-  fetchPage: (
-    perPage: number,
-    cursor: string | undefined
-  ) => Promise<PaginatedResponse<T[]>>,
-  defaultLimit = 10
-): Promise<PaginatedResponse<T[]>> {
-  const limit = options.limit ?? defaultLimit;
-  const perPage = Math.min(limit, API_MAX_PER_PAGE);
-  return autoPaginate(
-    (cursor) => fetchPage(perPage, cursor),
-    limit,
-    options.cursor
-  );
-}
-
-/**
  * Make an authenticated request to a specific Sentry region.
  * Returns both parsed response data and raw headers for pagination support.
  * Used for internal endpoints not covered by @sentry/api SDK functions.
@@ -749,18 +718,13 @@ export function isTextualContentType(contentType: string | null): boolean {
  *
  * @param endpoint - API endpoint path (e.g., "/organizations/")
  * @param options - Request options including method, body, params, and custom headers
- * @returns Response status, status text, headers, and parsed body
+ * @returns Response status, headers, and parsed body
  * @throws {AuthError} Only on authentication failure (not on API errors)
  */
 export async function rawApiRequest(
   endpoint: string,
   options: ApiRequestOptions & { headers?: Record<string, string> } = {}
-): Promise<{
-  status: number;
-  statusText: string;
-  headers: Headers;
-  body: unknown;
-}> {
+): Promise<{ status: number; headers: Headers; body: unknown }> {
   const { method = "GET", body, params, headers: customHeaders = {} } = options;
 
   const config = getDefaultSdkConfig();
@@ -817,7 +781,6 @@ export async function rawApiRequest(
 
   return {
     status: response.status,
-    statusText: response.statusText,
     headers: response.headers,
     body: responseBody,
   };

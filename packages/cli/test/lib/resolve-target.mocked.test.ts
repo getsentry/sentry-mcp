@@ -475,35 +475,7 @@ describe("resolveFromDsn", () => {
     expect(mockGetCachedProject).toHaveBeenCalledWith("123", "456");
   });
 
-  test("uses resolution surfaced by the detector without any API call", async () => {
-    mockDetectDsn.mockResolvedValue({
-      raw: "https://abc@o123.ingest.sentry.io/456",
-      protocol: "https",
-      publicKey: "abc",
-      host: "o123.ingest.sentry.io",
-      projectId: "456",
-      orgId: "123",
-      source: "env",
-      resolved: {
-        orgSlug: "detected-org",
-        orgName: "Detected Organization",
-        projectSlug: "detected-project",
-        projectName: "Detected Project",
-      },
-    });
-
-    const result = await resolveFromDsn("/test");
-
-    expect(result?.org).toBe("detected-org");
-    expect(result?.project).toBe("detected-project");
-    expect(result?.orgDisplay).toBe("Detected Organization");
-    expect(result?.projectDisplay).toBe("Detected Project");
-    // DSN already encodes identity — no discovery call and no cache lookup.
-    expect(mockGetProject).not.toHaveBeenCalled();
-    expect(mockGetCachedProject).not.toHaveBeenCalled();
-  });
-
-  test("skips org/project discovery on cache miss when DSN encodes identity", async () => {
+  test("fetches and caches project info on cache miss", async () => {
     mockDetectDsn.mockResolvedValue({
       raw: "https://abc@o123.ingest.sentry.io/456",
       protocol: "https",
@@ -515,40 +487,52 @@ describe("resolveFromDsn", () => {
       sourcePath: "/test/.env",
     });
     mockGetCachedProject.mockReturnValue(null);
+    mockGetProject.mockResolvedValue({
+      id: "456",
+      slug: "fetched-project",
+      name: "Fetched Project",
+      organization: {
+        id: "123",
+        slug: "fetched-org",
+        name: "Fetched Organization",
+      },
+    });
 
     const result = await resolveFromDsn("/test");
 
-    // No getProject discovery call — the numeric IDs from the DSN are used
-    // directly (the API accepts them as org/project identifiers).
-    expect(mockGetProject).not.toHaveBeenCalled();
-    expect(result?.org).toBe("123");
-    expect(result?.project).toBe("456");
-    expect(result?.projectId).toBe(456);
+    expect(result).not.toBeNull();
+    expect(result?.org).toBe("fetched-org");
+    expect(result?.project).toBe("fetched-project");
+    expect(result?.orgDisplay).toBe("Fetched Organization");
+    expect(result?.projectDisplay).toBe("Fetched Project");
+    expect(mockSetCachedProject).toHaveBeenCalled();
   });
 
-  test("enriches org slug from the local regions cache without an API call", async () => {
+  test("falls back to numeric IDs when project has no org info", async () => {
     mockDetectDsn.mockResolvedValue({
-      raw: "https://abc@o1169445.ingest.us.sentry.io/456",
+      raw: "https://abc@o123.ingest.sentry.io/456",
       protocol: "https",
       publicKey: "abc",
-      host: "o1169445.ingest.us.sentry.io",
+      host: "o123.ingest.sentry.io",
       projectId: "456",
-      orgId: "1169445",
+      orgId: "123",
       source: "env",
     });
     mockGetCachedProject.mockReturnValue(null);
-    mockGetOrgByNumericId.mockReturnValue({
-      slug: "my-org",
-      regionUrl: "https://us.sentry.io",
+    mockGetProject.mockResolvedValue({
+      id: "456",
+      slug: "project",
+      name: "Project Name",
+      // No organization field
     });
 
     const result = await resolveFromDsn("/test");
 
-    expect(result?.org).toBe("my-org");
-    expect(result?.orgDisplay).toBe("my-org");
-    expect(result?.project).toBe("456");
-    expect(mockGetProject).not.toHaveBeenCalled();
-    expect(mockGetOrgByNumericId).toHaveBeenCalledWith("1169445");
+    // Falls back to using numeric IDs (both org and project)
+    expect(result).not.toBeNull();
+    expect(result?.org).toBe("123");
+    expect(result?.project).toBe("456"); // Uses dsn.projectId, not projectInfo.slug
+    expect(result?.projectDisplay).toBe("Project Name");
   });
 });
 
@@ -856,47 +840,7 @@ describe("resolveAllTargets", () => {
     expect(result.targets[0].project).toBe("my-app");
   });
 
-  test("returns empty targets when a public-key DSN cannot be resolved", async () => {
-    mockGetDefaultOrganization.mockReturnValue(null);
-    mockGetDefaultProject.mockReturnValue(null);
-    // Self-hosted / public-key-only DSN (no orgId) — the DSN does not encode
-    // org identity, so a lookup is required and can fail.
-    mockDetectAllDsns.mockResolvedValue({
-      primary: {
-        raw: "https://abc@sentry.example.com/456",
-        protocol: "https",
-        publicKey: "abc",
-        host: "sentry.example.com",
-        projectId: "456",
-        source: "env",
-      },
-      all: [
-        {
-          raw: "https://abc@sentry.example.com/456",
-          protocol: "https",
-          publicKey: "abc",
-          host: "sentry.example.com",
-          projectId: "456",
-          source: "env",
-        },
-      ],
-      hasMultiple: false,
-      fingerprint: "",
-    });
-    mockGetCachedProjectByDsnKey.mockReturnValue(null);
-    // findProjectByDsnKey returns null (project not found)
-    mockFindProjectByDsnKey.mockResolvedValue(null);
-    mockFindProjectRoot.mockResolvedValue({
-      projectRoot: "/a",
-      detectedFrom: "package.json",
-    });
-
-    const result = await resolveAllTargets({ cwd: "/test" });
-
-    expect(result.targets).toHaveLength(0);
-  });
-
-  test("skips discovery for orgId DSNs and resolves from numeric IDs", async () => {
+  test("returns empty targets when all DSN resolutions fail", async () => {
     mockGetDefaultOrganization.mockReturnValue(null);
     mockGetDefaultProject.mockReturnValue(null);
     mockDetectAllDsns.mockResolvedValue({
@@ -924,14 +868,16 @@ describe("resolveAllTargets", () => {
       fingerprint: "",
     });
     mockGetCachedProject.mockReturnValue(null);
+    // getProject returns null (project not found)
+    mockGetProject.mockResolvedValue(null);
+    mockFindProjectRoot.mockResolvedValue({
+      projectRoot: "/a",
+      detectedFrom: "package.json",
+    });
 
     const result = await resolveAllTargets({ cwd: "/test" });
 
-    expect(result.targets).toHaveLength(1);
-    expect(result.targets[0].org).toBe("123");
-    expect(result.targets[0].project).toBe("456");
-    // The DSN already identifies the target — no discovery API call.
-    expect(mockGetProject).not.toHaveBeenCalled();
+    expect(result.targets).toHaveLength(0);
   });
 });
 

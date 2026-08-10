@@ -36,17 +36,10 @@ export async function listDir(payload: ListDirPayload): Promise<ToolResult> {
     maxDepth,
     maxEntries,
     recursive,
-    truncated: false,
   };
 
   await walkDirectory(targetPath, 0, state);
-  return {
-    ok: true,
-    data: {
-      entries: state.entries,
-      ...(state.truncated ? { truncated: true } : {}),
-    },
-  };
+  return { ok: true, data: { entries: state.entries } };
 }
 
 type WalkState = {
@@ -56,15 +49,13 @@ type WalkState = {
   maxDepth: number;
   maxEntries: number;
   recursive: boolean;
-  truncated: boolean;
 };
 
-async function readDirEntries(dir: string): Promise<fs.Dirent[] | undefined> {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
+async function readDirEntries(dir: string): Promise<fs.Dirent[]> {
   try {
     return await fs.promises.readdir(dir, { withFileTypes: true });
   } catch {
-    return;
+    return [];
   }
 }
 
@@ -95,7 +86,6 @@ function toDirEntry(
   const relNative = abs.slice(state.cwdPrefixLen);
 
   if (entry.isSymbolicLink()) {
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       safePath(state.cwd, relNative);
     } catch {
@@ -103,33 +93,11 @@ function toDirEntry(
     }
   }
 
-  if (entry.isDirectory()) {
-    return {
-      name: entry.name,
-      path: normalizePath(relNative),
-      type: "directory",
-    };
-  }
-
-  // Only regular files carry size. lstat avoids following a path that changed
-  // into a symlink after readdir; special files are never opened.
   return {
     name: entry.name,
     path: normalizePath(relNative),
-    type: "file",
-    ...(entry.isFile() ? fileSize(abs) : {}),
+    type: entry.isDirectory() ? "directory" : "file",
   };
-}
-
-/** Return a regular file's byte size without opening or reading its contents. */
-function fileSize(abs: string): { size?: number } {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
-  try {
-    const stat = fs.lstatSync(abs);
-    return stat.isFile() ? { size: stat.size } : {};
-  } catch {
-    return {};
-  }
 }
 
 async function walkDirectory(
@@ -138,19 +106,11 @@ async function walkDirectory(
   state: WalkState
 ): Promise<void> {
   if (depth > state.maxDepth || state.entries.length >= state.maxEntries) {
-    state.truncated = true;
     return;
   }
 
-  const entries = await readDirEntries(dir);
-  if (!entries) {
-    state.truncated = true;
-    return;
-  }
-
-  for (const entry of entries) {
+  for (const entry of await readDirEntries(dir)) {
     if (state.entries.length >= state.maxEntries) {
-      state.truncated = true;
       return;
     }
     const nextEntry = toDirEntry(state, dir, entry);
@@ -159,11 +119,7 @@ async function walkDirectory(
     }
     state.entries.push(nextEntry);
     if (shouldRecurseInto(entry, state)) {
-      if (depth >= state.maxDepth) {
-        state.truncated = true;
-      } else {
-        await walkDirectory(dir + NATIVE_SEP + entry.name, depth + 1, state);
-      }
+      await walkDirectory(dir + NATIVE_SEP + entry.name, depth + 1, state);
     }
   }
 }

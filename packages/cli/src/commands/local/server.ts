@@ -36,12 +36,7 @@ import {
   isItemIncluded,
   SENTRY_CONTENT_TYPE,
 } from "../../lib/formatters/local.js";
-import { logger, printJsonLine, printLine } from "../../lib/logger.js";
-import {
-  formatLocalServerUrl,
-  openLocalUiIfRequested,
-  validateOpenHost,
-} from "./ui.js";
+import { logger, printLine } from "../../lib/logger.js";
 
 /** Default port for the local dev server. */
 export const DEFAULT_PORT = 8969;
@@ -71,7 +66,7 @@ const MAX_BODY_BYTES = 10 * 1024 * 1024;
  * Parse and validate a `--format` value.
  * Accepts: human, json.
  */
-export function parseFormat(value: string): FormatValue {
+function parseFormat(value: string): FormatValue {
   const lower = value.toLowerCase();
   if (!FORMAT_VALUES.includes(lower as FormatValue)) {
     throw new ValidationError(
@@ -86,7 +81,7 @@ export function parseFormat(value: string): FormatValue {
  * Parse and validate a `--filter` value.
  * Accepts the canonical names: error, transaction, logger.
  */
-export function parseFilter(value: string): FilterValue {
+function parseFilter(value: string): FilterValue {
   const lower = value.toLowerCase();
   if (!FILTER_VALUES.includes(lower as FilterValue)) {
     throw new ValidationError(
@@ -104,7 +99,6 @@ type LocalFlags = {
   readonly filter: FilterValue[];
   readonly format: FormatValue;
   readonly attributes: boolean;
-  readonly open: boolean;
 };
 
 /**
@@ -127,26 +121,6 @@ export function parsePort(value: string): number {
 /** Match localhost origins on any port (http or https), including IPv6. */
 const LOCALHOST_ORIGIN_RE =
   /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
-const LOCAL_UI_ORIGIN = "https://local.sentry.dev";
-
-function isHostedUiStreamRequest(request: {
-  method: string;
-  path: string;
-  header: (name: string) => string | undefined;
-}): boolean {
-  if (
-    request.header("origin") !== LOCAL_UI_ORIGIN ||
-    request.path !== "/stream"
-  ) {
-    return false;
-  }
-
-  return (
-    request.method === "GET" ||
-    (request.method === "OPTIONS" &&
-      request.header("access-control-request-method") === "GET")
-  );
-}
 
 /**
  * Build the Hono application.
@@ -219,60 +193,14 @@ export function buildApp(
     await next();
   });
 
-  const localhostCors = cors({
-    origin: (origin) => (LOCALHOST_ORIGIN_RE.test(origin) ? origin : null),
-    allowMethods: ["GET", "POST", "OPTIONS"],
-    allowHeaders: [
-      "Content-Type",
-      "Content-Encoding",
-      "User-Agent",
-      "Last-Event-ID",
-    ],
-  });
-  const hostedStreamCors = cors({
-    origin: LOCAL_UI_ORIGIN,
-    allowMethods: ["GET", "OPTIONS"],
-    allowHeaders: ["Last-Event-ID"],
-  });
-
-  app.use("*", async (c, next) => {
-    const hostedUiOrigin = c.req.header("origin") === LOCAL_UI_ORIGIN;
-    const hostedStreamRequest = isHostedUiStreamRequest(c.req);
-
-    // The hosted UI may only read the event stream. CORS alone cannot stop a
-    // simple cross-origin POST, so reject any other hosted-origin request.
-    if (hostedUiOrigin && !hostedStreamRequest) {
-      return c.body(null, 403);
-    }
-
-    if (!hostedStreamRequest) {
-      return localhostCors(c, next);
-    }
-
-    if (c.req.method === "OPTIONS") {
-      const isPrivateNetworkRequest =
-        c.req.header("access-control-request-private-network") === "true";
-      c.header("Access-Control-Allow-Origin", LOCAL_UI_ORIGIN);
-      c.header("Access-Control-Allow-Methods", "GET, OPTIONS");
-      c.header("Access-Control-Allow-Headers", "Last-Event-ID");
-      if (isPrivateNetworkRequest) {
-        c.header("Access-Control-Allow-Private-Network", "true");
-      }
-      c.header(
-        "Vary",
-        [
-          "Origin",
-          "Access-Control-Request-Headers",
-          ...(isPrivateNetworkRequest
-            ? ["Access-Control-Request-Private-Network"]
-            : []),
-        ].join(", ")
-      );
-      return c.body(null, 204);
-    }
-
-    return await hostedStreamCors(c, next);
-  });
+  app.use(
+    "*",
+    cors({
+      origin: (origin) => (LOCALHOST_ORIGIN_RE.test(origin) ? origin : null),
+      allowMethods: ["GET", "POST", "OPTIONS"],
+      allowHeaders: ["Content-Type", "Content-Encoding", "User-Agent"],
+    })
+  );
 
   app.get("/health", (c) => c.text("OK"));
 
@@ -766,22 +694,13 @@ function processSSEEvent(
             showAttributes
           );
       for (const line of lines) {
-        printLocalEventLine(line, useJson);
+        printLine(line);
       }
     }
   } catch (err) {
     logger.debug(
       `Failed to parse SSE event: ${err instanceof Error ? err.message : String(err)}`
     );
-  }
-}
-
-/** Route human event tails to stderr and JSON observations to stdout. */
-function printLocalEventLine(line: string, useJson: boolean): void {
-  if (useJson) {
-    printJsonLine(line);
-  } else {
-    printLine(line);
   }
 }
 
@@ -793,7 +712,7 @@ export const serverCommand = buildCommand({
       "Sentry SDKs in your dev stack and tails them to the terminal.\n\n" +
       "If a server is already listening on the port, the command connects\n" +
       "as an SSE consumer and tails events from it. Otherwise it starts\n" +
-      "its own server. Use --open to launch the Sentry Local UI.\n\n" +
+      "its own server.\n\n" +
       "Press Ctrl-C to stop.",
   },
   parameters: {
@@ -826,18 +745,13 @@ export const serverCommand = buildCommand({
       format: {
         kind: "parsed",
         parse: parseFormat,
-        brief: "Output format: human (default) or json (NDJSON on stdout)",
+        brief: "Output format: human (default) or json (NDJSON)",
         default: "human",
       },
       attributes: {
         kind: "boolean",
         brief:
           "Show a grouped attribute table (user vs SDK) under each transaction",
-        default: false,
-      },
-      open: {
-        kind: "boolean",
-        brief: "Open Sentry Local UI in the browser",
         default: false,
       },
     },
@@ -852,13 +766,11 @@ export const serverCommand = buildCommand({
   },
   auth: false,
   async *func(this: SentryContext, flags: LocalFlags) {
-    validateOpenHost(flags.open, flags.host);
     const activeFilters = new Set(flags.filter);
-    const url = formatLocalServerUrl(flags.host, flags.port);
+    const url = `http://${flags.host}:${flags.port}`;
 
     if (await isServerRunning(url)) {
       logger.info(`Connected to existing server at ${bold(url)}`);
-      await openLocalUiIfRequested(flags.open, url);
       if (activeFilters.size > 0) {
         logger.info(`Filtering: ${[...activeFilters].join(", ")}`);
       }
@@ -902,7 +814,7 @@ export const serverCommand = buildCommand({
             activeFilters,
             flags.attributes
           )) {
-            printLocalEventLine(line, useJson);
+            printLine(line);
           }
         } catch (err) {
           logger.debug(
@@ -920,7 +832,7 @@ export const serverCommand = buildCommand({
       flags.host
     );
 
-    const listenUrl = formatLocalServerUrl(flags.host, boundPort);
+    const listenUrl = `http://${flags.host}:${boundPort}`;
     logger.info("Sentry Local Dev Server");
     logger.info(`  Ingest: ${bold(`${listenUrl}/stream`)}`);
     logger.info(`  Events: ${bold(`${listenUrl}/stream`)} (SSE)`);
@@ -939,8 +851,6 @@ export const serverCommand = buildCommand({
     }
     logger.info("");
     logger.info("Press Ctrl-C to stop.");
-
-    await openLocalUiIfRequested(flags.open, listenUrl);
 
     await waitForShutdown(server);
     logger.log("Server stopped.");

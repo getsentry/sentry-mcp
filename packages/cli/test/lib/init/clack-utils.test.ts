@@ -1,5 +1,5 @@
 /**
- * Tests for clack-utils: cancellation helpers and feature display metadata.
+ * Tests for clack-utils: WizardCancelledError, abortIfCancelled, featureLabel, featureHint.
  *
  * These are pure utility functions that don't require module mocking.
  */
@@ -7,7 +7,7 @@
 import { describe, expect, test } from "vitest";
 import {
   abortIfCancelled,
-  featureDescription,
+  featureHint,
   featureLabel,
   PROGRESS_ROTATE_INTERVAL_MS,
   STEP_ACTIVE_LABELS,
@@ -50,11 +50,9 @@ describe("featureLabel", () => {
   test("returns label for known feature", () => {
     expect(featureLabel("errorMonitoring")).toBe("Error Monitoring");
     expect(featureLabel("performanceMonitoring")).toBe("Tracing");
-    expect(featureLabel("logs")).toBe("Logs");
-    expect(featureLabel("crons")).toBe("Crons & Uptime Monitors");
-    expect(featureLabel("attachments")).toBe("Attachments");
-    expect(featureLabel("aiMonitoring")).toBe("Agent Tracing");
-    expect(featureLabel("mcpObservability")).toBe("MCP Observability");
+    expect(featureLabel("logs")).toBe("Logging");
+    expect(featureLabel("crons")).toBe("Crons");
+    expect(featureLabel("aiMonitoring")).toBe("AI Monitoring");
     expect(featureLabel("userFeedback")).toBe("User Feedback");
   });
 
@@ -63,51 +61,41 @@ describe("featureLabel", () => {
   });
 });
 
-describe("featureDescription", () => {
-  test("returns description for known feature", () => {
-    expect(featureDescription("errorMonitoring")).toBe(
-      "Automatically capture exceptions and stack traces"
+describe("featureHint", () => {
+  test("returns hint for known feature", () => {
+    expect(featureHint("errorMonitoring")).toBe(
+      "Group exceptions into issues with context"
     );
-    expect(featureDescription("performanceMonitoring")).toBe(
-      "Find bottlenecks, broken requests, and understand application flow end-to-end"
+    expect(featureHint("performanceMonitoring")).toBe(
+      "See request paths, spans, and bottlenecks"
     );
-    expect(featureDescription("sessionReplay")).toBe(
-      "Watch real user sessions to see what went wrong"
+    expect(featureHint("sessionReplay")).toBe(
+      "Replay sessions linked to errors"
     );
-    expect(featureDescription("profiling")).toBe(
-      "Pinpoint the functions and lines of code responsible for performance issues"
+    expect(featureHint("profiling")).toBe(
+      "Find CPU-heavy functions in production"
     );
-    expect(featureDescription("logs")).toBe(
-      "See logs in context with errors and performance issues"
+    expect(featureHint("logs")).toBe("Search logs beside errors and traces");
+    expect(featureHint("metrics")).toBe("Track custom measurements over time");
+    expect(featureHint("sourceMaps")).toBe(
+      "Turn minified stacks into your source"
     );
-    expect(featureDescription("metrics")).toBe(
-      "Track application performance and usage over time with custom metrics"
+    expect(featureHint("crons")).toBe(
+      "Alert on failed or missed scheduled jobs"
     );
-    expect(featureDescription("sourceMaps")).toBe(
-      "Turn minified production stack traces back into your original source code"
+    expect(featureHint("aiMonitoring")).toBe(
+      "Track AI calls, latency, cost, and failures"
     );
-    expect(featureDescription("crons")).toBe(
-      "Detect failed, missed, or delayed scheduled jobs"
+    expect(featureHint("userFeedback")).toBe(
+      "Collect user reports with issue context"
     );
-    expect(featureDescription("attachments")).toBe(
-      "Link user-supplied data to captured events"
-    );
-    expect(featureDescription("aiMonitoring")).toBe(
-      "Understand AI calls, latency, token usage, cost, and failures"
-    );
-    expect(featureDescription("mcpObservability")).toBe(
-      "Trace MCP tool calls and understand failures across agent workflows"
-    );
-    expect(featureDescription("userFeedback")).toBe(
-      "Collect user reports with the error and session context needed to investigate"
-    );
-    expect(featureDescription("reactFeatures")).toBe(
-      "Capture React-specific errors with component and rendering context"
+    expect(featureHint("reactFeatures")).toBe(
+      "Add React-specific context and integrations"
     );
   });
 
   test("returns undefined for unknown feature", () => {
-    expect(featureDescription("unknownFeature")).toBeUndefined();
+    expect(featureHint("unknownFeature")).toBeUndefined();
   });
 });
 
@@ -120,18 +108,14 @@ describe("sortFeatures", () => {
         "errorMonitoring",
         "sourceMaps",
         "crons",
-        "attachments",
         "aiMonitoring",
-        "mcpObservability",
       ])
     ).toEqual([
       "errorMonitoring",
       "logs",
-      "aiMonitoring",
-      "attachments",
-      "crons",
-      "mcpObservability",
       "sourceMaps",
+      "crons",
+      "aiMonitoring",
       "userFeedback",
     ]);
   });

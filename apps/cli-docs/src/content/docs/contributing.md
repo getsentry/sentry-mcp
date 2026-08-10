@@ -52,16 +52,15 @@ cli/
 │   ├── app.ts          # Stricli application setup
 │   ├── context.ts      # Dependency injection context
 │   ├── commands/       # CLI commands
-│   │   ├── agent-conversation/# list, view
 │   │   ├── alert/       # create, delete, edit, list, view
 │   │   ├── auth/        # login, logout, refresh, status, token, whoami
 │   │   ├── build/       # download, upload
-│   │   ├── cli/         # completion, defaults, feedback, fix, import, setup, uninstall, upgrade
+│   │   ├── cli/         # defaults, feedback, fix, import, setup, uninstall, upgrade
 │   │   ├── code-mappings/# upload
+│   │   ├── conversation/# list, view
 │   │   ├── dart-symbol-map/# upload
 │   │   ├── dashboard/   # add, create, delete, edit, list, restore, revisions, view
 │   │   ├── debug-files/ # bundle-jvm, bundle-sources, check, find, print-sources, upload
-│   │   ├── docs/        # list, query
 │   │   ├── event/       # list, send, view
 │   │   ├── feedback/    # list, view
 │   │   ├── issue/       # archive, events, explain, list, merge, plan, resolve, unresolve, view
@@ -79,7 +78,6 @@ cli/
 │   │   ├── snapshots/   # diff, download, upload
 │   │   ├── sourcemap/   # inject, resolve, upload
 │   │   ├── span/        # list, view
-│   │   ├── status/      # show
 │   │   ├── team/        # list
 │   │   ├── trace/       # list, logs, view
 │   │   ├── trial/       # list, start
@@ -90,7 +88,7 @@ cli/
 │   │   ├── init.ts      # Initialize Sentry in your project (experimental)
 │   │   └── schema.ts    # Browse the Sentry API schema
 │   ├── lib/            # Shared utilities
-│   └── types/          # TypeScript types and Valibot schemas
+│   └── types/          # TypeScript types and Zod schemas
 ├── test/               # Test files (mirrors src/ structure)
 ├── script/             # Build and utility scripts
 ├── plugins/            # Agent skill files

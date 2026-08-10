@@ -28,10 +28,7 @@ import {
   TARGET_PATTERN_NOTE,
 } from "../../lib/list-command.js";
 import { withProgress } from "../../lib/polling.js";
-import {
-  resolveLogProjectId,
-  resolveOrgProjectFromArg,
-} from "../../lib/resolve-target.js";
+import { resolveOrgProjectFromArg } from "../../lib/resolve-target.js";
 import { sanitizeQuery } from "../../lib/search-query.js";
 import {
   appendPeriodHint,
@@ -269,10 +266,6 @@ export const listCommand = buildListCommand("trace", {
       cwd,
       COMMAND_NAME
     );
-    // Resolve slug → numeric ID so the Events query scopes via the `project`
-    // param. `project:<slug>` only matches actively-selected projects and can
-    // otherwise 400 with "not actively selected" (#1317).
-    const projectId = await resolveLogProjectId(org, project);
     // Build context key and resolve cursor for pagination
     const contextKey = buildPaginationContextKey("trace", `${org}/${project}`, {
       sort: flags.sort,
@@ -296,7 +289,6 @@ export const listCommand = buildListCommand("trace", {
           limit: flags.limit,
           sort: flags.sort,
           cursor,
-          projectId,
           ...timeRangeToApiParams(timeRange),
         }).catch((error: unknown): never => {
           // An unparseable user --query is a user input mistake, not a CLI bug.

@@ -182,10 +182,7 @@ export type ResolveOrgOptions = {
 
 /**
  * Resolve organization and project from DSN detection.
- *
- * A SaaS DSN already encodes org+project identity, so this never makes a
- * discovery API call: it returns cached slugs when available and otherwise
- * builds the target from the DSN's numeric IDs (valid API identifiers).
+ * Uses cached project info when available, otherwise fetches and caches it.
  *
  * @param cwd - Current working directory to search for DSN
  * @returns Resolved target with org/project info, or null if DSN not found
@@ -200,19 +197,7 @@ export async function resolveFromDsn(
 
   const detectedFrom = getDsnSourceDescription(dsn);
 
-  // Resolution the DSN detection layer already surfaced (dsn_cache) — no lookup.
-  if (dsn.resolved) {
-    return {
-      org: dsn.resolved.orgSlug,
-      project: dsn.resolved.projectSlug,
-      projectId: toNumericId(dsn.projectId),
-      orgDisplay: dsn.resolved.orgName,
-      projectDisplay: dsn.resolved.projectName,
-      detectedFrom,
-    };
-  }
-
-  // Locally cached slugs — no lookup.
+  // Check cache first
   const cached = getCachedProject(dsn.orgId, dsn.projectId);
   if (cached) {
     return {
@@ -225,33 +210,40 @@ export async function resolveFromDsn(
     };
   }
 
-  // The DSN already encodes org+project identity, so skip the getProject
-  // discovery call (and its auth round-trip). Enrich the org slug from the
-  // local regions cache when available, otherwise fall back to the numeric IDs
-  // — the API accepts both as {org,project}_id_or_slug path params.
-  return dsnTargetFromNumericIds(dsn.orgId, dsn.projectId, detectedFrom);
-}
+  // Cache miss — fetch project details and cache them
+  const projectInfo = await getProject(dsn.orgId, dsn.projectId);
 
-/**
- * Build a {@link ResolvedTarget} straight from a DSN's numeric org/project IDs
- * without any API discovery. The org slug is resolved from the local regions
- * cache when present; both IDs are otherwise valid API identifiers.
- */
-function dsnTargetFromNumericIds(
-  orgId: string,
-  projectId: string,
-  detectedFrom: string,
-  packagePath?: string
-): ResolvedTarget {
-  const org = getOrgByNumericId(orgId)?.slug ?? orgId;
+  if (projectInfo.organization) {
+    const orgName = resolveOrgDisplayName(
+      projectInfo.organization.slug,
+      projectInfo.organization.name
+    );
+    setCachedProject(dsn.orgId, dsn.projectId, {
+      orgSlug: projectInfo.organization.slug,
+      orgName,
+      projectSlug: projectInfo.slug,
+      projectName: projectInfo.name,
+      projectId: projectInfo.id,
+    });
+
+    return {
+      org: projectInfo.organization.slug,
+      project: projectInfo.slug,
+      projectId: toNumericId(projectInfo.id),
+      orgDisplay: orgName,
+      projectDisplay: projectInfo.name,
+      detectedFrom,
+    };
+  }
+
+  // Fallback to numeric IDs if org info missing (rare edge case)
   return {
-    org,
-    project: projectId,
-    projectId: toNumericId(projectId),
-    orgDisplay: org,
-    projectDisplay: projectId,
+    org: dsn.orgId,
+    project: dsn.projectId,
+    projectId: toNumericId(projectInfo.id),
+    orgDisplay: dsn.orgId,
+    projectDisplay: projectInfo.name,
     detectedFrom,
-    packagePath,
   };
 }
 
@@ -319,7 +311,6 @@ async function normalizeNumericOrg(orgId: string): Promise<string> {
   // Slow path: fetch org list to populate numeric ID → slug mapping.
   // resolveEffectiveOrg doesn't handle bare numeric IDs (only o-prefixed),
   // so we do a targeted refresh via listOrganizationsUncached().
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const { listOrganizationsUncached } = await import("./api-client.js");
     await listOrganizationsUncached();
@@ -398,11 +389,10 @@ export async function resolveDsnByPublicKey(
 
 /**
  * Resolve a single detected DSN to a ResolvedTarget.
+ * Uses cache when available, otherwise fetches from API.
  *
  * Supports two resolution paths:
- * 1. DSNs with orgId: the DSN already encodes org+project identity, so no
- *    discovery API call is made — cached slugs are used when available,
- *    otherwise the target is built from the DSN's numeric IDs.
+ * 1. DSNs with orgId: Use getProject(orgId, projectId) API
  * 2. DSNs without orgId: Use findProjectByDsnKey(publicKey) API
  *
  * @param dsn - Detected DSN to resolve
@@ -414,27 +404,15 @@ async function resolveDsnToTarget(
   // For DSNs without orgId (self-hosted or some SaaS patterns),
   // resolve by searching for the project via DSN public key
   if (!dsn.orgId) {
-    return await resolveDsnByPublicKey(dsn);
+    return resolveDsnByPublicKey(dsn);
   }
 
+  // Capture narrowed values before the closure (TS loses narrowing across closures)
   const orgId = dsn.orgId;
   const { projectId: dsnProjectId, packagePath } = dsn;
   const detectedFrom = getDsnSourceDescription(dsn);
 
-  // Resolution the DSN detection layer already surfaced (dsn_cache) — no lookup.
-  if (dsn.resolved) {
-    return {
-      org: dsn.resolved.orgSlug,
-      project: dsn.resolved.projectSlug,
-      projectId: toNumericId(dsnProjectId),
-      orgDisplay: dsn.resolved.orgName,
-      projectDisplay: dsn.resolved.projectName,
-      detectedFrom,
-      packagePath,
-    };
-  }
-
-  // Locally cached slugs — no lookup.
+  // Check cache first
   const cached = getCachedProject(orgId, dsnProjectId);
   if (cached) {
     return {
@@ -448,14 +426,46 @@ async function resolveDsnToTarget(
     };
   }
 
-  // The DSN already encodes org+project identity, so skip the getProject
-  // discovery call (and its auth round-trip) and build the target directly.
-  return dsnTargetFromNumericIds(
-    orgId,
-    dsnProjectId,
-    detectedFrom,
-    packagePath
-  );
+  // Cache miss — fetch project details and cache them
+  const result = await withAuthGuard(async () => {
+    const projectInfo = await getProject(orgId, dsnProjectId);
+
+    if (projectInfo.organization) {
+      const orgName = resolveOrgDisplayName(
+        projectInfo.organization.slug,
+        projectInfo.organization.name
+      );
+      setCachedProject(orgId, dsnProjectId, {
+        orgSlug: projectInfo.organization.slug,
+        orgName,
+        projectSlug: projectInfo.slug,
+        projectName: projectInfo.name,
+        projectId: projectInfo.id,
+      });
+
+      return {
+        org: projectInfo.organization.slug,
+        project: projectInfo.slug,
+        projectId: toNumericId(projectInfo.id),
+        orgDisplay: orgName,
+        projectDisplay: projectInfo.name,
+        detectedFrom,
+        packagePath,
+      };
+    }
+
+    // Fallback to numeric IDs if org info missing
+    return {
+      org: orgId,
+      project: dsnProjectId,
+      projectId: toNumericId(projectInfo.id),
+      orgDisplay: orgId,
+      projectDisplay: projectInfo.name,
+      detectedFrom,
+      packagePath,
+    };
+  });
+  return result.ok ? result.value : null;
 }
 
 /** Minimum directory name length for inference (avoids matching too broadly) */
@@ -538,7 +548,6 @@ async function inferFromDirectoryName(cwd: string): Promise<ResolvedTargets> {
 
   // Search for matching projects using word-boundary matching
   let matches: Awaited<ReturnType<typeof findProjectsByPattern>>;
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     matches = await findProjectsByPattern(dirName);
   } catch {
@@ -654,7 +663,6 @@ async function findSimilarProjects(
   org: string,
   slug: string
 ): Promise<string[]> {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const projects = await listProjects(org);
     const slugs = projects.map((p) => p.slug);
@@ -686,7 +694,6 @@ async function findSimilarProjectsAcrossOrgs(
    *  when the slug convention differs (e.g. underscores vs dashes). */
   displayName?: string
 ): Promise<{ slug: string; orgSlug: string }[]> {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const concurrency = pLimit(5);
     const orgProjects = await Promise.all(
@@ -945,9 +952,9 @@ export async function fetchProjectId(
 }
 
 /**
- * Resolve a project slug to its numeric ID for Events API queries, tolerating failures.
+ * Resolve a project slug to its numeric ID for log queries, tolerating failures.
  *
- * Log/trace/span listing scopes by the `project` query param instead of the
+ * Log listing and lookup scope by the `project` query param instead of the
  * `project:<slug>` search filter, which only matches projects that are actively
  * selected in the org (see #1317). This helper resolves the slug so callers can
  * pass a numeric ID.
@@ -1365,7 +1372,6 @@ export async function resolveOrgAndProject(
       }
 
       // 5. DSN auto-detection
-      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         const dsnResult = await resolveFromDsn(cwd);
         if (dsnResult) {
@@ -1706,7 +1712,6 @@ export async function resolveOrg(
   }
 
   // 5. DSN auto-detection
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const result = await resolveOrgFromDsn(cwd);
     if (result) {

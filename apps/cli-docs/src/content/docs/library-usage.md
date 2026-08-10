@@ -119,14 +119,12 @@ const help = await sdk.run("help", "issue");
 ## Authentication
 
 The `token` option provides an auth token for the current invocation. When
-omitted, it falls back to stored credentials and environment variables:
+omitted, it falls back to environment variables and stored credentials:
 
 1. `token` option (highest priority)
-2. Stored OAuth token from `sentry auth login` (if not expired)
-3. `SENTRY_AUTH_TOKEN` environment variable
-4. `SENTRY_TOKEN` environment variable
-
-Set `SENTRY_FORCE_ENV_TOKEN=1` to make environment variable tokens take priority over stored OAuth.
+2. `SENTRY_AUTH_TOKEN` environment variable
+3. `SENTRY_TOKEN` environment variable
+4. Stored OAuth token from `sentry auth login`
 
 ```typescript
 // Explicit token
@@ -153,7 +151,6 @@ const sdk = createSentrySDK({ token: "...", text: true, cwd: "/my/project" });
 | `project` | `string` | Auto-detected | Default project slug |
 | `text` | `boolean` | `false` | Return human-readable text instead of parsed JSON (`run()` only) |
 | `cwd` | `string` | `process.cwd()` | Working directory for DSN auto-detection |
-| `headers` | `Record<string, string>` | — | Extra HTTP headers for self-hosted instances behind a reverse proxy (same as [`SENTRY_CUSTOM_HEADERS`](./configuration/#sentry_custom_headers)); ignored for sentry.io |
 | `signal` | `AbortSignal` | — | Abort signal for cancelling streaming commands |
 
 ## Return Values

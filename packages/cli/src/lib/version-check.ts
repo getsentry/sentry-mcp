@@ -10,7 +10,6 @@
 // biome-ignore lint/performance/noNamespaceImport: Sentry SDK recommends namespace import
 import * as Sentry from "@sentry/node-core/light";
 import { compare as semverCompare } from "semver";
-import type { UpgradeSource } from "./binary.js";
 import { CLI_VERSION } from "./constants.js";
 import { getReleaseChannel } from "./db/release-channel.js";
 import {
@@ -26,12 +25,8 @@ import { getEnv } from "./env.js";
 import { isUserError } from "./errors.js";
 import { cyan, muted } from "./formatters/colors.js";
 import { GLOBAL_FLAGS } from "./global-flags.js";
-import { logger } from "./logger.js";
 import { cleanupPatchCache } from "./patch-cache.js";
-import {
-  fetchLatestFromGitHubWithSource,
-  fetchLatestNightlyVersionWithSource,
-} from "./upgrade.js";
+import { fetchLatestFromGitHub, fetchLatestNightlyVersion } from "./upgrade.js";
 
 /** Target check interval: ~24 hours */
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -231,27 +226,26 @@ export function abortPendingVersionCheck(): void {
 async function maybePrefetchPatches(
   channel: "stable" | "nightly",
   latestVersion: string,
-  signal: AbortSignal,
-  source: UpgradeSource
+  signal: AbortSignal
 ): Promise<void> {
   if (semverCompare(latestVersion, CLI_VERSION) !== 1) {
     return;
   }
   try {
     if (channel === "nightly") {
-      await prefetchNightlyPatches(latestVersion, signal, source);
+      await prefetchNightlyPatches(latestVersion, signal);
     } else {
-      await prefetchStablePatches(latestVersion, signal, source);
+      await prefetchStablePatches(latestVersion, signal);
     }
-  } catch (error) {
-    logger.debug("Delta patch pre-fetch failed (best-effort)", error);
+  } catch {
+    // Pre-fetch is best-effort — don't report errors
   }
 
   // Opportunistic cleanup of stale cached patches
   try {
     await cleanupPatchCache();
-  } catch (error) {
-    logger.debug("Patch cache cleanup failed (best-effort)", error);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -286,14 +280,14 @@ function checkForUpdateInBackgroundImpl(): void {
     async (span) => {
       try {
         // Use GHCR for nightly channel; GitHub Releases for stable.
-        const { version: latestVersion, source } =
+        const latestVersion =
           channel === "nightly"
-            ? await fetchLatestNightlyVersionWithSource(signal)
-            : await fetchLatestFromGitHubWithSource(signal);
+            ? await fetchLatestNightlyVersion(signal)
+            : await fetchLatestFromGitHub(signal);
         setVersionCheckInfo(latestVersion);
 
         // Pre-fetch delta patches so `sentry cli upgrade` can apply them offline
-        await maybePrefetchPatches(channel, latestVersion, signal, source);
+        await maybePrefetchPatches(channel, latestVersion, signal);
 
         span.setStatus({ code: 1 }); // OK
       } catch (error) {

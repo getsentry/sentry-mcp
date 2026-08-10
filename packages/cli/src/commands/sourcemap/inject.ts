@@ -70,8 +70,6 @@ export const injectCommand = buildCommand({
       "  sentry sourcemap inject ./out --dry-run\n" +
       "  sentry sourcemap inject ./maybe-empty --allow-empty",
   },
-  // Purely local file operation — no Sentry API calls, no auth needed.
-  auth: false,
   output: {
     human: formatInjectResult,
   },

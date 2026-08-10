@@ -200,15 +200,9 @@ export const ENV_VAR_REGISTRY: readonly EnvVarEntry[] = [
     example: "1",
   },
   {
-    name: "SENTRY_NO_GRAPHICS",
-    description:
-      "Disable inline terminal graphics (kitty and sixel) on terminals that support them; the banner falls back to block art, and image attachments printed by `sentry api` are written as raw bytes instead of rendered inline. You can also set this persistently with `sentry cli defaults graphics off`.",
-    example: "1",
-  },
-  {
     name: "SENTRY_NO_SIXEL",
     description:
-      "Deprecated alias for `SENTRY_NO_GRAPHICS`. Still honored for backward compatibility.",
+      "Disable sixel graphics on terminals that support it; the banner falls back to block art, and image attachments printed by `sentry api` are written as raw bytes instead of rendered inline.",
     example: "1",
   },
   {
@@ -249,17 +243,6 @@ export const ENV_VAR_REGISTRY: readonly EnvVarEntry[] = [
       "Disable CLI telemetry (error tracking for the CLI itself). The CLI sends anonymized error reports to help improve reliability — set this to opt out.",
     example: "1",
     devGuide: "Disable CLI telemetry (error tracking)",
-  },
-  {
-    name: "DO_NOT_TRACK",
-    description:
-      "Industry-standard opt-out for telemetry. When set to `1`, the CLI disables all telemetry, equivalent to `SENTRY_CLI_NO_TELEMETRY=1`.",
-    example: "1",
-  },
-  {
-    name: "SENTRY_PIPELINE",
-    description:
-      "Identifies the Sentry build plugin that invoked the CLI (e.g., `sentry-webpack-plugin/3.0.0`). Used internally by `sentry build upload` to attribute uploads to the correct plugin. You typically don't need to set this manually — it is set automatically by Sentry build integrations.",
   },
   {
     name: "SENTRY_CLI_NO_UPDATE_CHECK",

@@ -15,7 +15,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { chmod, copyFile, mkdir, realpath, unlink } from "node:fs/promises";
-import { delimiter, dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { compare as semverCompare } from "semver";
 import { getUserAgent } from "./constants.js";
 import {
@@ -23,71 +23,11 @@ import {
   customFetch,
   isTlsCertError,
 } from "./custom-ca.js";
-import {
-  stringifyUnknown,
-  UpgradeError,
-  UpgradeTransportError,
-} from "./errors.js";
+import { stringifyUnknown, UpgradeError } from "./errors.js";
 import { logger } from "./logger.js";
 import { isProcessRunning } from "./process-utils.js";
 /** Known directories where the curl installer may place the binary */
 export const KNOWN_CURL_DIRS = [".local/bin", "bin", ".sentry/bin"];
-
-/**
- * Whether the current platform's filesystem is case-insensitive by default
- * (Windows, macOS). Resolved once at module load — `process.platform` never
- * changes at runtime.
- */
-const IS_CASE_INSENSITIVE_FS =
-  process.platform === "win32" || process.platform === "darwin";
-
-/**
- * Legacy install directory (relative to home) that predates the XDG layout.
- * The curl installer used to drop the binary here; migration moves it out.
- */
-export const LEGACY_INSTALL_SUBDIR = join(".sentry", "bin");
-
-/**
- * Legacy install sub-directories (relative to home) that predate the XDG
- * layout and that migration is allowed to move a binary out of. Deliberately
- * limited to the pre-XDG `~/.sentry/bin`: `~/.local/bin` and `~/bin` (also in
- * {@link KNOWN_CURL_DIRS}) are valid *current* XDG install targets, so treating
- * them as migration sources would relocate a working binary out of an active
- * directory. An array so more legacy locations can be added if they ever exist.
- */
-export const LEGACY_INSTALL_SUBDIRS = [LEGACY_INSTALL_SUBDIR];
-
-/**
- * Strip a trailing path separator (but never from a bare root like `/`) so a
- * PATH entry such as `~/.local/bin/` compares equal to `~/.local/bin`.
- */
-function stripTrailingSep(p: string): string {
-  return p.length > 1 && p.endsWith(sep) ? p.slice(0, -1) : p;
-}
-
-/**
- * Compare two filesystem paths for equality. Tolerates a trailing separator on
- * either side, and is case-insensitive on case-insensitive filesystems
- * (Windows, macOS) — a stored path can differ in casing from a freshly computed
- * one (e.g. `C:\Users\User` vs `C:\Users\user`) yet point at the same location,
- * so a strict `===` would wrongly differ.
- *
- * The implementation is chosen once at module load from
- * {@link IS_CASE_INSENSITIVE_FS} so there is no per-call platform check.
- */
-export const samePath: (a: string, b: string) => boolean =
-  IS_CASE_INSENSITIVE_FS
-    ? (a, b) =>
-        stripTrailingSep(a).toLowerCase() === stripTrailingSep(b).toLowerCase()
-    : (a, b) => stripTrailingSep(a) === stripTrailingSep(b);
-
-/**
- * Absolute legacy install directories for the given home. See
- * {@link LEGACY_INSTALL_SUBDIRS} for why this is scoped to pre-XDG locations.
- */
-export function getLegacyInstallDirs(homeDir: string): string[] {
-  return LEGACY_INSTALL_SUBDIRS.map((dir) => join(homeDir, dir));
-}
 
 /**
  * How the CLI was installed. Determines the upgrade strategy.
@@ -105,33 +45,6 @@ export type InstallationMethod =
   | "bun"
   | "yarn"
   | "unknown";
-
-/** A repository pair that hosts CLI stable releases and nightly OCI images. */
-export type UpgradeSource = {
-  /** GitHub `owner/repository` containing CLI release assets. */
-  readonly githubRepo: string;
-  /** GHCR `owner/package` containing CLI nightly images and delta patches. */
-  readonly ghcrRepo: string;
-  /** Prefix attached to CLI release tags in this repository. */
-  readonly tagPrefix: string;
-};
-
-/** Ordered CLI release sources. The resolver falls through only on HTTP 404. */
-export const UPGRADE_SOURCES = [
-  {
-    githubRepo: "getsentry/toolkit",
-    ghcrRepo: "getsentry/toolkit",
-    tagPrefix: "cli@",
-  },
-  {
-    githubRepo: "getsentry/cli",
-    ghcrRepo: "getsentry/cli",
-    tagPrefix: "",
-  },
-] as const satisfies readonly [UpgradeSource, ...UpgradeSource[]];
-
-/** The first source used by direct helper calls that do not resolve a source. */
-export const PRIMARY_UPGRADE_SOURCE = UPGRADE_SOURCES[0];
 
 /** Valid methods that can be specified via --method flag */
 const VALID_METHODS: InstallationMethod[] = [
@@ -235,130 +148,13 @@ export function getPlatformBinaryName(): string {
  * @param version - Version to download (without 'v' prefix)
  * @returns Download URL for the binary
  */
-export function getBinaryDownloadUrl(
-  version: string,
-  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
-): string {
-  const tag = `${source.tagPrefix}${version}`;
-  return `https://github.com/${source.githubRepo}/releases/download/${tag}/${getPlatformBinaryName()}`;
+export function getBinaryDownloadUrl(version: string): string {
+  return `https://github.com/getsentry/cli/releases/download/${version}/${getPlatformBinaryName()}`;
 }
 
-/** Build the GitHub API base URL for a release source. */
-export function getGitHubReleasesUrl(
-  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
-): string {
-  return `https://api.github.com/repos/${source.githubRepo}/releases`;
-}
-
-/** Build the GitHub API URL for one source-specific release tag. */
-export function getGitHubReleaseByTagUrl(
-  version: string,
-  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
-): string {
-  const tag = `${source.tagPrefix}${version}`;
-  return `${getGitHubReleasesUrl(source)}/tags/${encodeURIComponent(tag)}`;
-}
-
-/** Build the GitHub API URL used to discover a source's latest CLI release. */
-export function getGitHubLatestReleaseUrl(
-  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
-): string {
-  return source.tagPrefix
-    ? `${getGitHubReleasesUrl(source)}?per_page=100`
-    : `${getGitHubReleasesUrl(source)}/latest`;
-}
-
-/** Build the GitHub API URL used to verify that a source repository exists. */
-export function getGitHubRepositoryUrl(
-  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
-): string {
-  return `https://api.github.com/repos/${source.githubRepo}`;
-}
-
-/** GitHub API base URL for the primary release source. */
-export const GITHUB_RELEASES_URL = getGitHubReleasesUrl();
-
-/** Result of selecting one source for an upgrade operation. */
-export type ResolvedUpgradeSource = {
-  /** The selected release source. */
-  readonly source: UpgradeSource;
-  /** The successful response from the source probe. */
-  readonly response: Response;
-};
-
-/** All configured upgrade sources returned an HTTP 404 response. */
-export class UpgradeSourceNotFoundError extends UpgradeError {
-  constructor() {
-    super(
-      "network_error",
-      "No CLI upgrade source was found: every source returned HTTP 404"
-    );
-    this.name = "UpgradeSourceNotFoundError";
-  }
-}
-
-/** Configuration for selecting the first available upgrade source. */
-export type ResolveUpgradeSourceOptions = {
-  /** Build the source-specific URL whose response proves source availability. */
-  readonly getProbeUrl: (source: UpgradeSource) => string;
-  /** Fetch implementation used for the probe. Defaults to the CLI CA-aware fetch. */
-  readonly fetch?: typeof fetch;
-  /** Optional cancellation signal shared by every source probe. */
-  readonly signal?: AbortSignal;
-  /** Ordered sources to probe. Defaults to all configured upgrade sources. */
-  readonly sources?: readonly UpgradeSource[];
-};
-
-async function fetchUpgradeProbe(
-  source: UpgradeSource,
-  options: ResolveUpgradeSourceOptions
-): Promise<Response> {
-  try {
-    return await (options.fetch ?? customFetch)(options.getProbeUrl(source), {
-      headers: getGitHubHeaders(),
-      signal: options.signal,
-    });
-  } catch (error) {
-    if (options.signal?.aborted) {
-      throw options.signal.reason;
-    }
-    if (error instanceof Error && error.name === "AbortError") {
-      throw error;
-    }
-    if (error instanceof Error && isTlsCertError(error)) {
-      throw new UpgradeTransportError(buildTlsErrorDetail(error));
-    }
-    throw new UpgradeTransportError(
-      `Failed to connect to GitHub: ${stringifyUnknown(error)}`
-    );
-  }
-}
-
-/**
- * Select the first available upgrade source.
- *
- * The caller receives the successful probe response so it never repeats the
- * request. Only HTTP 404 advances to the next source. Every other HTTP or
- * network failure aborts immediately.
- */
-export async function resolveUpgradeSource(
-  options: ResolveUpgradeSourceOptions
-): Promise<ResolvedUpgradeSource> {
-  for (const source of options.sources ?? UPGRADE_SOURCES) {
-    const response = await fetchUpgradeProbe(source, options);
-    if (response.ok) {
-      return { source, response };
-    }
-    if (response.status !== 404) {
-      throw new UpgradeError(
-        "network_error",
-        `Failed to fetch from GitHub: HTTP ${response.status}`
-      );
-    }
-  }
-
-  throw new UpgradeSourceNotFoundError();
-}
+/** GitHub API base URL for releases */
+export const GITHUB_RELEASES_URL =
+  "https://api.github.com/repos/getsentry/cli/releases";
 
 /**
  * Detect whether a version string identifies a nightly build.
@@ -376,7 +172,7 @@ export function isNightlyVersion(version: string): boolean {
 /**
  * Compare two version strings and return their ordering.
  *
- * Uses `semver.compare` which handles both stable (`X.Y.Z`) and
+ * Uses `Bun.semver.order` which handles both stable (`X.Y.Z`) and
  * nightly (`X.Y.Z-dev.<unix-seconds>`) versions correctly — the numeric
  * pre-release identifier is compared numerically per SemVer spec.
  *
@@ -430,11 +226,10 @@ export function getBinaryPaths(installPath: string): {
  * Determine the install directory for a curl-installed binary.
  *
  * Priority:
- * 1. $SENTRY_INSTALL_DIR environment variable
- * 2. $XDG_BIN_HOME (if set to an absolute path, per the XDG spec)
- * 3. ~/.local/bin (if exists AND in $PATH)
- * 4. ~/bin (if exists AND in $PATH)
- * 5. ~/.local/bin (XDG-aligned fallback; setup handles PATH modification)
+ * 1. $SENTRY_INSTALL_DIR environment variable (if set and writable)
+ * 2. ~/.local/bin (if exists AND in $PATH)
+ * 3. ~/bin (if exists AND in $PATH)
+ * 4. ~/.sentry/bin (fallback; setup will handle PATH modification)
  *
  * @param homeDir - User's home directory
  * @param env - Process environment variables
@@ -451,25 +246,17 @@ export function determineInstallDir(
     return env.SENTRY_INSTALL_DIR;
   }
 
-  // 2. XDG_BIN_HOME override — honored only when absolute, per the XDG spec
-  const xdgBinHome = env.XDG_BIN_HOME;
-  if (xdgBinHome && isAbsolute(xdgBinHome)) {
-    return xdgBinHome;
-  }
-
-  // 3-4. Check well-known directories that are already in PATH. samePath keeps
-  // the membership check case-insensitive on Windows/macOS, where a PATH entry
-  // can differ in casing from the computed directory yet be the same dir.
+  // 2-3. Check well-known directories that are already in PATH
   const candidates = [join(homeDir, ".local", "bin"), join(homeDir, "bin")];
 
   for (const dir of candidates) {
-    if (existsSync(dir) && pathDirs.some((p) => samePath(p, dir))) {
+    if (existsSync(dir) && pathDirs.includes(dir)) {
       return dir;
     }
   }
 
-  // 5. XDG-aligned fallback — setup will handle adding this to PATH
-  return join(homeDir, ".local", "bin");
+  // 4. Fallback — setup will handle adding this to PATH
+  return join(homeDir, ".sentry", "bin");
 }
 
 /**
@@ -501,40 +288,17 @@ export async function fetchWithUpgradeError(
   try {
     return await customFetch(url, init);
   } catch (error) {
-    if (init.signal?.aborted) {
-      throw init.signal.reason;
-    }
     // Re-throw AbortError as-is so callers can handle it specifically
     if (error instanceof Error && error.name === "AbortError") {
       throw error;
     }
     if (error instanceof Error && isTlsCertError(error)) {
-      throw new UpgradeTransportError(buildTlsErrorDetail(error));
+      throw new UpgradeError("network_error", buildTlsErrorDetail(error));
     }
     const msg = stringifyUnknown(error);
-    throw new UpgradeTransportError(
+    throw new UpgradeError(
+      "network_error",
       `Failed to connect to ${serviceName}: ${msg}`
-    );
-  }
-}
-
-/** Parse an upgrade response while preserving cancellation and transport failures. */
-export async function parseUpgradeJson(
-  response: Response,
-  signal: AbortSignal | undefined,
-  invalidMessage: string
-): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch (error) {
-    if (signal?.aborted) {
-      throw signal.reason;
-    }
-    if (error instanceof SyntaxError) {
-      throw new UpgradeError("network_error", invalidMessage);
-    }
-    throw new UpgradeTransportError(
-      `${invalidMessage}: ${stringifyUnknown(error)}`
     );
   }
 }
@@ -562,7 +326,6 @@ export function replaceBinarySync(tempPath: string, installPath: string): void {
       renameSync(installPath, oldPath);
     } catch {
       // Current binary might not exist (fresh install) or .old already exists
-      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         unlinkSync(oldPath);
         renameSync(installPath, oldPath);
@@ -590,7 +353,6 @@ export function replaceBinarySync(tempPath: string, installPath: string): void {
  */
 export function cleanupOldBinary(oldPath: string): void {
   // Fire-and-forget: don't await, just let cleanup run in background
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   unlink(oldPath).catch(() => {
     // Intentionally ignore errors — file may not exist
   });
@@ -690,7 +452,6 @@ function handleExistingLock(lockPath: string): void {
  * @param lockPath - Path to the lock file
  */
 export function releaseLock(lockPath: string): void {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     unlinkSync(lockPath);
   } catch {

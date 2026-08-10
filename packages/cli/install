@@ -89,14 +89,14 @@ Options:
 
 Environment Variables:
     SENTRY_INSTALL_DIR      Override the installation directory
-    SENTRY_VERSION          Install a specific version (e.g., 0.42.2, nightly)
+    SENTRY_VERSION          Install a specific version (e.g., 0.40.0, nightly)
     SENTRY_INIT             Set to 1 to run \`sentry init\` after installing
 
 Examples:
     curl -fsSL https://cli.sentry.dev/install | bash
     curl -fsSL https://cli.sentry.dev/install | SENTRY_INIT=1 bash
     curl -fsSL https://cli.sentry.dev/install | bash -s -- --version nightly
-    curl -fsSL https://cli.sentry.dev/install | bash -s -- --version 0.42.2
+    curl -fsSL https://cli.sentry.dev/install | bash -s -- --version 0.40.0
     SENTRY_VERSION=nightly curl -fsSL https://cli.sentry.dev/install | bash
     SENTRY_INSTALL_DIR=~/.local/bin curl -fsSL https://cli.sentry.dev/install | bash
 EOF
@@ -337,15 +337,7 @@ trap - EXIT
 # interactively — when piped (curl | bash), stdin is the pipe.
 if [[ "${SENTRY_INIT:-}" == "1" ]]; then
   sentry_bin=""
-  # Only honor XDG_BIN_HOME when absolute, per the XDG spec (matches the Node
-  # determineInstallDir logic); a relative value is ignored. Accept both POSIX
-  # (/…) and Windows drive-letter (C:\… or C:/…) absolute paths so a Windows
-  # XDG_BIN_HOME isn't dropped while Node still installs there.
-  xdg_bin_home="${XDG_BIN_HOME:-}"
-  if [[ "$xdg_bin_home" != /* && ! "$xdg_bin_home" =~ ^[A-Za-z]:[\\/] ]]; then
-    xdg_bin_home=""
-  fi
-  for dir in "${SENTRY_INSTALL_DIR:-}" "$xdg_bin_home" "$HOME/.local/bin" "$HOME/bin" "$HOME/.sentry/bin"; do
+  for dir in "${SENTRY_INSTALL_DIR:-}" "$HOME/.local/bin" "$HOME/bin" "$HOME/.sentry/bin"; do
     [[ -z "$dir" ]] && continue
     if [[ -x "${dir}/sentry" ]]; then
       sentry_bin="${dir}/sentry"

@@ -46,16 +46,14 @@
  * as `dist/ink-app.js` alongside the CJS bundle.
  */
 
-import { spawn } from "node:child_process";
 import { openSync } from "node:fs";
 import { createRequire } from "node:module";
 import { ReadStream } from "node:tty";
 
 const _require = createRequire(import.meta.url);
 
-import { addBreadcrumb, setTag } from "@sentry/node-core/light";
+import { setTag } from "@sentry/node-core/light";
 import { FULL_BANNER_LINES } from "../../banner.js";
-import { openBrowser } from "../../browser.js";
 import { CLI_VERSION } from "../../constants.js";
 import { stripAnsi } from "../../formatters/plain-detect.js";
 import {
@@ -63,11 +61,7 @@ import {
   type WizardPromptKind,
 } from "../../telemetry.js";
 import { formatFeedbackHint, type InitFeedbackOutcome } from "../feedback.js";
-import {
-  formatFailureReport,
-  formatSuccessExitLine,
-  formatSuccessReport,
-} from "./ink-report.js";
+import { formatFailureReport, formatSuccessReport } from "./ink-report.js";
 import { LEARN_SEQUENCE } from "./learn-content.js";
 import { SENTRY_TIPS } from "./sentry-tips.js";
 import {
@@ -83,7 +77,7 @@ import {
   type WizardSummary,
   type WizardUI,
 } from "./types.js";
-import { type ActivePrompt, WizardStore } from "./wizard-store.js";
+import { WizardStore } from "./wizard-store.js";
 
 type CreateInkUIOptions = {
   initialWelcome?: WelcomeOptions;
@@ -128,47 +122,6 @@ function createPendingWelcome(): PendingWelcome {
     settled: false,
   };
   return pending;
-}
-
-/** Handle that keeps the wizard alive on the completion screen until the user
- * dismisses it. `[Symbol.asyncDispose]` awaits `promise`. */
-type PendingOutro = {
-  promise: Promise<void>;
-  resolve: () => void;
-  settled: boolean;
-};
-
-function createPendingOutro(): PendingOutro {
-  let resolve!: () => void;
-  const pending: PendingOutro = {
-    promise: new Promise<void>((r) => {
-      resolve = r;
-    }),
-    resolve: () => {
-      if (pending.settled) {
-        return;
-      }
-      pending.settled = true;
-      resolve();
-    },
-    settled: false,
-  };
-  return pending;
-}
-
-/** Run one shell command with the real terminal attached, resolving when it
- * exits. Used for post-exit actions (e.g. the interactive agent installer)
- * after the alternate screen has been torn down. Never rejects. */
-function runInheritedCommand(command: string): Promise<void> {
-  return new Promise((resolve) => {
-    try {
-      const child = spawn(command, { shell: true, stdio: "inherit" });
-      child.on("close", () => resolve());
-      child.on("error", () => resolve());
-    } catch {
-      resolve();
-    }
-  });
 }
 
 function seedWelcomePrompt(
@@ -240,7 +193,6 @@ import inkAppPath from "./ink-app.tsx" with { type: "file" };
  * broken in Bun-compiled binaries (see module docstring).
  */
 function openFreshTtyForInk(): ReadStream | null {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const fd = openSync("/dev/tty", "r");
     return new ReadStream(fd);
@@ -277,7 +229,6 @@ export async function createInkUI(
 
   // Check if running inside a Node SEA binary
   let isSea = false;
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     // biome-ignore lint/suspicious/noExplicitAny: node:sea types not yet in @types/node
     const sea = _require("node:sea") as any;
@@ -312,7 +263,6 @@ export async function createInkUI(
 
   // Clean up SEA temp file — module is cached in memory after import()
   if (seaTmpDir) {
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       const { rmSync } = await import("node:fs");
       rmSync(seaTmpDir, { recursive: true, force: true });
@@ -428,8 +378,6 @@ export class InkUI implements WizardUI {
 
   private tipIndex = 0;
   private activePromptCancel: (() => void) | undefined;
-  /** A resolved prompt that may remain visible until its successor is ready. */
-  private completedPrompt: ActivePrompt | undefined;
   private cancelHandler: (() => void) | undefined;
   /**
    * Guard so `tearDown()` runs at most once even when called from
@@ -465,7 +413,6 @@ export class InkUI implements WizardUI {
    * `[Symbol.asyncDispose]` awaits this so the `using` block keeps the
    * UI alive until the user has seen and acknowledged the final screen.
    */
-  private pendingOutro: PendingOutro | undefined;
 
   constructor(
     instance: InkInstance,
@@ -519,50 +466,8 @@ export class InkUI implements WizardUI {
 
   outro(message: string): void {
     const clean = stripAnsi(message);
+    this.appendLog("success", clean);
     this.outroMessage = clean;
-    // Keep the interactive completion screen mounted until the user dismisses
-    // it (see `[Symbol.asyncDispose]`), pausing the sidebar tip rotation so the
-    // final screen is stable.
-    this.pauseSidebarTimers();
-    this.pendingOutro ??= createPendingOutro();
-    // Bind the screen's side effects here (main bundle) so the Ink sidecar
-    // never imports Node built-ins (browser launch).
-    this.store.setOutro({
-      kind: "success",
-      dismiss: () => this.dismissOutro(),
-      actions: {
-        openUrl: (url) => {
-          // Best-effort; openBrowser never throws, catch keeps it non-blocking.
-          // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
-          openBrowser(url).catch(() => {
-            // ignore
-          });
-        },
-        track: (event) => {
-          // Land completion-screen interactions on the run's `cli.command`
-          // transaction so we can see, per run, whether the user opened Sentry
-          // and/or chose to install the agent plugin. Tags are sticky: once a
-          // user has clicked "install", un-toggling leaves the click recorded.
-          switch (event) {
-            case "open-sentry":
-              setTag("wizard.completion.opened_sentry", "true");
-              break;
-            case "agent-plugin-queued":
-              setTag("wizard.completion.agent_plugin_clicked", "true");
-              break;
-            case "agent-plugin-unqueued":
-              break;
-            default:
-              break;
-          }
-          addBreadcrumb({
-            category: "wizard.completion",
-            message: event,
-            level: "info",
-          });
-        },
-      },
-    });
   }
 
   cancel(message: string): void {
@@ -637,15 +542,7 @@ export class InkUI implements WizardUI {
     return {
       start: (message?: string) => {
         const clean = stripAnsi(message ?? "");
-        if (
-          this.completedPrompt &&
-          this.store.getSnapshot().prompt === this.completedPrompt
-        ) {
-          this.store.replacePromptWithSpinner(clean);
-          this.completedPrompt = undefined;
-        } else {
-          this.store.startSpinner(clean);
-        }
+        this.store.startSpinner(clean);
         if (clean) {
           this.store.appendStatus(clean);
         }
@@ -682,28 +579,6 @@ export class InkUI implements WizardUI {
     return this.promptTelemetry.tracePrompt(kind, () => new Promise<T>(mount));
   }
 
-  /**
-   * Defers cleanup so the resumed promise chain can replace the completed prompt.
-   * The identity check prevents the old cleanup from removing its successor.
-   */
-  private completePrompt<T>(
-    prompt: ActivePrompt,
-    value: T,
-    resolve: (resolvedValue: T) => void
-  ): void {
-    this.activePromptCancel = undefined;
-    this.completedPrompt = prompt;
-    resolve(value);
-    setImmediate(() => {
-      if (this.store.getSnapshot().prompt === prompt) {
-        this.store.setPrompt(null);
-      }
-      if (this.completedPrompt === prompt) {
-        this.completedPrompt = undefined;
-      }
-    });
-  }
-
   select<T extends string>(opts: SelectOptions<T>): Promise<T | Cancelled> {
     return this.waitForPrompt<T | Cancelled>("select", (resolve) => {
       const initialIndex =
@@ -715,35 +590,14 @@ export class InkUI implements WizardUI {
               )
             )
           : 0;
-      let settled = false;
       this.activePromptCancel = () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
         this.store.setPrompt(null);
         this.activePromptCancel = undefined;
         resolve(CANCELLED);
       };
-      const prompt: Extract<ActivePrompt, { kind: "select" }> = {
+      this.store.setPrompt({
         kind: "select",
         message: stripAnsi(opts.message),
-        ...(opts.details
-          ? {
-              details: opts.details.map((detail) => ({
-                ...detail,
-                text: stripAnsi(detail.text),
-              })),
-            }
-          : {}),
-        ...(opts.footer
-          ? {
-              footer: {
-                ...opts.footer,
-                text: stripAnsi(opts.footer.text),
-              },
-            }
-          : {}),
         options: opts.options.map((option) => ({
           value: option.value,
           label: option.label,
@@ -751,18 +605,15 @@ export class InkUI implements WizardUI {
         })),
         initialIndex,
         resolve: (value) => {
-          if (settled) {
-            return;
+          this.store.setPrompt(null);
+          this.activePromptCancel = undefined;
+          if (value === null) {
+            resolve(CANCELLED);
+          } else {
+            resolve(value as T);
           }
-          settled = true;
-          this.completePrompt(
-            prompt,
-            value === null ? CANCELLED : (value as T),
-            resolve
-          );
         },
-      };
-      this.store.setPrompt(prompt);
+      });
     });
   }
 
@@ -770,49 +621,31 @@ export class InkUI implements WizardUI {
     opts: MultiSelectOptions<T>
   ): Promise<T[] | Cancelled> {
     return this.waitForPrompt<T[] | Cancelled>("multiselect", (resolve) => {
-      let settled = false;
       this.activePromptCancel = () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
         this.store.setPrompt(null);
         this.activePromptCancel = undefined;
         resolve(CANCELLED);
       };
-      const prompt: Extract<ActivePrompt, { kind: "multiselect" }> = {
+      this.store.setPrompt({
         kind: "multiselect",
         message: stripAnsi(opts.message),
-        ...(opts.details
-          ? {
-              details: opts.details.map((detail) => ({
-                ...detail,
-                text: stripAnsi(detail.text),
-              })),
-            }
-          : {}),
         options: opts.options.map((option) => ({
           value: option.value,
           label: option.label,
           ...(option.hint ? { hint: option.hint } : {}),
-          ...(option.description ? { description: option.description } : {}),
-          ...(option.locked ? { locked: true } : {}),
         })),
         initialSelected: opts.initialValues ?? [],
         required: opts.required ?? false,
         resolve: (values) => {
-          if (settled) {
-            return;
+          this.store.setPrompt(null);
+          this.activePromptCancel = undefined;
+          if (values === null) {
+            resolve(CANCELLED);
+          } else {
+            resolve(values as T[]);
           }
-          settled = true;
-          this.completePrompt(
-            prompt,
-            values === null ? CANCELLED : (values as T[]),
-            resolve
-          );
         },
-      };
-      this.store.setPrompt(prompt);
+      });
     });
   }
 
@@ -883,40 +716,9 @@ export class InkUI implements WizardUI {
 
   // ── Disposal ──────────────────────────────────────────────────────
 
-  async [Symbol.asyncDispose](): Promise<void> {
-    // Keep the completion screen alive until the user acknowledges it, then
-    // tear down the alternate screen and run any commands they queued (e.g.
-    // the agent-plugin installer) in their real terminal.
-    const pendingOutro = this.pendingOutro;
-    if (pendingOutro && !pendingOutro.settled && !this.torndown) {
-      await pendingOutro.promise;
-    }
+  [Symbol.asyncDispose](): Promise<void> {
     this.tearDown();
-    await this.runPostExitActions();
-  }
-
-  /** Resolve the completion-screen handoff so async disposal can proceed. */
-  private dismissOutro(): void {
-    this.pendingOutro?.resolve();
-  }
-
-  /**
-   * Run commands the completion screen queued, now that the alternate screen is
-   * gone and the real terminal is restored. Interactive installers (e.g.
-   * `npx @sentry/ai install`) need the real TTY, which the alt-screen denied.
-   */
-  private async runPostExitActions(): Promise<void> {
-    const actions = this.store.getSnapshot().postExitActions;
-    if (actions.length > 0) {
-      // The agent-plugin installer is the only thing the completion screen
-      // queues, so a non-empty list here means the user finished with it queued
-      // and we're about to actually run it — the strongest "installed" signal.
-      setTag("wizard.completion.agent_plugin_installed", "true");
-    }
-    for (const command of actions) {
-      process.stdout.write(`\n$ ${command}\n`);
-      await runInheritedCommand(command);
-    }
+    return Promise.resolve();
   }
 
   /**
@@ -960,13 +762,11 @@ export class InkUI implements WizardUI {
     // Detach the cancel callback from the store so a stale Ctrl+C
     // routed through the App after teardown can't re-enter.
     this.store.setRequestCancel(undefined);
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       this.instance.clear();
     } catch {
       // best-effort
     }
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       this.instance.unmount();
     } catch {
@@ -974,33 +774,17 @@ export class InkUI implements WizardUI {
     }
     // Leave the alternate screen buffer so the user's original
     // scrollback is restored.
-    //
-    // When the user queued an interactive post-exit action (the agent-plugin
-    // installer), also clear the restored screen and home the cursor. Exiting
-    // the alt buffer returns the cursor to the row where `sentry init` was
-    // invoked — usually low on the screen — so without this the exit summary
-    // and the installer's own full-screen UI would render from mid-screen with
-    // a blank gap above. Clearing gives the handoff the same clean top-of-screen
-    // start as wizard startup (line ~362). The normal exit (no installer) is
-    // left untouched so its compact summary flows into scrollback as before.
-    const hasPostExitActions =
-      this.store.getSnapshot().postExitActions.length > 0;
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
-      process.stdout.write(
-        hasPostExitActions ? "\x1b[?1049l\x1b[2J\x1b[H" : "\x1b[?1049l"
-      );
+      process.stdout.write("\x1b[?1049l");
     } catch {
       // best-effort — stdout may already be destroyed
     }
     if (this.freshStdin) {
-      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         this.freshStdin.setRawMode(false);
       } catch {
         // stream already torn down
       }
-      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         this.freshStdin.pause();
         this.freshStdin.destroy();
@@ -1051,12 +835,6 @@ export class InkUI implements WizardUI {
    * teardown.
    */
   requestCancel(): void {
-    // On the completion screen, Ctrl+C is just "I'm done" — acknowledge the
-    // handoff and let async disposal exit cleanly (0), not the 130 abort path.
-    if (this.pendingOutro && !this.pendingOutro.settled) {
-      this.dismissOutro();
-      return;
-    }
     const promptCancel = this.activePromptCancel;
     if (promptCancel) {
       // Prompt path — let the runner unwind via WizardCancelledError.
@@ -1114,13 +892,11 @@ export class InkUI implements WizardUI {
     if (!this.outroMessage) {
       return;
     }
-    const summary = this.store.getSnapshot().summary ?? undefined;
-    // The interactive completion screen already showed the full summary; on
-    // exit leave only a compact confirmation rather than re-dumping everything.
-    if (summary?.completion) {
-      return formatSuccessExitLine(summary);
-    }
-    return formatSuccessReport(this.outroMessage, summary, this.feedbackHint);
+    return formatSuccessReport(
+      this.outroMessage,
+      this.store.getSnapshot().summary ?? undefined,
+      this.feedbackHint
+    );
   }
 
   // ── Internal helpers ──────────────────────────────────────────────

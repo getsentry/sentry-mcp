@@ -16,17 +16,13 @@
 
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import type { SentryContext } from "../../context.js";
 import {
   determineInstallDir,
   isDowngrade,
-  isNightlyVersion,
-  LEGACY_INSTALL_SUBDIR,
   releaseLock,
-  samePath,
-  type UpgradeSource,
 } from "../../lib/binary.js";
 import { buildCommand } from "../../lib/command.js";
 import { CLI_VERSION } from "../../lib/constants.js";
@@ -36,7 +32,7 @@ import {
   setReleaseChannel,
 } from "../../lib/db/release-channel.js";
 import { getVersionCheckInfo } from "../../lib/db/version-check.js";
-import { UpgradeError, UpgradeTransportError } from "../../lib/errors.js";
+import { UpgradeError } from "../../lib/errors.js";
 import { formatUpgradeResult } from "../../lib/formatters/human.js";
 import { formatBytes } from "../../lib/formatters/numbers.js";
 import { CommandOutput } from "../../lib/formatters/output.js";
@@ -46,7 +42,6 @@ import {
   type ChangelogSummary,
   fetchChangelog,
 } from "../../lib/release-notes.js";
-import { isInPath } from "../../lib/shell.js";
 import {
   detectInstallationMethod,
   executeUpgrade,
@@ -56,8 +51,6 @@ import {
   NIGHTLY_TAG,
   type OfflineMode,
   parseInstallationMethod,
-  resolveExistingUpgradeVersion,
-  resolveLatestUpgradeVersion,
   VERSION_PREFIX_REGEX,
   versionExists,
 } from "../../lib/upgrade.js";
@@ -100,7 +93,6 @@ type UpgradeFlags = {
   readonly check: boolean;
   readonly force: boolean;
   readonly offline: boolean;
-  readonly "no-agent-skills": boolean;
   readonly method?: InstallationMethod;
   /** Injected by buildCommand output wrapper — suppresses spinners */
   readonly json?: boolean;
@@ -176,13 +168,8 @@ async function resolveTargetWithFallback(opts: {
    *  clearing the version cache before the offline path can read it). */
   persistChannelFn: () => void;
 }): Promise<
-  | {
-      kind: "target";
-      target: string;
-      offline: OfflineMode;
-      source?: UpgradeSource;
-    }
-  | { kind: "done"; result: UpgradeResult; source?: UpgradeSource }
+  | { kind: "target"; target: string; offline: OfflineMode }
+  | { kind: "done"; result: UpgradeResult }
 > {
   const { resolveOpts, versionArg, offline, method, persistChannelFn } = opts;
 
@@ -212,17 +199,15 @@ async function resolveTargetWithFallback(opts: {
     if (resolved.kind === "done") {
       return resolved;
     }
-    return {
-      kind: "target",
-      target: resolved.target,
-      offline: false,
-      source: resolved.source,
-    };
+    return { kind: "target", target: resolved.target, offline: false };
   } catch (error) {
     // Automatic offline fallback: only for curl-installed binaries (package
     // managers need the network for the actual install, not just version
     // discovery), and only for network errors (not version_not_found etc.)
-    if (method !== "curl" || !(error instanceof UpgradeTransportError)) {
+    if (
+      method !== "curl" ||
+      !(error instanceof UpgradeError && error.reason === "network_error")
+    ) {
       throw error;
     }
     try {
@@ -244,6 +229,7 @@ async function resolveTargetWithFallback(opts: {
 function validateMethod(
   method: InstallationMethod,
   versionArg: string | undefined,
+  channel: ReleaseChannel,
   offline: boolean
 ): void {
   if (method === "unknown") {
@@ -251,10 +237,7 @@ function validateMethod(
   }
   // Homebrew manages versioning through the formula — pinning a specific
   // stable version is not supported via this command.
-  const pinnedVersion = CHANNEL_VERSIONS.has(versionArg ?? "")
-    ? undefined
-    : versionArg?.replace(VERSION_PREFIX_REGEX, "");
-  if (method === "brew" && pinnedVersion && !isNightlyVersion(pinnedVersion)) {
+  if (method === "brew" && versionArg && channel === "stable") {
     throw new UpgradeError(
       "unsupported_operation",
       "Homebrew does not support installing a specific version. Run 'brew upgrade getsentry/tools/sentry' to upgrade to the latest formula version."
@@ -268,10 +251,6 @@ function validateMethod(
       "Offline upgrade is only supported for curl-installed binaries."
     );
   }
-}
-
-function getArtifactChannel(target: string): ReleaseChannel {
-  return isNightlyVersion(target) ? "nightly" : "stable";
 }
 
 type ResolveTargetOptions = {
@@ -290,28 +269,8 @@ type ResolveTargetOptions = {
  *   (check-only mode, or already up to date)
  */
 type ResolveResult =
-  | { kind: "target"; target: string; source?: UpgradeSource }
-  | { kind: "done"; result: UpgradeResult; source?: UpgradeSource };
-
-async function resolvePinnedVersion(
-  lookupMethod: InstallationMethod,
-  target: string
-): Promise<UpgradeSource | undefined> {
-  if (lookupMethod !== "curl") {
-    if (!(await versionExists(lookupMethod, target))) {
-      throw new UpgradeError(
-        "version_not_found",
-        `Version ${target} not found`
-      );
-    }
-    return;
-  }
-  const resolved = await resolveExistingUpgradeVersion(target);
-  if (!resolved) {
-    throw new UpgradeError("version_not_found", `Version ${target} not found`);
-  }
-  return resolved.source;
-}
+  | { kind: "target"; target: string }
+  | { kind: "done"; result: UpgradeResult };
 
 /**
  * Resolve the target version and handle check-only mode.
@@ -323,58 +282,30 @@ async function resolveTargetVersion(
   opts: ResolveTargetOptions
 ): Promise<ResolveResult> {
   const { method, channel, versionArg, channelChanged, flags } = opts;
-  const standalone =
-    channel === "nightly" || method === "curl" || method === "brew";
-  const pinnedTarget =
-    versionArg && !CHANNEL_VERSIONS.has(versionArg)
-      ? versionArg.replace(VERSION_PREFIX_REGEX, "")
-      : undefined;
-  let source: UpgradeSource | undefined;
-
-  if (pinnedTarget) {
-    const lookupMethod = isNightlyVersion(pinnedTarget) ? "curl" : method;
-    source = await resolvePinnedVersion(lookupMethod, pinnedTarget);
-  }
-
-  const latestResolution =
-    pinnedTarget === undefined && standalone
-      ? await resolveLatestUpgradeVersion(channel)
-      : undefined;
-  const latest =
-    pinnedTarget ??
-    latestResolution?.version ??
-    (await fetchLatestVersion(method, channel));
-  const resolvedTarget = pinnedTarget ?? latest;
-  source ??= latestResolution?.source;
+  const latest = await fetchLatestVersion(method, channel);
+  const target = versionArg?.replace(VERSION_PREFIX_REGEX, "") ?? latest;
 
   log.debug(`Channel: ${channel}`);
   log.debug(`Latest version: ${latest}`);
   if (versionArg) {
-    log.debug(`Target version: ${resolvedTarget}`);
+    log.debug(`Target version: ${target}`);
   }
 
   if (flags.check) {
     return {
       kind: "done",
-      result: buildCheckResult({
-        target: resolvedTarget,
-        versionArg,
-        method,
-        channel,
-        flags,
-      }),
-      source,
+      result: buildCheckResult({ target, versionArg, method, channel, flags }),
     };
   }
 
   // Skip if already on target — unless forced or switching channels
-  if (CLI_VERSION === resolvedTarget && !flags.force && !channelChanged) {
+  if (CLI_VERSION === target && !flags.force && !channelChanged) {
     return {
       kind: "done",
       result: {
         action: "up-to-date",
         currentVersion: CLI_VERSION,
-        targetVersion: resolvedTarget,
+        targetVersion: target,
         channel,
         method,
         forced: false,
@@ -382,7 +313,21 @@ async function resolveTargetVersion(
     };
   }
 
-  return { kind: "target", target: resolvedTarget, source };
+  // Validate that a specific pinned version actually exists.
+  // Nightly builds are GitHub-only, so always use curl (GitHub) lookup for
+  // nightly channel regardless of the current install method.
+  if (versionArg && !CHANNEL_VERSIONS.has(versionArg)) {
+    const lookupMethod = channel === "nightly" ? "curl" : method;
+    const exists = await versionExists(lookupMethod, target);
+    if (!exists) {
+      throw new UpgradeError(
+        "version_not_found",
+        `Version ${target} not found`
+      );
+    }
+  }
+
+  return { kind: "target", target };
 }
 
 /**
@@ -551,8 +496,6 @@ type SetupOptions = {
   installDir?: string;
   /** Ask the new binary to refresh a stored OAuth grant when scopes changed. */
   ensureAuthScopes: boolean;
-  /** Skip agent skill installation during setup. */
-  noAgentSkills: boolean;
 };
 
 /**
@@ -568,15 +511,8 @@ type SetupOptions = {
  * updates completions, agent skills, and records metadata.
  */
 async function runSetupOnNewBinary(opts: SetupOptions): Promise<void> {
-  const {
-    binaryPath,
-    method,
-    channel,
-    install,
-    installDir,
-    ensureAuthScopes,
-    noAgentSkills,
-  } = opts;
+  const { binaryPath, method, channel, install, installDir, ensureAuthScopes } =
+    opts;
   const args = [
     "cli",
     "setup",
@@ -592,9 +528,6 @@ async function runSetupOnNewBinary(opts: SetupOptions): Promise<void> {
   }
   if (ensureAuthScopes) {
     args.push("--ensure-auth-scopes");
-  }
-  if (noAgentSkills) {
-    args.push("--no-agent-skills");
   }
 
   const env = installDir
@@ -619,41 +552,6 @@ function resolveUpdatedCliPath(
 }
 
 /**
- * Decide which directory a curl upgrade should install into.
- *
- * Normally the binary stays where it currently lives — pinning the install
- * dir keeps an in-place update from relocating a binary that is already on
- * the user's `PATH` (upgrade runs setup with `--no-modify-path`, so it can't
- * add a new directory to `PATH`).
- *
- * The one exception is a legacy `~/.sentry/bin` install: those should move to
- * the XDG-aligned location so users actually migrate off `~/.sentry`. We only
- * relocate when the XDG target directory is *already* on `PATH`, so the moved
- * binary stays discoverable without any `PATH` edit. When it isn't, we keep
- * the binary in place and leave relocation to an explicit `sentry cli setup`.
- */
-export function resolveUpgradeInstallDir(
-  currentInstallDir: string,
-  pathEnv: string | undefined
-): string {
-  const legacyBinDir = join(homedir(), LEGACY_INSTALL_SUBDIR);
-  if (!samePath(currentInstallDir, legacyBinDir)) {
-    return currentInstallDir;
-  }
-
-  // determineInstallDir with the legacy pin removed yields the XDG target.
-  const { SENTRY_INSTALL_DIR: _pinned, ...envWithoutPin } = process.env;
-  const xdgInstallDir = determineInstallDir(homedir(), envWithoutPin);
-  if (
-    !samePath(xdgInstallDir, legacyBinDir) &&
-    isInPath(xdgInstallDir, pathEnv)
-  ) {
-    return xdgInstallDir;
-  }
-  return currentInstallDir;
-}
-
-/**
  * Execute the standard upgrade path: download via curl or package manager,
  * then run setup on the new binary.
  */
@@ -667,8 +565,6 @@ async function executeStandardUpgrade(opts: {
   pathEnv?: string;
   offline?: OfflineMode;
   json?: boolean;
-  noAgentSkills: boolean;
-  source?: UpgradeSource;
 }): Promise<void> {
   const {
     method,
@@ -680,8 +576,6 @@ async function executeStandardUpgrade(opts: {
     pathEnv,
     offline,
     json,
-    noAgentSkills,
-    source,
   } = opts;
 
   // Use the rolling "nightly" tag only when upgrading to latest nightly
@@ -692,7 +586,7 @@ async function executeStandardUpgrade(opts: {
   const downloadResult = await withProgress(
     { message: `Downloading ${target}...`, json },
     async (setMessage) =>
-      executeUpgrade(method, target, downloadTag, offline, setMessage, source)
+      executeUpgrade(method, target, downloadTag, offline, setMessage)
   );
 
   if (downloadResult?.patchBytes) {
@@ -706,24 +600,18 @@ async function executeStandardUpgrade(opts: {
   if (downloadResult) {
     // Curl: new binary is at temp path, setup --install will place it.
     // Pin the install directory via SENTRY_INSTALL_DIR so the child's
-    // determineInstallDir() doesn't relocate to a directory that isn't on
-    // PATH. A legacy ~/.sentry/bin install is relocated to the XDG dir when
-    // that dir is already on PATH (see resolveUpgradeInstallDir); setup's
-    // legacy-binary migration then moves the old binary and removes it before
-    // --install writes the new one.
+    // determineInstallDir() doesn't relocate to a different directory.
     // Release the download lock after the child exits — if the child used
     // the same lock path (ppid takeover), this is a harmless no-op.
     const currentInstallDir = dirname(getCurlInstallPaths().installPath);
-    const installDir = resolveUpgradeInstallDir(currentInstallDir, pathEnv);
     try {
       await runSetupOnNewBinary({
         binaryPath: downloadResult.tempBinaryPath,
         method,
         channel,
         install: true,
-        installDir,
+        installDir: currentInstallDir,
         ensureAuthScopes: !json,
-        noAgentSkills,
       });
     } finally {
       releaseLock(downloadResult.lockPath);
@@ -738,7 +626,6 @@ async function executeStandardUpgrade(opts: {
       channel,
       install: false,
       ensureAuthScopes: !json,
-      noAgentSkills,
     });
   }
 }
@@ -754,23 +641,17 @@ async function executeStandardUpgrade(opts: {
  *   3. Run setup on the new binary to update completions, PATH, and metadata
  *   4. Return warnings about the old package-manager installation that may still be in PATH
  *
- * @param opts.versionArg - Specific version requested by the user, or undefined
- *   for latest nightly. When a specific version is given, its release tag is
- *   used instead of the rolling "nightly" tag so the correct binary is
- *   downloaded.
+ * @param versionArg - Specific version requested by the user, or undefined for
+ *   latest nightly. When a specific version is given, its release tag is used
+ *   instead of the rolling "nightly" tag so the correct binary is downloaded.
  * @returns Warnings about the old installation that may shadow the new one
  */
-async function migrateToStandaloneForNightly(opts: {
-  method: InstallationMethod;
-  target: string;
-  versionArg: string | undefined;
-  noAgentSkills: boolean;
-  json?: boolean;
-  source?: UpgradeSource;
-  channel: ReleaseChannel;
-}): Promise<string[]> {
-  const { method, target, versionArg, noAgentSkills, json, source, channel } =
-    opts;
+async function migrateToStandaloneForNightly(
+  method: InstallationMethod,
+  target: string,
+  versionArg: string | undefined,
+  json?: boolean
+): Promise<string[]> {
   log.info("Nightly builds are only available as standalone binaries.");
   log.info("Migrating to standalone installation...");
 
@@ -780,7 +661,7 @@ async function migrateToStandaloneForNightly(opts: {
   const downloadResult = await withProgress(
     { message: `Downloading ${target}...`, json },
     async (setMessage) =>
-      executeUpgrade("curl", target, downloadTag, undefined, setMessage, source)
+      executeUpgrade("curl", target, downloadTag, undefined, setMessage)
   );
 
   if (downloadResult?.patchBytes) {
@@ -802,11 +683,10 @@ async function migrateToStandaloneForNightly(opts: {
     await runSetupOnNewBinary({
       binaryPath: downloadResult.tempBinaryPath,
       method: "curl",
-      channel,
+      channel: "nightly",
       install: true,
       installDir,
       ensureAuthScopes: !json,
-      noAgentSkills,
     });
   } finally {
     releaseLock(downloadResult.lockPath);
@@ -852,7 +732,7 @@ async function resolveContext(
   const channelChanged = channel !== currentChannel;
 
   const method = flags.method ?? (await detectInstallationMethod());
-  validateMethod(method, versionArg, flags.offline);
+  validateMethod(method, versionArg, channel, flags.offline);
   return { channel, versionArg, channelChanged, method };
 }
 
@@ -878,14 +758,12 @@ function persistChannel(
  * Returns a promise that resolves to the changelog or undefined. Never
  * throws — errors are swallowed so the upgrade is not blocked.
  */
-function startChangelogFetch(options: {
-  channel: ReleaseChannel;
-  currentVersion: string;
-  targetVersion: string;
-  offline: OfflineMode;
-  source?: UpgradeSource;
-}): Promise<ChangelogSummary | undefined> {
-  const { channel, currentVersion, targetVersion, offline, source } = options;
+function startChangelogFetch(
+  channel: ReleaseChannel,
+  currentVersion: string,
+  targetVersion: string,
+  offline: OfflineMode
+): Promise<ChangelogSummary | undefined> {
   if (offline || currentVersion === targetVersion) {
     return Promise.resolve(undefined);
   }
@@ -893,7 +771,6 @@ function startChangelogFetch(options: {
     channel,
     fromVersion: currentVersion,
     toVersion: targetVersion,
-    source,
   })
     .then((result) => result ?? undefined)
     .catch(() => undefined as undefined);
@@ -939,8 +816,7 @@ export const upgradeCommand = buildCommand({
       "  sentry cli upgrade --check      # Check for updates without installing\n" +
       "  sentry cli upgrade --force      # Force re-download even if up to date\n" +
       "  sentry cli upgrade --method npm # Force using npm to upgrade\n" +
-      "  sentry cli upgrade --offline    # Upgrade from cached patches (no network)\n" +
-      "  sentry cli upgrade --no-agent-skills # Skip reinstalling agent skills",
+      "  sentry cli upgrade --offline    # Upgrade from cached patches (no network)",
   },
   output: { human: formatUpgradeResult },
   parameters: {
@@ -971,11 +847,6 @@ export const upgradeCommand = buildCommand({
         kind: "boolean",
         brief:
           "Upgrade using only cached version info and patches (no network)",
-        default: false,
-      },
-      "no-agent-skills": {
-        kind: "boolean",
-        brief: "Skip agent skill installation for AI coding assistants",
         default: false,
       },
       method: {
@@ -1014,27 +885,25 @@ export const upgradeCommand = buildCommand({
         result.action === "checked" &&
         result.currentVersion !== result.targetVersion
       ) {
-        result.changelog = await startChangelogFetch({
-          channel: getArtifactChannel(result.targetVersion),
-          currentVersion: CLI_VERSION,
-          targetVersion: result.targetVersion,
-          offline: false,
-          source: resolved.source,
-        });
+        result.changelog = await startChangelogFetch(
+          channel,
+          CLI_VERSION,
+          result.targetVersion,
+          false
+        );
       }
       return yield new CommandOutput(result);
     }
 
-    const { target, offline, source } = resolved;
+    const { target, offline } = resolved;
 
     // Start changelog fetch early — it runs in parallel with the download.
-    const changelogPromise = startChangelogFetch({
-      channel: getArtifactChannel(target),
-      currentVersion: CLI_VERSION,
-      targetVersion: target,
-      offline,
-      source,
-    });
+    const changelogPromise = startChangelogFetch(
+      channel,
+      CLI_VERSION,
+      target,
+      offline
+    );
 
     // --check with offline fallback: resolveTargetWithFallback returns
     // kind: "target" for offline check, so guard against actual upgrade.
@@ -1069,18 +938,15 @@ export const upgradeCommand = buildCommand({
 
     // Perform the actual upgrade
     let warnings: string[] | undefined;
-    if (isNightlyVersion(target) && method !== "curl") {
+    if (channel === "nightly" && method !== "curl") {
       // Nightly is GitHub-only. If the current install method is not curl,
       // migrate to a standalone binary — the migration handles setup internally.
-      warnings = await migrateToStandaloneForNightly({
+      warnings = await migrateToStandaloneForNightly(
         method,
         target,
         versionArg,
-        noAgentSkills: flags["no-agent-skills"],
-        json: flags.json,
-        source,
-        channel,
-      });
+        flags.json
+      );
     } else {
       await executeStandardUpgrade({
         method,
@@ -1092,8 +958,6 @@ export const upgradeCommand = buildCommand({
         pathEnv: this.process.env.PATH,
         offline,
         json: flags.json,
-        noAgentSkills: flags["no-agent-skills"],
-        source,
       });
     }
 

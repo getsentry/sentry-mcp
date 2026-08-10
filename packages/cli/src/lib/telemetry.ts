@@ -98,7 +98,7 @@ export function markSessionCrashed(): void {
 /** Env var that disables CLI telemetry when set to `"1"`. */
 export const TELEMETRY_ENV_VAR = "SENTRY_CLI_NO_TELEMETRY";
 
-/** Industry-standard env var for opting out of telemetry. */
+/** Industry-standard env var for opting out of telemetry (consoledonottrack.com). */
 export const DO_NOT_TRACK_ENV_VAR = "DO_NOT_TRACK";
 
 /** Result of resolving the effective telemetry state */
@@ -120,7 +120,7 @@ export type TelemetryEffective = {
  *
  * Priority (highest to lowest):
  * 1. `SENTRY_CLI_NO_TELEMETRY=1` — explicit CLI env var opt-out
- * 2. `DO_NOT_TRACK=1` — industry-standard opt-out
+ * 2. `DO_NOT_TRACK=1` — industry standard (consoledonottrack.com)
  * 3. SQLite persistent preference — `sentry cli defaults telemetry on/off`
  * 4. Default: enabled
  *
@@ -136,7 +136,6 @@ export function computeTelemetryEffective(): TelemetryEffective {
     return { enabled: false, source: `env:${DO_NOT_TRACK_ENV_VAR}` };
   }
 
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const pref = getTelemetryPreference();
     if (pref !== undefined) {
@@ -169,7 +168,7 @@ export function isTelemetryEnabled(): boolean {
  *
  * Telemetry can be disabled via:
  * - `SENTRY_CLI_NO_TELEMETRY=1` environment variable
- * - `DO_NOT_TRACK=1` environment variable
+ * - `DO_NOT_TRACK=1` environment variable (consoledonottrack.com)
  * - `sentry cli defaults telemetry off` (persistent preference)
  *
  * @param callback - The CLI execution function to wrap, receives the span for naming
@@ -190,7 +189,6 @@ export async function withTelemetry<T>(
 
   // Flush deferred completion telemetry (queued during __complete fast-path).
   // Best-effort: never block CLI execution for telemetry emission.
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const { drainCompletionTelemetry } = await import(
       "./db/completion-telemetry.js"
@@ -289,7 +287,6 @@ export function createBeforeExitHandler(
     // Flush pending events before exit. Convert PromiseLike to Promise
     // for proper error handling. The async work causes beforeExit to
     // re-fire when complete, which the isFlushing guard handles.
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     Promise.resolve(client.flush(3000)).catch(() => {
       // Ignore flush errors — telemetry should never block CLI exit
     });
@@ -437,7 +434,6 @@ const LIBRARY_EXCLUDED_INTEGRATIONS = new Set([
  * Checked once at module load so the integration filter is a simple boolean.
  */
 const hasGetSystemErrorMap = (() => {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     // Dynamic require to avoid bundler issues — the check only matters at runtime
     const util = _require("node:util") as Record<string, unknown>;
@@ -593,8 +589,8 @@ export function initSentry(
     enabled,
     // Compress outgoing envelopes with zstd (level 3) instead of gzip —
     // smaller payloads, faster compress/decompress on both sides.
-    // Automatic gzip fallback when running on Node < 22.15, where
-    // `node:zlib`'s zstd support is unavailable.
+    // Automatic gzip fallback when running on Node < 22.15 without the
+    // `Bun.zstdCompress` polyfill (see script/node-polyfills.ts).
     transport: makeCompressedTransport,
     // Pass custom CA certificates to the transport for corporate TLS proxies.
     // The zstd-transport reads `caCerts` and passes it as `ca:` to
@@ -1147,7 +1143,6 @@ const noop = (): void => {};
 
 /** Resolves the database path, falling back to a default if the import fails. */
 function resolveDbPath(): string {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const { getDbPath } = _require("./db/index.js") as {
       getDbPath: () => string;
@@ -1220,7 +1215,6 @@ function isOwnedByRoot(filePath: string): boolean {
   if (process.platform === "win32") {
     return false;
   }
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return statSync(filePath).uid === 0;
   } catch {
@@ -1255,7 +1249,6 @@ function tryRepairReadonly(): boolean {
     return false;
   }
 
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     // Repair config directory (needs rwx for WAL/SHM creation)
     chmodSync(configDir, 0o700);

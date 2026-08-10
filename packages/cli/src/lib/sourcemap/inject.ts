@@ -16,7 +16,6 @@ import {
   EXISTING_DEBUGID_RE,
   injectDebugId,
   injectInlineDebugId,
-  readSourcemapDebugId,
 } from "./debug-id.js";
 import {
   type DecodedInlineMap,
@@ -102,18 +101,17 @@ export async function injectDirectory(
   for (const { jsPath, map } of filePairs) {
     const mapPath = map.kind === "external" ? map.mapPath : undefined;
     if (options.dryRun) {
-      // Resolve the debug ID the real run would use, without modifying
-      // anything. Mirrors injectDebugId's precedence: the JS comment first,
-      // then an ID the sourcemap already carries — either means no injection.
+      // Check if file already has a debug ID without modifying it
       const js = await readFile(jsPath, "utf-8");
-      const existing =
-        js.match(EXISTING_DEBUGID_RE)?.[1] ?? (await readMapDebugId(map));
+      const existing = js.match(EXISTING_DEBUGID_RE);
+      const wouldInject = !existing;
+      const id = existing?.[1] ?? "(pending)";
       results.push({
         jsPath,
         map,
         mapPath,
-        injected: !existing,
-        debugId: existing ?? "(pending)",
+        injected: wouldInject,
+        debugId: id,
       });
       continue;
     }
@@ -139,31 +137,6 @@ export async function injectDirectory(
     }
   }
   return results;
-}
-
-/**
- * Read a debug ID already present on a discovered sourcemap, if any.
- *
- * Non-fatal: an unreadable or malformed map yields `undefined`, so callers
- * fall through to minting a content-derived ID exactly as before.
- *
- * @param map - The discovered sourcemap location
- * @returns The map's debug ID, or `undefined` when it carries none
- */
-async function readMapDebugId(map: MapSource): Promise<string | undefined> {
-  if (map.kind === "inline") {
-    return readSourcemapDebugId(map.decoded.map);
-  }
-  try {
-    return readSourcemapDebugId(
-      JSON.parse(await readFile(map.mapPath, "utf-8"))
-    );
-  } catch (err) {
-    log.warn(
-      `could not read a debug ID from ${map.mapPath}: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return;
-  }
 }
 
 /** A discovered JS + sourcemap pair. */
@@ -807,12 +780,6 @@ export async function resolveDirectorySourcemaps(
       debugId = js.match(EXISTING_DEBUGID_RE)?.[1];
     } catch (err) {
       log.debug(`failed to read JS file for debug ID: ${jsPath}`, err);
-    }
-    // No comment in the JS: the linked map may still carry the ID a bundler
-    // plugin stamped at build time, which injection would adopt rather than
-    // replace.
-    if (!debugId && map) {
-      debugId = await readMapDebugId(map);
     }
 
     results.push({

@@ -189,16 +189,6 @@ export function printLine(line: string): void {
 }
 
 /**
- * Write a machine-readable event record to stdout as one NDJSON line.
- *
- * Local command lifecycle messages continue to use stderr, leaving stdout
- * safe for an agent or another process to consume as a record stream.
- */
-export function printJsonLine(line: string): void {
-  process.stdout.write(`${line}\n`);
-}
-
-/**
  * Patch a consola instance's `withTag` so every child (and grandchild)
  * is registered in {@link scopedLoggers} for {@link setLogLevel} propagation.
  */
@@ -277,7 +267,6 @@ export function attachSentryReporter(): void {
     return;
   }
 
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     // Dynamic import to avoid pulling in Sentry at module load time.
     // The reporter is exported from @sentry/node-core/light (via @sentry/node → @sentry/core).

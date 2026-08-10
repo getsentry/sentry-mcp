@@ -24,7 +24,7 @@ import {
   searchEndpoints,
 } from "../lib/api-schema.js";
 import { buildCommand } from "../lib/command.js";
-import { OutputError, ResolutionError } from "../lib/errors.js";
+import { OutputError } from "../lib/errors.js";
 import { bold, cyan, muted, yellow } from "../lib/formatters/colors.js";
 import { filterFields } from "../lib/formatters/json.js";
 import {
@@ -33,7 +33,6 @@ import {
   renderMarkdown,
 } from "../lib/formatters/markdown.js";
 import { CommandOutput } from "../lib/formatters/output.js";
-import { fuzzyMatch } from "../lib/fuzzy.js";
 
 // ---------------------------------------------------------------------------
 // Output data types
@@ -190,39 +189,10 @@ function jsonTransformSchema(data: SchemaResult, fields?: string[]): unknown {
 // ---------------------------------------------------------------------------
 
 /**
- * Build the "no resource matches" error for a term that matched nothing.
- *
- * Previously these paths dumped the full resource list via `OutputError`,
- * which rendered byte-identical to a successful `sentry schema` browse and
- * gave no signal that the term matched nothing. A {@link ResolutionError}
- * reports the failure plainly, adds "did you mean" suggestions from a fuzzy
- * match, and exits non-zero so scripts can branch on it.
- */
-function noResourceMatchError(resource: string): ResolutionError {
-  const names = getResourceSummaries().map((r) => r.name);
-  const [closest] = fuzzyMatch(resource, names, { maxResults: 1 });
-  const browseHint = "sentry schema";
-  const searchHint = `sentry schema --search ${resource}    Search endpoints by keyword`;
-  // Lead with the closest resource name when a typo has an obvious fix
-  // (e.g. "committers" → "commits"); otherwise point at the full browse.
-  const primaryHint = closest ? `sentry schema ${closest}` : browseHint;
-  const suggestions = closest
-    ? ["sentry schema                    Browse all resources", searchHint]
-    : [searchHint];
-  return new ResolutionError(
-    `Resource "${resource}"`,
-    "does not exist in the schema",
-    primaryHint,
-    suggestions
-  );
-}
-
-/**
  * Resolve a resource + optional operation into a SchemaResult.
- * Throws ResolutionError for no-match cases; throws OutputError with the
- * resource's endpoints when the resource exists but the operation does not.
+ * Throws OutputError with fallback data for not-found cases.
  */
-export function resolveResourceQuery(
+function resolveResourceQuery(
   resource: string,
   operation?: string
 ): SchemaResult {
@@ -240,12 +210,10 @@ export function resolveResourceQuery(
       pattern.test(r.name.toLowerCase())
     );
     if (matched.length === 0) {
-      throw new ResolutionError(
-        `Pattern "${resource}"`,
-        "matched no resources",
-        "sentry schema",
-        ["sentry schema --all    List every endpoint in a flat table"]
-      );
+      throw new OutputError({
+        kind: "resources",
+        resources: allResources,
+      } satisfies SchemaResult);
     }
     const endpoints = matched.flatMap((r) => getEndpointsByResource(r.name));
     return { kind: "endpoints", endpoints };
@@ -257,9 +225,7 @@ export function resolveResourceQuery(
     if (endpoint) {
       return { kind: "endpoint", endpoint };
     }
-    // Resource exists but the operation didn't match: show its endpoints so
-    // the user can pick a valid operation. This is scoped to the resource,
-    // not the full list, so it isn't misleading.
+    // Show endpoints for this resource if it exists, otherwise show all resources
     const resourceEndpoints = getEndpointsByResource(resource);
     if (resourceEndpoints.length > 0) {
       throw new OutputError({
@@ -267,13 +233,19 @@ export function resolveResourceQuery(
         endpoints: resourceEndpoints,
       } satisfies SchemaResult);
     }
-    throw noResourceMatchError(resource);
+    throw new OutputError({
+      kind: "resources",
+      resources: getResourceSummaries(),
+    } satisfies SchemaResult);
   }
 
   // Resource only: show all endpoints for that resource
   const endpoints = getEndpointsByResource(resource);
   if (endpoints.length === 0) {
-    throw noResourceMatchError(resource);
+    throw new OutputError({
+      kind: "resources",
+      resources: getResourceSummaries(),
+    } satisfies SchemaResult);
   }
   return { kind: "endpoints", endpoints };
 }

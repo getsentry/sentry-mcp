@@ -15,7 +15,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { access, readFile, writeFile } from "node:fs/promises";
-import { join, sep } from "node:path";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   acquireLock,
@@ -25,19 +25,12 @@ import {
   getBinaryDownloadUrl,
   getBinaryFilename,
   getBinaryPaths,
-  getGitHubReleaseByTagUrl,
-  getLegacyInstallDirs,
   getPlatformBinaryName,
   installBinary,
   isDowngrade,
   isMusl,
-  parseUpgradeJson,
   releaseLock,
   replaceBinarySync,
-  resolveUpgradeSource,
-  samePath,
-  UPGRADE_SOURCES,
-  UpgradeSourceNotFoundError,
 } from "../../src/lib/binary.js";
 import { UpgradeError } from "../../src/lib/errors.js";
 
@@ -45,9 +38,9 @@ describe("getBinaryDownloadUrl", () => {
   test("builds correct URL for current platform", () => {
     const url = getBinaryDownloadUrl("1.0.0");
 
-    expect(url).toContain("/cli@1.0.0/");
+    expect(url).toContain("/1.0.0/");
     expect(url).toStartWith(
-      "https://github.com/getsentry/toolkit/releases/download/"
+      "https://github.com/getsentry/cli/releases/download/"
     );
     expect(url).toContain("sentry-");
 
@@ -63,128 +56,6 @@ describe("getBinaryDownloadUrl", () => {
     } else {
       expect(url).not.toEndWith(".exe");
     }
-  });
-});
-
-describe("UPGRADE_SOURCES", () => {
-  test("checks Toolkit before the legacy CLI repository", () => {
-    expect(UPGRADE_SOURCES).toEqual([
-      {
-        githubRepo: "getsentry/toolkit",
-        ghcrRepo: "getsentry/toolkit",
-        tagPrefix: "cli@",
-      },
-      {
-        githubRepo: "getsentry/cli",
-        ghcrRepo: "getsentry/cli",
-        tagPrefix: "",
-      },
-    ]);
-  });
-});
-
-describe("resolveUpgradeSource", () => {
-  test("uses the first source when it exists", async () => {
-    const requests: string[] = [];
-
-    const resolved = await resolveUpgradeSource({
-      getProbeUrl: (source) => getGitHubReleaseByTagUrl("0.45.0", source),
-      fetch: async (url) => {
-        requests.push(String(url));
-        return new Response(JSON.stringify({ tag_name: "cli@0.45.0" }), {
-          status: 200,
-        });
-      },
-    });
-
-    expect(resolved).toEqual({
-      source: UPGRADE_SOURCES[0],
-      response: expect.any(Response),
-    });
-    expect(requests).toEqual([
-      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.45.0",
-    ]);
-  });
-
-  test("falls back to the legacy source only on HTTP 404", async () => {
-    const requests: string[] = [];
-
-    const resolved = await resolveUpgradeSource({
-      getProbeUrl: (source) => getGitHubReleaseByTagUrl("0.45.0", source),
-      fetch: async (url) => {
-        requests.push(String(url));
-        return new Response(
-          requests.length === 1
-            ? "Not Found"
-            : JSON.stringify({ tag_name: "0.45.0" }),
-          { status: requests.length === 1 ? 404 : 200 }
-        );
-      },
-    });
-
-    expect(resolved.source).toBe(UPGRADE_SOURCES[1]);
-    expect(requests).toEqual([
-      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.45.0",
-      "https://api.github.com/repos/getsentry/cli/releases/tags/0.45.0",
-    ]);
-  });
-
-  test.each([
-    401, 403, 429, 500,
-  ])("does not fall back on HTTP %i", async (status) => {
-    const requests: string[] = [];
-
-    await expect(
-      resolveUpgradeSource({
-        getProbeUrl: (source) => getGitHubReleaseByTagUrl("0.45.0", source),
-        fetch: async (url) => {
-          requests.push(String(url));
-          return new Response("failure", { status });
-        },
-      })
-    ).rejects.toThrow(`HTTP ${status}`);
-
-    expect(requests).toEqual([
-      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.45.0",
-    ]);
-  });
-
-  test("does not fall back on a network failure", async () => {
-    const requests: string[] = [];
-
-    await expect(
-      resolveUpgradeSource({
-        getProbeUrl: (source) => getGitHubReleaseByTagUrl("0.45.0", source),
-        fetch: async (url) => {
-          requests.push(String(url));
-          throw new TypeError("fetch failed");
-        },
-      })
-    ).rejects.toThrow("Failed to connect to GitHub: fetch failed");
-
-    expect(requests).toEqual([
-      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.45.0",
-    ]);
-  });
-
-  test("fails after every source returns 404", async () => {
-    const requests: string[] = [];
-
-    const error = await resolveUpgradeSource({
-      getProbeUrl: (source) => getGitHubReleaseByTagUrl("0.45.0", source),
-      fetch: async (url) => {
-        requests.push(String(url));
-        return new Response("Not Found", { status: 404 });
-      },
-    }).catch((reason: unknown) => reason);
-
-    expect(error).toBeInstanceOf(UpgradeSourceNotFoundError);
-    expect(error).toMatchObject({ name: "UpgradeSourceNotFoundError" });
-
-    expect(requests).toEqual([
-      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.45.0",
-      "https://api.github.com/repos/getsentry/cli/releases/tags/0.45.0",
-    ]);
   });
 });
 
@@ -204,52 +75,6 @@ describe("getBinaryPaths", () => {
     expect(paths.tempPath).toBe("/usr/local/bin/sentry.download");
     expect(paths.oldPath).toBe("/usr/local/bin/sentry.old");
     expect(paths.lockPath).toBe("/usr/local/bin/sentry.lock");
-  });
-});
-
-describe("samePath", () => {
-  test("matches identical paths", () => {
-    expect(samePath("/home/user/.local/bin", "/home/user/.local/bin")).toBe(
-      true
-    );
-  });
-
-  test("distinguishes genuinely different paths", () => {
-    expect(samePath("/home/user/.local/bin", "/home/user/.sentry/bin")).toBe(
-      false
-    );
-  });
-
-  test("case sensitivity follows the platform", () => {
-    const result = samePath("/Home/User/bin", "/home/user/bin");
-    if (process.platform === "win32" || process.platform === "darwin") {
-      expect(result).toBe(true);
-    } else {
-      expect(result).toBe(false);
-    }
-  });
-
-  test("tolerates a trailing separator on either side", () => {
-    const dir = join("/home/user", ".local", "bin");
-    expect(samePath(dir + sep, dir)).toBe(true);
-    expect(samePath(dir, dir + sep)).toBe(true);
-    expect(samePath(dir + sep, dir + sep)).toBe(true);
-  });
-
-  test("does not treat root as equal to empty after stripping", () => {
-    // A bare root separator must not be stripped to "".
-    expect(samePath(sep, sep)).toBe(true);
-    expect(samePath(sep, "")).toBe(false);
-  });
-});
-
-describe("getLegacyInstallDirs", () => {
-  test("returns only the pre-XDG ~/.sentry/bin, not current XDG targets", () => {
-    const dirs = getLegacyInstallDirs("/home/user");
-    expect(dirs).toEqual([join("/home/user", ".sentry", "bin")]);
-    // ~/.local/bin and ~/bin are valid current targets, never migration sources
-    expect(dirs).not.toContain(join("/home/user", ".local", "bin"));
-    expect(dirs).not.toContain(join("/home/user", "bin"));
   });
 });
 
@@ -291,24 +116,6 @@ describe("determineInstallDir", () => {
     expect(result).toBe(localBin);
   });
 
-  test("matches a PATH entry case-insensitively on Windows/macOS", () => {
-    // Use ~/bin so the result is distinguishable from the ~/.local/bin fallback.
-    const homeBin = join(testDir, "bin");
-    mkdirSync(homeBin, { recursive: true });
-
-    const result = determineInstallDir(testDir, {
-      PATH: `/usr/bin:${homeBin.toUpperCase()}`,
-    });
-
-    if (process.platform === "win32" || process.platform === "darwin") {
-      // Case-insensitive FS: the upper-cased PATH entry still matches ~/bin.
-      expect(result).toBe(homeBin);
-    } else {
-      // Case-sensitive FS: no match, so it falls back to the XDG default.
-      expect(result).toBe(join(testDir, ".local", "bin"));
-    }
-  });
-
   test("uses ~/bin when it exists and is in PATH but ~/.local/bin is not", () => {
     const homeBin = join(testDir, "bin");
     mkdirSync(homeBin, { recursive: true });
@@ -320,15 +127,15 @@ describe("determineInstallDir", () => {
     expect(result).toBe(homeBin);
   });
 
-  test("falls back to ~/.local/bin when no candidates are in PATH", () => {
+  test("falls back to ~/.sentry/bin when no candidates are in PATH", () => {
     const result = determineInstallDir(testDir, {
       PATH: "/usr/bin:/bin",
     });
 
-    expect(result).toBe(join(testDir, ".local", "bin"));
+    expect(result).toBe(join(testDir, ".sentry", "bin"));
   });
 
-  test("falls back to ~/.local/bin when it exists but is not in PATH", () => {
+  test("skips ~/.local/bin when it exists but is not in PATH", () => {
     const localBin = join(testDir, ".local", "bin");
     mkdirSync(localBin, { recursive: true });
 
@@ -336,7 +143,8 @@ describe("determineInstallDir", () => {
       PATH: "/usr/bin:/bin",
     });
 
-    expect(result).toBe(localBin);
+    // Should fall back to ~/.sentry/bin, not use ~/.local/bin
+    expect(result).toBe(join(testDir, ".sentry", "bin"));
   });
 
   test("handles empty PATH", () => {
@@ -344,60 +152,13 @@ describe("determineInstallDir", () => {
       PATH: "",
     });
 
-    expect(result).toBe(join(testDir, ".local", "bin"));
+    expect(result).toBe(join(testDir, ".sentry", "bin"));
   });
 
   test("handles undefined PATH", () => {
     const result = determineInstallDir(testDir, {});
 
-    expect(result).toBe(join(testDir, ".local", "bin"));
-  });
-
-  test("uses XDG_BIN_HOME when set to an absolute path", () => {
-    const xdgBin = join(testDir, "xdg", "bin");
-
-    const result = determineInstallDir(testDir, {
-      XDG_BIN_HOME: xdgBin,
-      PATH: "/usr/bin",
-    });
-
-    expect(result).toBe(xdgBin);
-  });
-
-  test("ignores a non-absolute XDG_BIN_HOME per the XDG spec", () => {
-    const result = determineInstallDir(testDir, {
-      XDG_BIN_HOME: "relative/bin",
-      PATH: "/usr/bin",
-    });
-
-    expect(result).toBe(join(testDir, ".local", "bin"));
-  });
-
-  test("XDG_BIN_HOME takes priority over ~/.local/bin in PATH", () => {
-    const localBin = join(testDir, ".local", "bin");
-    mkdirSync(localBin, { recursive: true });
-    const xdgBin = join(testDir, "xdg", "bin");
-
-    const result = determineInstallDir(testDir, {
-      XDG_BIN_HOME: xdgBin,
-      PATH: `/usr/bin:${localBin}`,
-    });
-
-    expect(result).toBe(xdgBin);
-  });
-
-  test("SENTRY_INSTALL_DIR takes priority over XDG_BIN_HOME", () => {
-    const xdgBin = join(testDir, "xdg", "bin");
-    const customDir = join(testDir, "custom");
-    mkdirSync(customDir, { recursive: true });
-
-    const result = determineInstallDir(testDir, {
-      SENTRY_INSTALL_DIR: customDir,
-      XDG_BIN_HOME: xdgBin,
-      PATH: "/usr/bin",
-    });
-
-    expect(result).toBe(customDir);
+    expect(result).toBe(join(testDir, ".sentry", "bin"));
   });
 
   test("SENTRY_INSTALL_DIR takes priority over ~/.local/bin", () => {
@@ -455,21 +216,6 @@ describe("fetchWithUpgradeError", () => {
     }
   });
 
-  test("preserves an arbitrary external abort reason", async () => {
-    const controller = new AbortController();
-    const reason = { kind: "cancelled" };
-    const request = resolveUpgradeSource({
-      getProbeUrl: () => "https://example.com",
-      signal: controller.signal,
-      fetch: async () => {
-        controller.abort(reason);
-        throw reason;
-      },
-    });
-
-    await expect(request).rejects.toBe(reason);
-  });
-
   test("wraps network errors as UpgradeError", async () => {
     globalThis.fetch = (async () => {
       throw new Error("ECONNREFUSED");
@@ -498,48 +244,6 @@ describe("fetchWithUpgradeError", () => {
       expect(error).toBeInstanceOf(UpgradeError);
       expect((error as UpgradeError).message).toContain("ECONNRESET");
     }
-  });
-});
-
-describe("parseUpgradeJson", () => {
-  test("preserves cancellation during body consumption", async () => {
-    const controller = new AbortController();
-    const reason = { kind: "cancelled" };
-    const response = Response.json({});
-    response.json = async () => {
-      controller.abort(reason);
-      throw new DOMException("aborted", "AbortError");
-    };
-
-    await expect(
-      parseUpgradeJson(response, controller.signal, "invalid metadata")
-    ).rejects.toBe(reason);
-  });
-
-  test("classifies body termination as transport failure", async () => {
-    const response = Response.json({});
-    response.json = async () => {
-      throw new TypeError("terminated");
-    };
-
-    await expect(
-      parseUpgradeJson(response, undefined, "invalid metadata")
-    ).rejects.toMatchObject({
-      name: "UpgradeTransportError",
-      reason: "network_error",
-    });
-  });
-
-  test("classifies completed malformed JSON as metadata failure", async () => {
-    const response = new Response("not json");
-
-    await expect(
-      parseUpgradeJson(response, undefined, "invalid metadata")
-    ).rejects.toMatchObject({
-      name: "UpgradeError",
-      reason: "network_error",
-      message: "invalid metadata",
-    });
   });
 });
 

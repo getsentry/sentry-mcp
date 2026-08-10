@@ -227,7 +227,7 @@ export async function restoreDashboardRevision(
   const encodedRevisionId = encodeURIComponent(revisionId);
   const { data } = await apiRequestToRegion<DashboardDetail>(
     regionUrl,
-    `/organizations/${orgSlug}/dashboards/${dashboardId}/revisions/${encodedRevisionId}/restore/`,
+    `/organizations/${orgSlug}/dashboards/${dashboardId}/revisions/${encodedRevisionId}/`,
     { method: "POST", schema: DashboardDetailSchema }
   );
   return data;
@@ -480,7 +480,7 @@ async function queryWidgetTimeseries(
       reqParams.topEvents = widget.limit ?? 5;
       // Sort by the aggregate to get the actual top N groups.
       // The sort param is only supported on the spans dataset —
-      // the errors endpoint rejects it with 400.
+      // errors/discover endpoints reject it with 400.
       if (dataset === "spans") {
         reqParams.sort = query.orderby ?? `-${aggregates[0] ?? "count()"}`;
       }
@@ -542,7 +542,7 @@ async function queryWidgetTable(
         start,
         end,
         // sort is only supported on the spans dataset —
-        // the errors endpoint rejects it with 400.
+        // errors/discover endpoints reject it with 400.
         sort: dataset === "spans" ? query?.orderby || undefined : undefined,
         per_page: widget.limit ?? 10,
         environment: options.environment,

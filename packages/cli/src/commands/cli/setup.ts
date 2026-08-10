@@ -7,7 +7,6 @@
  */
 
 import { existsSync, unlinkSync } from "node:fs";
-import { chmod, copyFile, mkdir, rename, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { captureException } from "@sentry/node-core/light";
 import type { SentryContext } from "../../context.js";
@@ -15,11 +14,9 @@ import { installAgentSkills } from "../../lib/agent-skills.js";
 import {
   determineInstallDir,
   getBinaryFilename,
-  getLegacyInstallDirs,
   type InstallationMethod,
   installBinary,
   parseInstallationMethod,
-  samePath,
 } from "../../lib/binary.js";
 import { buildCommand } from "../../lib/command.js";
 import {
@@ -27,11 +24,6 @@ import {
   installCompletions,
 } from "../../lib/completions.js";
 import { CLI_VERSION } from "../../lib/constants.js";
-import {
-  getAgentSkillsPreference,
-  setAgentSkillsPreference,
-} from "../../lib/db/defaults.js";
-import { closeDatabase, resolveXdgConfigDir } from "../../lib/db/index.js";
 import { setInstallInfo } from "../../lib/db/install-info.js";
 import {
   parseReleaseChannel,
@@ -85,112 +77,6 @@ function formatSetupResult(result: SetupResult): string {
 }
 
 /**
- * Migrate `cli.db` (+ WAL sidecars) and the old `config.json` out of the legacy
- * `~/.sentry` directory into the XDG config directory.
- *
- * The database is opened at CLI startup (cleanup-old-binary reads install
- * info), so it must be closed before the files are moved — an open SQLite file
- * cannot be renamed on Windows. Closing also invalidates the cached handle, so
- * the next `getDatabase()` reopens at the new path.
- */
-async function migrateLegacyConfig(
-  homeDir: string,
-  env: NodeJS.ProcessEnv,
-  emit: Logger
-): Promise<void> {
-  const legacyDir = join(homeDir, ".sentry");
-  // Target the XDG location directly — resolveConfigDir keeps returning the
-  // legacy dir while it still holds cli.db, which would make migration a no-op.
-  const targetConfigDir = resolveXdgConfigDir(env, homeDir);
-  if (samePath(targetConfigDir, legacyDir)) {
-    return;
-  }
-
-  const configFiles = ["cli.db", "cli.db-wal", "cli.db-shm", "config.json"];
-  const hasLegacyConfig = configFiles.some((name) =>
-    existsSync(join(legacyDir, name))
-  );
-  if (!hasLegacyConfig || existsSync(join(targetConfigDir, "cli.db"))) {
-    return;
-  }
-
-  closeDatabase();
-  await mkdir(targetConfigDir, { recursive: true, mode: 0o700 });
-  for (const name of configFiles) {
-    const from = join(legacyDir, name);
-    if (existsSync(from)) {
-      await rename(from, join(targetConfigDir, name));
-    }
-  }
-  emit(`Config: Migrated ${legacyDir} → ${targetConfigDir}`);
-}
-
-/**
- * Find a binary in a *legacy* install directory (see {@link getLegacyInstallDirs})
- * that should be migrated into the resolved install target. Only genuinely
- * pre-XDG locations are considered — `~/.local/bin` and `~/bin` are valid
- * current targets and must never be treated as migration sources, or a working
- * binary could be relocated out of an active directory.
- */
-function findMigratableBinary(
-  homeDir: string,
-  targetDir: string,
-  filename: string
-): string | undefined {
-  for (const dir of getLegacyInstallDirs(homeDir)) {
-    if (samePath(dir, targetDir)) {
-      continue;
-    }
-    const candidate = join(dir, filename);
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-  return;
-}
-
-/**
- * Migrate an existing binary out of a known legacy install directory into the
- * XDG-aware install dir. Returns the new binary path when a move happened, so
- * the caller can point PATH setup and recorded install info at the new location
- * instead of the now-deleted legacy path.
- */
-async function migrateLegacyBinary(
-  homeDir: string,
-  env: NodeJS.ProcessEnv,
-  emit: Logger
-): Promise<string | undefined> {
-  const filename = getBinaryFilename();
-  const targetDir = determineInstallDir(homeDir, env);
-  const targetBin = join(targetDir, filename);
-  if (existsSync(targetBin)) {
-    return;
-  }
-
-  const legacyBin = findMigratableBinary(homeDir, targetDir, filename);
-  if (!legacyBin) {
-    return;
-  }
-
-  await mkdir(targetDir, { recursive: true, mode: 0o755 });
-  await copyFile(legacyBin, targetBin);
-  // copyFile already preserves the source mode, but assert the exec bit
-  // explicitly — mirrors installBinary — so the migrated binary is runnable
-  // even if the legacy copy's permissions were somehow stripped.
-  await chmod(targetBin, 0o755);
-  try {
-    await unlink(legacyBin);
-  } catch (error) {
-    // Leave the old binary in place if it can't be removed — the new copy
-    // is authoritative and setInstallInfo points upgrades at it.
-    logger.withTag("cli.setup").debug("Failed to remove legacy binary", error);
-  }
-  setInstallInfo({ method: "curl", path: targetBin, version: CLI_VERSION });
-  emit(`Binary: Migrated ${legacyBin} → ${targetBin}`);
-  return targetBin;
-}
-
-/**
  * Handle binary installation from a temp location.
  *
  * Determines the target install directory, copies the running binary
@@ -221,7 +107,6 @@ async function handleInstall(
 
   // Clean up temp binary (Posix only — the inode stays alive for the running process)
   if (process.platform !== "win32") {
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       unlinkSync(execPath);
     } catch {
@@ -547,20 +432,8 @@ async function runConfigurationSteps(opts: ConfigStepOptions) {
     );
   }
 
-  // 4. Install agent skills (auto-detected, silent when no agent found).
-  // Persist an explicit --no-agent-skills opt-out so later upgrades (which
-  // re-run setup without the flag) keep honoring it. Re-enable with
-  // `sentry cli defaults agent-skills on`.
-  if (flags["no-agent-skills"]) {
-    await bestEffort(
-      "Recording agent skills preference",
-      () => setAgentSkillsPreference(false),
-      warn
-    );
-  }
-  const skipAgentSkills =
-    flags["no-agent-skills"] || getAgentSkillsPreference() === false;
-  if (!skipAgentSkills) {
+  // 4. Install agent skills (auto-detected, silent when no agent found)
+  if (!flags["no-agent-skills"]) {
     await bestEffort(
       "Agent skills",
       () => handleAgentSkills(homeDir, emit),
@@ -666,35 +539,7 @@ export const setupCommand = buildCommand({
     let binaryDir = dirname(binaryPath);
     let freshInstall = false;
 
-    // 0. Migrate any legacy ~/.sentry config/binary into XDG locations first,
-    // so the steps below operate on the new paths. Config and binary migrations
-    // are independent — a failure in one must not skip the other, and both are
-    // best-effort: warnings surface to the user and errors are reported to
-    // Sentry, but a failure never aborts setup.
-    await bestEffort(
-      "Legacy config migration",
-      () => migrateLegacyConfig(homeDir, process.env, emit),
-      warn
-    );
-    await bestEffort(
-      "Legacy binary migration",
-      async () => {
-        const migratedBinary = await migrateLegacyBinary(
-          homeDir,
-          process.env,
-          emit
-        );
-        // Adopt the new location so PATH setup and recorded install info point
-        // at the migrated binary rather than the deleted legacy path.
-        if (migratedBinary) {
-          binaryPath = migratedBinary;
-          binaryDir = dirname(migratedBinary);
-        }
-      },
-      warn
-    );
-
-    // 1. Install binary from temp location (when --install is set)
+    // 0. Install binary from temp location (when --install is set)
     if (flags.install) {
       const result = await handleInstall(
         process.execPath,

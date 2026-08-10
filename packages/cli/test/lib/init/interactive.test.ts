@@ -280,7 +280,6 @@ describe("handleMultiSelect", () => {
     const setTagSpy = vi.spyOn(Sentry, "setTag");
     const { ui, respond } = createMockUI();
     respond.multiselect(["sessionReplay"]);
-    respond.select("continue");
 
     await handleInteractive(
       {
@@ -291,7 +290,6 @@ describe("handleMultiSelect", () => {
           "errorMonitoring",
           "performanceMonitoring",
           "sessionReplay",
-          "userFeedback",
         ],
       },
       makeOptions(),
@@ -319,7 +317,6 @@ describe("handleMultiSelect", () => {
           "errorMonitoring",
           "performanceMonitoring",
           "sessionReplay",
-          "userFeedback",
         ],
       },
       makeOptions({ yes: true }),
@@ -333,10 +330,8 @@ describe("handleMultiSelect", () => {
     ]);
   });
 
-  test("returns error monitoring when no features are provided", async () => {
-    const { ui, calls, respond } = createMockUI();
-    respond.multiselect([]);
-    respond.select("continue");
+  test("returns empty features when none available", async () => {
+    const { ui } = createMockUI();
     const result = await handleInteractive(
       {
         type: "interactive",
@@ -348,39 +343,13 @@ describe("handleMultiSelect", () => {
       ui
     );
 
-    expect(result).toEqual({ features: ["errorMonitoring"] });
-    expect(calls.some((call) => call.kind === "multiselect")).toBe(true);
-    expect(calls.some((call) => call.kind === "select")).toBe(true);
-  });
-
-  test("injects error monitoring when the server omits the baseline", async () => {
-    const { ui, calls, respond } = createMockUI();
-    respond.multiselect(["sessionReplay"]);
-    respond.select("continue");
-
-    const result = await handleInteractive(
-      {
-        type: "interactive",
-        prompt: "Select features",
-        kind: "multi-select",
-        availableFeatures: ["sessionReplay", "performanceMonitoring"],
-      },
-      makeOptions(),
-      ui
-    );
-
-    expect(result).toEqual({
-      features: ["errorMonitoring", "sessionReplay"],
-    });
-    const multiselectCall = calls.find((call) => call.kind === "multiselect");
-    expect(multiselectCall?.options).toContain("errorMonitoring");
+    expect(result).toEqual({ features: [] });
   });
 
   test("prepends errorMonitoring when available but not user-selected", async () => {
     // User selects only sessionReplay, but errorMonitoring is available (required)
     const { ui, respond } = createMockUI();
     respond.multiselect(["sessionReplay"]);
-    respond.select("continue");
 
     const result = await handleInteractive(
       {
@@ -429,10 +398,8 @@ describe("handleMultiSelect", () => {
     );
   });
 
-  test("shows selection and review when only errorMonitoring is available", async () => {
-    const { ui, calls, respond } = createMockUI();
-    respond.multiselect([]);
-    respond.select("continue");
+  test("returns required feature without calling multiselect when only errorMonitoring available", async () => {
+    const { ui, calls } = createMockUI();
     const result = await handleInteractive(
       {
         type: "interactive",
@@ -445,19 +412,12 @@ describe("handleMultiSelect", () => {
     );
 
     expect(result).toEqual({ features: ["errorMonitoring"] });
-    const multiselectCall = calls.find((call) => call.kind === "multiselect");
-    expect(multiselectCall?.options).toEqual(["errorMonitoring"]);
-    expect(multiselectCall?.initialValues).toEqual(["errorMonitoring"]);
-    const reviewCall = calls.find((call) => call.kind === "select");
-    expect(reviewCall?.details?.map((detail) => detail.text)).toContain(
-      "✓ Error Monitoring"
-    );
+    expect(calls.some((c) => c.kind === "multiselect")).toBe(false);
   });
 
-  test("shows errorMonitoring as a locked selected option", async () => {
+  test("excludes errorMonitoring from multiselect options (always included)", async () => {
     const { ui, calls, respond } = createMockUI();
     respond.multiselect(["performanceMonitoring"]);
-    respond.select("continue");
 
     await handleInteractive(
       {
@@ -470,30 +430,18 @@ describe("handleMultiSelect", () => {
       ui
     );
 
+    // The options passed to multiselect should NOT include errorMonitoring
     const multiselectCall = calls.find((c) => c.kind === "multiselect") as
       | Extract<(typeof calls)[number], { kind: "multiselect" }>
       | undefined;
     expect(multiselectCall).toBeDefined();
-    expect(multiselectCall?.options).toContain("errorMonitoring");
+    expect(multiselectCall?.options).not.toContain("errorMonitoring");
     expect(multiselectCall?.options).toContain("performanceMonitoring");
-    expect(multiselectCall?.initialValues).toEqual([
-      "errorMonitoring",
-      "performanceMonitoring",
-    ]);
-    expect(
-      multiselectCall?.optionDetails.find(
-        (option) => option.value === "errorMonitoring"
-      )
-    ).toMatchObject({
-      description: "Automatically capture exceptions and stack traces",
-      locked: true,
-    });
   });
 
-  test("shows defaults first, sorts optional features, and omits unsupported features", async () => {
+  test("shows available optional features without client-side recommendations", async () => {
     const { ui, calls, respond } = createMockUI();
     respond.multiselect(["sessionReplay"]);
-    respond.select("continue");
 
     const result = await handleInteractive(
       {
@@ -501,18 +449,10 @@ describe("handleMultiSelect", () => {
         prompt: "Select features",
         kind: "multi-select",
         availableFeatures: [
-          "sourceMaps",
-          "profiling",
-          "performanceMonitoring",
           "errorMonitoring",
-          "metrics",
+          "performanceMonitoring",
+          "sourceMaps",
           "sessionReplay",
-          "logs",
-          "crons",
-          "attachments",
-          "aiMonitoring",
-          "mcpObservability",
-          "userFeedback",
         ],
       },
       makeOptions({ yes: false }),
@@ -525,155 +465,11 @@ describe("handleMultiSelect", () => {
       | Extract<(typeof calls)[number], { kind: "multiselect" }>
       | undefined;
     expect(multiselectCall?.options).toEqual([
-      "errorMonitoring",
-      "logs",
       "sessionReplay",
       "performanceMonitoring",
-      "aiMonitoring",
-      "crons",
-      "mcpObservability",
-      "profiling",
       "sourceMaps",
     ]);
-    expect(multiselectCall?.initialValues).toEqual([
-      "errorMonitoring",
-      "logs",
-      "sessionReplay",
-      "performanceMonitoring",
-    ]);
-    expect(multiselectCall?.details).toEqual([
-      {
-        text: "Based on your project, these features are available to set up.",
-      },
-    ]);
-    expect(multiselectCall?.options).not.toContain("metrics");
-    expect(multiselectCall?.options).not.toContain("attachments");
-    expect(multiselectCall?.options).not.toContain("userFeedback");
-
-    const reviewCall = calls.find((call) => call.kind === "select");
-    expect(reviewCall?.details?.[0]).toEqual({
-      text: "We'll add these features:",
-    });
-    expect(reviewCall?.footer).toEqual({
-      text: "We'll modify project files for this Sentry setup.",
-    });
-  });
-
-  test("can go back from review and preserves the explicit selection", async () => {
-    const { ui, calls, respond } = createMockUI();
-    respond.multiselect(["sessionReplay"]);
-    respond.select("back");
-    respond.multiselect(["performanceMonitoring"]);
-    respond.select("continue");
-
-    const result = await handleInteractive(
-      {
-        type: "interactive",
-        prompt: "Select features",
-        kind: "multi-select",
-        availableFeatures: [
-          "errorMonitoring",
-          "performanceMonitoring",
-          "sessionReplay",
-        ],
-      },
-      makeOptions(),
-      ui
-    );
-
-    expect(result).toEqual({
-      features: ["errorMonitoring", "performanceMonitoring"],
-    });
-    const multiselectCalls = calls.filter(
-      (call) => call.kind === "multiselect"
-    );
-    expect(multiselectCalls).toHaveLength(2);
-    expect(multiselectCalls[1]?.initialValues).toEqual([
-      "errorMonitoring",
-      "sessionReplay",
-    ]);
-    const reviewCalls = calls.filter((call) => call.kind === "select");
-    expect(reviewCalls[0]?.details?.map((detail) => detail.text)).toContain(
-      "✓ Session Replay"
-    );
-    expect(reviewCalls[0]?.details?.map((detail) => detail.text)).not.toContain(
-      "✓ Tracing"
-    );
-    expect(
-      reviewCalls[0]?.details
-        ?.map((detail) => detail.text)
-        .filter((line) => line.startsWith("✓ "))
-    ).toEqual(["✓ Error Monitoring", "✓ Session Replay"]);
-    expect(reviewCalls[1]?.details?.map((detail) => detail.text)).toContain(
-      "✓ Tracing"
-    );
-    expect(reviewCalls[1]?.options).toEqual(["continue", "back"]);
-  });
-
-  test.each([
-    ["aiMonitoring", "Agent Tracing"],
-    ["mcpObservability", "MCP Observability"],
-    ["profiling", "Profiling"],
-  ])("review includes tracing when %s enables it implicitly", async (dependencyFeature, dependencyLabel) => {
-    const { ui, calls, respond } = createMockUI();
-    respond.multiselect([dependencyFeature]);
-    respond.select("continue");
-
-    const result = await handleInteractive(
-      {
-        type: "interactive",
-        prompt: "Select features",
-        kind: "multi-select",
-        availableFeatures: [
-          "errorMonitoring",
-          "performanceMonitoring",
-          dependencyFeature,
-        ],
-      },
-      makeOptions(),
-      ui
-    );
-
-    expect(result).toEqual({
-      features: ["errorMonitoring", "performanceMonitoring", dependencyFeature],
-    });
-    const reviewCall = calls.find((call) => call.kind === "select");
-    const reviewDetails = reviewCall?.details?.map((detail) => detail.text);
-    expect(reviewDetails).toContain("✓ Error Monitoring");
-    expect(reviewDetails).toContain("✓ Tracing");
-    expect(reviewDetails).toContain(`✓ ${dependencyLabel}`);
-  });
-
-  test("Back restores the normalized AI selection including Tracing", async () => {
-    const { ui, calls, respond } = createMockUI();
-    respond.multiselect(["aiMonitoring"]);
-    respond.select("back");
-    respond.multiselect(["aiMonitoring", "performanceMonitoring"]);
-    respond.select("continue");
-
-    await handleInteractive(
-      {
-        type: "interactive",
-        prompt: "Select features",
-        kind: "multi-select",
-        availableFeatures: [
-          "errorMonitoring",
-          "performanceMonitoring",
-          "aiMonitoring",
-        ],
-      },
-      makeOptions(),
-      ui
-    );
-
-    const multiselectCalls = calls.filter(
-      (call) => call.kind === "multiselect"
-    );
-    expect(multiselectCalls[1]?.initialValues).toEqual([
-      "errorMonitoring",
-      "performanceMonitoring",
-      "aiMonitoring",
-    ]);
+    expect(multiselectCall?.initialValues).toEqual(["performanceMonitoring"]);
   });
 });
 

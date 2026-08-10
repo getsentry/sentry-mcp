@@ -1,0 +1,26 @@
+/**
+ * sentry conversation
+ *
+ * List and view AI conversations from Sentry Explore.
+ */
+
+import { buildRouteMap } from "../../lib/route-map.js";
+import { listCommand } from "./list.js";
+import { viewCommand } from "./view.js";
+
+export const conversationRoute = buildRouteMap({
+  routes: {
+    list: listCommand,
+    view: viewCommand,
+  },
+  defaultCommand: "list",
+  docs: {
+    brief: "List and view AI conversations",
+    fullDescription:
+      "List and view AI conversations from Sentry Explore.\n\n" +
+      "Commands:\n" +
+      "  list     List recent AI conversations\n" +
+      "  view     View a conversation transcript\n",
+    hideRoute: {},
+  },
+});

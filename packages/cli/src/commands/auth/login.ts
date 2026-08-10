@@ -483,7 +483,6 @@ export const loginCommand = buildCommand({
       }
     }
 
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       await clearResponseCache();
     } catch {
@@ -510,7 +509,6 @@ export const loginCommand = buildCommand({
         method: "token",
         configPath: getDbPath(),
       };
-      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         const user = await getCurrentUser();
         setUserInfo({
@@ -558,7 +556,6 @@ export const loginCommand = buildCommand({
  * on the next command that needs it.
  */
 function warmOrgCache(): void {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   listOrganizationsUncached().catch(() => {
     // Best-effort: cache warming failure doesn't affect the login result
   });

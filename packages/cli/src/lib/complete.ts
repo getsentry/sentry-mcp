@@ -129,8 +129,8 @@ export const ORG_PROJECT_COMMANDS = new Set([
  * @internal Exported for testing only.
  */
 export const ORG_ONLY_COMMANDS = new Set([
-  "agent-conversation list",
-  "agent-conversation view",
+  "conversation list",
+  "conversation view",
   "org view",
   "release list",
   "release view",

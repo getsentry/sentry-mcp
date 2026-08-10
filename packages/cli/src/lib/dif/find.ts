@@ -12,7 +12,6 @@
 
 import { open, readFile, stat } from "node:fs/promises";
 import { extname, resolve } from "node:path";
-import { logger } from "../logger.js";
 import { computeProguardUuid } from "../proguard.js";
 import { walkFiles } from "../scan/walker.js";
 import { parseDebugFile, peekFormat } from "./index.js";
@@ -187,11 +186,7 @@ async function tryProguard(
   let uuid: string;
   try {
     uuid = computeProguardUuid(await readFile(path));
-  } catch (error) {
-    logger.debug(
-      `Skipping ProGuard candidate ${path}: read/hash failed`,
-      error
-    );
+  } catch {
     return;
   }
   const matched = matchRemaining(state, uuid);
@@ -225,8 +220,7 @@ async function tryObject(
     } finally {
       await fd.close();
     }
-  } catch (error) {
-    logger.debug(`Skipping ${path}: failed to peek format`, error);
+  } catch {
     return;
   }
   if (!state.formats.has(format)) {
@@ -239,8 +233,7 @@ async function tryObject(
   let objects: { debugId: string }[];
   try {
     objects = parseDebugFile(await readFile(path)).objects;
-  } catch (error) {
-    logger.debug(`Skipping ${path}: failed to parse debug file`, error);
+  } catch {
     return;
   }
   for (const obj of objects) {

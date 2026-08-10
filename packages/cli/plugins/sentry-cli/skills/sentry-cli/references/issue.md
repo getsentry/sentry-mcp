@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-issue
-version: 0.45.0
+version: 0.43.0-dev.0
 description: Manage Sentry issues
 requires:
   bins: ["sentry"]
@@ -19,7 +19,7 @@ List issues in a project
 - `-q, --query <value> - Search query (Sentry syntax, implicit AND, no OR operator)`
 - `-n, --limit <value> - Maximum number of issues to list - (default: "25")`
 - `-s, --sort <value> - Sort by: recommended, date, new, freq, user (default: recommended on sentry.io, else date)`
-- `-t, --period <value> - Time range: "7d", "2026-08-01..2026-09-01", ">=2026-08-01" - (default: "90d")`
+- `-t, --period <value> - Time range: "7d", "2026-07-01..2026-08-01", ">=2026-07-01" - (default: "90d")`
 - `-c, --cursor <value> - Pagination cursor (use "next" for next page, "prev" for previous)`
 - `--compact - Single-line rows for compact output (auto-detects if omitted)`
 - `-f, --fresh - Bypass cache, re-detect projects, and fetch fresh data`
@@ -92,7 +92,7 @@ List events for a specific issue
 - `-n, --limit <value> - Number of events (1-1000) - (default: "25")`
 - `-q, --query <value> - Search query (Sentry search syntax)`
 - `--full - Include full event body (stacktraces)`
-- `-t, --period <value> - Time range: "7d", "2026-08-01..2026-09-01", ">=2026-08-01" - (default: "7d")`
+- `-t, --period <value> - Time range: "7d", "2026-07-01..2026-08-01", ">=2026-07-01" - (default: "7d")`
 - `-f, --fresh - Bypass cache, re-detect projects, and fetch fresh data`
 - `-c, --cursor <value> - Navigate pages: "next", "prev", "first" (or raw cursor string)`
 
@@ -211,7 +211,7 @@ View details of a specific issue
 | `substatus` | string \| null | Issue substatus |
 | `isUnhandled` | boolean | Whether the issue is unhandled |
 | `seerFixabilityScore` | number \| null | Seer AI fixability score (0-1) |
-| `event` | unknown \| null | Latest event for the issue (full detail). Select named fields with `--fields event.id,event.title` to avoid pulling the whole payload; the `request` entry may include live session data. |
+| `event` | unknown \| null | Latest event for the issue (full detail) |
 | `org` | string \| null | Organization slug |
 | `replayIds` | array | Related Session Replay IDs |
 | `trace` | object \| null | Trace context from the latest event's span tree |
@@ -227,29 +227,6 @@ sentry issue view FRONT-ABC -w
 # GitHub-style identifiers work too (the "#" replaces the final slash)
 sentry issue view my-org/my-project#FRONT-ABC
 sentry issue view my-project#FRONT-ABC
-
-# Full JSON (issue fields + latest event + trace/replay context)
-sentry issue view FRONT-ABC --json
-
-# Select specific top-level fields to keep output small
-sentry issue view FRONT-ABC --json --fields shortId,title,culprit,count,userCount,permalink
-
-# Pull named fields off the latest event instead of the whole `event` object —
-# the event's `request` entry can include live session data (cookies, headers,
-# body), so extract only what you need
-sentry issue view FRONT-ABC --json --fields event.id,event.title,event.dateCreated
-
-# Issue summary
-sentry issue view FRONT-ABC --json | jq '{shortId, title, count, userCount, permalink}'
-
-# Latest event id + culprit
-sentry issue view FRONT-ABC --json | jq '{event: .event.id, culprit}'
-
-# Just the request URL and method (avoids the full request/session blob)
-sentry issue view FRONT-ABC --json | jq '.event.entries[] | select(.type == "request") | .data | {url, method}'
-
-# Exception type and value from the latest event
-sentry issue view FRONT-ABC --json | jq '.event.entries[] | select(.type == "exception") | .data.values[0] | {type, value}'
 ```
 
 ### `sentry issue resolve <issue>`

@@ -618,14 +618,6 @@ export class UpgradeError extends CliError {
   }
 }
 
-/** Upgrade failure caused by transport rather than an HTTP or metadata error. */
-export class UpgradeTransportError extends UpgradeError {
-  constructor(message: string) {
-    super("network_error", message);
-    this.name = "UpgradeTransportError";
-  }
-}
-
 // Seer Errors
 
 export type SeerErrorReason = "not_enabled" | "no_budget" | "ai_disabled";
@@ -772,7 +764,6 @@ export function stringifyUnknown(value: unknown): string {
   if (value && typeof value === "object") {
     // JSON.stringify can throw on circular references or BigInt values.
     // Fall back to String() which is always safe.
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       return JSON.stringify(value);
     } catch {

@@ -1,12 +1,12 @@
 /**
- * Agent conversations formatters
+ * AI Conversations formatters
  *
  * Human-readable formatting for conversation list and detail views.
  * Transcript parsing logic ported from sentry-mcp get-ai-conversation-details.
  */
 
 import type {
-  AgentConversationSpan,
+  AIConversationSpan,
   ConversationListItem,
 } from "../../types/conversation.js";
 import {
@@ -163,7 +163,7 @@ function numeric(value: string | number | null | undefined): number {
   return 0;
 }
 
-function getOperationType(span: AgentConversationSpan): string | undefined {
+function getOperationType(span: AIConversationSpan): string | undefined {
   const explicit = span["gen_ai.operation.type"];
   if (explicit) {
     return explicit;
@@ -189,7 +189,6 @@ function getOperationType(span: AgentConversationSpan): string | undefined {
 }
 
 function parseJson(value: string): unknown {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return JSON.parse(value);
   } catch {
@@ -275,7 +274,7 @@ function collectMessages(value: unknown): { role?: string; content: string }[] {
     .filter((m): m is { role?: string; content: string } => Boolean(m));
 }
 
-function extractUserContent(span: AgentConversationSpan): string | null {
+function extractUserContent(span: AIConversationSpan): string | null {
   const raw =
     span["gen_ai.input.messages"] ?? span["gen_ai.request.messages"] ?? null;
   if (!raw) {
@@ -289,7 +288,7 @@ function extractUserContent(span: AgentConversationSpan): string | null {
   return userMsg?.content ?? messages.at(-1)?.content ?? null;
 }
 
-function extractAssistantContent(span: AgentConversationSpan): string | null {
+function extractAssistantContent(span: AIConversationSpan): string | null {
   const outputMessages = span["gen_ai.output.messages"];
   if (outputMessages) {
     if (outputMessages === "[Filtered]") {
@@ -305,9 +304,7 @@ function extractAssistantContent(span: AgentConversationSpan): string | null {
   return span["gen_ai.response.text"] ?? span["gen_ai.response.object"] ?? null;
 }
 
-export function extractTurns(
-  spans: AgentConversationSpan[]
-): ConversationTurn[] {
+export function extractTurns(spans: AIConversationSpan[]): ConversationTurn[] {
   const sorted = [...spans].sort(
     (a, b) => a["precise.start_ts"] - b["precise.start_ts"]
   );
@@ -469,7 +466,7 @@ export function formatTranscriptResult(result: TranscriptResult): string {
   }
 
   const lines: string[] = [
-    `# Agent Conversation: ${escapeMarkdownInline(result.conversationId)}`,
+    `# AI Conversation: ${escapeMarkdownInline(result.conversationId)}`,
     "",
     mdKvTable(rows),
     "",
@@ -489,7 +486,7 @@ export function formatTranscriptResult(result: TranscriptResult): string {
 export function buildTranscriptResult(
   conversationId: string,
   org: string,
-  spans: AgentConversationSpan[],
+  spans: AIConversationSpan[],
   title: string | null = null
 ): TranscriptResult {
   const turns = extractTurns(spans);

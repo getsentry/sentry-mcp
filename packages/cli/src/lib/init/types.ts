@@ -2,9 +2,6 @@ export type DirEntry = {
   name: string;
   path: string;
   type: "file" | "directory";
-  /** File size in bytes; omitted for directories. Lets the agent skip huge
-   *  files without reading them, like `ls -l`. */
-  size?: number;
 };
 
 export type ExistingProjectData = {
@@ -69,14 +66,8 @@ export type InteractiveContext = Pick<
   "yes" | "dryRun" | "app"
 >;
 
-export type InitProtocolEnvelope = {
-  protocolVersion: 1;
-  requestId: string;
-};
-
 // Tool suspend payloads
 export type ToolPayload =
-  | AgentCheckpointPayload
   | ListDirPayload
   | ReadFilesPayload
   | FileExistsBatchPayload
@@ -89,28 +80,6 @@ export type ToolPayload =
   | DetectSentryPayload;
 
 export type ToolOperation = ToolPayload["operation"];
-
-/**
- * Suspend request used to continue a persisted server-side agent session.
- * The CLI acknowledges it without inspecting or mutating the local project.
- */
-export type AgentCheckpointPayload = {
-  /** Discriminator for locally handled workflow tools. */
-  type: "tool";
-  /** Stable no-op operation name. */
-  operation: "agent-checkpoint";
-  /** Optional progress copy displayed while the checkpoint is acknowledged. */
-  detail?: string;
-  /** Workflow filesystem root; not accessed by this operation. */
-  cwd: string;
-  /** Reserved operation arguments; currently always empty. */
-  params: Record<string, never>;
-};
-
-/** Explicit no-op acknowledgement validated by the init service boundary. */
-export type AgentCheckpointData = {
-  acknowledged: true;
-};
 
 export type ListDirPayload = {
   type: "tool";
@@ -130,35 +99,8 @@ export type ReadFilesPayload = {
   cwd: string;
   params: {
     paths: string[];
-    /** First 1-based line to inspect. Range reads support one path. */
-    startLine?: number;
-    /** Structured read-results protocol used by sentry init. */
-    resultVersion: 2;
+    maxBytes?: number;
   };
-};
-
-export type ReadFileErrorCode =
-  | "invalid-range"
-  | "line-too-long"
-  | "not-file"
-  | "not-found"
-  | "not-text"
-  | "unreadable";
-
-export type ReadFileV2Result =
-  | {
-      content: string;
-      status: "ok";
-      truncated: boolean;
-    }
-  | {
-      error: ReadFileErrorCode;
-      status: "error";
-    };
-
-export type ReadFilesV2Data = {
-  files: Record<string, ReadFileV2Result>;
-  version: 2;
 };
 
 export type FileExistsBatchPayload = {
@@ -234,12 +176,6 @@ export type ApplyPatchsetPatch =
   | { path: string; action: "modify"; edits: PatchEdit[] }
   | { path: string; action: "delete"; patch?: string };
 
-/**
- * Wire envelope for a file-change batch.
- *
- * The operation name remains stable for compatibility with deployed workflow
- * servers and older CLI releases.
- */
 export type ApplyPatchsetPayload = {
   type: "tool";
   operation: "apply-patchset";
@@ -299,28 +235,8 @@ export type WizardOutput = {
   exitCode?: number;
   docsUrl?: string;
   sentryProjectUrl?: string;
-  orgSlug?: string;
-  projectSlug?: string;
-  projectId?: string;
   message?: string;
   featureBlurbs?: Array<{ feature: string; blurb: string }>;
-};
-
-/**
- * Sentry project identity captured locally during the run.
- *
- * The CLI creates (or resolves) the Sentry project itself via the
- * `create-sentry-project` / `ensure-sentry-project` tool, so it already knows
- * the org/project identifiers first-hand — the server does not need to echo
- * them back in the final output. Captured from the tool result in the wizard
- * runner and used to build the Issues / event URLs on the completion screen.
- */
-export type SentryProjectIdentity = {
-  orgSlug: string;
-  projectSlug: string;
-  projectId: string;
-  dsn?: string;
-  url?: string;
 };
 
 // Interactive payloads
@@ -351,8 +267,7 @@ export type ConfirmPayload = {
   prompt: string;
 };
 
-export type SuspendPayload = (ToolPayload | InteractivePayload) &
-  InitProtocolEnvelope;
+export type SuspendPayload = ToolPayload | InteractivePayload;
 
 export type WorkflowRunResult = {
   status: "suspended" | "success" | "failed";

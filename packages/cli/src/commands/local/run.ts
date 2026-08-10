@@ -13,11 +13,7 @@
  * so events still tail to the terminal.
  */
 
-import {
-  type ChildProcess,
-  type StdioOptions,
-  spawn,
-} from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import type { Server } from "node:http";
 import { resolve } from "node:path";
 import { createSpotlightBuffer } from "@spotlightjs/spotlight/sdk";
@@ -26,39 +22,23 @@ import { buildCommand } from "../../lib/command.js";
 import { detectDevCommand } from "../../lib/dev-script.js";
 import { CliError, EXIT, ValidationError } from "../../lib/errors.js";
 import { bold } from "../../lib/formatters/colors.js";
-import {
-  type FilterValue,
-  type FormatValue,
-  formatEnvelopeLines,
-  formatEnvelopeLinesJson,
-} from "../../lib/formatters/local.js";
-import { logger, printJsonLine, printLine } from "../../lib/logger.js";
+import { formatEnvelopeLines } from "../../lib/formatters/local.js";
+import { logger, printLine } from "../../lib/logger.js";
 import { injectWranglerSpotlightBinding } from "../../lib/wrangler.js";
 import {
   buildApp,
   consumeSSE,
   DEFAULT_PORT,
   isServerRunning,
-  parseFilter,
-  parseFormat,
   parsePort,
   tryListen,
 } from "./server.js";
-import {
-  formatLocalServerUrl,
-  openLocalUiIfRequested,
-  validateOpenHost,
-} from "./ui.js";
 
 type RunFlags = {
   readonly port: number;
   readonly host: string;
   readonly verify: boolean;
   readonly timeout: number;
-  readonly filter?: readonly FilterValue[];
-  readonly format: FormatValue;
-  readonly attributes: boolean;
-  readonly open: boolean;
 };
 
 /** Buffer size for the auto-started background server. */
@@ -128,28 +108,6 @@ type EventTail = {
   cleanup: () => Promise<void>;
 };
 
-type EventTailOptions = {
-  port: number;
-  host: string;
-  activeFilters: ReadonlySet<FilterValue>;
-  useJson: boolean;
-  showAttributes: boolean;
-};
-
-/** Keep stdout exclusively for NDJSON when an agent requests JSON output. */
-function childStdio(useJson: boolean): StdioOptions {
-  return useJson ? ["inherit", "pipe", "pipe"] : "inherit";
-}
-
-/** Forward the wrapped app's console output without contaminating NDJSON. */
-function forwardChildOutput(child: ChildProcess, useJson: boolean): void {
-  if (!useJson) {
-    return;
-  }
-  child.stdout?.pipe(process.stderr, { end: false });
-  child.stderr?.pipe(process.stderr, { end: false });
-}
-
 /**
  * Tail events from a server this command did not start.
  *
@@ -159,19 +117,12 @@ function forwardChildOutput(child: ChildProcess, useJson: boolean): void {
  * reached the other server, but nothing was ever printed here. Attaching as
  * an SSE consumer is what `sentry local serve` does in the same situation.
  */
-function attachToExistingServer(
-  url: string,
-  activeFilters: ReadonlySet<FilterValue>,
-  useJson: boolean,
-  showAttributes: boolean
-): EventTail {
+function attachToExistingServer(url: string): EventTail {
   const ac = new AbortController();
   const tail = consumeSSE({
     url,
-    activeFilters,
+    activeFilters: new Set<never>(),
     signal: ac.signal,
-    useJson,
-    showAttributes,
   }).catch((err: unknown) => {
     if (!ac.signal.aborted) {
       logger.debug(
@@ -193,29 +144,20 @@ function attachToExistingServer(
  * Start a background dev server and subscribe to its buffer so incoming
  * envelopes are printed inline, matching the behavior of `sentry local serve`.
  */
-async function startBackgroundServer({
-  port,
-  host,
-  activeFilters,
-  useJson,
-  showAttributes,
-}: EventTailOptions): Promise<EventTail> {
+async function startBackgroundServer(
+  port: number,
+  host: string
+): Promise<EventTail> {
   const buffer = createSpotlightBuffer(BUFFER_SIZE);
   const app = buildApp(buffer);
   const { server, port: boundPort } = await tryListen(app, port, host);
-  const url = formatLocalServerUrl(host, boundPort);
+  const url = `http://${host}:${boundPort}`;
 
+  const noFilters = new Set<never>();
   const subscriptionId = buffer.subscribe((container) => {
     try {
-      const formatLines = useJson
-        ? formatEnvelopeLinesJson(container, activeFilters, showAttributes)
-        : formatEnvelopeLines(container, activeFilters, showAttributes);
-      for (const line of formatLines) {
-        if (useJson) {
-          printJsonLine(line);
-        } else {
-          printLine(line);
-        }
+      for (const line of formatEnvelopeLines(container, noFilters)) {
+        printLine(line);
       }
     } catch (err) {
       logger.debug(
@@ -241,29 +183,17 @@ async function startBackgroundServer({
  * with it, and falls back to attaching if the bind loses a race. `run` wraps
  * the user's dev command, so a busy port must never be fatal here.
  */
-async function openEventTail({
-  port,
-  host,
-  activeFilters,
-  useJson,
-  showAttributes,
-}: EventTailOptions): Promise<EventTail> {
-  const url = formatLocalServerUrl(host, port);
+async function openEventTail(port: number, host: string): Promise<EventTail> {
+  const url = `http://${host}:${port}`;
 
   if (await isServerRunning(url)) {
     logger.info(`Connected to existing server at ${bold(url)}`);
-    return attachToExistingServer(url, activeFilters, useJson, showAttributes);
+    return attachToExistingServer(url);
   }
 
   logger.info("No server detected, starting one in the background...");
   try {
-    const bg = await startBackgroundServer({
-      port,
-      host,
-      activeFilters,
-      useJson,
-      showAttributes,
-    });
+    const bg = await startBackgroundServer(port, host);
     logger.info(`Background server listening on ${bold(bg.url)}`);
     return bg;
   } catch (err) {
@@ -272,7 +202,7 @@ async function openEventTail({
     }
     // Something grabbed the port between the probe and the bind.
     logger.warn(`${err.message}; attaching to it instead`);
-    return attachToExistingServer(url, activeFilters, useJson, showAttributes);
+    return attachToExistingServer(url);
   }
 }
 
@@ -354,9 +284,7 @@ export const runCommand = buildCommand({
       "The child process inherits all current env vars plus\n" +
       "SENTRY_SPOTLIGHT (server-side SDKs read this automatically), the\n" +
       "framework-prefixed client variants (NEXT_PUBLIC_, VITE_, etc.), and\n" +
-      "SENTRY_TRACES_SAMPLE_RATE=1. Use --format json to stream versioned\n" +
-      "NDJSON observations to stdout for agents. Use --open to launch the\n" +
-      "Sentry Local UI.\n\n" +
+      "SENTRY_TRACES_SAMPLE_RATE=1.\n\n" +
       "Example:\n" +
       "  sentry local run -- npm run dev\n" +
       "  sentry local run -- python manage.py runserver",
@@ -383,14 +311,6 @@ export const runCommand = buildCommand({
         brief: "Hostname for the local server (default localhost)",
         default: "localhost",
       },
-      filter: {
-        kind: "parsed",
-        parse: parseFilter,
-        brief:
-          "Only show items of this type (repeatable: error, transaction, log, ai)",
-        variadic: true,
-        optional: true,
-      },
       verify: {
         kind: "boolean",
         brief: "Verify SDK sends events, then exit",
@@ -403,39 +323,15 @@ export const runCommand = buildCommand({
           "Kill the child after N seconds (0 = no timeout; defaults to 30 s in --verify mode)",
         default: "0",
       },
-      format: {
-        kind: "parsed",
-        parse: parseFormat,
-        brief: "Output format: human (default) or json (NDJSON on stdout)",
-        default: "human",
-      },
-      attributes: {
-        kind: "boolean",
-        brief: "Include selected event attributes in output",
-        default: false,
-      },
-      open: {
-        kind: "boolean",
-        brief: "Open Sentry Local UI in the browser",
-        default: false,
-      },
     },
     aliases: {
       p: "port",
-      f: "filter",
       V: "verify",
       t: "timeout",
-      F: "format",
-      a: "attributes",
     },
   },
   auth: false,
   async *func(this: SentryContext, flags: RunFlags, ...rawArgs: string[]) {
-    if (flags.open && flags.verify) {
-      throw new ValidationError("--open cannot be used with --verify.", "open");
-    }
-    validateOpenHost(flags.open, flags.host);
-
     const stripped = rawArgs[0] === "--" ? rawArgs.slice(1) : rawArgs;
     const { args, commandSource } = await resolveArgs(stripped, this.cwd);
 
@@ -444,20 +340,10 @@ export const runCommand = buildCommand({
       return;
     }
 
-    let url = formatLocalServerUrl(flags.host, flags.port);
+    let url = `http://${flags.host}:${flags.port}`;
 
-    const useJson = flags.format === "json";
-    const activeFilters = new Set(flags.filter);
-    const tail = await openEventTail({
-      port: flags.port,
-      host: flags.host,
-      activeFilters,
-      useJson,
-      showAttributes: flags.attributes,
-    });
+    const tail = await openEventTail(flags.port, flags.host);
     url = tail.url;
-
-    await openLocalUiIfRequested(flags.open, url);
 
     const spotlightUrl = `${url}/stream`;
     const wrangler = await injectWranglerSpotlightBinding(
@@ -479,9 +365,8 @@ export const runCommand = buildCommand({
       child = spawn(cmd, cmdArgs, {
         cwd: this.cwd,
         env: childEnv,
-        stdio: childStdio(useJson),
+        stdio: "inherit",
       });
-      forwardChildOutput(child, useJson);
     } catch (err) {
       await tail.cleanup();
       throw new CliError(
@@ -594,7 +479,7 @@ async function* runWithVerify(
     flags.port,
     flags.host
   );
-  const url = formatLocalServerUrl(flags.host, boundPort);
+  const url = `http://${flags.host}:${boundPort}`;
   logger.info(`Verify server listening on ${bold(url)}`);
 
   const spotlightUrl = `${url}/stream`;
@@ -617,15 +502,13 @@ async function* runWithVerify(
   }
 
   let child: ChildProcess;
-  const useJson = flags.format === "json";
   try {
     const [cmd = "", ...cmdArgs] = wrangler.args;
     child = spawn(cmd, cmdArgs, {
       cwd,
       env: childEnv,
-      stdio: childStdio(useJson),
+      stdio: "inherit",
     });
-    forwardChildOutput(child, useJson);
   } catch (err) {
     await shutdownServer(server);
     throw new CliError(

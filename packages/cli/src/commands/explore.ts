@@ -438,27 +438,6 @@ function validateMetricsFields(fieldList: string[]): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Datasets whose Events endpoint accepts a `sort` param. A deterministic sort
- * is what makes offset-based cursor pagination stable — without it, multi-page
- * grouped aggregate queries overlap and skip rows (#1519). `metrics`
- * (`tracemetrics`) and `logs` reject `sort` with a 400, so they stay unsorted.
- *
- * This is a hand-curated contract, not a machine-readable capability lookup,
- * because no canonical source for it exists today (#1523):
- *   - The OpenAPI spec (`@sentry/api` `listOrganizationEvents`) models `sort`
- *     as a flat query param whose only documented constraint is "must be in
- *     the `field` list" — it does not encode which datasets accept it.
- *   - There is no dataset-capability introspection endpoint in the spec.
- *   - The spec's `dataset` enum is
- *     `errors | logs | profile_functions | spans | tracemetrics |
- *     uptime_results`; `discover` is a legacy virtual dataset that is not a
- *     valid `--dataset` value here (see {@link DATASET_ALIASES}), so it is
- *     intentionally omitted.
- * Revisit if Sentry ever publishes a per-dataset capability contract.
- */
-const SORTABLE_DATASETS = new Set(["spans", "errors"]);
-
-/**
  * Dataset-specific configuration resolved before the main query loop.
  *
  * Centralizes all replay vs. non-replay branching so the main `func` body
@@ -481,30 +460,12 @@ type DatasetConfig = {
 };
 
 /**
- * Translate `--environment` values into a query filter term. A single value
- * becomes `environment:foo`; multiple values use the `environment:[a,b]` list
- * syntax so they are ORed rather than ANDed.
- */
-function buildEnvironmentQuery(
-  environment: string[] | undefined
-): string | undefined {
-  if (!environment || environment.length === 0) {
-    return;
-  }
-  if (environment.length === 1) {
-    return `environment:${environment[0]}`;
-  }
-  return `environment:[${environment.join(",")}]`;
-}
-
-/**
  * Resolve dataset-specific configuration: sort, query, validation, and fetch.
  *
  * For the `replays` dataset this validates fields, resolves replay-specific
  * sort, and returns a fetch function that calls `listReplays`. For all other
- * datasets it translates `--environment` values into `environment:...` query
- * filter terms, resolves explore sort (spans-only), prepends `project:<slug>`
- * to the query, and returns a `queryEvents` fetch.
+ * datasets it validates environment usage, resolves explore sort (spans-only),
+ * prepends `project:<slug>` to the query, and returns a `queryEvents` fetch.
  */
 function resolveDatasetConfig(params: {
   dataset: string;
@@ -557,35 +518,30 @@ function resolveDatasetConfig(params: {
     };
   }
 
-  // Non-replay datasets: translate --environment into query filter terms
-  // since the Discover/Events API expects environment:... in the query string.
-  const envPrefix = buildEnvironmentQuery(environment);
-  const queryWithEnv =
-    [envPrefix, flags.query].filter(Boolean).join(" ") || undefined;
+  // Non-replay datasets
+  if (environment) {
+    throw new ValidationError(
+      "--environment is only supported with --dataset replays. Use environment:... inside --query for other datasets.",
+      "environment"
+    );
+  }
 
   const firstAgg = findFirstAggregate(fieldList);
   const rawSort = flags.sort ?? (firstAgg ? `-${firstAgg}` : undefined);
   let sort: string | undefined;
-  if (SORTABLE_DATASETS.has(dataset)) {
-    // A deterministic sort is required for correct cursor pagination: the
-    // events cursor is offset-based, so without a stable total order the
-    // separate page requests overlap and skip rows, producing duplicate and
-    // missing dimension tuples across the merged result (#1519). Defaulting
-    // to `-<firstAggregate>` gives grouped aggregate queries a stable order.
+  if (dataset === "spans") {
     sort = rawSort;
   } else {
-    // Warn only when the user explicitly passed --sort on a dataset that
-    // rejects it (metrics/logs). An auto-derived sort is silently dropped.
+    // Warn only when user explicitly passed --sort on a non-spans dataset
     if (rawSort && flags.sort) {
-      const displayDataset = API_TO_USER_DATASET.get(dataset) ?? dataset;
       log.warn(
-        `--sort is not supported on the ${displayDataset} dataset. Ignoring sort.`
+        `--sort is only supported on the spans dataset. Ignoring sort for ${dataset}.`
       );
     }
     sort = undefined;
   }
 
-  const query = buildProjectQuery(queryWithEnv, project);
+  const query = buildProjectQuery(flags.query, project);
   return {
     sort,
     query,
@@ -710,7 +666,8 @@ export const exploreCommand = buildListCommand("explore", {
       environment: {
         kind: "parsed",
         parse: String,
-        brief: "Environment filter (repeatable, comma-separated)",
+        brief:
+          "Replay environment filter for --dataset replays (repeatable, comma-separated)",
         variadic: true,
         optional: true,
       },

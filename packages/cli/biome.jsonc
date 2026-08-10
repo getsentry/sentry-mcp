@@ -19,8 +19,7 @@
     "./lint-rules/no-inline-touch-cache.grit",
     "./lint-rules/no-stderr-write-in-commands.grit",
     "./lint-rules/no-args-join-in-release.grit",
-    "./lint-rules/no-generic-is-record.grit",
-    "./lint-rules/prefer-paginate-helper.grit"
+    "./lint-rules/no-generic-is-record.grit"
   ],
   "files": {
     // custom-ca.ts excluded: Biome's type analysis hits the 200k type limit
@@ -36,12 +35,7 @@
       "!codemods",
       // custom-ca.ts blows past Biome's type-analysis limit when pulled into
       // the module graph (internal Biome bug); force-ignore even via a test.
-      "!!src/lib/custom-ca.ts",
-      // output.ts hits the same 200k type-analysis limit once valibot's
-      // GenericSchema graph is pulled in — the same internal Biome bug, surfacing
-      // non-deterministically (main passes by a hair; unrelated PRs trip it,
-      // e.g. #1499, #1501). Force-ignore until Biome raises/fixes the limit.
-      "!!src/lib/formatters/output.ts"
+      "!!src/lib/custom-ca.ts"
     ]
   },
   "javascript": {},
@@ -63,16 +57,6 @@
     }
   },
   "overrides": [
-    {
-      // Silent-catch enforcement is scoped to production code under src/**.
-      // The grandfathered backlog is pinned with inline `// biome-ignore
-      // lint/plugin` comments; `pnpm run lint` runs with `--error-on-warnings`
-      // so an orphaned suppression fails as `suppressions/unused`, keeping the
-      // backlog shrink-only. Replaces the old script/silent-catch-baseline.json
-      // ratchet (see #1531).
-      "includes": ["src/**/*.ts"],
-      "plugins": ["./lint-rules/no-silent-catch.grit"]
-    },
     {
       // The React-hook lint rules infer "this is a hook" from the
       // `use*` naming convention. We have a couple of test helpers

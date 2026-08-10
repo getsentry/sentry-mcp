@@ -1,8 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
-  API_MAX_PER_PAGE,
   isTextualContentType,
-  paginate,
   rawApiRequest,
   throwApiError,
 } from "../../../src/lib/api/infrastructure.js";
@@ -670,75 +668,5 @@ describe("rawApiRequest binary handling", () => {
 
     const result = await rawApiRequest("some/text/");
     expect(result.body).toBe("not json");
-  });
-
-  test("returns the HTTP status text with the response", async () => {
-    globalThis.fetch = mockFetch(
-      async () =>
-        new Response("", {
-          status: 404,
-          statusText: "Not Found",
-        })
-    );
-
-    const result = await rawApiRequest("missing/");
-    expect(result.status).toBe(404);
-    expect(result.statusText).toBe("Not Found");
-    expect(result.body).toBe("");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// paginate helper (getsentry/cli#1473)
-// ---------------------------------------------------------------------------
-
-describe("paginate", () => {
-  test("caps perPage at API_MAX_PER_PAGE", async () => {
-    const spy = vi.fn().mockResolvedValue({ data: [] });
-    await paginate({ limit: 200 }, spy);
-    expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith(API_MAX_PER_PAGE, undefined);
-  });
-
-  test("uses defaultLimit when limit is undefined", async () => {
-    const spy = vi.fn().mockResolvedValue({ data: [] });
-    await paginate({}, spy, 25);
-    expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith(25, undefined);
-  });
-
-  test("forwards initial cursor", async () => {
-    const spy = vi.fn().mockResolvedValue({ data: [] });
-    await paginate({ cursor: "abc", limit: 5 }, spy);
-    expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith(5, "abc");
-  });
-
-  test("passes literal limit as perPage below cap", async () => {
-    const spy = vi.fn().mockResolvedValue({ data: [] });
-    await paginate({ limit: 5 }, spy);
-    expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith(5, undefined);
-  });
-
-  test("accumulates across pages when limit exceeds cap", async () => {
-    const spy = vi
-      .fn()
-      .mockResolvedValueOnce({
-        data: Array.from({ length: 100 }, (_, i) => i),
-        nextCursor: "c1",
-      })
-      .mockResolvedValueOnce({
-        data: Array.from({ length: 100 }, (_, i) => 100 + i),
-        nextCursor: undefined,
-      });
-
-    const result = await paginate({ limit: 150 }, spy);
-    expect(result.data.length).toBe(150);
-    expect(result.data).toEqual(Array.from({ length: 150 }, (_, i) => i));
-    expect(spy).toHaveBeenCalledTimes(2);
-    expect(
-      spy.mock.calls.every(([perPage]) => perPage === API_MAX_PER_PAGE)
-    ).toBe(true);
   });
 });

@@ -54,8 +54,7 @@ type SilenceReason =
   | "output_error"
   | "auth_expected"
   | "api_user_error"
-  | "network_error"
-  | "process_exit";
+  | "network_error";
 
 /**
  * Classify whether an error should be silenced.
@@ -95,16 +94,6 @@ export function classifySilenced(error: unknown): SilenceReason | null {
   if (error instanceof ApiError && error.status > 400 && error.status < 500) {
     return "api_user_error";
   }
-  // A child process launched by `sentry local run` or `sentry monitor run`
-  // that exits with a non-zero code throws `CliError("Process exited with
-  // code N")`. These are expected user-script failures, not CLI bugs — no
-  // actionable signal comes from capturing them (CLI-20G).
-  if (
-    error instanceof CliError &&
-    error.message.startsWith("Process exited with code")
-  ) {
-    return "process_exit";
-  }
   // A 400 (Bad Request) signals a malformed request the CLI built — a code
   // defect — so it is always captured. A user's unparseable `--query` is NOT a
   // 400 here: it is converted to a ValidationError at the command boundary
@@ -126,7 +115,6 @@ function recordSilencedError(error: unknown, reason: SilenceReason): void {
     attributes.auth_reason = error.reason;
   }
 
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     Sentry.metrics.distribution("cli.error.silenced", 1, { attributes });
   } catch {
@@ -136,7 +124,6 @@ function recordSilencedError(error: unknown, reason: SilenceReason): void {
   // Structured log for user API errors — `detail` is often the most actionable
   // field and is searchable in Sentry Logs.
   if (reason === "api_user_error" && error instanceof ApiError) {
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       Sentry.logger.info("cli.api_error_silenced", {
         status: error.status,

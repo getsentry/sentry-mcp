@@ -78,7 +78,7 @@ Run `sentry --help` to see all available commands, or browse the [command refere
 
 ## Configuration
 
-Credentials are stored in `$XDG_CONFIG_HOME/sentry/` (defaulting to `~/.config/sentry/`) with restricted permissions (mode 600). A pre-existing legacy `~/.sentry/` directory is still honored, and the location can be overridden with `SENTRY_CONFIG_DIR`.
+Credentials are stored in `~/.sentry/` with restricted permissions (mode 600).
 
 ## Library Usage
 
@@ -111,7 +111,6 @@ Options (all optional):
 - `project` — Default project slug.
 - `text` — Return human-readable string instead of parsed JSON (affects `run()` only).
 - `cwd` — Working directory for DSN auto-detection. Defaults to `process.cwd()`.
-- `headers` — Extra HTTP headers for self-hosted instances behind a reverse proxy (same as `SENTRY_CUSTOM_HEADERS`). Ignored for sentry.io.
 - `signal` — `AbortSignal` to cancel streaming commands (`--follow`, `--refresh`).
 
 Streaming commands return `AsyncIterable` — use `for await...of` and `break` to stop.

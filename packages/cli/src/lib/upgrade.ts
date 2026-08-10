@@ -19,49 +19,36 @@ import {
 } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, sep } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { setTimeout } from "node:timers/promises";
-import { prerelease as semverPrerelease, valid as semverValid } from "semver";
 import {
   acquireLock,
   cleanupOldBinary,
-  compareVersions,
-  determineInstallDir,
   fetchWithUpgradeError,
+  GITHUB_RELEASES_URL,
   getBinaryDownloadUrl,
   getBinaryFilename,
   getBinaryPaths,
   getGitHubHeaders,
-  getGitHubLatestReleaseUrl,
-  getGitHubReleaseByTagUrl,
-  getGitHubRepositoryUrl,
   getPlatformBinaryName,
   type InstallationMethod,
   isNightlyVersion,
   KNOWN_CURL_DIRS,
-  PRIMARY_UPGRADE_SOURCE,
-  parseUpgradeJson,
   releaseLock,
-  resolveUpgradeSource,
-  UPGRADE_SOURCES,
-  type UpgradeSource,
-  UpgradeSourceNotFoundError,
 } from "./binary.js";
 import { CLI_VERSION, NODE_MODULES_DIRNAME } from "./constants.js";
 import { getInstallInfo, setInstallInfo } from "./db/install-info.js";
 import type { ReleaseChannel } from "./db/release-channel.js";
 import { attemptDeltaUpgrade, type DeltaResult } from "./delta-upgrade.js";
-import { UpgradeError } from "./errors.js";
+import { AbortError, UpgradeError } from "./errors.js";
 import { formatBytes } from "./formatters/numbers.js";
 import {
   downloadNightlyBlob,
   fetchManifest,
   fetchNightlyManifest,
   findLayerByFilename,
-  GhcrManifestHttpError,
   getAnonymousToken,
   getNightlyVersion,
-  type OciManifest,
 } from "./ghcr.js";
 import { logger } from "./logger.js";
 import { clearPatchCache } from "./patch-cache.js";
@@ -99,123 +86,21 @@ const NPM_REGISTRY_URL = "https://registry.npmjs.org/sentry";
 /** Regex to strip 'v' prefix from version strings */
 export const VERSION_PREFIX_REGEX = /^v/;
 
-/** GitHub pagination link for the next page. */
-const NEXT_PAGE_LINK_REGEX = /<([^>]+)>;\s*rel="next"/;
-
-/** Canonical GitHub REST repository release-list path. */
-const CANONICAL_RELEASES_PATH_REGEX = /^\/repositories\/\d+\/releases$/;
-
-/** Positive GitHub pagination page number. */
-const PAGE_NUMBER_REGEX = /^[1-9]\d*$/;
-
-/** A resolved standalone-binary version and the source that must serve it. */
-export type ResolvedUpgradeVersion = {
-  /** Version without a source-specific tag prefix. */
-  readonly version: string;
-  /** Source selected for every later lookup and download in this operation. */
-  readonly source: UpgradeSource;
-};
-
-function extractReleaseVersions(
-  data: unknown,
-  source: UpgradeSource
-): string[] {
-  if (source.tagPrefix ? !Array.isArray(data) : Array.isArray(data)) {
-    throw new UpgradeError(
-      "network_error",
-      "GitHub returned invalid release metadata"
-    );
-  }
-  const releases = Array.isArray(data) ? data : [data];
-  return releases
-    .filter(
-      (release): release is Record<string, unknown> =>
-        typeof release === "object" && release !== null
-    )
-    .filter((release) => !(release.draft || release.prerelease))
-    .map((release) => release.tag_name)
-    .filter(
-      (tag): tag is string =>
-        typeof tag === "string" && tag.startsWith(source.tagPrefix)
-    )
-    .map((tag) => tag.slice(source.tagPrefix.length))
-    .map((tag) =>
-      source.tagPrefix ? tag : tag.replace(VERSION_PREFIX_REGEX, "")
-    )
-    .filter((tag) => semverValid(tag) === tag && semverPrerelease(tag) === null)
-    .sort((a, b) => compareVersions(b, a));
-}
-
-function getNextGitHubReleasePage(
-  response: Response,
-  source: UpgradeSource
-): string | undefined {
-  const link = response.headers.get("link");
-  const match = link?.match(NEXT_PAGE_LINK_REGEX);
-  if (!match?.[1]) {
-    return;
-  }
-  if (!URL.canParse(match[1])) {
-    throw new UpgradeError(
-      "network_error",
-      "GitHub returned an invalid release pagination URL"
-    );
-  }
-  const url = new URL(match[1]);
-  const isSelectedSourcePath =
-    url.pathname === `/repos/${source.githubRepo}/releases`;
-  const isCanonicalRepositoryPath = CANONICAL_RELEASES_PATH_REGEX.test(
-    url.pathname
-  );
-  const page = url.searchParams.get("page");
-  if (
-    url.protocol !== "https:" ||
-    url.hostname !== "api.github.com" ||
-    !(isSelectedSourcePath || isCanonicalRepositoryPath) ||
-    page === null ||
-    !PAGE_NUMBER_REGEX.test(page)
-  ) {
-    throw new UpgradeError(
-      "network_error",
-      "GitHub returned an invalid release pagination URL"
-    );
-  }
-  const nextPage = new URL(getGitHubLatestReleaseUrl(source));
-  nextPage.searchParams.set("page", page);
-  return nextPage.href;
-}
-
 // Curl Binary Helpers
 
 /**
- * Build the list of known curl install directories the binary may live in,
- * each with a trailing separator so `startsWith` matches a directory boundary
- * (e.g. `~/.local/bin/` won't match `~/.local/binaries/`). Pure — takes home
- * and env — so it can be unit-tested; `getKnownCurlPaths` memoizes the result.
- */
-export function buildKnownCurlPaths(
-  homeDir: string,
-  env: NodeJS.ProcessEnv
-): string[] {
-  const paths = KNOWN_CURL_DIRS.map((dir) => join(homeDir, dir) + sep);
-  // Honor an absolute XDG_BIN_HOME, matching determineInstallDir's precedence.
-  const xdgBinHome = env.XDG_BIN_HOME;
-  if (xdgBinHome && isAbsolute(xdgBinHome)) {
-    // join(dir, ".") strips any trailing separator so we don't emit a double
-    // separator (e.g. `/custom/bin//`) that would break the startsWith checks.
-    paths.push(join(xdgBinHome, ".") + sep);
-  }
-  return paths;
-}
-
-/**
- * Memoized known curl paths. Computed lazily (not at module load) to avoid TDZ
- * issues from circular imports — `KNOWN_CURL_DIRS` must be fully initialized
- * before access.
+ * Known directories where the curl installer may place the binary.
+ * Resolved at runtime against the user's home directory.
+ * Used for legacy detection (when no install info is stored).
+ * Trailing separator ensures startsWith matches a directory boundary
+ * (e.g. ~/.local/bin/ won't match ~/.local/binaries/).
+ *
+ * Computed lazily (not at module load) to avoid TDZ issues from circular
+ * imports — `KNOWN_CURL_DIRS` must be fully initialized before access.
  */
 let _knownCurlPaths: string[] | undefined;
 function getKnownCurlPaths(): string[] {
-  _knownCurlPaths ??= buildKnownCurlPaths(homedir(), process.env);
+  _knownCurlPaths ??= KNOWN_CURL_DIRS.map((dir) => join(homedir(), dir) + sep);
   return _knownCurlPaths;
 }
 
@@ -226,7 +111,7 @@ function getKnownCurlPaths(): string[] {
  * 1. Stored install path from DB (if method is curl AND its directory still
  *    exists — a stale path whose directory was purged is skipped)
  * 2. process.execPath if it's in a known curl install location
- * 3. Default to the XDG-aware install dir (fallback for fresh installs)
+ * 3. Default to ~/.sentry/bin/sentry (fallback for fresh installs)
  *
  * @returns Object with install, temp, old, and lock file paths
  */
@@ -243,7 +128,7 @@ export function getCurlInstallPaths(): {
   // `ENOENT ... open '.../sentry.lock'` (reported in #discuss-cli).
   //
   // existsSync also returns false on EACCES / a transiently-unmounted parent,
-  // in which case we fall through to execPath / the default-install fallback
+  // in which case we fall through to execPath / the ~/.sentry/bin fallback
   // rather than erroring. That tradeoff is acceptable: the running binary's
   // own directory (execPath) is by definition accessible, so a genuine install
   // is still found; only an unreadable *stored hint* is ignored.
@@ -264,10 +149,7 @@ export function getCurlInstallPaths(): {
   }
 
   // Fallback to default path (for fresh installs or non-curl runs like tests)
-  const defaultPath = join(
-    determineInstallDir(homedir(), process.env),
-    getBinaryFilename()
-  );
+  const defaultPath = join(homedir(), ".sentry", "bin", getBinaryFilename());
   return getBinaryPaths(defaultPath);
 }
 
@@ -327,7 +209,6 @@ function runCommand(
  * @returns true if sentry is installed globally via this package manager
  */
 async function isInstalledWith(pm: PackageManager): Promise<boolean> {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const args =
       pm === "yarn"
@@ -354,7 +235,6 @@ async function isInstalledWith(pm: PackageManager): Promise<boolean> {
  */
 function isHomebrewInstall(): boolean {
   let execPath = process.execPath;
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     execPath = realpathSync(execPath);
   } catch {
@@ -494,68 +374,32 @@ export async function detectInstallationMethod(): Promise<InstallationMethod> {
  * @throws {UpgradeError} When fetch fails or response is invalid
  * @throws {Error} AbortError if signal is aborted
  */
-export async function fetchLatestFromGitHubWithSource(
-  signal?: AbortSignal,
-  sources: readonly UpgradeSource[] = UPGRADE_SOURCES
-): Promise<ResolvedUpgradeVersion> {
-  const resolved = await resolveUpgradeSource({
-    getProbeUrl: getGitHubLatestReleaseUrl,
-    signal,
-    sources,
-  });
-  let response = resolved.response;
-  const visitedPages = new Set([getGitHubLatestReleaseUrl(resolved.source)]);
-  const versions: string[] = [];
-  while (true) {
-    const data = await parseUpgradeJson(
-      response,
-      signal,
-      "GitHub returned invalid release metadata"
-    );
-    versions.push(...extractReleaseVersions(data, resolved.source));
-    const nextPage = getNextGitHubReleasePage(response, resolved.source);
-    if (!nextPage) {
-      const version = versions.sort((a, b) => compareVersions(b, a))[0];
-      if (!version) {
-        throw new UpgradeError(
-          "network_error",
-          "No version found in GitHub release"
-        );
-      }
-      return { version, source: resolved.source };
-    }
-    if (visitedPages.has(nextPage)) {
-      throw new UpgradeError(
-        "network_error",
-        "GitHub returned cyclic release pagination"
-      );
-    }
-    visitedPages.add(nextPage);
-    response = await fetchWithUpgradeError(
-      nextPage,
-      { headers: getGitHubHeaders(), signal },
-      "GitHub"
-    );
-    if (!response.ok) {
-      throw new UpgradeError(
-        "network_error",
-        `Failed to fetch from GitHub: HTTP ${response.status}`
-      );
-    }
-  }
-}
-
-/** Fetch the latest standalone CLI version from the ordered GitHub sources. */
 export async function fetchLatestFromGitHub(
-  signal?: AbortSignal,
-  source?: UpgradeSource
+  signal?: AbortSignal
 ): Promise<string> {
-  return (
-    await fetchLatestFromGitHubWithSource(
-      signal,
-      source ? [source] : UPGRADE_SOURCES
-    )
-  ).version;
+  const response = await fetchWithUpgradeError(
+    `${GITHUB_RELEASES_URL}/latest`,
+    { headers: getGitHubHeaders(), signal },
+    "GitHub"
+  );
+
+  if (!response.ok) {
+    throw new UpgradeError(
+      "network_error",
+      `Failed to fetch from GitHub: ${response.status}`
+    );
+  }
+
+  const data = (await response.json()) as { tag_name?: string };
+
+  if (!data.tag_name) {
+    throw new UpgradeError(
+      "network_error",
+      "No version found in GitHub release"
+    );
+  }
+
+  return data.tag_name.replace(VERSION_PREFIX_REGEX, "");
 }
 
 /**
@@ -578,41 +422,13 @@ export async function fetchLatestFromNpm(): Promise<string> {
     );
   }
 
-  const data = await parseUpgradeJson(
-    response,
-    undefined,
-    "npm registry returned invalid metadata"
-  );
-  if (
-    typeof data !== "object" ||
-    data === null ||
-    Array.isArray(data) ||
-    !("version" in data) ||
-    typeof data.version !== "string"
-  ) {
-    throw new UpgradeError(
-      "network_error",
-      "npm registry returned invalid metadata"
-    );
+  const data = (await response.json()) as { version?: string };
+
+  if (!data.version) {
+    throw new UpgradeError("network_error", "No version found in npm registry");
   }
 
-  return validateStableVersion(data.version, "npm registry");
-}
-
-function validateStableVersion(
-  version: string | undefined,
-  source: string
-): string {
-  if (!version) {
-    throw new UpgradeError("network_error", `No version found in ${source}`);
-  }
-  if (semverValid(version) !== version || semverPrerelease(version) !== null) {
-    throw new UpgradeError(
-      "network_error",
-      `${source} returned an invalid stable version`
-    );
-  }
-  return version;
+  return data.version;
 }
 
 /**
@@ -626,63 +442,23 @@ function validateStableVersion(
  * @returns Latest nightly version string (e.g., "0.13.0-dev.1740000000")
  * @throws {UpgradeError} When fetch fails or the version annotation is missing
  */
-export async function fetchLatestNightlyVersionWithSource(
-  signal?: AbortSignal,
-  sources: readonly UpgradeSource[] = UPGRADE_SOURCES
-): Promise<ResolvedUpgradeVersion> {
-  if (signal?.aborted) {
-    throw signal.reason;
-  }
-  const resolved = await resolveNightlyManifest("nightly", signal, sources);
-  return {
-    version: getNightlyVersion(resolved.manifest),
-    source: resolved.source,
-  };
-}
-
-async function resolveNightlyManifest(
-  tag: string,
-  signal: AbortSignal | undefined,
-  sources: readonly UpgradeSource[]
-): Promise<{ source: UpgradeSource; manifest: OciManifest }> {
-  for (const source of sources) {
-    try {
-      await resolveUpgradeSource({
-        getProbeUrl: getGitHubRepositoryUrl,
-        signal,
-        sources: [source],
-      });
-    } catch (error) {
-      if (error instanceof UpgradeSourceNotFoundError) {
-        continue;
-      }
-      throw error;
-    }
-    try {
-      const token = await getAnonymousToken(source, signal);
-      const manifest = await fetchManifest(token, tag, signal, source);
-      return { source, manifest };
-    } catch (error) {
-      if (error instanceof GhcrManifestHttpError && error.status === 404) {
-        continue;
-      }
-      throw error;
-    }
-  }
-  throw new UpgradeSourceNotFoundError();
-}
-
-/** Fetch the latest nightly version from the ordered release sources. */
 export async function fetchLatestNightlyVersion(
-  signal?: AbortSignal,
-  source?: UpgradeSource
+  signal?: AbortSignal
 ): Promise<string> {
-  return (
-    await fetchLatestNightlyVersionWithSource(
-      signal,
-      source ? [source] : UPGRADE_SOURCES
-    )
-  ).version;
+  // AbortSignal is not threaded through ghcr helpers, but checking it before
+  // each network call ensures we bail out promptly when the process exits.
+  if (signal?.aborted) {
+    throw new AbortError();
+  }
+
+  const token = await getAnonymousToken();
+
+  if (signal?.aborted) {
+    throw new AbortError();
+  }
+
+  const manifest = await fetchNightlyManifest(token);
+  return getNightlyVersion(manifest);
 }
 
 /**
@@ -709,151 +485,33 @@ export function fetchLatestVersion(
     : fetchLatestFromNpm();
 }
 
-/** Resolve the latest version and selected source for a standalone upgrade. */
-export function resolveLatestUpgradeVersion(
-  channel: ReleaseChannel,
-  signal?: AbortSignal
-): Promise<ResolvedUpgradeVersion> {
-  return channel === "nightly"
-    ? fetchLatestNightlyVersionWithSource(signal)
-    : fetchLatestFromGitHubWithSource(signal);
-}
-
-function validateNightlyManifestVersion(
-  manifest: OciManifest,
-  expectedVersion: string
-): void {
-  const manifestVersion = getNightlyVersion(manifest);
-  if (manifestVersion !== expectedVersion) {
-    throw new UpgradeError(
-      "network_error",
-      `Nightly manifest version ${manifestVersion} does not match requested version ${expectedVersion}`
-    );
-  }
-}
-
-async function validatePinnedGitHubRelease(
-  response: Response,
-  version: string,
-  source: UpgradeSource
-): Promise<void> {
-  const release = await parseUpgradeJson(
-    response,
-    undefined,
-    `GitHub returned invalid metadata for version ${version}`
-  );
-  const expectedTag = `${source.tagPrefix}${version}`;
-  if (
-    typeof release !== "object" ||
-    release === null ||
-    !("tag_name" in release) ||
-    release.tag_name !== expectedTag ||
-    ("draft" in release && release.draft === true) ||
-    ("prerelease" in release && release.prerelease === true)
-  ) {
-    throw new UpgradeError(
-      "network_error",
-      `GitHub returned invalid metadata for version ${version}`
-    );
-  }
-}
-
-/** Resolve and validate a pinned standalone version against ordered sources. */
-export async function resolveExistingUpgradeVersion(
-  version: string
-): Promise<ResolvedUpgradeVersion | null> {
-  try {
-    if (isNightlyVersion(version)) {
-      const resolved = await resolveNightlyManifest(
-        `nightly-${version}`,
-        undefined,
-        UPGRADE_SOURCES
-      );
-      validateNightlyManifestVersion(resolved.manifest, version);
-      return { version, source: resolved.source };
-    }
-    validateStableVersion(version, "Requested standalone version");
-    const selected = await resolveUpgradeSource({
-      getProbeUrl: (source) => getGitHubReleaseByTagUrl(version, source),
-    });
-    await validatePinnedGitHubRelease(
-      selected.response,
-      version,
-      selected.source
-    );
-    return { version, source: selected.source };
-  } catch (error) {
-    if (error instanceof UpgradeSourceNotFoundError) {
-      return null;
-    }
-    throw error;
-  }
-}
-
 /**
  * Check if a versioned nightly tag exists in GHCR.
  *
  * Nightly builds are published to GHCR with tags like `nightly-0.14.0-dev.1772661724`.
  * This performs an anonymous token exchange + manifest fetch (2 HTTP requests).
- * Returns false only for HTTP 404 (tag not found). Every other HTTP or network
- * failure propagates as UpgradeError to match stable version check behavior.
+ * Returns false only for 404/403 (tag not found); network errors propagate as
+ * UpgradeError to match stable version check behavior.
  *
  * @param version - Nightly version string (e.g., "0.14.0-dev.1772661724")
  * @returns true if the nightly tag exists in GHCR, false if not found
  * @throws {UpgradeError} On network failure or GHCR unavailability
  */
-async function nightlyVersionExists(
-  version: string,
-  source: UpgradeSource
-): Promise<boolean> {
-  const token = await getAnonymousToken(source);
+async function nightlyVersionExists(version: string): Promise<boolean> {
+  const token = await getAnonymousToken();
   try {
-    const manifest = await fetchManifest(
-      token,
-      `nightly-${version}`,
-      undefined,
-      source
-    );
-    validateNightlyManifestVersion(manifest, version);
+    await fetchManifest(token, `nightly-${version}`);
     return true;
   } catch (error) {
-    if (error instanceof GhcrManifestHttpError && error.status === 404) {
+    // 404 = tag doesn't exist; 403 = token lacks access to non-existent tag
+    if (
+      error instanceof UpgradeError &&
+      (error.message.includes("HTTP 404") || error.message.includes("HTTP 403"))
+    ) {
       return false;
     }
     throw error;
   }
-}
-
-async function standaloneVersionExists(
-  version: string,
-  source?: UpgradeSource
-): Promise<boolean> {
-  if (!isNightlyVersion(version)) {
-    validateStableVersion(version, "Requested standalone version");
-  }
-  if (source) {
-    if (isNightlyVersion(version)) {
-      return nightlyVersionExists(version, source);
-    }
-    const response = await fetchWithUpgradeError(
-      getGitHubReleaseByTagUrl(version, source),
-      { headers: getGitHubHeaders() },
-      "GitHub"
-    );
-    if (response.ok) {
-      await validatePinnedGitHubRelease(response, version, source);
-      return true;
-    }
-    if (response.status === 404) {
-      return false;
-    }
-    throw new UpgradeError(
-      "network_error",
-      `Failed to fetch from GitHub: HTTP ${response.status}`
-    );
-  }
-  const resolved = await resolveExistingUpgradeVersion(version);
-  return resolved !== null;
 }
 
 /**
@@ -870,30 +528,28 @@ async function standaloneVersionExists(
  */
 export async function versionExists(
   method: InstallationMethod,
-  version: string,
-  source?: UpgradeSource
+  version: string
 ): Promise<boolean> {
-  if (isNightlyVersion(version) || method === "curl" || method === "brew") {
-    return standaloneVersionExists(version, source);
+  // Nightly versions are published to GHCR, not GitHub Releases or npm
+  if (isNightlyVersion(version)) {
+    return nightlyVersionExists(version);
   }
 
-  validateStableVersion(version, "Requested package version");
+  if (method === "curl" || method === "brew") {
+    const response = await fetchWithUpgradeError(
+      `${GITHUB_RELEASES_URL}/tags/${version}`,
+      { method: "HEAD", headers: getGitHubHeaders() },
+      "GitHub"
+    );
+    return response.ok;
+  }
 
   const response = await fetchWithUpgradeError(
     `${NPM_REGISTRY_URL}/${version}`,
     { method: "HEAD" },
     "npm registry"
   );
-  if (response.ok) {
-    return true;
-  }
-  if (response.status === 404) {
-    return false;
-  }
-  throw new UpgradeError(
-    "network_error",
-    `Failed to fetch from npm: ${response.status}`
-  );
+  return response.ok;
 }
 
 // Upgrade Execution
@@ -1050,24 +706,15 @@ function getNightlyGzFilename(): string {
 async function downloadNightlyToPath(
   destPath: string,
   version?: string,
-  setMessage?: SetMessage,
-  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
+  setMessage?: SetMessage
 ): Promise<void> {
-  const token = await getAnonymousToken(source);
+  const token = await getAnonymousToken();
   const manifest = version
-    ? await fetchManifest(token, `nightly-${version}`, undefined, source)
-    : await fetchNightlyManifest(token, undefined, source);
-  if (version) {
-    validateNightlyManifestVersion(manifest, version);
-  }
+    ? await fetchManifest(token, `nightly-${version}`)
+    : await fetchNightlyManifest(token);
   const filename = getNightlyGzFilename();
   const layer = findLayerByFilename(manifest, filename);
-  const response = await downloadNightlyBlob(
-    token,
-    layer.digest,
-    undefined,
-    source
-  );
+  const response = await downloadNightlyBlob(token, layer.digest);
 
   if (!response.body) {
     throw new UpgradeError(
@@ -1092,14 +739,12 @@ async function downloadNightlyToPath(
 async function downloadStableToPath(
   version: string,
   destPath: string,
-  setMessage?: SetMessage,
-  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
+  setMessage?: SetMessage
 ): Promise<void> {
-  const url = getBinaryDownloadUrl(version, source);
+  const url = getBinaryDownloadUrl(version);
   const headers = getGitHubHeaders();
 
   // Try gzip-compressed download first (~60% smaller)
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const gzResponse = await fetchWithUpgradeError(
       `${url}.gz`,
@@ -1231,13 +876,11 @@ async function waitForBinaryVisible(path: string): Promise<number> {
  * @returns The downloaded binary path and lock path to release
  * @throws {UpgradeError} When download fails
  */
-// biome-ignore lint/nursery/useMaxParams: compatibility API; source preserves one selected repository across the download.
 export async function downloadBinaryToTemp(
   version: string,
   downloadTag?: string,
   offline?: OfflineMode,
-  setMessage?: SetMessage,
-  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
+  setMessage?: SetMessage
 ): Promise<DownloadResult> {
   const { tempPath, lockPath } = getCurlInstallPaths();
 
@@ -1245,7 +888,6 @@ export async function downloadBinaryToTemp(
 
   try {
     // Clean up any leftover temp file from interrupted download
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       unlinkSync(tempPath);
     } catch {
@@ -1258,8 +900,7 @@ export async function downloadBinaryToTemp(
       version,
       tempPath,
       !!offline,
-      setMessage,
-      source
+      setMessage
     );
     let patchBytes: number | undefined;
     if (deltaResult) {
@@ -1275,13 +916,7 @@ export async function downloadBinaryToTemp(
       );
     } else {
       log.debug("Downloading full binary");
-      await downloadFullBinary(
-        version,
-        downloadTag,
-        tempPath,
-        setMessage,
-        source
-      );
+      await downloadFullBinary(version, downloadTag, tempPath, setMessage);
     }
 
     // Verify the download produced a real, non-empty file before the caller
@@ -1296,7 +931,6 @@ export async function downloadBinaryToTemp(
 
     // Clear consumed patch cache — patches for the old version are useless
     // after the binary has been updated (whether via delta or full download).
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     clearPatchCache().catch(() => {
       /* best-effort — don't fail the upgrade if cache cleanup fails */
     });
@@ -1323,21 +957,18 @@ export async function downloadBinaryToTemp(
  * @param destPath - Path to write the patched binary
  * @returns Delta result with SHA-256 and size info, or null if delta is unavailable
  */
-// biome-ignore lint/nursery/useMaxParams: mirrors the established download helper while forwarding source affinity.
 async function tryDeltaUpgrade(
   version: string,
   destPath: string,
   offline?: boolean,
-  setMessage?: SetMessage,
-  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
+  setMessage?: SetMessage
 ): Promise<DeltaResult | null> {
   return await attemptDeltaUpgrade(
     version,
     process.execPath,
     destPath,
     offline,
-    setMessage,
-    source
+    setMessage
   );
 }
 
@@ -1348,23 +979,16 @@ async function tryDeltaUpgrade(
  * @param downloadTag - Git tag override for the download URL
  * @param destPath - Path to write the binary
  */
-// biome-ignore lint/nursery/useMaxParams: internal dispatch retains the established download arguments plus source affinity.
 async function downloadFullBinary(
   version: string,
   downloadTag: string | undefined,
   destPath: string,
-  setMessage?: SetMessage,
-  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
+  setMessage?: SetMessage
 ): Promise<void> {
   if (isNightlyVersion(version)) {
-    await downloadNightlyToPath(destPath, version, setMessage, source);
+    await downloadNightlyToPath(destPath, version, setMessage);
   } else {
-    await downloadStableToPath(
-      downloadTag ?? version,
-      destPath,
-      setMessage,
-      source
-    );
+    await downloadStableToPath(downloadTag ?? version, destPath, setMessage);
   }
 }
 
@@ -1475,18 +1099,11 @@ export async function executeUpgrade(
   version: string,
   downloadTag?: string,
   offline?: OfflineMode,
-  setMessage?: SetMessage,
-  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
+  setMessage?: SetMessage
 ): Promise<DownloadResult | null> {
   switch (method) {
     case "curl":
-      return downloadBinaryToTemp(
-        version,
-        downloadTag,
-        offline,
-        setMessage,
-        source
-      );
+      return downloadBinaryToTemp(version, downloadTag, offline, setMessage);
     case "brew":
       await executeUpgradeHomebrew();
       return null;

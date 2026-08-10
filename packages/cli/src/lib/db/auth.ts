@@ -60,7 +60,6 @@ function migrateNullHost(row: AuthRow): string {
   const bootHost = getEnvTokenHost();
   const migratedHost = normalizeOrigin(bootHost);
   const host = migratedHost ?? DEFAULT_SENTRY_URL;
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     withDbSpan("migrateAuthHost", () => {
       const db = getDatabase();
@@ -215,7 +214,6 @@ export function getAuthConfig(): AuthConfig | undefined {
  * falls back to the caller's default behavior.
  */
 export function getStoredAuthHost(): string | undefined {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return withDbSpan("getStoredAuthHost", () => {
       const row = getAuthRow();
@@ -243,7 +241,6 @@ export function getStoredAuthHost(): string | undefined {
  * OAuth's host over the env-token snapshot.
  */
 export function hasUsableStoredToken(): boolean {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return withDbSpan("hasUsableStoredToken", () => {
       const row = getAuthRow();
@@ -273,7 +270,6 @@ export function hasUsableStoredToken(): boolean {
  * first access, same as {@link getStoredAuthHost}).
  */
 export function getUsableStoredTokenHost(): string | undefined {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return withDbSpan("getUsableStoredTokenHost", () => {
       const row = getAuthRow();
@@ -460,7 +456,6 @@ export async function clearAuth(): Promise<void> {
   clearTrustedHostState();
 
   // Dynamic import avoids the auth→response-cache→auth cycle.
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const { clearResponseCache } = await import("../response-cache.js");
     await clearResponseCache();

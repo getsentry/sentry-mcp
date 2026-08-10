@@ -8,10 +8,6 @@
  *
  * Format: semicolon-separated `Name: Value` pairs (newlines also accepted).
  *
- * The library API (`createSentrySDK({ headers })`) bypasses the string format
- * and sets the structured headers for the current invocation via
- * {@link setCustomHeadersOverride}, validated with the same rules.
- *
  * @example
  * ```bash
  * # Single header
@@ -75,33 +71,6 @@ let saasWarningLogged = false;
 let untrustedDestinationWarningLogged = false;
 
 /**
- * Structured headers set by the library API for the current invocation.
- * `undefined` = not set, fall through to the env var / SQLite defaults.
- */
-let overrideHeaders: readonly [string, string][] | undefined;
-
-/**
- * Validate a header name against RFC 7230 token rules and the reserved list.
- *
- * @param name - Trimmed header name
- * @param source - Where the header came from, for the error message
- * @throws {ConfigError} On invalid or reserved header names
- */
-function assertValidHeaderName(name: string, source: string): void {
-  if (!VALID_HEADER_NAME_RE.test(name)) {
-    throw new ConfigError(
-      `Invalid header name '${name}' in ${source}. Header names must contain only alphanumeric characters, hyphens, and RFC 7230 token characters.`
-    );
-  }
-
-  if (FORBIDDEN_HEADER_NAMES.has(name.toLowerCase())) {
-    throw new ConfigError(
-      `Cannot override reserved header '${name}' in ${source}. This header is managed by the CLI.`
-    );
-  }
-}
-
-/**
  * Parse a raw custom headers string into validated name/value pairs.
  *
  * Accepts semicolon-separated or newline-separated `Name: Value` entries.
@@ -139,47 +108,22 @@ export function parseCustomHeaders(raw: string): readonly [string, string][] {
       );
     }
 
-    assertValidHeaderName(name, "SENTRY_CUSTOM_HEADERS");
+    if (!VALID_HEADER_NAME_RE.test(name)) {
+      throw new ConfigError(
+        `Invalid header name '${name}' in SENTRY_CUSTOM_HEADERS. Header names must contain only alphanumeric characters, hyphens, and RFC 7230 token characters.`
+      );
+    }
+
+    if (FORBIDDEN_HEADER_NAMES.has(name.toLowerCase())) {
+      throw new ConfigError(
+        `Cannot override reserved header '${name}' in SENTRY_CUSTOM_HEADERS. This header is managed by the CLI.`
+      );
+    }
 
     results.push([name, value]);
   }
 
   return results;
-}
-
-/**
- * Set structured custom headers for the current library invocation.
- *
- * Bypasses `SENTRY_CUSTOM_HEADERS` and the SQLite defaults entirely: no
- * string round-trip, and an explicit map (even an empty one) takes precedence
- * over an inherited env var. The self-hosted guard and the request-origin
- * trust check in {@link applyCustomHeaders} still apply.
- *
- * Pass `undefined` to clear. The SDK invoke layer calls this next to `setEnv`.
- *
- * @param headers - Header name/value map from `SentryOptions.headers`
- * @throws {ConfigError} On invalid or reserved header names
- */
-export function setCustomHeadersOverride(
-  headers: Record<string, string> | undefined
-): void {
-  if (headers === undefined) {
-    overrideHeaders = undefined;
-    return;
-  }
-
-  const entries: [string, string][] = [];
-  for (const [rawName, rawValue] of Object.entries(headers)) {
-    const name = rawName.trim();
-    if (!name) {
-      throw new ConfigError(
-        "Invalid header in SentryOptions.headers: empty header name."
-      );
-    }
-    assertValidHeaderName(name, "SentryOptions.headers");
-    entries.push([name, rawValue.trim()]);
-  }
-  overrideHeaders = entries;
 }
 
 /**
@@ -217,20 +161,6 @@ function resolveRawHeaders(): string | undefined {
   return;
 }
 
-/** Self-hosted guard: warn once and report false on SaaS. */
-function passesSelfHostedGuard(): boolean {
-  if (isSelfHosted()) {
-    return true;
-  }
-  if (!saasWarningLogged) {
-    saasWarningLogged = true;
-    log.warn(
-      "Custom headers are set but no self-hosted Sentry instance is configured. Headers will be ignored."
-    );
-  }
-  return false;
-}
-
 /**
  * Get the parsed custom headers for the current session.
  *
@@ -242,18 +172,19 @@ function passesSelfHostedGuard(): boolean {
  * because `SENTRY_HOST` can be set dynamically by URL argument parsing.
  */
 export function getCustomHeaders(): readonly [string, string][] {
-  if (overrideHeaders !== undefined) {
-    return overrideHeaders.length > 0 && passesSelfHostedGuard()
-      ? overrideHeaders
-      : [];
-  }
-
   const raw = resolveRawHeaders();
   if (!raw) {
     return [];
   }
 
-  if (!passesSelfHostedGuard()) {
+  // Self-hosted guard: warn once and skip on SaaS
+  if (!isSelfHosted()) {
+    if (!saasWarningLogged) {
+      saasWarningLogged = true;
+      log.warn(
+        "SENTRY_CUSTOM_HEADERS is set but no self-hosted Sentry instance is configured. Headers will be ignored."
+      );
+    }
     return [];
   }
 
@@ -314,7 +245,6 @@ export function applyCustomHeaders(
 export function _resetCustomHeadersCache(): void {
   cachedHeaders = undefined;
   cachedRawSource = undefined;
-  overrideHeaders = undefined;
   saasWarningLogged = false;
   untrustedDestinationWarningLogged = false;
 }

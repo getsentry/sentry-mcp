@@ -1138,45 +1138,6 @@ describe("viewCommand.func", () => {
     getLatestEventSpy.mockRestore();
   });
 
-  test("org/project + short-ID second arg passes explicit org through to resolveOrg", async () => {
-    // Regression: with an explicit "org/project" target and an issue short ID
-    // as the second arg, the org must be forwarded to resolveOrg instead of
-    // being dropped (which would fall back to auto-detection and miss/mishit).
-    const resolveOrgSpy = vi
-      .spyOn(resolveTarget, "resolveOrg")
-      .mockResolvedValue({ org: "my-org" });
-    const getIssueByShortIdSpy = vi
-      .spyOn(apiClient, "getIssueByShortId")
-      .mockResolvedValue({ id: "999", shortId: "CAM-82X" } as never);
-    const getLatestEventSpy = vi
-      .spyOn(apiClient, "getLatestEvent")
-      .mockResolvedValue(sampleEvent);
-    getSpanTreeLinesSpy.mockResolvedValue({
-      lines: [],
-      spans: null,
-      traceId: null,
-      success: false,
-    });
-
-    const { context } = createMockContext();
-    const func = await viewCommand.loader();
-    await func.call(
-      context,
-      { json: true, web: false, spans: 0 },
-      "my-org/my-project",
-      "CAM-82X"
-    );
-
-    expect(resolveOrgSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ org: "my-org" })
-    );
-    expect(getLatestEventSpy).toHaveBeenCalled();
-
-    resolveOrgSpy.mockRestore();
-    getIssueByShortIdSpy.mockRestore();
-    getLatestEventSpy.mockRestore();
-  });
-
   test("logs normalized slug warning when underscores present", async () => {
     getEventSpy.mockResolvedValue(sampleEvent);
     getSpanTreeLinesSpy.mockResolvedValue({
@@ -1367,29 +1328,6 @@ describe("fetchEventWithContext", () => {
     // excludeOrgs should be undefined so cross-org retries the same org
     expect(findSpy).toHaveBeenCalledWith("abc123", {
       excludeOrgs: undefined,
-    });
-  });
-
-  test("cross-org excludes org when same-org search was rate-limited (429)", async () => {
-    vi.spyOn(apiClient, "getEvent").mockRejectedValue(
-      new ApiError("Not found", 404)
-    );
-    // Same-org search hit a rate limit — retrying it immediately is futile (CLI-2Y1)
-    vi.spyOn(apiClient, "resolveEventInOrg").mockRejectedValue(
-      new ApiError("Too Many Requests", 429)
-    );
-    const findSpy = vi
-      .spyOn(apiClient, "findEventAcrossOrgs")
-      .mockResolvedValue(null);
-
-    await expect(
-      fetchEventWithContext(null, "my-org", "my-project", "abc123")
-    ).rejects.toThrow(ResolutionError);
-
-    // org must be excluded — re-querying a rate-limited endpoint immediately
-    // produces consecutive identical HTTP requests (the Consecutive HTTP issue).
-    expect(findSpy).toHaveBeenCalledWith("abc123", {
-      excludeOrgs: ["my-org"],
     });
   });
 

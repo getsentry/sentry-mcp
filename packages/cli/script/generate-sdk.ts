@@ -182,12 +182,9 @@ function extractSdkFlags(command: Command): SdkFlagInfo[] {
  * - Single or compound placeholder → { name, variadic: false }
  * - Variadic (e.g., "<args...>") → { name, variadic: true }
  */
-/** One entry of a tuple positional, mapped to its own SDK param. */
-type PositionalEntry = { name: string; brief?: string };
-
 type PositionalInfo =
   | null
-  | { entries: PositionalEntry[]; variadic: false }
+  | { name: string; variadic: false }
   | { name: string; variadic: true };
 
 function derivePositional(command: Command): PositionalInfo {
@@ -203,15 +200,13 @@ function derivePositional(command: Command): PositionalInfo {
   }
 
   if (params.kind === "tuple" && params.parameters.length > 0) {
-    // One param per tuple entry. A compound placeholder is a single entry whose own parser
-    // splits it ("org/version" → orgVersion), but separate entries are separate argv tokens:
-    // joining them into one param made every multi-positional command unusable, because the
-    // whole string arrived as argv[0] and the remaining arguments were simply missing.
-    const entries = params.parameters.map((p, i) => ({
-      name: (p.placeholder ?? `arg${i}`).replace(PLACEHOLDER_CLEAN_RE, ""),
-      brief: p.brief,
-    }));
-    return { entries, variadic: false };
+    // For tuple positionals, combine all placeholders into a single string param.
+    // The command's internal parser handles splitting (e.g., "org/project/trace-id").
+    const placeholders = params.parameters.map(
+      (p, i) => p.placeholder ?? `arg${i}`
+    );
+    const name = placeholders.join("/").replace(PLACEHOLDER_CLEAN_RE, "");
+    return { name, variadic: false };
   }
 
   return null;
@@ -326,10 +321,8 @@ function generateParamsInterface(
   const lines: string[] = [];
 
   if (positional && !positional.variadic) {
-    for (const entry of positional.entries) {
-      lines.push(`  /** ${entry.brief ?? "Positional argument"} */`);
-      lines.push(`  ${camelCase(entry.name)}?: string;`);
-    }
+    lines.push("  /** Positional argument */");
+    lines.push(`  ${camelCase(positional.name)}?: string;`);
   }
 
   for (const flag of flags) {
@@ -367,17 +360,9 @@ function buildInvokeArgs(
   if (positional) {
     if (positional.variadic) {
       positionalExpr = "positional";
-    } else if (positional.entries.length === 1) {
-      const [entry] = positional.entries;
-      const camel = camelCase(entry?.name ?? "");
-      positionalExpr = `params?.${camel} ? [params.${camel}] : []`;
     } else {
-      // Arity matters here, so the values cannot simply be filtered: dropping an omitted
-      // entry would shift every later argument into the wrong slot.
-      const args = positional.entries
-        .map((entry) => `params?.${camelCase(entry.name)}`)
-        .join(", ");
-      positionalExpr = `positionals(${args})`;
+      const camel = camelCase(positional.name);
+      positionalExpr = `params?.${camel} ? [params.${camel}] : []`;
     }
   }
 
@@ -679,21 +664,6 @@ const output = [
     : "// No commands have parameters.",
   "",
   "// --- SDK factory ---",
-  "",
-  "/**",
-  " * Positional arguments for a command that takes more than one, in declaration order.",
-  " *",
-  " * Trailing omissions are dropped so optional tail arguments stay optional, but an omission",
-  " * in the middle becomes an empty string rather than disappearing - collapsing it would move",
-  " * every later argument into the wrong slot and silently run a different command.",
-  " */",
-  "function positionals(...values: (string | undefined)[]): string[] {",
-  "  let end = values.length;",
-  "  while (end > 0 && values[end - 1] === undefined) {",
-  "    end--;",
-  "  }",
-  '  return values.slice(0, end).map((value) => value ?? "");',
-  "}",
   "",
   "/** Invoke function type from sdk-invoke.ts */",
   "type Invoke = ReturnType<typeof buildInvoker>;",

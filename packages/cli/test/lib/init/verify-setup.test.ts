@@ -5,13 +5,9 @@ import { verifySetup } from "../../../src/lib/init/verify-setup.js";
 import { TEST_TMP_DIR } from "../../constants.js";
 import { createMockUI } from "./ui/mock-ui.js";
 
-const sentryMocks = vi.hoisted(() => ({
-  addBreadcrumb: vi.fn(),
+vi.mock("@sentry/node-core/light", () => ({
   captureException: vi.fn(),
-  setTag: vi.fn(),
 }));
-
-vi.mock("@sentry/node-core/light", () => sentryMocks);
 
 type FixtureProcesses = {
   shellPid: number;
@@ -23,9 +19,6 @@ let tmpDir: string;
 let fixtureProcesses: FixtureProcesses | undefined;
 
 beforeEach(async () => {
-  sentryMocks.addBreadcrumb.mockClear();
-  sentryMocks.captureException.mockClear();
-  sentryMocks.setTag.mockClear();
   tmpDir = await mkdtemp(join(TEST_TMP_DIR, "verify-setup-test-"));
 });
 
@@ -140,29 +133,6 @@ async function readFixtureProcesses(): Promise<FixtureProcesses> {
 }
 
 describe("verifySetup", () => {
-  test("records a skipped verify as a scope tag, not an error, when there is no dev command", async () => {
-    const { ui, calls } = createMockUI();
-
-    const result = await verifySetup(
-      { status: "success", result: { platform: "cocoa" } },
-      ui,
-      tmpDir
-    );
-
-    expect(result).toEqual({ verified: false, kind: "skipped" });
-    expect(calls).toContainEqual({
-      kind: "log.info",
-      message: "Skipping verification — could not detect a dev command",
-    });
-    expect(sentryMocks.captureException).not.toHaveBeenCalled();
-    expect(sentryMocks.setTag).toHaveBeenCalledWith("wizard.verify", "skipped");
-    expect(sentryMocks.addBreadcrumb).toHaveBeenCalledWith({
-      category: "wizard.verify",
-      level: "info",
-      message: "skipped:no_dev_command",
-    });
-  });
-
   test("does not fail init when the detected command cannot be spawned", async () => {
     await writeFile(
       join(tmpDir, "package.json"),
@@ -170,25 +140,17 @@ describe("verifySetup", () => {
     );
     const { ui, calls } = createMockUI();
 
-    const result = await verifySetup(
-      { status: "success", result: { platform: "javascript-nextjs" } },
-      ui,
-      tmpDir
-    );
-    // The SDK never phoned home, so nothing to verify or deep-link.
-    expect(result.verified).toBe(false);
-    expect(result.eventId).toBeUndefined();
+    await expect(
+      verifySetup(
+        { status: "success", result: { platform: "javascript-nextjs" } },
+        ui,
+        tmpDir
+      )
+    ).resolves.toBeUndefined();
 
     expect(calls).toContainEqual({
       kind: "log.warn",
       message: "Skipping verification — could not start the dev command.",
-    });
-    expect(sentryMocks.captureException).not.toHaveBeenCalled();
-    expect(sentryMocks.setTag).toHaveBeenCalledWith("wizard.verify", "skipped");
-    expect(sentryMocks.addBreadcrumb).toHaveBeenCalledWith({
-      category: "wizard.verify",
-      level: "info",
-      message: "skipped:spawn_failed",
     });
   });
 

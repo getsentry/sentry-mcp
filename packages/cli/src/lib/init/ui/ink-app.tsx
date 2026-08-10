@@ -64,12 +64,7 @@ import {
 } from "./ink-shortcuts.js";
 import { BLOCK_LINE_COUNT, LEARN_SEQUENCE } from "./learn-content.js";
 import { SENTRY_TIPS, type SentryTip } from "./sentry-tips.js";
-import type {
-  CompletionActions,
-  PromptDetail,
-  WizardCompletion,
-  WizardSummary,
-} from "./types.js";
+import type { WizardSummary } from "./types.js";
 import type {
   ActivePrompt,
   FileReadEntry,
@@ -237,29 +232,8 @@ function AppBody({ store }: AppProps): React.ReactNode {
     return bindings;
   }, [snapshot.requestCancel, tabs.length]);
   useInkShortcuts("init-app", appShortcuts, {
-    isActive:
-      snapshot.layout === "workflow" &&
-      snapshot.prompt === null &&
-      snapshot.outroState === null,
+    isActive: snapshot.layout === "workflow" && snapshot.prompt === null,
   });
-
-  if (snapshot.outroState?.kind === "success") {
-    return (
-      <InitRenderBoundary errorColor={COLOR_ERROR}>
-        <CompletionScreen
-          actions={snapshot.outroState.actions}
-          cliVersion={snapshot.cliVersion}
-          columns={columns}
-          completion={snapshot.summary?.completion ?? null}
-          onDismiss={snapshot.outroState.dismiss}
-          postExitActions={snapshot.postExitActions}
-          rows={rows}
-          store={store}
-          width={width}
-        />
-      </InitRenderBoundary>
-    );
-  }
 
   if (snapshot.layout === "intro" || snapshot.prompt?.kind === "welcome") {
     const inner = (
@@ -314,7 +288,6 @@ function AppBody({ store }: AppProps): React.ReactNode {
                   prompt={snapshot.prompt}
                   spinner={snapshot.spinner}
                   summary={snapshot.summary}
-                  terminalRows={rows}
                 />
               ) : (
                 <FilesScreen
@@ -395,23 +368,18 @@ function ActivityPane({
   spinner,
   prompt,
   summary,
-  terminalRows,
 }: {
   logs: LogEntry[];
   spinner: SpinnerState;
   prompt: ActivePrompt | null;
   summary: WizardSummary | null;
-  terminalRows: number;
 }): React.ReactNode {
-  const promptLogs = logs.filter(
-    (log) => log.severity === "warn" || log.severity === "error"
-  );
-  // The shortest supported frame can keep one actionable log above a prompt;
-  // roomier terminals retain the complete warning/error history.
-  let visibleLogs = logs;
-  if (prompt) {
-    visibleLogs = terminalRows <= 16 ? promptLogs.slice(-1) : promptLogs;
-  }
+  const visibleLogs =
+    prompt === null
+      ? logs
+      : logs.filter(
+          (log) => log.severity === "warn" || log.severity === "error"
+        );
   const hasContent =
     visibleLogs.length > 0 ||
     spinner.active ||
@@ -596,7 +564,7 @@ function ActionList<T extends string>({
               width="100%"
             >
               <Text color={ACCENT}>
-                {isCursor ? `${ICONS.triangleRight} ` : "  "}
+                {isCursor ? `${ICONS.triangleSmallRight} ` : "  "}
               </Text>
               <Text bold={isCursor}>{choice.label}</Text>
               {choice.hint ? <Text color={MUTED}> {choice.hint}</Text> : null}
@@ -606,7 +574,9 @@ function ActionList<T extends string>({
         return (
           <Box flexDirection="row" key={choice.value}>
             <Box flexShrink={0} width={4}>
-              <Text color={ACCENT}>{isCursor ? ICONS.triangleRight : " "}</Text>
+              <Text color={ACCENT}>
+                {isCursor ? ICONS.triangleSmallRight : " "}
+              </Text>
             </Box>
             <Text bold={isCursor}>{choice.label}</Text>
             {choice.hint ? <Text color={MUTED}> {choice.hint}</Text> : null}
@@ -629,420 +599,6 @@ function FeedbackBanner({
       <Text backgroundColor={ACCENT} color={FEEDBACK_BANNER_FG}>
         {formatFeedbackBanner(width, cliVersion)}
       </Text>
-    </Box>
-  );
-}
-
-// ────────────────────────── Completion Screen ─────────────────────────
-
-type CompletionActionId = "issues" | "agent" | "finish";
-
-/** Build the "What's next?" menu from the completion data + current state.
- * Pick one, run it, and come back — the plugin item shows its queued state so
- * doing several reads clearly. */
-function buildCompletionMenu({
-  agentCommand,
-  agentQueued,
-  completion,
-  primaryUrl,
-}: {
-  agentCommand: string | undefined;
-  agentQueued: boolean;
-  completion: WizardCompletion | null;
-  primaryUrl: string | undefined;
-}): ChoiceRow<CompletionActionId>[] {
-  const list: ChoiceRow<CompletionActionId>[] = [];
-  if (primaryUrl) {
-    list.push(
-      completion?.verification.eventUrl
-        ? {
-            value: "issues",
-            label: "View my first event",
-            hint: "opens the exact event",
-          }
-        : {
-            value: "issues",
-            label: "Open my Issues feed",
-            hint: "see your first error",
-          }
-    );
-  }
-  if (agentCommand) {
-    list.push({
-      value: "agent",
-      label: agentQueued
-        ? "Agent plugin — queued ✓"
-        : "Install the Sentry agent plugin",
-      hint: agentQueued ? "runs when you finish" : agentCommand,
-    });
-  }
-  list.push({ value: "finish", label: "Finish" });
-  return list;
-}
-
-/**
- * The interactive exit screen. Speaks the same visual language as the rest of
- * init — no boxed hero, glyph-aligned rows, and the prompt option idiom — with
- * a clear hierarchy:
- *   - what happened (Sentry installed, what was enabled), unnumbered context,
- *   1. see your first error — the focal step,
- *   2. next steps (MCP, agent plugin) as a driveable menu.
- */
-function CompletionScreen({
-  actions,
-  cliVersion,
-  columns,
-  completion,
-  onDismiss,
-  postExitActions,
-  rows,
-  store,
-  width,
-}: {
-  actions: CompletionActions;
-  cliVersion: string | null;
-  columns: number;
-  completion: WizardCompletion | null;
-  onDismiss: () => void;
-  postExitActions: string[];
-  rows: number;
-  store: WizardStore;
-  width: number;
-}): React.ReactNode {
-  const [note, setNote] = useState("");
-
-  const verified = completion?.verification.received ?? false;
-  const primaryUrl = completion?.verification.eventUrl ?? completion?.issuesUrl;
-  const agentCommand = completion?.agentInstallCommand;
-  const agentQueued = agentCommand
-    ? postExitActions.includes(agentCommand)
-    : false;
-
-  const menuChoices = useMemo(
-    () =>
-      buildCompletionMenu({
-        agentCommand,
-        agentQueued,
-        completion,
-        primaryUrl,
-      }),
-    [agentCommand, agentQueued, completion, primaryUrl]
-  );
-
-  const onMenuChoose = useCallback(
-    (value: CompletionActionId) => {
-      switch (value) {
-        case "issues":
-          if (primaryUrl) {
-            actions.openUrl(primaryUrl);
-            actions.track("open-sentry");
-            setNote("Opened Sentry in your browser.");
-          }
-          break;
-        case "agent":
-          if (agentCommand) {
-            if (agentQueued) {
-              store.dequeuePostExitAction(agentCommand);
-              actions.track("agent-plugin-unqueued");
-              setNote("");
-            } else {
-              store.queuePostExitAction(agentCommand);
-              actions.track("agent-plugin-queued");
-              setNote(`Queued — ${agentCommand} runs when you finish.`);
-            }
-          }
-          break;
-        case "finish":
-          onDismiss();
-          break;
-        default:
-          break;
-      }
-    },
-    [actions, agentCommand, agentQueued, onDismiss, primaryUrl, store]
-  );
-
-  // `o` opens the first-error link directly (the hint next to it), separate
-  // from arrowing to "Open my Issues feed" in the menu.
-  const openShortcuts = useMemo<ShortcutBinding[]>(
-    () =>
-      primaryUrl
-        ? [
-            {
-              key: "o",
-              action: "open",
-              priority: 45,
-              match: (input, key) =>
-                !key.ctrl && (input === "o" || input === "O"),
-              run: () => {
-                actions.openUrl(primaryUrl);
-                actions.track("open-sentry");
-                setNote("Opened Sentry in your browser.");
-              },
-            },
-          ]
-        : [],
-    [actions, primaryUrl]
-  );
-  useInkShortcuts("completion-open", openShortcuts);
-
-  return (
-    <Box
-      flexDirection="column"
-      height={rows}
-      marginLeft={getInkFrameMargin(columns, width)}
-      width={width}
-    >
-      <Box flexDirection="column" flexGrow={1} paddingTop={1}>
-        <CompletionHeader completion={completion} />
-        <CompletionWhatWeSetUp completion={completion} />
-        <CompletionFirstError completion={completion} verified={verified} />
-        <CompletionMenu
-          choices={menuChoices}
-          onChoose={onMenuChoose}
-          onDismiss={onDismiss}
-        />
-        {note ? (
-          <Box flexShrink={0} marginTop={1} paddingX={1}>
-            <Box flexShrink={0} width={3}>
-              <Text color={COLOR_SUCCESS}>
-                {ICON_BY_SEVERITY.success.glyph}
-              </Text>
-            </Box>
-            <Text color={MUTED} wrap="truncate">
-              {note}
-            </Text>
-          </Box>
-        ) : null}
-        <Box flexGrow={1} />
-        <ShortcutFooter color={MUTED_DIM} />
-        <FeedbackBanner cliVersion={cliVersion} width={width} />
-      </Box>
-    </Box>
-  );
-}
-
-/**
- * A `<marker> Title` section header. The `marker` numbers the two action
- * sections ("1", "2") so they read as a sequence; the passive "what we set up"
- * context passes a blank marker. Colour encodes importance: omit `color` for
- * the focal steps (bright white), `MUTED_DIM` for the supporting context.
- */
-function CompletionSectionHeader({
-  color,
-  marker,
-  title,
-}: {
-  color?: string;
-  marker: string;
-  title: string;
-}): React.ReactNode {
-  return (
-    <Box flexShrink={0}>
-      <Box flexShrink={0} width={3}>
-        <Text bold color={color}>
-          {marker}
-        </Text>
-      </Box>
-      <Text bold color={color}>
-        {title}
-      </Text>
-    </Box>
-  );
-}
-
-/**
- * The ✔ headline. When there's a feature list to show it flows straight into
- * it ("Sentry is set up in <project>, with:"), so the list needs no separate
- * subheader. The ✔ shares the glyph column with the numbered steps below.
- */
-function CompletionHeader({
-  completion,
-}: {
-  completion: WizardCompletion | null;
-}): React.ReactNode {
-  const projectName = completion?.projectName ?? "your project";
-  const hasSetup =
-    (completion?.featureBlurbs.length ?? 0) > 0 ||
-    (completion?.features.length ?? 0) > 0;
-  return (
-    <Box flexShrink={0} paddingX={1}>
-      <Box flexShrink={0} width={3}>
-        <Text bold color={COLOR_SUCCESS}>
-          {ICON_BY_SEVERITY.success.glyph}
-        </Text>
-      </Box>
-      <Text bold>Sentry is set up in </Text>
-      <Text bold color={ACCENT}>
-        {projectName}
-      </Text>
-      {hasSetup ? <Text color={MUTED}>, with:</Text> : null}
-    </Box>
-  );
-}
-
-/** "4 files changed" — the quiet footnote under the feature list. */
-function completionSummaryText(
-  completion: WizardCompletion | null
-): string | null {
-  const n = completion?.changedFileCount ?? 0;
-  if (n <= 0) {
-    return null;
-  }
-  return `${n} ${n === 1 ? "file" : "files"} changed`;
-}
-
-/**
- * The project info under the header's "…set up in <project>, with:" lead-in:
- * one small line per enabled feature (AI blurbs when available, plain labels
- * otherwise) plus a changed-files footnote.
- */
-function CompletionWhatWeSetUp({
-  completion,
-}: {
-  completion: WizardCompletion | null;
-}): React.ReactNode {
-  if (!completion) {
-    return null;
-  }
-  const { featureBlurbs, features } = completion;
-  const footnote = completionSummaryText(completion);
-  if (featureBlurbs.length === 0 && features.length === 0 && !footnote) {
-    return null;
-  }
-  return (
-    <Box flexDirection="column" flexShrink={0} paddingX={1}>
-      <Box flexDirection="column" paddingLeft={3}>
-        {featureBlurbs.length > 0
-          ? featureBlurbs.map(({ label, blurb }) => (
-              <Box flexDirection="row" flexShrink={0} key={label}>
-                <Box flexShrink={0} width={20}>
-                  <Text bold color={MUTED}>
-                    {label}
-                  </Text>
-                </Box>
-                <Box flexShrink={1}>
-                  <Text color={MUTED} wrap="wrap">
-                    {blurb}
-                  </Text>
-                </Box>
-              </Box>
-            ))
-          : features.map((label) => (
-              <Text bold color={MUTED} key={label}>
-                {label}
-              </Text>
-            ))}
-        {footnote ? <Text color={MUTED_DIM}>{footnote}</Text> : null}
-      </Box>
-    </Box>
-  );
-}
-
-/** Copy for the first-error section, by state. */
-function firstErrorInstruction(
-  verified: boolean,
-  startCommand: string | undefined
-): string {
-  if (verified) {
-    return "Your app is already sending events — here's the one you just sent:";
-  }
-  if (startCommand) {
-    return `Run ${startCommand}, make it throw an error, and it lands here:`;
-  }
-  return "Run your app, make it throw an error, and it lands here:";
-}
-
-/** The one thing to do next — the emphasized (ACCENT) section. */
-function CompletionFirstError({
-  completion,
-  verified,
-}: {
-  completion: WizardCompletion | null;
-  verified: boolean;
-}): React.ReactNode {
-  const primaryUrl = completion?.verification.eventUrl ?? completion?.issuesUrl;
-  const instruction = firstErrorInstruction(verified, completion?.startCommand);
-  return (
-    <Box flexDirection="column" flexShrink={0} marginTop={1} paddingX={1}>
-      <CompletionSectionHeader
-        marker="1"
-        title={verified ? "First event received" : "See your first error"}
-      />
-      <Box flexDirection="column" paddingLeft={3}>
-        <Text color={MUTED} wrap="truncate">
-          {instruction}
-        </Text>
-        {primaryUrl ? (
-          <Box>
-            <Text color={COLOR_SUCCESS}>{"→ "}</Text>
-            <Text color={COLOR_INFO} wrap="truncate">
-              {primaryUrl}
-            </Text>
-            <Text color={MUTED_DIM}>{"  (o) to open"}</Text>
-          </Box>
-        ) : null}
-      </Box>
-    </Box>
-  );
-}
-
-/** Option rows for the completion menu: a bold ▶ cursor (bigger than the
- * prompt's small ▸ so the selection is unmistakable), bold label on focus. */
-function CompletionOptions<T extends string>({
-  choices,
-  highlighted,
-}: {
-  choices: ChoiceRow<T>[];
-  highlighted: number;
-}): React.ReactNode {
-  // Indent so the cursor sits directly under the section title (e.g. below the
-  // "N" of "Next steps"), not under the section's number marker.
-  return (
-    <Box flexDirection="column" paddingLeft={3}>
-      {choices.map((choice, index) => {
-        const isCursor = index === highlighted;
-        return (
-          <Box
-            flexDirection="row"
-            height={1}
-            key={choice.value}
-            overflow="hidden"
-          >
-            <Box flexShrink={0} width={3}>
-              <Text bold color={ACCENT}>
-                {isCursor ? ICONS.triangleRight : " "}
-              </Text>
-            </Box>
-            <Text bold={isCursor}>{choice.label}</Text>
-            {choice.hint ? <Text color={MUTED}> {choice.hint}</Text> : null}
-          </Box>
-        );
-      })}
-    </Box>
-  );
-}
-
-/** Optional next steps — a de-emphasized (MUTED) `◇` section + driveable menu. */
-function CompletionMenu({
-  choices,
-  onChoose,
-  onDismiss,
-}: {
-  choices: ChoiceRow<CompletionActionId>[];
-  onChoose: (value: CompletionActionId) => void;
-  onDismiss: () => void;
-}): React.ReactNode {
-  const highlighted = useChoiceNavigation<CompletionActionId>({
-    choices,
-    onCancel: onDismiss,
-    onChoose,
-    scope: "completion-menu",
-  });
-  return (
-    <Box flexDirection="column" flexShrink={0} marginTop={1} paddingX={1}>
-      <CompletionSectionHeader marker="2" title="Next steps" />
-      <CompletionOptions choices={choices} highlighted={highlighted} />
     </Box>
   );
 }
@@ -1770,15 +1326,13 @@ function getCenteredSelectLayout(
 }
 
 /**
- * Rows unavailable to option lists: workflow chrome reserves the tab and
- * shortcut footers, multiselects add their local controls, and centered
- * prompts additionally reserve intro padding and the full banner.
+ * Rows unavailable to option lists: workflow chrome reserves the tab/shortcut
+ * footers, while centered prompts also reserve intro padding, the full banner,
+ * and the extra controls shown by multiselect prompts.
  */
 const WORKFLOW_PROMPT_RESERVED_ROWS = 10;
-const WORKFLOW_MULTISELECT_RESERVED_ROWS = 12;
 const CENTERED_SELECT_RESERVED_ROWS = 20;
 const CENTERED_MULTISELECT_RESERVED_ROWS = 23;
-const WORKFLOW_ACTIVITY_RESERVED_ROWS = 7;
 
 /**
  * Returns the half-open option range that keeps the highlighted item visible.
@@ -1810,7 +1364,7 @@ export function getOptionWindow(
   return [start, start + viewportSize];
 }
 
-function getPromptOptionCapacity({
+function getPromptOptionLimit({
   terminalRows,
   alignment,
   kind,
@@ -1823,10 +1377,7 @@ function getPromptOptionCapacity({
   occupiedRows: number;
   messageRows: number;
 }): number {
-  let reservedRows =
-    kind === "multiselect"
-      ? WORKFLOW_MULTISELECT_RESERVED_ROWS
-      : WORKFLOW_PROMPT_RESERVED_ROWS;
+  let reservedRows = WORKFLOW_PROMPT_RESERVED_ROWS;
   if (alignment === "center") {
     reservedRows =
       kind === "multiselect"
@@ -1834,68 +1385,10 @@ function getPromptOptionCapacity({
         : CENTERED_SELECT_RESERVED_ROWS;
   }
   const extraMessageRows = Math.max(0, messageRows - 1);
-  return terminalRows - reservedRows - occupiedRows - extraMessageRows;
-}
-
-function getPromptOptionLimit(
-  args: Parameters<typeof getPromptOptionCapacity>[0]
-): number {
-  return Math.max(1, getPromptOptionCapacity(args));
-}
-
-/**
- * Locked rows stay pinned, while the selectable viewport budgets for its
- * tallest wrapped description so changing the cursor cannot overflow it.
- */
-function getMultiSelectLayout({
-  options,
-  availableRows,
-  terminalColumns,
-  alignment,
-}: {
-  options: MultiSelectPromptOptionData[];
-  availableRows: number;
-  terminalColumns: number;
-  alignment: PromptAlignment;
-}): { maxVisibleOptions: number; showDescriptions: boolean } {
-  const descriptionWidth = Math.max(
+  return Math.max(
     1,
-    getPromptContentWidth(terminalColumns, alignment) -
-      (alignment === "center" ? 4 : 5)
+    terminalRows - reservedRows - occupiedRows - extraMessageRows
   );
-  const optionRows = options.map((option) => {
-    if (!option.description) {
-      return 1;
-    }
-    const descriptionRows = wrapAnsi(option.description, descriptionWidth, {
-      hard: true,
-      trim: false,
-      wordWrap: true,
-    }).split("\n").length;
-    return 1 + descriptionRows;
-  });
-  const lockedRows = optionRows.reduce(
-    (total, rows, index) => (options[index]?.locked ? total + rows : total),
-    0
-  );
-  const selectableRows = optionRows.filter(
-    (_rows, index) => !options[index]?.locked
-  );
-  const tallestSelectable = Math.max(1, ...selectableRows);
-  if (lockedRows + tallestSelectable > availableRows) {
-    const lockedCount = options.filter((option) => option.locked).length;
-    return {
-      maxVisibleOptions: Math.max(1, availableRows - lockedCount),
-      showDescriptions: false,
-    };
-  }
-  return {
-    maxVisibleOptions: Math.max(
-      1,
-      Math.floor(Math.max(0, availableRows - lockedRows) / tallestSelectable)
-    ),
-    showDescriptions: true,
-  };
 }
 
 function getPromptContentWidth(
@@ -1907,94 +1400,6 @@ function getPromptContentWidth(
     return Math.min(frameWidth, 84);
   }
   return frameWidth >= 80 ? Math.floor((frameWidth - 1) * 0.6) : frameWidth;
-}
-
-function getPromptTextRows(text: string, availableWidth: number): number {
-  return wrapAnsi(text, Math.max(1, availableWidth), {
-    hard: true,
-    trim: false,
-    wordWrap: true,
-  }).split("\n").length;
-}
-
-function getPromptDetailWidth(
-  terminalColumns: number,
-  alignment: PromptAlignment
-): number {
-  const leadingWidth = alignment === "start" ? 3 : 0;
-  return Math.max(
-    1,
-    getPromptContentWidth(terminalColumns, alignment) - leadingWidth
-  );
-}
-
-function getPromptDetailsRows(
-  details: readonly PromptDetail[],
-  availableWidth: number
-): number {
-  return details.reduce(
-    (rows, detail) => rows + getPromptTextRows(detail.text, availableWidth),
-    0
-  );
-}
-
-function getStructuredSelectLayout({
-  alignment,
-  details,
-  footer,
-  occupiedRows,
-  optionCount,
-  promptTitle,
-  terminalColumns,
-  terminalRows,
-}: {
-  alignment: PromptAlignment;
-  details: readonly PromptDetail[];
-  footer?: PromptDetail;
-  occupiedRows: number;
-  optionCount: number;
-  promptTitle: string;
-  terminalColumns: number;
-  terminalRows: number;
-}): {
-  compact: boolean;
-  detailWidth: number;
-  maxVisibleDetailRows: number;
-  maxVisibleOptions: number;
-} {
-  const detailWidth = getPromptDetailWidth(terminalColumns, alignment);
-  const titleRows = getPromptTextRows(promptTitle, detailWidth);
-  const detailRows = getPromptDetailsRows(details, detailWidth);
-  const footerRows = footer ? getPromptTextRows(footer.text, detailWidth) : 0;
-  const optionRows = Math.max(1, optionCount);
-  const minimumOptionRows =
-    details.length > 0 && optionCount <= 2 ? optionRows : 1;
-  const availableRows = Math.max(
-    1,
-    terminalRows - WORKFLOW_ACTIVITY_RESERVED_ROWS - occupiedRows
-  );
-  const naturalSpacingRows = 2 + (footer ? 1 : 0);
-  const naturalRows =
-    titleRows + detailRows + footerRows + optionRows + naturalSpacingRows;
-
-  if (naturalRows <= availableRows) {
-    return {
-      compact: false,
-      detailWidth,
-      maxVisibleDetailRows: detailRows + footerRows,
-      maxVisibleOptions: optionRows,
-    };
-  }
-
-  return {
-    compact: true,
-    detailWidth,
-    maxVisibleDetailRows: Math.max(
-      0,
-      availableRows - titleRows - minimumOptionRows
-    ),
-    maxVisibleOptions: minimumOptionRows,
-  };
 }
 
 function getPromptMessageRows({
@@ -2031,368 +1436,6 @@ function getPromptMessageRows({
   }).split("\n").length;
 }
 
-function PromptDetails({
-  alignment,
-  details,
-}: {
-  alignment: PromptAlignment;
-  details: PromptDetail[];
-}): React.ReactNode {
-  const layoutProps =
-    alignment === "center"
-      ? ({ justifyContent: "center", width: "100%" } as const)
-      : ({ paddingLeft: 3 } as const);
-  return details.map((detail, index) => {
-    const color = detail.tone === "success" ? COLOR_SUCCESS : MUTED;
-    return (
-      <Box key={`${index}:${detail.text}`} {...layoutProps}>
-        <Text color={color}>{detail.text}</Text>
-      </Box>
-    );
-  });
-}
-
-function normalizeDetailWindowStart(start: number, itemCount: number): number {
-  return Math.min(Math.max(0, start), Math.max(0, itemCount - 1));
-}
-
-function getDetailWindowEnd(
-  start: number,
-  itemRows: readonly number[],
-  rowBudget: number
-): number {
-  let usedRows = 0;
-  let end = normalizeDetailWindowStart(start, itemRows.length);
-  while (end < itemRows.length) {
-    const nextRows = itemRows[end] ?? 1;
-    if (usedRows + nextRows > rowBudget) {
-      break;
-    }
-    usedRows += nextRows;
-    end += 1;
-  }
-  return end;
-}
-
-function getPreviousDetailWindowStart(
-  start: number,
-  itemRows: readonly number[],
-  rowBudget: number
-): number {
-  let previousStart = normalizeDetailWindowStart(start, itemRows.length);
-  let usedRows = 0;
-  while (previousStart > 0) {
-    const nextRows = itemRows[previousStart - 1] ?? 1;
-    if (usedRows + nextRows > rowBudget) {
-      break;
-    }
-    usedRows += nextRows;
-    previousStart -= 1;
-  }
-  return previousStart;
-}
-
-function getNextDetailWindowStart(
-  start: number,
-  itemRows: readonly number[],
-  rowBudget: number
-): number {
-  const currentStart = normalizeDetailWindowStart(start, itemRows.length);
-  const windowEnd = getDetailWindowEnd(currentStart, itemRows, rowBudget);
-  const nextStart = windowEnd === currentStart ? currentStart + 1 : windowEnd;
-  return normalizeDetailWindowStart(nextStart, itemRows.length);
-}
-
-/**
- * Keeps the first detail pinned and pages the remaining details by their
- * wrapped row cost, reserving space for the footer and page indicator.
- */
-function usePromptDetailWindow(
-  promptDetails: PromptDetail[],
-  maxVisibleRows: number,
-  detailWidth: number,
-  footer?: PromptDetail
-): {
-  detailShortcut: ShortcutBinding | null;
-  isWindowed: boolean;
-  visibleDetails: PromptDetail[];
-} {
-  const detailLayout = useMemo(() => {
-    const header = promptDetails[0];
-    const items = header ? promptDetails.slice(1) : promptDetails;
-    return {
-      header,
-      headerRows: header ? getPromptTextRows(header.text, detailWidth) : 0,
-      itemRows: items.map((detail) =>
-        getPromptTextRows(detail.text, detailWidth)
-      ),
-      items,
-    };
-  }, [detailWidth, promptDetails]);
-  const footerRows = footer ? getPromptTextRows(footer.text, detailWidth) : 0;
-  const allDetailRows =
-    detailLayout.headerRows +
-    detailLayout.itemRows.reduce((total, rows) => total + rows, 0) +
-    footerRows;
-  const isWindowed =
-    allDetailRows > maxVisibleRows && detailLayout.items.length > 0;
-  const indicatorRows = isWindowed
-    ? getPromptTextRows(
-        `${detailLayout.items.length}-${detailLayout.items.length}/${detailLayout.items.length} · pgup/pgdn`,
-        detailWidth
-      )
-    : 0;
-  const itemRowBudget = Math.max(
-    0,
-    maxVisibleRows - detailLayout.headerRows - footerRows - indicatorRows
-  );
-  const [windowStart, setWindowStart] = useState(0);
-  const normalizedStart = normalizeDetailWindowStart(
-    windowStart,
-    detailLayout.items.length
-  );
-  const windowEnd = getDetailWindowEnd(
-    normalizedStart,
-    detailLayout.itemRows,
-    itemRowBudget
-  );
-  const visibleDetails = isWindowed
-    ? [
-        ...(detailLayout.header === undefined ? [] : [detailLayout.header]),
-        ...detailLayout.items.slice(normalizedStart, windowEnd),
-        {
-          text: `${normalizedStart + 1}-${windowEnd}/${detailLayout.items.length} · pgup/pgdn`,
-        },
-      ]
-    : promptDetails;
-  const detailShortcut = useMemo<ShortcutBinding | null>(() => {
-    if (!isWindowed) {
-      return null;
-    }
-    return {
-      key: "pgup/pgdn",
-      action: "review features",
-      priority: 41,
-      showInFooter: false,
-      match: (_input, key) => key.pageUp || key.pageDown,
-      run: (_input, key) => {
-        const moveWindow = key.pageUp
-          ? getPreviousDetailWindowStart
-          : getNextDetailWindowStart;
-        setWindowStart((start) =>
-          moveWindow(start, detailLayout.itemRows, itemRowBudget)
-        );
-      },
-    };
-  }, [detailLayout, isWindowed, itemRowBudget]);
-
-  return { detailShortcut, isWindowed, visibleDetails };
-}
-
-function PromptFooter({
-  alignment,
-  compact,
-  detail,
-}: {
-  alignment: PromptAlignment;
-  compact: boolean;
-  detail?: PromptDetail;
-}): React.ReactNode {
-  if (!detail) {
-    return null;
-  }
-  return (
-    <Box flexDirection="column" marginTop={compact ? 0 : 1}>
-      <PromptDetails alignment={alignment} details={[detail]} />
-    </Box>
-  );
-}
-
-function SelectPromptHeader({
-  alignment,
-  compact,
-  detailsAreWindowed,
-  footer,
-  isOptionWindowed,
-  highlighted,
-  promptTitle,
-  totalCount,
-  visiblePromptDetails,
-}: {
-  alignment: PromptAlignment;
-  compact: boolean;
-  detailsAreWindowed: boolean;
-  footer?: PromptDetail;
-  isOptionWindowed: boolean;
-  highlighted: number;
-  promptTitle: string;
-  totalCount: number;
-  visiblePromptDetails: PromptDetail[];
-}): React.ReactNode {
-  const position = isOptionWindowed ? (
-    <Text color={MUTED_DIM}>
-      ({highlighted + 1}/{totalCount})
-    </Text>
-  ) : null;
-  const detailRows = (
-    <>
-      <PromptDetails alignment={alignment} details={visiblePromptDetails} />
-      <PromptFooter
-        alignment={alignment}
-        compact={compact || detailsAreWindowed}
-        detail={footer}
-      />
-    </>
-  );
-
-  if (alignment === "center") {
-    return (
-      <Box flexDirection="column" marginBottom={compact ? 0 : 1} width="100%">
-        <Box gap={1} justifyContent="center" width="100%">
-          <Text bold>{promptTitle}</Text>
-          {position}
-        </Box>
-        {detailRows}
-      </Box>
-    );
-  }
-
-  return (
-    <Box flexDirection="column" marginBottom={compact ? 0 : 1}>
-      <Box>
-        <Box flexShrink={0} width={3}>
-          <Text bold color={ACCENT}>
-            {ICONS.diamondOpen}
-          </Text>
-        </Box>
-        <Text bold>{promptTitle}</Text>
-        {position}
-      </Box>
-      {detailRows}
-    </Box>
-  );
-}
-
-function SelectPromptArea({
-  alignment,
-  occupiedRows,
-  prompt,
-}: {
-  alignment: PromptAlignment;
-  occupiedRows: number;
-  prompt: Extract<ActivePrompt, { kind: "select" }>;
-}): React.ReactNode {
-  const { columns, rows } = useInkFrameSize();
-  const hasStructuredCopy =
-    (prompt.details?.length ?? 0) > 0 || prompt.footer !== undefined;
-  if (alignment === "start" && hasStructuredCopy) {
-    const layout = getStructuredSelectLayout({
-      alignment,
-      details: prompt.details ?? [],
-      footer: prompt.footer,
-      occupiedRows,
-      optionCount: prompt.options.length,
-      promptTitle: prompt.message,
-      terminalColumns: columns,
-      terminalRows: rows,
-    });
-    return (
-      <SelectPrompt
-        alignment={alignment}
-        compact={layout.compact}
-        detailWidth={layout.detailWidth}
-        maxVisibleDetailRows={layout.maxVisibleDetailRows}
-        maxVisibleOptions={layout.maxVisibleOptions}
-        prompt={prompt}
-      />
-    );
-  }
-
-  const promptMessage = [
-    prompt.message,
-    ...(prompt.details ?? []).map((detail) => detail.text),
-    ...(prompt.footer ? ["", prompt.footer.text] : []),
-  ].join("\n");
-  const messageRows = getPromptMessageRows({
-    message: promptMessage,
-    terminalColumns: columns,
-    alignment,
-    kind: prompt.kind,
-    totalCount: prompt.options.length,
-  });
-  const optionCapacity = getPromptOptionCapacity({
-    terminalRows: rows,
-    alignment,
-    kind: prompt.kind,
-    occupiedRows,
-    messageRows,
-  });
-  const optionLimit = Math.max(1, optionCapacity);
-  const minimumVisibleOptions =
-    (prompt.details?.length ?? 0) > 0 && prompt.options.length <= 2
-      ? prompt.options.length
-      : 1;
-  const maxVisibleDetailRows = Math.max(
-    0,
-    messageRows - 1 - Math.max(0, minimumVisibleOptions - optionCapacity)
-  );
-  return (
-    <SelectPrompt
-      alignment={alignment}
-      compact={optionLimit < minimumVisibleOptions}
-      detailWidth={getPromptDetailWidth(columns, alignment)}
-      maxVisibleDetailRows={maxVisibleDetailRows}
-      maxVisibleOptions={Math.max(minimumVisibleOptions, optionLimit)}
-      prompt={prompt}
-    />
-  );
-}
-
-function MultiSelectPromptArea({
-  alignment,
-  occupiedRows,
-  prompt,
-}: {
-  alignment: PromptAlignment;
-  occupiedRows: number;
-  prompt: Extract<ActivePrompt, { kind: "multiselect" }>;
-}): React.ReactNode {
-  const { columns, rows } = useInkFrameSize();
-  const promptMessage = [
-    prompt.message,
-    ...(prompt.details ?? []).map((detail) => detail.text),
-    ...((prompt.details?.length ?? 0) > 0 ? [""] : []),
-  ].join("\n");
-  const messageRows = getPromptMessageRows({
-    message: promptMessage,
-    terminalColumns: columns,
-    alignment,
-    kind: prompt.kind,
-    totalCount: prompt.options.length,
-  });
-  const availableRows = getPromptOptionLimit({
-    terminalRows: rows,
-    alignment,
-    kind: prompt.kind,
-    occupiedRows,
-    messageRows,
-  });
-  const multiselectLayout = getMultiSelectLayout({
-    options: prompt.options,
-    availableRows,
-    terminalColumns: columns,
-    alignment,
-  });
-  return (
-    <MultiSelectPrompt
-      alignment={alignment}
-      maxVisibleOptions={multiselectLayout.maxVisibleOptions}
-      prompt={prompt}
-      showDescriptions={multiselectLayout.showDescriptions}
-    />
-  );
-}
-
 function PromptArea({
   alignment = "start",
   occupiedRows = 0,
@@ -2402,20 +1445,25 @@ function PromptArea({
   occupiedRows?: number;
   prompt: ActivePrompt;
 }): React.ReactNode {
+  const { columns, rows } = useInkFrameSize();
   if (prompt.kind === "select") {
+    const messageRows = getPromptMessageRows({
+      message: prompt.message,
+      terminalColumns: columns,
+      alignment,
+      kind: prompt.kind,
+      totalCount: prompt.options.length,
+    });
     return (
-      <SelectPromptArea
+      <SelectPrompt
         alignment={alignment}
-        occupiedRows={occupiedRows}
-        prompt={prompt}
-      />
-    );
-  }
-  if (prompt.kind === "multiselect") {
-    return (
-      <MultiSelectPromptArea
-        alignment={alignment}
-        occupiedRows={occupiedRows}
+        maxVisibleOptions={getPromptOptionLimit({
+          terminalRows: rows,
+          alignment,
+          kind: prompt.kind,
+          occupiedRows,
+          messageRows,
+        })}
         prompt={prompt}
       />
     );
@@ -2423,38 +1471,42 @@ function PromptArea({
   if (prompt.kind === "confirm") {
     return <ConfirmPrompt alignment={alignment} prompt={prompt} />;
   }
+  if (prompt.kind === "multiselect") {
+    const messageRows = getPromptMessageRows({
+      message: prompt.message,
+      terminalColumns: columns,
+      alignment,
+      kind: prompt.kind,
+      totalCount: prompt.options.length,
+    });
+    return (
+      <MultiSelectPrompt
+        alignment={alignment}
+        maxVisibleOptions={getPromptOptionLimit({
+          terminalRows: rows,
+          alignment,
+          kind: prompt.kind,
+          occupiedRows,
+          messageRows,
+        })}
+        prompt={prompt}
+      />
+    );
+  }
   return null;
 }
 
 function SelectPrompt({
   alignment,
-  compact,
-  detailWidth,
-  maxVisibleDetailRows,
   maxVisibleOptions,
   prompt,
 }: {
   alignment: PromptAlignment;
-  compact: boolean;
-  detailWidth: number;
-  maxVisibleDetailRows: number;
   maxVisibleOptions: number;
   prompt: Extract<ActivePrompt, { kind: "select" }>;
 }): React.ReactNode {
   const isCentered = alignment === "center";
   const promptWidth = isCentered ? "100%" : undefined;
-  const promptTitle = prompt.message;
-  const promptDetails = prompt.details ?? [];
-  const {
-    detailShortcut,
-    isWindowed: detailsAreWindowed,
-    visibleDetails: visiblePromptDetails,
-  } = usePromptDetailWindow(
-    promptDetails,
-    maxVisibleDetailRows,
-    detailWidth,
-    prompt.footer
-  );
   const { columns } = useInkFrameSize();
   const centeredLayout = isCentered
     ? getCenteredSelectLayout(prompt.options)
@@ -2489,11 +1541,10 @@ function SelectPrompt({
           setHighlighted((idx) => (idx + 1) % totalCount);
         },
       },
-      ...(detailShortcut ? [detailShortcut] : []),
       {
         key: "enter",
         action: "confirm",
-        priority: 42,
+        priority: 41,
         match: (_input, key) => key.return,
         run: () => {
           const current = prompt.options[highlighted];
@@ -2505,12 +1556,12 @@ function SelectPrompt({
       {
         key: "esc",
         action: "cancel",
-        priority: 43,
+        priority: 42,
         match: (input, key) => key.escape || (key.ctrl && input === "c"),
         run: () => prompt.resolve(null),
       },
     ],
-    [detailShortcut, highlighted, prompt, totalCount]
+    [highlighted, prompt, totalCount]
   );
   useInkShortcuts("select-prompt", shortcuts);
 
@@ -2518,20 +1569,31 @@ function SelectPrompt({
     <Box
       flexDirection="column"
       flexShrink={0}
-      marginTop={compact ? 0 : 1}
+      marginTop={1}
       width={promptWidth}
     >
-      <SelectPromptHeader
-        alignment={alignment}
-        compact={compact}
-        detailsAreWindowed={detailsAreWindowed}
-        footer={prompt.footer}
-        highlighted={highlighted}
-        isOptionWindowed={isWindowed}
-        promptTitle={promptTitle}
-        totalCount={totalCount}
-        visiblePromptDetails={visiblePromptDetails}
-      />
+      {isCentered ? (
+        <Box gap={1} justifyContent="center" marginBottom={1} width="100%">
+          <Text bold>{prompt.message}</Text>
+          {isWindowed ? (
+            <Text color={MUTED_DIM}>
+              ({highlighted + 1}/{totalCount})
+            </Text>
+          ) : null}
+        </Box>
+      ) : (
+        <Box gap={1} marginBottom={1}>
+          <Text bold color={ACCENT}>
+            {ICONS.diamondOpen}
+          </Text>
+          <Text bold>{prompt.message}</Text>
+          {isWindowed ? (
+            <Text color={MUTED_DIM}>
+              ({highlighted + 1}/{totalCount})
+            </Text>
+          ) : null}
+        </Box>
+      )}
       <Box
         justifyContent={isCentered ? "center" : "flex-start"}
         width={promptWidth}
@@ -2571,7 +1633,9 @@ function SelectPromptOptionRow({
     return (
       <Box flexDirection="row" height={1} overflow="hidden" width="100%">
         <Box flexShrink={0} width={2}>
-          <Text color={ACCENT}>{isCursor ? ICONS.triangleRight : " "}</Text>
+          <Text color={ACCENT}>
+            {isCursor ? ICONS.triangleSmallRight : " "}
+          </Text>
         </Box>
         <Box flexShrink={0} width={centeredLabelWidth}>
           <Text bold={isCursor}>{option.label}</Text>
@@ -2585,7 +1649,7 @@ function SelectPromptOptionRow({
   return (
     <Box flexDirection="row" height={1} overflow="hidden">
       <Box flexShrink={0} width={3}>
-        <Text color={ACCENT}>{isCursor ? ICONS.triangleRight : " "}</Text>
+        <Text color={ACCENT}>{isCursor ? ICONS.triangleSmallRight : " "}</Text>
       </Box>
       <Text bold={isCursor}>{option.label}</Text>
       {option.hint !== undefined && option.hint !== "" ? (
@@ -2653,12 +1717,10 @@ function ConfirmPrompt({
           </Text>
         </Box>
       ) : (
-        <Box>
-          <Box flexShrink={0} width={3}>
-            <Text bold color={ACCENT}>
-              {ICONS.diamondOpen}
-            </Text>
-          </Box>
+        <Box gap={1}>
+          <Text bold color={ACCENT}>
+            {ICONS.diamondOpen}
+          </Text>
           <Text bold>{prompt.message}</Text>
           <Text color={MUTED_DIM}>
             ({yLabel}/{nLabel})
@@ -2673,53 +1735,29 @@ function MultiSelectPrompt({
   alignment,
   maxVisibleOptions,
   prompt,
-  showDescriptions,
 }: {
   alignment: PromptAlignment;
   maxVisibleOptions: number;
   prompt: Extract<ActivePrompt, { kind: "multiselect" }>;
-  showDescriptions: boolean;
 }): React.ReactNode {
   const isCentered = alignment === "center";
   const promptWidth = isCentered ? "100%" : undefined;
-  const promptTitle = prompt.message;
-  const promptDetails = prompt.details ?? [];
-  const lockedOptions = useMemo(
-    () => prompt.options.filter((option) => option.locked),
-    [prompt.options]
-  );
-  const selectableOptions = useMemo(
-    () => prompt.options.filter((option) => !option.locked),
-    [prompt.options]
-  );
   const [selected, setSelected] = useState<Set<string>>(
-    () =>
-      new Set([
-        ...prompt.initialSelected,
-        ...prompt.options
-          .filter((option) => option.locked)
-          .map((option) => option.value),
-      ])
+    () => new Set(prompt.initialSelected)
   );
-  const [highlighted, setHighlighted] = useState<number>(() => {
-    const firstUnselected = selectableOptions.findIndex(
-      (option) => !prompt.initialSelected.includes(option.value)
-    );
-    return Math.max(0, firstUnselected);
-  });
+  const [highlighted, setHighlighted] = useState<number>(0);
   const totalCount = prompt.options.length;
-  const selectableCount = selectableOptions.length;
   const [windowStart, windowEnd] = getOptionWindow(
-    selectableCount,
+    totalCount,
     highlighted,
     maxVisibleOptions
   );
-  const visibleOptions = selectableOptions.slice(windowStart, windowEnd);
-  const isWindowed = visibleOptions.length < selectableCount;
+  const visibleOptions = prompt.options.slice(windowStart, windowEnd);
+  const isWindowed = visibleOptions.length < totalCount;
 
   const toggleAt = useCallback(
     (idx: number) => {
-      const current = selectableOptions[idx];
+      const current = prompt.options[idx];
       if (!current) {
         return;
       }
@@ -2733,7 +1771,7 @@ function MultiSelectPrompt({
         return next;
       });
     },
-    [selectableOptions]
+    [prompt.options]
   );
 
   const commit = useCallback(() => {
@@ -2754,16 +1792,11 @@ function MultiSelectPrompt({
         priority: 40,
         match: (_input, key) => key.upArrow || key.downArrow,
         run: (_input, key) => {
-          if (selectableCount === 0) {
-            return;
-          }
           if (key.upArrow) {
-            setHighlighted((idx) =>
-              idx === 0 ? selectableCount - 1 : idx - 1
-            );
+            setHighlighted((idx) => (idx === 0 ? totalCount - 1 : idx - 1));
             return;
           }
-          setHighlighted((idx) => (idx + 1) % selectableCount);
+          setHighlighted((idx) => (idx + 1) % totalCount);
         },
       },
       {
@@ -2780,12 +1813,8 @@ function MultiSelectPrompt({
         match: (input) => input === "a",
         run: () => {
           setSelected((prev) => {
-            const lockedValues = lockedOptions.map((option) => option.value);
-            const allSelectableSelected = selectableOptions.every((option) =>
-              prev.has(option.value)
-            );
-            if (allSelectableSelected) {
-              return new Set(lockedValues);
+            if (prev.size === totalCount) {
+              return new Set<string>();
             }
             return new Set(prompt.options.map((option) => option.value));
           });
@@ -2793,7 +1822,7 @@ function MultiSelectPrompt({
       },
       {
         key: "enter",
-        action: "continue",
+        action: "confirm",
         priority: 43,
         match: (_input, key) => key.return,
         run: commit,
@@ -2806,20 +1835,12 @@ function MultiSelectPrompt({
         run: () => prompt.resolve(null),
       },
     ],
-    [
-      commit,
-      highlighted,
-      lockedOptions,
-      prompt,
-      selectableCount,
-      selectableOptions,
-      toggleAt,
-    ]
+    [commit, highlighted, prompt, toggleAt, totalCount]
   );
   useInkShortcuts("multiselect-prompt", shortcuts);
-  const shortcutText = `↑↓ move ${ICONS.bullet} space toggle ${ICONS.bullet} a all ${ICONS.bullet} enter continue`;
+  const shortcutText = `space toggle ${ICONS.bullet} a all ${ICONS.bullet} enter confirm ${ICONS.bullet} esc cancel`;
   const selectedCount = isWindowed
-    ? `${selected.size}/${totalCount} selected ${ICONS.bullet} ${highlighted + 1}/${selectableCount}`
+    ? `${selected.size}/${totalCount} selected ${ICONS.bullet} ${highlighted + 1}/${totalCount}`
     : `${selected.size}/${totalCount}`;
 
   return (
@@ -2830,43 +1851,32 @@ function MultiSelectPrompt({
       width={promptWidth}
     >
       {isCentered ? (
-        <Box flexDirection="column" width="100%">
-          <Box justifyContent="center" width="100%">
-            <Text bold>{promptTitle}</Text>
-          </Box>
-          <PromptDetails alignment={alignment} details={promptDetails} />
+        <Box justifyContent="center" marginBottom={1} width="100%">
+          <Text bold>{prompt.message}</Text>
         </Box>
       ) : (
-        <Box flexDirection="column">
-          <Box justifyContent="space-between">
-            <Box>
-              <Box flexShrink={0} width={3}>
-                <Text bold color={ACCENT}>
-                  {ICONS.diamondOpen}
-                </Text>
-              </Box>
-              <Text bold>{promptTitle}</Text>
-            </Box>
-            <Text color={ACCENT}>{selectedCount}</Text>
+        <Box justifyContent="space-between" marginBottom={1}>
+          <Box gap={1}>
+            <Text bold color={ACCENT}>
+              {ICONS.diamondOpen}
+            </Text>
+            <Text bold>{prompt.message}</Text>
           </Box>
-          <PromptDetails alignment={alignment} details={promptDetails} />
+          <Text color={ACCENT}>{selectedCount}</Text>
         </Box>
       )}
-      <Box
-        flexDirection="column"
-        marginTop={(prompt.details?.length ?? 0) > 0 ? 1 : 0}
-        width={promptWidth}
-      >
-        {lockedOptions.map((option) => (
-          <MultiSelectPromptOptionRow
-            centered={isCentered}
-            isCursor={false}
-            isSelected={true}
-            key={option.value}
-            option={option}
-            showDescription={showDescriptions}
-          />
-        ))}
+      {isCentered ? (
+        <Box
+          alignItems="center"
+          flexDirection="column"
+          marginBottom={1}
+          width="100%"
+        >
+          <Text color={MUTED_DIM}>{shortcutText}</Text>
+          <Text color={ACCENT}>{selectedCount}</Text>
+        </Box>
+      ) : null}
+      <Box flexDirection="column" width={promptWidth}>
         {visibleOptions.map((option, visibleIndex) => {
           const idx = windowStart + visibleIndex;
           const isSelected = selected.has(option.value);
@@ -2878,63 +1888,11 @@ function MultiSelectPrompt({
               isSelected={isSelected}
               key={option.value}
               option={option}
-              showDescription={showDescriptions}
             />
           );
         })}
       </Box>
-      {isCentered ? (
-        <Box
-          alignItems="center"
-          flexDirection="column"
-          marginTop={1}
-          width="100%"
-        >
-          <Text color={MUTED_DIM}>{shortcutText}</Text>
-          <Text color={ACCENT}>{selectedCount}</Text>
-        </Box>
-      ) : (
-        <Box marginTop={1}>
-          <Text color={MUTED_DIM}>{shortcutText}</Text>
-        </Box>
-      )}
     </Box>
-  );
-}
-
-function getLockedOptionHint(
-  option: MultiSelectPromptOptionData,
-  availableWidth: number
-): string {
-  if (!option.locked) {
-    return "";
-  }
-  const lockedHint = " (always included)";
-  const optionHint = option.hint ? ` ${option.hint}` : "";
-  return stringWidth(`${option.label}${optionHint}${lockedHint}`) <=
-    availableWidth
-    ? lockedHint
-    : "";
-}
-
-function MultiSelectOptionLabel({
-  isCursor,
-  lockedHint,
-  option,
-}: {
-  isCursor: boolean;
-  lockedHint: string;
-  option: MultiSelectPromptOptionData;
-}): React.ReactNode {
-  const labelColor = option.locked ? MUTED : undefined;
-  return (
-    <>
-      <Text bold={isCursor} color={labelColor}>
-        {option.label}
-      </Text>
-      {option.hint ? <Text color={MUTED}> {option.hint}</Text> : null}
-      <Text color={MUTED_DIM}>{lockedHint}</Text>
-    </>
   );
 }
 
@@ -2943,68 +1901,43 @@ function MultiSelectPromptOptionRow({
   isCursor,
   isSelected,
   option,
-  showDescription,
 }: {
   centered: boolean;
   isCursor: boolean;
   isSelected: boolean;
   option: MultiSelectPromptOptionData;
-  showDescription: boolean;
 }): React.ReactNode {
   const marker = isSelected ? ICONS.squareFilled : ICONS.squareOpen;
   const markerColor = isSelected ? COLOR_SUCCESS : MUTED;
-  const { columns } = useInkFrameSize();
-  const alignment = centered ? "center" : "start";
-  const optionContentWidth =
-    getPromptContentWidth(columns, alignment) - (centered ? 4 : 5);
-  const lockedHint = getLockedOptionHint(option, optionContentWidth);
-  const descriptionIndent = 5;
-  const visibleDescription = showDescription ? option.description : undefined;
   if (centered) {
     return (
-      <Box flexDirection="column" width="100%">
-        <Box
-          flexDirection="row"
-          height={1}
-          justifyContent="center"
-          overflow="hidden"
-          width="100%"
-        >
-          <Text color={ACCENT}>
-            {isCursor ? `${ICONS.triangleRight} ` : "  "}
-          </Text>
-          <Text color={markerColor}>{marker} </Text>
-          <MultiSelectOptionLabel
-            isCursor={isCursor}
-            lockedHint={lockedHint}
-            option={option}
-          />
-        </Box>
-        {visibleDescription ? (
-          <Box justifyContent="center" width="100%">
-            <Text color={MUTED}>{visibleDescription}</Text>
-          </Box>
+      <Box
+        flexDirection="row"
+        height={1}
+        justifyContent="center"
+        overflow="hidden"
+        width="100%"
+      >
+        <Text color={ACCENT}>
+          {isCursor ? `${ICONS.triangleSmallRight} ` : "  "}
+        </Text>
+        <Text color={markerColor}>{marker} </Text>
+        <Text bold={isCursor}>{option.label}</Text>
+        {option.hint !== undefined && option.hint !== "" ? (
+          <Text color={MUTED}> {option.hint}</Text>
         ) : null}
       </Box>
     );
   }
   return (
-    <Box flexDirection="column" width="100%">
-      <Box flexDirection="row" height={1} overflow="hidden">
-        <Box flexShrink={0} width={3}>
-          <Text color={ACCENT}>{isCursor ? ICONS.triangleRight : " "}</Text>
-        </Box>
-        <Text color={markerColor}>{marker} </Text>
-        <MultiSelectOptionLabel
-          isCursor={isCursor}
-          lockedHint={lockedHint}
-          option={option}
-        />
+    <Box flexDirection="row" height={1} overflow="hidden">
+      <Box flexShrink={0} width={3}>
+        <Text color={ACCENT}>{isCursor ? ICONS.triangleSmallRight : " "}</Text>
       </Box>
-      {visibleDescription ? (
-        <Box paddingLeft={descriptionIndent} width="100%">
-          <Text color={MUTED}>{visibleDescription}</Text>
-        </Box>
+      <Text color={markerColor}>{marker} </Text>
+      <Text bold={isCursor}>{option.label}</Text>
+      {option.hint !== undefined && option.hint !== "" ? (
+        <Text color={MUTED}> {option.hint}</Text>
       ) : null}
     </Box>
   );

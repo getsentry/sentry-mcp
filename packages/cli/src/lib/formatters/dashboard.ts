@@ -19,22 +19,11 @@ import type {
   TimeseriesResult,
   WidgetDataResult,
 } from "../../types/dashboard.js";
-import { encodeImageToKitty } from "../kitty-image.js";
-import { logger } from "../logger.js";
-import {
-  detectSixelCaps,
-  type GraphicsFormat,
-  type GraphicsRendererPreference,
-  graphicsCellSize,
-  selectGraphicsFormat,
-  terminalPixelWidth,
-} from "../sixel.js";
-import { SERIES_PALETTE } from "./chart-core.js";
 import { COLORS, muted, terminalLink } from "./colors.js";
 import { renderMarkdown } from "./markdown.js";
+
 import type { HumanRenderer } from "./output.js";
 import { isPlainOutput } from "./plain-detect.js";
-import { renderDashboardAsSixel } from "./sixel-dashboard.js";
 import { downsample, sparkline } from "./sparkline.js";
 
 // ---------------------------------------------------------------------------
@@ -50,10 +39,6 @@ export type DashboardViewData = {
   url: string;
   dateCreated?: string;
   environment?: string[];
-  /** Renderer selected by --renderer; omitted for API/JSON output. */
-  rendererPreference?: GraphicsRendererPreference;
-  /** Whether the default high-DPI graphics width cap should apply. */
-  graphicsCap?: boolean;
   widgets: DashboardViewWidget[];
 };
 
@@ -85,9 +70,6 @@ const MIN_TERM_WIDTH = 80;
 /** Fallback terminal width when stdout is not a TTY */
 const DEFAULT_TERM_WIDTH = 100;
 
-/** Default graphics canvas cap for high-DPI terminals. */
-const MAX_GRAPHICS_WIDTH = 2560;
-
 /**
  * Get the effective terminal width.
  *
@@ -101,12 +83,6 @@ function getTermWidth(): number {
     return Math.max(MIN_TERM_WIDTH, cols);
   }
   return DEFAULT_TERM_WIDTH;
-}
-
-/** Actual terminal width for pixel-exact sixel output, without ASCII's floor. */
-function getSixelTermWidth(): number | undefined {
-  const columns = process.stdout.columns;
-  return columns && columns > 0 ? columns : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -1235,6 +1211,29 @@ function renderTimeBarRows(
 }
 
 /**
+ * Chart color palette based on Sentry's categorical chart hues.
+ *
+ * Derived from sentry/static/app/utils/theme/scraps/tokens/color.tsx
+ * (categorical.dark / categorical.light), adjusted to a mid-luminance
+ * range so every color achieves ≥3:1 contrast on **both** dark (#1e1e1e)
+ * and light (#f0f0f0) terminal backgrounds.
+ *
+ * "Other" always gets muted gray (handled by seriesColor).
+ */
+const SERIES_PALETTE = [
+  "#7553FF", // blurple (Sentry primary)
+  "#F0369A", // pink
+  "#C06F20", // orange  (darkened from #FF9838)
+  "#3D8F09", // green   (darkened from #67C800)
+  "#8B6AC8", // purple  (lightened from #5D3EB2)
+  "#E45560", // salmon  (darkened from #FA6769)
+  "#B82D90", // magenta
+  "#9E8B18", // yellow  (darkened from #FFD00E)
+  "#228A83", // teal    (fills hue gap)
+  "#7B50D0", // indigo  (lightened from #50219C)
+] as const;
+
+/**
  * Fill characters for plain/no-color mode.
  *
  * Descending density so the most prominent series gets the densest fill.
@@ -1242,13 +1241,7 @@ function renderTimeBarRows(
  */
 const PLAIN_FILLS = ["█", "▓", "▒", "#", "=", "*", "+", "~", ":", "."] as const;
 
-/**
- * Get the color for a series by index. "Other" gets muted gray.
- *
- * Shares {@link SERIES_PALETTE} with the pixel chart core so the ASCII and
- * sixel renderers use identical hues; only the "Other" bucket differs (ANSI
- * muted vs the core's hex gray).
- */
+/** Get the color for a series by index. "Other" gets muted gray. */
 function seriesColor(label: string, index: number): string {
   if (label === "Other") {
     return COLORS.muted;
@@ -1538,148 +1531,14 @@ function renderPlaceholderContent(message: string): string[] {
   return [isPlainOutput() ? `(${message})` : muted(`(${message})`)];
 }
 
-// ---------------------------------------------------------------------------
-// Heatmap renderer
-// ---------------------------------------------------------------------------
-
-/**
- * Intensity ramp for heatmap cells.
- *
- * Index 0 is empty (zero value); 1-4 map increasing intensity to shade
- * blocks in plain mode and to a blue→red heat gradient in color mode.
- */
-const HEATMAP_SHADES = [" ", "░", "▒", "▓", "█"] as const;
-const HEATMAP_COLORS = [
-  "#79B8FF", // low  — cyan/blue
-  "#FDB81B", // yellow
-  "#FF9838", // orange
-  "#fe4144", // high — red
-] as const;
-
-/** Map a normalized intensity (0-1) to a ramp bucket index (0-4). */
-function heatmapBucket(normalized: number): number {
-  if (normalized <= 0) {
-    return 0;
-  }
-  return Math.min(4, Math.max(1, Math.ceil(normalized * 4)));
-}
-
-/** Render a single heatmap cell for a normalized intensity. */
-function heatmapCell(normalized: number, plain: boolean): string {
-  const bucket = heatmapBucket(normalized);
-  if (plain) {
-    return HEATMAP_SHADES[bucket] ?? " ";
-  }
-  if (bucket === 0) {
-    return " ";
-  }
-  const color = HEATMAP_COLORS[bucket - 1] ?? COLORS.magenta;
-  return chalk.hex(color)("█");
-}
-
-/**
- * Render heatmap content: one row per series (category), columns over time.
- *
- * Cell intensity encodes the value relative to the global maximum across all
- * cells, so hot spots stand out. Falls back to a "no data" line when there
- * are no series or values.
- */
-function renderHeatmapContent(
-  data: TimeseriesResult,
-  opts: { innerWidth: number; contentHeight: number }
-): string[] {
-  const { innerWidth, contentHeight } = opts;
-  if (data.series.length === 0) {
-    return [noDataLine()];
-  }
-
-  const plain = isPlainOutput();
-
-  // Reserve rows for the bottom time axis (2 lines) and a legend (1 line).
-  const axisLines = 3;
-  const maxRows = Math.max(1, contentHeight - axisLines);
-  const series = data.series.slice(0, maxRows);
-
-  const maxLabelLen = Math.min(
-    20,
-    Math.max(4, ...series.map((s) => s.label.length))
-  );
-  const gutterW = maxLabelLen + 1; // label + space
-  const chartWidth = Math.max(1, innerWidth - gutterW);
-
-  // Determine the actual number of time buckets from the longest series.
-  const maxLen = Math.max(0, ...series.map((s) => s.values.length));
-  const bucketCount = Math.min(chartWidth, maxLen || chartWidth);
-
-  // Downsample every series to that bucket count; pad shorter series so every
-  // row has exactly `bucketCount` cells (downsample returns early for short input).
-  const rows = series.map((s) => {
-    const ds = downsample(
-      s.values.map((v) => v.value),
-      bucketCount
-    );
-    return ds.length < bucketCount
-      ? [...ds, ...new Array(bucketCount - ds.length).fill(0)]
-      : ds;
-  });
-  const globalMax = Math.max(1, ...rows.flat());
-
-  const lines: string[] = [];
-  for (let i = 0; i < series.length; i += 1) {
-    const s = series[i];
-    const values = rows[i] ?? [];
-    if (!s) {
-      continue;
-    }
-    const label =
-      s.label.length > maxLabelLen
-        ? `${s.label.slice(0, maxLabelLen - 1)}…`
-        : s.label.padEnd(maxLabelLen);
-    const cells = values.map((v) => heatmapCell(v / globalMax, plain)).join("");
-    const labelStr = plain ? label : chalk.hex(COLORS.cyan)(label);
-    lines.push(`${labelStr} ${cells}`);
-  }
-
-  // Bottom time axis, aligned to the chart area.
-  // Find the longest series so its timestamps match the bucketCount.
-  const longest = series.reduce(
-    (a, b) => (b.values.length > a.values.length ? b : a),
-    series[0] ?? { values: [] }
-  );
-  const axisTs = longest.values.map((v) => v.timestamp);
-  if (axisTs.length > 0) {
-    const dsTs = downsampleTimestamps(axisTs, bucketCount);
-    lines.push(
-      ...buildTimeAxis({
-        timestamps: dsTs,
-        chartWidth: bucketCount,
-        gutterWidth: gutterW,
-      })
-    );
-  }
-
-  // Intensity legend: low → high.
-  const gutter = " ".repeat(gutterW);
-  if (plain) {
-    lines.push(`${gutter}low ${HEATMAP_SHADES.slice(1).join("")} high`);
-  } else {
-    const ramp = HEATMAP_COLORS.map((c) => chalk.hex(c)("█")).join("");
-    lines.push(`${gutter}${muted("low")} ${ramp} ${muted("high")}`);
-  }
-
-  return lines;
-}
-
 /**
  * Dispatch to the appropriate content renderer based on data type.
  *
  * Returns raw content lines (no title, no border). The caller handles
  * border wrapping and height enforcement.
  */
-type ContentWidget = Pick<DashboardViewWidget, "displayType" | "data">;
-
 function renderContentLines(opts: {
-  widget: ContentWidget;
+  widget: DashboardViewWidget;
   innerWidth: number;
   contentHeight: number;
 }): string[] {
@@ -1687,10 +1546,7 @@ function renderContentLines(opts: {
   const { data } = widget;
 
   switch (data.type) {
-    case "timeseries": {
-      if (widget.displayType === "heatmap") {
-        return renderHeatmapContent(data, { innerWidth, contentHeight });
-      }
+    case "timeseries":
       if (widget.displayType === "categorical_bar") {
         return renderVerticalBarsContent(data, { innerWidth, contentHeight });
       }
@@ -1699,7 +1555,6 @@ function renderContentLines(opts: {
         return renderTimeseriesBarsContent(data, { innerWidth, contentHeight });
       }
       return renderTimeseriesContent(data, innerWidth);
-    }
 
     case "table":
       return renderTableContent(data, innerWidth);
@@ -1761,7 +1616,7 @@ function renderWidgetLines(
  * If longer, it is truncated (ANSI-aware via character iteration).
  */
 /** ANSI escape sequence type for the truncation state machine. */
-type EscapeType = "none" | "start" | "csi" | "osc" | "dcs";
+type EscapeType = "none" | "start" | "csi" | "osc";
 
 /** Check if a character is an ASCII letter (CSI sequence terminator). */
 function isAsciiLetter(ch: string): boolean {
@@ -1780,15 +1635,6 @@ function advanceEscape(
   ch: string,
   buffer: string
 ): boolean {
-  return advanceEscapeInner(state, ch, buffer.at(-1));
-}
-
-function advanceEscapeInner(
-  state: { type: EscapeType },
-  ch: string,
-  prev: string | undefined
-): boolean {
-  const stTerminator = ch === "\\" && prev === "\x1b";
   switch (state.type) {
     case "none":
       if (ch === "\x1b") {
@@ -1801,8 +1647,6 @@ function advanceEscapeInner(
         state.type = "csi";
       } else if (ch === "]") {
         state.type = "osc";
-      } else if (ch === "P") {
-        state.type = "dcs";
       } else {
         state.type = "none";
       }
@@ -1814,13 +1658,7 @@ function advanceEscapeInner(
       return true;
     case "osc":
       // OSC ends at BEL (\x07) or ST (\x1b\\)
-      if (ch === "\x07" || stTerminator) {
-        state.type = "none";
-      }
-      return true;
-    case "dcs":
-      // DCS ends at ST (\x1b\\)
-      if (stTerminator) {
+      if (ch === "\x07" || (ch === "\\" && buffer.at(-1) === "\x1b")) {
         state.type = "none";
       }
       return true;
@@ -1837,7 +1675,7 @@ function fitToWidth(line: string, targetWidth: number): string {
   // Truncate: walk characters, tracking visible width
   let result = "";
   let width = 0;
-  const esc: { type: EscapeType } = { type: "none" };
+  const esc = { type: "none" as "none" | "start" | "csi" | "osc" };
   for (const ch of line) {
     if (advanceEscape(esc, ch, result)) {
       result += ch;
@@ -2002,181 +1840,9 @@ export function formatDashboardWithData(data: DashboardViewData): string {
   const termWidth = getTermWidth();
   const lines: string[] = [];
   lines.push(...renderHeader(data, termWidth));
-
-  const graphics = renderCompleteDashboardAsGraphics(data, getSixelTermWidth());
-  logDashboardGraphicsRenderer(graphics);
-  if (graphics.output) {
-    lines.push(graphics.output);
-  } else {
-    lines.push(...renderGrid(data.widgets, termWidth));
-  }
-
+  lines.push(...renderGrid(data.widgets, termWidth));
   lines.push("");
   return lines.join("\n");
-}
-
-/**
- * Render the complete dashboard as one graphics canvas, selecting the most
- * capable terminal format available (kitty over sixel over ASCII). When the
- * terminal advertises graphics but doesn't report its cell geometry — common
- * for kitty terminals, which frequently answer the graphics query but never
- * send `CSI 16 t` — default cell dimensions are used so the dashboard still
- * renders as graphics rather than silently dropping to ASCII. Never partially
- * replaces the framebuffer: when no graphics format is available it records
- * the fallback reason so the caller can render the complete character view and
- * emit a useful debug log.
- */
-type DashboardGraphicsRender = {
-  renderer: GraphicsFormat | "ascii";
-  rendererPreference: GraphicsRendererPreference;
-  output?: string;
-  reason?: string;
-  termWidth?: number;
-  cell?: { cellWidth: number; cellHeight: number };
-  nativePixelWidth?: number;
-  pixelWidth?: number;
-  graphicsCapApplied?: boolean;
-};
-
-/** Log the terminal graphics decision without including dashboard data. */
-function logDashboardGraphicsRenderer(render: DashboardGraphicsRender): void {
-  const caps = detectSixelCaps();
-  const details = [
-    `requested=${render.rendererPreference}`,
-    `capabilities: kitty=${caps.kitty === true ? "yes" : "no"}, sixel=${caps.supported ? "yes" : "no"}`,
-    `terminal: stdout TTY=${process.stdout.isTTY ? "yes" : "no"}, stdin TTY=${process.stdin.isTTY ? "yes" : "no"}`,
-    `plain output=${isPlainOutput() ? "yes" : "no"}`,
-    `columns=${render.termWidth ?? "unavailable"}`,
-  ];
-  if (render.cell) {
-    details.push(`cell=${render.cell.cellWidth}x${render.cell.cellHeight}`);
-  }
-  if (render.nativePixelWidth) {
-    details.push(`native pixel width=${render.nativePixelWidth}`);
-  }
-  if (render.pixelWidth) {
-    details.push(`effective pixel width=${render.pixelWidth}`);
-  }
-  details.push(
-    `graphics cap=${render.graphicsCapApplied ? "applied" : "not applied"}`
-  );
-  const reason = render.reason ? ` (reason: ${render.reason})` : "";
-  logger.debug(
-    `Dashboard graphics renderer: ${render.renderer}${reason}; ${details.join("; ")}`
-  );
-}
-
-function renderCompleteDashboardAsGraphics(
-  data: DashboardViewData,
-  termWidth: number | undefined
-): DashboardGraphicsRender {
-  const rendererPreference = data.rendererPreference ?? "auto";
-  const format = selectGraphicsFormat(rendererPreference);
-  if (!termWidth) {
-    return {
-      renderer: "ascii",
-      rendererPreference,
-      reason: "terminal width unavailable",
-    };
-  }
-  if (isPlainOutput()) {
-    return {
-      renderer: "ascii",
-      rendererPreference,
-      reason: "plain output requested",
-      termWidth,
-    };
-  }
-  if (!format) {
-    return {
-      renderer: "ascii",
-      rendererPreference,
-      reason: "no compatible graphics protocol detected",
-      termWidth,
-    };
-  }
-  const cell = graphicsCellSize(rendererPreference);
-  if (!cell) {
-    return {
-      renderer: "ascii",
-      rendererPreference,
-      reason: "graphics cell size unavailable",
-      termWidth,
-    };
-  }
-  // Preserve the terminal's reported pixel width when known; otherwise derive it
-  // from the (possibly defaulted) cell width so the canvas still matches the
-  // column count exactly.
-  const nativePixelWidth =
-    terminalPixelWidth(termWidth) ?? termWidth * cell.cellWidth;
-  const cellWidth = Math.floor(nativePixelWidth / termWidth);
-  if (cellWidth < 1) {
-    return {
-      renderer: "ascii",
-      rendererPreference,
-      reason: "calculated graphics cell width is invalid",
-      termWidth,
-      cell,
-      nativePixelWidth,
-    };
-  }
-  const graphicsCap = data.graphicsCap !== false;
-  const graphicsCapApplied =
-    graphicsCap && nativePixelWidth > MAX_GRAPHICS_WIDTH;
-  const graphicsColumns = graphicsCapApplied
-    ? Math.min(termWidth, Math.floor(MAX_GRAPHICS_WIDTH / cellWidth))
-    : termWidth;
-  if (graphicsColumns < 1) {
-    return {
-      renderer: "ascii",
-      rendererPreference,
-      reason: "graphics cap is smaller than one terminal cell",
-      termWidth,
-      cell,
-      nativePixelWidth,
-    };
-  }
-  const pixelWidth = graphicsCapApplied
-    ? graphicsColumns * cellWidth
-    : nativePixelWidth;
-  const graphics = renderDashboardAsSixel(data, {
-    pixelWidth,
-    cellWidth,
-    cellHeight: cell.cellHeight,
-    renderTextContent(widget, innerWidth, contentHeight) {
-      return renderContentLines({
-        widget,
-        innerWidth,
-        contentHeight,
-      });
-    },
-    encodeImage:
-      format === "kitty"
-        ? (image) => encodeImageToKitty(image, image.width, true)
-        : undefined,
-  });
-  if (!("output" in graphics)) {
-    return {
-      renderer: "ascii",
-      rendererPreference,
-      reason: graphics.reason,
-      termWidth,
-      cell,
-      nativePixelWidth,
-      pixelWidth,
-      graphicsCapApplied,
-    };
-  }
-  return {
-    renderer: format,
-    rendererPreference,
-    output: graphics.output,
-    termWidth,
-    cell,
-    nativePixelWidth,
-    pixelWidth,
-    graphicsCapApplied,
-  };
 }
 
 // ---------------------------------------------------------------------------

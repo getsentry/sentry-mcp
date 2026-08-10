@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-auth
-version: 0.45.0
+version: 0.43.0-dev.0
 description: Authenticate with Sentry
 requires:
   bins: ["sentry"]
@@ -64,12 +64,6 @@ Refresh your OAuth access token
 
 ```bash
 sentry auth refresh
-
-# Refresh with read-only scopes
-sentry auth refresh --read-only
-
-# Refresh with specific scopes
-sentry auth refresh --scope project:read --scope org:read
 ```
 
 ### `sentry auth status`

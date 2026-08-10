@@ -22,12 +22,9 @@ import { BANNER_SIXEL } from "../../src/generated/banner-sixel.js";
 import {
   __resetSixelCache,
   detectSixelCaps,
-  graphicsCellSize,
   optedOut,
   parseSixelCaps,
   readReply,
-  selectGraphicsFormat,
-  selectGraphicsFormatFromAvailability,
   sixelBanner,
   sixelFits,
   terminalPixelWidth,
@@ -83,26 +80,6 @@ describe("parseSixelCaps", () => {
       { numRuns: DEFAULT_NUM_RUNS }
     );
   });
-
-  test("detects kitty support from an OK graphics reply", () => {
-    const caps = parseSixelCaps(`${ESC}_Gi=31;OK${ESC}\\${ESC}[?62c`);
-    expect(caps.kitty).toBe(true);
-  });
-
-  test("kitty support does not imply sixel support", () => {
-    const caps = parseSixelCaps(`${ESC}_Gi=31;OK${ESC}\\${ESC}[?62c`);
-    expect(caps.supported).toBe(false);
-  });
-
-  test("reports both when the terminal advertises sixel and kitty", () => {
-    const caps = parseSixelCaps(`${ESC}_Gi=31;OK${ESC}\\${ESC}[?62;4c`);
-    expect(caps).toMatchObject({ supported: true, kitty: true });
-  });
-
-  test("a kitty error reply is not treated as support", () => {
-    const caps = parseSixelCaps(`${ESC}_Gi=31;ENOENT:bad${ESC}\\${ESC}[?62c`);
-    expect(caps.kitty).toBeUndefined();
-  });
 });
 
 describe("sixelFits", () => {
@@ -139,40 +116,6 @@ describe("terminalPixelWidth", () => {
     // unsupported and there's no cell width to derive a pixel budget from.
     __resetSixelCache();
     expect(terminalPixelWidth(80)).toBeUndefined();
-  });
-});
-
-describe("selectGraphicsFormat", () => {
-  afterEach(() => {
-    __resetSixelCache();
-  });
-
-  test("returns undefined in a non-interactive (test) environment", () => {
-    // Under vitest stdin/stdout are not TTYs, so neither kitty nor sixel is
-    // available and the caller falls back to ASCII.
-    __resetSixelCache();
-    expect(selectGraphicsFormat()).toBeUndefined();
-  });
-
-  test("falls back to the automatic renderer when the requested one is unavailable", () => {
-    expect(
-      selectGraphicsFormatFromAvailability("sixel", {
-        kitty: true,
-        sixel: false,
-      })
-    ).toBe("kitty");
-  });
-});
-
-describe("graphicsCellSize", () => {
-  afterEach(() => {
-    __resetSixelCache();
-  });
-
-  test("returns undefined when no graphics format is available", () => {
-    // No TTY in the test env means no graphics format, so no cell size either.
-    __resetSixelCache();
-    expect(graphicsCellSize()).toBeUndefined();
   });
 });
 
@@ -228,7 +171,6 @@ describe("optedOut", () => {
     stdin: process.stdin.isTTY,
     TERM: process.env.TERM,
     SENTRY_NO_SIXEL: process.env.SENTRY_NO_SIXEL,
-    SENTRY_NO_GRAPHICS: process.env.SENTRY_NO_GRAPHICS,
     NO_COLOR: process.env.NO_COLOR,
     SENTRY_PLAIN_OUTPUT: process.env.SENTRY_PLAIN_OUTPUT,
     FORCE_COLOR: process.env.FORCE_COLOR,
@@ -247,7 +189,6 @@ describe("optedOut", () => {
     process.stdin.isTTY = saved.stdin;
     setEnv("TERM", saved.TERM);
     setEnv("SENTRY_NO_SIXEL", saved.SENTRY_NO_SIXEL);
-    setEnv("SENTRY_NO_GRAPHICS", saved.SENTRY_NO_GRAPHICS);
     setEnv("NO_COLOR", saved.NO_COLOR);
     setEnv("SENTRY_PLAIN_OUTPUT", saved.SENTRY_PLAIN_OUTPUT);
     setEnv("FORCE_COLOR", saved.FORCE_COLOR);
@@ -309,11 +250,6 @@ describe("optedOut", () => {
     if (process.platform !== "win32") {
       expect(optedOut()).toBe(false);
     }
-  });
-
-  test("SENTRY_NO_GRAPHICS opts out", () => {
-    setEnv("SENTRY_NO_GRAPHICS", "1");
-    expect(optedOut()).toBe(true);
   });
 });
 

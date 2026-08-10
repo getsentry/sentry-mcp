@@ -65,7 +65,7 @@ pnpm exec vitest                         # Watch mode
 
 When adding a package, always use `pnpm add -D <package>` (the `-D` flag).
 
-When the `@sentry/api` SDK provides types for an API response, import them directly from `@sentry/api` instead of creating redundant Valibot schemas in `src/types/sentry.ts`.
+When the `@sentry/api` SDK provides types for an API response, import them directly from `@sentry/api` instead of creating redundant Zod schemas in `src/types/sentry.ts`.
 
 ## Rules: Use Node.js APIs
 
@@ -121,7 +121,7 @@ Top-level layout:
   `db/` (SQLite layer), `dsn/` (DSN detection, with per-language extractors under
   `dsn/languages/`), and `formatters/` (output formatting). See the file-locations
   table below and the JSDoc in each module for details.
-- **`src/types/`** — TypeScript types and Valibot schemas.
+- **`src/types/`** — TypeScript types and Zod schemas.
 - **`test/`** — tests mirroring `src/` (unit, `*.property.test.ts`,
   `*.model-based.test.ts`, `e2e/`, `fixtures/`, `mocks/`).
 - **`../../apps/cli-docs/`** — documentation site (Astro + Starlight);
@@ -432,31 +432,30 @@ All command docs and skill files are generated via `pnpm run generate:docs` (whi
 - `pnpm run check:fragments` validates fragment ↔ route consistency.
 - Positional `placeholder` values must be descriptive: `"org/project/trace-id"` not `"args"`.
 
-### Valibot Schemas for Validation
+### Zod Schemas for Validation
 
-All config and API types use Valibot schemas:
+All config and API types use Zod schemas:
 
 ```typescript
-import { type InferOutput, object, string, optional, number } from "valibot";
+import { z } from "zod";
 
-export const MySchema = object({
-  field: string(),
-  optional: optional(number()),
+export const MySchema = z.object({
+  field: z.string(),
+  optional: z.number().optional(),
 });
 
-export type MyType = InferOutput<typeof MySchema>;
+export type MyType = z.infer<typeof MySchema>;
 
 // Validate data
-import { safeParse } from "valibot";
-const result = safeParse(MySchema, data);
+const result = MySchema.safeParse(data);
 if (result.success) {
-  // result.output is typed
+  // result.data is typed
 }
 ```
 
 ### Type Organization
 
-- Define Valibot schemas alongside types in `src/types/*.ts`
+- Define Zod schemas alongside types in `src/types/*.ts`
 - Key type files: `sentry.ts` (API types), `config.ts` (configuration), `oauth.ts` (auth flow), `seer.ts` (Seer AI)
 - Re-export from `src/types/index.ts`
 - Use `type` imports: `import type { MyType } from "../types/index.js"`
@@ -526,7 +525,7 @@ CliError (base, exitCode=1)
 - Pass `alternatives: []` when defaults are irrelevant (e.g., for missing Trace ID, Event ID)
 - Use `" and "` in `resource` for plural grammar: `"Trace ID and span ID"` → "are required"
 
-**CI enforcement:** `pnpm run check:errors` scans for `ContextError` with multiline commands and `CliError` with ad-hoc "Try:" strings. Silent `catch` blocks are enforced separately by the `no-silent-catch` Biome plugin (see below).
+**CI enforcement:** `pnpm run check:errors` scans for `ContextError` with multiline commands, `CliError` with ad-hoc "Try:" strings, and silent `catch` blocks (advisory).
 
 ```typescript
 // Usage examples
@@ -570,18 +569,11 @@ catch (error) {
 
 Use `logger.withTag("command-name")` for tagged logging in command files.
 
-**CI enforcement:** the `no-silent-catch` Biome plugin
-(`lint-rules/no-silent-catch.grit`, registered in `biome.jsonc`) flags `catch`
-blocks — statement and `.catch()` form — that are empty, comment-only, or
-return-only without surfacing the error. The pre-existing backlog is
-grandfathered in place with inline
-`// biome-ignore lint/plugin: <reason>` comments. Because `pnpm run lint` runs
-with `--error-on-warnings`, an *orphaned* suppression (left behind when a
-grandfathered catch is fixed) fails as `suppressions/unused` — so the backlog
-can only shrink, the same ratchet the old JSON baseline provided, with no
-separate script or baseline file to maintain. Fix a grandfathered catch by
-adding logging/re-throwing and deleting its `biome-ignore` line; only add a new
-suppression for a genuinely intentional silent catch, with a real reason.
+**CI enforcement:** `pnpm run check:errors` includes a silent-catch scan that flags
+`catch` blocks which are empty, comment-only, or return-only without surfacing the
+error. It is currently **advisory** (warns, does not fail CI) because of a pre-existing
+backlog; run with `SENTRY_STRICT_SILENT_CATCH=1` to enforce. Do not add new silent
+catches — they will appear in the scan output during review.
 
 ### Auto-Recovery for Wrong Entity Types
 
@@ -645,10 +637,10 @@ Every new `src/lib/**/*.ts` file must start with a module-level JSDoc comment de
 - Use `type` keyword for type-only imports
 
 ```typescript
-import { object, string, optional } from "valibot";
+import { z } from "zod";
 import { buildCommand } from "../../lib/command.js";
 import type { SentryContext } from "../../context.js";
-import { getAuthToken } from "../../lib/db/auth.js";
+import { getAuthToken } from "../../lib/config.js";
 ```
 
 ### List Command Infrastructure

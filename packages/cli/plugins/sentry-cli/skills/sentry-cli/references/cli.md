@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-cli
-version: 0.45.0
+version: 0.43.0-dev.0
 description: CLI-related commands
 requires:
   bins: ["sentry"]
@@ -10,22 +10,6 @@ requires:
 # CLI Commands
 
 CLI-related commands
-
-### `sentry cli completion <shell>`
-
-Print the shell completion script
-
-**Examples:**
-
-```bash
-# Print completions for your current shell (auto-detected from $SHELL)
-sentry cli completion
-
-# Generate for a specific shell
-sentry cli completion zsh > ~/.local/share/zsh/site-functions/_sentry
-eval "$(sentry cli completion bash)"
-sentry cli completion fish > ~/.config/fish/completions/sentry.fish
-```
 
 ### `sentry cli defaults <key value...>`
 
@@ -180,7 +164,6 @@ Update the Sentry CLI to the latest version
 - `--check - Check for updates without installing`
 - `--force - Force upgrade even if already on the latest version`
 - `--offline - Upgrade using only cached version info and patches (no network)`
-- `--no-agent-skills - Skip agent skill installation for AI coding assistants`
 - `--method <value> - Installation method to use (curl, brew, npm, pnpm, bun, yarn)`
 
 **Examples:**

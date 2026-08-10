@@ -11,7 +11,6 @@ import {
 } from "../../../lib/api-client.js";
 import { buildCommand, numberParser } from "../../../lib/command.js";
 import { ValidationError } from "../../../lib/errors.js";
-import { warning } from "../../../lib/formatters/colors.js";
 import { CommandOutput } from "../../../lib/formatters/output.js";
 import { resolveOrgOptionalProjectFromArg } from "../../../lib/resolve-target.js";
 import {
@@ -19,7 +18,6 @@ import {
   normalizeProjectList,
   parseJsonObjectList,
   parseStatusFlag,
-  resolveMetricDataset,
   statusToMetricValue,
   validateMetricDataset,
   validateMetricTimeWindow,
@@ -78,8 +76,7 @@ function validateMetricEditFlags(flags: EditFlags): void {
 function applyMetricCoreFields(
   body: Record<string, unknown>,
   flags: EditFlags
-): string | undefined {
-  let notice: string | undefined;
+): Record<string, unknown> {
   if (flags.name !== undefined) {
     body.name = flags.name;
   }
@@ -96,21 +93,15 @@ function applyMetricCoreFields(
     body.aggregate = flags.aggregate;
   }
   if (flags.dataset !== undefined) {
-    // Resolve against the effective query (the just-applied --query flag, or the
-    // rule's existing query) so a `transaction(s)` request routes to `spans`
-    // with `is_transaction:true` added even when --query is not also passed.
-    const currentQuery = typeof body.query === "string" ? body.query : "";
-    const resolved = resolveMetricDataset(flags.dataset, currentQuery);
-    validateMetricDataset(resolved.dataset);
-    body.dataset = resolved.dataset;
-    body.query = resolved.query;
-    notice = resolved.notice;
+    const dataset = normalizeMetricDataset(flags.dataset);
+    validateMetricDataset(dataset);
+    body.dataset = dataset;
   }
   if (flags["time-window"] !== undefined) {
     validateMetricTimeWindow(flags["time-window"]);
     body.timeWindow = flags["time-window"];
   }
-  return notice;
+  return body;
 }
 
 function applyMetricOptionalFields(
@@ -175,7 +166,7 @@ export const editCommand = buildCommand({
       "Examples:\n" +
       "  sentry alert metrics edit my-org/9 --name 'Error budget'\n" +
       "  sentry alert metrics edit my-org/9 --status disabled\n" +
-      "  sentry alert metrics edit my-org/9 --time-window 15 --dataset spans",
+      "  sentry alert metrics edit my-org/9 --time-window 15 --dataset transactions",
   },
   output: {
     human: formatEdited,
@@ -222,7 +213,7 @@ export const editCommand = buildCommand({
         parse: String,
         optional: true,
         brief:
-          "Dataset: errors (error-events), sessions, events, spans, metrics (transaction(s) routes to spans)",
+          "Dataset: errors (error-events), transactions (transaction-like), sessions, events, spans, metrics",
       },
       "time-window": {
         kind: "parsed",
@@ -280,12 +271,9 @@ export const editCommand = buildCommand({
     const body = {
       ...(await getMetricAlertRuleDocument(orgSlug, rule.id)),
     } as Record<string, unknown>;
-    const datasetNotice = applyMetricCoreFields(body, flags);
+    applyMetricCoreFields(body, flags);
     applyMetricOptionalFields(body, flags);
     validateMetricBody(body, flags);
-    if (datasetNotice) {
-      this.stderr.write(`${warning(`Tip: ${datasetNotice}`)}\n`);
-    }
     const updated = await putMetricAlertRule(orgSlug, rule.id, body);
     yield new CommandOutput({
       ...updated,

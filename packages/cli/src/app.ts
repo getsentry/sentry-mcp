@@ -5,8 +5,6 @@ import {
   UnexpectedPositionalError,
   UnsatisfiedPositionalError,
 } from "@stricli/core";
-import { conversationRoute } from "./commands/agent-conversation/index.js";
-import { listCommand as conversationListCommand } from "./commands/agent-conversation/list.js";
 import { alertRoute } from "./commands/alert/index.js";
 import { apiCommand } from "./commands/api.js";
 import { authRoute } from "./commands/auth/index.js";
@@ -15,11 +13,12 @@ import { bashHookCommand } from "./commands/bash-hook.js";
 import { buildRoute } from "./commands/build/index.js";
 import { cliRoute } from "./commands/cli/index.js";
 import { codeMappingsRoute } from "./commands/code-mappings/index.js";
+import { conversationRoute } from "./commands/conversation/index.js";
+import { listCommand as conversationListCommand } from "./commands/conversation/list.js";
 import { dartSymbolMapRoute } from "./commands/dart-symbol-map/index.js";
 import { dashboardRoute } from "./commands/dashboard/index.js";
 import { listCommand as dashboardListCommand } from "./commands/dashboard/list.js";
 import { debugFilesRoute } from "./commands/debug-files/index.js";
-import { docsRoute } from "./commands/docs/index.js";
 import { eventRoute } from "./commands/event/index.js";
 import { listCommand as eventListCommand } from "./commands/event/list.js";
 import { exploreCommand } from "./commands/explore.js";
@@ -55,7 +54,6 @@ import { snapshotsRoute } from "./commands/snapshots/index.js";
 import { sourcemapRoute } from "./commands/sourcemap/index.js";
 import { spanRoute } from "./commands/span/index.js";
 import { listCommand as spanListCommand } from "./commands/span/list.js";
-import { statusRoute } from "./commands/status/index.js";
 import { teamRoute } from "./commands/team/index.js";
 import { listCommand as teamListCommand } from "./commands/team/list.js";
 import { traceRoute } from "./commands/trace/index.js";
@@ -88,7 +86,7 @@ import { buildRouteMap } from "./lib/route-map.js";
  * Used to suggest the correct command when users type e.g. `sentry projects view cli`.
  */
 const PLURAL_TO_SINGULAR: Record<string, string> = {
-  "agent-conversations": "agent-conversation",
+  conversations: "conversation",
   dashboards: "dashboard",
   events: "event",
   issues: "issue",
@@ -116,11 +114,10 @@ export const routes = buildRouteMap({
     build: buildRoute,
     cli: cliRoute,
     "code-mappings": codeMappingsRoute,
-    "agent-conversation": conversationRoute,
+    conversation: conversationRoute,
     "dart-symbol-map": dartSymbolMapRoute,
     "debug-files": debugFilesRoute,
     dashboard: dashboardRoute,
-    docs: docsRoute,
     org: orgRoute,
     platform: platformRoute,
     project: projectRoute,
@@ -141,7 +138,6 @@ export const routes = buildRouteMap({
     sourcemap: sourcemapRoute,
     sourcemaps: sourcemapRoute,
     span: spanRoute,
-    status: statusRoute,
     trace: traceRoute,
     trial: trialRoute,
     init: initCommand,
@@ -153,7 +149,7 @@ export const routes = buildRouteMap({
     "send-event": sendEventCommand,
     "send-envelope": sendEnvelopeCommand,
     "bash-hook": bashHookCommand,
-    "agent-conversations": conversationListCommand,
+    conversations: conversationListCommand,
     dashboards: dashboardListCommand,
     issues: issueListCommand,
     orgs: orgListCommand,
@@ -177,7 +173,7 @@ export const routes = buildRouteMap({
       "sentry is a command-line interface for interacting with Sentry. " +
       "It provides commands for authentication, viewing issues, and making API calls.",
     hideRoute: {
-      "agent-conversations": true,
+      conversations: true,
       dashboards: true,
       events: true,
       issues: true,

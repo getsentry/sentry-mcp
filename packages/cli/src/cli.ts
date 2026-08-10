@@ -50,7 +50,6 @@ async function preloadProjectContext(cwd: string): Promise<void> {
   // Apply persistent URL default (lower priority than env vars and .sentryclirc).
   const env = getEnv();
   if (!(env.SENTRY_HOST?.trim() || env.SENTRY_URL?.trim())) {
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       const { getDefaultUrl } = await import("./lib/db/defaults.js");
       const url = getDefaultUrl();
@@ -246,8 +245,9 @@ export async function runCli(cliArgs: string[]): Promise<void> {
   const { runInteractiveLogin } = await import("./lib/interactive-login.js");
   const { recoverWithAutoLogin } = await import("./lib/auto-auth.js");
   const { getEnvLogLevel, setLogLevel } = await import("./lib/logger.js");
-  const { scheduleForceExit } = await import("./lib/force-exit.js");
-  const { closeGlobalDispatcher } = await import("./lib/close-dispatcher.js");
+  const { scheduleInitForceExitIfRequested } = await import(
+    "./lib/init/force-exit.js"
+  );
   const { isTrialEligible, promptAndStartTrial } = await import(
     "./lib/seer-trial.js"
   );
@@ -502,7 +502,6 @@ export async function runCli(cliArgs: string[]): Promise<void> {
           return;
         }
         // Best-effort: telemetry must never crash the CLI
-        // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
         try {
           await reportUnknownCommand(argv);
         } catch {
@@ -643,14 +642,9 @@ export async function runCli(cliArgs: string[]): Promise<void> {
   } finally {
     // Abort any pending version check to allow clean exit
     abortPendingVersionCheck();
-    // Arm the backstop first so it fires regardless of what the dispatcher
-    // teardown does. The unref'd timer only triggers if the loop is still
-    // referenced after a drained command, so it's a no-op on clean exits
-    // (a libuv refcount quirk on macOS keeps it worthwhile — see #1237).
-    scheduleForceExit();
-    // Release undici's pooled keep-alive sockets so the event loop can drain
-    // on its own — the root-cause fix. Never rejects (see close-dispatcher.ts).
-    await closeGlobalDispatcher();
+    // Runs after auto-auth, scope recovery, and command retry have reached a
+    // terminal result, so the init-specific macOS timer cannot interrupt them.
+    scheduleInitForceExitIfRequested();
   }
 
   // Show update notification after command completes
