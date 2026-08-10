@@ -68,6 +68,7 @@ describe("snapshots upload", () => {
   let existsSpy: ReturnType<typeof vi.spyOn>;
   let putSpy: ReturnType<typeof vi.spyOn>;
   let createSpy: ReturnType<typeof vi.spyOn>;
+  let uploadOptionsSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "snap-up-"));
@@ -75,9 +76,9 @@ describe("snapshots upload", () => {
       org: "test-org",
       project: "test-project",
     });
-    vi.spyOn(preprod, "fetchSnapshotsUploadOptions").mockResolvedValue(
-      UPLOAD_OPTIONS
-    );
+    uploadOptionsSpy = vi
+      .spyOn(preprod, "fetchSnapshotsUploadOptions")
+      .mockResolvedValue(UPLOAD_OPTIONS);
     existsSpy = vi.spyOn(objectstore, "objectExists").mockResolvedValue(false);
     putSpy = vi.spyOn(objectstore, "putObject").mockResolvedValue(undefined);
     createSpy = vi.spyOn(preprod, "createPreprodSnapshot").mockResolvedValue({
@@ -213,6 +214,130 @@ describe("snapshots upload", () => {
     expect(createSpy).not.toHaveBeenCalled();
     expect(putSpy).not.toHaveBeenCalled();
     expect(harness.output()).toContain("No image files found");
+  });
+
+  test("creates an all-unchanged snapshot from an inline image-name list", async () => {
+    const dir = join(tmpDir, "empty");
+    await mkdir(dir);
+    createSpy.mockResolvedValue({
+      artifactId: "snap-empty",
+      imageCount: 0,
+      snapshotUrl: "https://sentry.io/snap-empty",
+    });
+    const harness = createContext();
+    const func = await uploadCommand.loader();
+
+    await func.call(
+      harness.context,
+      {
+        "app-id": "app",
+        "all-image-file-names": "./a.png,sub\\b.jpg",
+      },
+      dir
+    );
+
+    expect(uploadOptionsSpy).not.toHaveBeenCalled();
+    expect(existsSpy).not.toHaveBeenCalled();
+    expect(putSpy).not.toHaveBeenCalled();
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    const manifest = createSpy.mock.calls[0]?.[2];
+    expect(manifest).toMatchObject({
+      app_id: "app",
+      selective: true,
+      all_image_file_names: ["a.png", "sub/b.jpg"],
+    });
+    expect(manifest?.images).toEqual({});
+    expect(harness.output()).toContain("snap-empty");
+  });
+
+  test("creates an all-unchanged snapshot from an image-name file", async () => {
+    const dir = join(tmpDir, "empty");
+    const namesFile = join(tmpDir, "all-images.txt");
+    await mkdir(dir);
+    await writeFile(namesFile, "a.png\nsub/b.png\n");
+    createSpy.mockResolvedValue({
+      artifactId: "snap-empty",
+      imageCount: 0,
+      snapshotUrl: null,
+    });
+    const func = await uploadCommand.loader();
+
+    await func.call(
+      createContext().context,
+      { "app-id": "app", "all-image-file-names-file": namesFile },
+      dir
+    );
+
+    expect(uploadOptionsSpy).not.toHaveBeenCalled();
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    const manifest = createSpy.mock.calls[0]?.[2];
+    expect(manifest).toMatchObject({
+      selective: true,
+      all_image_file_names: ["a.png", "sub/b.png"],
+    });
+    expect(manifest?.images).toEqual({});
+  });
+
+  test("keeps an empty --selective-only upload as a no-op", async () => {
+    const dir = join(tmpDir, "empty");
+    await mkdir(dir);
+    const harness = createContext();
+    const func = await uploadCommand.loader();
+
+    await func.call(harness.context, { "app-id": "app", selective: true }, dir);
+
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(uploadOptionsSpy).not.toHaveBeenCalled();
+    expect(harness.output()).toContain("No image files found");
+  });
+
+  test("rejects an unreadable image-name file for an empty upload", async () => {
+    const dir = join(tmpDir, "empty");
+    await mkdir(dir);
+    const func = await uploadCommand.loader();
+
+    await expect(
+      func.call(
+        createContext().context,
+        {
+          "app-id": "app",
+          "all-image-file-names-file": join(tmpDir, "missing.txt"),
+        },
+        dir
+      )
+    ).rejects.toThrow(ValidationError);
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  test("rejects an empty image-name list for an empty upload", async () => {
+    const dir = join(tmpDir, "empty");
+    const namesFile = join(tmpDir, "all-images.txt");
+    await mkdir(dir);
+    await writeFile(namesFile, " \n\n");
+    const func = await uploadCommand.loader();
+
+    await expect(
+      func.call(
+        createContext().context,
+        { "app-id": "app", "all-image-file-names-file": namesFile },
+        dir
+      )
+    ).rejects.toThrow(ValidationError);
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    { "all-image-file-names": "" },
+    { "all-image-file-names-file": "" },
+  ])("rejects an explicitly empty image-name flag", async (flag) => {
+    const dir = join(tmpDir, "empty");
+    await mkdir(dir);
+    const func = await uploadCommand.loader();
+
+    await expect(
+      func.call(createContext().context, { "app-id": "app", ...flag }, dir)
+    ).rejects.toThrow(ValidationError);
+    expect(createSpy).not.toHaveBeenCalled();
   });
 
   test("rejects a path that is not a directory", async () => {

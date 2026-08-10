@@ -68,7 +68,7 @@ type SnapshotUploadResult = {
   uploaded: number;
   /** Number of images skipped (already present in objectstore). */
   skipped: number;
-  /** The created snapshot, or `null` when there were no images. */
+  /** The created snapshot, or `null` when there was nothing to record. */
   snapshot: CreateSnapshotResponse | null;
 };
 
@@ -97,7 +97,7 @@ function parsePrNumber(value: string): number {
 async function resolveAllImageNames(
   flags: UploadFlags
 ): Promise<string[] | undefined> {
-  if (flags["all-image-file-names"]) {
+  if (flags["all-image-file-names"] !== undefined) {
     const names = normalizeImageNames(
       splitAndTrim(flags["all-image-file-names"], ",")
     );
@@ -109,7 +109,7 @@ async function resolveAllImageNames(
     }
     return names;
   }
-  if (flags["all-image-file-names-file"]) {
+  if (flags["all-image-file-names-file"] !== undefined) {
     const path = flags["all-image-file-names-file"];
     let content: string;
     try {
@@ -475,7 +475,10 @@ export const uploadCommand = buildCommand({
     }
     const { org, project } = resolved;
 
-    if (flags["all-image-file-names"] && flags["all-image-file-names-file"]) {
+    if (
+      flags["all-image-file-names"] !== undefined &&
+      flags["all-image-file-names-file"] !== undefined
+    ) {
       throw new ValidationError(
         "--all-image-file-names and --all-image-file-names-file cannot be used together",
         "all-image-file-names"
@@ -484,7 +487,11 @@ export const uploadCommand = buildCommand({
     const vcs = collectVcs(flags, this.cwd, this.env);
 
     const images = await collectImages(dir);
-    if (images.length === 0) {
+    validateImageSizes(images);
+
+    const { selective, allImageNames } = await resolveSelective(flags, images);
+    // A complete name list makes zero uploaded images a valid all-unchanged run.
+    if (images.length === 0 && allImageNames === undefined) {
       yield new CommandOutput<SnapshotUploadResult>({
         imagesFound: 0,
         uploaded: 0,
@@ -493,16 +500,17 @@ export const uploadCommand = buildCommand({
       });
       return { hint: "No image files found." };
     }
-    validateImageSizes(images);
 
-    const { selective, allImageNames } = await resolveSelective(flags, images);
-
-    log.info(`Uploading ${images.length} image(s)...`);
-    const { entries, uploaded, skipped } = await uploadImages(
-      org,
-      project,
-      images
-    );
+    let uploadResult: UploadImagesResult = {
+      entries: {},
+      uploaded: 0,
+      skipped: 0,
+    };
+    if (images.length > 0) {
+      log.info(`Uploading ${images.length} image(s)...`);
+      uploadResult = await uploadImages(org, project, images);
+    }
+    const { entries, uploaded, skipped } = uploadResult;
 
     const manifest = buildManifest({
       appId: flags["app-id"],
