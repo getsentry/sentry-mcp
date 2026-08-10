@@ -3847,7 +3847,7 @@
   },
   {
     "name": "search_ai_conversations",
-    "description": "Search Sentry AI Conversations and return one summary row per conversation.\n\nUse this tool to find or list AI Conversations. Results are conversation summaries, not raw span rows.\nUse get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_ai_conversations(organizationSlug='my-org', query='failed conversations', period='7d')\nsearch_ai_conversations(organizationSlug='my-org', query='checkout', project='backend')\n</examples>",
+    "description": "Search Sentry AI Conversations and return one summary row per conversation.\n\nUse this tool to find or list AI Conversations. Results are conversation summaries, not raw span rows.\nEach row includes title (when available), cost, tokens, call counts, previews, and other list metadata.\nUse get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_ai_conversations(organizationSlug='my-org', query='failed conversations', period='7d')\nsearch_ai_conversations(organizationSlug='my-org', query='checkout', project='backend')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3954,6 +3954,16 @@
             "properties": {
               "conversationId": {
                 "type": "string"
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "url": {
                 "type": "string",
@@ -4064,6 +4074,7 @@
             },
             "required": [
               "conversationId",
+              "title",
               "url",
               "startTimestamp",
               "endTimestamp",

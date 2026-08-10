@@ -1412,6 +1412,7 @@ describe("buildServer", () => {
             return HttpResponse.json([
               {
                 conversationId: "conv-123",
+                title: "Checkout worker timeouts",
                 flow: ["triage-agent"],
                 errors: 1,
                 llmCalls: 2,

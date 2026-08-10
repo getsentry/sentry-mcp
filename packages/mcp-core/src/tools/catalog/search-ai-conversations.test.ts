@@ -10,6 +10,7 @@ import {
 
 const baseConversation = {
   conversationId: "conv-123",
+  title: "Checkout worker timeouts",
   flow: ["triage-agent"],
   errors: 1,
   llmCalls: 2,
@@ -106,6 +107,7 @@ describe("search_ai_conversations", () => {
               "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             ],
             "startTimestamp": 1713805400000,
+            "title": "Checkout worker timeouts",
             "toolCallCount": 1,
             "toolErrorCount": 1,
             "toolNames": [
