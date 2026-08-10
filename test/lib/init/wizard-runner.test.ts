@@ -721,6 +721,32 @@ describe("runWizard", () => {
     expect(lastFeedbackOutcome()).toBe("failed");
   });
 
+  test("preserves 403 errors thrown for command-level scope inspection", async () => {
+    const payload: ToolPayload = {
+      type: "tool",
+      operation: "create-sentry-project",
+      cwd: "/tmp/test",
+      params: { name: "my-app", platform: "javascript-react" },
+    };
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["ensure-sentry-project"]],
+      steps: {
+        "ensure-sentry-project": { suspendPayload: payload },
+      },
+    };
+    const scopeError = new ApiError("Forbidden", 403);
+    executeToolSpy.mockRejectedValue(scopeError);
+
+    await expect(runWizard(makeOptions())).rejects.toBe(scopeError);
+
+    expect(spinnerMock.stop).toHaveBeenCalledWith(
+      "Sentry API request denied",
+      1
+    );
+    expect(lastCancelMessage()).toBe("Sentry API request denied");
+  });
+
   test("tears down forwarding and stops the spinner on cancellation", async () => {
     const captureSpy = vi.spyOn(Sentry, "captureException");
     const payload: ToolPayload = {

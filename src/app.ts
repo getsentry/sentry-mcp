@@ -67,6 +67,7 @@ import {
 import { CLI_VERSION } from "./lib/constants.js";
 import { reportCliError } from "./lib/error-reporting.js";
 import {
+  ApiError,
   AuthError,
   CliError,
   getExitCode,
@@ -280,6 +281,16 @@ function formatSynonymError(
   return `${prefix} ${exc.format()}\n${tip}`;
 }
 
+function escapesToOuterMiddleware(exc: unknown): boolean {
+  if (exc instanceof OutputError) {
+    return true;
+  }
+  if (exc instanceof AuthError) {
+    return exc.reason === "not_authenticated" || exc.reason === "expired";
+  }
+  return exc instanceof ApiError && (exc.status === 401 || exc.status === 403);
+}
+
 /**
  * Custom error formatting for CLI errors.
  *
@@ -353,19 +364,9 @@ const customText: ApplicationText = {
     return base;
   },
   exceptionWhileRunningCommand: (exc: unknown, ansiColor: boolean): string => {
-    // OutputError: data was already rendered to stdout — just re-throw
-    // so the exit code propagates without Stricli printing an error message.
-    if (exc instanceof OutputError) {
-      throw exc;
-    }
-
-    // Re-throw AuthError for auto-login flow in bin.ts
-    // Don't capture to Sentry - it's an expected state (user not logged in or token expired), not an error
-    // Note: skipAutoAuth is checked in bin.ts, not here — all auth errors must escape Sentry capture
-    if (
-      exc instanceof AuthError &&
-      (exc.reason === "not_authenticated" || exc.reason === "expired")
-    ) {
+    // These errors are handled outside Stricli: OutputError has already been
+    // rendered, while auth errors may trigger login and a single retry.
+    if (escapesToOuterMiddleware(exc)) {
       throw exc;
     }
 

@@ -1,12 +1,11 @@
 /**
  * Process-wide gate for interactive prompts.
  *
- * Commands that emit machine-readable output (`--json`, or `SENTRY_OUTPUT_FORMAT=json`)
- * must never block on an interactive prompt or interleave prompt UI with JSON on
- * stdout. The command wrapper disables prompts for such runs via
+ * Commands that emit machine-readable output or explicitly run unattended
+ * (`--json`, `--yes`, or `--dry-run`) must never block on an interactive prompt.
+ * The command wrapper disables prompts from parsed flag values via
  * {@link setInteractivePromptsAllowed}, and prompt sites (e.g. the org/project
- * picker in `resolve-target.ts`) consult {@link interactivePromptsAllowed}
- * before showing a prompt.
+ * picker in `resolve-target.ts`) consult {@link interactivePromptsAllowed}.
  *
  * Defaults to `true` so code paths that run outside the command wrapper (tests,
  * library callers) fall back to their own TTY checks rather than being silently

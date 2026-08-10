@@ -707,9 +707,16 @@ export function buildCommand<
       }
     }
 
-    // Suppress interactive prompts (e.g. the org/project picker) in JSON mode so
-    // a prompt never blocks a scripted run or interleaves with stdout JSON.
-    setInteractivePromptsAllowed(!cleanFlags.json);
+    // Suppress prompts when parsed command flags require unattended or
+    // machine-readable execution. Using parsed flags avoids confusing aliases
+    // such as list command `-n` (limit) with init's `-n` (dry-run).
+    setInteractivePromptsAllowed(
+      !(
+        cleanFlags.json === true ||
+        cleanFlags.yes === true ||
+        cleanFlags["dry-run"] === true
+      )
+    );
 
     const stdout = (this as unknown as { stdout: Writer }).stdout;
 

@@ -11,6 +11,10 @@ vi.mock("../../../../src/lib/api-client.js", async (importOriginal) => {
   );
 });
 
+vi.mock("../../../../src/lib/scope-recovery.js", () => ({
+  captureOAuthScopeRecoveryGate: vi.fn(),
+}));
+
 // biome-ignore lint/performance/noNamespaceImport: spyOn requires object reference
 import * as apiClient from "../../../../src/lib/api-client.js";
 import { ApiError } from "../../../../src/lib/errors.js";
@@ -18,10 +22,13 @@ import {
   createSentryProject,
   createSentryProjectTool,
 } from "../../../../src/lib/init/tools/create-sentry-project.js";
+import { executeTool } from "../../../../src/lib/init/tools/registry.js";
 import type {
   CreateSentryProjectPayload,
   EnsureSentryProjectPayload,
 } from "../../../../src/lib/init/types.js";
+// biome-ignore lint/performance/noNamespaceImport: spyOn requires object reference
+import * as scopeRecovery from "../../../../src/lib/scope-recovery.js";
 
 vi.mock("../../../../src/lib/resolve-team.js", async (importOriginal) => {
   const actual =
@@ -82,8 +89,13 @@ let createProjectWithAutoTeamSpy: ReturnType<typeof spyOn>;
 let getProjectSpy: ReturnType<typeof spyOn>;
 let tryGetPrimaryDsnSpy: ReturnType<typeof spyOn>;
 let resolveOrCreateTeamSpy: ReturnType<typeof spyOn>;
+let shouldDelegateScopeRecovery: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  shouldDelegateScopeRecovery = vi.fn().mockResolvedValue(false);
+  vi.mocked(scopeRecovery.captureOAuthScopeRecoveryGate).mockReturnValue({
+    shouldDelegate: shouldDelegateScopeRecovery,
+  });
   createProjectWithDsnSpy = vi
     .spyOn(apiClient, "createProjectWithDsn")
     .mockResolvedValue({
@@ -124,12 +136,14 @@ afterEach(() => {
   getProjectSpy.mockRestore();
   tryGetPrimaryDsnSpy.mockRestore();
   resolveOrCreateTeamSpy.mockRestore();
+  vi.mocked(scopeRecovery.captureOAuthScopeRecoveryGate).mockReset();
 });
 
 describe("createSentryProject", () => {
   test("returns the pre-resolved existing project without creating", async () => {
     const result = await createSentryProject(makePayload(), {
       dryRun: false,
+      yes: false,
       org: "acme",
       team: undefined,
       project: "my-app",
@@ -151,6 +165,7 @@ describe("createSentryProject", () => {
   test("accepts the legacy ensure-sentry-project alias", async () => {
     const result = await createSentryProject(makeEnsurePayload(), {
       dryRun: false,
+      yes: false,
       org: "acme",
       team: undefined,
       project: "my-app",
@@ -171,6 +186,7 @@ describe("createSentryProject", () => {
   test("returns error when project name produces an empty slug", async () => {
     const result = await createSentryProject(makePayload({ name: "---" }), {
       dryRun: false,
+      yes: false,
       org: "acme",
       team: undefined,
       project: undefined,
@@ -186,6 +202,7 @@ describe("createSentryProject", () => {
 
     const result = await createSentryProject(makePayload(), {
       dryRun: false,
+      yes: false,
       org: "acme",
       team: "platform",
       project: undefined,
@@ -205,6 +222,7 @@ describe("createSentryProject", () => {
   test("re-checks for an existing project before creating when the slug is known", async () => {
     const result = await createSentryProject(makePayload(), {
       dryRun: false,
+      yes: false,
       org: "acme",
       team: "platform",
       project: undefined,
@@ -221,6 +239,7 @@ describe("createSentryProject", () => {
 
     const result = await createSentryProject(makePayload(), {
       dryRun: false,
+      yes: false,
       org: "acme",
       team: "platform",
       project: undefined,
@@ -236,6 +255,7 @@ describe("createSentryProject", () => {
 
     const result = await createSentryProject(makePayload(), {
       dryRun: true,
+      yes: true,
       org: "acme",
       team: "platform",
       project: undefined,
@@ -256,6 +276,7 @@ describe("createSentryProject", () => {
 
     const result = await createSentryProject(makePayload(), {
       dryRun: false,
+      yes: false,
       org: "acme",
       team: undefined,
       project: undefined,
@@ -284,6 +305,7 @@ describe("createSentryProject", () => {
 
     const result = await createSentryProject(makePayload(), {
       dryRun: false,
+      yes: false,
       org: "acme",
       team: undefined,
       project: undefined,
@@ -314,6 +336,7 @@ describe("createSentryProject", () => {
 
     const result = await createSentryProject(makePayload(), {
       dryRun: false,
+      yes: false,
       org: "acme",
       team: "platform",
       project: undefined,
@@ -334,6 +357,7 @@ describe("createSentryProject", () => {
 
     const result = await createSentryProject(makePayload(), {
       dryRun: false,
+      yes: false,
       org: "acme",
       team: "backend",
       isExplicitTeam: true,
@@ -342,6 +366,78 @@ describe("createSentryProject", () => {
 
     expect(result.ok).toBe(false);
     expect(createProjectWithAutoTeamSpy).not.toHaveBeenCalled();
+  });
+
+  test("lets a recoverable 403 escape the real tool registry", async () => {
+    shouldDelegateScopeRecovery.mockResolvedValueOnce(true);
+    getProjectSpy.mockRejectedValueOnce(new ApiError("Not found", 404));
+    createProjectWithAutoTeamSpy.mockRejectedValueOnce(
+      new ApiError("Forbidden", 403, "No project:write access")
+    );
+
+    const error = await executeTool(makePayload(), {
+      directory: "/tmp/test",
+      yes: false,
+      dryRun: false,
+      org: "acme",
+      team: undefined,
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(403);
+    expect(shouldDelegateScopeRecovery).toHaveBeenCalledWith(
+      expect.any(ApiError),
+      {
+        unattended: false,
+      }
+    );
+  });
+
+  test("keeps the tool fallback when OAuth recovery is unattended", async () => {
+    getProjectSpy.mockRejectedValueOnce(new ApiError("Not found", 404));
+    createProjectWithAutoTeamSpy.mockRejectedValueOnce(
+      new ApiError("Forbidden", 403, "No project:write access")
+    );
+
+    const result = await createSentryProject(makePayload(), {
+      dryRun: false,
+      yes: true,
+      org: "acme",
+      team: undefined,
+      project: undefined,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(shouldDelegateScopeRecovery).toHaveBeenCalledWith(
+      expect.any(ApiError),
+      {
+        unattended: true,
+      }
+    );
+  });
+
+  test("keeps the policy-specific error when OAuth scopes are stale", async () => {
+    shouldDelegateScopeRecovery.mockResolvedValueOnce(true);
+    getProjectSpy.mockRejectedValueOnce(new ApiError("Not found", 404));
+    createProjectWithAutoTeamSpy.mockRejectedValueOnce(
+      new ApiError(
+        "Forbidden",
+        403,
+        "Your organization has disabled this feature for members."
+      )
+    );
+
+    const result = await createSentryProject(makePayload(), {
+      dryRun: false,
+      yes: false,
+      org: "acme",
+      team: undefined,
+      project: undefined,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("disabled for members");
+    expect(shouldDelegateScopeRecovery).not.toHaveBeenCalled();
   });
 
   test("does not fall back on team-scoped policy 403", async () => {
@@ -356,6 +452,7 @@ describe("createSentryProject", () => {
 
     const result = await createSentryProject(makePayload(), {
       dryRun: false,
+      yes: false,
       org: "acme",
       team: "platform",
       project: undefined,
@@ -374,6 +471,7 @@ describe("createSentryProject", () => {
 
     const result = await createSentryProject(makePayload(), {
       dryRun: false,
+      yes: false,
       org: "acme",
       team: undefined,
       project: undefined,
@@ -390,6 +488,7 @@ describe("createSentryProject", () => {
 
     const result = await createSentryProject(makePayload(), {
       dryRun: true,
+      yes: true,
       org: "acme",
       team: undefined,
       project: undefined,

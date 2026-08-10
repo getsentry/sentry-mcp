@@ -15,6 +15,7 @@ import {
 } from "../../api-client.js";
 import { ApiError } from "../../errors.js";
 import { resolveOrCreateTeam } from "../../resolve-team.js";
+import { captureOAuthScopeRecoveryGate } from "../../scope-recovery.js";
 import { slugify } from "../../utils.js";
 import { tryGetExistingProjectData } from "../existing-project.js";
 import { formatMemberProjectCreationDisabledError } from "../project-creation-errors.js";
@@ -200,7 +201,13 @@ export async function createSentryProject(
   payload: CreateSentryProjectPayload | EnsureSentryProjectPayload,
   context: Pick<
     ToolContext,
-    "dryRun" | "existingProject" | "isExplicitTeam" | "org" | "team" | "project"
+    | "dryRun"
+    | "existingProject"
+    | "isExplicitTeam"
+    | "org"
+    | "team"
+    | "project"
+    | "yes"
   >
 ): Promise<ToolResult> {
   const name = context.project ?? payload.params.name;
@@ -220,6 +227,7 @@ export async function createSentryProject(
     };
   }
 
+  const scopeRecovery = captureOAuthScopeRecoveryGate();
   try {
     const existingProject = await tryGetExistingProjectData(context.org, slug);
     if (existingProject) {
@@ -279,6 +287,13 @@ export async function createSentryProject(
         ok: false,
         error: formatMemberProjectCreationDisabledError(context.org),
       };
+    }
+    if (
+      await scopeRecovery.shouldDelegate(error, {
+        unattended: context.yes || context.dryRun,
+      })
+    ) {
+      throw error;
     }
     // 409: project already exists (from either the team-scoped or org-scoped
     // endpoint — both propagate here). Surface a friendly message with a view

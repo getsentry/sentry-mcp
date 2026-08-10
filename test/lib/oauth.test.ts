@@ -23,6 +23,10 @@ import { DEFAULT_NUM_RUNS } from "../model-based/helpers.js";
 const knownScopeArb = constantFrom(...SENTRY_SCOPES);
 
 describe("resolveOAuthScopeString", () => {
+  test("default scopes include Team Admin for project creation", () => {
+    expect(OAUTH_SCOPES).toContain("team:admin");
+  });
+
   test("default (no selection) returns the full OAUTH_SCOPES set", () => {
     expect(resolveOAuthScopeString()).toBe(OAUTH_SCOPES.join(" "));
     expect(resolveOAuthScopeString({})).toBe(OAUTH_SCOPES.join(" "));

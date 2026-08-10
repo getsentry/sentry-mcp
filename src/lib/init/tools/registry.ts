@@ -1,3 +1,4 @@
+import { ApiError } from "../../errors.js";
 import type { ToolOperation, ToolPayload, ToolResult } from "../types.js";
 import { applyPatchsetTool } from "./apply-patchset.js";
 import {
@@ -62,6 +63,12 @@ export async function executeTool(
   try {
     return await tool.execute(payload as never, context);
   } catch (error) {
+    if (
+      error instanceof ApiError &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      throw error;
+    }
     return { ok: false, error: formatToolError(error) };
   }
 }

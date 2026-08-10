@@ -28,7 +28,12 @@ import {
 } from "../../src/lib/command.js";
 import { EXIT, OutputError } from "../../src/lib/errors.js";
 import { CommandOutput } from "../../src/lib/formatters/output.js";
+import {
+  interactivePromptsAllowed,
+  setInteractivePromptsAllowed,
+} from "../../src/lib/interactive-prompts.js";
 import { LOG_LEVEL_NAMES, logger, setLogLevel } from "../../src/lib/logger.js";
+import { DRY_RUN_FLAG, YES_FLAG } from "../../src/lib/mutate-command.js";
 import { resolveOrgAndProject } from "../../src/lib/resolve-target.js";
 import { buildRouteMap } from "../../src/lib/route-map.js";
 
@@ -74,6 +79,75 @@ function createTestContext() {
     errors: stderrCollected,
   };
 }
+
+test("derives prompt availability from parsed flags instead of ambiguous aliases", async () => {
+  type InitPromptFlags = { yes: boolean; "dry-run": boolean };
+  type DataFlags = { limit?: number; row?: number };
+  const promptStates: boolean[] = [];
+
+  const initCommand = buildCommand<InitPromptFlags, [], TestContext>({
+    auth: false,
+    docs: { brief: "Init" },
+    parameters: {
+      flags: { yes: YES_FLAG, "dry-run": DRY_RUN_FLAG },
+      aliases: { y: "yes", n: "dry-run" },
+    },
+    // biome-ignore lint/correctness/useYield: test command only observes wrapper state
+    async *func() {
+      promptStates.push(interactivePromptsAllowed());
+    },
+  });
+  const dataCommand = buildCommand<DataFlags, [], TestContext>({
+    auth: false,
+    docs: { brief: "Data" },
+    parameters: {
+      flags: {
+        limit: {
+          kind: "parsed",
+          parse: numberParser,
+          brief: "Limit",
+          optional: true,
+        },
+        row: {
+          kind: "parsed",
+          parse: numberParser,
+          brief: "Row",
+          optional: true,
+        },
+      },
+      aliases: { n: "limit", y: "row" },
+    },
+    // biome-ignore lint/correctness/useYield: test command only observes wrapper state
+    async *func() {
+      promptStates.push(interactivePromptsAllowed());
+    },
+  });
+  const routeMap = buildRouteMap({
+    routes: { init: initCommand, data: dataCommand },
+    docs: { brief: "Test app" },
+  });
+  const app = buildApplication(routeMap, { name: "test" });
+  const ctx = createTestContext();
+  const cases: Array<{
+    args: string[];
+    expected: boolean;
+  }> = [
+    { args: ["init", "-y"], expected: false },
+    { args: ["init", "-n"], expected: false },
+    { args: ["init", "--yes=false"], expected: true },
+    { args: ["data", "-n", "10"], expected: true },
+    { args: ["data", "-y", "2"], expected: true },
+  ];
+
+  try {
+    for (const testCase of cases) {
+      await run(app, testCase.args, ctx as TestContext);
+      expect(promptStates.at(-1)).toBe(testCase.expected);
+    }
+  } finally {
+    setInteractivePromptsAllowed(true);
+  }
+});
 
 describe("buildCommand", () => {
   test("builds a valid command object", () => {

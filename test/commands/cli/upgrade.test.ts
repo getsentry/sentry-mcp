@@ -11,7 +11,7 @@
 
 // biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
 import * as child_process from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -61,6 +61,7 @@ function createMockContext(
     homeDir: string;
     env: Record<string, string | undefined>;
     execPath: string;
+    argv: string[];
   }> = {}
 ): {
   context: SentryContext;
@@ -118,6 +119,7 @@ function createMockContext(
       env,
       cwd: () => "/tmp",
       execPath: overrides.execPath ?? "/usr/local/bin/sentry",
+      argv: overrides.argv ?? ["/usr/local/bin/sentry"],
       exit: vi.fn(() => {
         // no-op for tests
       }),
@@ -778,6 +780,56 @@ describe("sentry cli upgrade — curl full upgrade path (child_process.spawn spy
     expect(setupCall?.args).toContain("--method");
     expect(setupCall?.args).toContain("curl");
     expect(setupCall?.args).toContain("--install");
+    expect(setupCall?.args).toContain("--ensure-auth-scopes");
+  });
+
+  test("does not launch interactive auth from JSON upgrades", async () => {
+    mockBinaryDownloadWithVersion("99.99.99");
+
+    const { context, restore } = createMockContext({ homeDir: testDir });
+    restoreStderr = restore;
+
+    await run(app, ["cli", "upgrade", "--method", "curl", "--json"], context);
+
+    const setupCall = spawnedArgs.find((entry) => entry.args.includes("setup"));
+    expect(setupCall).toBeDefined();
+    expect(setupCall?.args).not.toContain("--ensure-auth-scopes");
+  });
+
+  test("runs setup through the CLI entrypoint after an npm upgrade", async () => {
+    mockGitHubVersion("99.99.99");
+    const entryPath = "/npm/global/node_modules/sentry/dist/bin.cjs";
+    const { context, restore } = createMockContext({
+      homeDir: testDir,
+      execPath: "/usr/bin/node",
+      argv: ["/usr/bin/node", entryPath],
+    });
+    restoreStderr = restore;
+
+    await run(app, ["cli", "upgrade", "--method", "npm"], context);
+
+    const setupCall = spawnedArgs.find((entry) => entry.args.includes("setup"));
+    expect(setupCall?.cmd).toBe(entryPath);
+    expect(setupCall?.args).toContain("--ensure-auth-scopes");
+  });
+
+  test("runs the new Homebrew binary and keeps JSON upgrades non-interactive", async () => {
+    mockGitHubVersion("99.99.99");
+    const binaryPath = join(testDir, "sentry");
+    writeFileSync(binaryPath, "#!/bin/sh\n");
+    chmodSync(binaryPath, 0o755);
+    const { context, restore } = createMockContext({
+      homeDir: testDir,
+      execPath: "/opt/homebrew/Cellar/sentry/old/bin/sentry",
+      env: { PATH: testDir },
+    });
+    restoreStderr = restore;
+
+    await run(app, ["cli", "upgrade", "--method", "brew", "--json"], context);
+
+    const setupCall = spawnedArgs.find((entry) => entry.args.includes("setup"));
+    expect(setupCall?.cmd).toBe(binaryPath);
+    expect(setupCall?.args).not.toContain("--ensure-auth-scopes");
   });
 
   test("reports setup failure when spawn exits non-zero", async () => {
