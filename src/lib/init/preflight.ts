@@ -7,6 +7,7 @@ import {
 import { getAuthToken } from "../db/auth.js";
 import { ApiError, AuthError, HostScopeError, WizardError } from "../errors.js";
 import { buildOrgNotFoundError, resolveOrCreateTeam } from "../resolve-team.js";
+import { captureOAuthScopeRecoveryGate } from "../scope-recovery.js";
 import { slugify } from "../utils.js";
 import { WizardCancelledError } from "./clack-utils.js";
 import { tryGetExistingProjectData } from "./existing-project.js";
@@ -82,7 +83,12 @@ async function withPreflightHandling(
       return null;
     }
 
-    if (error instanceof AuthError || error instanceof HostScopeError) {
+    if (
+      error instanceof AuthError ||
+      error instanceof HostScopeError ||
+      (error instanceof ApiError &&
+        (error.status === 401 || error.status === 403))
+    ) {
       throw error;
     }
 
@@ -343,6 +349,7 @@ async function resolveTeam(
     return await resolveImplicitTeam(org, initial, ui);
   }
 
+  const scopeRecovery = captureOAuthScopeRecoveryGate();
   try {
     const result = await resolveOrCreateTeam(org, {
       team: initial.team,
@@ -353,6 +360,15 @@ async function resolveTeam(
     return result.source === "deferred" ? undefined : result.slug;
   } catch (error) {
     if (error instanceof WizardCancelledError) {
+      throw error;
+    }
+    if (
+      error instanceof ApiError &&
+      (error.status === 401 || error.status === 403) &&
+      (await scopeRecovery.shouldDelegate(error, {
+        unattended: initial.yes || initial.dryRun,
+      }))
+    ) {
       throw error;
     }
     if (error instanceof ApiError && error.status === 403) {
@@ -409,13 +425,22 @@ async function assertOrgScopedCreationCanProceed(org: string): Promise<void> {
 }
 
 async function listTeamsForImplicitInit(
-  org: string
+  org: string,
+  unattended: boolean
 ): Promise<SentryTeam[] | undefined> {
+  const scopeRecovery = captureOAuthScopeRecoveryGate();
   try {
     return await listTeams(org);
   } catch (error) {
     // 403 from listTeams means the user cannot inspect team access. Continue
     // without a team so init mirrors onboarding's org-scoped auto-team path.
+    if (
+      error instanceof ApiError &&
+      (error.status === 401 || error.status === 403) &&
+      (await scopeRecovery.shouldDelegate(error, { unattended }))
+    ) {
+      throw error;
+    }
     if (error instanceof ApiError && error.status === 403) {
       await assertOrgScopedCreationCanProceed(org);
       return;
@@ -432,7 +457,10 @@ async function resolveImplicitTeam(
   initial: WizardOptions,
   ui: WizardUI
 ): Promise<string | undefined> {
-  const teams = await listTeamsForImplicitInit(org);
+  const teams = await listTeamsForImplicitInit(
+    org,
+    initial.yes || initial.dryRun
+  );
   if (!teams) {
     return;
   }
@@ -505,9 +533,13 @@ async function resolveOrgSlug(
   }
 
   let orgs: Awaited<ReturnType<typeof listOrganizations>>;
+  const scopeRecovery = captureOAuthScopeRecoveryGate();
   try {
     orgs = await listOrganizations();
   } catch (error) {
+    if (await scopeRecovery.shouldDelegate(error, { unattended: yes })) {
+      throw error;
+    }
     return handleOrgListError(error);
   }
   orgs.sort(

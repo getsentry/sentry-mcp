@@ -90,6 +90,7 @@ export const OAUTH_SCOPES: readonly string[] = [
   "member:read",
   "team:read",
   "team:write",
+  "team:admin",
   "alerts:read",
   "alerts:write",
 ];

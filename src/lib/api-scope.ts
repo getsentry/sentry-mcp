@@ -61,6 +61,11 @@ export function extractRequiredScopes(detail: unknown): string[] {
   if (!detail) {
     return [];
   }
+  const serializedDetail =
+    typeof detail === "string" ? detail : JSON.stringify(detail);
+  if (isMemberProjectCreationPolicy(serializedDetail)) {
+    return [];
+  }
   if (typeof detail === "object") {
     const fromFields = extractFromRecord(detail as Record<string, unknown>);
     if (fromFields.length > 0) {
@@ -73,6 +78,15 @@ export function extractRequiredScopes(detail: unknown): string[] {
     return extractFromText(detail);
   }
   return [];
+}
+
+/** A role/policy denial can mention scope names without a token lacking them. */
+function isMemberProjectCreationPolicy(detail: string): boolean {
+  const normalized = detail.toLowerCase();
+  return (
+    normalized.includes("disabled this feature for members") ||
+    normalized.includes("org-level policy setting, not an auth issue")
+  );
 }
 
 function extractFromRecord(record: Record<string, unknown>): string[] {
