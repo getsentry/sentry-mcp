@@ -1640,6 +1640,8 @@ export const AIConversationUserSchema = z
 export const AIConversationSummarySchema = z
   .object({
     conversationId: z.string(),
+    // AI-generated title from conversation metadata when available.
+    title: z.string().nullable(),
     flow: z.array(z.string()),
     errors: z.number(),
     llmCalls: z.number(),
