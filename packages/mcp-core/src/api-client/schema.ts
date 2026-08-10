@@ -1103,7 +1103,7 @@ const BaseEventSchema = z.object({
   // It's safer to type as unknown since its structure varies
   _meta: z.unknown().optional(),
   // dateReceived is when the server received the event (may not be present in all contexts)
-  dateReceived: z.string().datetime().optional(),
+  dateReceived: z.string().datetime().nullish(),
 });
 
 export const ErrorEventSchema = BaseEventSchema.omit({
@@ -1195,7 +1195,7 @@ export const GenericEventSchema = BaseEventSchema.omit({
   type: z.literal("generic"),
   culprit: z.string().nullable().optional(),
   dateCreated: z.string().datetime(),
-  occurrence: OccurrenceSchema.optional(),
+  occurrence: OccurrenceSchema.nullish(),
 });
 
 export const UnknownEventSchema = BaseEventSchema.omit({
