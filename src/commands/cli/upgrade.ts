@@ -54,6 +54,7 @@ import {
   VERSION_PREFIX_REGEX,
   versionExists,
 } from "../../lib/upgrade.js";
+import { whichSync } from "../../lib/which.js";
 
 const log = logger.withTag("cli.upgrade");
 
@@ -428,7 +429,7 @@ async function spawnWithRetry(
   for (let attempt = 1; attempt <= SPAWN_MAX_ATTEMPTS; attempt++) {
     try {
       const proc = spawn(binaryPath, args, {
-        stdio: ["ignore", "inherit", "inherit"],
+        stdio: "inherit",
         env,
       });
       return await new Promise<number>((resolve, reject) => {
@@ -493,6 +494,8 @@ type SetupOptions = {
   install: boolean;
   /** Pin the install directory (prevents relocation during upgrade) */
   installDir?: string;
+  /** Ask the new binary to refresh a stored OAuth grant when scopes changed. */
+  ensureAuthScopes: boolean;
 };
 
 /**
@@ -508,7 +511,8 @@ type SetupOptions = {
  * updates completions, agent skills, and records metadata.
  */
 async function runSetupOnNewBinary(opts: SetupOptions): Promise<void> {
-  const { binaryPath, method, channel, install, installDir } = opts;
+  const { binaryPath, method, channel, install, installDir, ensureAuthScopes } =
+    opts;
   const args = [
     "cli",
     "setup",
@@ -521,6 +525,9 @@ async function runSetupOnNewBinary(opts: SetupOptions): Promise<void> {
   ];
   if (install) {
     args.push("--install");
+  }
+  if (ensureAuthScopes) {
+    args.push("--ensure-auth-scopes");
   }
 
   const env = installDir
@@ -536,6 +543,14 @@ async function runSetupOnNewBinary(opts: SetupOptions): Promise<void> {
   }
 }
 
+function resolveUpdatedCliPath(
+  execPath: string,
+  entryPath: string | undefined,
+  pathEnv: string | undefined
+): string {
+  return whichSync("sentry", { PATH: pathEnv }) ?? entryPath ?? execPath;
+}
+
 /**
  * Execute the standard upgrade path: download via curl or package manager,
  * then run setup on the new binary.
@@ -546,10 +561,22 @@ async function executeStandardUpgrade(opts: {
   versionArg: string | undefined;
   target: string;
   execPath: string;
+  entryPath?: string;
+  pathEnv?: string;
   offline?: OfflineMode;
   json?: boolean;
 }): Promise<void> {
-  const { method, channel, versionArg, target, execPath, offline, json } = opts;
+  const {
+    method,
+    channel,
+    versionArg,
+    target,
+    execPath,
+    entryPath,
+    pathEnv,
+    offline,
+    json,
+  } = opts;
 
   // Use the rolling "nightly" tag only when upgrading to latest nightly
   // (no specific version was requested). A specific version arg always
@@ -584,18 +611,21 @@ async function executeStandardUpgrade(opts: {
         channel,
         install: true,
         installDir: currentInstallDir,
+        ensureAuthScopes: !json,
       });
     } finally {
       releaseLock(downloadResult.lockPath);
     }
-  } else if (method !== "brew") {
-    // Package manager: binary already in place, just run setup.
-    // Skip brew — Homebrew's post_install hook already runs setup.
+  } else {
+    // Package managers replace their PATH entry in place. Resolve it after the
+    // install so setup runs with the new CLI, not Node's process.execPath or a
+    // removed Homebrew keg path.
     await runSetupOnNewBinary({
-      binaryPath: execPath,
+      binaryPath: resolveUpdatedCliPath(execPath, entryPath, pathEnv),
       method,
       channel,
       install: false,
+      ensureAuthScopes: !json,
     });
   }
 }
@@ -656,6 +686,7 @@ async function migrateToStandaloneForNightly(
       channel: "nightly",
       install: true,
       installDir,
+      ensureAuthScopes: !json,
     });
   } finally {
     releaseLock(downloadResult.lockPath);
@@ -923,6 +954,8 @@ export const upgradeCommand = buildCommand({
         versionArg,
         target,
         execPath: this.process.execPath,
+        entryPath: this.process.argv?.[1],
+        pathEnv: this.process.env.PATH,
         offline,
         json: flags.json,
       });

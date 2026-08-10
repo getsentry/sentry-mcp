@@ -21,6 +21,16 @@ describe("extractRequiredScopes", () => {
     ).toEqual([]);
   });
 
+  test("ignores role scopes mentioned in member-project policy guidance", () => {
+    expect(
+      extractRequiredScopes(
+        "Your organization has disabled this feature for members. " +
+          "This is an org-level policy setting, not an auth issue. " +
+          "You need org:admin/manager/owner role, or team:admin role on the team."
+      )
+    ).toEqual([]);
+  });
+
   test("extracts a single scope from a detail string", () => {
     expect(
       extractRequiredScopes(

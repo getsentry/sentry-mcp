@@ -12,9 +12,28 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { run } from "@stricli/core";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+
+vi.mock("../../../src/lib/interactive-login.js", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../../src/lib/interactive-login.js")
+  >()),
+  runInteractiveLogin: vi.fn(),
+}));
+
+vi.mock("../../../src/lib/scope-recovery.js", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../../src/lib/scope-recovery.js")
+  >()),
+  ensureCurrentOAuthScopes: vi.fn(),
+}));
+
 import { app } from "../../../src/app.js";
 import type { SentryContext } from "../../../src/context.js";
 import { getReleaseChannel } from "../../../src/lib/db/release-channel.js";
+// biome-ignore lint/performance/noNamespaceImport: dynamic setup imports are mocked at the module boundary
+import * as interactiveLogin from "../../../src/lib/interactive-login.js";
+// biome-ignore lint/performance/noNamespaceImport: dynamic setup imports are mocked at the module boundary
+import * as scopeRecovery from "../../../src/lib/scope-recovery.js";
 import { useTestConfigDir } from "../../helpers.js";
 
 /** Store original fetch for restoration */
@@ -122,12 +141,14 @@ describe("sentry cli setup", () => {
       `setup-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
     );
     mkdirSync(testDir, { recursive: true });
+    vi.mocked(scopeRecovery.ensureCurrentOAuthScopes).mockResolvedValue(false);
   });
 
   afterEach(() => {
     restoreStderr?.();
     restoreStderr = undefined;
     rmSync(testDir, { recursive: true, force: true });
+    vi.mocked(scopeRecovery.ensureCurrentOAuthScopes).mockReset();
   });
 
   test("runs with --quiet and skips all output", async () => {
@@ -151,6 +172,30 @@ describe("sentry cli setup", () => {
 
     // With --quiet, no output should be produced
     expect(getOutput()).toBe("");
+  });
+
+  test("checks OAuth scopes when invoked by the upgrade command", async () => {
+    const { context, restore } = createMockContext({ homeDir: testDir });
+    restoreStderr = restore;
+
+    await run(
+      app,
+      [
+        "cli",
+        "setup",
+        "--quiet",
+        "--no-modify-path",
+        "--no-completions",
+        "--no-agent-skills",
+        "--ensure-auth-scopes",
+      ],
+      context
+    );
+
+    expect(scopeRecovery.ensureCurrentOAuthScopes).toHaveBeenCalledOnce();
+    expect(scopeRecovery.ensureCurrentOAuthScopes).toHaveBeenCalledWith(
+      interactiveLogin.runInteractiveLogin
+    );
   });
 
   test("produces no welcome or completion output without --install", async () => {

@@ -51,6 +51,7 @@ type SetupFlags = {
   readonly "no-modify-path": boolean;
   readonly "no-completions": boolean;
   readonly "no-agent-skills": boolean;
+  readonly "ensure-auth-scopes": boolean;
   readonly quiet: boolean;
 };
 
@@ -499,6 +500,12 @@ export const setupCommand = buildCommand({
         brief: "Skip agent skill installation for AI coding assistants",
         default: false,
       },
+      "ensure-auth-scopes": {
+        kind: "boolean",
+        brief: "Refresh an outdated stored OAuth authorization",
+        default: false,
+        hidden: true as const,
+      },
       quiet: {
         kind: "boolean",
         brief: "Suppress output (for scripted usage)",
@@ -555,6 +562,21 @@ export const setupCommand = buildCommand({
       emit,
       warn,
     });
+
+    if (flags["ensure-auth-scopes"]) {
+      await bestEffort(
+        "Authorization",
+        async () => {
+          const [{ runInteractiveLogin }, { ensureCurrentOAuthScopes }] =
+            await Promise.all([
+              import("../../lib/interactive-login.js"),
+              import("../../lib/scope-recovery.js"),
+            ]);
+          await ensureCurrentOAuthScopes(runInteractiveLogin);
+        },
+        warn
+      );
+    }
 
     // 5. Print welcome message only on fresh install — upgrades are silent
     // since the upgrade command itself prints a success message.
