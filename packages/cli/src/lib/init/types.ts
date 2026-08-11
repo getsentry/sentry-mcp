@@ -4,6 +4,41 @@ export type DirEntry = {
   type: "file" | "directory";
 };
 
+export type OmittedDirectoryReason =
+  | "excluded"
+  | "hidden"
+  | "max-depth"
+  | "non-recursive";
+
+export type OmittedDirectory = {
+  path: string;
+  reason: OmittedDirectoryReason;
+};
+
+export type DirectoryScanMetadata = {
+  /** True when maxEntries prevented the scanner from inspecting more entries. */
+  truncated: boolean;
+  /** Directories present in the listing whose contents were not inspected. */
+  omittedDirectories: OmittedDirectory[];
+};
+
+export type DirectoryScanResult = {
+  entries: DirEntry[];
+  metadata: DirectoryScanMetadata;
+};
+
+export type FileReadResult = {
+  status: "read" | "truncated" | "skipped" | "error";
+  bytesRead?: number;
+  totalBytes?: number;
+  reason?:
+    | "not-found"
+    | "not-regular-file"
+    | "outside-project"
+    | "permission-denied"
+    | "read-failed";
+};
+
 export type ExistingProjectData = {
   orgSlug: string;
   projectSlug: string;

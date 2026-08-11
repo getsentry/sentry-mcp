@@ -4,7 +4,7 @@ import { isLikelyBinary } from "../scan/index.js";
 import { MAX_FILE_BYTES } from "./constants.js";
 import { detectSentry } from "./tools/detect-sentry.js";
 import { listDir } from "./tools/list-dir.js";
-import type { DirEntry } from "./types.js";
+import type { DirEntry, DirectoryScanResult } from "./types.js";
 
 /**
  * Common config files that multiple init steps frequently inspect.
@@ -87,14 +87,21 @@ const MAX_PREREAD_TOTAL_BYTES = 512 * 1024;
  */
 export async function precomputeDirListing(
   directory: string
-): Promise<DirEntry[]> {
+): Promise<DirectoryScanResult> {
   const result = await listDir({
     type: "tool",
     operation: "list-dir",
     cwd: directory,
     params: { path: ".", recursive: true, maxDepth: 3, maxEntries: 500 },
   });
-  return (result.data as { entries?: DirEntry[] } | undefined)?.entries ?? [];
+  const data = result.data as DirectoryScanResult | undefined;
+  return {
+    entries: data?.entries ?? [],
+    metadata: data?.metadata ?? {
+      truncated: false,
+      omittedDirectories: [],
+    },
+  };
 }
 
 /**

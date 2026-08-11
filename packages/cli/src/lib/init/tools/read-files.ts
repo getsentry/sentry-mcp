@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { MAX_FILE_BYTES } from "../constants.js";
-import type { ReadFilesPayload, ToolResult } from "../types.js";
+import type { FileReadResult, ReadFilesPayload, ToolResult } from "../types.js";
 import { safePath } from "./shared.js";
 import type { InitToolDefinition } from "./types.js";
 
@@ -15,24 +15,31 @@ export async function readFiles(
   const maxBytes = payload.params.maxBytes ?? MAX_FILE_BYTES;
   const results = await Promise.all(
     payload.params.paths.map(async (filePath) => {
-      const content = await readSingleFile(payload.cwd, filePath, maxBytes);
-      return [filePath, content] as const;
+      const result = await readSingleFile(payload.cwd, filePath, maxBytes);
+      return [filePath, result] as const;
     })
   );
 
   const files: Record<string, string | null> = {};
-  for (const [filePath, content] of results) {
-    files[filePath] = content;
+  const readResults: Record<string, FileReadResult> = {};
+  for (const [filePath, result] of results) {
+    files[filePath] = result.content;
+    readResults[filePath] = result.metadata;
   }
 
-  return { ok: true, data: { files } };
+  return { ok: true, data: { files, readResults } };
 }
+
+type SingleFileRead = {
+  content: string | null;
+  metadata: FileReadResult;
+};
 
 async function readSingleFile(
   cwd: string,
   filePath: string,
   maxBytes: number
-): Promise<string | null> {
+): Promise<SingleFileRead> {
   try {
     const absPath = safePath(cwd, filePath);
     const stat = await fs.promises.stat(absPath);
@@ -40,22 +47,60 @@ async function readSingleFile(
     // `open("r")` block indefinitely on a FIFO waiting for a writer.
     // `stat` follows symlinks, so symlink → FIFO is caught too.
     if (!stat.isFile()) {
-      return null;
+      return {
+        content: null,
+        metadata: { status: "skipped", reason: "not-regular-file" },
+      };
     }
-    if (stat.size <= maxBytes) {
-      return await fs.promises.readFile(absPath, "utf-8");
-    }
+    const buffer =
+      stat.size <= maxBytes
+        ? await fs.promises.readFile(absPath)
+        : await readFilePrefix(absPath, maxBytes);
 
-    const handle = await fs.promises.open(absPath, "r");
-    try {
-      const buffer = Buffer.alloc(maxBytes);
-      await handle.read(buffer, 0, maxBytes, 0);
-      return buffer.toString("utf-8");
-    } finally {
-      await handle.close();
-    }
-  } catch {
-    return null;
+    return {
+      content: buffer.toString("utf-8"),
+      metadata: {
+        status: stat.size > maxBytes ? "truncated" : "read",
+        bytesRead: buffer.byteLength,
+        totalBytes: stat.size,
+      },
+    };
+  } catch (error) {
+    return {
+      content: null,
+      metadata: { status: "error", reason: readFailureReason(error) },
+    };
+  }
+}
+
+function readFailureReason(error: unknown): FileReadResult["reason"] {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String(error.code)
+      : undefined;
+  if (code === "ENOENT") {
+    return "not-found";
+  }
+  if (code === "EACCES" || code === "EPERM") {
+    return "permission-denied";
+  }
+  if (error instanceof Error && error.message.includes("outside project")) {
+    return "outside-project";
+  }
+  return "read-failed";
+}
+
+async function readFilePrefix(
+  absPath: string,
+  maxBytes: number
+): Promise<Buffer> {
+  const handle = await fs.promises.open(absPath, "r");
+  try {
+    const buffer = Buffer.alloc(maxBytes);
+    const { bytesRead } = await handle.read(buffer, 0, maxBytes, 0);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
   }
 }
 

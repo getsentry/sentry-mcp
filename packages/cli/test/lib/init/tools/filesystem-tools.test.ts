@@ -72,7 +72,9 @@ describe("filesystem tools", () => {
 
     expect(result.ok).toBe(true);
     expect(entries.map((entry) => entry.path)).toContain("src/app.ts");
-    expect(precomputed.map((entry) => entry.path)).toContain("src/app.ts");
+    expect(precomputed.entries.map((entry) => entry.path)).toContain(
+      "src/app.ts"
+    );
   });
 
   test("reads files and checks existence in batches", async () => {
@@ -99,6 +101,10 @@ describe("filesystem tools", () => {
 
     expect((readResult.data as any).files["exists.txt"]).toBe("hello");
     expect((readResult.data as any).files["missing.txt"]).toBeNull();
+    expect((readResult.data as any).readResults).toEqual({
+      "exists.txt": { status: "read", bytesRead: 5, totalBytes: 5 },
+      "missing.txt": { status: "error", reason: "not-found" },
+    });
     expect((existsResult.data as any).exists["exists.txt"]).toBe(true);
     expect((existsResult.data as any).exists["missing.txt"]).toBe(false);
   });
@@ -121,6 +127,27 @@ describe("filesystem tools", () => {
     expect((result.data as any).files["sentry-wizard"]).toBe(
       content.toString("utf-8")
     );
+  });
+
+  test("reports when a file read is truncated", async () => {
+    fs.writeFileSync(path.join(testDir, "large.txt"), "1234567890");
+
+    const result = await executeTool(
+      {
+        type: "tool",
+        operation: "read-files",
+        cwd: testDir,
+        params: { paths: ["large.txt"], maxBytes: 4 },
+      },
+      makeContext(testDir)
+    );
+
+    expect((result.data as any).files["large.txt"]).toBe("1234");
+    expect((result.data as any).readResults["large.txt"]).toEqual({
+      status: "truncated",
+      bytesRead: 4,
+      totalBytes: 10,
+    });
   });
 
   test("applies patchsets and injects auth tokens into env files", async () => {

@@ -950,10 +950,16 @@ export async function runWizard(initialOptions: WizardOptions): Promise<void> {
   let run: Awaited<ReturnType<typeof workflow.createRun>>;
   let result: WorkflowRunResult;
   try {
-    const [dirListing, existingSentry] = await Promise.all([
+    const [directoryScan, existingSentry] = await Promise.all([
       precomputeDirListing(directory),
       precomputeSentryDetection(directory).catch(() => null),
     ]);
+    const { entries: dirListing, metadata: dirListingMetadata } = directoryScan;
+    setTag("wizard.scan.truncated", dirListingMetadata.truncated);
+    setTag(
+      "wizard.scan.omitted_directory_count",
+      dirListingMetadata.omittedDirectories.length
+    );
     const fileCache = await preReadCommonFiles(directory, dirListing);
     ui.setIntroMode?.(false);
     spin.message("Connecting to wizard...");
@@ -981,6 +987,7 @@ export async function runWizard(initialOptions: WizardOptions): Promise<void> {
               },
               initialState: {
                 dirListing,
+                dirListingMetadata,
                 fileCache,
                 existingSentry: existingSentry?.data,
                 knownPlatform: context.existingProject?.platform,

@@ -211,7 +211,10 @@ beforeEach(() => {
   });
   precomputeDirListingSpy = vi
     .spyOn(workflowInputs, "precomputeDirListing")
-    .mockResolvedValue([]);
+    .mockResolvedValue({
+      entries: [],
+      metadata: { truncated: false, omittedDirectories: [] },
+    });
   preReadCommonFilesSpy = vi
     .spyOn(workflowInputs, "preReadCommonFiles")
     .mockResolvedValue({});
@@ -841,7 +844,16 @@ describe("runWizard", () => {
     const fileCache = { "package.json": '{"name":"app"}' };
     const detectedSentry = { status: "none" as const, signals: [] };
 
-    precomputeDirListingSpy.mockResolvedValue(dirListing);
+    const dirListingMetadata = {
+      truncated: false,
+      omittedDirectories: [
+        { path: "node_modules", reason: "excluded" as const },
+      ],
+    };
+    precomputeDirListingSpy.mockResolvedValue({
+      entries: dirListing,
+      metadata: dirListingMetadata,
+    });
     preReadCommonFilesSpy.mockResolvedValue(fileCache);
     precomputeSentryDetectionSpy.mockResolvedValue({
       ok: true,
@@ -867,6 +879,7 @@ describe("runWizard", () => {
     expect(args.inputData).not.toHaveProperty("fileCache");
     expect(args.inputData).not.toHaveProperty("existingSentry");
     expect(args.initialState?.dirListing).toEqual(dirListing);
+    expect(args.initialState?.dirListingMetadata).toEqual(dirListingMetadata);
     expect(args.initialState?.fileCache).toEqual(fileCache);
     expect(args.initialState?.existingSentry).toEqual(detectedSentry);
   });
