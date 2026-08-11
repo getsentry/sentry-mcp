@@ -3411,7 +3411,7 @@ export class SentryApiService {
    * @param params.organizationSlug Organization identifier
    * @param params.projectSlug Project identifier (optional, scopes to specific project)
    * @param params.query Sentry search query (e.g., "is:unresolved browser:chrome")
-   * @param params.sortBy Sort order ("user", "freq", "date", "new")
+   * @param params.sortBy Sort order ("user", "freq", "date", "new", "recommended")
    * @param opts Request options
    * @returns Array of issues with metadata and statistics
    *
@@ -3445,7 +3445,7 @@ export class SentryApiService {
       organizationSlug: string;
       projectId?: string;
       query?: string | null;
-      sortBy?: "user" | "freq" | "date" | "new";
+      sortBy?: "user" | "freq" | "date" | "new" | "recommended";
       limit?: number;
       /**
        * Controls the search time window - which issues are included in results.

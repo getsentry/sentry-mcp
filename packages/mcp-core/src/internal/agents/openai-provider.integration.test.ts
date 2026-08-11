@@ -95,7 +95,7 @@ describe("OpenAI Provider Integration", () => {
       // sort can be null or one of the valid values
       expect(
         result.sort === null ||
-          ["date", "freq", "new", "user"].includes(result.sort),
+          ["date", "freq", "new", "user", "recommended"].includes(result.sort),
       ).toBe(true);
     },
   );
@@ -121,7 +121,7 @@ describe("OpenAI Provider Integration", () => {
       // sort being null is valid and tests the nullable field handling
       expect(
         result.sort === null ||
-          ["date", "freq", "new", "user"].includes(result.sort),
+          ["date", "freq", "new", "user", "recommended"].includes(result.sort),
       ).toBe(true);
     },
   );
