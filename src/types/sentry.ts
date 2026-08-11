@@ -334,7 +334,11 @@ export const IssueViewOutputSchema = pipe(
     event: optional(
       pipe(
         nullable(unknown()),
-        description("Latest event for the issue (full detail)")
+        description(
+          "Latest event for the issue (full detail). Select named fields with " +
+            "`--fields event.id,event.title` to avoid pulling the whole payload; " +
+            "the `request` entry may include live session data."
+        )
       )
     ),
     org: optional(pipe(nullable(string()), description("Organization slug"))),
