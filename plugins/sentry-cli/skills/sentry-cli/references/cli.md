@@ -164,6 +164,7 @@ Update the Sentry CLI to the latest version
 - `--check - Check for updates without installing`
 - `--force - Force upgrade even if already on the latest version`
 - `--offline - Upgrade using only cached version info and patches (no network)`
+- `--no-agent-skills - Skip agent skill installation for AI coding assistants`
 - `--method <value> - Installation method to use (curl, brew, npm, pnpm, bun, yarn)`
 
 **Examples:**
