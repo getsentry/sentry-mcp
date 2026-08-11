@@ -208,7 +208,7 @@ Display types with default sizes:
 
 Use **common** types for general dashboards. Use **specialized** only when specifically requested. Avoid **internal** types unless the user explicitly asks.
 
-Available datasets: `spans` (default), `tracemetrics`, `discover`, `issue`, `error-events`, `logs`. Run `sentry dashboard widget --help` for dataset descriptions, query formats, and examples.
+Available datasets: `spans` (default), `errors`, `transactions`, `metrics`, `issue`, `logs`. Run `sentry dashboard widget --help` for dataset descriptions, query formats, and examples.
 
 **Row-filling examples:**
 
