@@ -131,6 +131,44 @@ sentry issue view my-org/my-project#FRONT-ABC
 sentry issue view my-project#FRONT-ABC
 ```
 
+**JSON output for agents and scripting:**
+
+`--json` returns the issue fields at the top level plus the latest event under
+`event`, the resolved `org` slug, related `replayIds`, and `trace` context.
+Prefer this over the human output when parsing programmatically.
+
+```bash
+# Full JSON (issue fields + latest event + trace/replay context)
+sentry issue view FRONT-ABC --json
+
+# Select specific top-level fields to keep output small
+sentry issue view FRONT-ABC --json --fields shortId,title,culprit,count,userCount,permalink
+
+# Pull named fields off the latest event instead of the whole `event` object —
+# the event's `request` entry can include live session data (cookies, headers,
+# body), so extract only what you need
+sentry issue view FRONT-ABC --json --fields event.id,event.title,event.dateCreated
+```
+
+Common `jq` shapes for the `--json` output. The latest event's data lives under
+`event.entries[]`, each tagged with a `type` (`"exception"`, `"request"`,
+`"breadcrumbs"`, …) and a `data` payload — not as top-level `event.request` /
+`event.exception` keys:
+
+```bash
+# Issue summary
+sentry issue view FRONT-ABC --json | jq '{shortId, title, count, userCount, permalink}'
+
+# Latest event id + culprit
+sentry issue view FRONT-ABC --json | jq '{event: .event.id, culprit}'
+
+# Just the request URL and method (avoids the full request/session blob)
+sentry issue view FRONT-ABC --json | jq '.event.entries[] | select(.type == "request") | .data | {url, method}'
+
+# Exception type and value from the latest event
+sentry issue view FRONT-ABC --json | jq '.event.entries[] | select(.type == "exception") | .data.values[0] | {type, value}'
+```
+
 ### Explain and plan with Seer AI
 
 ```bash
