@@ -327,12 +327,9 @@ describe("listDir", () => {
     }
   });
 
-  test("returns empty entries for a missing subpath", async () => {
-    // `safePath` allows nonexistent paths under the sandbox; `readdir`
-    // throws, which the walker swallows.
-    const entries = entriesOf(
-      await listDir(makePayload(testDir, { path: "does-not-exist" }))
-    );
-    expect(entries).toEqual([]);
+  test("surfaces readdir errors for a missing subpath", async () => {
+    await expect(
+      listDir(makePayload(testDir, { path: "does-not-exist" }))
+    ).rejects.toMatchObject({ code: "ENOENT" });
   });
 });

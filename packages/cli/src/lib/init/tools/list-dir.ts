@@ -72,14 +72,6 @@ type WalkState = {
   truncated: boolean;
 };
 
-async function readDirEntries(dir: string): Promise<fs.Dirent[]> {
-  try {
-    return await fs.promises.readdir(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-}
-
 function omissionReason(
   entry: fs.Dirent,
   state: WalkState,
@@ -147,7 +139,9 @@ async function walkDirectory(
     return;
   }
 
-  for (const entry of await readDirEntries(dir)) {
+  for (const entry of await fs.promises.readdir(dir, {
+    withFileTypes: true,
+  })) {
     if (state.entries.length >= state.maxEntries) {
       state.truncated = true;
       return;
