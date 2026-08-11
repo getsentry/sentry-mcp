@@ -796,6 +796,36 @@ describe("sentry cli upgrade — curl full upgrade path (child_process.spawn spy
     expect(setupCall?.args).not.toContain("--ensure-auth-scopes");
   });
 
+  test("does not pass --no-agent-skills to setup by default", async () => {
+    mockBinaryDownloadWithVersion("99.99.99");
+
+    const { context, restore } = createMockContext({ homeDir: testDir });
+    restoreStderr = restore;
+
+    await run(app, ["cli", "upgrade", "--method", "curl"], context);
+
+    const setupCall = spawnedArgs.find((entry) => entry.args.includes("setup"));
+    expect(setupCall).toBeDefined();
+    expect(setupCall?.args).not.toContain("--no-agent-skills");
+  });
+
+  test("forwards --no-agent-skills to setup on the downloaded binary", async () => {
+    mockBinaryDownloadWithVersion("99.99.99");
+
+    const { context, restore } = createMockContext({ homeDir: testDir });
+    restoreStderr = restore;
+
+    await run(
+      app,
+      ["cli", "upgrade", "--method", "curl", "--no-agent-skills"],
+      context
+    );
+
+    const setupCall = spawnedArgs.find((entry) => entry.args.includes("setup"));
+    expect(setupCall).toBeDefined();
+    expect(setupCall?.args).toContain("--no-agent-skills");
+  });
+
   test("runs setup through the CLI entrypoint after an npm upgrade", async () => {
     mockGitHubVersion("99.99.99");
     const entryPath = "/npm/global/node_modules/sentry/dist/bin.cjs";

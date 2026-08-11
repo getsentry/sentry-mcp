@@ -93,6 +93,7 @@ type UpgradeFlags = {
   readonly check: boolean;
   readonly force: boolean;
   readonly offline: boolean;
+  readonly "no-agent-skills": boolean;
   readonly method?: InstallationMethod;
   /** Injected by buildCommand output wrapper — suppresses spinners */
   readonly json?: boolean;
@@ -496,6 +497,8 @@ type SetupOptions = {
   installDir?: string;
   /** Ask the new binary to refresh a stored OAuth grant when scopes changed. */
   ensureAuthScopes: boolean;
+  /** Skip agent skill installation during setup. */
+  noAgentSkills: boolean;
 };
 
 /**
@@ -511,8 +514,15 @@ type SetupOptions = {
  * updates completions, agent skills, and records metadata.
  */
 async function runSetupOnNewBinary(opts: SetupOptions): Promise<void> {
-  const { binaryPath, method, channel, install, installDir, ensureAuthScopes } =
-    opts;
+  const {
+    binaryPath,
+    method,
+    channel,
+    install,
+    installDir,
+    ensureAuthScopes,
+    noAgentSkills,
+  } = opts;
   const args = [
     "cli",
     "setup",
@@ -528,6 +538,9 @@ async function runSetupOnNewBinary(opts: SetupOptions): Promise<void> {
   }
   if (ensureAuthScopes) {
     args.push("--ensure-auth-scopes");
+  }
+  if (noAgentSkills) {
+    args.push("--no-agent-skills");
   }
 
   const env = installDir
@@ -565,6 +578,7 @@ async function executeStandardUpgrade(opts: {
   pathEnv?: string;
   offline?: OfflineMode;
   json?: boolean;
+  noAgentSkills: boolean;
 }): Promise<void> {
   const {
     method,
@@ -576,6 +590,7 @@ async function executeStandardUpgrade(opts: {
     pathEnv,
     offline,
     json,
+    noAgentSkills,
   } = opts;
 
   // Use the rolling "nightly" tag only when upgrading to latest nightly
@@ -612,6 +627,7 @@ async function executeStandardUpgrade(opts: {
         install: true,
         installDir: currentInstallDir,
         ensureAuthScopes: !json,
+        noAgentSkills,
       });
     } finally {
       releaseLock(downloadResult.lockPath);
@@ -626,6 +642,7 @@ async function executeStandardUpgrade(opts: {
       channel,
       install: false,
       ensureAuthScopes: !json,
+      noAgentSkills,
     });
   }
 }
@@ -641,17 +658,20 @@ async function executeStandardUpgrade(opts: {
  *   3. Run setup on the new binary to update completions, PATH, and metadata
  *   4. Return warnings about the old package-manager installation that may still be in PATH
  *
- * @param versionArg - Specific version requested by the user, or undefined for
- *   latest nightly. When a specific version is given, its release tag is used
- *   instead of the rolling "nightly" tag so the correct binary is downloaded.
+ * @param opts.versionArg - Specific version requested by the user, or undefined
+ *   for latest nightly. When a specific version is given, its release tag is
+ *   used instead of the rolling "nightly" tag so the correct binary is
+ *   downloaded.
  * @returns Warnings about the old installation that may shadow the new one
  */
-async function migrateToStandaloneForNightly(
-  method: InstallationMethod,
-  target: string,
-  versionArg: string | undefined,
-  json?: boolean
-): Promise<string[]> {
+async function migrateToStandaloneForNightly(opts: {
+  method: InstallationMethod;
+  target: string;
+  versionArg: string | undefined;
+  noAgentSkills: boolean;
+  json?: boolean;
+}): Promise<string[]> {
+  const { method, target, versionArg, noAgentSkills, json } = opts;
   log.info("Nightly builds are only available as standalone binaries.");
   log.info("Migrating to standalone installation...");
 
@@ -687,6 +707,7 @@ async function migrateToStandaloneForNightly(
       install: true,
       installDir,
       ensureAuthScopes: !json,
+      noAgentSkills,
     });
   } finally {
     releaseLock(downloadResult.lockPath);
@@ -816,7 +837,8 @@ export const upgradeCommand = buildCommand({
       "  sentry cli upgrade --check      # Check for updates without installing\n" +
       "  sentry cli upgrade --force      # Force re-download even if up to date\n" +
       "  sentry cli upgrade --method npm # Force using npm to upgrade\n" +
-      "  sentry cli upgrade --offline    # Upgrade from cached patches (no network)",
+      "  sentry cli upgrade --offline    # Upgrade from cached patches (no network)\n" +
+      "  sentry cli upgrade --no-agent-skills # Skip reinstalling agent skills",
   },
   output: { human: formatUpgradeResult },
   parameters: {
@@ -847,6 +869,11 @@ export const upgradeCommand = buildCommand({
         kind: "boolean",
         brief:
           "Upgrade using only cached version info and patches (no network)",
+        default: false,
+      },
+      "no-agent-skills": {
+        kind: "boolean",
+        brief: "Skip agent skill installation for AI coding assistants",
         default: false,
       },
       method: {
@@ -941,12 +968,13 @@ export const upgradeCommand = buildCommand({
     if (channel === "nightly" && method !== "curl") {
       // Nightly is GitHub-only. If the current install method is not curl,
       // migrate to a standalone binary — the migration handles setup internally.
-      warnings = await migrateToStandaloneForNightly(
+      warnings = await migrateToStandaloneForNightly({
         method,
         target,
         versionArg,
-        flags.json
-      );
+        noAgentSkills: flags["no-agent-skills"],
+        json: flags.json,
+      });
     } else {
       await executeStandardUpgrade({
         method,
@@ -958,6 +986,7 @@ export const upgradeCommand = buildCommand({
         pathEnv: this.process.env.PATH,
         offline,
         json: flags.json,
+        noAgentSkills: flags["no-agent-skills"],
       });
     }
 
