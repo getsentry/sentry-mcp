@@ -24,6 +24,10 @@ import {
   installCompletions,
 } from "../../lib/completions.js";
 import { CLI_VERSION } from "../../lib/constants.js";
+import {
+  getAgentSkillsPreference,
+  setAgentSkillsPreference,
+} from "../../lib/db/defaults.js";
 import { setInstallInfo } from "../../lib/db/install-info.js";
 import {
   parseReleaseChannel,
@@ -432,8 +436,20 @@ async function runConfigurationSteps(opts: ConfigStepOptions) {
     );
   }
 
-  // 4. Install agent skills (auto-detected, silent when no agent found)
-  if (!flags["no-agent-skills"]) {
+  // 4. Install agent skills (auto-detected, silent when no agent found).
+  // Persist an explicit --no-agent-skills opt-out so later upgrades (which
+  // re-run setup without the flag) keep honoring it. Re-enable with
+  // `sentry cli defaults agent-skills on`.
+  if (flags["no-agent-skills"]) {
+    await bestEffort(
+      "Recording agent skills preference",
+      () => setAgentSkillsPreference(false),
+      warn
+    );
+  }
+  const skipAgentSkills =
+    flags["no-agent-skills"] || getAgentSkillsPreference() === false;
+  if (!skipAgentSkills) {
     await bestEffort(
       "Agent skills",
       () => handleAgentSkills(homeDir, emit),

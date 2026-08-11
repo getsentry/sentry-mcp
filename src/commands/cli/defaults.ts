@@ -20,6 +20,7 @@ import { parseCustomHeaders } from "../../lib/custom-headers.js";
 import {
   clearAllDefaults,
   type DefaultsState,
+  getAgentSkillsPreference,
   getAllDefaults,
   getDefaultCaCert,
   getDefaultHeaders,
@@ -27,6 +28,7 @@ import {
   getDefaultProject,
   getDefaultUrl,
   getTelemetryPreference,
+  setAgentSkillsPreference,
   setDefaultCaCert,
   setDefaultHeaders,
   setDefaultOrganization,
@@ -56,6 +58,7 @@ type DefaultKey =
   | "organization"
   | "project"
   | "telemetry"
+  | "agent-skills"
   | "url"
   | "headers"
   | "ca-cert";
@@ -113,6 +116,29 @@ const DEFAULTS_REGISTRY: Record<DefaultKey, DefaultHandler> = {
       setTelemetryPreference(parsed);
     },
     clear: () => setTelemetryPreference(null),
+  },
+  "agent-skills": {
+    get: () => {
+      const pref = getAgentSkillsPreference();
+      if (pref === true) {
+        return "on";
+      }
+      if (pref === false) {
+        return "off";
+      }
+      return null;
+    },
+    set: (value) => {
+      const parsed = parseBoolValue(value);
+      if (parsed === null) {
+        throw new ValidationError(
+          `Invalid agent-skills value: '${value}'. Use on/off, yes/no, true/false, or 1/0.`,
+          "agent-skills"
+        );
+      }
+      setAgentSkillsPreference(parsed);
+    },
+    clear: () => setAgentSkillsPreference(null),
   },
   url: {
     get: getDefaultUrl,
@@ -227,6 +253,7 @@ export const defaultsCommand = buildCommand({
       "sentry cli defaults org my-org         # Set default organization\n" +
       "sentry cli defaults project my-proj    # Set default project\n" +
       "sentry cli defaults telemetry off      # Disable telemetry\n" +
+      "sentry cli defaults agent-skills off   # Stop installing agent skills on upgrade\n" +
       "sentry cli defaults url https://...    # Set Sentry URL (self-hosted)\n" +
       "sentry cli defaults headers 'X-IAP: t'  # Set custom headers (self-hosted)\n" +
       "sentry cli defaults ca-cert /path/to/ca.pem  # Trust a custom CA certificate\n" +
@@ -239,6 +266,7 @@ export const defaultsCommand = buildCommand({
       "| `org` | Default organization slug |\n" +
       "| `project` | Default project slug |\n" +
       "| `telemetry` | Telemetry preference (on/off, yes/no, true/false, 1/0) |\n" +
+      "| `agent-skills` | Install agent skills on setup/upgrade (on/off, yes/no, true/false, 1/0) |\n" +
       "| `url` | Sentry instance URL (for self-hosted installations) |\n" +
       "| `headers` | Custom HTTP headers for self-hosted proxies (semicolon-separated `Name: Value`) |\n" +
       "| `ca-cert` | Path to PEM file with custom CA certificates (for corporate proxies) |",
@@ -295,7 +323,7 @@ export const defaultsCommand = buildCommand({
         guardNonInteractive(flags);
         if (!isConfirmationBypassed(flags)) {
           const confirmed = await log.prompt(
-            "This will clear all defaults (organization, project, telemetry, URL, headers, ca-cert). Continue?",
+            "This will clear all defaults (organization, project, telemetry, URL, headers, ca-cert, agent-skills). Continue?",
             { type: "confirm" }
           );
           if (confirmed !== true) {

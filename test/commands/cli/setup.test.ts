@@ -29,6 +29,10 @@ vi.mock("../../../src/lib/scope-recovery.js", async (importOriginal) => ({
 
 import { app } from "../../../src/app.js";
 import type { SentryContext } from "../../../src/context.js";
+import {
+  getAgentSkillsPreference,
+  setAgentSkillsPreference,
+} from "../../../src/lib/db/defaults.js";
 import { getReleaseChannel } from "../../../src/lib/db/release-channel.js";
 // biome-ignore lint/performance/noNamespaceImport: dynamic setup imports are mocked at the module boundary
 import * as interactiveLogin from "../../../src/lib/interactive-login.js";
@@ -731,6 +735,9 @@ describe("sentry cli setup", () => {
 
   describe("agent skills", () => {
     beforeEach(() => {
+      // Reset the persisted preference — the config DB is shared across tests
+      // in this file, so a prior --no-agent-skills run would otherwise leak.
+      setAgentSkillsPreference(null);
       originalFetch = globalThis.fetch;
       mockFetch(
         async () =>
@@ -740,6 +747,7 @@ describe("sentry cli setup", () => {
 
     afterEach(() => {
       globalThis.fetch = originalFetch;
+      setAgentSkillsPreference(null);
     });
 
     test("installs agent skills when Claude Code is detected", async () => {
@@ -883,6 +891,62 @@ describe("sentry cli setup", () => {
       );
 
       expect(getOutput()).not.toContain("Agent skills:");
+    });
+
+    test("persists the opt-out when --no-agent-skills is passed", async () => {
+      mkdirSync(join(testDir, ".claude"), { recursive: true });
+
+      const { context, restore } = createMockContext({
+        homeDir: testDir,
+        execPath: join(testDir, "bin", "sentry"),
+        env: {
+          PATH: `/usr/bin:${join(testDir, "bin")}:/bin`,
+          SHELL: "/bin/bash",
+        },
+      });
+      restoreStderr = restore;
+
+      await run(
+        app,
+        [
+          "cli",
+          "setup",
+          "--no-modify-path",
+          "--no-completions",
+          "--no-agent-skills",
+        ],
+        context
+      );
+
+      expect(getAgentSkillsPreference()).toBe(false);
+    });
+
+    test("honors a persisted opt-out without the flag (upgrade scenario)", async () => {
+      // Simulate a prior `--no-agent-skills` run having stored the preference.
+      setAgentSkillsPreference(false);
+      mkdirSync(join(testDir, ".claude"), { recursive: true });
+
+      const { context, getOutput, restore } = createMockContext({
+        homeDir: testDir,
+        execPath: join(testDir, "bin", "sentry"),
+        env: {
+          PATH: `/usr/bin:${join(testDir, "bin")}:/bin`,
+          SHELL: "/bin/bash",
+        },
+      });
+      restoreStderr = restore;
+
+      // No --no-agent-skills flag — the upgrade command re-runs setup this way.
+      await run(
+        app,
+        ["cli", "setup", "--no-modify-path", "--no-completions"],
+        context
+      );
+
+      expect(getOutput()).not.toContain("Agent skills:");
+      expect(
+        existsSync(join(testDir, ".claude", "skills", "sentry-cli", "SKILL.md"))
+      ).toBe(false);
     });
 
     test("installs embedded skill files when Claude Code is detected", async () => {
