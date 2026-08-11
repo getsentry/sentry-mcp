@@ -70,14 +70,33 @@ See [Exit Codes](/exit-codes/) for the complete reference.
 # 1. Find the issue (auto-detects org/project from DSN or config)
 sentry issue list --query "is:unresolved" --limit 5
 
-# 2. Get details
-sentry issue view PROJECT-123
+# 2. Get details. For agents, prefer --json — it includes the full issue plus
+# the latest event under `event`, so you get everything in one call.
+sentry issue view PROJECT-123 --json
 
 # 3. Get AI root cause analysis
 sentry issue explain PROJECT-123
 
 # 4. Get a fix plan
 sentry issue plan PROJECT-123
+```
+
+`sentry issue view <SHORT-ID> --json` is the fastest way to get an agent up to
+speed on an issue. Select just the fields you need with `--fields` instead of
+consuming the whole payload — the latest event's `request` entry can carry live
+session data (cookies, headers, body), so extract named fields rather than
+dumping the entire object:
+
+```bash
+# Top-level issue fields
+sentry issue view PROJECT-123 --json --fields shortId,title,culprit,count,userCount,permalink
+
+# Named fields from the latest event — avoids pulling the full request/session blob
+sentry issue view PROJECT-123 --json --fields event.id,event.title,event.dateCreated
+
+# Just the request URL and method (not the whole request entry). Event data
+# lives under event.entries[], each tagged with a `type` and `data` payload.
+sentry issue view PROJECT-123 --json | jq '.event.entries[] | select(.type == "request") | .data | {url, method}'
 ```
 
 #### Explore Traces and Performance
