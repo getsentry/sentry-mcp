@@ -1,7 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText, stepCountIs, APICallError, RetryError } from "ai";
 import { startNewTrace, startSpan } from "@sentry/core";
-import type { MCPConnection } from "./types.js";
+import { APICallError, RetryError, stepCountIs, streamText } from "ai";
 import {
   DEFAULT_OPENAI_MODEL,
   DEFAULT_OPENROUTER_MODEL,
@@ -9,13 +8,14 @@ import {
 } from "./constants.js";
 import {
   logError,
+  logStreamEnd,
+  logStreamStart,
+  logStreamWrite,
   logTool,
   logToolResult,
-  logStreamStart,
-  logStreamEnd,
-  logStreamWrite,
 } from "./logger.js";
 import { formatToolOutputForDisplay } from "./tool-output-format.js";
+import type { MCPConnection } from "./types.js";
 import { LIB_VERSION } from "./version.js";
 
 const SYSTEM_PROMPT = `You are a helpful assistant designed EXCLUSIVELY for testing the Sentry MCP server. Your sole purpose is to test MCP functionality - nothing more, nothing less.
