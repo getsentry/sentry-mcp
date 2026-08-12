@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText, stepCountIs } from "ai";
+import { streamText, stepCountIs, APICallError, RetryError } from "ai";
 import { startNewTrace, startSpan } from "@sentry/core";
 import type { MCPConnection } from "./types.js";
 import {
@@ -42,6 +42,58 @@ export interface AgentConfig {
   model?: string;
   maxSteps?: number;
   provider?: "openai" | "openrouter";
+}
+
+/**
+ * Finds the underlying provider APICallError inside whatever the AI SDK
+ * surfaces. Retryable failures (429, 5xx) are wrapped in a RetryError once
+ * retries run out, so the HTTP status lives on the wrapped `lastError`.
+ */
+function findApiCallError(error: unknown): APICallError | undefined {
+  if (APICallError.isInstance(error)) {
+    return error;
+  }
+  if (RetryError.isInstance(error) && error.lastError) {
+    return findApiCallError(error.lastError);
+  }
+  if (error && typeof error === "object" && "cause" in error && error.cause) {
+    return findApiCallError((error as { cause: unknown }).cause);
+  }
+  return undefined;
+}
+
+/**
+ * Builds a user-facing message for a provider failure raised while streaming.
+ *
+ * The Vercel AI SDK does not throw when a provider request fails mid-stream.
+ * It reports the failure through the `onError` callback and ends `textStream`
+ * with no chunks, so the error has to be surfaced explicitly (see issue #500).
+ */
+export function describeProviderError(
+  error: unknown,
+  provider: "openai" | "openrouter",
+): string {
+  const label = provider === "openrouter" ? "OpenRouter API" : "OpenAI API";
+  const envVar =
+    provider === "openrouter" ? "OPENROUTER_API_KEY" : "OPENAI_API_KEY";
+
+  const apiError = findApiCallError(error);
+  if (apiError) {
+    const status = apiError.statusCode;
+    if (status === 401 || status === 403) {
+      return `${label} authentication failed. Please check your ${envVar} environment variable.`;
+    }
+    if (status === 429) {
+      return `${label} rate limit exceeded. Please wait and try again.`;
+    }
+    if (status !== undefined && status >= 500) {
+      return `${label} service error. The service may be temporarily unavailable.`;
+    }
+    return `${label} request failed${status ? ` (HTTP ${status})` : ""}: ${apiError.message}`;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  return `${label} request failed: ${message}`;
 }
 
 /**
@@ -97,6 +149,7 @@ export async function runAgent(
           const tools = await connection.client.tools();
           let toolCallCount = 0;
           let isStreaming = false;
+          let streamError: unknown;
 
           const result = await streamText({
             model: languageModel,
@@ -106,6 +159,12 @@ export async function runAgent(
             stopWhen: stepCountIs(maxSteps),
             experimental_telemetry: {
               isEnabled: true,
+            },
+            onError: ({ error }) => {
+              // Provider failures (invalid key, rate limit, 5xx) arrive here
+              // rather than as a thrown error. Capture and surface after the
+              // stream drains so the Sentry span and the user both see it.
+              streamError = error;
             },
             onStepFinish: ({ toolCalls, toolResults }) => {
               if (toolCalls && toolCalls.length > 0) {
@@ -160,6 +219,19 @@ export async function runAgent(
             chunkCount++;
             logStreamWrite(chunk);
             currentOutput += chunk;
+          }
+
+          // Surface a provider failure captured during streaming. Throwing
+          // routes it through the catch below, which marks the span errored
+          // and rethrows so Sentry records it, instead of the silent fallback.
+          if (streamError !== undefined) {
+            if (isStreaming) {
+              logStreamEnd();
+              isStreaming = false;
+            }
+            throw new Error(describeProviderError(streamError, provider), {
+              cause: streamError,
+            });
           }
 
           // Show message if no response generated and no tools were used
