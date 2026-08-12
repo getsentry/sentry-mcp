@@ -56,7 +56,6 @@ Path-like arguments (starting with `.`, `/`, or `~`) are always treated as the d
 | `sourcemaps` | Source map uploads |
 | `crons` | Cron job monitoring |
 | `ai-monitoring` | AI/LLM monitoring |
-| `user-feedback` | User feedback widget |
 
 ## What the Wizard Does
 
