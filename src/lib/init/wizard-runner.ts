@@ -423,7 +423,13 @@ async function handleSuspendedStep(
       );
     }
 
-    spin.start("Processing...");
+    // Feature review is complete, so name the next visible phase instead of
+    // briefly falling back to generic processing while the server advances.
+    spin.start(
+      stepId === "select-features"
+        ? STEP_ACTIVE_LABELS["plan-codemods"]
+        : "Processing..."
+    );
     spinState.running = true;
 
     return {

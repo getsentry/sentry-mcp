@@ -41,12 +41,25 @@ export type MockCall =
   | { kind: "spinner.start"; message?: string }
   | { kind: "spinner.message"; message?: string }
   | { kind: "spinner.stop"; message?: string; code?: SpinnerExitCode }
-  | { kind: "select"; message: string; options: string[] }
+  | {
+      kind: "select";
+      message: string;
+      details?: Array<{ text: string; tone?: "muted" | "success" }>;
+      footer?: { text: string; tone?: "muted" | "success" };
+      options: string[];
+    }
   | { kind: "welcome"; options: WelcomeOptions }
   | {
       kind: "multiselect";
       message: string;
+      details?: Array<{ text: string; tone?: "muted" | "success" }>;
       options: string[];
+      optionDetails: Array<{
+        value: string;
+        label: string;
+        description?: string;
+        locked?: boolean;
+      }>;
       initialValues?: string[];
     }
   | { kind: "confirm"; message: string; initialValue?: boolean }
@@ -145,6 +158,8 @@ export function createMockUI(options: MockUIOptions = {}): {
       calls.push({
         kind: "select",
         message: opts.message,
+        ...(opts.details ? { details: opts.details } : {}),
+        ...(opts.footer ? { footer: opts.footer } : {}),
         options: opts.options.map((option) => option.value),
       });
       return Promise.resolve(takeResponse("select"));
@@ -153,7 +168,14 @@ export function createMockUI(options: MockUIOptions = {}): {
       calls.push({
         kind: "multiselect",
         message: opts.message,
+        ...(opts.details ? { details: opts.details } : {}),
         options: opts.options.map((option) => option.value),
+        optionDetails: opts.options.map((option) => ({
+          value: option.value,
+          label: option.label,
+          ...(option.description ? { description: option.description } : {}),
+          ...(option.locked ? { locked: true } : {}),
+        })),
         ...(opts.initialValues ? { initialValues: opts.initialValues } : {}),
       });
       return Promise.resolve(takeResponse("multiselect"));

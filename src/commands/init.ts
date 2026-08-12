@@ -58,8 +58,6 @@ const FEATURE_ALIASES = {
   crons: "crons",
   "ai-monitoring": "aiMonitoring",
   aiMonitoring: "aiMonitoring",
-  "user-feedback": "userFeedback",
-  userFeedback: "userFeedback",
 } as const;
 
 const SUPPORTED_FEATURE_NAMES = [
@@ -72,7 +70,6 @@ const SUPPORTED_FEATURE_NAMES = [
   "sourcemaps",
   "crons",
   "ai-monitoring",
-  "user-feedback",
 ] as const;
 
 const SUPPORTED_FEATURE_TEXT = SUPPORTED_FEATURE_NAMES.join(", ");
@@ -337,7 +334,7 @@ export const initCommand = buildCommand<
         kind: "parsed",
         parse: String,
         brief:
-          "Features to enable: errors,tracing,logs,replay,metrics,profiling,sourcemaps,crons,ai-monitoring,user-feedback",
+          "Features to enable: errors,tracing,logs,replay,metrics,profiling,sourcemaps,crons,ai-monitoring",
         variadic: true,
         optional: true,
       },

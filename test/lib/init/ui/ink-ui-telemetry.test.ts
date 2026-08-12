@@ -70,6 +70,194 @@ afterEach(() => {
 });
 
 describe("InkUI prompt telemetry", () => {
+  test("replaces sequential prompts without an empty frame", async () => {
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const { ui, store } = createUi();
+    const promptKinds: Array<string | null> = [];
+    const unsubscribe = store.subscribe(() => {
+      promptKinds.push(store.getSnapshot().prompt?.kind ?? null);
+    });
+
+    const resultPromise = (async () => {
+      await ui.multiselect({
+        message: "Choose features",
+        options: [{ label: "Tracing", value: "performanceMonitoring" }],
+      });
+      return ui.select({
+        message: "Review your Sentry setup",
+        options: [
+          { label: "Continue", value: "continue" },
+          { label: "Back", value: "back" },
+        ],
+      });
+    })();
+
+    const featurePrompt = store.getSnapshot().prompt;
+    expect(featurePrompt?.kind).toBe("multiselect");
+    if (featurePrompt?.kind !== "multiselect") {
+      throw new Error("Expected a multiselect prompt");
+    }
+    featurePrompt.resolve(["performanceMonitoring"]);
+
+    await vi.waitFor(() => {
+      expect(store.getSnapshot().prompt?.kind).toBe("select");
+    });
+    expect(promptKinds).toEqual(["multiselect", "select"]);
+
+    const reviewPrompt = store.getSnapshot().prompt;
+    if (reviewPrompt?.kind !== "select") {
+      throw new Error("Expected a select prompt");
+    }
+    reviewPrompt.resolve("continue");
+    await expect(resultPromise).resolves.toBe("continue");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(promptKinds).toEqual(["multiselect", "select", null]);
+
+    unsubscribe();
+    await ui[Symbol.asyncDispose]();
+  });
+
+  test("returns from review to feature selection without an empty frame", async () => {
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const { ui, store } = createUi();
+    const promptKinds: Array<string | null> = [];
+    const unsubscribe = store.subscribe(() => {
+      promptKinds.push(store.getSnapshot().prompt?.kind ?? null);
+    });
+
+    const resultPromise = (async () => {
+      await ui.select({
+        message: "Review your Sentry setup",
+        options: [
+          { label: "Continue", value: "continue" },
+          { label: "Back", value: "back" },
+        ],
+      });
+      return ui.multiselect({
+        message: "Choose features",
+        options: [{ label: "Tracing", value: "performanceMonitoring" }],
+      });
+    })();
+
+    const reviewPrompt = store.getSnapshot().prompt;
+    expect(reviewPrompt?.kind).toBe("select");
+    if (reviewPrompt?.kind !== "select") {
+      throw new Error("Expected a select prompt");
+    }
+    reviewPrompt.resolve("back");
+
+    await vi.waitFor(() => {
+      expect(store.getSnapshot().prompt?.kind).toBe("multiselect");
+    });
+    expect(promptKinds).toEqual(["select", "multiselect"]);
+
+    const featurePrompt = store.getSnapshot().prompt;
+    if (featurePrompt?.kind !== "multiselect") {
+      throw new Error("Expected a multiselect prompt");
+    }
+    featurePrompt.resolve(["performanceMonitoring"]);
+    await expect(resultPromise).resolves.toEqual(["performanceMonitoring"]);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(promptKinds).toEqual(["select", "multiselect", null]);
+
+    unsubscribe();
+    await ui[Symbol.asyncDispose]();
+  });
+
+  test("replaces the completed review atomically with planning progress", async () => {
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const { ui, store } = createUi();
+    const states: Array<{
+      prompt: string | null;
+      spinnerActive: boolean;
+      spinnerMessage: string;
+    }> = [];
+    const unsubscribe = store.subscribe(() => {
+      const snapshot = store.getSnapshot();
+      states.push({
+        prompt: snapshot.prompt?.kind ?? null,
+        spinnerActive: snapshot.spinner.active,
+        spinnerMessage: snapshot.spinner.message,
+      });
+    });
+
+    const resultPromise = (async () => {
+      const result = await ui.select({
+        message: "Review your Sentry setup",
+        options: [
+          { label: "Continue", value: "continue" },
+          { label: "Back", value: "back" },
+        ],
+      });
+      ui.spinner().start("Planning code changes...");
+      return result;
+    })();
+
+    const reviewPrompt = store.getSnapshot().prompt;
+    if (reviewPrompt?.kind !== "select") {
+      throw new Error("Expected a select prompt");
+    }
+    reviewPrompt.resolve("continue");
+
+    await vi.waitFor(() => {
+      expect(store.getSnapshot().spinner.active).toBe(true);
+    });
+    await expect(resultPromise).resolves.toBe("continue");
+    expect(states).not.toContainEqual(
+      expect.objectContaining({ prompt: null, spinnerActive: false })
+    );
+    expect(states).not.toContainEqual(
+      expect.objectContaining({ prompt: "select", spinnerActive: true })
+    );
+    expect(store.getSnapshot()).toMatchObject({
+      prompt: null,
+      spinner: {
+        active: true,
+        message: "Planning code changes...",
+      },
+    });
+
+    unsubscribe();
+    await ui[Symbol.asyncDispose]();
+  });
+
+  test.each([
+    "select",
+    "multiselect",
+  ] as const)("clears a cancelled %s prompt after returning the cancellation", async (kind) => {
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const { ui, store } = createUi();
+    const promptKinds: Array<string | null> = [];
+    const unsubscribe = store.subscribe(() => {
+      promptKinds.push(store.getSnapshot().prompt?.kind ?? null);
+    });
+
+    const resultPromise =
+      kind === "select"
+        ? ui.select({
+            message: "Review your Sentry setup",
+            options: [{ label: "Continue", value: "continue" }],
+          })
+        : ui.multiselect({
+            message: "Choose features",
+            options: [{ label: "Tracing", value: "performanceMonitoring" }],
+          });
+    const prompt = store.getSnapshot().prompt;
+    expect(prompt?.kind).toBe(kind);
+    if (prompt?.kind !== "select" && prompt?.kind !== "multiselect") {
+      throw new Error(`Expected a ${kind} prompt`);
+    }
+
+    prompt.resolve(null);
+    await expect(resultPromise).resolves.toBe(CANCELLED);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(store.getSnapshot().prompt).toBeNull();
+    expect(promptKinds).toEqual([kind, null]);
+
+    unsubscribe();
+    await ui[Symbol.asyncDispose]();
+  });
+
   test("attributes workflow prompts to the active step", async () => {
     const metricSpy = vi.spyOn(Sentry.metrics, "distribution");
     const startSpanSpy = vi.spyOn(Sentry, "startSpan");

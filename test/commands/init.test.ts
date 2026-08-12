@@ -223,11 +223,27 @@ describe("init command func", () => {
       });
       await expect(promise).rejects.toThrow(ValidationError);
       await expect(promise).rejects.toThrow(
-        "Supported features: errors, tracing, logs, replay, metrics, profiling, sourcemaps, crons, ai-monitoring, user-feedback"
+        "Supported features: errors, tracing, logs, replay, metrics, profiling, sourcemaps, crons, ai-monitoring"
       );
       expect(runWizardSpy).not.toHaveBeenCalled();
       expect(findProjectsSpy).not.toHaveBeenCalled();
       expect(warmSpy).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      "user-feedback",
+      "userFeedback",
+    ])("rejects %s because init cannot configure User Feedback placement", async (feature) => {
+      const ctx = makeContext();
+      const promise = func.call(ctx, {
+        ...DEFAULT_FLAGS,
+        features: [feature],
+      });
+      await expect(promise).rejects.toThrow(ValidationError);
+      await expect(promise).rejects.toThrow(
+        `Unknown init feature "${feature}"`
+      );
+      expect(runWizardSpy).not.toHaveBeenCalled();
     });
 
     test("passes undefined when features not provided", async () => {
