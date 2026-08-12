@@ -34,6 +34,7 @@ import { USER_AGENT } from "../version";
 import { apiPath } from "./api-path";
 import { ApiNotFoundError, ApiValidationError, createApiError } from "./errors";
 import {
+  AgenticOnboardingRunSchema,
   AIConversationDetailsResponseSchema,
   AIConversationSummaryListSchema,
   ApiErrorSchema,
@@ -92,6 +93,8 @@ import {
   UserSchema,
 } from "./schema";
 import type {
+  AgenticOnboardingRun,
+  AgenticOnboardingStatusUpdate,
   AIConversationDetails,
   AIConversationSpanList,
   AIConversationSummary,
@@ -1858,6 +1861,28 @@ export class SentryApiService {
    * @param opts Request options
    * @returns Updated project data
    */
+  async updateAgenticOnboardingStatus(
+    {
+      organizationSlug,
+      update,
+    }: {
+      organizationSlug: string;
+      update: AgenticOnboardingStatusUpdate;
+    },
+    opts?: RequestOptions,
+  ): Promise<AgenticOnboardingRun> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/onboarding/agent/status/`,
+      {
+        method: "POST",
+        body: JSON.stringify(update),
+      },
+      opts,
+    );
+
+    return AgenticOnboardingRunSchema.parse(body);
+  }
+
   async updateProject(
     {
       organizationSlug,
@@ -2904,8 +2929,7 @@ export class SentryApiService {
     }
     this.applyTimeParams(searchQuery, effectiveStatsPeriod, start, end);
 
-    const path =
-      apiPath`/projects/${organizationSlug}/${projectSlug}/uptime/${uptimeMonitorId}/checks/`;
+    const path = apiPath`/projects/${organizationSlug}/${projectSlug}/uptime/${uptimeMonitorId}/checks/`;
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,

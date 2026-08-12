@@ -85,6 +85,7 @@ export interface ToolConfig<
   description: ToolDescription;
   inputSchema: TSchema;
   skills: Skill[]; // Which skill categories this tool belongs to
+  includeInSkillDefinitions?: boolean; // Whether generated skill prompts advertise this tool
   requiredScopes: Scope[]; // LEGACY: Which API scopes needed (deprecated, for backward compatibility)
   experimental?: boolean; // Mark tool as experimental (only shown in experimental mode)
   hideInExperimentalMode?: boolean; // Hide tool when experimental mode is active (for tools replaced by unified tools)

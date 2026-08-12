@@ -402,6 +402,33 @@ export const restHandlers = buildHandlers([
     },
   },
   {
+    method: "post",
+    path: "/api/0/organizations/sentry-mcp-evals/onboarding/agent/status/",
+    fetch: () => {
+      return HttpResponse.json({
+        schemaVersion: 1,
+        runId: "2d27f6654b754dcaa2d26af18274d142",
+        channelId: "6835652362204cb1b10719783c26983a",
+        clientRunId: "e806c6f4-fef8-47b4-a720-5ab582b2fcf0",
+        createdAt: "2026-08-12T12:00:00Z",
+        updatedAt: "2026-08-12T12:01:00Z",
+        sequence: 1,
+        expiresAt: "2026-08-13T12:00:00Z",
+        continueUpdates: true,
+        runStatus: "active",
+        projectSlugs: [],
+        issueIds: [],
+        stages: [
+          {
+            stage: "connect_mcp",
+            status: "completed",
+            eventNote: null,
+          },
+        ],
+      });
+    },
+  },
+  {
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/dashboards/",
     fetch: ({ request }) => {

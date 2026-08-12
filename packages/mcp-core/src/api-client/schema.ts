@@ -2076,3 +2076,77 @@ export const TransactionProfileSchema = z
       .optional(),
   })
   .passthrough();
+
+export const AgenticOnboardingStageSchema = z.enum([
+  "connect_mcp",
+  "analyze_project",
+  "create_project",
+  "instrument_app",
+  "plan_test_error",
+  "send_verification_error",
+  "receive_verification_error",
+  "prepare_production",
+  "check_stack_trace_quality",
+]);
+
+export const AgenticOnboardingStageStatusSchema = z.enum([
+  "active",
+  "waiting",
+  "completed",
+  "skipped",
+  "failed",
+  "bypassed",
+]);
+
+export const AgenticOnboardingStageStatusUpdateSchema = z.enum([
+  "active",
+  "waiting",
+  "completed",
+  "skipped",
+  "failed",
+]);
+
+export const AgenticOnboardingStageStateSchema = z.object({
+  stage: AgenticOnboardingStageSchema,
+  status: AgenticOnboardingStageStatusSchema.nullable(),
+  eventNote: z.string().nullable(),
+});
+
+export const AgenticOnboardingRunStatusSchema = z.enum([
+  "active",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+export const AgenticOnboardingRunStatusUpdateSchema = z.enum([
+  "completed",
+  "failed",
+]);
+
+export const AgenticOnboardingStatusUpdateSchema = z.object({
+  schemaVersion: z.literal(1),
+  runToken: z.string().regex(/^[A-Za-z0-9]{10}$/),
+  stage: AgenticOnboardingStageSchema,
+  status: AgenticOnboardingStageStatusUpdateSchema,
+  runStatus: AgenticOnboardingRunStatusUpdateSchema.optional(),
+  eventNote: z.string().trim().min(1).max(256).optional(),
+  projectSlugs: z.array(z.string().trim().min(1)).min(1).max(100).optional(),
+  issueIds: z.array(z.string().trim().min(1)).min(1).max(100).optional(),
+});
+
+export const AgenticOnboardingRunSchema = z.object({
+  schemaVersion: z.literal(1),
+  runId: z.string(),
+  channelId: z.string(),
+  clientRunId: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  sequence: z.number().int().nonnegative(),
+  expiresAt: z.string(),
+  continueUpdates: z.boolean(),
+  runStatus: AgenticOnboardingRunStatusSchema,
+  projectSlugs: z.array(z.string()),
+  issueIds: z.array(z.string()),
+  stages: z.array(AgenticOnboardingStageStateSchema),
+});

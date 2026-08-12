@@ -49,6 +49,7 @@ import getLatestBaseSnapshot from "./get-latest-base-snapshot";
 import getAIConversationDetails from "./get-ai-conversation-details";
 import searchAIConversations from "./search-ai-conversations";
 import addIssueNote from "./add-issue-note";
+import onboardingStatusUpdate from "./onboarding-status-update";
 import type { ToolConfig } from "../types";
 
 /**
@@ -112,6 +113,7 @@ const catalogTools = {
   get_ai_conversation_details: getAIConversationDetails,
   search_ai_conversations: searchAIConversations,
   add_issue_note: addIssueNote,
+  onboarding_status_update: onboardingStatusUpdate,
 } as const satisfies Record<string, ToolConfig<any>>;
 
 export default catalogTools;
