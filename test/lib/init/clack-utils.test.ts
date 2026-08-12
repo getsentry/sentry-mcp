@@ -1,5 +1,5 @@
 /**
- * Tests for clack-utils: WizardCancelledError, abortIfCancelled, featureLabel, featureHint.
+ * Tests for clack-utils: cancellation helpers and feature display metadata.
  *
  * These are pure utility functions that don't require module mocking.
  */
@@ -7,7 +7,7 @@
 import { describe, expect, test } from "vitest";
 import {
   abortIfCancelled,
-  featureHint,
+  featureDescription,
   featureLabel,
   PROGRESS_ROTATE_INTERVAL_MS,
   STEP_ACTIVE_LABELS,
@@ -61,41 +61,48 @@ describe("featureLabel", () => {
   });
 });
 
-describe("featureHint", () => {
-  test("returns hint for known feature", () => {
-    expect(featureHint("errorMonitoring")).toBe(
-      "Group exceptions into issues with context"
+describe("featureDescription", () => {
+  test("returns description for known feature", () => {
+    expect(featureDescription("errorMonitoring")).toBe(
+      "Automatically capture exceptions and stack traces"
     );
-    expect(featureHint("performanceMonitoring")).toBe(
-      "See request paths, spans, and bottlenecks"
+    expect(featureDescription("performanceMonitoring")).toBe(
+      "Find bottlenecks, broken requests, and understand application flow end-to-end"
     );
-    expect(featureHint("sessionReplay")).toBe(
-      "Replay sessions linked to errors"
+    expect(featureDescription("sessionReplay")).toBe(
+      "Watch real user sessions to see what went wrong"
     );
-    expect(featureHint("profiling")).toBe(
-      "Find CPU-heavy functions in production"
+    expect(featureDescription("profiling")).toBe(
+      "Pinpoint the functions and lines of code responsible for performance issues"
     );
-    expect(featureHint("logs")).toBe("Search logs beside errors and traces");
-    expect(featureHint("metrics")).toBe("Track custom measurements over time");
-    expect(featureHint("sourceMaps")).toBe(
-      "Turn minified stacks into your source"
+    expect(featureDescription("logs")).toBe(
+      "See logs in context with errors and performance issues"
     );
-    expect(featureHint("crons")).toBe(
-      "Alert on failed or missed scheduled jobs"
+    expect(featureDescription("metrics")).toBe(
+      "Track application performance and usage over time with custom metrics"
     );
-    expect(featureHint("aiMonitoring")).toBe(
-      "Track AI calls, latency, cost, and failures"
+    expect(featureDescription("sourceMaps")).toBe(
+      "Turn minified production stack traces back into your original source code"
     );
-    expect(featureHint("userFeedback")).toBe(
-      "Collect user reports with issue context"
+    expect(featureDescription("crons")).toBe(
+      "Detect failed, missed, or delayed scheduled jobs"
     );
-    expect(featureHint("reactFeatures")).toBe(
-      "Add React-specific context and integrations"
+    expect(featureDescription("aiMonitoring")).toBe(
+      "Understand AI calls, latency, token usage, cost, and failures"
+    );
+    expect(featureDescription("mcpObservability")).toBe(
+      "Trace MCP tool calls and understand failures across agent workflows"
+    );
+    expect(featureDescription("userFeedback")).toBe(
+      "Collect user reports with the error and session context needed to investigate"
+    );
+    expect(featureDescription("reactFeatures")).toBe(
+      "Capture React-specific errors with component and rendering context"
     );
   });
 
   test("returns undefined for unknown feature", () => {
-    expect(featureHint("unknownFeature")).toBeUndefined();
+    expect(featureDescription("unknownFeature")).toBeUndefined();
   });
 });
 
@@ -109,6 +116,7 @@ describe("sortFeatures", () => {
         "sourceMaps",
         "crons",
         "aiMonitoring",
+        "mcpObservability",
       ])
     ).toEqual([
       "errorMonitoring",
@@ -116,6 +124,7 @@ describe("sortFeatures", () => {
       "sourceMaps",
       "crons",
       "aiMonitoring",
+      "mcpObservability",
       "userFeedback",
     ]);
   });

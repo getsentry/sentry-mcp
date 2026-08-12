@@ -11,6 +11,7 @@
 
 import { Readable, Writable } from "node:stream";
 import { setTimeout as sleep } from "node:timers/promises";
+import chalk from "chalk";
 import { render } from "ink";
 import { createElement } from "react";
 import { describe, expect, test, vi } from "vitest";
@@ -33,7 +34,7 @@ const FILES_HEADER_UNPINNED_RE = /Files analyzed\s+\u2191\s+\d+\/\d+/;
 const KEYBOARD_HINT_RE = /switch tab/;
 const SPACE_TOGGLE_HINT_RE = /space\s+toggle/;
 const A_ALL_HINT_RE = /a\s+all/;
-const ENTER_CONFIRM_HINT_RE = /enter\s+confirm/;
+const ENTER_CONTINUE_HINT_RE = /enter\s+continue/;
 const ESC_CANCEL_HINT_RE = /esc\s+cancel/;
 const COMPLETED_SELECTING_FEATURES_RE = /✔\s+Selecting features/;
 const ANSI_ESCAPE_PREFIX = "\u001B[";
@@ -44,6 +45,8 @@ const ANSI_CSI_RE = /\u001B\[[0-9;?]*[ -/]*[@-~]/g;
 const ANSI_OSC_RE = /\u001B\][^\u0007]*(?:\u0007|\u001B\\)/g;
 const LINE_SPLIT_RE = /\r?\n/;
 const DOWN_ARROW = "\u001B[B";
+const PAGE_DOWN = "\u001B[6~";
+const PAGE_UP = "\u001B[5~";
 const RIGHT_ARROW = "\u001B[C";
 const FEEDBACK_BANNER_TEXT = '$ sentry cli feedback "what worked or broke"';
 
@@ -536,41 +539,492 @@ describe("Ink App snapshot", () => {
     expect(longLogoLine).toBe(shortLogoLine);
   });
 
-  test("feature multiselect shows available features directly", async () => {
+  test("feature multiselect shows descriptions and the included baseline", async () => {
+    const store = new WizardStore({ bannerRows: [] });
+    store.setPrompt({
+      kind: "multiselect",
+      message: "Select features to enable",
+      details: [
+        {
+          text: "Based on your project, these features are available to set up.",
+        },
+      ],
+      options: [
+        {
+          value: "errorMonitoring",
+          label: "Error Monitoring",
+          description: "Automatically capture exceptions and stack traces",
+          locked: true,
+        },
+        {
+          value: "logs",
+          label: "Logging",
+          description: "See logs in context with errors and performance issues",
+        },
+        {
+          value: "sessionReplay",
+          label: "Session Replay",
+          description: "Watch real user sessions to see what went wrong",
+        },
+        {
+          value: "performanceMonitoring",
+          label: "Tracing",
+          description:
+            "Find bottlenecks, broken requests, and understand application flow end-to-end",
+        },
+        {
+          value: "sourceMaps",
+          label: "Source Maps",
+          description:
+            "Turn minified production stack traces back into your original source code",
+        },
+      ],
+      initialSelected: [
+        "errorMonitoring",
+        "logs",
+        "sessionReplay",
+        "performanceMonitoring",
+      ],
+      required: false,
+      resolve: ignorePromptResolution,
+    });
+
+    const previousColorLevel = chalk.level;
+    chalk.level = 3;
+    let frame: string;
+    try {
+      frame = (await renderApp(store, 120)).latestFrame();
+    } finally {
+      chalk.level = previousColorLevel;
+    }
+    const plainFrame = stripAnsi(frame);
+    expect(frame).toContain("Select features to enable");
+    expect(frame).toContain("Based on your project, these features are");
+    expect(frame).toContain("available to set up.");
+    expect(frame).toContain("Error Monitoring");
+    expect(frame).toContain(
+      "Automatically capture exceptions and stack traces"
+    );
+    expect(frame).toContain("Session Replay");
+    expect(frame).toContain("Watch real user sessions to see what went wrong");
+    expect(frame).toContain("Tracing");
+    expect(frame).toContain("Find bottlenecks, broken requests");
+    expect(frame).toContain("Source Maps");
+    expect(plainFrame).toContain("4/5");
+    expect(plainFrame).toContain(
+      "↑↓ move • space toggle • a all • enter continue"
+    );
+    expect(plainFrame).toMatch(SPACE_TOGGLE_HINT_RE);
+    expect(plainFrame).toMatch(A_ALL_HINT_RE);
+    expect(plainFrame).toMatch(ENTER_CONTINUE_HINT_RE);
+    expect(plainFrame).toMatch(ESC_CANCEL_HINT_RE);
+    expect(plainFrame).not.toContain("required");
+    expect(plainFrame).toContain("Error Monitoring (always included)");
+    const errorMonitoringRow = frame
+      .split(LINE_SPLIT_RE)
+      .find((line) => line.includes("Error Monitoring"));
+    expect(errorMonitoringRow).toContain(
+      `${ANSI_ESCAPE_PREFIX}38;2;131;218;144m◼ `
+    );
+    expect(frame).not.toContain("Recommended setup");
+    expect(frame).not.toContain("Apply recommended setup");
+    expect(plainFrame.indexOf("Error Monitoring")).toBeLessThan(
+      plainFrame.indexOf("Logging")
+    );
+    expect(plainFrame.indexOf("Logging")).toBeLessThan(
+      plainFrame.indexOf("Session Replay")
+    );
+    expect(plainFrame.indexOf("Session Replay")).toBeLessThan(
+      plainFrame.indexOf("Tracing")
+    );
+    expect(plainFrame.indexOf("Tracing")).toBeLessThan(
+      plainFrame.indexOf("Source Maps")
+    );
+    const lines = plainFrame.split(LINE_SPLIT_RE);
+    const shortcutLine = lines.findIndex((line) =>
+      line.includes("↑↓ move • space toggle • a all • enter continue")
+    );
+    const contextLastLine = lines.findIndex((line) =>
+      line.includes("available to set up.")
+    );
+    const firstFeatureLine = lines.findIndex((line) =>
+      line.includes("Error Monitoring")
+    );
+    const lastFeatureLine = lines.findIndex((line) =>
+      line.includes("Source Maps")
+    );
+    expect(contextLastLine).toBeGreaterThan(0);
+    expect(firstFeatureLine - contextLastLine).toBeGreaterThan(1);
+    expect(shortcutLine).toBeGreaterThan(0);
+    expect(lastFeatureLine).toBeGreaterThan(0);
+    expect(shortcutLine - lastFeatureLine).toBeGreaterThan(2);
+    expect(plainFrame.indexOf("Tracing")).toBeLessThan(
+      plainFrame.indexOf("↑↓ move • space toggle • a all • enter continue")
+    );
+  });
+
+  test("multiselect hints render and locked options survive toggle all", async () => {
+    const resolve = vi.fn();
     const store = new WizardStore({ bannerRows: [] });
     store.setPrompt({
       kind: "multiselect",
       message: "Select features",
       options: [
-        { value: "sessionReplay", label: "Session Replay" },
         {
-          value: "performanceMonitoring",
-          label: "Tracing",
-          hint: "See request paths, spans, and bottlenecks",
+          value: "errors",
+          label: "Error Monitoring",
+          hint: "captured by default",
+          locked: true,
         },
-        { value: "sourceMaps", label: "Source Maps" },
+        { value: "replay", label: "Session Replay" },
       ],
-      initialSelected: [],
+      initialSelected: ["errors", "replay"],
+      required: false,
+      resolve,
+    });
+
+    const rendered = await renderApp(store, 120, { input: ["a", "\r"] });
+    expect(stripAnsi(rendered.allOutput())).toContain("captured by default");
+    expect(resolve).toHaveBeenCalledWith(["errors"]);
+  });
+
+  test("the multiselect cursor starts on the first unselected option", async () => {
+    const resolve = vi.fn();
+    const store = new WizardStore({ bannerRows: [] });
+    store.setPrompt({
+      kind: "multiselect",
+      message: "Select features",
+      options: [
+        { value: "errors", label: "Error Monitoring", locked: true },
+        { value: "logs", label: "Logging" },
+        { value: "replay", label: "Session Replay" },
+        { value: "profiling", label: "Profiling" },
+      ],
+      initialSelected: ["errors", "logs", "replay"],
+      required: false,
+      resolve,
+    });
+
+    await renderApp(store, 120, { input: [" ", "\r"] });
+    expect(resolve).toHaveBeenCalledWith([
+      "errors",
+      "logs",
+      "replay",
+      "profiling",
+    ]);
+  });
+
+  test("feature descriptions fit short terminals and keep the baseline pinned", async () => {
+    const store = new WizardStore({ bannerRows: [] });
+    store.setPrompt({
+      kind: "multiselect",
+      message: "Select features to enable",
+      details: [
+        {
+          text: "Based on your project, these features are available to set up.",
+        },
+      ],
+      options: [
+        {
+          value: "errors",
+          label: "Error Monitoring",
+          description: "Automatically capture exceptions and stack traces",
+          locked: true,
+        },
+        ...Array.from({ length: 5 }, (_value, index) => ({
+          value: `feature-${index + 1}`,
+          label: `Feature ${index + 1}`,
+          description:
+            "A longer explanation that wraps cleanly and still leaves enough room for navigation",
+        })),
+      ],
+      initialSelected: ["errors"],
       required: false,
       resolve: ignorePromptResolution,
     });
 
-    const frame = (await renderApp(store, 120)).allOutput();
-    const plainFrame = stripAnsi(frame);
+    const rendered = await renderApp(store, 60, {
+      input: [DOWN_ARROW, DOWN_ARROW, DOWN_ARROW],
+      rows: 16,
+    });
+    const frame = stripFinalLineBreak(stripAnsi(rendered.latestFrame()));
+    expect(frame).toContain("Error Monitoring");
+    expect(frame).toContain("Feature 4");
+    expect(frame).toContain("↑↓ move • space toggle • a all • enter continue");
+    expect(frame.split(LINE_SPLIT_RE).length).toBeLessThanOrEqual(16);
+  });
+
+  test("feature selection stays usable at 30 columns", async () => {
+    const resolve = vi.fn();
+    const store = new WizardStore({ bannerRows: [] });
+    store.setPrompt({
+      kind: "multiselect",
+      message: "Select features to enable",
+      details: [
+        {
+          text: "Based on your project, these features are available to set up.",
+        },
+      ],
+      options: [
+        {
+          value: "errors",
+          label: "Error Monitoring",
+          description: "Automatically capture exceptions and stack traces",
+          locked: true,
+        },
+        {
+          value: "logs",
+          label: "Logging",
+          description: "See logs in context with errors and performance issues",
+        },
+        {
+          value: "replay",
+          label: "Session Replay",
+          description: "Watch real user sessions to see what went wrong",
+        },
+        {
+          value: "tracing",
+          label: "Tracing",
+          description:
+            "Find bottlenecks, broken requests, and understand application flow end-to-end",
+        },
+        {
+          value: "profiling",
+          label: "Profiling",
+          description:
+            "Pinpoint the functions and lines of code responsible for performance issues",
+        },
+      ],
+      initialSelected: ["errors", "logs", "replay", "tracing"],
+      required: false,
+      resolve,
+    });
+
+    const rendered = await renderApp(store, 30, {
+      input: [DOWN_ARROW, DOWN_ARROW, " ", "\r"],
+      rows: 16,
+    });
+    const frame = stripFinalLineBreak(stripAnsi(rendered.latestFrame()));
+    expect(frame).toContain("Error Monitoring");
     expect(frame).toContain("Session Replay");
+    expect(frame).toContain("space toggle");
+    expect(frame.split(LINE_SPLIT_RE).length).toBeLessThanOrEqual(16);
+    expect(resolve).toHaveBeenCalledWith(["errors", "logs", "tracing"]);
+  });
+
+  test("feature review shows the selected setup and a way back", async () => {
+    const resolve = vi.fn();
+    const store = new WizardStore({ bannerRows: [] });
+    store.setPrompt({
+      kind: "select",
+      message: "Review your Sentry setup",
+      details: [
+        { text: "We'll add these features:" },
+        { text: "✓ Error Monitoring", tone: "success" },
+        { text: "✓ Session Replay", tone: "success" },
+        { text: "✓ Tracing", tone: "success" },
+      ],
+      footer: {
+        text: "We'll modify project files for this Sentry setup.",
+      },
+      options: [
+        { value: "continue", label: "Continue" },
+        { value: "back", label: "Back" },
+      ],
+      initialIndex: 0,
+      resolve,
+    });
+
+    const frame = stripAnsi((await renderApp(store, 120)).latestFrame());
+    expect(frame).toContain("Review your Sentry setup");
+    expect(frame).toContain("We'll add these features:");
+    expect(frame).toContain("Error Monitoring");
     expect(frame).toContain("Tracing");
-    expect(frame).toContain("See request paths, spans, and bottlenecks");
-    expect(frame).toContain("Source Maps");
-    expect(plainFrame).toContain("0/3");
-    expect(plainFrame).not.toContain(
-      "space toggle • a all • enter confirm • esc cancel"
+    expect(frame).toContain("Session Replay");
+    expect(frame).toContain("Continue");
+    expect(frame).toContain("Back");
+    expect(frame).not.toContain("Change features");
+    expect(frame).toContain(
+      "We'll modify project files for this Sentry setup."
     );
-    expect(plainFrame).toMatch(SPACE_TOGGLE_HINT_RE);
-    expect(plainFrame).toMatch(A_ALL_HINT_RE);
-    expect(plainFrame).toMatch(ENTER_CONFIRM_HINT_RE);
-    expect(plainFrame).toMatch(ESC_CANCEL_HINT_RE);
-    expect(frame).not.toContain("Recommended setup");
-    expect(frame).not.toContain("Apply recommended setup");
+    expect(frame.indexOf("✓ Tracing")).toBeLessThan(
+      frame.indexOf("We'll modify project files for this Sentry setup.")
+    );
+    expect(
+      frame.indexOf("We'll modify project files for this Sentry setup.")
+    ).toBeLessThan(frame.indexOf("Continue"));
+    const reviewLines = frame
+      .split(LINE_SPLIT_RE)
+      .filter((line) => line.includes("✓ "));
+    expect(reviewLines).toHaveLength(3);
+    expect(
+      reviewLines.every((line) => (line.match(/✓/g) ?? []).length === 1)
+    ).toBe(true);
+
+    await renderApp(store, 120, { input: [DOWN_ARROW, "\r"] });
+    expect(resolve).toHaveBeenCalledWith("back");
+  });
+
+  test("feature review keeps the workflow content anchored for the next step", async () => {
+    const reviewStore = new WizardStore({ bannerRows: [] });
+    reviewStore.setPrompt({
+      kind: "select",
+      message: "Review your Sentry setup",
+      details: [
+        { text: "We'll add these features:" },
+        { text: "✓ Error Monitoring", tone: "success" },
+        { text: "✓ Logging", tone: "success" },
+        { text: "✓ Tracing", tone: "success" },
+      ],
+      footer: {
+        text: "We'll modify project files for this Sentry setup.",
+      },
+      options: [
+        { value: "continue", label: "Continue" },
+        { value: "back", label: "Back" },
+      ],
+      initialIndex: 0,
+      resolve: ignorePromptResolution,
+    });
+    const planStore = new WizardStore({ bannerRows: [] });
+    planStore.startSpinner("Planning Sentry changes");
+
+    const reviewFrame = stripAnsi(
+      (await renderApp(reviewStore, 120)).latestFrame()
+    );
+    const planFrame = stripAnsi(
+      (await renderApp(planStore, 120)).latestFrame()
+    );
+    const reviewLine = reviewFrame
+      .split(LINE_SPLIT_RE)
+      .find((line) => line.includes("Review your Sentry setup"));
+    const planLine = planFrame
+      .split(LINE_SPLIT_RE)
+      .find((line) => line.includes("Planning Sentry changes"));
+
+    expect(reviewLine).toBeDefined();
+    expect(planLine).toBeDefined();
+    expect(reviewLine?.indexOf("Review your Sentry setup")).toBe(
+      planLine?.indexOf("Planning Sentry changes")
+    );
+  });
+
+  test.each([
+    120, 60, 30,
+  ])("review prompts keep their warning and actions visible at %i columns", async (columns) => {
+    const store = new WizardStore({ bannerRows: [] });
+    store.appendLog("warn", "Review warning remains visible");
+    store.setPrompt({
+      kind: "select",
+      message: "Review your Sentry setup",
+      details: [
+        { text: "We'll add these features:" },
+        ...[
+          "AI Monitoring",
+          "Application Metrics",
+          "Crons",
+          "Error Monitoring",
+          "Logging",
+          "MCP Observability",
+          "Profiling",
+          "Session Replay",
+          "Source Maps",
+          "Tracing",
+        ].map((feature) => ({
+          text: `✓ ${feature}`,
+          tone: "success" as const,
+        })),
+      ],
+      footer: {
+        text: "We'll modify project files for this Sentry setup.",
+      },
+      options: [
+        { value: "continue", label: "Continue" },
+        { value: "back", label: "Back" },
+      ],
+      initialIndex: 0,
+      resolve: ignorePromptResolution,
+    });
+
+    const rendered = await renderApp(store, columns, {
+      input: Array.from({ length: 12 }, () => PAGE_DOWN),
+      rows: 16,
+    });
+    const frame = stripFinalLineBreak(stripAnsi(rendered.latestFrame()));
+    const normalizedFrame = frame.replace(/\s+/g, " ");
+    expect(frame).toContain("Review your Sentry setup");
+    expect(frame).toContain("Review warning remains");
+    expect(frame).toContain("10-10/10 · pgup/pgdn");
+    expect(frame).toContain("Tracing");
+    expect(normalizedFrame).toContain(
+      "We'll modify project files for this Sentry setup."
+    );
+    expect(frame).toContain("Continue");
+    expect(frame).toContain("Back");
+    expect(frame).not.toContain("Change features");
+    expect(frame).toContain("Status");
+    expect(frame).toContain("Files");
+    expect(frame).toContain("↑↓ navigate");
+    expect(frame).toContain("enter confirm");
+    expect(frame).toContain("Sentry");
+    expect(frame.split(LINE_SPLIT_RE).length).toBeLessThanOrEqual(16);
+  });
+
+  test("narrow review paging remains reversible when warnings accumulate", async () => {
+    const store = new WizardStore({ bannerRows: [] });
+    store.appendLog("warn", "An older review warning");
+    store.appendLog("error", "The latest review warning remains visible");
+    store.setPrompt({
+      kind: "select",
+      message: "Review your Sentry setup",
+      details: [
+        { text: "We'll add these features:" },
+        ...Array.from({ length: 10 }, (_value, index) => ({
+          text: `✓ Feature ${index + 1}`,
+          tone: "success" as const,
+        })),
+      ],
+      footer: {
+        text: "We'll modify project files for this Sentry setup.",
+      },
+      options: [
+        { value: "continue", label: "Continue" },
+        { value: "back", label: "Back" },
+      ],
+      initialIndex: 0,
+      resolve: ignorePromptResolution,
+    });
+
+    const firstFrame = stripAnsi(
+      (await renderApp(store, 30, { rows: 16 })).latestFrame()
+    );
+    expect(firstFrame).not.toContain("An older review warning");
+    expect(firstFrame).toContain("latest review warning");
+    expect(firstFrame).toContain("✓ Feature 1");
+    expect(firstFrame).toContain("1-1/10 · pgup/pgdn");
+
+    const nextFrame = stripAnsi(
+      (
+        await renderApp(store, 30, { input: [PAGE_DOWN], rows: 16 })
+      ).latestFrame()
+    );
+    expect(nextFrame).toContain("✓ Feature 2");
+    expect(nextFrame).toContain("2-2/10 · pgup/pgdn");
+
+    const previousFrame = stripAnsi(
+      (
+        await renderApp(store, 30, {
+          input: [PAGE_DOWN, PAGE_UP],
+          rows: 16,
+        })
+      ).latestFrame()
+    );
+    expect(previousFrame).toContain("✓ Feature 1");
+    expect(previousFrame).toContain("1-1/10 · pgup/pgdn");
+    expect(previousFrame).toContain("Continue");
+    expect(previousFrame).toContain("Back");
+    expect(previousFrame).toContain("Status");
+    expect(previousFrame).toContain("Files");
   });
 
   test("workflow prompts hide routine logs but keep warnings and tasks", async () => {
@@ -678,7 +1132,8 @@ describe("Ink App snapshot", () => {
     store.appendLog("warn", "A second warning also remains visible");
     store.setPrompt({
       kind: "multiselect",
-      message: "Select features\nReview the monitoring choices",
+      message: "Select features",
+      details: [{ text: "Review the monitoring choices" }],
       options: Array.from({ length: 20 }, (_value, index) => ({
         value: `feature-${index + 1}`,
         label: `Feature ${index + 1}`,
@@ -693,8 +1148,8 @@ describe("Ink App snapshot", () => {
     expect(frame).toContain("0/20 selected • 1/20");
     expect(frame).toContain("Review the monitoring choices");
     expect(frame).toContain("A second warning also remains visible");
-    expect(frame).toContain("Feature 2");
-    expect(frame).not.toContain("Feature 3");
+    expect(frame).toContain("Feature 1");
+    expect(frame).not.toContain("Feature 2");
     expect(frame.split(LINE_SPLIT_RE).length).toBeLessThanOrEqual(16);
     expect(frame).toContain(FEEDBACK_BANNER_TEXT);
 
@@ -721,7 +1176,8 @@ describe("Ink App snapshot", () => {
     });
     store.setPrompt({
       kind: "multiselect",
-      message: "Select features\nReview the monitoring choices",
+      message: "Select features",
+      details: [{ text: "Review the monitoring choices" }],
       options: Array.from({ length: 20 }, (_value, index) => ({
         value: `feature-${index + 1}`,
         label: `Feature ${index + 1}`,
@@ -734,8 +1190,8 @@ describe("Ink App snapshot", () => {
     const rendered = await renderApp(store, 120, { rows: 30 });
     const frame = stripFinalLineBreak(stripAnsi(rendered.latestFrame()));
     expect(frame).toContain("Review the monitoring choices");
-    expect(frame).toContain("Feature 6");
-    expect(frame).not.toContain("Feature 7");
+    expect(frame).toContain("Feature 5");
+    expect(frame).not.toContain("Feature 6");
     expect(frame.split(LINE_SPLIT_RE).length).toBeLessThanOrEqual(30);
     expect(frame).toContain(FEEDBACK_BANNER_TEXT);
   });

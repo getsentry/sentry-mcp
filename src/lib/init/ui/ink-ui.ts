@@ -77,7 +77,7 @@ import {
   type WizardSummary,
   type WizardUI,
 } from "./types.js";
-import { WizardStore } from "./wizard-store.js";
+import { type ActivePrompt, WizardStore } from "./wizard-store.js";
 
 type CreateInkUIOptions = {
   initialWelcome?: WelcomeOptions;
@@ -378,6 +378,8 @@ export class InkUI implements WizardUI {
 
   private tipIndex = 0;
   private activePromptCancel: (() => void) | undefined;
+  /** A resolved prompt that may remain visible until its successor is ready. */
+  private completedPrompt: ActivePrompt | undefined;
   private cancelHandler: (() => void) | undefined;
   /**
    * Guard so `tearDown()` runs at most once even when called from
@@ -542,7 +544,15 @@ export class InkUI implements WizardUI {
     return {
       start: (message?: string) => {
         const clean = stripAnsi(message ?? "");
-        this.store.startSpinner(clean);
+        if (
+          this.completedPrompt &&
+          this.store.getSnapshot().prompt === this.completedPrompt
+        ) {
+          this.store.replacePromptWithSpinner(clean);
+          this.completedPrompt = undefined;
+        } else {
+          this.store.startSpinner(clean);
+        }
         if (clean) {
           this.store.appendStatus(clean);
         }
@@ -579,6 +589,28 @@ export class InkUI implements WizardUI {
     return this.promptTelemetry.tracePrompt(kind, () => new Promise<T>(mount));
   }
 
+  /**
+   * Defers cleanup so the resumed promise chain can replace the completed prompt.
+   * The identity check prevents the old cleanup from removing its successor.
+   */
+  private completePrompt<T>(
+    prompt: ActivePrompt,
+    value: T,
+    resolve: (resolvedValue: T) => void
+  ): void {
+    this.activePromptCancel = undefined;
+    this.completedPrompt = prompt;
+    resolve(value);
+    setImmediate(() => {
+      if (this.store.getSnapshot().prompt === prompt) {
+        this.store.setPrompt(null);
+      }
+      if (this.completedPrompt === prompt) {
+        this.completedPrompt = undefined;
+      }
+    });
+  }
+
   select<T extends string>(opts: SelectOptions<T>): Promise<T | Cancelled> {
     return this.waitForPrompt<T | Cancelled>("select", (resolve) => {
       const initialIndex =
@@ -590,14 +622,35 @@ export class InkUI implements WizardUI {
               )
             )
           : 0;
+      let settled = false;
       this.activePromptCancel = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
         this.store.setPrompt(null);
         this.activePromptCancel = undefined;
         resolve(CANCELLED);
       };
-      this.store.setPrompt({
+      const prompt: Extract<ActivePrompt, { kind: "select" }> = {
         kind: "select",
         message: stripAnsi(opts.message),
+        ...(opts.details
+          ? {
+              details: opts.details.map((detail) => ({
+                ...detail,
+                text: stripAnsi(detail.text),
+              })),
+            }
+          : {}),
+        ...(opts.footer
+          ? {
+              footer: {
+                ...opts.footer,
+                text: stripAnsi(opts.footer.text),
+              },
+            }
+          : {}),
         options: opts.options.map((option) => ({
           value: option.value,
           label: option.label,
@@ -605,15 +658,18 @@ export class InkUI implements WizardUI {
         })),
         initialIndex,
         resolve: (value) => {
-          this.store.setPrompt(null);
-          this.activePromptCancel = undefined;
-          if (value === null) {
-            resolve(CANCELLED);
-          } else {
-            resolve(value as T);
+          if (settled) {
+            return;
           }
+          settled = true;
+          this.completePrompt(
+            prompt,
+            value === null ? CANCELLED : (value as T),
+            resolve
+          );
         },
-      });
+      };
+      this.store.setPrompt(prompt);
     });
   }
 
@@ -621,31 +677,49 @@ export class InkUI implements WizardUI {
     opts: MultiSelectOptions<T>
   ): Promise<T[] | Cancelled> {
     return this.waitForPrompt<T[] | Cancelled>("multiselect", (resolve) => {
+      let settled = false;
       this.activePromptCancel = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
         this.store.setPrompt(null);
         this.activePromptCancel = undefined;
         resolve(CANCELLED);
       };
-      this.store.setPrompt({
+      const prompt: Extract<ActivePrompt, { kind: "multiselect" }> = {
         kind: "multiselect",
         message: stripAnsi(opts.message),
+        ...(opts.details
+          ? {
+              details: opts.details.map((detail) => ({
+                ...detail,
+                text: stripAnsi(detail.text),
+              })),
+            }
+          : {}),
         options: opts.options.map((option) => ({
           value: option.value,
           label: option.label,
           ...(option.hint ? { hint: option.hint } : {}),
+          ...(option.description ? { description: option.description } : {}),
+          ...(option.locked ? { locked: true } : {}),
         })),
         initialSelected: opts.initialValues ?? [],
         required: opts.required ?? false,
         resolve: (values) => {
-          this.store.setPrompt(null);
-          this.activePromptCancel = undefined;
-          if (values === null) {
-            resolve(CANCELLED);
-          } else {
-            resolve(values as T[]);
+          if (settled) {
+            return;
           }
+          settled = true;
+          this.completePrompt(
+            prompt,
+            values === null ? CANCELLED : (values as T[]),
+            resolve
+          );
         },
-      });
+      };
+      this.store.setPrompt(prompt);
     });
   }
 

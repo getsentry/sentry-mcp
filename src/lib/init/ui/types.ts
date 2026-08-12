@@ -90,36 +90,73 @@ export type WizardLog = {
 
 /** Single option in a `select` / `multiselect` prompt. */
 export type SelectOption<T extends string> = {
+  /** Machine-readable value returned when the user chooses this option. */
   value: T;
+  /** User-facing option label. */
   label: string;
+  /** Optional secondary copy rendered beside the label; omitted by default. */
   hint?: string;
+};
+
+/** Option in a multiselect prompt, optionally carrying supporting copy or a fixed selection. */
+export type MultiSelectOption<T extends string> = SelectOption<T> & {
+  /** Product-oriented copy rendered below the label; omitted by default. */
+  description?: string;
+  /** When true, keeps the option selected and skips it during toggles. Defaults to false. */
+  locked?: boolean;
+};
+
+/** Supporting row rendered beneath a prompt title. */
+export type PromptDetail = {
+  /** Text displayed on its own row. */
+  text: string;
+  /** Semantic color treatment for the row. Defaults to `muted`. */
+  tone?: "muted" | "success";
 };
 
 /** Args for `select`. */
 export type SelectOptions<T extends string> = {
+  /** Prompt title shown above the choices. */
   message: string;
+  /** Supporting rows rendered below the title; omitted by default. */
+  details?: PromptDetail[];
+  /** Explanatory copy rendered between details and actions; omitted by default. */
+  footer?: PromptDetail;
+  /** Choices presented to the user in display order. */
   options: SelectOption<T>[];
+  /** Initially highlighted value. Defaults to the first option. */
   initialValue?: T;
 };
 
 /** Args for `multiselect`. */
 export type MultiSelectOptions<T extends string> = {
+  /** Prompt title shown above the choices. */
   message: string;
-  options: SelectOption<T>[];
+  /** Supporting rows rendered above a visually separated option list; omitted by default. */
+  details?: PromptDetail[];
+  /** Choices presented to the user in display order. */
+  options: MultiSelectOption<T>[];
+  /** Values selected when the prompt mounts. Defaults to an empty list. */
   initialValues?: T[];
+  /** Whether at least one value is required before continuing. Defaults to false. */
   required?: boolean;
 };
 
 /** Args for `confirm`. */
 export type ConfirmOptions = {
+  /** Confirmation question shown to the user. */
   message: string;
+  /** Initially highlighted answer. Defaults to false. */
   initialValue?: boolean;
 };
 
 /** Args for the richer Ink-only welcome screen. */
 export type WelcomeOptions = {
+  /** Heading shown on the welcome screen. */
   title: string;
+  /** Supporting paragraphs shown below the heading. */
   body: string[];
+  /** Final call-to-action copy shown above the Continue action. */
   punchline: string;
 };
 

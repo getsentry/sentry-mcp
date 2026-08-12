@@ -22,6 +22,7 @@ import {
   shortStepLabel,
 } from "../clack-utils.js";
 import type {
+  PromptDetail,
   SpinnerExitCode,
   WelcomeOptions,
   WizardSummary,
@@ -32,14 +33,18 @@ export type LogSeverity = "info" | "warn" | "error" | "success" | "message";
 export type LogEntry = {
   /** Stable id used as React key. Monotonic per store instance. */
   id: number;
+  /** Visual severity used to choose the row glyph and color. */
   severity: LogSeverity;
+  /** User-facing log text. */
   text: string;
 };
 
 export type SpinnerState = {
+  /** Whether the spinner row is currently mounted. */
   active: boolean;
   /** The spinner frame index. Bumped by the renderer's interval. */
   frame: number;
+  /** Current user-facing operation text. */
   message: string;
 };
 
@@ -51,7 +56,9 @@ export type SpinnerState = {
  * `ink-app.tsx`).
  */
 export type FileReadEntry = {
+  /** Project-relative path read by the wizard. */
   path: string;
+  /** Whether reading is still active or analysis has completed. */
   status: "reading" | "analyzed";
 };
 
@@ -78,14 +85,22 @@ export type StepEntry = {
   id: string;
   /** Sidebar-friendly short label (already abbreviated). */
   label: string;
+  /** Current lifecycle state for this workflow step. */
   status: StepStatus;
 };
 
 /** Generic option shape passed to mounted prompts. */
 export type PromptOption = {
+  /** Machine-readable value returned when the user chooses this option. */
   value: string;
+  /** User-facing option label. */
   label: string;
+  /** Optional secondary copy rendered beside the label; omitted by default. */
   hint?: string;
+  /** Product-oriented copy rendered below the label; omitted by default. */
+  description?: string;
+  /** When true, keeps the option selected and skips it during toggles. Defaults to false. */
+  locked?: boolean;
 };
 
 /**
@@ -98,29 +113,53 @@ export type PromptOption = {
  */
 export type ActivePrompt =
   | {
+      /** Select prompt discriminator. */
       kind: "select";
+      /** Prompt title shown above the choices. */
       message: string;
+      /** Supporting rows rendered below the title; omitted by default. */
+      details?: PromptDetail[];
+      /** Explanatory copy rendered between details and actions; omitted by default. */
+      footer?: PromptDetail;
+      /** Choices presented to the user in display order. */
       options: PromptOption[];
+      /** Zero-based option index highlighted when the prompt mounts. */
       initialIndex: number;
+      /** Completes the prompt with a value, or `null` on cancellation. */
       resolve: (value: string | null) => void;
     }
   | {
+      /** Multiselect prompt discriminator. */
       kind: "multiselect";
+      /** Prompt title shown above the choices. */
       message: string;
+      /** Supporting rows rendered above a visually separated option list; omitted by default. */
+      details?: PromptDetail[];
+      /** Choices presented to the user in display order. */
       options: PromptOption[];
+      /** Values selected when the prompt mounts. */
       initialSelected: string[];
+      /** Whether at least one value must remain selected. */
       required: boolean;
+      /** Completes the prompt with values, or `null` on cancellation. */
       resolve: (values: string[] | null) => void;
     }
   | {
+      /** Confirmation prompt discriminator. */
       kind: "confirm";
+      /** Confirmation question shown to the user. */
       message: string;
+      /** Answer highlighted when the prompt mounts. */
       initialValue: boolean;
+      /** Completes the prompt with an answer, or `null` on cancellation. */
       resolve: (value: boolean | null) => void;
     }
   | {
+      /** Welcome prompt discriminator. */
       kind: "welcome";
+      /** Copy used by the richer welcome screen. */
       options: WelcomeOptions;
+      /** Continues the wizard, or receives `null` on cancellation. */
       resolve: (value: "continue" | null) => void;
     };
 
@@ -283,6 +322,14 @@ export class WizardStore {
 
   startSpinner(message: string): void {
     this.update({
+      spinner: { active: true, frame: 0, message },
+    });
+  }
+
+  /** Replace a completed prompt with progress in one render-state update. */
+  replacePromptWithSpinner(message: string): void {
+    this.update({
+      prompt: null,
       spinner: { active: true, frame: 0, message },
     });
   }

@@ -11,13 +11,11 @@
  */
 
 import { setTag } from "@sentry/node-core/light";
-import chalk from "chalk";
 import { WizardError } from "../errors.js";
 import {
   abortIfCancelled,
-  featureHint,
+  featureDescription,
   featureLabel,
-  sortFeatures,
 } from "./clack-utils.js";
 import { REQUIRED_FEATURE } from "./constants.js";
 import type {
@@ -27,16 +25,65 @@ import type {
   MultiSelectPayload,
   SelectPayload,
 } from "./types.js";
-import type { WizardUI } from "./ui/types.js";
+import type { PromptDetail, WizardUI } from "./ui/types.js";
 
-function prependRequiredFeature(
-  features: string[],
-  hasRequired: boolean
-): string[] {
-  if (!(hasRequired && !features.includes(REQUIRED_FEATURE))) {
+function prependRequiredFeature(features: string[]): string[] {
+  if (features.includes(REQUIRED_FEATURE)) {
     return features;
   }
   return [REQUIRED_FEATURE, ...features];
+}
+
+type FeatureReviewAction = "continue" | "back";
+
+const DEFAULT_FEATURE_ORDER = [
+  REQUIRED_FEATURE,
+  "logs",
+  "sessionReplay",
+  "performanceMonitoring",
+] as const;
+const DEFAULT_FEATURES = new Set<string>(DEFAULT_FEATURE_ORDER);
+const DEFAULT_FEATURE_RANK = new Map<string, number>(
+  DEFAULT_FEATURE_ORDER.map((feature, index) => [feature, index])
+);
+// Feedback setup needs an in-app placement choice this wizard cannot make yet.
+const UNSUPPORTED_INIT_FEATURES = new Set(["userFeedback"]);
+const FEATURE_SELECTION_CONTEXT =
+  "Based on your project, these features are available to set up.";
+
+function sortFeatureOptions(features: string[]): string[] {
+  return features.slice().sort((a, b) => {
+    const rankDifference =
+      (DEFAULT_FEATURE_RANK.get(a) ?? Number.MAX_SAFE_INTEGER) -
+      (DEFAULT_FEATURE_RANK.get(b) ?? Number.MAX_SAFE_INTEGER);
+    if (rankDifference !== 0) {
+      return rankDifference;
+    }
+    return featureLabel(a).localeCompare(featureLabel(b), "en");
+  });
+}
+
+function normalizeFeatureSelection(features: string[]): string[] {
+  const normalized = new Set(features);
+  // The server enforces this dependency too; normalizing before review keeps
+  // the reviewed, resumed, and restored-on-Back selections identical.
+  if (
+    features.includes("aiMonitoring") ||
+    features.includes("mcpObservability")
+  ) {
+    normalized.add("performanceMonitoring");
+  }
+  return sortFeatureOptions([...normalized]);
+}
+
+function buildFeatureReviewDetails(features: string[]): PromptDetail[] {
+  return [
+    { text: "We'll add these features:" },
+    ...features.map((feature) => ({
+      text: `✓ ${featureLabel(feature)}`,
+      tone: "success" as const,
+    })),
+  ];
 }
 
 export async function handleInteractive(
@@ -163,13 +210,11 @@ async function handleMultiSelect(
   options: InteractiveContext,
   ui: WizardUI
 ): Promise<Record<string, unknown>> {
-  const available = payload.availableFeatures ?? payload.options ?? [];
-
-  if (available.length === 0) {
-    return { features: [] };
-  }
-
-  const hasRequired = available.includes(REQUIRED_FEATURE);
+  const available = prependRequiredFeature(
+    (payload.availableFeatures ?? payload.options ?? []).filter(
+      (feature) => !UNSUPPORTED_INIT_FEATURES.has(feature)
+    )
+  );
 
   if (options.yes) {
     ui.log.info(
@@ -178,46 +223,50 @@ async function handleMultiSelect(
     return { features: available };
   }
 
-  const optional = sortFeatures(
-    available.filter((f) => f !== REQUIRED_FEATURE)
+  const sorted = sortFeatureOptions(available);
+  setTag("wizard.features.offered", available.join(","));
+  let initialValues: string[] = sorted.filter((feature) =>
+    DEFAULT_FEATURES.has(feature)
   );
 
-  if (optional.length === 0) {
-    if (hasRequired) {
-      ui.log.info(`${featureLabel(REQUIRED_FEATURE)} is always included.`);
+  while (true) {
+    const selected = await ui.multiselect<string>({
+      message: payload.prompt,
+      details: [{ text: FEATURE_SELECTION_CONTEXT }],
+      options: sorted.map((feature) => {
+        const description = featureDescription(feature);
+        return {
+          value: feature,
+          label: featureLabel(feature),
+          ...(description ? { description } : {}),
+          ...(feature === REQUIRED_FEATURE ? { locked: true } : {}),
+        };
+      }),
+      initialValues,
+      required: false,
+    });
+
+    const chosen = abortIfCancelled(selected);
+    const features = normalizeFeatureSelection(prependRequiredFeature(chosen));
+    const review = await ui.select<FeatureReviewAction>({
+      message: "Review your Sentry setup",
+      details: buildFeatureReviewDetails(features),
+      footer: {
+        text: "We'll modify project files for this Sentry setup.",
+      },
+      options: [
+        { value: "continue", label: "Continue" },
+        { value: "back", label: "Back" },
+      ],
+      initialValue: "continue",
+    });
+
+    if (abortIfCancelled(review) === "continue") {
+      setTag("wizard.features.selected", features.join(","));
+      return { features };
     }
-    return { features: hasRequired ? [REQUIRED_FEATURE] : [] };
+    initialValues = features;
   }
-
-  const hints: string[] = [];
-  // Use clack's vertical bar character so hint lines align with the option lines below
-  const bar = chalk.gray("\u2502");
-  if (hasRequired) {
-    hints.push(
-      `${bar}  ${chalk.dim(`${featureLabel(REQUIRED_FEATURE)} is always included`)}`
-    );
-  }
-  hints.push(`${bar}  ${chalk.dim("space=toggle, a=all, enter=confirm")}`);
-
-  setTag("wizard.features.offered", available.join(","));
-  const selected = await ui.multiselect<string>({
-    message: `${payload.prompt}\n${hints.join("\n")}`,
-    options: optional.map((feature) => {
-      const hint = featureHint(feature);
-      return {
-        value: feature,
-        label: featureLabel(feature),
-        ...(hint ? { hint } : {}),
-      };
-    }),
-    initialValues: optional.filter((f) => f === "performanceMonitoring"),
-    required: false,
-  });
-
-  const chosen = abortIfCancelled(selected);
-  const features = prependRequiredFeature(chosen, hasRequired);
-  setTag("wizard.features.selected", features.join(","));
-  return { features };
 }
 
 async function handleConfirm(
