@@ -2,6 +2,7 @@ import { logIssue } from "@sentry/mcp-core/telem/logging";
 import { type Context, Hono } from "hono";
 import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
+import { generateHomepageMarkdown } from "../homepage-content";
 import { createScopedAuthorizationServerMetadataResponse } from "./authorization-server-metadata";
 import { createRequestLogger } from "./logging";
 import sentryOauth from "./oauth";
@@ -17,66 +18,6 @@ import { setSentryUserFromRequest } from "./utils/sentry-user";
 /** Derive the base URL (origin) from the current request. */
 function getBaseUrl(c: Context): string {
   return new URL(c.req.url).origin;
-}
-
-function generateLlmsTxt(baseUrl: string): string {
-  return `# Sentry MCP Server
-
-Connects AI assistants to Sentry for searching errors, analyzing performance, triaging issues, reading documentation, and managing projects — all via the Model Context Protocol.
-
-All connections use OAuth. The first connection will trigger an authentication flow to connect to your Sentry account.
-
-## Connecting
-
-The base MCP server address is: \`${baseUrl}/mcp\`
-
-You can optionally scope the connection to an organization or project:
-
-- \`${baseUrl}/mcp/{organizationSlug}\` — scoped to one organization
-- \`${baseUrl}/mcp/{organizationSlug}/{projectSlug}\` — scoped to one project
-
-When scoped, tools automatically default to the constrained org/project and unnecessary discovery tools are hidden. Scoping to a project is recommended when possible.
-
-### Query Parameters
-
-- \`?experimental=1\` — Enable forward-looking tool variants and experimental features
-
-Parameters can be combined: \`${baseUrl}/mcp/my-org/my-project?experimental=1\`
-
-## Setup Instructions
-
-### Claude Code
-
-\`\`\`bash
-claude mcp add --transport http sentry ${baseUrl}/mcp/{organizationSlug}/{projectSlug}
-\`\`\`
-
-### Cursor
-
-Use the "Install MCP Server" button, or manually add to MCP settings:
-
-\`\`\`json
-{
-  "mcpServers": {
-    "sentry": {
-      "url": "${baseUrl}/mcp/{organizationSlug}/{projectSlug}"
-    }
-  }
-}
-\`\`\`
-
-### VSCode
-
-Command Palette → "MCP: Add Server" → HTTP → enter the endpoint:
-
-\`\`\`
-${baseUrl}/mcp/{organizationSlug}/{projectSlug}
-\`\`\`
-
-### Other Clients
-
-Any MCP-compatible client can connect using the HTTP transport at the endpoint URL above.
-`;
 }
 
 // RFC 9728: OAuth 2.0 Protected Resource Metadata handler
@@ -123,7 +64,7 @@ const app = new Hono<{
     if (!accept.includes("text/markdown")) {
       return next();
     }
-    return c.text(generateLlmsTxt(getBaseUrl(c)), 200, {
+    return c.text(generateHomepageMarkdown(getBaseUrl(c)), 200, {
       "Content-Type": "text/markdown; charset=utf-8",
       Vary: "Accept",
     });
@@ -141,7 +82,7 @@ const app = new Hono<{
     );
   })
   .get("/llms.txt", (c) => {
-    return c.text(generateLlmsTxt(getBaseUrl(c)), 200, {
+    return c.text(generateHomepageMarkdown(getBaseUrl(c)), 200, {
       "Content-Type": "text/plain; charset=utf-8",
     });
   })

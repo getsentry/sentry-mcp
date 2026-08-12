@@ -7,6 +7,42 @@
   <title>Sentry MCP</title>
   <link href="./src/client/index.css" rel="stylesheet" />
   <link rel="icon" href="/favicon.ico" />
+  <!-- Hide the static homepage fallback before paint when JS is available. -->
+  <script>document.documentElement.classList.add("js");</script>
+  <style>
+    html.js #static-home {
+      display: none !important;
+    }
+    #static-home {
+      max-width: 48rem;
+      margin: 0 auto;
+      padding: 2rem 1.25rem;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #e5e7eb;
+      background: #0b0d12;
+    }
+    #static-home h1,
+    #static-home h2,
+    #static-home h3 {
+      line-height: 1.25;
+      color: #f9fafb;
+    }
+    #static-home code,
+    #static-home pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.9em;
+    }
+    #static-home pre {
+      overflow-x: auto;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      background: #111827;
+    }
+    #static-home a {
+      color: #a78bfa;
+    }
+  </style>
   <script defer data-domain="mcp.sentry.dev" src="https://plausible.io/js/script.js"></script>
   <!-- Primary Meta Tags -->
   <meta name="title" content="Sentry MCP" />
@@ -30,7 +66,15 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <!--
+    Content-only homepage for no-JS browsers and HTML scrapers.
+    Injected at build/dev time from src/homepage-content.ts (same body as /llms.txt).
+    React replaces #root on mount.
+  -->
+  <div id="root">
+    <!--app-static-home-start-->
+    <!--app-static-home-end-->
+  </div>
   <script type="module" src="./src/client/main.tsx"></script>
 </body>
 
