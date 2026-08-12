@@ -645,6 +645,29 @@ describe("runWizard", () => {
     );
   });
 
+  test("moves feature review directly into code-planning progress", async () => {
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["select-features"]],
+      steps: {
+        "select-features": {
+          suspendPayload: {
+            type: "interactive",
+            kind: "multi-select",
+            prompt: "Select features to enable",
+            availableFeatures: ["errorMonitoring", "performanceMonitoring"],
+          },
+        },
+      },
+    };
+    mockResumeResults = [{ status: "success" }];
+
+    await runWizard(makeOptions());
+
+    expect(spinnerMock.start).toHaveBeenCalledWith("Planning code changes...");
+    expect(spinnerMock.start).not.toHaveBeenCalledWith("Processing...");
+  });
+
   test("skips verify-changes interactive prompts during dry-run", async () => {
     resolveInitContextSpy.mockResolvedValue(makeContext({ dryRun: true }));
     mockStartResult = {

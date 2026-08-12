@@ -34,44 +34,62 @@ export function abortIfCancelled<T>(value: T): Exclude<T, symbol> {
   return value as Exclude<T, symbol>;
 }
 
-const FEATURE_INFO: Record<string, { label: string; hint: string }> = {
+const FEATURE_INFO: Record<string, { label: string; description: string }> = {
   errorMonitoring: {
     label: "Error Monitoring",
-    hint: "Group exceptions into issues with context",
+    description: "Automatically capture exceptions and stack traces",
   },
   performanceMonitoring: {
     label: "Tracing",
-    hint: "See request paths, spans, and bottlenecks",
+    description:
+      "Find bottlenecks, broken requests, and understand application flow end-to-end",
   },
   sessionReplay: {
     label: "Session Replay",
-    hint: "Replay sessions linked to errors",
+    description: "Watch real user sessions to see what went wrong",
   },
   profiling: {
     label: "Profiling",
-    hint: "Find CPU-heavy functions in production",
+    description:
+      "Pinpoint the functions and lines of code responsible for performance issues",
   },
-  logs: { label: "Logging", hint: "Search logs beside errors and traces" },
-  metrics: { label: "Metrics", hint: "Track custom measurements over time" },
+  logs: {
+    label: "Logging",
+    description: "See logs in context with errors and performance issues",
+  },
+  metrics: {
+    label: "Application Metrics",
+    description:
+      "Track application performance and usage over time with custom metrics",
+  },
   sourceMaps: {
     label: "Source Maps",
-    hint: "Turn minified stacks into your source",
+    description:
+      "Turn minified production stack traces back into your original source code",
   },
   crons: {
     label: "Crons",
-    hint: "Alert on failed or missed scheduled jobs",
+    description: "Detect failed, missed, or delayed scheduled jobs",
   },
   aiMonitoring: {
     label: "AI Monitoring",
-    hint: "Track AI calls, latency, cost, and failures",
+    description:
+      "Understand AI calls, latency, token usage, cost, and failures",
+  },
+  mcpObservability: {
+    label: "MCP Observability",
+    description:
+      "Trace MCP tool calls and understand failures across agent workflows",
   },
   userFeedback: {
     label: "User Feedback",
-    hint: "Collect user reports with issue context",
+    description:
+      "Collect user reports with the error and session context needed to investigate",
   },
   reactFeatures: {
     label: "React Features",
-    hint: "Add React-specific context and integrations",
+    description:
+      "Capture React-specific errors with component and rendering context",
   },
 };
 
@@ -79,8 +97,9 @@ export function featureLabel(id: string): string {
   return FEATURE_INFO[id]?.label ?? id;
 }
 
-export function featureHint(id: string): string | undefined {
-  return FEATURE_INFO[id]?.hint;
+/** Returns product-oriented supporting copy for a known feature. */
+export function featureDescription(id: string): string | undefined {
+  return FEATURE_INFO[id]?.description;
 }
 
 const FEATURE_DISPLAY_ORDER = [
@@ -93,11 +112,12 @@ const FEATURE_DISPLAY_ORDER = [
   "sourceMaps",
   "crons",
   "aiMonitoring",
+  "mcpObservability",
   "userFeedback",
   "reactFeatures",
 ];
 
-/** Sort features into canonical display order for the multi-select prompt. */
+/** Sort features into the canonical order used by summaries and final output. */
 export function sortFeatures(features: string[]): string[] {
   return features.slice().sort((a, b) => {
     const ai = FEATURE_DISPLAY_ORDER.indexOf(a);
