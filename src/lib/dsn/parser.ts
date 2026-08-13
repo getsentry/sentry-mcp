@@ -28,6 +28,26 @@ const ORG_ID_PATTERN = /^o(\d+)\.ingest(?:\.[a-z]+)?\.sentry\.io$/;
 const PROTOCOL_COLON_PATTERN = /:$/;
 
 /**
+ * Numeric org/project IDs that are only zeros ("0", "00", "00000").
+ * Docs and examples often use these as stand-ins for real IDs.
+ */
+const ALL_ZERO_ID_PATTERN = /^0+$/;
+
+/**
+ * Public keys used as documentation placeholders.
+ *
+ * Sourced from getsentry/sentry-docs code context defaults and common
+ * SDK/docs example strings (examplePublicKey@o0..., YOUR_DSN_HERE, etc.).
+ * Matched case-insensitively against the DSN username.
+ */
+// Keep this list to unmistakable docs/template keys. Do NOT include bare
+// "public" or "publickey" — legacy DSNs and scanner fixtures use those as
+// real public keys (`public:secret@host/project`). Docs copies that use
+// bare `public` also use o0 / project 0 and are caught by numeric-id checks.
+const PLACEHOLDER_PUBLIC_KEY_PATTERN =
+  /^(?:example(?:public)?key|your(?:public)?key|your[_-]?dsn(?:[_-]?here)?|___+public[_-]?dsn___+|__+dsn__+|<[^<>]+>)$/i;
+
+/**
  * Extract organization ID from a Sentry ingest host
  *
  * @param host - The host portion of the DSN (e.g., "o1169445.ingest.us.sentry.io")
@@ -41,6 +61,28 @@ const PROTOCOL_COLON_PATTERN = /:$/;
 export function extractOrgIdFromHost(host: string): string | null {
   const match = host.match(ORG_ID_PATTERN);
   return match?.[1] ?? null;
+}
+
+/**
+ * True when a SaaS org ID or project ID is a docs-style zero placeholder.
+ * Covers `0`, `00`, and `00000` (for example `o00000.ingest.sentry.io`).
+ */
+export function isPlaceholderNumericId(id: string): boolean {
+  return ALL_ZERO_ID_PATTERN.test(id);
+}
+
+/**
+ * True when a DSN public key is a known documentation placeholder.
+ */
+export function isPlaceholderPublicKey(publicKey: string): boolean {
+  // URL parsers may percent-encode angle-bracket templates such as `%3Ckey%3E`.
+  let decoded = publicKey;
+  try {
+    decoded = decodeURIComponent(publicKey);
+  } catch {
+    // Keep the raw key when it is not valid percent-encoding.
+  }
+  return PLACEHOLDER_PUBLIC_KEY_PATTERN.test(decoded);
 }
 
 /**
@@ -68,7 +110,7 @@ export function parseDsn(dsn: string): ParsedDsn | null {
 
     // Public key is the username portion
     const publicKey = url.username;
-    if (!publicKey) {
+    if (!publicKey || isPlaceholderPublicKey(publicKey)) {
       return null;
     }
 
@@ -81,12 +123,17 @@ export function parseDsn(dsn: string): ParsedDsn | null {
     // Project ID is the last path segment
     const pathParts = url.pathname.split("/").filter(Boolean);
     const projectId = pathParts.at(-1);
-    if (!projectId) {
+    if (!projectId || isPlaceholderNumericId(projectId)) {
       return null;
     }
 
-    // Try to extract org ID from host (SaaS only)
+    // Try to extract org ID from host (SaaS only).
+    // `o0` / `o00000` hosts become org IDs that are only zeros — reject those
+    // so docs placeholders never become API org context.
     const orgId = extractOrgIdFromHost(host) ?? undefined;
+    if (orgId !== undefined && isPlaceholderNumericId(orgId)) {
+      return null;
+    }
 
     return {
       protocol,
