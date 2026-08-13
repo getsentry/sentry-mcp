@@ -12,6 +12,8 @@ import {
   createDetectedDsn,
   createDsnFingerprint,
   inferPackagePath,
+  isPlaceholderNumericId,
+  isPlaceholderPublicKey,
   parseDsn,
 } from "../../src/lib/dsn/index.js";
 
@@ -26,6 +28,86 @@ describe("parseDsn edge cases", () => {
     const dsn = "https://key@o123.ingest.sentry.io/api/456";
     const result = parseDsn(dsn);
     expect(result?.projectId).toBe("456");
+  });
+
+  test.each([
+    // Canonical sentry-docs codeContext default
+    "https://examplePublicKey@o0.ingest.sentry.io/0",
+    // Docs example with bare `public` key + o0 host (rejected via org id)
+    "https://public@o0.ingest.sentry.io/1",
+    // All-zero padded org host used in OTLP docs examples
+    "https://abc123@o00000.ingest.sentry.io/1111111",
+    // Zero project ID only
+    "https://key@o123.ingest.sentry.io/0",
+    // Zero SaaS org ID only
+    "https://key@o0.ingest.sentry.io/456",
+    // Angle-bracket template keys (URL-encoded by the parser)
+    "https://%3Ckey%3E@o123.ingest.sentry.io/456",
+    "https://YOUR_DSN_HERE@o123.ingest.sentry.io/456",
+    "https://___PUBLIC_DSN___@o123.ingest.sentry.io/456",
+    "https://__DSN__@o123.ingest.sentry.io/456",
+  ])("returns null for docs placeholder DSN %s", (dsn) => {
+    expect(parseDsn(dsn)).toBeNull();
+  });
+
+  test("still accepts a real-looking SaaS DSN", () => {
+    const dsn =
+      "https://abc123def456@o1169445.ingest.us.sentry.io/4505229541441536";
+    const result = parseDsn(dsn);
+    expect(result).toEqual({
+      protocol: "https",
+      publicKey: "abc123def456",
+      host: "o1169445.ingest.us.sentry.io",
+      projectId: "4505229541441536",
+      orgId: "1169445",
+    });
+  });
+
+  test("still accepts legacy public:secret DSNs with real org/project ids", () => {
+    // Bare "public" is a valid public key in legacy DSNs; do not reject it alone.
+    const dsn = "https://public:secret@o123.ingest.sentry.io/456";
+    const result = parseDsn(dsn);
+    expect(result).toEqual({
+      protocol: "https",
+      publicKey: "public",
+      host: "o123.ingest.sentry.io",
+      projectId: "456",
+      orgId: "123",
+    });
+  });
+});
+
+describe("placeholder helpers", () => {
+  test.each(["0", "00", "00000"])("isPlaceholderNumericId accepts %s", (id) => {
+    expect(isPlaceholderNumericId(id)).toBe(true);
+  });
+
+  test.each([
+    "1",
+    "10",
+    "1169445",
+  ])("isPlaceholderNumericId rejects %s", (id) => {
+    expect(isPlaceholderNumericId(id)).toBe(false);
+  });
+
+  test.each([
+    "examplePublicKey",
+    "exampleKey",
+    "YOUR_DSN_HERE",
+    "___PUBLIC_DSN___",
+    "__DSN__",
+    "<key>",
+  ])("isPlaceholderPublicKey accepts %s", (key) => {
+    expect(isPlaceholderPublicKey(key)).toBe(true);
+  });
+
+  test.each([
+    "abc123def456",
+    "public",
+    "publickey",
+    "public-app-key",
+  ])("isPlaceholderPublicKey rejects %s", (key) => {
+    expect(isPlaceholderPublicKey(key)).toBe(false);
   });
 });
 

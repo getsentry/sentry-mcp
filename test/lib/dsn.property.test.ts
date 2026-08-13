@@ -34,11 +34,11 @@ const publicKeyArb = array(constantFrom(..."0123456789abcdef".split("")), {
   maxLength: 32,
 }).map((chars) => chars.join(""));
 
-/** Generate valid project IDs (numeric strings) */
-const projectIdArb = nat(9_999_999_999).map(String);
+/** Generate valid positive project IDs (numeric strings) */
+const projectIdArb = nat(9_999_999_998).map((id) => String(id + 1));
 
-/** Generate valid org IDs (numeric) */
-const orgIdArb = nat(9_999_999);
+/** Generate valid positive org IDs (numeric) */
+const orgIdArb = nat(9_999_998).map((id) => id + 1);
 
 /** Generate region codes */
 const regionArb = constantFrom("us", "de", "eu", "");
