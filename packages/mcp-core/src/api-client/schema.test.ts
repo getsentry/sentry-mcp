@@ -317,7 +317,7 @@ describe("EventSchema", () => {
 
     const result = EventSchema.parse(genericEvent);
     expect(result.dateReceived).toBeNull();
-    expect(result.occurrence).toBeNull();
+    expect(result).toHaveProperty("occurrence", null);
   });
 
   it("should allow partially populated user geo payloads", () => {
