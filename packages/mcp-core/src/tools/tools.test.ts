@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 import { assert, test } from "vitest";
 import catalogTools from "./catalog/index.js";
 import {
-  findNestedJsonSchemaUnions,
+  findIncompatibleJsonSchemaUnions,
+  formatJsonSchemaUnionViolations,
   zodFieldMapToJsonSchema,
 } from "./catalog-runtime/schema.js";
 import * as tools from "./index.js";
@@ -129,20 +130,20 @@ test("tool registry keys match tool names", () => {
   }
 });
 
-test("direct tool input schemas do not nest JSON Schema unions", () => {
+test("direct tool input schemas ban root and nested JSON Schema unions", () => {
   for (const experimentalMode of [false, true]) {
     for (const tool of Object.values(tools.default)) {
       if (!isTopLevelToolName(tool.name, experimentalMode)) {
         continue;
       }
 
-      const nestedPaths = findNestedJsonSchemaUnions(
+      const violations = findIncompatibleJsonSchemaUnions(
         zodFieldMapToJsonSchema(tool.inputSchema),
       );
       assert.deepEqual(
-        nestedPaths,
+        violations,
         [],
-        `${tool.name} input schema must not nest anyOf/oneOf/allOf (found ${nestedPaths.join(", ")})`,
+        `${tool.name} input schema must not use root or nested anyOf/oneOf/allOf (found ${formatJsonSchemaUnionViolations(violations)})`,
       );
     }
   }

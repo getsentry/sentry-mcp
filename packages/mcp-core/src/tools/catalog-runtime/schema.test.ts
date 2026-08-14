@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
-  findNestedJsonSchemaUnions,
+  findIncompatibleJsonSchemaUnions,
   zodFieldMapToJsonSchema,
 } from "./schema.js";
 
-describe("findNestedJsonSchemaUnions", () => {
+describe("findIncompatibleJsonSchemaUnions", () => {
   it("allows a single property-level anyOf", () => {
     const schema = zodFieldMapToJsonSchema({
       regionUrl: z.string().nullable().optional(),
     });
 
-    expect(findNestedJsonSchemaUnions(schema)).toEqual([]);
+    expect(findIncompatibleJsonSchemaUnions(schema)).toEqual([]);
   });
 
   it("flags nested anyOf from union + nullable", () => {
@@ -22,8 +22,37 @@ describe("findNestedJsonSchemaUnions", () => {
         .optional(),
     });
 
-    expect(findNestedJsonSchemaUnions(schema)).toEqual([
-      "properties.environment.anyOf.0.anyOf",
+    expect(findIncompatibleJsonSchemaUnions(schema)).toEqual([
+      {
+        path: "properties.environment.anyOf.0.anyOf",
+        reason: "nested-union",
+        keyword: "anyOf",
+      },
+    ]);
+  });
+
+  it("flags root-level anyOf", () => {
+    const schema = {
+      anyOf: [
+        {
+          type: "object",
+          properties: { id: { type: "string" } },
+          required: ["id"],
+        },
+        {
+          type: "object",
+          properties: { name: { type: "string" } },
+          required: ["name"],
+        },
+      ],
+    };
+
+    expect(findIncompatibleJsonSchemaUnions(schema)).toEqual([
+      {
+        path: "anyOf",
+        reason: "root-union",
+        keyword: "anyOf",
+      },
     ]);
   });
 
@@ -34,7 +63,7 @@ describe("findNestedJsonSchemaUnions", () => {
         .optional(),
     });
 
-    expect(findNestedJsonSchemaUnions(schema)).toEqual([]);
+    expect(findIncompatibleJsonSchemaUnions(schema)).toEqual([]);
     expect(schema).toMatchObject({
       properties: {
         environment: {
