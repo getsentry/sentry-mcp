@@ -108,6 +108,43 @@ describe("onboarding_status_update", () => {
     ).resolves.toBe("Onboarding status updated. Continue updates: yes.");
   });
 
+  it("accepts nullable reference lists from the backend", async () => {
+    mswServer.use(
+      http.post(
+        "https://us.sentry.io/api/0/organizations/sentry-mcp-evals/onboarding/agent/status/",
+        () =>
+          HttpResponse.json({
+            schemaVersion: 1,
+            runId: "2d27f6654b754dcaa2d26af18274d142",
+            channelId: "6835652362204cb1b10719783c26983a",
+            clientRunId: "e806c6f4-fef8-47b4-a720-5ab582b2fcf0",
+            createdAt: "2026-08-12T12:00:00Z",
+            updatedAt: "2026-08-12T12:01:00Z",
+            sequence: 1,
+            expiresAt: "2026-08-13T12:00:00Z",
+            continueUpdates: true,
+            runStatus: "active",
+            projectSlugs: null,
+            issueIds: null,
+            stages: [],
+          }),
+      ),
+    );
+
+    await expect(
+      onboardingStatusUpdate.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          regionUrl: "https://us.sentry.io",
+          runToken: "a1B2c3D4e5",
+          stage: "connect_mcp",
+          status: "completed",
+        },
+        context,
+      ),
+    ).resolves.toBe("Onboarding status updated. Continue updates: yes.");
+  });
+
   it("reports when the run no longer accepts updates", async () => {
     mswServer.use(
       http.post(

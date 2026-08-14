@@ -2146,7 +2146,13 @@ export const AgenticOnboardingRunSchema = z.object({
   expiresAt: z.string(),
   continueUpdates: z.boolean(),
   runStatus: AgenticOnboardingRunStatusSchema,
-  projectSlugs: z.array(z.string()),
-  issueIds: z.array(z.string()),
+  projectSlugs: z
+    .array(z.string())
+    .nullable()
+    .transform((projectSlugs) => projectSlugs ?? []),
+  issueIds: z
+    .array(z.string())
+    .nullable()
+    .transform((issueIds) => issueIds ?? []),
   stages: z.array(AgenticOnboardingStageStateSchema),
 });
