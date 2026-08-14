@@ -2148,11 +2148,11 @@ export const AgenticOnboardingRunSchema = z.object({
   runStatus: AgenticOnboardingRunStatusSchema,
   projectSlugs: z
     .array(z.string())
-    .nullable()
+    .nullish()
     .transform((projectSlugs) => projectSlugs ?? []),
   issueIds: z
     .array(z.string())
-    .nullable()
+    .nullish()
     .transform((issueIds) => issueIds ?? []),
   stages: z.array(AgenticOnboardingStageStateSchema),
 });
