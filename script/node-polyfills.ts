@@ -14,10 +14,6 @@ import { compare as semverCompare } from "semver";
 import { glob } from "tinyglobby";
 import { uuidv7 } from "uuidv7";
 
-declare global {
-  var Bun: typeof BunPolyfill;
-}
-
 const BunPolyfill = {
   file(path: string) {
     return {
@@ -241,4 +237,15 @@ if (
   ): Promise<Buffer> => nodeZstdDecompress(toBufferForCompression(data));
 }
 
-globalThis.Bun = BunPolyfill as typeof Bun;
+/**
+ * The polyfill is exported rather than assigned to `globalThis`, because esbuild's `inject`
+ * substitutes unbound `Bun` identifiers in the bundle with this binding. Writing the global
+ * instead broke consumers in both directions: under Bun the global is readonly, so importing the
+ * package threw `Attempted to assign to readonly property`, and under Node it left a `Bun` object
+ * on `globalThis` that made unrelated libraries take their Bun code path and call methods the
+ * polyfill does not have, such as `Bun.serve`.
+ *
+ * The real Bun is preferred when present, so running under Bun keeps the genuine implementation.
+ */
+export const Bun: typeof BunPolyfill =
+  (globalThis as { Bun?: typeof BunPolyfill }).Bun ?? BunPolyfill;
