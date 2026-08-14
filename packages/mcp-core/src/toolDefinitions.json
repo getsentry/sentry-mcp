@@ -3780,6 +3780,91 @@
     "surface": "catalog"
   },
   {
+    "name": "onboarding_status_update",
+    "description": "Update the progress shown in Sentry's agentic onboarding UI.\n\nUse this tool only when the Sentry getting started skill provides a run token. Call it at the workflow boundaries described by that skill.\n\n<hints>\n- Progress updates are operational UI state, not user analytics.\n- Keep eventNote brief and limited to context useful in the progress UI.\n- Do not include source code, repository paths, credentials, error output, or other sensitive data.\n- status is required for every update.\n- Set runStatus to completed or failed only when the entire onboarding run reaches that state.\n- A failed status requires a brief eventNote explaining the failure.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runToken": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9]{10}$",
+          "description": "The 10-character onboarding run token supplied by Sentry."
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "connect_mcp",
+            "analyze_project",
+            "create_project",
+            "instrument_app",
+            "plan_test_error",
+            "send_verification_error",
+            "receive_verification_error",
+            "prepare_production",
+            "check_stack_trace_quality"
+          ],
+          "description": "The onboarding stage being updated."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "waiting", "completed", "skipped", "failed"],
+          "description": "The stage's current status."
+        },
+        "runStatus": {
+          "description": "Set only when the entire onboarding run has completed or failed.",
+          "type": "string",
+          "enum": ["completed", "failed"]
+        },
+        "eventNote": {
+          "description": "Short context to display with this progress event. Required when status is failed.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "projectSlugs": {
+          "description": "Validated Sentry project slugs. Send only for create_project. Values accumulate across updates; include each project as it becomes usable while active, then all known projects when completed.",
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "issueIds": {
+          "description": "Validated Sentry issue IDs returned by MCP. Send only for receive_verification_error. Values accumulate across updates; include each matching issue as it is confirmed, then all known issues when completed.",
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": ["organizationSlug", "runToken", "stage", "status"]
+    },
+    "requiredScopes": ["org:read"],
+    "skills": ["inspect", "seer", "docs", "triage", "project-management"],
+    "surface": "catalog"
+  },
+  {
     "name": "remove_team_from_project",
     "description": "Revoke a team's access to an existing Sentry project.\n\nUse this tool when you need to:\n- Remove a team from a project\n- Revoke team access without changing project metadata\n- Check project team assignments before removing access\n\nBe careful when using this tool because it revokes project access.\n\n<examples>\nremove_team_from_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- The team must already be assigned to the project.\n- This tool will not remove the last team assigned to a project.\n</hints>",
     "inputSchema": {

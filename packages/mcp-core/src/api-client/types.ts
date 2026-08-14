@@ -40,6 +40,8 @@
  */
 import type { z } from "zod";
 import type {
+  AgenticOnboardingRunSchema,
+  AgenticOnboardingStatusUpdateSchema,
   AssignedToSchema,
   AIConversationSummaryListSchema,
   AIConversationSummarySchema,
@@ -125,6 +127,10 @@ import type {
   UserReportListSchema,
 } from "./schema";
 
+export type AgenticOnboardingRun = z.infer<typeof AgenticOnboardingRunSchema>;
+export type AgenticOnboardingStatusUpdate = z.infer<
+  typeof AgenticOnboardingStatusUpdateSchema
+>;
 export type User = z.infer<typeof UserSchema>;
 export type Organization = z.infer<typeof OrganizationSchema>;
 export type Team = z.infer<typeof TeamSchema>;

@@ -93,6 +93,9 @@ export async function getSkillsArrayWithCounts(): Promise<SkillDefinition[]> {
     if (isWrapperTool(toolName) || isCatalogInfrastructureTool(toolName)) {
       continue;
     }
+    if (tool.includeInSkillDefinitions === false) {
+      continue;
+    }
     if (Array.isArray(tool.skills)) {
       for (const skill of tool.skills) {
         counts.set(skill as Skill, (counts.get(skill as Skill) || 0) + 1);
