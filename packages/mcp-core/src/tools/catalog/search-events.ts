@@ -13,10 +13,10 @@ import {
 } from "../../schema";
 import type { ServerContext } from "../../types";
 import {
-  PUBLIC_EVENTS_DATASETS,
-  type PublicEventsDataset,
   isMetricsDataset,
   normalizeEventsDataset,
+  PUBLIC_EVENTS_DATASETS,
+  type PublicEventsDataset,
 } from "../../utils/events-datasets";
 import { extractConversationIdFromSearchQuery } from "../../utils/url-utils";
 import {
@@ -434,10 +434,11 @@ export default defineTool({
         z.string().trim().min(1),
         z.array(z.string().trim().min(1)).min(1),
       ])
-      .nullable()
+      // Keep optional (omit when unused). Do not add .nullable(): Zod emits nested
+      // anyOf for union+null, which some model APIs reject on tool schemas.
       .optional()
       .describe(
-        "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead.",
+        "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. Omit when unused. For other datasets, filter environment in the query string instead.",
       ),
     period: ParamPeriod.optional(),
     regionUrl: ParamRegionUrl.nullable().default(null),
@@ -832,10 +833,7 @@ export default defineTool({
         }
       }
 
-      if (
-        !lastValidation.valid &&
-        !providerUnavailableDuringValidationRepair
-      ) {
+      if (!lastValidation.valid && !providerUnavailableDuringValidationRepair) {
         const formatted = formatEventsValidationResults(lastValidation);
         throw new UserInputError(
           formatted

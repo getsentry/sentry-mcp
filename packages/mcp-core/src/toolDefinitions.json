@@ -4410,26 +4410,19 @@
           ]
         },
         "environment": {
-          "description": "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead.",
+          "description": "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. Omit when unused. For other datasets, filter environment in the query string instead.",
           "anyOf": [
             {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "minLength": 1
-                },
-                {
-                  "minItems": 1,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              ]
+              "type": "string",
+              "minLength": 1
             },
             {
-              "type": "null"
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },

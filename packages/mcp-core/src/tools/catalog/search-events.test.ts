@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import searchEvents from "./search-events";
-import { MAX_EVENTS_VALIDATION_ATTEMPTS } from "../support/search-events/utils";
 import { APICallError, generateText } from "ai";
+import { HttpResponse, http } from "msw";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UserInputError } from "../../errors";
+import { MAX_EVENTS_VALIDATION_ATTEMPTS } from "../support/search-events/utils";
+import searchEvents from "./search-events";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -160,7 +160,6 @@ describe("search_events", () => {
         query: "level:error",
         fields: null,
         sort: null,
-        environment: null,
         period: "24h",
         limit: 10,
         includeExplanation: false,
