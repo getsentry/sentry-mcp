@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SentryApiService } from "../../../api-client";
 import * as logging from "../../../telem/logging";
 import {
-  extractStructuredSearchFilters,
   fetchCustomAttributes,
   formatEventsValidationResults,
   formatEventValue,
@@ -224,27 +223,7 @@ describe("search query helpers", () => {
     expect(looksLikeSentrySearchSyntax("ERROR: service is down")).toBe(false);
   });
 
-  it("extracts structured search filters including quoted values", () => {
-    expect(
-      extractStructuredSearchFilters(
-        'conv_id:ZYGC-86ZR environment:prod message:"hello world"',
-      ),
-    ).toEqual([
-      { key: "conv_id", value: "ZYGC-86ZR", raw: "conv_id:ZYGC-86ZR" },
-      {
-        key: "environment",
-        value: "prod",
-        raw: "environment:prod",
-      },
-      {
-        key: "message",
-        value: '"hello world"',
-        raw: 'message:"hello world"',
-      },
-    ]);
-  });
-
-  it("detects semantic full-text downgrades but allows real field renames", () => {
+  it("detects message full-text downgrades but allows real field renames", () => {
     expect(
       isSemanticFilterDowngrade("conv_id:ZYGC-86ZR", 'message:"*ZYGC-86ZR*"'),
     ).toBe(true);
@@ -254,9 +233,6 @@ describe("search query helpers", () => {
         "message:*ZYGC-86ZR* environment:prod",
       ),
     ).toBe(true);
-    expect(isSemanticFilterDowngrade("conv_id:ZYGC-86ZR", "ZYGC-86ZR")).toBe(
-      true,
-    );
 
     // Legitimate typo/rename repairs must not be treated as downgrades.
     expect(

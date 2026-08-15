@@ -287,9 +287,6 @@ function choosePreservingRepairedQuery(params: {
     return appendSearchFilter(originalQuery, params.filter);
   }
 
-  // Never accept silent full-text downgrades of structured filters
-  // (e.g. conv_id:X -> message:"*X*"). Keep the original so validation can
-  // fail honestly instead of returning lucky/wrong results.
   if (isSemanticFilterDowngrade(originalQuery, repairedQuery)) {
     return appendSearchFilter(originalQuery, params.filter);
   }
@@ -311,12 +308,8 @@ function chooseValidatedRepairedQuery(params: {
     return params.currentQuery;
   }
 
-  // Validation repair may rename invalid fields (spon.duration -> span.duration).
-  // Only reject the false-success path where a structured filter becomes message/*.
-  if (
-    looksLikeSentrySearchSyntax(params.originalQuery) &&
-    isSemanticFilterDowngrade(params.originalQuery, repairedQuery)
-  ) {
+  // Validation repair may rename invalid fields. Only reject message/* downgrades.
+  if (isSemanticFilterDowngrade(params.originalQuery, repairedQuery)) {
     return params.currentQuery;
   }
 
@@ -605,19 +598,16 @@ export default defineTool({
       dataset = shouldTrustStructuredTraceSearch
         ? inputDataset
         : parsed.dataset;
-      // Prefer preserving structured filters whenever the caller used search
-      // syntax. Trust-trace path also locks dataset; for other structured
-      // queries still refuse semantic downgrades even if dataset may change.
-      sentryQuery = hasStructuredQuery
+      sentryQuery = shouldTrustStructuredTraceSearch
         ? choosePreservingRepairedQuery({
             originalQuery: params.query ?? "",
             repairedQuery: parsed.query,
-            filter:
-              dataset !== "replays" && isTraceItemDataset(dataset)
-                ? environmentFilter
-                : undefined,
+            filter: environmentFilter,
           })
-        : parsed.query || "";
+        : looksLikeSentrySearchSyntax(params.query) &&
+            isSemanticFilterDowngrade(params.query ?? "", parsed.query || "")
+          ? (params.query ?? "")
+          : parsed.query || "";
       sortParam =
         shouldTrustExplicitSearchParams && explicitSort
           ? explicitSort
