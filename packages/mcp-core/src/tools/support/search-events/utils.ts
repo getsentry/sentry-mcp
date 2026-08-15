@@ -667,8 +667,6 @@ export function recordEventsSearchValidationTelemetry({
   }
 }
 
-export const MAX_EVENTS_VALIDATION_ATTEMPTS = 3;
-
 export async function validateEventsSearch(
   apiService: SentryApiService,
   {
@@ -877,6 +875,93 @@ ${DATASET_EXAMPLES[normalizedDataset]
   .join("\n\n")}
 
 Use these examples as patterns for constructing your query.`;
+    },
+  });
+}
+
+/**
+ * Create a tool for the agent to validate a candidate events search before returning.
+ * Prefer this over external try/fail/retry orchestration in the tool handler.
+ */
+export function createValidateEventsSearchTool(options: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  projectId?: string;
+}) {
+  const { apiService, organizationSlug, projectId } = options;
+
+  return agentTool({
+    description:
+      "Validate a candidate Sentry events search before returning it. Call this after constructing dataset/query/fields/sort. If invalid, fix the request and validate again. Never replace a structured field:value filter with message/log.body full-text matching.",
+    parameters: z.object({
+      dataset: z
+        .enum(PUBLIC_EVENTS_DATASETS)
+        .describe("Dataset for the candidate search"),
+      query: z
+        .string()
+        .describe("Candidate Sentry search query string (may be empty)"),
+      fields: z
+        .array(z.string())
+        .min(1)
+        .describe(
+          "Candidate fields, including any aggregate functions and sort field",
+        ),
+      sort: z.string().min(1).describe("Candidate sort parameter"),
+      statsPeriod: z
+        .string()
+        .optional()
+        .describe("Optional relative time period like 1h, 24h, 7d"),
+      start: z.string().optional().describe("Optional ISO 8601 start time"),
+      end: z.string().optional().describe("Optional ISO 8601 end time"),
+      environment: z
+        .union([z.string().min(1), z.array(z.string().min(1)).min(1)])
+        .optional()
+        .describe(
+          "Optional environment filter. Prefer query filters for non-replay datasets.",
+        ),
+    }),
+    execute: async ({
+      dataset,
+      query,
+      fields,
+      sort,
+      statsPeriod,
+      start,
+      end,
+      environment,
+    }) => {
+      const validation = await validateEventsSearch(apiService, {
+        organizationSlug,
+        dataset,
+        fields,
+        query,
+        sort,
+        projectId,
+        environment,
+        statsPeriod,
+        start,
+        end,
+      });
+
+      recordEventsSearchValidationTelemetry({
+        attempt: 0,
+        validation,
+      });
+
+      if (validation.valid) {
+        return {
+          valid: true,
+          message: "Search validation passed.",
+        };
+      }
+
+      const formatted = formatEventsValidationResults(validation);
+      return {
+        valid: false,
+        message: formatted
+          ? `Search validation failed:\n${formatted}`
+          : "Search validation failed.",
+      };
     },
   });
 }
