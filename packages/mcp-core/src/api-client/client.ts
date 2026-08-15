@@ -3400,7 +3400,7 @@ export class SentryApiService {
           body && typeof body === "object" && "detail" in body
             ? String((body as { detail: unknown }).detail)
             : "Invalid request";
-        throw createApiError(detail, 400, body);
+        throw createApiError(detail, 400, detail, body);
       }
       throw err;
     }
