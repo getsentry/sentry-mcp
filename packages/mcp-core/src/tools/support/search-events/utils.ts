@@ -118,28 +118,101 @@ export function looksLikeSentrySearchSyntax(query?: string): boolean {
 
 const FULL_TEXT_SEARCH_KEYS = new Set(["message", "log.body"]);
 
-function structuredSearchKeys(query: string): string[] {
-  const keys: string[] = [];
-  for (const match of query.matchAll(SENTRY_SEARCH_TOKEN_PATTERN)) {
-    const key = match[2]?.toLowerCase();
-    if (!key || FULL_TEXT_SEARCH_KEYS.has(key)) {
+/**
+ * Replace quoted regions with same-length placeholders so colons inside quotes
+ * are not treated as filter-key separators (e.g. transaction:"handle message:hello").
+ * Length is preserved so offsets still map back to the original query.
+ */
+function maskQuotedRegions(query: string): string {
+  let out = "";
+  let quote: '"' | "'" | null = null;
+  let escaped = false;
+
+  for (const char of query) {
+    if (escaped) {
+      escaped = false;
+      out += quote ? "x" : char;
       continue;
     }
-    keys.push(key);
+    if (char === "\\") {
+      escaped = true;
+      out += quote ? "x" : char;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+        out += char;
+      } else {
+        // Keep length; neutralize token separators inside quotes.
+        out += char === ":" || /\s/.test(char) ? "x" : char;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      out += char;
+      continue;
+    }
+    out += char;
+  }
+
+  return out;
+}
+
+function searchFilterKeys(query: string): string[] {
+  const keys: string[] = [];
+  for (const match of maskQuotedRegions(query).matchAll(
+    SENTRY_SEARCH_TOKEN_PATTERN,
+  )) {
+    const key = match[2]?.toLowerCase();
+    if (key) {
+      keys.push(key);
+    }
   }
   return keys;
 }
 
+function structuredSearchKeys(query: string): string[] {
+  return searchFilterKeys(query).filter(
+    (key) => !FULL_TEXT_SEARCH_KEYS.has(key),
+  );
+}
+
 function firstFilterValue(query: string, key: string): string | undefined {
   const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = query.match(new RegExp(`(?:^|\\s)!?${escapedKey}:(\\S+)`, "i"));
-  if (!match?.[1]) {
+  const match = maskQuotedRegions(query).match(
+    new RegExp(`(?:^|\\s)!?${escapedKey}:(\\S+)`, "i"),
+  );
+  if (!match?.[1] || match.index === undefined) {
     return undefined;
   }
-  return match[1]
+
+  // Read the real value from the original query at the same offset so quotes
+  // and wildcards are preserved for comparison.
+  const valueStart = match.index + match[0].indexOf(":") + 1;
+  const rawFromOriginal = query.slice(valueStart);
+  const valueMatch = rawFromOriginal.match(/^\S+/);
+  const rawValue = valueMatch?.[0] ?? match[1];
+
+  return rawValue
     .replace(/^['"]|['"]$/g, "")
     .replace(/^\*+|\*+$/g, "")
     .trim();
+}
+
+function fullTextFilterValues(query: string): string[] {
+  const values: string[] = [];
+  for (const key of searchFilterKeys(query)) {
+    if (!FULL_TEXT_SEARCH_KEYS.has(key)) {
+      continue;
+    }
+    const value = firstFilterValue(query, key);
+    if (value) {
+      values.push(value.toLowerCase());
+    }
+  }
+  return values;
 }
 
 /**
@@ -165,15 +238,21 @@ export function isSemanticFilterDowngrade(
     return false;
   }
 
-  // Renames keep values on non-full-text attributes and do not need this guard.
-  if (!/(?:^|\s)(?:message|log\.body):/i.test(repairedQuery)) {
+  const repairedFullTextValues = fullTextFilterValues(repairedQuery);
+  if (repairedFullTextValues.length === 0) {
+    // Renames keep values on non-full-text attributes and do not need this guard.
     return false;
   }
 
-  const repairedLower = repairedQuery.toLowerCase();
   return droppedKeys.some((key) => {
-    const value = firstFilterValue(originalQuery, key);
-    return !!value && repairedLower.includes(value.toLowerCase());
+    const value = firstFilterValue(originalQuery, key)?.toLowerCase();
+    return (
+      !!value &&
+      repairedFullTextValues.some(
+        (fullTextValue) =>
+          fullTextValue.includes(value) || value.includes(fullTextValue),
+      )
+    );
   });
 }
 

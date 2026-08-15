@@ -258,6 +258,14 @@ describe("search query helpers", () => {
         'message:"*ZYGC-86ZR*"',
       ),
     ).toBe(false);
+
+    // message: inside a quoted value is not a full-text filter.
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:hello",
+        'transaction:"handle message:hello"',
+      ),
+    ).toBe(false);
   });
 });
 
