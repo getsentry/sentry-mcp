@@ -266,6 +266,35 @@ describe("search query helpers", () => {
         'transaction:"handle message:hello"',
       ),
     ).toBe(false);
+
+    // Duplicate structured keys must still catch a partial full-text downgrade.
+    // Set-based key comparison would miss this because "custom" remains present.
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:foo custom:bar",
+        'custom:bar message:"*foo*"',
+      ),
+    ).toBe(true);
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:foo custom:foo",
+        'custom:foo message:"*foo*"',
+      ),
+    ).toBe(true);
+
+    // Keeping both structured values (or renaming one) is not a downgrade.
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:foo custom:bar",
+        "custom:foo custom:bar environment:prod",
+      ),
+    ).toBe(false);
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:foo custom:bar",
+        "tags[custom]:foo custom:bar",
+      ),
+    ).toBe(false);
   });
 });
 

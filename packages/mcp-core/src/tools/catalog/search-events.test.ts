@@ -2731,6 +2731,80 @@ describe("search_events", () => {
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects partial full-text downgrades when a duplicate structured key remains", async () => {
+    // Set-based key comparison would miss this: custom remains present after
+    // custom:foo is dropped into message full-text.
+    mockGenerateText.mockResolvedValue(
+      mockAIResponse(
+        "logs",
+        'custom:bar message:"*foo*"',
+        ["timestamp", "message", "trace"],
+        undefined,
+        "-timestamp",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () =>
+          HttpResponse.json({
+            valid: false,
+            projects: [],
+            dataset: [],
+            environment: [],
+            field: [],
+            query: {
+              valid: false,
+              error: null,
+              fields: [
+                {
+                  name: "custom",
+                  valid: false,
+                  attrType: null,
+                  error: "Unknown attribute",
+                },
+              ],
+            },
+            orderby: [],
+          }),
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+        HttpResponse.json({
+          data: [{ id: "should-not-run", message: "foo bar lucky hit" }],
+        }),
+      ),
+    );
+
+    await expect(
+      searchEvents.handler(
+        {
+          organizationSlug: "test-org",
+          regionUrl: null,
+          projectSlug: null,
+          dataset: "logs",
+          query: "custom:foo custom:bar",
+          fields: null,
+          sort: null,
+          period: "24h",
+          limit: 10,
+          includeExplanation: false,
+        },
+        {
+          constraints: {
+            organizationSlug: null,
+            regionUrl: null,
+            projectSlug: null,
+          },
+          accessToken: "test-token",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow(/Search validation failed/);
+
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps caller fields when the agent returns an empty fields array", async () => {
     let eventsRequestUrl: URL | undefined;
 

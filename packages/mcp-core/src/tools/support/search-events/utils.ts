@@ -160,64 +160,106 @@ function maskQuotedRegions(query: string): string {
   return out;
 }
 
-function searchFilterKeys(query: string): string[] {
-  const keys: string[] = [];
-  for (const match of maskQuotedRegions(query).matchAll(
-    SENTRY_SEARCH_TOKEN_PATTERN,
-  )) {
-    const key = match[2]?.toLowerCase();
-    if (key) {
-      keys.push(key);
-    }
-  }
-  return keys;
-}
+type SearchFilterOccurrence = {
+  key: string;
+  value: string;
+};
 
-function structuredSearchKeys(query: string): string[] {
-  return searchFilterKeys(query).filter(
-    (key) => !FULL_TEXT_SEARCH_KEYS.has(key),
-  );
-}
-
-function firstFilterValue(query: string, key: string): string | undefined {
-  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = maskQuotedRegions(query).match(
-    new RegExp(`(?:^|\\s)!?${escapedKey}:(\\S+)`, "i"),
-  );
-  if (!match?.[1] || match.index === undefined) {
-    return undefined;
-  }
-
-  // Read the real value from the original query at the same offset so quotes
-  // and wildcards are preserved for comparison.
-  const valueStart = match.index + match[0].indexOf(":") + 1;
-  const rawFromOriginal = query.slice(valueStart);
-  const valueMatch = rawFromOriginal.match(/^\S+/);
-  const rawValue = valueMatch?.[0] ?? match[1];
-
+function normalizeFilterValue(rawValue: string): string {
   return rawValue
     .replace(/^['"]|['"]$/g, "")
     .replace(/^\*+|\*+$/g, "")
-    .trim();
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Extract every field:value occurrence while preserving multiplicity and quote
+ * boundaries. Values are normalized for comparison (strip wrapping quotes and
+ * leading/trailing wildcards).
+ */
+function searchFilterOccurrences(query: string): SearchFilterOccurrence[] {
+  const occurrences: SearchFilterOccurrence[] = [];
+  const masked = maskQuotedRegions(query);
+
+  for (const match of masked.matchAll(SENTRY_SEARCH_TOKEN_PATTERN)) {
+    const key = match[2]?.toLowerCase();
+    if (!key || match.index === undefined) {
+      continue;
+    }
+
+    // Read the real value from the original query at the same offset so quotes
+    // and wildcards are preserved before normalization.
+    const valueStart = match.index + match[0].indexOf(":") + 1;
+    const rawFromOriginal = query.slice(valueStart);
+    const valueMatch = rawFromOriginal.match(/^\S+/);
+    if (!valueMatch?.[0]) {
+      continue;
+    }
+
+    const value = normalizeFilterValue(valueMatch[0]);
+    if (!value) {
+      continue;
+    }
+
+    occurrences.push({ key, value });
+  }
+
+  return occurrences;
+}
+
+function structuredFilterOccurrences(
+  query: string,
+): SearchFilterOccurrence[] {
+  return searchFilterOccurrences(query).filter(
+    (occurrence) => !FULL_TEXT_SEARCH_KEYS.has(occurrence.key),
+  );
 }
 
 function fullTextFilterValues(query: string): string[] {
-  const values: string[] = [];
-  for (const key of searchFilterKeys(query)) {
-    if (!FULL_TEXT_SEARCH_KEYS.has(key)) {
+  return searchFilterOccurrences(query)
+    .filter((occurrence) => FULL_TEXT_SEARCH_KEYS.has(occurrence.key))
+    .map((occurrence) => occurrence.value);
+}
+
+function filterOccurrenceIdentity(occurrence: SearchFilterOccurrence): string {
+  return `${occurrence.key}\0${occurrence.value}`;
+}
+
+/**
+ * Structured filters present in `original` that are not covered by multiset
+ * cardinality in `repaired` (same key+value pair counts).
+ */
+function unmatchedStructuredFilters(
+  original: SearchFilterOccurrence[],
+  repaired: SearchFilterOccurrence[],
+): SearchFilterOccurrence[] {
+  const remaining = new Map<string, number>();
+  for (const occurrence of repaired) {
+    const identity = filterOccurrenceIdentity(occurrence);
+    remaining.set(identity, (remaining.get(identity) ?? 0) + 1);
+  }
+
+  const unmatched: SearchFilterOccurrence[] = [];
+  for (const occurrence of original) {
+    const identity = filterOccurrenceIdentity(occurrence);
+    const count = remaining.get(identity) ?? 0;
+    if (count > 0) {
+      remaining.set(identity, count - 1);
       continue;
     }
-    const value = firstFilterValue(query, key);
-    if (value) {
-      values.push(value.toLowerCase());
-    }
+    unmatched.push(occurrence);
   }
-  return values;
+
+  return unmatched;
 }
 
 /**
  * True when a structured field:value filter was replaced with message/log.body
  * full-text matching (false-success path). Allows real attribute renames.
+ *
+ * Uses multiset key+value matching so dropping one of several identical keys
+ * (e.g. `custom:foo custom:bar` → `custom:bar message:"*foo*"`) is still caught.
  */
 export function isSemanticFilterDowngrade(
   originalQuery: string,
@@ -227,14 +269,17 @@ export function isSemanticFilterDowngrade(
     return false;
   }
 
-  const originalKeys = structuredSearchKeys(originalQuery);
-  if (originalKeys.length === 0) {
+  const originalFilters = structuredFilterOccurrences(originalQuery);
+  if (originalFilters.length === 0) {
     return false;
   }
 
-  const repairedKeySet = new Set(structuredSearchKeys(repairedQuery));
-  const droppedKeys = originalKeys.filter((key) => !repairedKeySet.has(key));
-  if (droppedKeys.length === 0) {
+  const repairedFilters = structuredFilterOccurrences(repairedQuery);
+  const droppedFilters = unmatchedStructuredFilters(
+    originalFilters,
+    repairedFilters,
+  );
+  if (droppedFilters.length === 0) {
     return false;
   }
 
@@ -244,16 +289,13 @@ export function isSemanticFilterDowngrade(
     return false;
   }
 
-  return droppedKeys.some((key) => {
-    const value = firstFilterValue(originalQuery, key)?.toLowerCase();
-    return (
-      !!value &&
-      repairedFullTextValues.some(
-        (fullTextValue) =>
-          fullTextValue.includes(value) || value.includes(fullTextValue),
-      )
-    );
-  });
+  return droppedFilters.some((filter) =>
+    repairedFullTextValues.some(
+      (fullTextValue) =>
+        fullTextValue.includes(filter.value) ||
+        filter.value.includes(fullTextValue),
+    ),
+  );
 }
 
 function isPrimitive(
