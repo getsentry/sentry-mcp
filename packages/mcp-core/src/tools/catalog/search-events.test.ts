@@ -2040,6 +2040,8 @@ describe("search_events", () => {
   });
 
   it("should repair direct search params with the agent when available", async () => {
+    let eventsRequestUrl: URL | undefined;
+
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse("logs", "severity:error", [
         "timestamp",
@@ -2052,9 +2054,7 @@ describe("search_events", () => {
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/",
         ({ request }) => {
-          const url = new URL(request.url);
-          expect(url.searchParams.get("dataset")).toBe("logs");
-          expect(url.searchParams.get("query")).toBe("severity:error");
+          eventsRequestUrl = new URL(request.url);
           return HttpResponse.json({
             data: [
               {
@@ -2069,7 +2069,7 @@ describe("search_events", () => {
       ),
     );
 
-    await searchEvents.handler(
+    const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
         regionUrl: null,
@@ -2093,10 +2093,17 @@ describe("search_events", () => {
       },
     );
 
-    const prompt = mockGenerateText.mock.calls[0]?.[0]?.prompt;
-    expect(prompt).toContain("Translate this Sentry event search request");
-    expect(prompt).toContain("severity:error");
-    expect(prompt).toContain('"dataset": "errors"');
+    // Assert behavior via Sentry API inputs + tool output, not agent prompt text.
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(eventsRequestUrl).toBeDefined();
+    expect(eventsRequestUrl!.searchParams.get("dataset")).toBe("logs");
+    expect(eventsRequestUrl!.searchParams.get("query")).toBe("severity:error");
+    expect(eventsRequestUrl!.searchParams.getAll("field")).toEqual([
+      "timestamp",
+      "message",
+      "severity",
+    ]);
+    expect(result).toContain("Connection failed to database");
   });
 
   it("should handle AI agent errors gracefully", async () => {
@@ -2655,6 +2662,8 @@ describe("search_events", () => {
   it("rejects agent rewrites that downgrade structured filters to message full-text", async () => {
     // Tweet failure mode: agent rewrites conv_id:X -> message:"*X*". Keep the
     // structured filter and fail validation honestly instead of lucky hits.
+    const validatedQueries: string[] = [];
+
     mockGenerateText.mockResolvedValue(
       mockAIResponse(
         "logs",
@@ -2668,8 +2677,10 @@ describe("search_events", () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/validate/",
-        () =>
-          HttpResponse.json({
+        ({ request }) => {
+          const url = new URL(request.url);
+          validatedQueries.push(url.searchParams.get("query") ?? "");
+          return HttpResponse.json({
             valid: false,
             projects: [],
             dataset: [],
@@ -2688,18 +2699,12 @@ describe("search_events", () => {
               ],
             },
             orderby: [],
-          }),
+          });
+        },
       ),
-      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
-        HttpResponse.json({
-          data: [
-            {
-              id: "should-not-run",
-              message: "[Agent][ZYGC-86ZR] luck hit",
-            },
-          ],
-        }),
-      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () => {
+        throw new Error("searchEvents should not be called on downgrade");
+      }),
     );
 
     await expect(
@@ -2729,11 +2734,16 @@ describe("search_events", () => {
     ).rejects.toThrow(/Search validation failed/);
 
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    // Final validation must keep the structured filter, not the message rewrite.
+    expect(validatedQueries.at(-1)).toBe("conv_id:ZYGC-86ZR");
+    expect(validatedQueries.at(-1)).not.toContain("message:");
   });
 
   it("rejects partial full-text downgrades when a duplicate structured key remains", async () => {
     // Set-based key comparison would miss this: custom remains present after
     // custom:foo is dropped into message full-text.
+    const validatedQueries: string[] = [];
+
     mockGenerateText.mockResolvedValue(
       mockAIResponse(
         "logs",
@@ -2747,8 +2757,10 @@ describe("search_events", () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/validate/",
-        () =>
-          HttpResponse.json({
+        ({ request }) => {
+          const url = new URL(request.url);
+          validatedQueries.push(url.searchParams.get("query") ?? "");
+          return HttpResponse.json({
             valid: false,
             projects: [],
             dataset: [],
@@ -2767,13 +2779,12 @@ describe("search_events", () => {
               ],
             },
             orderby: [],
-          }),
+          });
+        },
       ),
-      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
-        HttpResponse.json({
-          data: [{ id: "should-not-run", message: "foo bar lucky hit" }],
-        }),
-      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () => {
+        throw new Error("searchEvents should not be called on downgrade");
+      }),
     );
 
     await expect(
@@ -2803,6 +2814,86 @@ describe("search_events", () => {
     ).rejects.toThrow(/Search validation failed/);
 
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(validatedQueries.at(-1)).toBe("custom:foo custom:bar");
+    expect(validatedQueries.at(-1)).not.toContain("message:");
+  });
+
+  it("allows real attribute renames that are not full-text downgrades", async () => {
+    let eventsRequestUrl: URL | undefined;
+
+    // errors is not a trusted structured-trace dataset, so the handler uses the
+    // downgrade guard only. A real rename must still execute.
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "errors",
+        "error.type:TimeoutError",
+        ["issue", "title", "error.type", "timestamp"],
+        undefined,
+        "-timestamp",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () => HttpResponse.json(validEventsValidationResponse),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          eventsRequestUrl = new URL(request.url);
+          return HttpResponse.json({
+            data: [
+              {
+                id: "err1",
+                issue: "PROJ-1",
+                title: "TimeoutError",
+                "error.type": "TimeoutError",
+                timestamp: "2024-01-15T10:30:00Z",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "errors",
+        query: "eror.type:TimeoutError",
+        fields: null,
+        sort: null,
+        period: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(eventsRequestUrl).toBeDefined();
+    expect(eventsRequestUrl!.searchParams.get("dataset")).toBe("errors");
+    expect(eventsRequestUrl!.searchParams.get("query")).toBe(
+      "error.type:TimeoutError",
+    );
+    expect(eventsRequestUrl!.searchParams.getAll("field")).toEqual([
+      "issue",
+      "title",
+      "error.type",
+      "timestamp",
+    ]);
+    expect(result).toContain("TimeoutError");
   });
 
   it("keeps caller fields when the agent returns an empty fields array", async () => {
