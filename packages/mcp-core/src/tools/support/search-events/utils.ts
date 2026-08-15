@@ -259,6 +259,36 @@ function filterOccurrenceIdentity(occurrence: SearchFilterOccurrence): string {
   return `${occurrence.key}\0${occurrence.value}`;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * True when `needle` appears in `haystack` as a whole token, not a bare
+ * substring. Prevents `id:1` from matching inside `message:"error 401"`.
+ */
+function containsAsWholeToken(haystack: string, needle: string): boolean {
+  if (!haystack || !needle) {
+    return false;
+  }
+  if (haystack === needle) {
+    return true;
+  }
+
+  const escaped = escapeRegExp(needle);
+  // Token edges are start/end or a non-alphanumeric/underscore char so short
+  // numeric fragments cannot match inside longer numbers.
+  return new RegExp(`(?:^|[^A-Za-z0-9_])${escaped}(?:$|[^A-Za-z0-9_])`).test(
+    haystack,
+  );
+}
+
+function isRelatedFilterValue(left: string, right: string): boolean {
+  return (
+    containsAsWholeToken(left, right) || containsAsWholeToken(right, left)
+  );
+}
+
 /**
  * Structured filters present in `original` that are not covered by multiset
  * cardinality in `repaired` (same key+value pair counts).
@@ -293,6 +323,8 @@ function unmatchedStructuredFilters(
  *
  * Uses multiset key+value matching so dropping one of several identical keys
  * (e.g. `custom:foo custom:bar` → `custom:bar message:"*foo*"`) is still caught.
+ * Value comparison is whole-token, not bare substring, so unrelated full-text
+ * (e.g. `id:1` vs `message:"error 401"`) is not treated as a downgrade.
  */
 export function isSemanticFilterDowngrade(
   originalQuery: string,
@@ -323,10 +355,8 @@ export function isSemanticFilterDowngrade(
   }
 
   return droppedFilters.some((filter) =>
-    repairedFullTextValues.some(
-      (fullTextValue) =>
-        fullTextValue.includes(filter.value) ||
-        filter.value.includes(fullTextValue),
+    repairedFullTextValues.some((fullTextValue) =>
+      isRelatedFilterValue(filter.value, fullTextValue),
     ),
   );
 }
