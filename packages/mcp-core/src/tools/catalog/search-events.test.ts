@@ -2700,6 +2700,84 @@ describe("search_events", () => {
     expect(result).toContain("span1");
   });
 
+  it("rejects validation repairs that downgrade structured filters to message full-text", async () => {
+    // Tweet failure mode: agent rewrites conv_id:X -> message:"*X*" and the
+    // tool would otherwise return lucky/wrong hits. Keep the structured filter
+    // and fail validation honestly instead of accepting the semantic downgrade.
+    mockGenerateText.mockResolvedValue(
+      mockAIResponse(
+        "logs",
+        'message:"*ZYGC-86ZR*"',
+        ["timestamp", "message", "trace"],
+        undefined,
+        "-timestamp",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () =>
+          HttpResponse.json({
+            valid: false,
+            projects: [],
+            dataset: [],
+            environment: [],
+            field: [],
+            query: {
+              valid: false,
+              error: null,
+              fields: [
+                {
+                  name: "conv_id",
+                  valid: false,
+                  attrType: null,
+                  error: "Unknown attribute",
+                },
+              ],
+            },
+            orderby: [],
+          }),
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+        HttpResponse.json({
+          data: [
+            {
+              id: "should-not-run",
+              message: "[Agent][ZYGC-86ZR] luck hit",
+            },
+          ],
+        }),
+      ),
+    );
+
+    await expect(
+      searchEvents.handler(
+        {
+          organizationSlug: "test-org",
+          regionUrl: null,
+          projectSlug: null,
+          dataset: "logs",
+          query: "conv_id:ZYGC-86ZR",
+          fields: ["timestamp", "message", "trace"],
+          sort: "-timestamp",
+          period: "24h",
+          limit: 10,
+          includeExplanation: false,
+        },
+        {
+          constraints: {
+            organizationSlug: null,
+            regionUrl: null,
+            projectSlug: null,
+          },
+          accessToken: "test-token",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow(/Search validation failed after repair attempts/);
+  });
+
   it("keeps prior fields when validation repair returns an empty fields array", async () => {
     let validateCalls = 0;
     let eventsRequestUrl: URL | undefined;

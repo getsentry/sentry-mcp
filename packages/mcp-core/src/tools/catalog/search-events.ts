@@ -43,6 +43,7 @@ import {
 import {
   formatEventsValidationResults,
   isAggregateQuery,
+  isSemanticFilterDowngrade,
   looksLikeSentrySearchSyntax,
   MAX_EVENTS_VALIDATION_ATTEMPTS,
   recordEventsSearchValidationTelemetry,
@@ -140,13 +141,18 @@ function buildRequestFields(
 function applyValidationRepairFromAgent(
   state: EventsSearchState,
   parsed: SearchEventsAgentResult,
+  originalQuery: string,
 ): EventsSearchState {
   const sortParam = parsed.sort.trim();
   const repairedFields =
     parsed.fields && parsed.fields.length > 0 ? parsed.fields : state.fields;
   return {
     dataset: parsed.dataset === "replays" ? state.dataset : parsed.dataset,
-    sentryQuery: parsed.query || state.sentryQuery,
+    sentryQuery: chooseValidatedRepairedQuery({
+      originalQuery,
+      currentQuery: state.sentryQuery,
+      repairedQuery: parsed.query,
+    }),
     fields: augmentFieldsWithSort(repairedFields, sortParam),
     sortParam,
     environment: parsed.environment ? parsed.environment : state.environment,
@@ -281,11 +287,40 @@ function choosePreservingRepairedQuery(params: {
     return appendSearchFilter(originalQuery, params.filter);
   }
 
+  // Never accept silent full-text downgrades of structured filters
+  // (e.g. conv_id:X -> message:"*X*"). Keep the original so validation can
+  // fail honestly instead of returning lucky/wrong results.
+  if (isSemanticFilterDowngrade(originalQuery, repairedQuery)) {
+    return appendSearchFilter(originalQuery, params.filter);
+  }
+
   if (!originalQuery || preservesSearchTokens(originalQuery, repairedQuery)) {
     return appendSearchFilter(repairedQuery, params.filter);
   }
 
   return appendSearchFilter(originalQuery, params.filter);
+}
+
+function chooseValidatedRepairedQuery(params: {
+  originalQuery: string;
+  currentQuery: string;
+  repairedQuery?: string | null;
+}): string {
+  const repairedQuery = params.repairedQuery?.trim();
+  if (!repairedQuery) {
+    return params.currentQuery;
+  }
+
+  // Validation repair may rename invalid fields (spon.duration -> span.duration).
+  // Only reject the false-success path where a structured filter becomes message/*.
+  if (
+    looksLikeSentrySearchSyntax(params.originalQuery) &&
+    isSemanticFilterDowngrade(params.originalQuery, repairedQuery)
+  ) {
+    return params.currentQuery;
+  }
+
+  return repairedQuery;
 }
 
 function buildSearchRepairPrompt(params: {
@@ -301,6 +336,7 @@ function buildSearchRepairPrompt(params: {
     "The query may be natural language or already-valid Sentry search syntax.",
     "Preserve valid explicit parameters, but correct dataset, query syntax, fields, sort, and time range when they conflict or would fail.",
     "If the user query already uses Sentry search syntax, treat its filters as authoritative unless the search validation step proves a field is invalid.",
+    "Never replace a structured field filter with message/log.body/full-text matching. If no valid attribute exists for an explicit field:value filter, keep the field and let validation fail.",
     "For spans, logs, and metrics, use datasetAttributes to discover likely fields with substringMatch, query, and attributeTypes before dropping or renaming explicit fields.",
     "A broad datasetAttributes result may be truncated, so absence from that preview does not prove an explicit field is invalid.",
     "For non-replay datasets, convert environment parameters into query filters. For replays, keep environment in the separate environment parameter.",
@@ -336,6 +372,7 @@ function buildValidationFailureRepairPrompt(params: {
     "Use the validation results to correct every invalid parameter: dataset, environment, query filters, selected fields, sort, and time range.",
     "Use datasetAttributes to discover valid field names before renaming or replacing invalid fields.",
     "Prefer renaming invalid fields to valid attributes instead of dropping them.",
+    "Never replace a structured field filter with message/log.body/full-text matching. If no valid attribute exists for an explicit field:value filter, keep the field and let validation fail.",
     "Ensure the sort field is included in the fields array.",
     "For non-replay datasets, convert environment filters into query syntax when validation rejects the environment parameter.",
     "For replays, keep environment in the separate environment parameter.",
@@ -568,11 +605,17 @@ export default defineTool({
       dataset = shouldTrustStructuredTraceSearch
         ? inputDataset
         : parsed.dataset;
-      sentryQuery = shouldTrustStructuredTraceSearch
+      // Prefer preserving structured filters whenever the caller used search
+      // syntax. Trust-trace path also locks dataset; for other structured
+      // queries still refuse semantic downgrades even if dataset may change.
+      sentryQuery = hasStructuredQuery
         ? choosePreservingRepairedQuery({
             originalQuery: params.query ?? "",
             repairedQuery: parsed.query,
-            filter: environmentFilter,
+            filter:
+              dataset !== "replays" && isTraceItemDataset(dataset)
+                ? environmentFilter
+                : undefined,
           })
         : parsed.query || "";
       sortParam =
@@ -802,6 +845,7 @@ export default defineTool({
                 timeParams,
               },
               parsed,
+              params.query ?? "",
             ));
             validationExplanation = parsed.explanation || validationExplanation;
             sentryQuery = applyEnvironmentToEventsQuery(

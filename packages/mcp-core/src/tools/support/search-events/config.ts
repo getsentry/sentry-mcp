@@ -40,6 +40,7 @@ TOOL USAGE GUIDELINES:
 5. IMPORTANT: For ambiguous terms like "user agents", "browser", "client" - use the appropriate field discovery tool instead of guessing field names
 6. When the user already supplied Sentry search syntax for spans/logs/metrics, call datasetAttributes with substringMatch or query filters from the request before dropping or renaming fields
 7. Use datasetAttributes substringMatch, query, and attributeTypes for targeted lookup when broad field discovery is truncated
+8. NEVER replace a structured field:value filter with message/log.body/full-text matching. If an explicit field is unavailable on the dataset, keep it and let validation fail instead of inventing a weaker query
 
 CRITICAL - TOOL RESPONSE HANDLING:
 All tools return responses in this format: {error?: string, result?: data}

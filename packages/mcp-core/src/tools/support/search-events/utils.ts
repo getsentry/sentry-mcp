@@ -1,13 +1,13 @@
-import { z } from "zod";
 import { getActiveSpan } from "@sentry/core";
-import { UserInputError } from "../../../errors";
+import { z } from "zod";
 import type {
-  SentryApiService,
-  TraceItemAttributeType,
   EventsQueryValidation,
   EventsValidationResult,
+  SentryApiService,
+  TraceItemAttributeType,
   TraceItemType,
 } from "../../../api-client";
+import { UserInputError } from "../../../errors";
 import {
   agentTool,
   recordAgentToolResultCount,
@@ -18,8 +18,8 @@ import {
 } from "../../../internal/user-formatting";
 import {
   type EventsDataset,
-  PUBLIC_EVENTS_DATASETS,
   normalizeEventsDataset,
+  PUBLIC_EVENTS_DATASETS,
 } from "../../../utils/events-datasets";
 
 // Type for flexible event data that can contain any fields
@@ -109,6 +109,217 @@ export function looksLikeSentrySearchSyntax(query?: string): boolean {
     }
 
     if (/^[a-z_][a-z0-9_-]*$/.test(key)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Only pure free-text carriers. Attribute renames onto fields like
+// transaction/title are legitimate structured repairs, not silent downgrades.
+const FULL_TEXT_SEARCH_KEYS = new Set(["message", "log.body"]);
+
+export type StructuredSearchFilter = {
+  key: string;
+  value: string;
+  raw: string;
+};
+
+function normalizeSearchFilterValue(value: string): string {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function stripSearchWildcards(value: string): string {
+  return normalizeSearchFilterValue(value)
+    .replace(/^\*+/u, "")
+    .replace(/\*+$/u, "");
+}
+
+export function isFullTextSearchKey(key: string): boolean {
+  const normalized = key.trim().toLowerCase();
+  return FULL_TEXT_SEARCH_KEYS.has(normalized);
+}
+
+/**
+ * Extract key:value filters from Sentry search syntax.
+ * Values may include quotes and wildcards; operators before keys (!, -) are stripped from key.
+ */
+export function extractStructuredSearchFilters(
+  query?: string,
+): StructuredSearchFilter[] {
+  const trimmedQuery = query?.trim();
+  if (!trimmedQuery) {
+    return [];
+  }
+
+  const filters: StructuredSearchFilter[] = [];
+  for (const match of trimmedQuery.matchAll(SENTRY_SEARCH_TOKEN_PATTERN)) {
+    const key = match[2];
+    if (!key) {
+      continue;
+    }
+
+    const start = (match.index ?? 0) + (match[1]?.length ?? 0);
+    const valueStart = start + match[0].slice(match[1]?.length ?? 0).length;
+    let index = valueStart;
+    let quote: '"' | "'" | null = null;
+    let escaped = false;
+    let bracketDepth = 0;
+
+    while (index < trimmedQuery.length) {
+      const char = trimmedQuery[index];
+      if (char === undefined) {
+        break;
+      }
+
+      if (escaped) {
+        escaped = false;
+        index += 1;
+        continue;
+      }
+
+      if (char === "\\") {
+        escaped = true;
+        index += 1;
+        continue;
+      }
+
+      if (quote) {
+        if (char === quote) {
+          quote = null;
+        }
+        index += 1;
+        continue;
+      }
+
+      if (char === '"' || char === "'") {
+        quote = char;
+        index += 1;
+        continue;
+      }
+
+      if (char === "[") {
+        bracketDepth += 1;
+        index += 1;
+        continue;
+      }
+
+      if (char === "]" && bracketDepth > 0) {
+        bracketDepth -= 1;
+        index += 1;
+        continue;
+      }
+
+      if (bracketDepth === 0 && /\s/.test(char)) {
+        break;
+      }
+
+      index += 1;
+    }
+
+    const raw = trimmedQuery.slice(start, index);
+    const value = trimmedQuery.slice(valueStart, index);
+    if (!value) {
+      continue;
+    }
+
+    filters.push({
+      key,
+      value,
+      raw,
+    });
+  }
+
+  return filters;
+}
+
+function filterValueContains(candidateValue: string, needle: string): boolean {
+  if (!needle) {
+    return false;
+  }
+  const normalizedCandidate =
+    stripSearchWildcards(candidateValue).toLowerCase();
+  const normalizedNeedle = stripSearchWildcards(needle).toLowerCase();
+  return (
+    normalizedCandidate.length > 0 &&
+    normalizedNeedle.length > 0 &&
+    normalizedCandidate.includes(normalizedNeedle)
+  );
+}
+
+/**
+ * Detect silent semantic downgrades of structured filters, e.g.
+ * `conv_id:ABC` -> `message:"*ABC*"`.
+ *
+ * Allows legitimate renames (`spon.duration` -> `span.duration`) where the
+ * value remains under a non-full-text attribute. Rejects only the false-success
+ * path where a structured field disappears and its value survives only as
+ * free-text / message matching.
+ */
+export function isSemanticFilterDowngrade(
+  originalQuery: string,
+  repairedQuery: string,
+): boolean {
+  if (!looksLikeSentrySearchSyntax(originalQuery)) {
+    return false;
+  }
+
+  const originalFilters = extractStructuredSearchFilters(originalQuery).filter(
+    (filter) => !isFullTextSearchKey(filter.key),
+  );
+  if (originalFilters.length === 0) {
+    return false;
+  }
+
+  const repairedFilters = extractStructuredSearchFilters(repairedQuery);
+  const repairedNonFullText = repairedFilters.filter(
+    (filter) => !isFullTextSearchKey(filter.key),
+  );
+  const repairedFullText = repairedFilters.filter((filter) =>
+    isFullTextSearchKey(filter.key),
+  );
+
+  for (const original of originalFilters) {
+    const sameKeyStillPresent = repairedFilters.some(
+      (filter) =>
+        filter.key === original.key &&
+        filterValueContains(filter.value, original.value),
+    );
+    if (sameKeyStillPresent) {
+      continue;
+    }
+
+    const renamedToStructuredField = repairedNonFullText.some((filter) =>
+      filterValueContains(filter.value, original.value),
+    );
+    if (renamedToStructuredField) {
+      continue;
+    }
+
+    const valueBare = stripSearchWildcards(original.value);
+    if (!valueBare) {
+      continue;
+    }
+
+    const survivedAsFullText = repairedFullText.some((filter) =>
+      filterValueContains(filter.value, valueBare),
+    );
+    if (survivedAsFullText) {
+      return true;
+    }
+
+    // Value left only as bare free-text (no key:value carrier).
+    const escaped = valueBare.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const bareValuePattern = new RegExp(`(^|\\s)${escaped}(?=\\s|$)`, "i");
+    if (bareValuePattern.test(repairedQuery)) {
       return true;
     }
   }
