@@ -295,6 +295,21 @@ describe("search query helpers", () => {
         "tags[custom]:foo custom:bar",
       ),
     ).toBe(false);
+
+    // Quoted multi-word values must keep later words for downgrade detection.
+    // Truncating at the first space would miss message rewrites of "world".
+    expect(
+      isSemanticFilterDowngrade(
+        'transaction:"hello world"',
+        'message:"*world*"',
+      ),
+    ).toBe(true);
+    expect(
+      isSemanticFilterDowngrade(
+        "transaction:'hello world'",
+        'log.body:"*hello world*"',
+      ),
+    ).toBe(true);
   });
 });
 

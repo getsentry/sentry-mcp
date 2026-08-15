@@ -174,6 +174,40 @@ function normalizeFilterValue(rawValue: string): string {
 }
 
 /**
+ * Read one filter value starting at `valueStart` in the original query.
+ * Quoted values keep interior whitespace; unquoted values stop at whitespace.
+ */
+function readRawFilterValue(query: string, valueStart: number): string | undefined {
+  if (valueStart >= query.length) {
+    return undefined;
+  }
+
+  const first = query[valueStart];
+  if (first === '"' || first === "'") {
+    let escaped = false;
+    for (let i = valueStart + 1; i < query.length; i += 1) {
+      const char = query[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === first) {
+        return query.slice(valueStart, i + 1);
+      }
+    }
+    // Unclosed quote: take the remainder so comparison still sees later words.
+    return query.slice(valueStart);
+  }
+
+  const valueMatch = query.slice(valueStart).match(/^\S+/);
+  return valueMatch?.[0];
+}
+
+/**
  * Extract every field:value occurrence while preserving multiplicity and quote
  * boundaries. Values are normalized for comparison (strip wrapping quotes and
  * leading/trailing wildcards).
@@ -189,15 +223,14 @@ function searchFilterOccurrences(query: string): SearchFilterOccurrence[] {
     }
 
     // Read the real value from the original query at the same offset so quotes
-    // and wildcards are preserved before normalization.
+    // and multi-word quoted values are preserved before normalization.
     const valueStart = match.index + match[0].indexOf(":") + 1;
-    const rawFromOriginal = query.slice(valueStart);
-    const valueMatch = rawFromOriginal.match(/^\S+/);
-    if (!valueMatch?.[0]) {
+    const rawValue = readRawFilterValue(query, valueStart);
+    if (!rawValue) {
       continue;
     }
 
-    const value = normalizeFilterValue(valueMatch[0]);
+    const value = normalizeFilterValue(rawValue);
     if (!value) {
       continue;
     }
