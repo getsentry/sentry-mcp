@@ -3387,10 +3387,23 @@ export class SentryApiService {
       apiPath`/organizations/${organizationSlug}/events/validate/` +
         `?${queryParams.toString()}`,
       undefined,
-      opts,
+      { ...opts, allowStatuses: [400] },
     );
     const body = await this.parseJsonResponse(response);
-    return EventsValidationResponseSchema.parse(body);
+    try {
+      return EventsValidationResponseSchema.parse(body);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        // The API returned a 400 with a generic error body (e.g. {detail: "..."})
+        // rather than a structured validation result. Treat it as an API client error.
+        const detail =
+          body && typeof body === "object" && "detail" in body
+            ? String((body as { detail: unknown }).detail)
+            : "Invalid request";
+        throw createApiError(detail, 400, body);
+      }
+      throw err;
+    }
   }
 
   private async fetchTraceItemAttributes(
