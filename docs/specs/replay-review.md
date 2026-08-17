@@ -376,17 +376,95 @@ separately. Tool count rises by one, well inside the 20-tool target.
 
 ## Out of Scope
 
-Web visual snapshots. Rendering a DOM snapshot requires running rrweb playback
+Web visual snapshots. *Rendering* a DOM snapshot requires running rrweb playback
 in a browser, which this server has no place to host. The image plumbing already
 exists (`get_snapshot_image`, `createImagePreview` in
 `packages/mcp-core/src/internal/blob-utils.ts`), so this is a hosting gap, not a
 protocol one.
+
+Note the distinction from the DOM *tree*, which is a different problem with a
+different answer. Rendering needs a layout engine; reading the structure does
+not, and the structure is already in the segments we download. See "DOM tree
+reads" under Future Work.
 
 Mobile replay video is tractable — replays are captured as video and
 `/projects/{org}/{project}/replays/{replay_id}/videos/{segment_id}/` exists —
 but it is deferred rather than half-built alongside the web path.
 
 ## Future Work
+
+### DOM tree reads
+
+The largest capability gap against comparable tools. Peers expose a
+`review-snapshot`-style call returning a screenshot, a component tree, and
+bounding boxes at a timestamp, rooted at an optional component id. Of those four
+pieces, the tree and the rooting are reachable here; the image and the boxes are
+not, and for the same reason.
+
+**What the segments already contain.** A recording is rrweb events, and the ones
+this spec's taxonomy ignores are exactly the ones carrying structure:
+
+| `type` | rrweb name | Currently |
+|---|---|---|
+| 2 | `FullSnapshot` | Ignored — carries the complete serialized DOM |
+| 3 | `IncrementalSnapshot` | Ignored except `source: 9` (canvas) |
+| 5 | `Custom` | Everything this spec classifies |
+
+Upstream's `which()` ignores types 2 and 3 too, so nothing was lost by matching
+it — Seer summarizes behavior, not structure. But the data is already downloaded
+and discarded.
+
+A `FullSnapshot` holds `serializedNodeWithId` recursively: `id`, `type`
+(`NodeType`: Document 0, DocumentType 1, Element 2, Text 3, CDATA 4, Comment 5),
+`tagName` and `attributes` on elements, `textContent` on text nodes, and
+`childNodes`. Reconstructing state at an arbitrary timestamp means applying each
+subsequent `IncrementalSnapshot` with `source: 0` (`Mutation`), whose payload is
+four arrays — `adds` (`parentId`, `nextId`, serialized `node`), `removes`
+(`parentId`, `id`), `attributes` (`id` plus a partial attribute map, `null`
+meaning removal), and `texts` (`id`, `value`).
+
+**Why rooting is nearly free.** rrweb node ids are stable within a recording and
+already reach us: every click breadcrumb carries `payload.data.node.id`
+alongside the `tagName` and `attributes` the classifier renders today. So "show
+me the DOM around the element that was rage-clicked" needs no new identifier
+scheme — the id in the signal is the handle, and `get_replay_activity` already
+surfaces those signals.
+
+**What is not reachable.** Bounding boxes require layout, and rrweb records no
+geometry beyond the `Meta` event's viewport width and height. A `visible` lens
+is the same problem: visibility is a computed style, not a recorded fact. Both
+need a browser, which puts them with the screenshot in Out of Scope. An
+`interactive` lens — form controls, buttons, links, ARIA roles — is decidable
+from tag and attributes alone, and is the useful one regardless.
+
+**The two hard constraints.**
+
+- *Memory.* Replaying mutations to a timestamp means holding a DOM snapshot plus
+  every mutation up to that point. Real snapshots run to megabytes of JSON and
+  parsed rrweb objects expand well beyond their serialized size — the same
+  pressure that produced this spec's 10MB read budget under a 128MB Workers
+  ceiling. A viable implementation streams segments and applies mutations into a
+  node map, discarding raw text as it goes, rather than parsing the recording
+  whole. This is why it cannot simply reuse `getReplayRecordingSegments`.
+- *Output size.* A full tree is far past any reasonable tool response. Rooting
+  at a node id plus an `interactive` lens is the default that keeps output
+  bounded; a `full` lens needs a depth limit and truncation reporting consistent
+  with the rest of this spec.
+
+**Masking is not redaction.** `maskAllText` and `maskAllInputs` default to on,
+so a real tree arrives with text and input values already replaced by the SDK,
+client-side, with no marker. Per this spec's redaction rule, such values render
+as delivered and must not be labeled `<redacted>` — the tool cannot distinguish
+"masked at capture" from "genuinely this text". Only Relay's `[Filtered]` marker
+supports that claim.
+
+**Open questions for QA to answer.** Whether real segments carry a
+`FullSnapshot` in the first page or only later — which decides whether a tree
+read can be cheap — and whether real clicks carry `node.id` consistently or only
+sometimes, which decides whether subtree rooting is a reliable entry point or a
+best-effort one.
+
+### Other
 
 - Friction analysis via `GET /organizations/{org}/replay-selectors/`, which
   returns `count_dead_clicks`, `count_rage_clicks`, `dom_element`, and
@@ -520,6 +598,10 @@ real organization confirms or moves them.
 - Upstream replay sort configuration: `getsentry/sentry` at
   `src/sentry/replays/usecases/query/configs/aggregate_sort.py`
 - [Replay recording event spec](https://develop.sentry.dev/sdk/data-model/event-payloads/replay-recording)
+- rrweb event, mutation, and serialized-node types:
+  [`rrweb-io/rrweb` `packages/types/src/index.ts`](https://github.com/rrweb-io/rrweb/blob/master/packages/types/src/index.ts).
+  Sentry pins its own copy of the `EventType` enum in
+  `src/sentry/replays/testutils.py`, which is the version to match.
 - [Sentry Replays API](https://docs.sentry.io/api/replays/)
 - Tool authoring: [Adding Tools](../contributing/adding-tools.md), and
   "Tool Output Policy" in [Tool Responses](../contributing/tool-responses.md)
