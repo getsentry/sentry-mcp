@@ -31,13 +31,13 @@ baselines encode the same wrong event shape they do today.
 
 ## 4. Replay Details as a Map
 
-- [ ] 4.1 Replace the activity sample with signal counts, time span, page flow, and per-kind breakdown including error and rage or dead click counts.
-- [ ] 4.2 Derive a suggested `get_replay_activity` window from error timestamps resolved through `getReplayErrorEvents`, degrading to no suggested window if the endpoint fails or returns no usable timestamp.
-- [ ] 4.3 Replace the per-error `listIssues` lookups in the Related section with the same batched `getReplayErrorEvents` call, which already returns issue identity.
-- [ ] 4.4 Fall back to a whole-session digest suggestion when no error timestamp resolves.
-- [ ] 4.5 Report truncation for related issues and traces.
-- [ ] 4.6 Wire the summary chapters section as a single-read enhancement, rendering only on `status: completed` and degrading silently on 403, error status, `processing`, `not_started`, timeout, and parse failure. Assert in tests that exactly one request is issued and no start request is sent.
-- [ ] 4.7 Preserve archived-replay and missing-segment behavior.
+- [x] 4.1 Replace the activity sample with signal counts, time span, page flow, and per-kind breakdown including error and rage or dead click counts.
+- [x] 4.2 Derive a suggested `get_replay_activity` window from error timestamps resolved through `getReplayErrorEvents`, degrading to no suggested window if the endpoint fails or returns no usable timestamp.
+- [x] 4.3 Replace the per-error `listIssues` lookups in the Related section with the same batched `getReplayErrorEvents` call, which already returns issue identity. Related entries are still driven by `replay.error_ids`, so an id the private endpoint cannot resolve is listed by id rather than dropped.
+- [x] 4.4 Fall back to a whole-session digest suggestion when no error timestamp resolves.
+- [x] 4.5 Report truncation for related issues and traces.
+- [x] 4.6 Wire the summary chapters section as a single-read enhancement, rendering only on `status: completed` and degrading silently on 403, error status, `processing`, `not_started`, timeout, and parse failure. Assert in tests that exactly one request is issued and no start request is sent. Also covered: a non-completed status that carries stale chapter data, verified by mutation to fail without the status guard.
+- [x] 4.7 Preserve archived-replay and missing-segment behavior.
 
 ## 5. Replay Activity Tool
 
@@ -58,7 +58,7 @@ baselines encode the same wrong event shape they do today.
 
 ## 7. Tests
 
-- [ ] 7.1 Re-baseline `get-replay-details.test.ts` snapshots against the rebuilt fixtures.
+- [x] 7.1 Re-baseline `get-replay-details.test.ts` snapshots against the rebuilt fixtures.
 - [ ] 7.2 Add `get-replay-activity.test.ts` covering windowing, each grain, kind filtering, paging, and constraint injection.
 - [ ] 7.3 Add degradation tests: summary 403, summary `processing`, summary timeout, summary unparseable, segment fetch 404, archived replay, zero segments, multi-page segments, and the segment budget being hit.
 - [ ] 7.4 Add redaction tests asserting `<not captured>` and `[Filtered]`-driven `<redacted>` rendering.

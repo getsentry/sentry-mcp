@@ -360,10 +360,10 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(
         `# Replay ${replayDetailsFixture.id} in **sentry-mcp-evals**`,
       );
-      // Assert the recording was read, not how a signal is phrased — the
-      // activity rendering is being replaced (docs/specs/replay-review.md).
-      expect(result).toContain("## Activity");
-      expect(result).toContain("button#sign-in");
+      // Assert the recording was read and mapped, not how a signal is
+      // phrased — that belongs to the replay tool's own tests.
+      expect(result).toContain("## Map");
+      expect(result).toContain("**Signals**:");
     });
 
     it("dispatches monitor URL with a simple slug to get_monitor_details", async () => {
@@ -719,8 +719,8 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(
         `# Replay ${replayDetailsFixture.id} in **sentry-mcp-evals**`,
       );
-      expect(result).toContain("## Activity");
-      expect(result).toContain("button#sign-in");
+      expect(result).toContain("## Map");
+      expect(result).toContain("**Signals**:");
     });
 
     it("fetches snapshot by snapshot ID", async () => {
