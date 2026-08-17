@@ -360,7 +360,10 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(
         `# Replay ${replayDetailsFixture.id} in **sentry-mcp-evals**`,
       );
-      expect(result).toContain("Clicked submit order");
+      // Assert the recording was read, not how a signal is phrased — the
+      // activity rendering is being replaced (docs/specs/replay-review.md).
+      expect(result).toContain("## Activity");
+      expect(result).toContain("button#sign-in");
     });
 
     it("dispatches monitor URL with a simple slug to get_monitor_details", async () => {
@@ -716,7 +719,8 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(
         `# Replay ${replayDetailsFixture.id} in **sentry-mcp-evals**`,
       );
-      expect(result).toContain("Clicked submit order");
+      expect(result).toContain("## Activity");
+      expect(result).toContain("button#sign-in");
     });
 
     it("fetches snapshot by snapshot ID", async () => {

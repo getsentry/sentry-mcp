@@ -11,14 +11,156 @@
     },
     {
       "type": 5,
-      "timestamp": 1744027210,
+      "timestamp": 1744027200100,
+      "data": {
+        "tag": "options",
+        "payload": {
+          "shouldRecordCanvas": false,
+          "sessionSampleRate": 0.1,
+          "errorSampleRate": 1,
+          "useCompressionOption": true,
+          "blockAllMedia": true,
+          "maskAllText": true,
+          "maskAllInputs": true,
+          "useCompression": true,
+          "networkDetailHasUrls": false,
+          "networkCaptureBodies": false,
+          "networkRequestHasHeaders": false,
+          "networkResponseHasHeaders": false
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027200.5,
+      "data": {
+        "tag": "performanceSpan",
+        "payload": {
+          "op": "navigation.navigate",
+          "description": "https://example.com/login",
+          "startTimestamp": 1744027200.5,
+          "endTimestamp": 1744027201.04,
+          "data": {
+            "size": 18420,
+            "decodedBodySize": 74210,
+            "encodedBodySize": 18420,
+            "duration": 540,
+            "domInteractive": 318,
+            "domContentLoadedEventStart": 402,
+            "domContentLoadedEventEnd": 407,
+            "loadEventStart": 531,
+            "loadEventEnd": 540,
+            "redirectCount": 0
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027201.2,
+      "data": {
+        "tag": "performanceSpan",
+        "payload": {
+          "op": "resource.script",
+          "description": "https://cdn.example.com/vendor.js",
+          "startTimestamp": 1744027201.2,
+          "endTimestamp": 1744027201.58,
+          "data": {
+            "size": 145820,
+            "decodedBodySize": 402118,
+            "encodedBodySize": 145820,
+            "statusCode": 200
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027212400,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "ui.click",
+          "message": "body > div#root > form#login > button#sign-in",
+          "timestamp": 1744027212.4,
+          "data": {
+            "nodeId": 42,
+            "node": {
+              "id": 42,
+              "tagName": "button",
+              "textContent": "Sign in",
+              "attributes": {
+                "id": "sign-in",
+                "type": "submit"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027213.1,
+      "data": {
+        "tag": "performanceSpan",
+        "payload": {
+          "op": "resource.fetch",
+          "description": "https://example.com/api/login",
+          "startTimestamp": 1744027213.1,
+          "endTimestamp": 1744027213.34,
+          "data": {
+            "method": "POST",
+            "statusCode": 200,
+            "request": {
+              "size": 48,
+              "headers": {}
+            },
+            "response": {
+              "size": 132,
+              "headers": {}
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027214000,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "navigation",
+          "timestamp": 1744027214,
+          "data": {
+            "from": "/login",
+            "to": "/checkout"
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027214.2,
       "data": {
         "tag": "performanceSpan",
         "payload": {
           "op": "navigation.navigate",
           "description": "https://example.com/checkout",
+          "startTimestamp": 1744027214.2,
+          "endTimestamp": 1744027214.91,
           "data": {
-            "duration": 710
+            "size": 24680,
+            "decodedBodySize": 98304,
+            "encodedBodySize": 24680,
+            "duration": 710,
+            "domInteractive": 412,
+            "domContentLoadedEventStart": 480,
+            "domContentLoadedEventEnd": 486,
+            "loadEventStart": 700,
+            "loadEventEnd": 710,
+            "redirectCount": 0
           }
         }
       }
@@ -27,11 +169,131 @@
   [
     {
       "type": 5,
-      "timestamp": 1744027220,
+      "timestamp": 1744027380600,
       "data": {
-        "tag": "ui.click",
+        "tag": "breadcrumb",
         "payload": {
-          "message": "Clicked submit order"
+          "type": "default",
+          "category": "ui.click",
+          "message": "body > div#root > main > button#complete-order",
+          "timestamp": 1744027380.6,
+          "data": {
+            "nodeId": 96,
+            "node": {
+              "id": 96,
+              "tagName": "button",
+              "textContent": "Complete order",
+              "attributes": {
+                "id": "complete-order",
+                "type": "button"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027381,
+      "data": {
+        "tag": "performanceSpan",
+        "payload": {
+          "op": "resource.fetch",
+          "description": "https://example.com/api/checkout",
+          "startTimestamp": 1744027381,
+          "endTimestamp": 1744027382.24,
+          "data": {
+            "method": "POST",
+            "statusCode": 500,
+            "request": {
+              "size": 214,
+              "headers": {}
+            },
+            "response": {
+              "size": 87,
+              "headers": {}
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027381300,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "console",
+          "level": "error",
+          "message": "TypeError: Cannot read properties of undefined (reading 'id')",
+          "timestamp": 1744027381.3,
+          "data": {
+            "arguments": [
+              "TypeError: Cannot read properties of undefined (reading 'id')"
+            ],
+            "logger": "console"
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027388400,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "ui.slowClickDetected",
+          "message": "body > div#root > main > button#complete-order",
+          "timestamp": 1744027388.4,
+          "data": {
+            "nodeId": 96,
+            "node": {
+              "id": 96,
+              "tagName": "button",
+              "textContent": "Complete order",
+              "attributes": {
+                "id": "complete-order",
+                "type": "button"
+              }
+            },
+            "url": "https://example.com/checkout",
+            "route": "/checkout",
+            "timeAfterClickMs": 7000,
+            "endReason": "timeout",
+            "clickCount": 5
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027421700,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "ui.slowClickDetected",
+          "message": "body > div#root > main > a#download-receipt",
+          "timestamp": 1744027421.7,
+          "data": {
+            "nodeId": 118,
+            "node": {
+              "id": 118,
+              "tagName": "a",
+              "textContent": "Download receipt",
+              "attributes": {
+                "id": "download-receipt",
+                "href": "/receipts/latest"
+              }
+            },
+            "url": "https://example.com/checkout",
+            "route": "/checkout",
+            "timeAfterClickMs": 7000,
+            "endReason": "timeout",
+            "clickCount": 1
+          }
         }
       }
     }

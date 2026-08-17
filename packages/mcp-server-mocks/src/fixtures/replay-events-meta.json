@@ -1,0 +1,27 @@
+{
+  "data": [
+    {
+      "id": "7ca573c0f4814912aaa9bdc77d1a7d51",
+      "issue.id": 6507376925,
+      "issue": "CLOUDFLARE-MCP-41",
+      "title": "Error: Tool list_organizations is already registered",
+      "level": "error",
+      "error.type": ["TypeError"],
+      "project.name": "cloudflare-mcp",
+      "timestamp": "2025-04-07T12:03:01.300000+00:00"
+    }
+  ],
+  "meta": {
+    "fields": {
+      "id": "string",
+      "issue.id": "integer",
+      "issue": "string",
+      "title": "string",
+      "level": "string",
+      "error.type": "string",
+      "project.name": "string",
+      "timestamp": "date"
+    },
+    "units": {}
+  }
+}

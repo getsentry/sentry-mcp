@@ -1,0 +1,127 @@
+[
+  [
+    {
+      "type": 4,
+      "timestamp": 1744027200000,
+      "data": {
+        "href": "https://example.com/dashboard",
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027201000,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "ui.click",
+          "message": "body > nav > button#page-1-action",
+          "timestamp": 1744027201,
+          "data": {
+            "nodeId": 11,
+            "node": {
+              "id": 11,
+              "tagName": "button",
+              "textContent": "Segment one action",
+              "attributes": { "id": "page-1-action" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  [
+    {
+      "type": 5,
+      "timestamp": 1744027260000,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "ui.click",
+          "message": "body > nav > button#page-2-action",
+          "timestamp": 1744027260,
+          "data": {
+            "nodeId": 12,
+            "node": {
+              "id": 12,
+              "tagName": "button",
+              "textContent": "Segment two action",
+              "attributes": { "id": "page-2-action" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  [
+    {
+      "type": 5,
+      "timestamp": 1744027320000,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "ui.click",
+          "message": "body > nav > button#page-3-action",
+          "timestamp": 1744027320,
+          "data": {
+            "nodeId": 13,
+            "node": {
+              "id": 13,
+              "tagName": "button",
+              "textContent": "Segment three action",
+              "attributes": { "id": "page-3-action" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  [
+    {
+      "type": 5,
+      "timestamp": 1744027380000,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "console",
+          "level": "error",
+          "message": "Error: checkout total mismatch",
+          "timestamp": 1744027380,
+          "data": {
+            "arguments": ["Error: checkout total mismatch"],
+            "logger": "console"
+          }
+        }
+      }
+    }
+  ],
+  [
+    {
+      "type": 5,
+      "timestamp": 1744027440000,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "ui.click",
+          "message": "body > nav > button#page-5-action",
+          "timestamp": 1744027440,
+          "data": {
+            "nodeId": 15,
+            "node": {
+              "id": 15,
+              "tagName": "button",
+              "textContent": "Segment five action",
+              "attributes": { "id": "page-5-action" }
+            }
+          }
+        }
+      }
+    }
+  ]
+]

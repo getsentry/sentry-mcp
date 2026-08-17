@@ -9,6 +9,15 @@ import getReplayDetails, { resolveReplayParams } from "./get-replay-details.js";
 import { getServerContext } from "../../test-setup.js";
 
 describe("get_replay_details", () => {
+  // NOTE: The Activity snapshots below record known-wrong output. The fixtures
+  // now use the event shape the SDK actually emits (`tag: "breadcrumb"` with
+  // the meaning in `payload.category`), which the current classifier does not
+  // understand: it labels every user action `breadcrumb`, spends the six-event
+  // budget on session-boot noise, and drops the console error, the failed
+  // checkout request, the rage click, and the dead click entirely.
+  //
+  // These baselines exist to make the taxonomy fix visible as a diff. See
+  // docs/specs/replay-review.md.
   it("loads replay details from replayUrl", async () => {
     const result = await getReplayDetails.handler(
       {
@@ -32,8 +41,8 @@ describe("get_replay_details", () => {
       - **Device**: MacBook Pro
       - **Release**: frontend@1.2.3
       - **Errors**: 1
-      - **Rage Clicks**: 0
-      - **Dead Clicks**: 1
+      - **Rage Clicks**: 1
+      - **Dead Clicks**: 2
       - **Warnings**: 2
       - **Infos**: 3
       - **Recording Segments**: 2
@@ -42,8 +51,11 @@ describe("get_replay_details", () => {
       ## Activity
 
       - T+0s · \`page.view\` · href=https://example.com/login
-      - T+10s · \`navigation.navigate\` · description=https://example.com/checkout · duration_ms=710
-      - T+20s · \`ui.click\` · message="Clicked submit order"
+      - T+0s · \`options\` · payload="sessionSampleRate=0.1, errorSampleRate=1"
+      - T+1s · \`navigation.navigate\` · description=https://example.com/login · duration_ms=540
+      - T+1s · \`resource.script\` · description=https://cdn.example.com/vendor.js
+      - T+12s · \`breadcrumb\` · message="body > div#root > form#login > button#sign-in" · category="ui.click" · type="default" · payload="timestamp=1744027212.4"
+      - T+13s · \`resource.fetch\` · description=https://example.com/api/login
 
       ## Related
 
@@ -119,8 +131,8 @@ describe("get_replay_details", () => {
       - **Device**: MacBook Pro
       - **Release**: frontend@1.2.3
       - **Errors**: 1
-      - **Rage Clicks**: 0
-      - **Dead Clicks**: 1
+      - **Rage Clicks**: 1
+      - **Dead Clicks**: 2
       - **Warnings**: 2
       - **Infos**: 3
       - **Recording Segments**: 2
@@ -181,8 +193,8 @@ describe("get_replay_details", () => {
       - **Device**: MacBook Pro
       - **Release**: frontend@1.2.3
       - **Errors**: 1
-      - **Rage Clicks**: 0
-      - **Dead Clicks**: 1
+      - **Rage Clicks**: 1
+      - **Dead Clicks**: 2
       - **Warnings**: 2
       - **Infos**: 3
       - **Recording Segments**: 2

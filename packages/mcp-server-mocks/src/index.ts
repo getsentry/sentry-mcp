@@ -108,7 +108,19 @@ import releaseDeploysFixture from "./fixtures/release-deploys.json" with {
 import replayDetailsFixture from "./fixtures/replay-details.json" with {
   type: "json",
 };
+import replayEventsMetaFixture from "./fixtures/replay-events-meta.json" with {
+  type: "json",
+};
 import replayRecordingSegmentsFixture from "./fixtures/replay-recording-segments.json" with {
+  type: "json",
+};
+import replayRecordingSegmentsPagedFixture from "./fixtures/replay-recording-segments-paged.json" with {
+  type: "json",
+};
+import replaySummaryFixture from "./fixtures/replay-summary.json" with {
+  type: "json",
+};
+import replaySummaryProcessingFixture from "./fixtures/replay-summary-processing.json" with {
   type: "json",
 };
 import tagsFixture from "./fixtures/tags.json" with { type: "json" };
@@ -156,6 +168,17 @@ import uptimeMonitorFixture from "./fixtures/uptime-monitor.json" with {
 };
 import userFixture from "./fixtures/user.json" with { type: "json" };
 import { issueFixture2 } from "./payloads";
+
+/**
+ * Replay whose recording is served across multiple segment pages.
+ */
+export const PAGED_REPLAY_ID = "b81f2c3d-4e5a-6b7c-8d9e-0f1a2b3c4d5e";
+
+/**
+ * Segments returned per page. Sentry's segment index caps `per_page` at 100;
+ * the mock uses a small page so paging is reachable with a few fixtures.
+ */
+const SEGMENTS_PER_PAGE = 2;
 
 /**
  * Builds MSW handlers for both SaaS and self-hosted Sentry instances.
@@ -318,6 +341,53 @@ function buildUpdatedIssueResponse(
     statusDetails,
     assignedTo: body.assignedTo ?? baseIssue.assignedTo,
   };
+}
+
+/**
+ * A replay whose recording spans more segments than one page, so segment
+ * pagination is exercisable. Its counts match
+ * `replay-recording-segments-paged.json`.
+ */
+export const pagedReplayDetailsFixture = {
+  ...replayDetailsFixture,
+  id: PAGED_REPLAY_ID,
+  count_segments: replayRecordingSegmentsPagedFixture.length,
+  count_errors: 0,
+  count_dead_clicks: 0,
+  count_rage_clicks: 0,
+  count_urls: 1,
+  urls: ["/dashboard"],
+  trace_ids: [],
+  error_ids: [],
+};
+
+/**
+ * Mimic Sentry's segment index pagination.
+ *
+ * Sentry serves at most `SEGMENTS_PER_PAGE` segments per response and reports
+ * continuation through the `Link` header, which always carries both a `prev`
+ * and a `next` relation. `results="false"` — not an absent header — is how the
+ * final page is signalled.
+ */
+function respondWithSegmentPage(
+  request: Request,
+  segments: unknown[],
+): HttpResponse {
+  const url = new URL(request.url);
+  const offset = Number(url.searchParams.get("cursor")?.split(":")[1] ?? "0");
+  const page = segments.slice(offset, offset + SEGMENTS_PER_PAGE);
+  const nextOffset = offset + SEGMENTS_PER_PAGE;
+  const hasNext = nextOffset < segments.length;
+  const path = `${url.origin}${url.pathname}`;
+
+  return HttpResponse.json(page, {
+    headers: {
+      Link: [
+        `<${path}?cursor=0:0:1>; rel="previous"; results="${offset > 0}"; cursor="0:0:1"`,
+        `<${path}?cursor=0:${nextOffset}:0>; rel="next"; results="${hasNext}"; cursor="0:${nextOffset}:0"`,
+      ].join(", "),
+    },
+  });
 }
 
 /**
@@ -895,7 +965,44 @@ export const restHandlers = buildHandlers([
   {
     method: "get",
     path: `/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
-    fetch: () => HttpResponse.json(replayRecordingSegmentsFixture),
+    fetch: ({ request }) =>
+      respondWithSegmentPage(request, replayRecordingSegmentsFixture),
+  },
+  {
+    method: "get",
+    path: `/api/0/organizations/sentry-mcp-evals/replays/${PAGED_REPLAY_ID}/`,
+    fetch: () => HttpResponse.json({ data: pagedReplayDetailsFixture }),
+  },
+  {
+    method: "get",
+    path: `/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${PAGED_REPLAY_ID}/recording-segments/`,
+    // The paged replay has more segments than SEGMENTS_PER_PAGE, so this
+    // handler emits a `Link` header with a next cursor. Clients that ignore it
+    // see only the first page.
+    fetch: ({ request }) =>
+      respondWithSegmentPage(request, replayRecordingSegmentsPagedFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/replays-events-meta/",
+    fetch: ({ request }) => {
+      const query = new URL(request.url).searchParams.get("query") ?? "";
+      const requestedIds = new Set(
+        query.match(/id:\[([^\]]*)\]/)?.[1]?.split(",") ?? [],
+      );
+
+      return HttpResponse.json({
+        ...replayEventsMetaFixture,
+        data: replayEventsMetaFixture.data.filter((event) =>
+          requestedIds.has(event.id),
+        ),
+      });
+    },
+  },
+  {
+    method: "get",
+    path: `/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/summarize/`,
+    fetch: () => HttpResponse.json(replaySummaryFixture),
   },
 
   // Trace endpoints
@@ -1986,7 +2093,11 @@ export {
   projectFixture,
   releaseFixture,
   replayDetailsFixture,
+  replayEventsMetaFixture,
   replayRecordingSegmentsFixture,
+  replayRecordingSegmentsPagedFixture,
+  replaySummaryFixture,
+  replaySummaryProcessingFixture,
   tagsFixture,
   teamFixture,
   traceEventFixture,
