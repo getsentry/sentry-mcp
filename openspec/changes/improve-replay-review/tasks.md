@@ -60,13 +60,13 @@ baselines encode the same wrong event shape they do today.
 
 - [x] 7.1 Re-baseline `get-replay-details.test.ts` snapshots against the rebuilt fixtures.
 - [x] 7.2 Add `get-replay-activity.test.ts` covering windowing, each grain, kind filtering, paging, and constraint injection.
-- [ ] 7.3 Add degradation tests: summary 403, summary `processing`, summary timeout, summary unparseable, segment fetch 404, archived replay, zero segments, multi-page segments, and the segment budget being hit.
-- [ ] 7.4 Add redaction tests asserting `<not captured>` and `[Filtered]`-driven `<redacted>` rendering.
+- [x] 7.3 Add degradation tests: summary 403, summary `processing`, summary timeout, summary unparseable, segment fetch 404, archived replay, zero segments, multi-page segments, and the segment budget being hit. Summary degradation covers eight responses including a connection failure and a non-JSON body; the byte budget is tripped end-to-end rather than by injecting a bound.
+- [x] 7.4 Add redaction tests asserting `<not captured>` and `[Filtered]`-driven `<redacted>` rendering. Unit-level in `replay-events.test.ts`, plus end-to-end through `get_replay_activity` at detail grain, where the two labels appear on the same signal so they cannot be conflated.
 - [x] 7.5 Add search-events tests for the replay capability gate, the dataset options omitting `replays`, and the reconciled sort list.
 - [x] 7.6 Add a `get_issue_details` test asserting rate-limited replay lookup is reported as unavailable, not as no replays.
-- [ ] 7.7 Add a replay eval covering map-then-zoom navigation.
-- [ ] 7.8 Update registry, tool count, skill gating, and generated-definition tests.
-- [ ] 7.9 Add suggested-window tests: a resolved error timestamp produces a bracketing window, and a failing or unauthorized `replays-events-meta` lookup degrades to the whole-session suggestion with the map intact.
+- [x] 7.7 Add a replay eval covering map-then-zoom navigation. `get-replay.eval.ts` runs the tools for real against the mocks, so the second case can only pass by reading the window off the map. Not executed here — evals need `OPENROUTER_API_KEY`.
+- [x] 7.8 Update registry, tool count, skill gating, and generated-definition tests. Capability gating was untested for any tool; `availability.test.ts` now covers replays-present, replays-absent, unconstrained, direct-surface, and skill-gated cases, verified by mutation. Generated definitions are current and the token budget is unchanged at 5,598.
+- [x] 7.9 Add suggested-window tests: a resolved error timestamp produces a bracketing window, and a failing or unauthorized `replays-events-meta` lookup degrades to the whole-session suggestion with the map intact. Landed with task 4.2.
 
 ## 8. Documentation and Generated Definitions
 

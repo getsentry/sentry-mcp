@@ -5,6 +5,7 @@ import getReplayActivity from "./get-replay-activity.js";
 import { getServerContext } from "../../test-setup.js";
 
 const REPLAY_URL = `https://us.sentry.io/api/0/organizations/sentry-mcp-evals/replays/${replayDetailsFixture.id}/`;
+const SEGMENTS_URL = `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`;
 
 function callTool(
   params: Record<string, unknown> = {},
@@ -113,6 +114,63 @@ describe("get_replay_activity", () => {
       const result = await callTool({ kinds: ["network"] });
 
       expect(result).not.toContain("request body:");
+    });
+  });
+
+  describe("redaction", () => {
+    /** Serve a single fetch span with the given `data` payload. */
+    function serveNetworkSpan(data: Record<string, unknown>) {
+      mswServer.use(
+        http.get(SEGMENTS_URL, () =>
+          HttpResponse.json([
+            [
+              {
+                type: 5,
+                timestamp: 1744027201,
+                data: {
+                  tag: "performanceSpan",
+                  payload: {
+                    op: "resource.fetch",
+                    description: "https://example.com/api/pay",
+                    startTimestamp: 1744027201,
+                    endTimestamp: 1744027201.4,
+                    data,
+                  },
+                },
+              },
+            ],
+          ]),
+        ),
+      );
+    }
+
+    it("distinguishes a value Relay scrubbed from one never captured", async () => {
+      // Both are absent from the output, but for different reasons, and the
+      // difference decides what the reader does next: enable
+      // networkCaptureBodies, or relax a server-side scrubbing rule.
+      serveNetworkSpan({
+        method: "POST",
+        statusCode: 500,
+        request: { size: 64, body: "[Filtered]" },
+        response: { size: 32 },
+      });
+
+      const result = await callTool({ grain: "detail", kinds: ["network"] });
+
+      expect(result).toContain("request body: <redacted>");
+      expect(result).toContain("response body: 32 bytes <not captured>");
+    });
+
+    it("never prints a body Relay scrubbed", async () => {
+      serveNetworkSpan({
+        method: "POST",
+        statusCode: 500,
+        request: { size: 64, body: "[Filtered]" },
+      });
+
+      const result = await callTool({ grain: "detail", kinds: ["network"] });
+
+      expect(result).not.toContain("[Filtered]");
     });
   });
 

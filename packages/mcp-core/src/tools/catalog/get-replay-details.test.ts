@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import {
   mswServer,
   organizationFixture,
+  PAGED_REPLAY_ID,
   replayDetailsFixture,
 } from "@sentry/mcp-server-mocks";
 import getReplayDetails from "./get-replay-details.js";
@@ -10,6 +11,12 @@ import { resolveReplayParams } from "../../internal/tool-helpers/replay.js";
 import { getServerContext } from "../../test-setup.js";
 
 describe("get_replay_details", () => {
+  // Overrides are not reset automatically, and a leaked stub silently changes
+  // what a later test is measuring.
+  afterEach(() => {
+    mswServer.resetHandlers();
+  });
+
   it("loads replay details from replayUrl", async () => {
     const result = await getReplayDetails.handler(
       {
@@ -349,6 +356,102 @@ describe("get_replay_details", () => {
     );
   });
 
+  it("reports a replay whose recording has no segments", async () => {
+    // Distinct from a failed fetch: the request succeeded and the recording
+    // is genuinely empty, which the reader should not confuse with an error.
+    mswServer.use(
+      http.get(
+        `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+        () => HttpResponse.json([]),
+      ),
+    );
+
+    const result = await getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: replayDetailsFixture.id,
+        regionUrl: "https://us.sentry.io",
+      },
+      getServerContext(),
+    );
+
+    expect(result).toContain("No activity recorded.");
+    expect(result).not.toContain("Recording is unavailable.");
+    // With nothing to zoom into, suggesting a window would be noise.
+    expect(result).not.toContain("## Next");
+  });
+
+  it("reads a recording that spans multiple segment pages", async () => {
+    // A recording longer than one page was previously cut off at the page
+    // boundary without any indication, so the map understated the session.
+    const result = await getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: PAGED_REPLAY_ID,
+        regionUrl: "https://us.sentry.io",
+      },
+      getServerContext(),
+    );
+
+    // The fixture's five segments span three pages, so the last signal is
+    // only reachable by following two `Link` cursors. Reading the first page
+    // alone would report a session ending at T+1m 0.0s.
+    expect(result).toContain(
+      "- **Signals**: 5 signals across T+1.0s–T+4m 0.0s",
+    );
+    expect(result).toContain("- **Kinds**: click 4 · console 1 (1 error)");
+    // Following the header is not the same as hitting a bound.
+    expect(result).toContain("- **Truncated**: no");
+  });
+
+  it("says the map is partial when the byte budget stops the read", async () => {
+    // Silence here is the dangerous failure: a truncated recording renders as
+    // a complete one, and "no errors in this replay" becomes a false negative.
+    // The budget is enforced on bytes off the wire, so one oversized page
+    // trips it — padding an ignored field keeps the signals intact.
+    const oversizedPage = [
+      [
+        {
+          type: 5,
+          timestamp: 1744027200500,
+          data: {
+            tag: "breadcrumb",
+            payload: {
+              type: "default",
+              category: "ui.click",
+              timestamp: 1744027200500,
+              message: "button#pay",
+              // Pushes the page past MAX_REPLAY_SEGMENT_BYTES on its own.
+              padding: "x".repeat(11 * 1024 * 1024),
+            },
+          },
+        },
+      ],
+    ];
+
+    mswServer.use(
+      http.get(
+        `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+        () => HttpResponse.json(oversizedPage),
+      ),
+    );
+
+    const result = await getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: replayDetailsFixture.id,
+        regionUrl: "https://us.sentry.io",
+      },
+      getServerContext(),
+    );
+
+    expect(result).toContain("- **Truncated**: yes");
+    expect(result).toContain("later activity is not included");
+    // What was read is still reported; truncation degrades the map's
+    // completeness, not its usefulness.
+    expect(result).toContain("- **Signals**: 1 signal");
+  });
+
   it("ignores events whose tag is not one the SDK emits", async () => {
     // `tag: "console"` is not a shape the SDK produces — meaning lives in
     // `payload.category` under `tag: "breadcrumb"`. Such an event is
@@ -537,6 +640,14 @@ describe("get_replay_details", () => {
       [
         "a server failure",
         () => HttpResponse.json({ detail: "boom" }, { status: 500 }),
+      ],
+      // Seer can take tens of seconds on a long replay. A connection timeout
+      // is raised as a ConfigurationError, which would abort the whole tool
+      // if it escaped the chapters lookup.
+      ["the connection times out", () => HttpResponse.error()],
+      [
+        "the body is not JSON at all",
+        () => HttpResponse.text("<html>gateway</html>"),
       ],
     ] as const) {
       it(`omits chapters on ${label} without degrading the map`, async () => {
