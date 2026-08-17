@@ -414,55 +414,190 @@ Upstream's `which()` ignores types 2 and 3 too, so nothing was lost by matching
 it — Seer summarizes behavior, not structure. But the data is already downloaded
 and discarded.
 
-A `FullSnapshot` holds `serializedNodeWithId` recursively: `id`, `type`
-(`NodeType`: Document 0, DocumentType 1, Element 2, Text 3, CDATA 4, Comment 5),
-`tagName` and `attributes` on elements, `textContent` on text nodes, and
-`childNodes`. Reconstructing state at an arbitrary timestamp means applying each
-subsequent `IncrementalSnapshot` with `source: 0` (`Mutation`), whose payload is
-four arrays — `adds` (`parentId`, `nextId`, serialized `node`), `removes`
-(`parentId`, `id`), `attributes` (`id` plus a partial attribute map, `null`
-meaning removal), and `texts` (`id`, `value`).
+#### The reconstruction model
 
-**Why rooting is nearly free.** rrweb node ids are stable within a recording and
-already reach us: every click breadcrumb carries `payload.data.node.id`
-alongside the `tagName` and `attributes` the classifier renders today. So "show
-me the DOM around the element that was rage-clicked" needs no new identifier
-scheme — the id in the signal is the handle, and `get_replay_activity` already
-surfaces those signals.
+A `FullSnapshot` holds `serializedNodeWithId` recursively. Node shapes differ by
+`NodeType` — Document 0, DocumentType 1, Element 2, Text 3, CDATA 4, Comment 5 —
+and the distinction that matters for rendering is that **element nodes have no
+`textContent`**. Their text lives in child text nodes, so a button's label is a
+child, not a property. Elements carry `tagName`, `attributes`, and `childNodes`;
+text, CDATA, and comment nodes carry `textContent`.
 
-**What is not reachable.** Bounding boxes require layout, and rrweb records no
-geometry beyond the `Meta` event's viewport width and height. A `visible` lens
-is the same problem: visibility is a computed style, not a recorded fact. Both
-need a browser, which puts them with the screenshot in Out of Scope. An
-`interactive` lens — form controls, buttons, links, ARIA roles — is decidable
-from tag and attributes alone, and is the useful one regardless.
+State at time *T* is the last `FullSnapshot` at or before *T*, with every
+intervening `IncrementalSnapshot` applied in order. Two sources mutate structure
+or content:
 
-**The two hard constraints.**
+- `source: 0` (`Mutation`) — four arrays. `adds` (`parentId`, `nextId`,
+  serialized `node`), `removes` (`parentId`, `id`), `attributes` (`id` plus a
+  partial map whose `null` values mean removal and whose values may be a
+  `styleOMValue` rather than a string), and `texts` (`id`, `value`).
+- `source: 5` (`Input`) — `id`, `text`, `isChecked`. **Input values do not
+  arrive as attribute mutations.** A tree that applies only `source: 0` shows
+  every field at its initial value, which is worse than showing nothing: it
+  looks authoritative and is stale.
 
-- *Memory.* Replaying mutations to a timestamp means holding a DOM snapshot plus
-  every mutation up to that point. Real snapshots run to megabytes of JSON and
-  parsed rrweb objects expand well beyond their serialized size — the same
-  pressure that produced this spec's 10MB read budget under a 128MB Workers
-  ceiling. A viable implementation streams segments and applies mutations into a
-  node map, discarding raw text as it goes, rather than parsing the recording
-  whole. This is why it cannot simply reuse `getReplayRecordingSegments`.
-- *Output size.* A full tree is far past any reasonable tool response. Rooting
-  at a node id plus an `interactive` lens is the default that keeps output
-  bounded; a `full` lens needs a depth limit and truncation reporting consistent
-  with the rest of this spec.
+`nextId` is the ordering handle for `adds`; `previousId` exists only for
+backward compatibility and should be ignored. An `add` whose `parentId` is
+unknown — because it was pruned, or the snapshot was truncated — must be
+dropped rather than reparented, and the drop counted toward the fidelity report
+below.
 
-**Masking is not redaction.** `maskAllText` and `maskAllInputs` default to on,
-so a real tree arrives with text and input values already replaced by the SDK,
-client-side, with no marker. Per this spec's redaction rule, such values render
-as delivered and must not be labeled `<redacted>` — the tool cannot distinguish
-"masked at capture" from "genuinely this text". Only Relay's `[Filtered]` marker
-supports that claim.
+#### Reconstruction is not guaranteed to be cheap
 
-**Open questions for QA to answer.** Whether real segments carry a
-`FullSnapshot` in the first page or only later — which decides whether a tree
-read can be cheap — and whether real clicks carry `node.id` consistently or only
-sometimes, which decides whether subtree rooting is a reliable entry point or a
-best-effort one.
+The naive read is "start at segment zero, apply everything". Whether that is
+necessary depends on how often full snapshots appear, and the answer is not
+fixed: rrweb re-snapshots on `checkoutEveryNms`/`checkoutEveryNth`, and Sentry's
+SDK additionally treats the first event of a recording as a checkout
+(`handleRecordingEmit`). So a recording may contain several `FullSnapshot`
+events, and a read at *T* only needs the nearest one at or before it.
+
+This is the single largest open question, and it decides the shape of the
+feature:
+
+- **If checkouts are frequent** — a tree read pages segments until it passes *T*,
+  keeping only the most recent snapshot seen, then applies the remaining
+  mutations. Cost is bounded by checkout spacing, not by session length.
+- **If a recording has exactly one snapshot at segment zero** — a read at the end
+  of a long session must apply every mutation in between, and cost grows with
+  session length. That is the case where the memory ceiling binds and where a
+  read may have to refuse rather than truncate.
+
+QA should answer this before the interface is settled. Implementing for the
+frequent-checkout case and discovering the single-snapshot case in production
+means a tool that works on short replays and OOMs on the long ones that matter.
+
+#### Fidelity must be reported, not assumed
+
+A reconstruction can be complete, partial, or wrong, and the three are
+indistinguishable from the output alone. Consistent with this spec's rule that
+truncation is always stated, a tree read reports what it did:
+
+- Which `FullSnapshot` it started from, as an offset.
+- How many mutation events it applied.
+- How many operations it dropped, and why (unknown `parentId`, unknown `id`,
+  malformed payload).
+- Whether it stopped early against a budget.
+
+A read that dropped a meaningful fraction of its mutations is a read whose tree
+should not be trusted for the element in question, and the caller cannot know
+that unless told.
+
+#### What is not reachable
+
+Bounding boxes require layout, and rrweb records no geometry beyond the `Meta`
+event's viewport width and height. A `visible` lens is the same problem:
+visibility is a computed style, not a recorded fact — `display: none` on an
+ancestor is knowable only by resolving the cascade, which is a browser's job.
+Both belong with the screenshot in Out of Scope.
+
+An `interactive` lens is decidable from tag and attributes alone — form
+controls, buttons, links, `[role]`, `[onclick]`, `[tabindex]` — and is the
+useful one regardless, since it is the set a user can act on.
+
+#### Rooting is nearly free
+
+rrweb node ids are stable within a recording and already reach us: every click
+breadcrumb carries `payload.data.node.id` alongside the `tagName` and
+`attributes` the classifier renders today. So "show me the DOM around the
+element that was rage-clicked" needs no new identifier scheme — the id in the
+signal is the handle, and `get_replay_activity` already surfaces those signals.
+
+This is what makes the feature coherent rather than a curiosity: the map finds
+the failure, the activity read names the element, and the tree read explains
+what was around it. Each step hands the next a concrete handle.
+
+#### Tool surface
+
+Three options, with the tradeoff that decides it.
+
+**A. A separate `get_replay_dom` tool.** A point-in-time structural read is a
+different operation from a windowed signal list: different return shape,
+different cost model, different failure modes. It is also the only option where
+a read can refuse on budget grounds without complicating an existing tool's
+contract.
+
+**B. A `grain: "dom"` on `get_replay_activity`.** Reuses the tool, but `grain`
+currently means "how verbose", not "what kind of thing". A `dom` grain would
+change the return type rather than its verbosity, and would need `startMs`
+and `endMs` collapsed to a point, which the window semantics do not express.
+
+**C. An `include: ["tree"]` parameter on `get_replay_activity`.** Closest to the
+peer design, but pushes a second, much more expensive operation behind a
+parameter on a tool agents already call routinely. A caller asking for signals
+should not risk a multi-megabyte reconstruction because a default changed.
+
+**Recommendation: A.** The catalog is the right home — it costs no direct-surface
+budget, which is why `get_replay_activity` landed there too. Sketch:
+
+```typescript
+get_replay_dom({
+  organizationSlug, replayId, regionUrl,   // or replayUrl
+  atMs: number,                            // required; no sensible default
+  rootNodeId?: number,                     // from a click signal
+  lens?: "interactive" | "full",           // default "interactive"
+  maxDepth?: number,
+  maxNodes?: number,
+})
+```
+
+`atMs` is deliberately required. A tree with no timestamp would default to
+either end of the session, and both defaults are wrong often enough that
+guessing is worse than asking.
+
+Expected output, rooted at a click's node id:
+
+```text
+# Replay 7e07485f… DOM at T+3m 1.3s
+
+Reconstructed from the snapshot at T+0.4s, applying 1,847 mutations.
+Dropped 3 operations (unknown parentId).
+
+form#checkout-form
+  ├─ div.address-block
+  │   ├─ input#unit [value="***"]
+  │   └─ input#zip [value="***"]
+  └─ button#complete-order  "Complete order" [disabled]
+
+Node ids: form#checkout-form=88, button#complete-order=96
+```
+
+#### Masking is not redaction
+
+`maskAllText` and `maskAllInputs` default to on, so a real tree arrives with
+text and input values already replaced by the SDK, client-side, with no marker.
+Per this spec's redaction rule, such values render as delivered and must not be
+labeled `<redacted>` — the tool cannot distinguish "masked at capture" from
+"genuinely this text". Only Relay's `[Filtered]` marker supports that claim.
+
+The practical consequence is that a tree is a **structural** artifact, not a
+content one. It answers "was the button disabled", "did the error node exist
+yet", "what was around the element the user rage-clicked". It does not answer
+"what did the user type", and should not be built as though it might.
+
+#### Testing
+
+Beyond the usual unit coverage, three cases carry the risk:
+
+- **Reconstruction correctness.** Apply a known mutation sequence to a known
+  snapshot and assert the resulting tree — including that an `add` with an
+  unknown `parentId` is dropped and counted, not reparented.
+- **Input values come from `source: 5`.** A fixture where a field's value
+  changes only via an input event must render the new value. This is the
+  failure that would otherwise ship silently, since a `source: 0`-only
+  implementation produces a plausible-looking stale tree.
+- **Budget refusal.** A recording that cannot be reconstructed within budget
+  must say so rather than return a partial tree that reads as complete.
+
+#### Open questions for QA
+
+- Does a `FullSnapshot` appear only at segment zero, or periodically? This
+  decides whether reconstruction cost scales with session length or with
+  checkout spacing — see above.
+- Do real click breadcrumbs carry `payload.data.node.id` consistently, or only
+  sometimes? This decides whether subtree rooting is a reliable entry point or
+  best-effort.
+- How large is a real `FullSnapshot` in practice? The 10MB segment budget was
+  set for signal extraction; a tree read has a different profile.
 
 ### Other
 
