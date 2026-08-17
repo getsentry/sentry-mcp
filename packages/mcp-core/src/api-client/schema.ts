@@ -522,6 +522,76 @@ export const ReplayListResponseSchema = z.object({
   data: z.array(ReplayDetailsSchema),
 });
 
+/**
+ * One error event associated with a replay, from
+ * `GET /organizations/{org}/replays-events-meta/`.
+ *
+ * The endpoint deletes `timestamp_ms` from its own output and folds that
+ * millisecond precision into `timestamp` as an ISO 8601 string, so the
+ * resolution a zoom window needs arrives there and nowhere else.
+ *
+ * `issue.id` arrives as a number from Snuba but is coerced to a string, since
+ * every other issue identifier in this client is a string.
+ */
+export const ReplayErrorEventSchema = z
+  .object({
+    id: z.string(),
+    issue: z.string().nullish(),
+    "issue.id": z
+      .union([z.string(), z.number()])
+      .nullish()
+      .transform((value) => (value == null ? null : String(value))),
+    title: z.string().nullish(),
+    timestamp: z.string().nullish(),
+  })
+  .passthrough();
+
+export const ReplayErrorEventsResponseSchema = z.object({
+  data: z.array(ReplayErrorEventSchema),
+});
+
+/**
+ * Seer's replay summary state, proxied verbatim by Sentry's summarize endpoint.
+ *
+ * Both sides are experimental, so every field below `status` is optional and
+ * the shape is parsed defensively: the caller renders chapters only when the
+ * status is `completed` and the body actually parses, and omits the section
+ * otherwise.
+ *
+ * Defined upstream in `getsentry/seer` at
+ * `src/seer/automation/summarize/replays.py`.
+ */
+export const ReplaySummarySchema = z
+  .object({
+    data: z
+      .object({
+        time_ranges: z
+          .array(
+            z
+              .object({
+                // Float UNIX timestamps in milliseconds, so chapters carry
+                // windows usable for zoom rather than only prose.
+                period_start: z.number(),
+                period_end: z.number(),
+                period_title: z.string(),
+              })
+              .passthrough(),
+          )
+          .optional()
+          .catch(undefined),
+        summary: z.string().optional().catch(undefined),
+      })
+      .passthrough()
+      .nullish()
+      .catch(null),
+    num_segments: z.number().nullish().catch(null),
+    created_at: z.string().nullish().catch(null),
+    status: z
+      .enum(["not_started", "processing", "completed", "error"])
+      .catch("error"),
+  })
+  .passthrough();
+
 export const ReplayIdsByResourceSchema = z.record(
   z.string(),
   z.array(z.string()),

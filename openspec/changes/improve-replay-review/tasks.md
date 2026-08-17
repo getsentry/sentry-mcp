@@ -22,12 +22,12 @@ baselines encode the same wrong event shape they do today.
 
 ## 3. API Client
 
-- [ ] 3.1 Re-verify the recording segments index contract against `getsentry/sentry`.
-- [ ] 3.2 Follow the `Link` header's `cursor` in `getReplayRecordingSegments` and remove the non-existent `download=true` parameter. Note `per_page` is a no-op (default and maximum are both 100), and that reading the header requires the raw-response request path rather than `requestJSON`.
-- [ ] 3.3 Page through segments up to 150 segments or 10MB of raw segment JSON, whichever is hit first, and report which bound stopped the read.
-- [ ] 3.4 Add a single-read replay summary method for the experimental summarize endpoint, parsing the known Seer response shape (`data.time_ranges[]`, `status`) defensively. No start method and no retry loop: one `GET`, then move on.
-- [ ] 3.5 Add an explicit `field` allow-list to `searchReplays`, drawn from `VALID_FIELD_SET` in `sentry/replays/validators.py`. Use upstream's coarse names (`browser`, `user`, `device`, `sdk`, `releases`, `trace_ids`) and exclude `replay_type` and `ota_updates`, which return 400.
-- [ ] 3.6 Add a `getReplayErrorEvents` method wrapping `GET /organizations/{org}/replays-events-meta/` with a batched `query=id:[...]`, returning `id`, `issue`, `issue.id`, `title`, and `timestamp`. Parse `timestamp` as a millisecond-precision ISO string; the endpoint deletes `timestamp_ms` from its own output.
+- [x] 3.1 Re-verify the recording segments index contract against `getsentry/sentry`. Confirmed: `GenericOffsetPaginator` emits `0:<offset>:0` cursors, `PAGINATION_DEFAULT_PER_PAGE` and `max_per_page` are both 100, and the index has no `download` parameter.
+- [x] 3.2 Follow the `Link` header's `cursor` in `getReplayRecordingSegments` and remove the non-existent `download=true` parameter. Note `per_page` is a no-op (default and maximum are both 100), and that reading the header requires the raw-response request path rather than `requestJSON`.
+- [x] 3.3 Page through segments up to 150 segments or 10MB of raw segment JSON, whichever is hit first, and report which bound stopped the read. `get_replay_details` now prints the bound that stopped it; full truncation reporting lands with the map in section 4.
+- [x] 3.4 Add a single-read replay summary method for the experimental summarize endpoint, parsing the known Seer response shape (`data.time_ranges[]`, `status`) defensively. No start method and no retry loop: one `GET`, then move on.
+- [x] 3.5 Add an explicit `field` allow-list to `searchReplays`, drawn from `VALID_FIELD_SET` in `sentry/replays/validators.py`. Use upstream's coarse names (`browser`, `user`, `device`, `sdk`, `releases`, `trace_ids`) and exclude `replay_type` and `ota_updates`, which return 400.
+- [x] 3.6 Add a `getReplayErrorEvents` method wrapping `GET /organizations/{org}/replays-events-meta/` with a batched `query=id:[...]`, returning `id`, `issue`, `issue.id`, `title`, and `timestamp`. Parse `timestamp` as a millisecond-precision ISO string; the endpoint deletes `timestamp_ms` from its own output.
 
 ## 4. Replay Details as a Map
 

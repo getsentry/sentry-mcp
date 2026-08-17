@@ -4,8 +4,13 @@ import type {
   ReplayDetails,
   ReplayRecordingEvent,
   ReplayRecordingSegments,
+  ReplayRecordingSegmentsResult,
   SentryApiService,
   TraceMeta,
+} from "../../api-client";
+import {
+  MAX_REPLAY_SEGMENTS,
+  MAX_REPLAY_SEGMENT_BYTES,
 } from "../../api-client";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
@@ -116,26 +121,27 @@ export default defineTool({
       replay.project_id != null ? String(replay.project_id) : null;
     const hasSegments = (replay.count_segments ?? 0) > 0;
 
-    const [{ segments }, relatedIssues, relatedTraces] = await Promise.all([
-      fetchReplaySegments({
-        apiService,
-        organizationSlug: resolved.organizationSlug,
-        replayId: resolved.replayId,
-        projectId,
-        isArchived,
-        hasSegments,
-      }),
-      fetchReplayIssues({
-        apiService,
-        organizationSlug: resolved.organizationSlug,
-        errorIds: replay.error_ids,
-      }),
-      fetchReplayTraces({
-        apiService,
-        organizationSlug: resolved.organizationSlug,
-        traceIds: replay.trace_ids,
-      }),
-    ]);
+    const [{ segments, truncatedBy }, relatedIssues, relatedTraces] =
+      await Promise.all([
+        fetchReplaySegments({
+          apiService,
+          organizationSlug: resolved.organizationSlug,
+          replayId: resolved.replayId,
+          projectId,
+          isArchived,
+          hasSegments,
+        }),
+        fetchReplayIssues({
+          apiService,
+          organizationSlug: resolved.organizationSlug,
+          errorIds: replay.error_ids,
+        }),
+        fetchReplayTraces({
+          apiService,
+          organizationSlug: resolved.organizationSlug,
+          traceIds: replay.trace_ids,
+        }),
+      ]);
 
     return formatReplayOutput({
       replay,
@@ -144,6 +150,7 @@ export default defineTool({
         params.replayUrl ??
         apiService.getReplayUrl(resolved.organizationSlug, replay.id),
       segments,
+      truncatedBy,
       isArchived,
       relatedIssues,
       relatedTraces,
@@ -223,6 +230,7 @@ function formatReplayOutput({
   organizationSlug,
   replayUrl,
   segments,
+  truncatedBy,
   isArchived,
   relatedIssues,
   relatedTraces,
@@ -231,6 +239,7 @@ function formatReplayOutput({
   organizationSlug: string;
   replayUrl: string;
   segments: ReplayRecordingSegments | null;
+  truncatedBy: ReplayRecordingSegmentsResult["truncatedBy"];
   isArchived: boolean;
   relatedIssues: RelatedReplayIssue[];
   relatedTraces: RelatedReplayTrace[];
@@ -313,6 +322,19 @@ function formatReplayOutput({
     lines.push("No activity events recorded.");
   }
 
+  // A partial read must say so rather than reading as a complete session.
+  if (truncatedBy === "segments") {
+    lines.push("");
+    lines.push(
+      `Recording was read up to the first ${MAX_REPLAY_SEGMENTS} segments; later activity is not included.`,
+    );
+  } else if (truncatedBy === "bytes") {
+    lines.push("");
+    lines.push(
+      `Recording was read up to ${MAX_REPLAY_SEGMENT_BYTES / (1024 * 1024)}MB; later activity is not included.`,
+    );
+  }
+
   // Related
   const hasRelated = relatedIssues.length > 0 || relatedTraces.length > 0;
   if (hasRelated) {
@@ -370,20 +392,21 @@ async function fetchReplaySegments({
   hasSegments: boolean;
 }): Promise<{
   segments: ReplayRecordingSegments | null;
+  truncatedBy: ReplayRecordingSegmentsResult["truncatedBy"];
 }> {
   if (isArchived || !projectId || !hasSegments) {
-    return { segments: null };
+    return { segments: null, truncatedBy: null };
   }
 
   try {
-    const segments = await apiService.getReplayRecordingSegments({
+    const result = await apiService.getReplayRecordingSegments({
       organizationSlug,
       projectSlugOrId: projectId,
       replayId,
     });
-    return { segments };
+    return { segments: result.segments, truncatedBy: result.truncatedBy };
   } catch {
-    return { segments: null };
+    return { segments: null, truncatedBy: null };
   }
 }
 

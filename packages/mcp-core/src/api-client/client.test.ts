@@ -1451,10 +1451,21 @@ describe("API query builders", () => {
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining(
-          "/api/0/organizations/test-org/replays/?query=count_errors%3A%3E0&per_page=25&sort=-count_errors&environment=production&environment=staging&statsPeriod=24h",
+          "/api/0/organizations/test-org/replays/?query=count_errors%3A%3E0&per_page=25&sort=-count_errors&environment=production&environment=staging",
         ),
         expect.any(Object),
       );
+
+      const requestUrl = vi.mocked(globalThis.fetch).mock.calls[0][0] as string;
+      expect(requestUrl).toContain("statsPeriod=24h");
+      // Without an explicit allow-list Sentry returns its own default column
+      // set, which is wider than anything rendered.
+      expect(requestUrl).toContain("field=id");
+      expect(requestUrl).toContain("field=browser");
+      // Present in responses but absent from VALID_FIELD_SET, so requesting
+      // them would 400.
+      expect(requestUrl).not.toContain("field=replay_type");
+      expect(requestUrl).not.toContain("field=ota_updates");
     });
   });
 
@@ -2261,7 +2272,9 @@ describe("API query builders", () => {
             get: (key: string) =>
               key === "content-type" ? "application/json" : null,
           },
-          json: () => Promise.resolve([["segment-1"]]),
+          // Segments are read as text so the byte budget measures the bytes
+          // that crossed the wire rather than the parsed object graph.
+          text: () => Promise.resolve(JSON.stringify([[]])),
         });
       });
 
