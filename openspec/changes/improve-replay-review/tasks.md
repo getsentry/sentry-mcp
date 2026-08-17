@@ -76,9 +76,9 @@ baselines encode the same wrong event shape they do today.
 
 ## 9. Verification
 
-- [ ] 9.1 Run targeted replay tool tests and catalog availability tests.
-- [ ] 9.2 Run `pnpm run tsc`.
-- [ ] 9.3 Run `pnpm run lint`.
-- [ ] 9.4 Run `pnpm run test`.
-- [ ] 9.5 Run `pnpm run measure-tokens` and confirm the added tool definition stays within budget.
+- [x] 9.1 Run targeted replay tool tests and catalog availability tests. 167 passed across 9 files.
+- [x] 9.2 Run `pnpm run tsc`. Clean.
+- [x] 9.3 Run `pnpm run lint`. 2 warnings, both pre-existing and unrelated (`mcp-cloudflare/index.html` noDescendingSpecificity, `oauth/helpers.test.ts` noUnusedImports).
+- [x] 9.4 Run `pnpm run test`. 8/8 tasks; mcp-core 1481 passed / 6 skipped. The `smoke-tests` package skips without a deployed `PREVIEW_URL`, which is expected locally and unrelated to replays.
+- [x] 9.5 Run `pnpm run measure-tokens` and confirm the added tool definition stays within budget. Unchanged at 5,598 tokens across 9 direct tools — `get_replay_activity` is catalog-only, so it costs no direct-surface budget.
 - [ ] 9.6 QA against a real organization with the `mcp-qa` skill, since mocks cannot prove the SDK-shape fix. Confirm on a long real replay that the 150-segment and 10MB bounds hold under the Workers memory ceiling, and adjust them if not.
