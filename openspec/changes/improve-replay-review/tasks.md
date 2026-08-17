@@ -51,10 +51,10 @@ baselines encode the same wrong event shape they do today.
 
 ## 6. Adjacent Correctness Fixes
 
-- [ ] 6.1 Add the sorts Sentry supports but `REPLAY_SORT_FIELDS` omits: `count_screens` and the aliases `browser`, `os`, `os_name`. Do not add `count_traces`, `count_segments`, or `viewed_by_me`, which are absent from `sort_config` and would be rejected.
-- [ ] 6.2 Stop advertising filterable-but-unsortable replay fields as sort options in `dataset-fields.ts`, so discovery output cannot produce an invalid sort.
-- [ ] 6.3 Reject `dataset="replays"` in the `search_events` handler when the constrained project lacks the `replays` capability, and drop `replays` from the advertised dataset options in that case.
-- [ ] 6.4 Distinguish rate-limit and error responses from absence in `listReplayIdsForIssue`, and report unavailability in the issue Session Replay section.
+- [x] 6.1 Add the sorts Sentry supports but `REPLAY_SORT_FIELDS` omits: `count_screens` and the aliases `browser`, `os`, `os_name`. Do not add `count_traces`, `count_segments`, or `viewed_by_me`, which are absent from `sort_config` and would be rejected. The list is now verified against upstream's 29 keys with a test asserting exact parity.
+- [x] 6.2 Stop advertising filterable-but-unsortable replay fields as sort options in `dataset-fields.ts`, so discovery output cannot produce an invalid sort. Discovery had no sortable signal at all, so replay fields now carry a `sortable` flag derived from the same allow-list, and the agent prompt tells the router to respect it.
+- [x] 6.3 Reject `dataset="replays"` in the `search_events` handler when the constrained project lacks the `replays` capability, and drop `replays` from the advertised dataset options in that case. The check runs on the resolved dataset so an agent-chosen route is rejected too; schema narrowing uses a new general `refineInputSchema` hook rather than replay-specific logic in shared infrastructure.
+- [x] 6.4 Distinguish rate-limit and error responses from absence in `listReplayIdsForIssue`, and report unavailability in the issue Session Replay section. Covered for both the no-replays-found and attached-replay-only cases, verified by mutation.
 
 ## 7. Tests
 
@@ -62,8 +62,8 @@ baselines encode the same wrong event shape they do today.
 - [x] 7.2 Add `get-replay-activity.test.ts` covering windowing, each grain, kind filtering, paging, and constraint injection.
 - [ ] 7.3 Add degradation tests: summary 403, summary `processing`, summary timeout, summary unparseable, segment fetch 404, archived replay, zero segments, multi-page segments, and the segment budget being hit.
 - [ ] 7.4 Add redaction tests asserting `<not captured>` and `[Filtered]`-driven `<redacted>` rendering.
-- [ ] 7.5 Add search-events tests for the replay capability gate, the dataset options omitting `replays`, and the reconciled sort list.
-- [ ] 7.6 Add a `get_issue_details` test asserting rate-limited replay lookup is reported as unavailable, not as no replays.
+- [x] 7.5 Add search-events tests for the replay capability gate, the dataset options omitting `replays`, and the reconciled sort list.
+- [x] 7.6 Add a `get_issue_details` test asserting rate-limited replay lookup is reported as unavailable, not as no replays.
 - [ ] 7.7 Add a replay eval covering map-then-zoom navigation.
 - [ ] 7.8 Update registry, tool count, skill gating, and generated-definition tests.
 - [ ] 7.9 Add suggested-window tests: a resolved error timestamp produces a bracketing window, and a failing or unauthorized `replays-events-meta` lookup degrades to the whole-session suggestion with the map intact.

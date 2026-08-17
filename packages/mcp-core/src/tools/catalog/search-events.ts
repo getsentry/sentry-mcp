@@ -54,6 +54,31 @@ const DEFAULT_EVENTS_SORT = "-timestamp";
 
 type SearchEventsAgentResult = z.output<typeof searchEventsAgentOutputSchema>;
 
+/**
+ * Whether replay search is available to this session.
+ *
+ * Only meaningful when the session is constrained to a project, since that is
+ * the only time project capabilities are known. An unconstrained session may
+ * span projects with different capabilities, so replay search stays available
+ * and Sentry decides per request.
+ */
+function hasReplaysCapability(context: ServerContext): boolean {
+  const { projectSlug, projectCapabilities } = context.constraints;
+  if (!projectSlug || !projectCapabilities) {
+    return true;
+  }
+  return projectCapabilities.replays === true;
+}
+
+function assertReplaysAvailable(context: ServerContext): void {
+  if (hasReplaysCapability(context)) {
+    return;
+  }
+  throw new UserInputError(
+    `Session Replay is not enabled for project "${context.constraints.projectSlug}", so replay search is unavailable. Choose a different dataset.`,
+  );
+}
+
 function defaultSortForDataset(dataset: PublicEventsDataset | "replays") {
   return dataset === "replays" ? DEFAULT_REPLAY_SORT : DEFAULT_EVENTS_SORT;
 }
@@ -402,6 +427,24 @@ export default defineTool({
     destructiveHint: false,
     openWorldHint: true,
   },
+  // Drop `replays` from the advertised dataset options when the constrained
+  // project has no Session Replay, so the routing agent cannot pick a dataset
+  // the handler would reject.
+  refineInputSchema(schema, context) {
+    if (hasReplaysCapability(context)) {
+      return schema;
+    }
+
+    return {
+      ...schema,
+      dataset: z
+        .enum(PUBLIC_EVENTS_DATASETS)
+        .optional()
+        .describe(
+          "Initial dataset hint: errors, logs, spans, metrics, or profiles. The agent may correct this when configured.",
+        ),
+    };
+  },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -556,6 +599,12 @@ export default defineTool({
     }
 
     if (dataset === "replays") {
+      // Checked on the resolved dataset, not the requested one, so an agent
+      // that routes to replays is rejected the same way an explicit request
+      // is. A tool-level `requiredCapabilities` cannot do this: search_events
+      // serves six datasets, and only one of them needs replays.
+      assertReplaysAvailable(context);
+
       const replaySort = sortParam || DEFAULT_REPLAY_SORT;
       if (!isValidReplaySort(replaySort)) {
         throw new UserInputError(

@@ -98,6 +98,7 @@ QUERY MODES:
    - For replays, put environment in the separate "environment" field, NOT inside query
    - For replay environment filters, use a string for one environment or an array of strings for multiple environments
    - For replays, use sorts like -started_at, -count_errors, -count_rage_clicks, -count_dead_clicks, -duration
+   - For replays, only sort by a field the field-discovery tool marks sortable; most replay fields are searchable but not sortable, and Sentry rejects the rest
    - Replays do NOT support count()/avg()/sum() aggregations through this path
 
 CRITICAL LIMITATION - TIME SERIES NOT SUPPORTED:

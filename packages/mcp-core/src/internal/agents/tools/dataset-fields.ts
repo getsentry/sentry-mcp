@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../../api-client";
+import { REPLAY_SORT_FIELDS } from "../../../tools/support/search-events/replays";
 import { agentTool } from "./utils";
 
 export type DatasetType = "events" | "errors" | "replays" | "search_issues";
@@ -10,6 +11,18 @@ export interface DatasetField {
   name: string;
   totalValues: number;
   examples?: string[];
+  /**
+   * Whether this field can be sorted on, when that differs from being
+   * searchable.
+   *
+   * Replay search is the case that motivates this: most replay fields are
+   * filterable but only a subset appears in Sentry's replay sort
+   * configuration, and a sort outside it is rejected outright. Presenting a
+   * flat field list invites an agent to pick a sort that cannot work.
+   *
+   * Left undefined for datasets where the distinction does not apply.
+   */
+  sortable?: boolean;
 }
 
 export interface DatasetFieldsResult {
@@ -25,6 +38,14 @@ interface CommonPattern {
 }
 
 const REPLAY_EXCLUDED_TAGS = new Set(["browser", "device", "os", "user"]);
+
+/**
+ * Replay fields Sentry can sort on.
+ *
+ * Drawn from the single allow-list validated against Sentry's own
+ * `sort_config`, so discovery cannot advertise a sort the query layer rejects.
+ */
+const REPLAY_SORTABLE_KEYS = new Set<string>(REPLAY_SORT_FIELDS);
 
 const REPLAY_FIELDS = [
   "activity",
@@ -384,6 +405,9 @@ function createDatasetField(
     name: tag?.name ?? humanizeFieldName(key),
     totalValues: tag?.totalValues ?? 0,
     examples: getFieldExamples(key, dataset),
+    ...(dataset === "replays"
+      ? { sortable: REPLAY_SORTABLE_KEYS.has(key) }
+      : {}),
   };
 }
 

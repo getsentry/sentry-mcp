@@ -195,6 +195,7 @@ export function formatEventOutput(
       apiService: SentryApiService;
       organizationSlug: string;
       relatedReplayIds?: string[];
+      replayLookupFailed?: boolean;
       experimentalMode?: boolean;
       availableToolNames?: ReadonlySet<string>;
       directToolNames?: ReadonlySet<string>;
@@ -218,6 +219,7 @@ export function formatEventOutput(
       organizationSlug: options.replaySummary.organizationSlug,
       event,
       relatedReplayIds: options.replaySummary.relatedReplayIds,
+      replayLookupFailed: options.replaySummary.replayLookupFailed,
       experimentalMode: options.replaySummary.experimentalMode ?? false,
       availableToolNames: options.replaySummary.availableToolNames,
       directToolNames: options.replaySummary.directToolNames,
@@ -1956,6 +1958,7 @@ export function formatIssueOutput({
   performanceTrace,
   externalIssues,
   relatedReplayIds,
+  replayLookupFailed,
   aiConversations,
   codeLocation,
   experimentalMode,
@@ -1970,6 +1973,7 @@ export function formatIssueOutput({
   performanceTrace?: Trace;
   externalIssues?: ExternalIssueList;
   relatedReplayIds?: string[];
+  replayLookupFailed?: boolean;
   aiConversations?: AIConversationReference[];
   codeLocation?: CodeLocation;
   experimentalMode?: boolean;
@@ -2138,6 +2142,7 @@ export function formatIssueOutput({
       apiService,
       organizationSlug,
       relatedReplayIds,
+      replayLookupFailed,
       experimentalMode: experimentalMode ?? false,
       availableToolNames,
       directToolNames,
@@ -2323,6 +2328,7 @@ function formatIssueReplayOutput({
   organizationSlug,
   event,
   relatedReplayIds,
+  replayLookupFailed,
   experimentalMode,
   availableToolNames,
   directToolNames,
@@ -2331,6 +2337,7 @@ function formatIssueReplayOutput({
   organizationSlug: string;
   event: Event;
   relatedReplayIds?: string[];
+  replayLookupFailed?: boolean;
   experimentalMode: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
@@ -2342,7 +2349,17 @@ function formatIssueReplayOutput({
   );
 
   if (!attachedReplayId && normalizedRelatedReplayIds.length === 0) {
-    return "";
+    // The replay-count lookup is rate limited per organization, so a failure
+    // here is common under parallel triage. Reporting nothing would assert
+    // this issue has no replays, which we do not actually know.
+    return replayLookupFailed
+      ? [
+          "## Session Replay",
+          "",
+          "Related replays could not be looked up (the replay count endpoint is rate limited or unavailable). This issue may still have replays.",
+          "",
+        ].join("\n")
+      : "";
   }
 
   const lines: string[] = ["## Session Replay", ""];
@@ -2356,6 +2373,12 @@ function formatIssueReplayOutput({
   if (normalizedRelatedReplayIds.length > 0) {
     lines.push(
       `**Related Replay Count**: ${normalizedRelatedReplayIds.length}`,
+    );
+  } else if (replayLookupFailed) {
+    // An attached replay was found on the event, but the lookup for others
+    // failed. Saying nothing would imply this is the only one.
+    lines.push(
+      "**Related Replays**: could not be looked up (the replay count endpoint is rate limited or unavailable)",
     );
   }
 

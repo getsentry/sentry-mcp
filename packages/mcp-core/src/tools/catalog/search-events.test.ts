@@ -3156,3 +3156,80 @@ describe("search_events", () => {
     expect(mockGenerateText).not.toHaveBeenCalled();
   });
 });
+
+describe("replays capability gate", () => {
+  const constrainedContext = (replays: boolean | undefined) => ({
+    constraints: {
+      organizationSlug: "test-org",
+      regionUrl: null,
+      projectSlug: "cloudflare-mcp",
+      projectCapabilities: replays === undefined ? undefined : { replays },
+    },
+    accessToken: "test-token",
+    userId: "1",
+  });
+
+  const replayParams = {
+    organizationSlug: "test-org",
+    regionUrl: null,
+    projectSlug: "cloudflare-mcp",
+    dataset: "replays" as const,
+    query: "count_errors:>0",
+    fields: null,
+    sort: null,
+    period: "24h",
+    limit: 10,
+    includeExplanation: false,
+  };
+
+  it("rejects an explicit replays dataset when the project lacks the capability", async () => {
+    await expect(
+      searchEvents.handler(replayParams, constrainedContext(false) as never),
+    ).rejects.toThrow(/Session Replay is not enabled for project/);
+  });
+
+  it("allows replays when capabilities are unknown", async () => {
+    // An unconstrained session may span projects with different capabilities,
+    // so Sentry decides per request rather than us guessing.
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/test-org/replays/", () =>
+        HttpResponse.json({ data: [] }),
+      ),
+    );
+
+    await expect(
+      searchEvents.handler(
+        replayParams,
+        constrainedContext(undefined) as never,
+      ),
+    ).resolves.toContain("replay");
+  });
+
+  describe("advertised dataset options", () => {
+    const datasetOptions = (replays: boolean) => {
+      const schema = searchEvents.refineInputSchema?.(
+        searchEvents.inputSchema as never,
+        constrainedContext(replays) as never,
+      );
+      if (!schema?.dataset) {
+        throw new Error("expected a dataset parameter in the refined schema");
+      }
+      // `.unwrap()` drops the `.optional()` wrapper; `.options` is the
+      // public accessor for an enum's values.
+      return (
+        schema.dataset as never as { unwrap: () => { options: string[] } }
+      ).unwrap().options;
+    };
+
+    it("omits replays when the constrained project lacks the capability", () => {
+      // A routing agent that cannot see the option cannot choose one the
+      // handler would reject.
+      expect(datasetOptions(false)).not.toContain("replays");
+      expect(datasetOptions(false)).toContain("errors");
+    });
+
+    it("keeps replays when the capability is present", () => {
+      expect(datasetOptions(true)).toContain("replays");
+    });
+  });
+});

@@ -90,7 +90,6 @@ function isAllowedBySkills({
   tool: ToolConfig<any>;
   context: ServerContext;
 }): boolean {
-
   const grantedSkills: Set<Skill> | undefined = context.grantedSkills
     ? new Set<Skill>(context.grantedSkills)
     : undefined;
@@ -126,11 +125,13 @@ export function getFilteredInputSchema(
     getConstraintKeysToFilter(context.constraints, tool.inputSchema),
   );
 
-  return Object.fromEntries(
+  const schema = Object.fromEntries(
     Object.entries(tool.inputSchema).filter(
       ([key]) => !constraintKeysToFilter.has(key),
     ),
   ) as Record<string, z.ZodType>;
+
+  return tool.refineInputSchema?.(schema, context) ?? schema;
 }
 
 export function injectConstraintParams(
@@ -201,7 +202,6 @@ export function getToolsForMcpRegistration({
     experimentalMode,
     useDefaultSurfacePolicy,
   });
-
 
   return availableTools.filter(({ isTopLevel }) => isTopLevel);
 }
