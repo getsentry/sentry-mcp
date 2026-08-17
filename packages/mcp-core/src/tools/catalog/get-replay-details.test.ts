@@ -5,7 +5,8 @@ import {
   organizationFixture,
   replayDetailsFixture,
 } from "@sentry/mcp-server-mocks";
-import getReplayDetails, { resolveReplayParams } from "./get-replay-details.js";
+import getReplayDetails from "./get-replay-details.js";
+import { resolveReplayParams } from "../../internal/tool-helpers/replay.js";
 import { getServerContext } from "../../test-setup.js";
 
 describe("get_replay_details", () => {

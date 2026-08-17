@@ -1024,7 +1024,11 @@ describe("buildServer", () => {
       );
       expect(getTextContent(result)).not.toContain("# Tool Search Results");
       expect(getTextContent(result)).not.toContain("```json");
-      expect(firstResult?.name).toBe("get_replay_details");
+      // This test is about the shape of a search result and the hiding of
+      // constraint-injected parameters, not about which replay tool ranks
+      // first, so it asserts the match is a replay tool rather than pinning
+      // the ranking.
+      expect(firstResult?.name).toMatch(/^get_replay_/);
       expect(Object.keys(firstResult ?? {}).sort()).toEqual([
         "annotations",
         "description",

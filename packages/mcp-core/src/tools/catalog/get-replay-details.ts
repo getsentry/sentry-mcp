@@ -25,12 +25,13 @@ import {
   formatToolCall,
   formatToolCallInstruction,
 } from "../../internal/tool-helpers/tool-call-formatting";
+import {
+  assertReplayWithinProjectConstraint,
+  resolveReplayParams,
+} from "../../internal/tool-helpers/replay";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/resolve-region-url";
-import { parseSentryUrl } from "../../internal/url-helpers";
-import { resolveScopedOrganizationSlug } from "../../internal/url-scope";
-import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,
@@ -208,73 +209,6 @@ export default defineTool({
     });
   },
 });
-
-export function resolveReplayParams(params: {
-  replayUrl?: string | null;
-  organizationSlug?: string | null;
-  replayId?: string | null;
-}): ResolvedReplayParams {
-  if (params.replayUrl) {
-    const parsed = parseSentryUrl(params.replayUrl);
-    if (parsed.type !== "replay" || !parsed.replayId) {
-      throw new UserInputError(
-        "Invalid replay URL. URL must point to a Sentry replay resource.",
-      );
-    }
-    return {
-      organizationSlug: resolveScopedOrganizationSlug({
-        resourceLabel: "Replay",
-        scopedOrganizationSlug: params.organizationSlug,
-        urlOrganizationSlug: parsed.organizationSlug,
-      }),
-      replayId: parsed.replayId,
-    };
-  }
-
-  if (!params.organizationSlug || !params.replayId) {
-    throw new UserInputError(
-      "Provide either `replayUrl` or both `organizationSlug` and `replayId`.",
-    );
-  }
-
-  return {
-    organizationSlug: params.organizationSlug,
-    replayId: params.replayId,
-  };
-}
-
-async function assertReplayWithinProjectConstraint({
-  apiService,
-  organizationSlug,
-  replay,
-  projectSlug,
-}: {
-  apiService: SentryApiService;
-  organizationSlug: string;
-  replay: ReplayDetails;
-  projectSlug?: string | null;
-}): Promise<void> {
-  if (!projectSlug) {
-    return;
-  }
-
-  if (replay.project_id == null) {
-    throw new UserInputError(
-      `Replay is outside the active project constraint. Expected project "${projectSlug}".`,
-    );
-  }
-
-  const project = await apiService.getProject({
-    organizationSlug,
-    projectSlugOrId: projectSlug,
-  });
-
-  if (String(project.id) !== String(replay.project_id)) {
-    throw new UserInputError(
-      `Replay is outside the active project constraint. Expected project "${projectSlug}".`,
-    );
-  }
-}
 
 function formatReplayOutput({
   replay,

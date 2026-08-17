@@ -3482,6 +3482,92 @@
     "surface": "catalog"
   },
   {
+    "name": "get_replay_activity",
+    "description": "Read what happened during a window of a Sentry replay session.\n\nUSE THIS TOOL WHEN USERS:\n- Ask what happened around a specific moment in a replay\n- Need the requests, clicks, or console output behind a replay failure\n- Want more or less detail than the replay map provides\n\nCall `get_replay_details` first for the session map; it suggests a window.\nOffsets are milliseconds from the start of the replay.\n\n<examples>\n### Zoom into a failure\n```\nget_replay_activity(organizationSlug='my-organization', replayId='7e07485f-12f9-416b-8b14-26260799b51f', startMs=306000, endMs=316000, grain='detail')\n```\n\n### Cheap shape check on a long session\n```\nget_replay_activity(replayUrl='https://my-organization.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/', grain='digest', kinds=['network','console'])\n```\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "replayUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the replay. e.g. https://my-organization.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/"
+        },
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "replayId": {
+          "type": "string",
+          "description": "The replay ID. e.g. `7e07485f-12f9-416b-8b14-26260799b51f`"
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "startMs": {
+          "description": "Window start, in milliseconds from the start of the replay. Omit for the whole session.",
+          "type": "number",
+          "minimum": 0
+        },
+        "endMs": {
+          "description": "Window end, in milliseconds from the start of the replay. Omit for the whole session.",
+          "type": "number",
+          "minimum": 0
+        },
+        "grain": {
+          "default": "standard",
+          "description": "How much to render per signal: `digest` is one rollup line per kind, `standard` one line per signal, `detail` adds payload such as status codes and durations.",
+          "type": "string",
+          "enum": ["digest", "standard", "detail"]
+        },
+        "kinds": {
+          "description": "Only return these kinds of signal. Omit to include everything.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "navigation",
+              "click",
+              "dead-click",
+              "rage-click",
+              "slow-click",
+              "network",
+              "console",
+              "hydration-error",
+              "feedback",
+              "web-vital",
+              "tap",
+              "scroll",
+              "swipe",
+              "app-lifecycle",
+              "device"
+            ]
+          }
+        },
+        "limit": {
+          "default": 50,
+          "type": "number",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "cursor": {
+          "description": "Continue a truncated result, using the cursor it returned.",
+          "type": "string"
+        }
+      }
+    },
+    "requiredScopes": ["org:read", "project:read", "event:read"],
+    "skills": ["inspect"],
+    "surface": "catalog"
+  },
+  {
     "name": "get_replay_details",
     "description": "Get high-level information about a specific Sentry replay by URL or replay ID.\n\nUSE THIS TOOL WHEN USERS:\n- Share a replay URL\n- Ask what happened in a specific replay\n- Want a concise replay summary plus the next issue or trace lookups to run\n\n<examples>\n### With replay URL\n```\nget_replay_details(replayUrl='https://my-organization.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/')\n```\n\n### With organization and replay ID\n```\nget_replay_details(organizationSlug='my-organization', replayId='7e07485f-12f9-416b-8b14-26260799b51f')\n```\n</examples>",
     "inputSchema": {

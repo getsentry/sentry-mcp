@@ -5,7 +5,7 @@
     "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, cron monitors, uptime monitors, profiles, documentation, and project metadata",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 37,
+    "toolCount": 38,
     "tools": [
       {
         "name": "find_alert_rules",
@@ -126,6 +126,11 @@
         "name": "get_release_details",
         "description": "Get details for a Sentry release.\n\nUse this tool when you need to:\n- Inspect an exact release version\n- Scope a release lookup to a specific project\n- See deploys and environments for a release\n- See recent commits attached to a release\n- Gather release health metadata when a project is known\n\n<examples>\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3')\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3', projectSlugOrId='backend')\nget_release_details(organizationSlug='my-organization', releaseVersion='1.2.3', includeHealth=true, projectSlugOrId='backend')\n</examples>",
         "requiredScopes": ["project:read"]
+      },
+      {
+        "name": "get_replay_activity",
+        "description": "Read what happened during a window of a Sentry replay session.\n\nUSE THIS TOOL WHEN USERS:\n- Ask what happened around a specific moment in a replay\n- Need the requests, clicks, or console output behind a replay failure\n- Want more or less detail than the replay map provides\n\nCall `get_replay_details` first for the session map; it suggests a window.\nOffsets are milliseconds from the start of the replay.\n\n<examples>\n### Zoom into a failure\n```\nget_replay_activity(organizationSlug='my-organization', replayId='7e07485f-12f9-416b-8b14-26260799b51f', startMs=306000, endMs=316000, grain='detail')\n```\n\n### Cheap shape check on a long session\n```\nget_replay_activity(replayUrl='https://my-organization.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/', grain='digest', kinds=['network','console'])\n```\n</examples>",
+        "requiredScopes": ["org:read", "project:read", "event:read"]
       },
       {
         "name": "get_replay_details",

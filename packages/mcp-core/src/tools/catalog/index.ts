@@ -23,6 +23,7 @@ import getIssueTagValues from "./get-issue-tag-values";
 import getIssueUserReports from "./get-issue-user-reports";
 import getTraceDetails from "./get-trace-details";
 import getSpanDetails from "./get-span-details";
+import getReplayActivity from "./get-replay-activity";
 import getReplayDetails from "./get-replay-details";
 import getEventAttachment from "./get-event-attachment";
 import updateIssue from "./update-issue";
@@ -88,6 +89,7 @@ const catalogTools = {
   get_trace_details: getTraceDetails,
   get_span_details: getSpanDetails,
   get_replay_details: getReplayDetails,
+  get_replay_activity: getReplayActivity,
   get_event_attachment: getEventAttachment,
   update_issue: updateIssue,
   search_events: searchEvents,

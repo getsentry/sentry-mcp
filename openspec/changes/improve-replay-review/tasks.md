@@ -41,13 +41,13 @@ baselines encode the same wrong event shape they do today.
 
 ## 5. Replay Activity Tool
 
-- [ ] 5.1 Add `get_replay_activity` as a catalog-only `inspect` tool with `requiredCapabilities: ["replays"]` and replay read scopes.
-- [ ] 5.2 Implement `startMs`/`endMs` windowing, defaulting to the whole session.
-- [ ] 5.3 Implement `grain` and the optional `kinds` allow-list.
-- [ ] 5.4 Implement `limit`/`cursor` paging with explicit truncation reporting, encoding the window, `kinds`, and offset in the synthetic cursor so continuation is stable.
-- [ ] 5.5 Accept `replayUrl` as well as `organizationSlug` plus `replayId`, reusing the existing parameter resolution and constraint checks.
-- [ ] 5.6 Register in the catalog and confirm it is not added to the direct top-level surface.
-- [ ] 5.7 Record telemetry on the existing span: grain requested, window width, and result counts.
+- [x] 5.1 Add `get_replay_activity` as a catalog-only `inspect` tool with `requiredCapabilities: ["replays"]` and replay read scopes.
+- [x] 5.2 Implement `startMs`/`endMs` windowing, defaulting to the whole session. Bounds are inclusive; a signal whose timestamp did not resolve is excluded from a windowed read rather than guessed into one.
+- [x] 5.3 Implement `grain` and the optional `kinds` allow-list.
+- [x] 5.4 Implement `limit`/`cursor` paging with explicit truncation reporting, encoding the window, `kinds`, and offset in the synthetic cursor so continuation is stable. A cursor fully describes its query and overrides any window or filter passed alongside it, verified by mutation.
+- [x] 5.5 Accept `replayUrl` as well as `organizationSlug` plus `replayId`, reusing the existing parameter resolution and constraint checks. Both were extracted to `internal/tool-helpers/replay.ts` so the two replay tools cannot diverge.
+- [x] 5.6 Register in the catalog and confirm it is not added to the direct top-level surface. `pnpm run measure-tokens` is unchanged at 5,598 tokens across 9 direct tools.
+- [x] 5.7 Record telemetry on the existing span: grain requested, window width, and result counts.
 
 ## 6. Adjacent Correctness Fixes
 
@@ -59,7 +59,7 @@ baselines encode the same wrong event shape they do today.
 ## 7. Tests
 
 - [x] 7.1 Re-baseline `get-replay-details.test.ts` snapshots against the rebuilt fixtures.
-- [ ] 7.2 Add `get-replay-activity.test.ts` covering windowing, each grain, kind filtering, paging, and constraint injection.
+- [x] 7.2 Add `get-replay-activity.test.ts` covering windowing, each grain, kind filtering, paging, and constraint injection.
 - [ ] 7.3 Add degradation tests: summary 403, summary `processing`, summary timeout, summary unparseable, segment fetch 404, archived replay, zero segments, multi-page segments, and the segment budget being hit.
 - [ ] 7.4 Add redaction tests asserting `<not captured>` and `[Filtered]`-driven `<redacted>` rendering.
 - [ ] 7.5 Add search-events tests for the replay capability gate, the dataset options omitting `replays`, and the reconciled sort list.

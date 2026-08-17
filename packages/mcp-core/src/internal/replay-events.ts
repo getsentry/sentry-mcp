@@ -82,22 +82,25 @@ export type ReplayEventType =
  * `device` — because callers filter by what happened, not by which SDK API
  * reported it.
  */
-export type ReplaySignalKind =
-  | "navigation"
-  | "click"
-  | "dead-click"
-  | "rage-click"
-  | "slow-click"
-  | "network"
-  | "console"
-  | "hydration-error"
-  | "feedback"
-  | "web-vital"
-  | "tap"
-  | "scroll"
-  | "swipe"
-  | "app-lifecycle"
-  | "device";
+export const REPLAY_SIGNAL_KINDS = [
+  "navigation",
+  "click",
+  "dead-click",
+  "rage-click",
+  "slow-click",
+  "network",
+  "console",
+  "hydration-error",
+  "feedback",
+  "web-vital",
+  "tap",
+  "scroll",
+  "swipe",
+  "app-lifecycle",
+  "device",
+] as const;
+
+export type ReplaySignalKind = (typeof REPLAY_SIGNAL_KINDS)[number];
 
 export type ReplayGrain = "digest" | "standard" | "detail";
 
