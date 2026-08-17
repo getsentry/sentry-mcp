@@ -44,6 +44,8 @@ import {
   EXIT_DEPENDENCY_INSTALL_FAILED,
   EXIT_PLATFORM_NOT_DETECTED,
   EXIT_VERIFICATION_FAILED,
+  INIT_PROTOCOL_VERSION,
+  INIT_REQUEST_CONFLICT_CODE,
   MASTRA_API_URL,
   VERIFY_CHANGES_STEP,
   WORKFLOW_ID,
@@ -135,6 +137,20 @@ function hasHttpStatus(value: unknown): value is { status: number } {
     "status" in value &&
     typeof value.status === "number"
   );
+}
+
+/** Read a complete v1 identity while keeping legacy server payloads valid. */
+function initProtocolEnvelope(
+  payload: SuspendPayload
+): { protocolVersion: 1; requestId: string } | undefined {
+  return payload.protocolVersion === INIT_PROTOCOL_VERSION &&
+    typeof payload.requestId === "string" &&
+    payload.requestId.length > 0
+    ? {
+        protocolVersion: INIT_PROTOCOL_VERSION,
+        requestId: payload.requestId,
+      }
+    : undefined;
 }
 
 function hasActiveStepsPath(value: Record<string, unknown>): value is Record<
@@ -479,6 +495,7 @@ function assertWorkflowResult(raw: unknown): WorkflowRunResult {
   return obj as WorkflowRunResult;
 }
 
+/** Parse legacy or complete v1 suspend payloads, rejecting partial envelopes. */
 function assertSuspendPayload(raw: unknown): SuspendPayload {
   if (!raw || typeof raw !== "object") {
     throw new Error("Invalid suspend payload: expected object");
@@ -490,7 +507,13 @@ function assertSuspendPayload(raw: unknown): SuspendPayload {
   ) {
     throw new Error(`Unknown suspend payload type: ${String(obj.type)}`);
   }
-  return obj as SuspendPayload;
+  const payload = obj as SuspendPayload;
+  const hasProtocolFields =
+    Object.hasOwn(obj, "protocolVersion") || Object.hasOwn(obj, "requestId");
+  if (hasProtocolFields && !initProtocolEnvelope(payload)) {
+    throw new Error("Invalid init protocol envelope");
+  }
+  return payload;
 }
 
 function withTimeout<T>(
@@ -666,6 +689,19 @@ function isStepAlreadyAdvancedError(err: unknown): boolean {
   return err instanceof Error && err.message.includes("was not suspended");
 }
 
+/** Match the API's stable stale-request response, not mutable error prose. */
+function isInitProtocolConflictError(err: unknown): boolean {
+  if (httpStatus(err) !== 409 || typeof err !== "object" || err === null) {
+    return false;
+  }
+  const body = Reflect.get(err, "body") as unknown;
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    Reflect.get(body, "code") === INIT_REQUEST_CONFLICT_CODE
+  );
+}
+
 function httpStatus(err: unknown): number | undefined {
   return hasHttpStatus(err) ? err.status : undefined;
 }
@@ -684,6 +720,11 @@ function runStateRecoveryBackoffMs(): number[] {
   return delays;
 }
 
+/**
+ * A v1 request advances only when the active request ID changed. Legacy
+ * servers fall back to payload equality during the temporary compatibility
+ * window.
+ */
 function isRecoverableRunState(
   result: WorkflowRunResult,
   resumedStepId: string,
@@ -696,6 +737,12 @@ function isRecoverableRunState(
   const recovered = extractSuspendPayload(result, resumedStepId);
   if (!recovered) {
     return false;
+  }
+
+  const resumedEnvelope = initProtocolEnvelope(resumedPayload);
+  const recoveredEnvelope = initProtocolEnvelope(recovered.payload);
+  if (resumedEnvelope && recoveredEnvelope) {
+    return recoveredEnvelope.requestId !== resumedEnvelope.requestId;
   }
 
   return !(
@@ -762,6 +809,10 @@ async function tryRecoverCurrentRunState(
   return null;
 }
 
+/**
+ * Resume once, then recover by observing durable run state. This never
+ * re-executes the local tool when a response was lost or its request is stale.
+ */
 async function resumeWithRecovery(
   args: ResumeRetryArgs
 ): Promise<WorkflowRunResult> {
@@ -776,10 +827,17 @@ async function resumeWithRecovery(
     ui,
     progressRotation,
   } = args;
+  const envelope = initProtocolEnvelope(payload);
+  const wireResumeData = envelope ? { ...resumeData, ...envelope } : resumeData;
   try {
     const raw = await withTimeout(
       withInitServiceAuthClassification(
-        () => run.resumeAsync({ step: stepId, resumeData, tracingOptions }),
+        () =>
+          run.resumeAsync({
+            step: stepId,
+            resumeData: wireResumeData,
+            tracingOptions,
+          }),
         WORKFLOW_RESUME_ASYNC_ENDPOINT
       ),
       API_TIMEOUT_MS,
@@ -787,7 +845,7 @@ async function resumeWithRecovery(
     );
     return assertWorkflowResult(raw);
   } catch (err) {
-    if (isStepAlreadyAdvancedError(err)) {
+    if (isStepAlreadyAdvancedError(err) || isInitProtocolConflictError(err)) {
       progressRotation?.pause();
       spin.message("Reconnecting...");
       const recovered = await tryRecoverCurrentRunState(
@@ -847,6 +905,7 @@ async function resumeWithRecovery(
   }
 }
 
+/** Run the wizard while negotiating v1 and echoing each suspended request ID. */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sequential wizard orchestration with error handling branches
 export async function runWizard(initialOptions: WizardOptions): Promise<void> {
   // Note: a previous `forwardFreshTtyToStdin()` call lived here as a
@@ -980,6 +1039,10 @@ export async function runWizard(initialOptions: WizardOptions): Promise<void> {
           () =>
             run.startAsync({
               inputData: {
+                client: {
+                  cliVersion: CLI_VERSION,
+                  protocolVersion: INIT_PROTOCOL_VERSION,
+                },
                 directory,
                 yes,
                 dryRun,

@@ -66,6 +66,11 @@ export type InteractiveContext = Pick<
   "yes" | "dryRun" | "app"
 >;
 
+export type InitProtocolEnvelope = {
+  protocolVersion: 1;
+  requestId: string;
+};
+
 // Tool suspend payloads
 export type ToolPayload =
   | ListDirPayload
@@ -273,7 +278,13 @@ export type ConfirmPayload = {
   prompt: string;
 };
 
-export type SuspendPayload = ToolPayload | InteractivePayload;
+type LegacyInitProtocolEnvelope = {
+  protocolVersion?: never;
+  requestId?: never;
+};
+
+export type SuspendPayload = (ToolPayload | InteractivePayload) &
+  (InitProtocolEnvelope | LegacyInitProtocolEnvelope);
 
 export type WorkflowRunResult = {
   status: "suspended" | "success" | "failed";

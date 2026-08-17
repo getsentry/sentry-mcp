@@ -6,6 +6,9 @@ export const MASTRA_API_URL =
 
 export const WORKFLOW_ID = "sentry-wizard";
 
+export const INIT_PROTOCOL_VERSION = 1 as const;
+export const INIT_REQUEST_CONFLICT_CODE = "init_request_conflict" as const;
+
 export const SENTRY_DOCS_URL = "https://docs.sentry.io/platforms/";
 
 export const MAX_FILE_BYTES = 262_144; // 256KB per file
