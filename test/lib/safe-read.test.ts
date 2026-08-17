@@ -191,55 +191,57 @@ describe("init apply-patchset FIFO safety", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("throws targeted error for a FIFO target instead of hanging", async () => {
+  test("returns a targeted error for a FIFO target instead of hanging", async () => {
     createFifo(join(dir, "config.ts"));
 
-    await expect(
-      applyPatchset(
-        {
-          type: "tool",
-          operation: "apply-patchset",
-          cwd: dir,
-          params: {
-            patches: [
-              {
-                action: "modify",
-                path: "config.ts",
-                edits: [{ oldString: "foo", newString: "bar" }],
-              },
-            ],
-          },
+    const result = await applyPatchset(
+      {
+        type: "tool",
+        operation: "apply-patchset",
+        cwd: dir,
+        params: {
+          patches: [
+            {
+              action: "modify",
+              path: "config.ts",
+              edits: [{ oldString: "foo", newString: "bar" }],
+            },
+          ],
         },
-        { dryRun: false, authToken: undefined }
-      )
-    ).rejects.toThrow(/not a regular file|read failed/);
+      },
+      { dryRun: false, authToken: undefined }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/not a (?:readable )?regular file/);
   });
 
-  test("throws targeted error for a symlink to a FIFO", async () => {
+  test("returns a targeted error for a symlink to a FIFO", async () => {
     const fifo = join(dir, "config.pipe");
     const link = join(dir, "config.ts");
     createFifo(fifo);
     execSync(`ln -s ${JSON.stringify(fifo)} ${JSON.stringify(link)}`);
 
-    await expect(
-      applyPatchset(
-        {
-          type: "tool",
-          operation: "apply-patchset",
-          cwd: dir,
-          params: {
-            patches: [
-              {
-                action: "modify",
-                path: "config.ts",
-                edits: [{ oldString: "foo", newString: "bar" }],
-              },
-            ],
-          },
+    const result = await applyPatchset(
+      {
+        type: "tool",
+        operation: "apply-patchset",
+        cwd: dir,
+        params: {
+          patches: [
+            {
+              action: "modify",
+              path: "config.ts",
+              edits: [{ oldString: "foo", newString: "bar" }],
+            },
+          ],
         },
-        { dryRun: false, authToken: undefined }
-      )
-    ).rejects.toThrow(/not a regular file|read failed/);
+      },
+      { dryRun: false, authToken: undefined }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/not a (?:readable )?regular file/);
   });
 });
 

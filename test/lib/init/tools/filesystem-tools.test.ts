@@ -160,7 +160,9 @@ describe("filesystem tools", () => {
       );
 
       expect(result.ok).toBe(false);
-      expect(result.error).toContain("Invalid patch path");
+      expect(result.error).toMatch(
+        /Invalid (?:file change path|file changes request)/
+      );
     }
   });
 
