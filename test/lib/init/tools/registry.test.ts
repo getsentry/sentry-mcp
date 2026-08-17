@@ -43,4 +43,14 @@ describe("tool registry", () => {
     expect(result.ok).toBe(false);
     expect(result.error).toContain("Unknown operation");
   });
+
+  test("describes malformed file-change payloads without throwing", () => {
+    const payload = {
+      cwd: "/tmp/test",
+      operation: "apply-patchset",
+      type: "tool",
+    } as unknown as ToolPayload;
+
+    expect(describeTool(payload)).toBe("Applying file changes...");
+  });
 });
