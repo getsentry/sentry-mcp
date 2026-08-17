@@ -1,5 +1,11 @@
 # Replay Review Specification
 
+> **Status: implemented.** The Motivation section below describes the behavior
+> that prompted this work and is retained as the record of what was wrong; it is
+> written in the present tense of that time. See "Divergences from the As-Built
+> Implementation" at the end for the points where the shipped code differs from
+> what this spec proposed.
+
 ## Overview
 
 Replay retrieval today returns a single fixed-grain summary capped at six
@@ -136,7 +142,7 @@ Replace the prose activity sample with session shape:
 … unchanged fields …
 
 ## Map
-- **Signals**: 1,182 across 0.0s–353.2s, 4 pages
+- **Signals**: 1,182 signals across T+0.0s–T+5m 53.2s
 - **Flow**: /login ▸ /cart ▸ /checkout ▸ /checkout/confirm
 - **Kinds**: navigation 18 · click 36 (2 rage, 1 dead) · network 58 (2 failed) · console 4 (2 error)
 - **Truncated**: no
@@ -148,9 +154,14 @@ Replace the prose activity sample with session shape:
 … unchanged …
 
 ## Next
-Error CLOUDFLARE-MCP-41 occurred at T+311.8s:
+Error CLOUDFLARE-MCP-41 occurred at T+5m 11.8s. Use the Sentry tool `get_replay_activity` to read the signals in a time window:
 get_replay_activity(organizationSlug='my-org', replayId='7e07485f…', startMs=306000, endMs=316000, grain='detail')
 ```
+
+Offsets render in the same `T+` form throughout, rather than mixing bare
+seconds into the Map and Next lines. The page count was dropped from the
+Signals line: the Flow line already lists the pages, and a count beside a time
+span read as a count of something temporal.
 
 The suggested window comes from
 `GET /organizations/{org}/replays-events-meta/`, which resolves the replay's
@@ -287,7 +298,9 @@ These are correctness bugs in shipped code, independent of the new tool:
   The real defect is on the discovery side: `REPLAY_FIELDS` in
   `packages/mcp-core/src/internal/agents/tools/dataset-fields.ts` presents
   filterable fields as if they were sortable, so an agent picks a sort from
-  discovery output and gets a `UserInputError`.
+  discovery output and gets a `UserInputError`. Note that discovery carries no
+  sortability signal at all, so the fix is to add one rather than to correct an
+  existing claim — see the divergences section.
 - Gate the `dataset="replays"` path in `search_events` on the `replays`
   capability, so replay search and replay details agree about availability.
   A tool-level `requiredCapabilities` will not do: `search_events` serves six
@@ -403,6 +416,88 @@ but it is deferred rather than half-built alongside the web path.
 - Replay retention is documented as 90 days paid and 30 days free. Only a flat
   90-day query window is visible in source; the per-plan split is a product-docs
   claim. Hedge in user-facing copy or verify against a free-tier org.
+
+## Divergences from the As-Built Implementation
+
+Where the shipped code differs from what this spec proposed, and why.
+
+### Discovery gained a sortability flag rather than losing fields
+
+The spec framed `REPLAY_FIELDS` as advertising filterable fields "as if they
+were sortable". It carried no sortability signal at all — a flat list that
+invited an agent to sort by anything on it. Removing the unsortable entries
+would have been wrong, since they are legitimately searchable; the fix adds a
+`sortable` flag drawn from the same allow-list as `REPLAY_SORT_FIELDS`, plus a
+routing-prompt line telling the agent to respect it.
+
+The sort list also turned out to be short by exactly the four the spec named.
+It is now verified against upstream's 29 keys by a test that fails in both
+directions, so a sort we advertise and Sentry rejects is as visible as one
+Sentry supports and we omit.
+
+### Dataset narrowing uses a general hook, not replay-specific logic
+
+The spec called for "removal of `replays` from the advertised dataset options"
+without saying where that lives. Special-casing replays inside
+`getFilteredInputSchema` would have put one tool's concern in shared
+infrastructure, so `ToolConfig` gained a general `refineInputSchema(schema,
+context)` hook and `search_events` supplies the replay-specific narrowing.
+`requiredCapabilities` still gates whole tools; this covers the case where a
+tool stays available but not all of its options apply.
+
+### Both replay tools share extracted parameter resolution
+
+`get_replay_activity` accepts the same `replayUrl`-or-`organizationSlug`-plus-
+`replayId` shape as `get_replay_details`. Rather than reimplement it, the
+resolution and the project-constraint check were extracted to
+`packages/mcp-core/src/internal/tool-helpers/replay.ts`, so the two tools cannot
+drift apart on which replays a constrained session may read.
+
+### The activity cursor overrides its sibling arguments
+
+The spec said the synthetic cursor encodes the window, `kinds`, and offset. It
+did not say what happens when a caller passes a cursor *and* a conflicting
+window. A cursor fully describes its own query and wins over any window or
+filter passed beside it — otherwise a continuation could silently page through
+different criteria than the first request. It is base64url-encoded JSON, opaque
+by intent.
+
+### The Related section lists unresolvable error ids
+
+The spec had `replays-events-meta` replacing the per-error `listIssues` lookups
+for issue identity. Related entries are still driven by `replay.error_ids`, so
+an id the private endpoint cannot resolve is listed by id rather than dropped —
+`error_ids` is the replay's own record that an error occurred, and omitting it
+would understate the session.
+
+### `count_dead_clicks` includes rage clicks
+
+Not a divergence in our code, but a fixture correction worth recording: upstream
+sets `click_is_dead` for both `DEAD_CLICK` and `RAGE_CLICK`, and
+`count_dead_clicks` sums that column. A replay with one rage click and one dead
+click therefore reports `count_dead_clicks: 2`, not 1. The Summary section
+mirrors Sentry's own counts, so it inherits this; the Map's `click 4 (1 rage, 1
+dead)` breakdown is computed from the recording and counts them separately.
+
+### Two upstream fixes folded in
+
+Beyond the spec's list, the taxonomy port includes two upstream fixes:
+
+- #120859 — `as_log_message` indexed `payload["data"]["method"]` and
+  `["statusCode"]` directly, which raises for a request that never got a
+  response. Upstream now renders `no response` in place of a status; we do the
+  same, and report the request rather than dropping it.
+- #121765 — PII scrubbing can replace a click breadcrumb's numeric `timestamp`
+  with a marker string, and `int()` raised `ValueError` on it. Our equivalent is
+  `resolveTimestampMs` returning `null` for a non-finite timestamp, so one
+  scrubbed click cannot take out the events around it.
+
+### Still provisional
+
+The 150-segment and 10MB bounds remain unmeasured against real replays. Mocks
+cannot exercise them meaningfully — the fixtures are orders of magnitude smaller
+than a real recording — so they stand as reasoned defaults until QA against a
+real organization confirms or moves them.
 
 ## References
 

@@ -12,7 +12,7 @@ baselines encode the same wrong event shape they do today.
 
 ## 2. Event Classification Module
 
-- [x] 2.1 Re-verify `which()`, `as_log_message()`, and `get_timestamp_unit()` against `getsentry/sentry` before porting. Two recent upstream fixes are folded in: missing `method`/`statusCode` on requests that never got a response (#120859), and PII-scrubbed values arriving where a number is expected (#121765).
+- [x] 2.1 Re-verify `which()`, `as_log_message()`, and `get_timestamp_unit()` against `getsentry/sentry` before porting. Two recent upstream fixes are folded in: missing `method`/`statusCode` on requests that never got a response (#120859), and PII-scrubbed values arriving where a number is expected (#121765). Verified against the commits in `getsentry/sentry`.
 - [x] 2.2 Add a shared internal module exposing replay event classification, per-type timestamp resolution, and signal rendering (`packages/mcp-core/src/internal/replay-events.ts`).
 - [x] 2.3 Port the event-type taxonomy and the noise exclusion list, including skipping 2xx network requests from rendering while keeping them in kind counts, and preferring `NAVIGATION_SPAN` over `NAVIGATION` for web replays.
 - [x] 2.4 Implement behavioral dead, rage, and slow click classification, reading `payload.data.node.tagName` and accepting the lowercase `timeafterclickms`/`clickcount` spellings.
@@ -70,9 +70,9 @@ baselines encode the same wrong event shape they do today.
 
 ## 8. Documentation and Generated Definitions
 
-- [ ] 8.1 Update `docs/specs/replay-review.md` if the implemented contract diverges from the spec.
-- [ ] 8.2 Update any docs describing replay tool output.
-- [ ] 8.3 Run `pnpm run --filter @sentry/mcp-core generate-definitions`.
+- [x] 8.1 Update `docs/specs/replay-review.md` if the implemented contract diverges from the spec. Added a status banner (Motivation is retained as the record of what was wrong, in its original present tense), corrected the Map example to the shipped `T+` offset format, and added a "Divergences from the As-Built Implementation" section covering the sortability flag, the `refineInputSchema` hook, shared parameter resolution, cursor precedence, unresolvable error ids, `count_dead_clicks` including rage clicks, and the two upstream fixes. The #120859/#121765 descriptions were swapped in the task notes; verified against the commits and corrected.
+- [x] 8.2 Update any docs describing replay tool output. Nothing else describes it: `docs/operations/embedded-agents.md` and `docs/contributing/adding-tools.md` mention replays only in passing and both remain accurate. `proposal.md` and the delta spec are the historical record of the change and are left as written.
+- [x] 8.3 Run `pnpm run --filter @sentry/mcp-core generate-definitions`. Already up to date — no regeneration needed.
 
 ## 9. Verification
 
