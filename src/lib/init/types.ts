@@ -176,6 +176,12 @@ export type ApplyPatchsetPatch =
   | { path: string; action: "modify"; edits: PatchEdit[] }
   | { path: string; action: "delete"; patch?: string };
 
+/**
+ * Wire envelope for a file-change batch.
+ *
+ * The operation name remains stable for compatibility with deployed workflow
+ * servers and older CLI releases.
+ */
 export type ApplyPatchsetPayload = {
   type: "tool";
   operation: "apply-patchset";
