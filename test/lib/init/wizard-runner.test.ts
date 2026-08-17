@@ -40,6 +40,7 @@ import * as readiness from "../../../src/lib/init/readiness.js";
 import * as registry from "../../../src/lib/init/tools/registry.js";
 import type {
   ResolvedInitContext,
+  SuspendPayload,
   ToolPayload,
   WizardOptions,
   WorkflowRunResult,
@@ -103,6 +104,7 @@ function makeContext(
 let mockStartResult: WorkflowRunResult;
 let mockResumeResults: WorkflowRunResult[];
 let resumeCallCount = 0;
+let sharedResumeAsyncMock: ReturnType<typeof mock>;
 let startAsyncMock: ReturnType<typeof mock>;
 let mockRunByIdResult: WorkflowRunResult | Error;
 let runByIdMock: ReturnType<typeof mock>;
@@ -231,16 +233,17 @@ beforeEach(() => {
       ? Promise.reject(mockRunByIdResult)
       : Promise.resolve(mockRunByIdResult)
   );
+  sharedResumeAsyncMock = vi.fn(() => {
+    const result = mockResumeResults[resumeCallCount] ?? {
+      status: "success",
+    };
+    resumeCallCount += 1;
+    return Promise.resolve(result);
+  });
   const run = {
     runId: "test-run-id",
     startAsync: startAsyncMock,
-    resumeAsync: vi.fn(() => {
-      const result = mockResumeResults[resumeCallCount] ?? {
-        status: "success",
-      };
-      resumeCallCount += 1;
-      return Promise.resolve(result);
-    }),
+    resumeAsync: sharedResumeAsyncMock,
   };
   const workflow = {
     createRun: vi.fn(() => Promise.resolve(run)),
@@ -617,6 +620,7 @@ describe("runWizard", () => {
   });
 
   test("dispatches interactive payloads to the prompt handler", async () => {
+    const requestId = "8c7ee6b9-e955-4514-9164-f01844584a28";
     mockStartResult = {
       status: "suspended",
       suspended: [["pick-feature"]],
@@ -626,6 +630,8 @@ describe("runWizard", () => {
             type: "interactive",
             kind: "confirm",
             prompt: "Continue?",
+            protocolVersion: 1,
+            requestId,
           },
         },
       },
@@ -639,9 +645,19 @@ describe("runWizard", () => {
         type: "interactive",
         kind: "confirm",
         prompt: "Continue?",
+        protocolVersion: 1,
+        requestId,
       },
       makeContext(),
       expect.anything()
+    );
+    expect(sharedResumeAsyncMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resumeData: expect.objectContaining({
+          protocolVersion: 1,
+          requestId,
+        }),
+      })
     );
   });
 
@@ -669,6 +685,7 @@ describe("runWizard", () => {
   });
 
   test("skips verify-changes interactive prompts during dry-run", async () => {
+    const requestId = "3bc6b6f4-e2f5-40e4-9ac5-bbd69bf7af70";
     resolveInitContextSpy.mockResolvedValue(makeContext({ dryRun: true }));
     mockStartResult = {
       status: "suspended",
@@ -679,6 +696,8 @@ describe("runWizard", () => {
             type: "interactive",
             kind: "confirm",
             prompt: "Verify changes?",
+            protocolVersion: 1,
+            requestId,
           },
         },
       },
@@ -688,6 +707,14 @@ describe("runWizard", () => {
     await runWizard(makeOptions({ dryRun: true }));
 
     expect(handleInteractiveSpy).not.toHaveBeenCalled();
+    expect(sharedResumeAsyncMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resumeData: expect.objectContaining({
+          protocolVersion: 1,
+          requestId,
+        }),
+      })
+    );
   });
 
   test("surfaces malformed suspend payload types", async () => {
@@ -889,6 +916,10 @@ describe("runWizard", () => {
     expect(args.inputData).not.toHaveProperty("dirListing");
     expect(args.inputData).not.toHaveProperty("fileCache");
     expect(args.inputData).not.toHaveProperty("existingSentry");
+    expect(args.inputData?.client).toEqual({
+      cliVersion: expect.any(String),
+      protocolVersion: 1,
+    });
     expect(args.initialState?.dirListing).toEqual(dirListing);
     expect(args.initialState?.fileCache).toEqual(fileCache);
     expect(args.initialState?.existingSentry).toEqual(detectedSentry);
@@ -1105,10 +1136,10 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
   function httpError(
     status: number,
     body: unknown
-  ): Error & { status: number } {
+  ): Error & { body: unknown; status: number } {
     return Object.assign(
       new Error(`HTTP error! status: ${status} - ${JSON.stringify(body)}`),
-      { status }
+      { body, status }
     );
   }
 
@@ -1125,6 +1156,16 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
     });
   }
 
+  function protocolConflictError(): Error & {
+    body: unknown;
+    status: number;
+  } {
+    return httpError(409, {
+      code: "init_request_conflict",
+      error: "The init tool result does not match the active suspended request",
+    });
+  }
+
   function selectWorkflowFields(
     result: WorkflowRunResult,
     fields: string[] | undefined
@@ -1138,6 +1179,64 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
     }
     return selected;
   }
+
+  test("echoes the v1 request identity with the local tool result", async () => {
+    const protocolPayload: SuspendPayload = {
+      ...toolPayload,
+      protocolVersion: 1,
+      requestId: "8c7ee6b9-e955-4514-9164-f01844584a28",
+    };
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["tool-step"]],
+      steps: { "tool-step": { suspendPayload: protocolPayload } },
+    };
+    let capturedResume: Record<string, unknown> | undefined;
+    makeStaleStepRun((args) => {
+      capturedResume = args.resumeData as Record<string, unknown>;
+      return Promise.resolve({ status: "success" });
+    });
+
+    await runWizard(makeOptions());
+
+    expect(capturedResume).toMatchObject({
+      protocolVersion: 1,
+      requestId: protocolPayload.requestId,
+    });
+  });
+
+  test("uses request identity instead of mutable payload details during recovery", async () => {
+    vi.useFakeTimers();
+    const requestId = "8c7ee6b9-e955-4514-9164-f01844584a28";
+    const protocolPayload: SuspendPayload = {
+      ...toolPayload,
+      protocolVersion: 1,
+      requestId,
+    };
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["tool-step"]],
+      steps: { "tool-step": { suspendPayload: protocolPayload } },
+    };
+    runByIdMock
+      .mockResolvedValueOnce({
+        status: "suspended",
+        suspendPayload: { ...protocolPayload, detail: "new display text" },
+      })
+      .mockResolvedValueOnce({ status: "success" });
+    let resumeCount = 0;
+    makeStaleStepRun(() => {
+      resumeCount += 1;
+      return Promise.reject(staleRunError(409));
+    });
+
+    const run = runWizard(makeOptions());
+    await vi.advanceTimersByTimeAsync(250);
+    await run;
+
+    expect(runByIdMock).toHaveBeenCalledTimes(2);
+    expect(resumeCount).toBe(1);
+  });
 
   test("recovers from a sparse 409 stale-resume conflict", async () => {
     mockStartResult = {
@@ -1177,6 +1276,33 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
       })
     );
     // Recovery succeeded on the first attempt — resumeAsync was not called again.
+    expect(resumeCount).toBe(1);
+  });
+
+  test("recovers from a v1 request-correlation conflict", async () => {
+    const protocolPayload: SuspendPayload = {
+      ...toolPayload,
+      protocolVersion: 1,
+      requestId: "8c7ee6b9-e955-4514-9164-f01844584a28",
+    };
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["tool-step"]],
+      steps: { "tool-step": { suspendPayload: protocolPayload } },
+    };
+    runByIdMock.mockResolvedValue({
+      status: "success",
+      suspended: [],
+    });
+    let resumeCount = 0;
+    makeStaleStepRun(() => {
+      resumeCount += 1;
+      return Promise.reject(protocolConflictError());
+    });
+
+    await runWizard(makeOptions());
+
+    expect(runByIdMock).toHaveBeenCalledTimes(1);
     expect(resumeCount).toBe(1);
   });
 
