@@ -412,16 +412,80 @@ export const ReplayDetailsSchema = z
   })
   .passthrough();
 
-const ReplayRecordingPayloadSchema = z
+/**
+ * Request or response half of a replay network span.
+ *
+ * `size` is absent unless the SDK captured bodies (`networkCaptureBodies` is
+ * opt-in), so an absent value means "not captured", not "empty".
+ */
+const NetworkBodySchema = z
   .object({
+    size: z.number().optional().catch(undefined),
+    headers: z.record(z.string(), z.unknown()).optional(),
+    body: z.unknown().optional(),
+  })
+  .passthrough();
+
+/**
+ * Body of a replay recording event.
+ *
+ * Every field is optional and permissively parsed: recordings are produced by
+ * many SDK versions and are subject to PII scrubbing, which can replace a
+ * numeric value with a marker string. Upstream reads these defensively for the
+ * same reason (see `sentry.replays.usecases.ingest.event_parser`), so a
+ * malformed field must degrade that one field rather than drop the event.
+ */
+export const ReplayRecordingPayloadSchema = z
+  .object({
+    // Span events (`tag: "performanceSpan"`) carry the meaning in `op`;
+    // breadcrumb events carry it in `category`.
     op: z.string().optional().catch(undefined),
     description: z.string().optional().catch(undefined),
     message: z.string().optional().catch(undefined),
     category: z.string().optional().catch(undefined),
     type: z.string().optional().catch(undefined),
+    level: z.string().optional().catch(undefined),
+    startTimestamp: z.number().optional().catch(undefined),
+    endTimestamp: z.number().optional().catch(undefined),
+    timestamp: z.number().optional().catch(undefined),
     data: z
       .object({
         duration: z.number().optional().catch(undefined),
+        // Network spans. `method` and `statusCode` are absent on requests that
+        // never got a response (CORS failures, for example).
+        method: z.string().optional().catch(undefined),
+        statusCode: z.number().optional().catch(undefined),
+        request: NetworkBodySchema.optional().catch(undefined),
+        response: NetworkBodySchema.optional().catch(undefined),
+        // SDK 7.44/7.45 reported body sizes at the top level instead.
+        requestBodySize: z.number().optional().catch(undefined),
+        responseBodySize: z.number().optional().catch(undefined),
+        // Click events. Upstream also accepts the lowercase spellings.
+        node: z
+          .object({
+            id: z.number().optional().catch(undefined),
+            tagName: z.string().optional().catch(undefined),
+            textContent: z.string().optional().catch(undefined),
+            attributes: z.record(z.string(), z.unknown()).optional(),
+          })
+          .passthrough()
+          .optional()
+          .catch(undefined),
+        endReason: z.string().optional().catch(undefined),
+        timeAfterClickMs: z.number().optional().catch(undefined),
+        timeafterclickms: z.number().optional().catch(undefined),
+        clickCount: z.number().optional().catch(undefined),
+        clickcount: z.number().optional().catch(undefined),
+        url: z.string().optional().catch(undefined),
+        // Navigation breadcrumbs (mobile keeps these; web prefers the span).
+        to: z.string().optional().catch(undefined),
+        from: z.string().optional().catch(undefined),
+        // Web vitals.
+        size: z.number().optional().catch(undefined),
+        rating: z.string().optional().catch(undefined),
+        // Mobile scroll/swipe events.
+        "view.id": z.string().optional().catch(undefined),
+        direction: z.string().optional().catch(undefined),
       })
       .passthrough()
       .optional()

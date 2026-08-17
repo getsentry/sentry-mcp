@@ -12,13 +12,13 @@ baselines encode the same wrong event shape they do today.
 
 ## 2. Event Classification Module
 
-- [ ] 2.1 Re-verify `which()`, `as_log_message()`, and `get_timestamp_unit()` against `getsentry/sentry` before porting.
-- [ ] 2.2 Add a shared internal module exposing replay event classification, per-type timestamp resolution, and signal rendering.
-- [ ] 2.3 Port the event-type taxonomy and the noise exclusion list, including skipping 2xx network requests from rendering while keeping them in kind counts, and preferring `NAVIGATION_SPAN` over `NAVIGATION` for web replays.
-- [ ] 2.4 Implement behavioral dead, rage, and slow click classification, reading `payload.data.node.tagName` and accepting the lowercase `timeafterclickms`/`clickcount` spellings.
-- [ ] 2.5 Implement `digest`, `standard`, and `detail` rendering, labeling absent payload `<not captured>` and values equal to `[Filtered]` as `<redacted>`.
-- [ ] 2.6 Unit-test each event type, both timestamp units, and the dead/rage boundaries at `timeAfterClickMs` 6999 vs 7000 and `clickCount` 4 vs 5.
-- [ ] 2.7 Resolve signal offsets from the replay's `started_at` rather than the first recorded event.
+- [x] 2.1 Re-verify `which()`, `as_log_message()`, and `get_timestamp_unit()` against `getsentry/sentry` before porting. Two recent upstream fixes are folded in: missing `method`/`statusCode` on requests that never got a response (#120859), and PII-scrubbed values arriving where a number is expected (#121765).
+- [x] 2.2 Add a shared internal module exposing replay event classification, per-type timestamp resolution, and signal rendering (`packages/mcp-core/src/internal/replay-events.ts`).
+- [x] 2.3 Port the event-type taxonomy and the noise exclusion list, including skipping 2xx network requests from rendering while keeping them in kind counts, and preferring `NAVIGATION_SPAN` over `NAVIGATION` for web replays.
+- [x] 2.4 Implement behavioral dead, rage, and slow click classification, reading `payload.data.node.tagName` and accepting the lowercase `timeafterclickms`/`clickcount` spellings.
+- [x] 2.5 Implement `digest`, `standard`, and `detail` rendering, labeling absent payload `<not captured>` and values equal to `[Filtered]` as `<redacted>`.
+- [x] 2.6 Unit-test each event type, both timestamp units, and the dead/rage boundaries at `timeAfterClickMs` 6999 vs 7000 and `clickCount` 4 vs 5.
+- [x] 2.7 Resolve signal offsets from the replay's `started_at` rather than the first recorded event.
 
 ## 3. API Client
 

@@ -109,6 +109,7 @@ import type {
   ReplayDetailsSchema,
   ReplayListResponseSchema,
   ReplayRecordingEventSchema,
+  ReplayRecordingPayloadSchema,
   ReplayRecordingSegmentsSchema,
   StacktraceLinkSchema,
   TagListSchema,
@@ -179,6 +180,12 @@ export type AssignedTo = z.infer<typeof AssignedToSchema>;
 export type ReplayDetails = z.infer<typeof ReplayDetailsSchema>;
 export type ReplayList = z.infer<typeof ReplayListResponseSchema>["data"];
 export type ReplayRecordingEvent = z.infer<typeof ReplayRecordingEventSchema>;
+export type ReplayRecordingPayload = z.infer<
+  typeof ReplayRecordingPayloadSchema
+>;
+export type ReplayRecordingPayloadData = NonNullable<
+  ReplayRecordingPayload["data"]
+>;
 export type ReplayRecordingSegments = z.infer<
   typeof ReplayRecordingSegmentsSchema
 >;
