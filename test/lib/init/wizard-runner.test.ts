@@ -619,7 +619,43 @@ describe("runWizard", () => {
     expect(spinnerMock.message).toHaveBeenCalledWith("Running tool...");
   });
 
-  test("dispatches interactive payloads to the prompt handler", async () => {
+  test("keeps v1 transport metadata out of local tool payloads", async () => {
+    const requestId = "8c7ee6b9-e955-4514-9164-f01844584a28";
+    const toolPayload: ToolPayload = {
+      type: "tool",
+      operation: "apply-patchset",
+      cwd: "/tmp/test",
+      params: { patches: [] },
+    };
+    const protocolPayload: SuspendPayload = {
+      ...toolPayload,
+      protocolVersion: 1,
+      requestId,
+    };
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["apply-codemods"]],
+      steps: {
+        "apply-codemods": { suspendPayload: protocolPayload },
+      },
+    };
+    mockResumeResults = [{ status: "success" }];
+
+    await runWizard(makeOptions());
+
+    expect(describeToolSpy).toHaveBeenCalledWith(toolPayload);
+    expect(executeToolSpy).toHaveBeenCalledWith(toolPayload, makeContext());
+    expect(sharedResumeAsyncMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resumeData: expect.objectContaining({
+          protocolVersion: 1,
+          requestId,
+        }),
+      })
+    );
+  });
+
+  test("keeps v1 transport metadata out of interactive payloads", async () => {
     const requestId = "8c7ee6b9-e955-4514-9164-f01844584a28";
     mockStartResult = {
       status: "suspended",
@@ -645,8 +681,6 @@ describe("runWizard", () => {
         type: "interactive",
         kind: "confirm",
         prompt: "Continue?",
-        protocolVersion: 1,
-        requestId,
       },
       makeContext(),
       expect.anything()
