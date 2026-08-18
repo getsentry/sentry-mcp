@@ -723,6 +723,14 @@ function buildNextStepLines({
         toolName: "get_replay_activity",
         arguments: { organizationSlug, replayId, grain: "digest" },
       }),
+      ...structuralReadLines({
+        organizationSlug,
+        replayId,
+        // No failure to anchor on, so offer the start of the session as a
+        // starting point rather than omit the call.
+        atMs: 0,
+        context,
+      }),
     ];
   }
 
@@ -740,6 +748,61 @@ function buildNextStepLines({
         endMs,
         grain: "detail",
       },
+    }),
+    ...structuralReadLines({
+      organizationSlug,
+      replayId,
+      atMs: anchor.offsetMs,
+      context,
+    }),
+  ];
+}
+
+/**
+ * Name the structural read from the map itself.
+ *
+ * The map is where a reader stops when the map looks sufficient, and a chain
+ * that only names its immediate next step leaves the third tool unreachable.
+ * Observed failure: an agent read the map, concluded "the replay tooling only
+ * exposes metadata and breadcrumbs, not rendered DOM text", and went looking for
+ * the answer in application source at a release SHA. That conclusion is wrong,
+ * and nothing in the map contradicted it.
+ *
+ * Text is called out specifically because it is the non-obvious capability. The
+ * SDK masks user-entered values but not product copy, so the rendered wording of
+ * a label or message is recoverable — which is exactly the question source code
+ * at a release cannot answer reliably.
+ */
+function structuralReadLines({
+  organizationSlug,
+  replayId,
+  atMs,
+  context,
+}: {
+  organizationSlug: string;
+  replayId: string;
+  atMs: number;
+  context: ServerContext;
+}): string[] {
+  const instruction = formatToolCallInstruction({
+    toolName: "get_replay_dom",
+    experimentalMode: context.experimentalMode ?? false,
+    availableToolNames: context.availableToolNames,
+    directToolNames: context.directToolNames,
+    // Silence beats a dangling pointer to a tool this session cannot call.
+    fallbackInstruction: "",
+    purpose: "to read the page as it was rendered",
+  });
+  if (!instruction) {
+    return [];
+  }
+
+  return [
+    "",
+    `For what the page itself showed — the wording of a label or message, whether a control was present or disabled — the signals above cannot answer it. ${instruction}:`,
+    formatToolCall({
+      toolName: "get_replay_dom",
+      arguments: { organizationSlug, replayId, atMs, lens: "full" },
     }),
   ];
 }

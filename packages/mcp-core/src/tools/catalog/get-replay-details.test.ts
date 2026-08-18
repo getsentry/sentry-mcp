@@ -70,7 +70,10 @@ describe("get_replay_details", () => {
       ## Next
 
       Error CLOUDFLARE-MCP-41 occurred at T+3m 1.3s. Use the Sentry tool \`get_replay_activity\` to read the signals in a time window:
-      get_replay_activity(organizationSlug='sentry-mcp-evals', replayId='7e07485f-12f9-416b-8b14-26260799b51f', startMs=176300, endMs=186300, grain='detail')"
+      get_replay_activity(organizationSlug='sentry-mcp-evals', replayId='7e07485f-12f9-416b-8b14-26260799b51f', startMs=176300, endMs=186300, grain='detail')
+
+      For what the page itself showed — the wording of a label or message, whether a control was present or disabled — the signals above cannot answer it. Use the Sentry tool \`get_replay_dom\` to read the page as it was rendered:
+      get_replay_dom(organizationSlug='sentry-mcp-evals', replayId='7e07485f-12f9-416b-8b14-26260799b51f', atMs=181300, lens='full')"
     `);
   });
 
@@ -750,5 +753,49 @@ describe("get_replay_details", () => {
         "regionUrl",
       ]);
     });
+  });
+});
+
+describe("structural read pointer", () => {
+  afterEach(() => {
+    mswServer.resetHandlers();
+  });
+
+  function readMap(context = getServerContext()) {
+    return getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: replayDetailsFixture.id,
+      },
+      context,
+    );
+  }
+
+  it("names the DOM read from the map, not only from activity", async () => {
+    // Observed failure: an agent read the map, concluded the replay tooling
+    // exposes "metadata/breadcrumbs — not rendered DOM text", and went to read
+    // application source at a release SHA instead. The map is where a reader
+    // stops, so the third tool has to be named there too.
+    const result = await readMap();
+
+    expect(result).toContain(
+      "get_replay_dom(organizationSlug='sentry-mcp-evals'",
+    );
+    expect(result).toContain("the wording of a label or message");
+    expect(result).toContain("lens='full'");
+  });
+
+  it("stays silent when the DOM tool is absent from the session", async () => {
+    // Naming a tool this session cannot call sends the reader after nothing.
+    const result = await readMap(
+      getServerContext({
+        availableToolNames: new Set([
+          "get_replay_details",
+          "get_replay_activity",
+        ]),
+      }),
+    );
+
+    expect(result).not.toContain("get_replay_dom");
   });
 });
