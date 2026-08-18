@@ -442,6 +442,8 @@ describe("callEmbeddedAgent", () => {
       'Invalid OPENROUTER_REASONING_EFFORT "ludicrous"',
     );
     vi.mocked(getAgentProvider).mockReturnValue({
+      type: "openrouter",
+      label: "OpenRouter",
       getModel: () => "mocked-model" as never,
       getProviderOptions: () => {
         throw configError;
