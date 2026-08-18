@@ -11,6 +11,7 @@ import {
 import { getAgentProvider } from "./provider-factory";
 import {
   AgentExecutionError,
+  ConfigurationError,
   UserInputError,
   LLMProviderError,
 } from "../../errors";
@@ -228,10 +229,13 @@ export async function callEmbeddedAgent<
       );
     }
 
-    // Expected application errors thrown above (schema/user-input paths) must
-    // keep their original type so callers do not treat them as unexpected.
+    // Expected application errors thrown above (schema/user-input/config paths)
+    // must keep their original type so callers do not treat them as unexpected.
+    // ConfigurationError can come from provider.getProviderOptions() (e.g. bad
+    // OPENROUTER_REASONING_EFFORT) and must surface, not silently fall back.
     if (
       error instanceof UserInputError ||
+      error instanceof ConfigurationError ||
       error instanceof LLMProviderError ||
       error instanceof AgentExecutionError
     ) {

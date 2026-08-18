@@ -11,10 +11,12 @@ import { z } from "zod";
 import { callEmbeddedAgent } from "./callEmbeddedAgent";
 import {
   AgentExecutionError,
+  ConfigurationError,
   LLMProviderError,
   UserInputError,
 } from "../../errors";
 import { logIssue } from "../../telem/logging";
+import { getAgentProvider } from "./provider-factory";
 
 vi.mock("../../telem/logging", () => ({
   logIssue: vi.fn(() => "mock-event-id"),
@@ -39,14 +41,27 @@ vi.mock("ai", async (importOriginal) => {
   };
 });
 
+vi.mock("./provider-factory", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./provider-factory")>();
+  return {
+    ...actual,
+    getAgentProvider: vi.fn(actual.getAgentProvider),
+  };
+});
+
 describe("callEmbeddedAgent", () => {
   const mockGenerateText = vi.mocked(generateText);
   const testSchema = z.object({
     result: z.string(),
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const actual =
+      await vi.importActual<typeof import("./provider-factory")>(
+        "./provider-factory",
+      );
+    vi.mocked(getAgentProvider).mockImplementation(actual.getAgentProvider);
     process.env.OPENAI_API_KEY = "test-key";
     process.env.OPENROUTER_API_KEY = "";
   });
@@ -420,6 +435,30 @@ describe("callEmbeddedAgent", () => {
         loggerScope: ["agents", "embedded"],
       }),
     );
+  });
+
+  it("rethrows ConfigurationError from getProviderOptions without filing an issue", async () => {
+    const configError = new ConfigurationError(
+      'Invalid OPENROUTER_REASONING_EFFORT "ludicrous"',
+    );
+    vi.mocked(getAgentProvider).mockReturnValue({
+      getModel: () => "mocked-model" as never,
+      getProviderOptions: () => {
+        throw configError;
+      },
+    });
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toBe(configError);
+
+    expect(logIssue).not.toHaveBeenCalled();
+    expect(mockGenerateText).not.toHaveBeenCalled();
   });
 
   describe("NoObjectGeneratedError handling", () => {
