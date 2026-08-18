@@ -4080,6 +4080,46 @@ export class SentryApiService {
    * rather than presenting a partial recording as complete.
    */
   async getReplayRecordingSegments(
+    params: {
+      organizationSlug: string;
+      projectSlugOrId: string;
+      replayId: string;
+      maxSegments?: number;
+      maxBytes?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReplayRecordingSegmentsResult> {
+    const segments: ReplayRecordingSegments = [];
+    const stats = await this.streamReplayRecordingSegments(
+      params,
+      (segment) => {
+        segments.push(segment);
+      },
+      opts,
+    );
+
+    return { ...stats, segments };
+  }
+
+  /**
+   * Reads a recording segment by segment, without retaining it.
+   *
+   * {@link getReplayRecordingSegments} accumulates every segment before
+   * returning, which is fine for signal extraction — signals are a tiny
+   * projection of the events they come from — but not for anything that must
+   * fold a whole recording into a running state. DOM reconstruction applies
+   * thousands of mutations and keeps only the resulting node map, so holding
+   * the raw events as well would double the peak for no benefit.
+   *
+   * `onSegment` is called once per segment in wire order. Returning `"stop"`
+   * ends the read immediately, which lets a caller that has passed the moment
+   * it cares about avoid paging the rest of the session.
+   *
+   * The budgets and their reporting are identical to the buffering read: the
+   * caller is told which bound stopped it, so a partial fold is never
+   * presented as a whole one.
+   */
+  async streamReplayRecordingSegments(
     {
       organizationSlug,
       projectSlugOrId,
@@ -4093,11 +4133,16 @@ export class SentryApiService {
       maxSegments?: number;
       maxBytes?: number;
     },
+    onSegment: (
+      segment: ReplayRecordingSegments[number],
+      index: number,
+    ) => "stop" | void,
     opts?: RequestOptions,
-  ): Promise<ReplayRecordingSegmentsResult> {
-    const segments: ReplayRecordingSegments = [];
+  ): Promise<Omit<ReplayRecordingSegmentsResult, "segments">> {
     let cursor: string | null = null;
     let bytesRead = 0;
+    let segmentsRead = 0;
+    let stopped = false;
     let truncatedBy: ReplayRecordingSegmentsResult["truncatedBy"] = null;
 
     do {
@@ -4129,14 +4174,21 @@ export class SentryApiService {
 
       const page = ReplayRecordingSegmentsSchema.parse(body);
       for (const segment of page) {
-        if (segments.length >= maxSegments) {
+        if (segmentsRead >= maxSegments) {
           truncatedBy = "segments";
           break;
         }
-        segments.push(segment);
+        const outcome = onSegment(segment, segmentsRead);
+        segmentsRead += 1;
+        if (outcome === "stop") {
+          // The caller has what it needs. This is not truncation: the read
+          // ended by choice, with nothing missing from what was asked for.
+          stopped = true;
+          break;
+        }
       }
 
-      if (truncatedBy) {
+      if (truncatedBy || stopped) {
         break;
       }
       if (bytesRead >= maxBytes) {
@@ -4149,7 +4201,7 @@ export class SentryApiService {
       cursor = getNextCursor(response.headers.get("link"));
     } while (cursor);
 
-    return { segments, truncatedBy, segmentsRead: segments.length, bytesRead };
+    return { truncatedBy, segmentsRead, bytesRead };
   }
 
   /**

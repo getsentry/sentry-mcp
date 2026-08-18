@@ -124,6 +124,94 @@ describe("getReplayRecordingSegments", () => {
   });
 });
 
+describe("streamReplayRecordingSegments", () => {
+  function streamSegments(
+    replayId: string,
+    onSegment: (segment: unknown, index: number) => "stop" | void,
+    overrides = {},
+  ) {
+    return apiService.streamReplayRecordingSegments(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlugOrId: String(replayDetailsFixture.project_id),
+        replayId,
+        ...overrides,
+      },
+      onSegment,
+    );
+  }
+
+  it("delivers every segment in wire order without retaining them", async () => {
+    const seen: number[] = [];
+    const stats = await streamSegments(PAGED_REPLAY_ID, (_segment, index) => {
+      seen.push(index);
+    });
+
+    expect(seen).toEqual([0, 1, 2, 3, 4]);
+    expect(stats.segmentsRead).toBe(replayRecordingSegmentsPagedFixture.length);
+    expect(stats.truncatedBy).toBeNull();
+    // The stats shape is the buffering read's minus the payload, so callers
+    // can report the same bounds without holding the recording.
+    expect(stats).not.toHaveProperty("segments");
+  });
+
+  it("stops paging when the callback says stop", async () => {
+    // The point of the early exit: a read that has passed the moment it cares
+    // about should not fetch the rest of the session.
+    const requested: string[] = [];
+    mswServer.use(
+      http.get(SEGMENTS_URL(PAGED_REPLAY_ID), ({ request }) => {
+        requested.push(request.url);
+        return HttpResponse.json([replayRecordingSegmentsPagedFixture[0]], {
+          headers: {
+            Link: `<${SEGMENTS_URL(PAGED_REPLAY_ID)}?cursor=0:1:0>; rel="next"; results="true"; cursor="0:1:0"`,
+          },
+        });
+      }),
+    );
+
+    const stats = await streamSegments(PAGED_REPLAY_ID, () => "stop");
+
+    expect(requested).toHaveLength(1);
+    expect(stats.segmentsRead).toBe(1);
+    // Stopping by choice is not truncation; conflating them would make a
+    // deliberate early exit look like a lost tail.
+    expect(stats.truncatedBy).toBeNull();
+  });
+
+  it("reports the segment budget the same way the buffering read does", async () => {
+    const stats = await streamSegments(PAGED_REPLAY_ID, () => {}, {
+      maxSegments: 3,
+    });
+
+    expect(stats.segmentsRead).toBe(3);
+    expect(stats.truncatedBy).toBe("segments");
+  });
+
+  it("reports the byte budget the same way the buffering read does", async () => {
+    const stats = await streamSegments(PAGED_REPLAY_ID, () => {}, {
+      maxBytes: 1,
+    });
+
+    expect(stats.truncatedBy).toBe("bytes");
+    expect(stats.bytesRead).toBeGreaterThan(0);
+  });
+
+  it("agrees with the buffering read on what it saw", async () => {
+    // The buffering read is now a thin wrapper over this one, so any drift
+    // between them is a bug in the wrapper.
+    const streamed: unknown[] = [];
+    const stats = await streamSegments(PAGED_REPLAY_ID, (segment) => {
+      streamed.push(segment);
+    });
+    const buffered = await readSegments(PAGED_REPLAY_ID);
+
+    expect(streamed).toEqual(buffered.segments);
+    expect(stats.segmentsRead).toBe(buffered.segmentsRead);
+    expect(stats.bytesRead).toBe(buffered.bytesRead);
+  });
+});
+
 describe("getReplayErrorEvents", () => {
   it("resolves a batch of error ids in one request", async () => {
     const requested: string[] = [];
