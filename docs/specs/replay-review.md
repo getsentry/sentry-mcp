@@ -506,28 +506,30 @@ This is what makes the feature coherent rather than a curiosity: the map finds
 the failure, the activity read names the element, and the tree read explains
 what was around it. Each step hands the next a concrete handle.
 
-#### Tool surface
+#### Tool surface: a separate `get_replay_dom`
 
-Three options, with the tradeoff that decides it.
+**Decided: a separate catalog-only tool.** A point-in-time structural read is a
+different operation from a windowed signal list — different return shape,
+different cost model, different failure modes — and it is the only option where
+a read can refuse on budget grounds without complicating a contract agents call
+routinely.
 
-**A. A separate `get_replay_dom` tool.** A point-in-time structural read is a
-different operation from a windowed signal list: different return shape,
-different cost model, different failure modes. It is also the only option where
-a read can refuse on budget grounds without complicating an existing tool's
-contract.
+The alternatives, recorded so the decision is not relitigated from scratch:
 
-**B. A `grain: "dom"` on `get_replay_activity`.** Reuses the tool, but `grain`
-currently means "how verbose", not "what kind of thing". A `dom` grain would
-change the return type rather than its verbosity, and would need `startMs`
-and `endMs` collapsed to a point, which the window semantics do not express.
+- *A `grain: "dom"` on `get_replay_activity`.* `grain` means "how verbose", not
+  "what kind of thing". A `dom` grain would change the return type rather than
+  its verbosity, and needs `startMs`/`endMs` collapsed to a point, which the
+  window semantics do not express.
+- *An `include: ["tree"]` parameter on `get_replay_activity`.* Closest to
+  comparable tools, but puts a second, far more expensive operation behind a
+  parameter on a routinely-called tool. A caller asking for signals should not
+  risk a multi-megabyte reconstruction because a default moved.
 
-**C. An `include: ["tree"]` parameter on `get_replay_activity`.** Closest to the
-peer design, but pushes a second, much more expensive operation behind a
-parameter on a tool agents already call routinely. A caller asking for signals
-should not risk a multi-megabyte reconstruction because a default changed.
-
-**Recommendation: A.** The catalog is the right home — it costs no direct-surface
-budget, which is why `get_replay_activity` landed there too. Sketch:
+Catalog-only matters for cost: the tool-count target of ≤20 (hard limit 25)
+governs the direct surface, which stands at 9. Catalog tools are discovered
+through `search_sentry_tools` and add no per-session token overhead, which is
+why `get_replay_activity` landed there and why a third replay tool is
+affordable at all.
 
 ```typescript
 get_replay_dom({
@@ -540,9 +542,27 @@ get_replay_dom({
 })
 ```
 
+Gating matches the other two replay tools: `skills: ["inspect"]`,
+`requiredCapabilities: ["replays"]`, scopes `org:read`, `project:read`,
+`event:read`. Parameter resolution and the project-constraint check reuse
+`internal/tool-helpers/replay.ts`, which was extracted for exactly this reason
+when the second replay tool landed.
+
 `atMs` is deliberately required. A tree with no timestamp would default to
 either end of the session, and both defaults are wrong often enough that
 guessing is worse than asking.
+
+Two behaviors follow from the decision and should not be quietly dropped in
+implementation:
+
+- **Refusal is a supported outcome.** When a reconstruction cannot complete
+  within budget, the tool says so and explains what would help — a nearer
+  `atMs`, or a `rootNodeId`. It does not return a partial tree, because a
+  partial tree is indistinguishable from a complete one at the point of use.
+- **It composes with the other two rather than duplicating them.** The tool
+  returns structure only. Anything about *what happened* stays in
+  `get_replay_activity`, so the two cannot drift into competing accounts of the
+  same moment.
 
 Expected output, rooted at a click's node id:
 
@@ -587,6 +607,10 @@ Beyond the usual unit coverage, three cases carry the risk:
   implementation produces a plausible-looking stale tree.
 - **Budget refusal.** A recording that cannot be reconstructed within budget
   must say so rather than return a partial tree that reads as complete.
+- **Gating and surface.** Like the other replay tools: hidden when the
+  constrained project lacks the `replays` capability, absent from the direct
+  top-level surface, reachable through the catalog. The existing
+  `availability.test.ts` cases extend to cover it.
 
 #### Open questions for QA
 
