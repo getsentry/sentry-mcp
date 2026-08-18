@@ -117,6 +117,59 @@ replay signals for a requested time window at a requested grain.
 - **WHEN** the MCP server registers tools
 - **THEN** `get_replay_activity` is catalog-only, requires the `inspect` skill, and requires the `replays` project capability
 
+### Requirement: Replay DOM structure is readable at a point in time
+The system SHALL provide a `get_replay_dom` catalog tool that reconstructs the
+page structure of a replay at one moment from the recording's rrweb snapshot and
+mutation events, and returns it as an indented tree.
+
+#### Scenario: Point-in-time reconstruction
+- **WHEN** a caller supplies `atMs`
+- **THEN** the tree reflects the last full snapshot at or before that moment with every intervening mutation applied, and excludes structure that arrives after it
+
+#### Scenario: Required moment
+- **WHEN** a caller omits `atMs`
+- **THEN** the request is rejected, because defaulting to either end of the session would answer a different question
+
+#### Scenario: Input values supersede shipped attributes
+- **WHEN** a form control's value is changed by an rrweb input event rather than an attribute mutation
+- **THEN** the tree renders the changed value, not the value the page shipped with
+
+#### Scenario: Later snapshot supersedes earlier state
+- **WHEN** a recording contains more than one full snapshot at or before the requested moment
+- **THEN** the newest one replaces prior state wholesale rather than being merged into it
+
+#### Scenario: Subtree rooting
+- **WHEN** a caller supplies `rootNodeId`
+- **THEN** only that node and its descendants are rendered
+
+#### Scenario: Rooting at a node that does not exist yet
+- **WHEN** `rootNodeId` names a node absent from the DOM at the requested moment
+- **THEN** the response says the node does not exist, rather than returning an empty tree
+
+#### Scenario: Interactive lens
+- **WHEN** a caller requests the default `interactive` lens
+- **THEN** elements a user can act on are kept along with the ancestors that place them, and inert leaves are dropped
+
+#### Scenario: Budget refusal
+- **WHEN** the segment budget is exhausted before the requested moment is reached
+- **THEN** the tool refuses and explains what would help, and does not return a partial tree
+
+#### Scenario: Fidelity reporting
+- **WHEN** a reconstruction drops operations, or the recording ends before the requested moment
+- **THEN** the response states it, so a partial reconstruction is not read as a complete one
+
+#### Scenario: Structural scope
+- **WHEN** text or form values were masked by the SDK before upload
+- **THEN** they render as delivered and are not labeled redacted, since client-side masking leaves no marker
+
+#### Scenario: Node id handoff
+- **WHEN** a caller reads replay activity at `detail` grain
+- **THEN** each click signal reports the rrweb node id that `get_replay_dom` accepts as `rootNodeId`
+
+#### Scenario: Tool availability
+- **WHEN** the MCP server registers tools
+- **THEN** `get_replay_dom` is catalog-only, requires the `inspect` skill, and requires the `replays` project capability
+
 ### Requirement: Unavailable replay payload is labeled
 The system SHALL distinguish payload that was never captured from payload that
 was removed by masking.

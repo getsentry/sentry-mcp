@@ -31,6 +31,13 @@ cannot distinguish truncation from absence.
 - Add `get_replay_activity` as a catalog-only tool: a time window (`startMs`,
   `endMs`), a grain (`digest`, `standard`, `detail`), an optional `kinds`
   allow-list, and `limit`/`cursor` paging.
+- Add `get_replay_dom` as a catalog-only tool: reconstruct the page structure at
+  a required `atMs` from the rrweb snapshot and mutation events already present
+  in the segments and discarded today, rooted at an optional `rootNodeId` taken
+  from a click signal. Originally filed as follow-up work; the map and the zoom
+  answer what happened but leave "what was the page" unanswerable, which is the
+  question a structural failure poses. Refuses rather than returning a partial
+  tree when the segment budget runs out.
 - Surface Sentry's experimental replay summary endpoint as an optional
   `## Chapters` section, read once per call — never started, never retried —
   strictly additive and degrading silently.
