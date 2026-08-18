@@ -11,6 +11,7 @@ import {
   NODE_TYPE_ELEMENT,
   NODE_TYPE_TEXT,
   countDropped,
+  renderDomTree,
   type DomNode,
 } from "./replay-dom.js";
 import type { ReplayRecordingEvent } from "../api-client";
@@ -428,5 +429,225 @@ describe("malformed payloads", () => {
 
     expect(result.dropped.malformed).toBe(1);
     expect(result.nodes.get(3)?.tagName).toBe("div");
+  });
+});
+
+describe("rendering", () => {
+  /** A checkout form: a container, two inputs, and a submit button. */
+  function checkoutSnapshot() {
+    return snapshot(0, [
+      element(10, "div", { class: "page wrapper" }, [
+        element(11, "form", { id: "checkout-form" }, [
+          element(12, "div", { class: "address-block" }, [
+            element(13, "input", { id: "unit", value: "***" }),
+            element(14, "input", { id: "zip", value: "***" }),
+          ]),
+          element(15, "button", { id: "complete-order", disabled: true }, [
+            text(16, "Complete order"),
+          ]),
+        ]),
+      ]),
+    ]);
+  }
+
+  it("renders a tree with connectors and node ids", () => {
+    const rendered = renderDomTree(reconstruct([checkoutSnapshot()]), {
+      rootNodeId: 11,
+    });
+
+    expect(rendered.lines.join("\n")).toMatchInlineSnapshot(`
+      "form#checkout-form  id=11
+      ├─ div.address-block  id=12
+      │  ├─ input#unit  [value="***"]  id=13
+      │  └─ input#zip  [value="***"]  id=14
+      └─ button#complete-order  "Complete order"  [disabled]  id=15"
+    `);
+  });
+
+  it("takes element text from child text nodes", () => {
+    // rrweb element nodes carry no textContent, so a label only appears if the
+    // renderer looks at children.
+    const rendered = renderDomTree(reconstruct([checkoutSnapshot()]), {
+      rootNodeId: 15,
+    });
+
+    expect(rendered.lines[0]).toContain('"Complete order"');
+  });
+
+  it("does not let a container inherit its descendants' text", () => {
+    const rendered = renderDomTree(reconstruct([checkoutSnapshot()]), {
+      rootNodeId: 11,
+    });
+
+    expect(rendered.lines[0]).not.toContain("Complete order");
+  });
+
+  it("takes text only from text children, not from nested elements", () => {
+    // An element child may carry its own text; treating it as this element's
+    // text would attribute a label to the wrong node. The distinguishing case
+    // needs an element child that has textContent set, which only happens for
+    // a malformed or unusual payload — hence asserting on node type rather
+    // than on the presence of the field.
+    const oddPayload = snapshot(0, [
+      element(20, "div", { id: "container" }, [
+        {
+          id: 21,
+          type: NODE_TYPE_ELEMENT,
+          tagName: "span",
+          attributes: {},
+          childNodes: [],
+          textContent: "child element text",
+        },
+        text(22, "own text"),
+      ]),
+    ]);
+
+    const rendered = renderDomTree(reconstruct([oddPayload]), {
+      rootNodeId: 20,
+      lens: "full",
+    });
+
+    expect(rendered.lines[0]).toContain('"own text"');
+    expect(rendered.lines[0]).not.toContain("child element text");
+  });
+
+  it("roots at a node id, excluding everything above it", () => {
+    const rendered = renderDomTree(reconstruct([checkoutSnapshot()]), {
+      rootNodeId: 12,
+    });
+
+    expect(rendered.lines[0]).toContain("div.address-block");
+    expect(rendered.lines.join("\n")).not.toContain("checkout-form");
+  });
+
+  it("reports a root id that is not in the reconstruction", () => {
+    // Silently falling back to the document root would answer a question the
+    // caller did not ask.
+    const rendered = renderDomTree(reconstruct([checkoutSnapshot()]), {
+      rootNodeId: 9999,
+    });
+
+    expect(rendered.rootNotFound).toBe(true);
+    expect(rendered.lines).toEqual([]);
+  });
+
+  describe("the interactive lens", () => {
+    it("keeps interactive elements and the ancestors that place them", () => {
+      const rendered = renderDomTree(reconstruct([checkoutSnapshot()]), {
+        lens: "interactive",
+      });
+      const output = rendered.lines.join("\n");
+
+      expect(output).toContain("button#complete-order");
+      expect(output).toContain("input#unit");
+      // div.address-block is inert but is on the path to the inputs.
+      expect(output).toContain("div.address-block");
+    });
+
+    it("drops inert leaves", () => {
+      const withDecoration = snapshot(0, [
+        element(10, "div", {}, [
+          element(11, "span", { class: "decoration" }),
+          element(12, "button", { id: "go" }),
+        ]),
+      ]);
+
+      const rendered = renderDomTree(reconstruct([withDecoration]), {
+        lens: "interactive",
+      });
+
+      expect(rendered.lines.join("\n")).toContain("button#go");
+      expect(rendered.lines.join("\n")).not.toContain("decoration");
+    });
+
+    it("keeps an element made interactive by an attribute alone", () => {
+      const withRole = snapshot(0, [
+        element(10, "div", { role: "button", id: "fake-button" }),
+      ]);
+
+      const rendered = renderDomTree(reconstruct([withRole]), {
+        lens: "interactive",
+      });
+
+      expect(rendered.lines.join("\n")).toContain("fake-button");
+    });
+
+    it("keeps inert elements under the full lens", () => {
+      const withDecoration = snapshot(0, [
+        element(10, "div", {}, [element(11, "span", { class: "decoration" })]),
+      ]);
+
+      const rendered = renderDomTree(reconstruct([withDecoration]), {
+        lens: "full",
+      });
+
+      expect(rendered.lines.join("\n")).toContain("decoration");
+    });
+  });
+
+  it("renders the current input value, not the shipped attribute", () => {
+    const result = reconstruct([
+      snapshot(0, [element(10, "input", { id: "email", value: "initial" })]),
+      inputEvent(100, 10, { text: "typed@example.com" }),
+    ]);
+
+    const rendered = renderDomTree(result, { rootNodeId: 10 });
+
+    expect(rendered.lines[0]).toContain('[value="typed@example.com"]');
+    expect(rendered.lines[0]).not.toContain("initial");
+  });
+
+  it("renders masked values as delivered rather than claiming redaction", () => {
+    // SDK masking leaves no marker, so labeling this <redacted> would assert
+    // something the recording cannot support.
+    const rendered = renderDomTree(reconstruct([checkoutSnapshot()]), {
+      rootNodeId: 13,
+    });
+
+    expect(rendered.lines[0]).toContain('[value="***"]');
+    expect(rendered.lines[0]).not.toContain("redacted");
+  });
+
+  it("stops at maxNodes and says so", () => {
+    const wide = snapshot(0, [
+      element(
+        10,
+        "div",
+        {},
+        Array.from({ length: 20 }, (_unused, index) =>
+          element(100 + index, "button", { id: `b${index}` }),
+        ),
+      ),
+    ]);
+
+    const rendered = renderDomTree(reconstruct([wide]), { maxNodes: 5 });
+
+    expect(rendered.nodesRendered).toBe(5);
+    expect(rendered.truncated).toBe(true);
+  });
+
+  it("stops at maxDepth and says so", () => {
+    // Build a deep chain so depth, not breadth, is what cuts it off.
+    let deepest: unknown = element(60, "button", { id: "deep" });
+    for (let id = 59; id >= 50; id -= 1) {
+      deepest = element(id, "div", {}, [deepest]);
+    }
+
+    const rendered = renderDomTree(reconstruct([snapshot(0, [deepest])]), {
+      maxDepth: 3,
+      lens: "full",
+    });
+
+    expect(rendered.truncated).toBe(true);
+    expect(rendered.nodesRendered).toBeLessThan(10);
+  });
+
+  it("returns nothing for a reconstruction with no snapshot", () => {
+    const rendered = renderDomTree(
+      reconstruct([mutation(100, { texts: [{ id: 1, value: "x" }] })]),
+    );
+
+    expect(rendered.lines).toEqual([]);
+    expect(rendered.rootNotFound).toBe(false);
   });
 });

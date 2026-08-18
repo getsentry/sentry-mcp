@@ -574,3 +574,288 @@ function readAttributes(
   }
   return attributes;
 }
+
+/**
+ * How much of the tree to render.
+ *
+ * `interactive` keeps what a user can act on — form controls, buttons, links,
+ * and anything carrying an interaction role — plus the ancestors needed to
+ * place them. `full` keeps every element.
+ *
+ * There is deliberately no `visible` lens. Visibility is a computed style, and
+ * resolving the cascade is a browser's job; a lens that guessed would be
+ * confidently wrong about the thing a reader most wants to trust.
+ */
+export type DomLens = "interactive" | "full";
+
+/** Tag names that are interactive regardless of attributes. */
+const INTERACTIVE_TAGS = new Set([
+  "a",
+  "button",
+  "input",
+  "select",
+  "textarea",
+  "option",
+  "label",
+  "form",
+  "details",
+  "summary",
+  "dialog",
+]);
+
+/** Attributes that make an otherwise-inert element interactive. */
+const INTERACTIVE_ATTRIBUTES = ["role", "onclick", "tabindex", "href"];
+
+/** Attributes worth rendering, in this order, when present. */
+const RENDERED_ATTRIBUTES = [
+  "type",
+  "name",
+  "href",
+  "role",
+  "placeholder",
+  "aria-label",
+  "disabled",
+  "checked",
+  "required",
+  "readonly",
+];
+
+const MAX_TEXT_LENGTH = 80;
+
+export interface RenderTreeOptions {
+  lens?: DomLens;
+  /** Render only this node and its descendants. */
+  rootNodeId?: number;
+  maxDepth?: number;
+  maxNodes?: number;
+}
+
+export interface RenderedTree {
+  lines: string[];
+  /** Nodes rendered, after lens filtering and limits. */
+  nodesRendered: number;
+  /** True when `maxNodes` or `maxDepth` cut the output short. */
+  truncated: boolean;
+  /** Set when `rootNodeId` named a node that is not in the reconstruction. */
+  rootNotFound: boolean;
+}
+
+/**
+ * Renders a reconstruction as an indented tree.
+ *
+ * Text is taken from child text nodes, since rrweb element nodes carry none.
+ * Values render exactly as recorded: SDK masking leaves no marker, so a masked
+ * field is indistinguishable from a real one and claiming redaction would
+ * assert something unknowable. Only Relay's marker supports that claim, and it
+ * does not appear in DOM payloads.
+ */
+export function renderDomTree(
+  reconstruction: DomReconstruction,
+  options: RenderTreeOptions = {},
+): RenderedTree {
+  const {
+    lens = "interactive",
+    rootNodeId,
+    maxDepth = 12,
+    maxNodes = 200,
+  } = options;
+
+  const { nodes } = reconstruction;
+  const startId = rootNodeId ?? reconstruction.rootId;
+
+  if (rootNodeId !== undefined && !nodes.has(rootNodeId)) {
+    return {
+      lines: [],
+      nodesRendered: 0,
+      truncated: false,
+      rootNotFound: true,
+    };
+  }
+
+  if (startId === null || startId === undefined || !nodes.has(startId)) {
+    return {
+      lines: [],
+      nodesRendered: 0,
+      truncated: false,
+      rootNotFound: false,
+    };
+  }
+
+  // Under the interactive lens, an element is kept when it is interactive or
+  // when it has a kept descendant — otherwise a button would be rendered with
+  // no indication of where it sits.
+  const keep =
+    lens === "full" ? null : collectInteractiveAncestry(nodes, startId);
+
+  const lines: string[] = [];
+  let nodesRendered = 0;
+  let truncated = false;
+
+  const walk = (id: number, depth: number, prefix: string, isLast: boolean) => {
+    if (truncated) {
+      return;
+    }
+    const node = nodes.get(id);
+    if (!node || node.nodeType !== NODE_TYPE_ELEMENT) {
+      return;
+    }
+    if (keep && !keep.has(id)) {
+      return;
+    }
+    if (nodesRendered >= maxNodes) {
+      truncated = true;
+      return;
+    }
+    if (depth > maxDepth) {
+      truncated = true;
+      return;
+    }
+
+    const connector = depth === 0 ? "" : isLast ? "└─ " : "├─ ";
+    lines.push(`${prefix}${connector}${describeElement(node, nodes)}`);
+    nodesRendered += 1;
+
+    const childPrefix = depth === 0 ? "" : `${prefix}${isLast ? "   " : "│  "}`;
+    const renderable = node.childIds.filter((childId) => {
+      const child = nodes.get(childId);
+      if (!child || child.nodeType !== NODE_TYPE_ELEMENT) {
+        return false;
+      }
+      return !keep || keep.has(childId);
+    });
+
+    for (const [index, childId] of renderable.entries()) {
+      walk(childId, depth + 1, childPrefix, index === renderable.length - 1);
+    }
+  };
+
+  walk(startId, 0, "", true);
+
+  return { lines, nodesRendered, truncated, rootNotFound: false };
+}
+
+/**
+ * Ids to keep under the interactive lens: interactive elements, plus every
+ * ancestor up to the render root so each one has a path.
+ */
+function collectInteractiveAncestry(
+  nodes: Map<number, DomNode>,
+  startId: number,
+): Set<number> {
+  const keep = new Set<number>([startId]);
+
+  const markAncestors = (id: number) => {
+    let current = nodes.get(id)?.parentId ?? null;
+    while (current !== null && !keep.has(current)) {
+      keep.add(current);
+      current = nodes.get(current)?.parentId ?? null;
+    }
+  };
+
+  // Walk the subtree under startId rather than the whole map, so a rooted
+  // render is not influenced by interactive elements elsewhere in the page.
+  const stack = [startId];
+  while (stack.length > 0) {
+    const id = stack.pop();
+    if (id === undefined) {
+      continue;
+    }
+    const node = nodes.get(id);
+    if (!node) {
+      continue;
+    }
+    if (isInteractive(node)) {
+      keep.add(id);
+      markAncestors(id);
+    }
+    stack.push(...node.childIds);
+  }
+
+  return keep;
+}
+
+function isInteractive(node: DomNode): boolean {
+  if (node.tagName && INTERACTIVE_TAGS.has(node.tagName.toLowerCase())) {
+    return true;
+  }
+  return INTERACTIVE_ATTRIBUTES.some((name) => name in node.attributes);
+}
+
+/**
+ * One line for an element: a CSS-like selector, its text, and the attributes
+ * that carry state.
+ */
+function describeElement(node: DomNode, nodes: Map<number, DomNode>): string {
+  const parts = [describeSelector(node)];
+
+  const text = directText(node, nodes);
+  if (text) {
+    parts.push(`"${text}"`);
+  }
+
+  // The current value, not the attribute: input events supersede it, and the
+  // attribute records only what the page shipped with.
+  if (node.inputValue !== undefined) {
+    parts.push(`[value=${JSON.stringify(truncateText(node.inputValue))}]`);
+  }
+  if (node.inputChecked !== undefined) {
+    parts.push(`[checked=${node.inputChecked}]`);
+  }
+
+  const rendered = RENDERED_ATTRIBUTES.filter(
+    (name) => name in node.attributes && name !== "value",
+  ).map((name) => {
+    const value = node.attributes[name];
+    return value === true ? `[${name}]` : `[${name}=${value}]`;
+  });
+  parts.push(...rendered);
+
+  parts.push(`id=${node.id}`);
+
+  return parts.join("  ");
+}
+
+/**
+ * `tag#id.class` for an element, matching the selector style used elsewhere in
+ * replay output.
+ */
+function describeSelector(node: DomNode): string {
+  const tag = node.tagName?.toLowerCase() ?? "node";
+  const id =
+    typeof node.attributes.id === "string" ? `#${node.attributes.id}` : "";
+  const className =
+    typeof node.attributes.class === "string"
+      ? node.attributes.class
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((name) => `.${name}`)
+          .join("")
+      : "";
+  return `${tag}${id}${className}`;
+}
+
+/**
+ * Text belonging directly to this element.
+ *
+ * Only immediate text children, so a container does not inherit the
+ * concatenated text of everything beneath it.
+ */
+function directText(node: DomNode, nodes: Map<number, DomNode>): string | null {
+  const parts: string[] = [];
+  for (const childId of node.childIds) {
+    const child = nodes.get(childId);
+    if (child?.nodeType === NODE_TYPE_TEXT && child.textContent) {
+      parts.push(child.textContent);
+    }
+  }
+  const joined = parts.join(" ").replace(/\s+/g, " ").trim();
+  return joined ? truncateText(joined) : null;
+}
+
+function truncateText(value: string): string {
+  return value.length > MAX_TEXT_LENGTH
+    ? `${value.slice(0, MAX_TEXT_LENGTH)}…`
+    : value;
+}
