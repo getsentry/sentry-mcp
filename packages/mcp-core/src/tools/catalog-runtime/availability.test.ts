@@ -75,7 +75,11 @@ describe("catalog availability", () => {
   });
 
   describe("replay capability gating", () => {
-    const REPLAY_TOOLS = ["get_replay_details", "get_replay_activity"];
+    const REPLAY_TOOLS = [
+      "get_replay_details",
+      "get_replay_activity",
+      "get_replay_dom",
+    ];
 
     function getInspectContext(
       constraints: Partial<ServerContext["constraints"]> = {},
@@ -86,7 +90,7 @@ describe("catalog availability", () => {
       });
     }
 
-    it("offers both replay tools when the constrained project has replays", () => {
+    it("offers every replay tool when the constrained project has replays", () => {
       const names = getSearchableToolNames(
         getInspectContext({
           organizationSlug: "my-org",
@@ -98,7 +102,7 @@ describe("catalog availability", () => {
       expect(names).toEqual(expect.arrayContaining(REPLAY_TOOLS));
     });
 
-    it("hides both replay tools when the constrained project has no replays", () => {
+    it("hides every replay tool when the constrained project has no replays", () => {
       // Advertising a tool that can only fail costs a tool slot and invites a
       // call that returns nothing useful.
       const names = getSearchableToolNames(
@@ -123,7 +127,7 @@ describe("catalog availability", () => {
       expect(names).toEqual(expect.arrayContaining(REPLAY_TOOLS));
     });
 
-    it("keeps both replay tools off the direct surface", () => {
+    it("keeps every replay tool off the direct surface", () => {
       // They are catalog-only by design: the direct surface is budgeted, and
       // replay review starts from a search or a pasted URL either way.
       const directToolNames = getToolsForMcpRegistration({

@@ -5,7 +5,7 @@
     "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, cron monitors, uptime monitors, profiles, documentation, and project metadata",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 38,
+    "toolCount": 39,
     "tools": [
       {
         "name": "find_alert_rules",
@@ -135,6 +135,11 @@
       {
         "name": "get_replay_details",
         "description": "Get high-level information about a specific Sentry replay by URL or replay ID.\n\nUSE THIS TOOL WHEN USERS:\n- Share a replay URL\n- Ask what happened in a specific replay\n- Want a concise replay summary plus the next issue or trace lookups to run\n\n<examples>\n### With replay URL\n```\nget_replay_details(replayUrl='https://my-organization.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/')\n```\n\n### With organization and replay ID\n```\nget_replay_details(organizationSlug='my-organization', replayId='7e07485f-12f9-416b-8b14-26260799b51f')\n```\n</examples>",
+        "requiredScopes": ["org:read", "project:read", "event:read"]
+      },
+      {
+        "name": "get_replay_dom",
+        "description": "Read the page structure of a Sentry replay at one moment in time.\n\nUSE THIS TOOL WHEN USERS:\n- Ask what the page looked like when something failed\n- Need to know whether an element existed, was disabled, or was empty\n- Want the DOM around an element that was clicked or rage-clicked\n\nReturns structure only — what the page *was*, not what the user did.\nUse `get_replay_activity` for that, and to find the `nodeId` to root at.\n`atMs` is milliseconds from the start of the replay and is required.\n\nText and form values are masked by the SDK before upload, so this answers\nstructural questions, not what a user typed.\n\n<examples>\n### What the page looked like when the error fired\n```\nget_replay_dom(organizationSlug='my-organization', replayId='7e07485f-12f9-416b-8b14-26260799b51f', atMs=181300)\n```\n\n### The subtree around a rage-clicked element\n```\nget_replay_dom(organizationSlug='my-organization', replayId='7e07485f-12f9-416b-8b14-26260799b51f', atMs=181300, rootNodeId=96, lens='full')\n```\n</examples>",
         "requiredScopes": ["org:read", "project:read", "event:read"]
       },
       {

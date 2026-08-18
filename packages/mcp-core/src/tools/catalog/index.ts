@@ -25,6 +25,7 @@ import getTraceDetails from "./get-trace-details";
 import getSpanDetails from "./get-span-details";
 import getReplayActivity from "./get-replay-activity";
 import getReplayDetails from "./get-replay-details";
+import getReplayDom from "./get-replay-dom";
 import getEventAttachment from "./get-event-attachment";
 import updateIssue from "./update-issue";
 import searchEvents from "./search-events";
@@ -90,6 +91,7 @@ const catalogTools = {
   get_span_details: getSpanDetails,
   get_replay_details: getReplayDetails,
   get_replay_activity: getReplayActivity,
+  get_replay_dom: getReplayDom,
   get_event_attachment: getEventAttachment,
   update_issue: updateIssue,
   search_events: searchEvents,
