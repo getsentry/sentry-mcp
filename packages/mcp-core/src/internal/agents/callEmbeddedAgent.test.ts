@@ -3,12 +3,23 @@ import {
   generateText,
   APICallError,
   NoObjectGeneratedError,
+  NoOutputGeneratedError,
   RetryError,
   type LanguageModelUsage,
 } from "ai";
 import { z } from "zod";
 import { callEmbeddedAgent } from "./callEmbeddedAgent";
-import { LLMProviderError, UserInputError } from "../../errors";
+import {
+  AgentExecutionError,
+  LLMProviderError,
+  UserInputError,
+} from "../../errors";
+import { logIssue } from "../../telem/logging";
+
+vi.mock("../../telem/logging", () => ({
+  logIssue: vi.fn(() => "mock-event-id"),
+  logWarn: vi.fn(),
+}));
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -309,7 +320,7 @@ describe("callEmbeddedAgent", () => {
     ).rejects.toThrow(/currently unavailable.*socket hang up/);
   });
 
-  it("re-throws non-APICallError errors unchanged", async () => {
+  it("converts unexpected errors into AgentExecutionError after filing a Sentry issue", async () => {
     const genericError = new Error("Something went wrong");
 
     mockGenerateText.mockRejectedValue(genericError);
@@ -321,7 +332,94 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow("Something went wrong");
+    ).rejects.toBeInstanceOf(AgentExecutionError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("Something went wrong"),
+      eventId: "mock-event-id",
+      cause: genericError,
+    });
+
+    expect(logIssue).toHaveBeenCalledWith(
+      genericError,
+      expect.objectContaining({
+        loggerScope: ["agents", "embedded"],
+      }),
+    );
+  });
+
+  it("converts NoOutputGeneratedError into AgentExecutionError after filing a Sentry issue", async () => {
+    const noOutputError = new NoOutputGeneratedError({
+      message: "No output generated.",
+    });
+
+    mockGenerateText.mockRejectedValue(noOutputError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toBeInstanceOf(AgentExecutionError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("No output generated."),
+      eventId: "mock-event-id",
+      cause: noOutputError,
+    });
+
+    expect(logIssue).toHaveBeenCalledWith(
+      noOutputError,
+      expect.objectContaining({
+        loggerScope: ["agents", "embedded"],
+        contexts: {
+          embeddedAgent: expect.objectContaining({
+            isNoOutputGenerated: true,
+          }),
+        },
+      }),
+    );
+  });
+
+  it("treats missing experimental_output as NoOutputGeneratedError", async () => {
+    mockGenerateText.mockResolvedValue({
+      experimental_output: undefined,
+    } as never);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toBeInstanceOf(AgentExecutionError);
+
+    expect(logIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "AI_NoOutputGeneratedError",
+        message: "No output generated.",
+      }),
+      expect.objectContaining({
+        loggerScope: ["agents", "embedded"],
+      }),
+    );
   });
 
   describe("NoObjectGeneratedError handling", () => {

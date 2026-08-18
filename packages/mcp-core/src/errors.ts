@@ -34,3 +34,30 @@ export class LLMProviderError extends Error {
     this.name = "LLMProviderError";
   }
 }
+
+export type AgentExecutionErrorOptions = ErrorOptions & {
+  /**
+   * Sentry event id from the single logIssue call that already reported this
+   * unexpected agent failure. Downstream handlers must not file another issue.
+   */
+  eventId?: string;
+};
+
+/**
+ * Unexpected failure inside an embedded agent run (for example the AI SDK
+ * finishing without structured output).
+ *
+ * These are real bugs/operational defects and MUST create a Sentry issue once
+ * at the agent boundary. Callers should still degrade gracefully (fallback or
+ * formatted tool error) instead of hard-failing the parent MCP tool. The issue
+ * is filed before this error is thrown; do not call logIssue again for it.
+ */
+export class AgentExecutionError extends Error {
+  readonly eventId?: string;
+
+  constructor(message: string, options?: AgentExecutionErrorOptions) {
+    super(message, options);
+    this.name = "AgentExecutionError";
+    this.eventId = options?.eventId;
+  }
+}
