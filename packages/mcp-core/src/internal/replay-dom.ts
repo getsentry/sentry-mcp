@@ -655,6 +655,20 @@ const RENDERED_ATTRIBUTES = [
 
 const MAX_TEXT_LENGTH = 80;
 
+/**
+ * Depth allowed before a branch is pruned.
+ *
+ * Deliberately generous. Measured against a real Sentry replay, whose element
+ * tree is 17 levels deep with its interactive elements below level 12 — a
+ * shallower cap clipped exactly the nodes the interactive lens exists to show.
+ * Component frameworks nest wrapper elements freely, so depth is a poor proxy
+ * for output size; `maxNodes` is the real budget.
+ */
+const DEFAULT_MAX_DEPTH = 40;
+
+/** Elements rendered before the walk stops and says so. */
+const DEFAULT_MAX_NODES = 200;
+
 export interface RenderTreeOptions {
   lens?: DomLens;
   /** Render only this node and its descendants. */
@@ -667,8 +681,22 @@ export interface RenderedTree {
   lines: string[];
   /** Nodes rendered, after lens filtering and limits. */
   nodesRendered: number;
-  /** True when `maxNodes` or `maxDepth` cut the output short. */
+  /**
+   * True when either limit cut the output short.
+   *
+   * Kept as a single flag for callers that only need "is this the whole thing",
+   * but the two limits below say which, because they call for different fixes.
+   */
   truncated: boolean;
+  /**
+   * Subtrees omitted for exceeding `maxDepth`.
+   *
+   * Depth pruning is local: the deep branch is dropped and its siblings still
+   * render, so a single deeply-nested branch cannot hide the rest of the page.
+   */
+  depthLimitedSubtrees: number;
+  /** True when `maxNodes` was reached and the walk stopped. */
+  nodeLimitReached: boolean;
   /** Set when `rootNodeId` named a node that is not in the reconstruction. */
   rootNotFound: boolean;
 }
@@ -689,8 +717,8 @@ export function renderDomTree(
   const {
     lens = "interactive",
     rootNodeId,
-    maxDepth = 12,
-    maxNodes = 200,
+    maxDepth = DEFAULT_MAX_DEPTH,
+    maxNodes = DEFAULT_MAX_NODES,
   } = options;
 
   const { nodes } = reconstruction;
@@ -701,6 +729,8 @@ export function renderDomTree(
       lines: [],
       nodesRendered: 0,
       truncated: false,
+      depthLimitedSubtrees: 0,
+      nodeLimitReached: false,
       rootNotFound: true,
     };
   }
@@ -710,6 +740,8 @@ export function renderDomTree(
       lines: [],
       nodesRendered: 0,
       truncated: false,
+      depthLimitedSubtrees: 0,
+      nodeLimitReached: false,
       rootNotFound: false,
     };
   }
@@ -725,6 +757,8 @@ export function renderDomTree(
       lines: [],
       nodesRendered: 0,
       truncated: false,
+      depthLimitedSubtrees: 0,
+      nodeLimitReached: false,
       rootNotFound: false,
     };
   }
@@ -737,10 +771,12 @@ export function renderDomTree(
 
   const lines: string[] = [];
   let nodesRendered = 0;
-  let truncated = false;
+  let nodeLimitReached = false;
+  let depthLimitedSubtrees = 0;
 
   const walk = (id: number, depth: number, prefix: string, isLast: boolean) => {
-    if (truncated) {
+    // The node budget is global: once spent, nothing further can render.
+    if (nodeLimitReached) {
       return;
     }
     const node = nodes.get(id);
@@ -751,11 +787,15 @@ export function renderDomTree(
       return;
     }
     if (nodesRendered >= maxNodes) {
-      truncated = true;
+      nodeLimitReached = true;
       return;
     }
+    // The depth budget is local: prune this branch and count it, but keep
+    // walking its siblings. Aborting the traversal here would let one deeply
+    // nested branch hide the entire rest of the page — `head` is often deep
+    // enough to swallow `body`.
     if (depth > maxDepth) {
-      truncated = true;
+      depthLimitedSubtrees += 1;
       return;
     }
 
@@ -779,7 +819,14 @@ export function renderDomTree(
 
   walk(renderRootId, 0, "", true);
 
-  return { lines, nodesRendered, truncated, rootNotFound: false };
+  return {
+    lines,
+    nodesRendered,
+    truncated: nodeLimitReached || depthLimitedSubtrees > 0,
+    depthLimitedSubtrees,
+    nodeLimitReached,
+    rootNotFound: false,
+  };
 }
 
 /**

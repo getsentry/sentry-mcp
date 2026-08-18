@@ -3649,16 +3649,18 @@
           "enum": ["interactive", "full"]
         },
         "maxDepth": {
-          "default": 12,
+          "default": 40,
+          "description": "How deep to descend. Branches below this are pruned and counted, not silently dropped; their siblings still render. Real pages nest deeply, so lower this only to skim.",
           "type": "number",
           "minimum": 1,
-          "maximum": 50
+          "maximum": 200
         },
         "maxNodes": {
           "default": 200,
+          "description": "How many elements to render before stopping. This is the real budget on output size; raise it, or pass `rootNodeId`, to see more.",
           "type": "number",
           "minimum": 1,
-          "maximum": 1000
+          "maximum": 2000
         }
       },
       "required": ["atMs"]

@@ -82,8 +82,22 @@ export default defineTool({
       .describe(
         "`interactive` keeps elements a user can act on plus the ancestors that place them; `full` keeps every element.",
       ),
-    maxDepth: z.number().min(1).max(50).default(12),
-    maxNodes: z.number().min(1).max(1000).default(200),
+    maxDepth: z
+      .number()
+      .min(1)
+      .max(200)
+      .default(40)
+      .describe(
+        "How deep to descend. Branches below this are pruned and counted, not silently dropped; their siblings still render. Real pages nest deeply, so lower this only to skim.",
+      ),
+    maxNodes: z
+      .number()
+      .min(1)
+      .max(2000)
+      .default(200)
+      .describe(
+        "How many elements to render before stopping. This is the real budget on output size; raise it, or pass `rootNodeId`, to see more.",
+      ),
   },
   annotations: {
     readOnlyHint: true,
@@ -316,10 +330,18 @@ function formatDomOutput({
   lines.push(...tree.lines);
   lines.push("```");
 
-  if (tree.truncated) {
+  // The two limits call for different fixes, so they are reported separately
+  // rather than as one "truncated" line the reader has to guess at.
+  if (tree.nodeLimitReached) {
     lines.push("");
     lines.push(
-      `Tree truncated at ${tree.nodesRendered} nodes. Raise \`maxNodes\`/\`maxDepth\`, or pass a \`rootNodeId\` to narrow the read.`,
+      `Stopped after ${tree.nodesRendered} elements (\`maxNodes\`). To see more: raise \`maxNodes\`, or pass \`rootNodeId\` to render one subtree in full — every line above carries the id to use.`,
+    );
+  }
+  if (tree.depthLimitedSubtrees > 0) {
+    lines.push("");
+    lines.push(
+      `${tree.depthLimitedSubtrees} subtree${tree.depthLimitedSubtrees === 1 ? "" : "s"} ${tree.depthLimitedSubtrees === 1 ? "was" : "were"} deeper than \`maxDepth\` and ${tree.depthLimitedSubtrees === 1 ? "is" : "are"} not shown. Raise \`maxDepth\`, or root at the deepest node shown to continue from there.`,
     );
   }
 

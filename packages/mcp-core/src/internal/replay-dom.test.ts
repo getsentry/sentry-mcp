@@ -467,6 +467,34 @@ describe("rendering", () => {
     ]);
   }
 
+  it("prunes a deep branch locally, leaving later siblings intact", () => {
+    // The real failure this reproduces: on a live page `head` is deep enough
+    // that aborting the walk at the depth limit hid `body` and everything under
+    // it. Depth pruning must drop only the offending branch.
+    const deepThenShallow = snapshot(0, [
+      element(10, "div", { id: "deep" }, [
+        element(11, "div", {}, [
+          element(12, "div", {}, [element(13, "button", { id: "buried" })]),
+        ]),
+      ]),
+      element(20, "button", { id: "later-sibling" }),
+    ]);
+
+    const rendered = renderDomTree(reconstruct([deepThenShallow]), {
+      lens: "full",
+      maxDepth: 3,
+    });
+    const output = rendered.lines.join("\n");
+
+    // `div#deep` sits at the limit; its children are pruned.
+    expect(output).toContain("div#deep");
+    expect(output).not.toContain("buried");
+    // The sibling that comes after the pruned branch must still render.
+    expect(output).toContain("button#later-sibling");
+    expect(rendered.depthLimitedSubtrees).toBeGreaterThan(0);
+    expect(rendered.nodeLimitReached).toBe(false);
+  });
+
   it("renders from the document root by descending to the first element", () => {
     // The regression this guards: rrweb roots a snapshot at the Document node,
     // which is not an element, and a renderer that walks from it directly emits

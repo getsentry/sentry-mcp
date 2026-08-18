@@ -172,15 +172,43 @@ describe("get_replay_dom", () => {
       expect(full).toContain("div#order-error");
     });
 
-    it("reports truncation rather than silently cutting the tree", async () => {
+    it("reports hitting the node budget, and how to see more", async () => {
       const result = await callTool({
         atMs: AT_CHECKOUT_ERROR,
         lens: "full",
         maxNodes: 4,
       });
 
-      expect(result).toContain("Tree truncated at 4 nodes");
-      expect(result).toContain("Raise `maxNodes`");
+      expect(result).toContain("Stopped after 4 elements (`maxNodes`)");
+      expect(result).toContain("raise `maxNodes`");
+      expect(result).toContain("`rootNodeId`");
+    });
+
+    it("prunes a deep branch without dropping its siblings", async () => {
+      // The bug this guards: depth truncation used to abort the whole walk, so
+      // one deep branch hid every later sibling — on a real page `head` is
+      // routinely deep enough to swallow `body` entirely.
+      const result = await callTool({
+        atMs: AT_CHECKOUT_ERROR,
+        lens: "full",
+        maxDepth: 2,
+      });
+
+      // `head` and `body` are both at depth 1, so both must appear even though
+      // everything below them is pruned.
+      expect(result).toContain("head");
+      expect(result).toContain("body");
+      expect(result).toContain("deeper than `maxDepth`");
+      expect(result).toContain("not shown");
+    });
+
+    it("renders a deeply nested real-world page at the default depth", async () => {
+      // The default was 12, which clipped a real Sentry page whose element tree
+      // is 17 levels deep — hiding exactly the interactive elements the lens
+      // exists to surface.
+      const result = await callTool({ atMs: AT_CHECKOUT_ERROR });
+
+      expect(result).not.toContain("deeper than `maxDepth`");
     });
   });
 
