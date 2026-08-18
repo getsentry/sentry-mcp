@@ -823,10 +823,15 @@ function describeNetworkRequest(
   const request = method ? `${method} ${url}` : url;
   const status = statusCode != null ? String(statusCode) : "no response";
 
+  // Duration belongs in the summary, not the detail lines: how long a failing
+  // request took is often the difference between a rejected call and a timeout,
+  // and it is the first thing asked about a slow page. It was previously read
+  // from `data.duration`, which the SDK never sets — `NetworkRequestData` has no
+  // such field — so the line silently never rendered.
+  const durationMs = spanDurationMs(payload);
+  const timing = durationMs !== null ? ` in ${formatDuration(durationMs)}` : "";
+
   const details: string[] = [];
-  if (typeof data?.duration === "number") {
-    details.push(`duration: ${data.duration}ms`);
-  }
   details.push(
     `request body: ${describeBody(data?.request, data?.requestBodySize)}`,
   );
@@ -835,10 +840,43 @@ function describeNetworkRequest(
   );
 
   return {
-    summary: `${label} ${request} failed with ${status}`,
+    summary: `${label} ${request} failed with ${status}${timing}`,
     details,
     isError: true,
   };
+}
+
+/**
+ * Elapsed time of a span frame, in milliseconds.
+ *
+ * Span frames carry `startTimestamp`/`endTimestamp` in seconds — verified
+ * against `ReplayBaseSpanFrame` in `@sentry-internal/replay` — and no duration
+ * field of their own. Returns null rather than zero when either bound is
+ * missing, so an unknown duration is not reported as instant.
+ */
+function spanDurationMs(
+  payload: ReplayRecordingPayload | undefined,
+): number | null {
+  const start = payload?.startTimestamp;
+  const end = payload?.endTimestamp;
+  if (typeof start !== "number" || typeof end !== "number") {
+    return null;
+  }
+  const elapsed = (end - start) * 1000;
+  return elapsed >= 0 ? elapsed : null;
+}
+
+/**
+ * Render a millisecond duration at a precision that stays readable.
+ *
+ * Sub-second timings are the common case and matter to the millisecond;
+ * anything longer is about magnitude, not precision.
+ */
+function formatDuration(ms: number): string {
+  if (ms < 1000) {
+    return `${Math.round(ms)}ms`;
+  }
+  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 /**

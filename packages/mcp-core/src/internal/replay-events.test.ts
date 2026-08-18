@@ -542,7 +542,12 @@ describe("rendering grains", () => {
       "resource.fetch",
       {
         description: "https://example.com/api/checkout",
-        data: { method: "POST", statusCode: 500, duration: 1240 },
+        data: { method: "POST", statusCode: 500 },
+        // Span frames carry timing here, in seconds. There is no `duration`
+        // field on `NetworkRequestData`; asserting one meant asserting a shape
+        // that never arrives.
+        startTimestamp: (SESSION_START_MS + 181_000) / 1000,
+        endTimestamp: (SESSION_START_MS + 182_240) / 1000,
       },
       (SESSION_START_MS + 181_000) / 1000,
     ),
@@ -564,15 +569,51 @@ describe("rendering grains", () => {
   it("renders one line per signal at standard grain", () => {
     expect(renderReplaySignals(signalsFrom(events), "standard")).toEqual([
       "T+3m 0.6s  click  Clicked button#complete-order",
-      "T+3m 1.0s  network  Fetch POST example.com/api/checkout failed with 500",
+      "T+3m 1.0s  network  Fetch POST example.com/api/checkout failed with 500 in 1.2s",
       "T+3m 1.3s  console  Console error: TypeError: Cannot read 'id' of undefined",
     ]);
   });
 
   it("adds payload lines at detail grain", () => {
     const lines = renderReplaySignals(signalsFrom(events), "detail");
-    expect(lines).toContain("    duration: 1240ms");
     expect(lines).toContain(`    request body: ${NOT_CAPTURED}`);
+  });
+
+  it("reports how long a failing request took, in the summary", () => {
+    // Duration answers "rejected or timed out", which is the first question
+    // asked of a failure, so it belongs on the line every grain shows rather
+    // than in detail-only payload.
+    const [signal] = signalsFrom([
+      span(
+        "resource.fetch",
+        {
+          description: "https://example.com/api/slow",
+          data: { method: "GET", statusCode: 504 },
+          startTimestamp: SESSION_START_MS / 1000,
+          endTimestamp: SESSION_START_MS / 1000 + 30,
+        },
+        SESSION_START_MS / 1000,
+      ),
+    ]);
+
+    expect(signal.summary).toBe(
+      "Fetch GET example.com/api/slow failed with 504 in 30.0s",
+    );
+  });
+
+  it("omits the duration when the span carries no bounds", () => {
+    // Reporting an unknown duration as 0ms would assert the request was
+    // instant, which is a stronger claim than saying nothing.
+    const [signal] = signalsFrom([
+      span("resource.fetch", {
+        description: "https://example.com/api/unknown",
+        data: { method: "GET", statusCode: 500 },
+      }),
+    ]);
+
+    expect(signal.summary).toBe(
+      "Fetch GET example.com/api/unknown failed with 500",
+    );
   });
 
   it("merges repeated signals at standard grain", () => {
@@ -609,7 +650,7 @@ describe("against the recorded fixture", () => {
       "Clicked body > div#root > form#login > button#sign-in",
       "Navigated to example.com/checkout",
       "Clicked body > div#root > main > button#complete-order",
-      "Fetch POST example.com/api/checkout failed with 500",
+      "Fetch POST example.com/api/checkout failed with 500 in 1.2s",
       "Console error: TypeError: Cannot read properties of undefined (reading 'id')",
       "Rage click on body > div#root > main > button#complete-order",
       "Dead click — no response from body > div#root > main > a#download-receipt",

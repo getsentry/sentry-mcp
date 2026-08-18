@@ -50,7 +50,7 @@ describe("get_replay_activity", () => {
       T+12.4s  click  Clicked body > div#root > form#login > button#sign-in
       T+14.2s  navigation  Navigated to example.com/checkout
       T+3m 0.6s  click  Clicked body > div#root > main > button#complete-order
-      T+3m 1.0s  network  Fetch POST example.com/api/checkout failed with 500
+      T+3m 1.0s  network  Fetch POST example.com/api/checkout failed with 500 in 1.2s
       T+3m 1.3s  console  Console error: TypeError: Cannot read properties of undefined (reading 'id')
       T+3m 8.4s  rage-click  Rage click on body > div#root > main > button#complete-order
       T+3m 41.7s  dead-click  Dead click — no response from body > div#root > main > a#download-receipt
@@ -220,6 +220,39 @@ describe("get_replay_activity", () => {
       expect(result).toContain("cursor='");
     });
 
+    it("prints a callable continuation, not a bare cursor", async () => {
+      // A bare `cursor='…'` leaves the reader to rebuild the call around it,
+      // including the org and replay it belongs to.
+      const result = await callTool({ limit: 3 });
+
+      expect(result).toContain(
+        "get_replay_activity(organizationSlug='sentry-mcp-evals'",
+      );
+      expect(result).toContain("(`limit` was 3)");
+      expect(result).toContain("Or raise `limit`");
+    });
+
+    it("warns above the numbers when a digest rollup is partial", async () => {
+      // The failure mode this addresses: a truncated digest reads as a complete
+      // session rollup. Here the rage click, dead click, network failure and
+      // console error all fall on later pages, so the counts shown describe a
+      // healthier session than the real one.
+      const result = await callTool({ grain: "digest", limit: 3 });
+
+      expect(result).toContain("**Partial rollup.**");
+      expect(result).toContain("only signals 1–3 of 8");
+      // The warning must precede the counts it qualifies.
+      expect(result.indexOf("Partial rollup")).toBeLessThan(
+        result.indexOf("navigation ×"),
+      );
+    });
+
+    it("does not warn when a digest covers everything that matched", async () => {
+      const result = await callTool({ grain: "digest" });
+
+      expect(result).not.toContain("Partial rollup");
+    });
+
     it("continues from the cursor without repeating or skipping signals", async () => {
       const first = await callTool({ limit: 3 });
       const second = await callTool({ cursor: cursorFrom(first), limit: 3 });
@@ -333,10 +366,48 @@ describe("get_replay_activity", () => {
       expect(result).toContain("rootNodeId=96");
     });
 
-    it("does not suggest a structural read when nothing structural happened", async () => {
-      // A suggestion on every response is one nobody reads. A failed request is
-      // explained by its response, not by the DOM.
+    it("still names the capability when no signal points at an element", async () => {
+      // Plenty of replay questions are about page state with no signal behind
+      // them — a message that flashed, a control that was missing. Without a
+      // pointer an agent goes looking for the explanation in application source
+      // instead, so the capability is stated even with no moment to aim at.
       const result = await callTool({ kinds: ["network", "console"] });
+
+      expect(result).toContain("get_replay_dom");
+      expect(result).toContain("what the page showed");
+      // No element to root at, so none is invented.
+      expect(result).not.toContain("rootNodeId");
+      // Anchored on the failure rather than the first signal in the page: a
+      // leading navigation explains nothing, and the example offset is the one
+      // a reader is most likely to reuse.
+      expect(result).toContain("atMs=181000");
+    });
+
+    it("prefers a rooted call over the general pointer when both apply", async () => {
+      // A specific signal earns a specific call; the general note would be
+      // weaker advice in the same space.
+      const result = await callTool();
+
+      expect(result).toContain("rootNodeId=96");
+      expect(result).not.toContain("what the page showed");
+    });
+
+    it("anchors the example offset on a failure, not the first signal", async () => {
+      // With navigations and clicks in the page, the first signal is a
+      // navigation at T+0.5s — a useless moment to reconstruct. The failure is
+      // the offset a reader will actually reuse.
+      const result = await callTool({
+        kinds: ["navigation", "click", "network"],
+      });
+
+      expect(result).toContain("atMs=181000");
+      expect(result).not.toContain("atMs=500");
+    });
+
+    it("says nothing when no signal has a resolvable offset", async () => {
+      // With no timeline there is no moment to pass, and a call the reader
+      // cannot complete is worse than no call.
+      const result = await callTool({ kinds: ["web-vital"] });
 
       expect(result).not.toContain("get_replay_dom");
     });

@@ -329,6 +329,20 @@ function formatActivityOutput({
   );
   lines.push("");
 
+  const nextOffset = offset + signals.length;
+  const isTruncated = nextOffset < matchedCount;
+
+  // A digest is a rollup, and a rollup of one page reads exactly like a rollup
+  // of the session — the counts look authoritative while the failures that
+  // decide the answer sit on a later page. Say so above the numbers, not only
+  // below them, because the numbers are what gets believed.
+  if (isTruncated && grain === "digest" && signals.length > 0) {
+    lines.push(
+      `**Partial rollup.** These counts cover only signals ${offset + 1}\u2013${nextOffset} of ${matchedCount}, not the whole window. Raise \`limit\` for a complete rollup before drawing conclusions from them.`,
+    );
+    lines.push("");
+  }
+
   if (signals.length === 0) {
     lines.push(
       matchedCount === 0
@@ -339,15 +353,27 @@ function formatActivityOutput({
     lines.push(...renderReplaySignals(signals, grain));
   }
 
-  // Truncation is always stated, and always with the means to continue.
-  const nextOffset = offset + signals.length;
-  if (nextOffset < matchedCount) {
+  // Truncation is always stated, and always with the means to continue — as a
+  // callable tool call rather than a bare cursor, so continuing does not require
+  // reconstructing the call around it.
+  if (isTruncated) {
     lines.push("");
     lines.push(
-      `Showing ${offset + 1}–${nextOffset} of ${matchedCount} matching signals. Continue with:`,
+      `Showing ${offset + 1}\u2013${nextOffset} of ${matchedCount} matching signals${offset === 0 ? ` (\`limit\` was ${limit})` : ""}. To continue:`,
     );
     lines.push(
-      `cursor='${encodeCursor({ startMs, endMs, kinds, offset: nextOffset })}'`,
+      formatToolCall({
+        toolName: "get_replay_activity",
+        arguments: {
+          organizationSlug,
+          replayId,
+          cursor: encodeCursor({ startMs, endMs, kinds, offset: nextOffset }),
+          grain,
+        },
+      }),
+    );
+    lines.push(
+      "Or raise `limit` (max 200) to see more at once; a windowed read with `startMs`/`endMs` is cheaper than paging a whole session.",
     );
   }
 
@@ -396,11 +422,6 @@ function suggestStructuralRead({
   organizationSlug: string;
   context: ServerContext;
 }): string[] {
-  const signal = findStructuralSignal(signals);
-  if (!signal || signal.offsetMs === null) {
-    return [];
-  }
-
   const instruction = formatToolCallInstruction({
     toolName: "get_replay_dom",
     experimentalMode: context.experimentalMode ?? false,
@@ -415,22 +436,53 @@ function suggestStructuralRead({
     return [];
   }
 
-  const reason =
-    signal.type === "hydration-error"
-      ? "A hydration error means the server and client DOM disagreed"
-      : "A click the page did not answer is usually explained by the element itself";
+  const signal = findStructuralSignal(signals);
+
+  // A specific signal earns a specific, rooted call.
+  if (signal && signal.offsetMs !== null) {
+    const reason =
+      signal.type === "hydration-error"
+        ? "A hydration error means the server and client DOM disagreed"
+        : "A click the page did not answer is usually explained by the element itself";
+
+    return [
+      "",
+      `${reason}. ${instruction}:`,
+      formatToolCall({
+        toolName: "get_replay_dom",
+        arguments: {
+          organizationSlug,
+          replayId,
+          atMs: signal.offsetMs,
+          ...(signal.nodeId !== undefined ? { rootNodeId: signal.nodeId } : {}),
+        },
+      }),
+    ];
+  }
+
+  // Nothing here names an element, but plenty of replay questions are about
+  // page state with no signal at all behind them: a message that flashed, a
+  // control that was missing, a spinner that never resolved. The signal list
+  // cannot answer those, and an agent that does not know a structural read
+  // exists will go looking for an explanation in application source instead.
+  // So the capability is stated once, without a specific moment to aim at,
+  // whenever there is a timeline to aim into.
+  // Prefer a failure as the example offset: it is the moment a reader is most
+  // likely to ask about, and the first signal in the page is usually a
+  // navigation that explains nothing. Falls back to any placed signal so the
+  // call is always completable.
+  const placed = signals.filter((candidate) => candidate.offsetMs !== null);
+  const anchor = placed.find((candidate) => candidate.isError) ?? placed[0];
+  if (!anchor || anchor.offsetMs === null) {
+    return [];
+  }
 
   return [
     "",
-    `${reason}. ${instruction}:`,
+    `If the question is about what the page showed — a message that appeared, a control that was missing or disabled, an element that never rendered — the signals above cannot answer it. ${instruction}, passing the moment you care about:`,
     formatToolCall({
       toolName: "get_replay_dom",
-      arguments: {
-        organizationSlug,
-        replayId,
-        atMs: signal.offsetMs,
-        ...(signal.nodeId !== undefined ? { rootNodeId: signal.nodeId } : {}),
-      },
+      arguments: { organizationSlug, replayId, atMs: anchor.offsetMs },
     }),
   ];
 }
