@@ -35,7 +35,6 @@ import {
   abortIfCancelled,
   PROGRESS_ROTATE_INTERVAL_MS,
   STEP_ACTIVE_LABELS,
-  STEP_LABELS,
   STEP_PROGRESS_MESSAGES,
   WizardCancelledError,
 } from "./clack-utils.js";
@@ -346,7 +345,6 @@ async function handleSuspendedStep(
   stepHistory: Map<string, CompactPhaseHistoryEntry[]>
 ): Promise<Record<string, unknown>> {
   const { payload, stepId, spin, spinState, context, ui } = ctx;
-  const label = STEP_LABELS[stepId] ?? stepId;
 
   if (payload.type === "tool") {
     const message =
@@ -374,8 +372,14 @@ async function handleSuspendedStep(
     const toolResult = await executeTool(payload, context);
 
     if (toolResult.message) {
-      spin.stop(renderInlineMarkdown(toolResult.message));
-      spin.start("Processing...");
+      // Tool messages (e.g. "Using existing project ...") describe a
+      // completed sub-action that the sidebar Tasks checklist already
+      // tracks. Surface it as a transient spinner update instead of
+      // stopping the spinner to persist a ✔ line that just duplicates the
+      // checklist.
+      spin.message(
+        renderInlineMarkdown(truncateForTerminal(toolResult.message))
+      );
     } else {
       const followUpMessage =
         toolResult.ok === false ? undefined : describePostTool(payload);
@@ -420,7 +424,11 @@ async function handleSuspendedStep(
       };
     }
 
-    spin.stop(label);
+    // Stop the spinner to hand its row over to the interactive prompt, but
+    // pass an empty message so no ✔ line is persisted for the step label
+    // (e.g. "Selecting features"). The sidebar Tasks checklist already
+    // tracks step progress, so a duplicate line in the activity log is noise.
+    spin.stop("");
     spinState.running = false;
 
     const interactiveResult = await handleInteractive(payload, context, ui);

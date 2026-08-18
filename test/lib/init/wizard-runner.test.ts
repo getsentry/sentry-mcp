@@ -959,7 +959,7 @@ describe("runWizard", () => {
     expect(args.initialState?.existingSentry).toEqual(detectedSentry);
   });
 
-  test("renders tool result messages via the spinner stop state", async () => {
+  test("renders tool result messages as a transient spinner message, not a persisted line", async () => {
     mockStartResult = {
       status: "suspended",
       suspended: [["ensure-sentry-project"]],
@@ -983,7 +983,11 @@ describe("runWizard", () => {
 
     await runWizard(makeOptions());
 
-    expect(spinnerMock.stop).toHaveBeenCalledWith("Using existing project");
+    // Tool messages update the live spinner instead of persisting a ✔ line —
+    // the sidebar Tasks checklist already tracks step completion, so a
+    // duplicate line in the activity log is just noise.
+    expect(spinnerMock.message).toHaveBeenCalledWith("Using existing project");
+    expect(spinnerMock.stop).not.toHaveBeenCalledWith("Using existing project");
   });
 
   test("shows --yes hint when LoggingUI prompt fails", async () => {
