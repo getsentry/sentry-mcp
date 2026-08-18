@@ -65,6 +65,7 @@ import { checkReadiness } from "./readiness.js";
 
 import { describeTool, executeTool } from "./tools/registry.js";
 import type {
+  InteractivePayload,
   ResolvedInitContext,
   SuspendPayload,
   ToolPayload,
@@ -97,7 +98,7 @@ type CompactPhaseHistoryEntry = {
 };
 
 type StepContext = {
-  payload: SuspendPayload;
+  payload: InteractivePayload | ToolPayload;
   stepId: string;
   spin: SpinnerHandle;
   spinState: SpinState;
@@ -247,11 +248,7 @@ function formatReadFilesSummary(progress: ReadFilesDisplay): string {
  * Build a follow-up spinner message after a tool succeeds and the CLI is
  * waiting for the server to continue processing the returned data.
  */
-function describePostTool(payload: SuspendPayload): string | undefined {
-  if (payload.type !== "tool") {
-    return;
-  }
-
+function describePostTool(payload: ToolPayload): string | undefined {
   switch (payload.operation) {
     case "read-files":
       return formatReadFilesSummary({
@@ -514,6 +511,18 @@ function assertSuspendPayload(raw: unknown): SuspendPayload {
     throw new Error("Invalid init protocol envelope");
   }
   return payload;
+}
+
+/** Keep transport identity at the wire boundary, outside local tool and UI contracts. */
+function localSuspendPayload(
+  payload: SuspendPayload
+): InteractivePayload | ToolPayload {
+  const {
+    protocolVersion: _protocolVersion,
+    requestId: _requestId,
+    ...localPayload
+  } = payload;
+  return localPayload;
 }
 
 function withTimeout<T>(
@@ -1127,7 +1136,7 @@ export async function runWizard(initialOptions: WizardOptions): Promise<void> {
 
       const resumeData = await handleSuspendedStep(
         {
-          payload: extracted.payload,
+          payload: localSuspendPayload(extracted.payload),
           stepId: extracted.stepId,
           spin,
           spinState,
