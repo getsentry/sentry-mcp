@@ -118,6 +118,13 @@ export interface ReplaySignal {
   details: string[];
   /** True when this signal indicates a failure (error log, failed request). */
   isError: boolean;
+  /**
+   * rrweb node id of the element this signal is about, when it names one.
+   *
+   * Kept as data rather than only as a rendered detail line so a caller can
+   * hand it to a structural read without parsing it back out of prose.
+   */
+  nodeId?: number;
 }
 
 /** Rendered when the SDK never captured a value. */
@@ -579,7 +586,10 @@ function isErrorEvent(
   return type === "hydration-error";
 }
 
-type SummarizedEvent = Pick<ReplaySignal, "summary" | "details" | "isError">;
+type SummarizedEvent = Pick<
+  ReplaySignal,
+  "summary" | "details" | "isError" | "nodeId"
+>;
 
 /**
  * Describe an event, or return null when it should not be rendered.
@@ -657,6 +667,13 @@ function summarizeEvent(
     case "lcp": {
       const size = data?.size;
       const rating = data?.rating;
+      // A paint that met its threshold is not an event worth a line beside a
+      // failed request or a rage click. Rendering it as a peer invites an agent
+      // to investigate a metric that is already fine; the count remains
+      // available through `countReplayKinds`.
+      if (rating === "good") {
+        return null;
+      }
       return {
         summary:
           size != null && rating != null
@@ -768,8 +785,9 @@ function describeClick(
   // because it is otherwise unreachable: it is stable within a recording, but
   // nothing else in this output names it, so "show me the DOM around what was
   // clicked" would have no way to say which element.
-  if (typeof data?.node?.id === "number") {
-    details.push(`nodeId: ${data.node.id}`);
+  const nodeId = typeof data?.node?.id === "number" ? data.node.id : undefined;
+  if (nodeId !== undefined) {
+    details.push(`nodeId: ${nodeId}`);
   }
 
   return {
@@ -777,6 +795,7 @@ function describeClick(
     details,
     // A dead or rage click is a failure of the page, not of the request.
     isError: verb !== "Clicked",
+    nodeId,
   };
 }
 

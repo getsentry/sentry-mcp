@@ -18,6 +18,10 @@ import {
   resolveReplayParams,
 } from "../../internal/tool-helpers/replay";
 import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/resolve-region-url";
+import {
+  formatToolCall,
+  formatToolCallInstruction,
+} from "../../internal/tool-helpers/tool-call-formatting";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
 import { z } from "zod";
@@ -61,6 +65,12 @@ export default defineTool({
     "",
     "Call `get_replay_details` first for the session map; it suggests a window.",
     "Offsets are milliseconds from the start of the replay.",
+    "",
+    "This answers what *happened*, not what the page *was*. When a click went",
+    "unanswered or an element looks wrong, `get_replay_dom` reads the structure",
+    "at that moment — this tool reports the `nodeId` to root it at.",
+    "Web vitals and console warnings are context, rarely the cause; prefer the",
+    "failed request, the unanswered click, or the DOM around it.",
     "",
     "<examples>",
     "### Zoom into a failure",
@@ -204,9 +214,48 @@ export default defineTool({
       endMs,
       kinds,
       truncatedBy: recording.truncatedBy,
+      organizationSlug: resolved.organizationSlug,
+      context,
     });
   },
 });
+
+/**
+ * Signals that raise a question about the page, not about a request.
+ *
+ * A rage or dead click means the user acted and the page did not respond, and a
+ * hydration error means the DOM the server sent and the one the client built
+ * disagreed. In all three the useful next question is what the element looked
+ * like, which the signal list cannot answer. Ordinary clicks and network
+ * failures are deliberately excluded: a 500 is explained by the response, and
+ * suggesting a structural read after every click would train a reader to ignore
+ * the suggestion.
+ */
+const STRUCTURAL_SIGNAL_TYPES = new Set([
+  "rage-click",
+  "dead-click",
+  "hydration-error",
+]);
+
+/**
+ * Pick the signal whose structure is worth looking at.
+ *
+ * Prefers one that names a node, since rooting a read at the element beats
+ * rendering the whole page. Falls back to the first structural signal so the
+ * offset is still offered when no id came through — real recordings populate
+ * `node.id` on most but not all click breadcrumbs.
+ */
+function findStructuralSignal(signals: ReplaySignal[]): ReplaySignal | null {
+  const candidates = signals.filter(
+    (signal) =>
+      STRUCTURAL_SIGNAL_TYPES.has(signal.type) && signal.offsetMs !== null,
+  );
+  return (
+    candidates.find((signal) => signal.nodeId !== undefined) ??
+    candidates[0] ??
+    null
+  );
+}
 
 function matchesQuery(
   signal: ReplaySignal,
@@ -251,6 +300,8 @@ function formatActivityOutput({
   endMs,
   kinds,
   truncatedBy,
+  organizationSlug,
+  context,
 }: {
   replayId: string;
   signals: ReplaySignal[];
@@ -261,6 +312,8 @@ function formatActivityOutput({
   startMs?: number;
   endMs?: number;
   kinds?: string[];
+  organizationSlug: string;
+  context: ServerContext;
   truncatedBy: ReplayRecordingSegmentsResult["truncatedBy"];
 }): string {
   const lines: string[] = [];
@@ -312,7 +365,74 @@ function formatActivityOutput({
     );
   }
 
+  lines.push(
+    ...suggestStructuralRead({ replayId, signals, organizationSlug, context }),
+  );
+
   return lines.join("\n");
+}
+
+/**
+ * Point at a structural read when a signal raises a question this tool cannot
+ * answer.
+ *
+ * The signal list explains what happened; it cannot say what the page was. When
+ * a click went unanswered or hydration disagreed, that second question is the
+ * one that matters, and without a printed call the reader has to know a third
+ * tool exists and go looking for it. The map already hands this tool its next
+ * call the same way, so the chain reads end to end.
+ *
+ * Deliberately conditional. A suggestion on every response is a suggestion
+ * nobody reads, so it appears only for signals whose explanation is structural.
+ */
+function suggestStructuralRead({
+  replayId,
+  signals,
+  organizationSlug,
+  context,
+}: {
+  replayId: string;
+  signals: ReplaySignal[];
+  organizationSlug: string;
+  context: ServerContext;
+}): string[] {
+  const signal = findStructuralSignal(signals);
+  if (!signal || signal.offsetMs === null) {
+    return [];
+  }
+
+  const instruction = formatToolCallInstruction({
+    toolName: "get_replay_dom",
+    experimentalMode: context.experimentalMode ?? false,
+    availableToolNames: context.availableToolNames,
+    directToolNames: context.directToolNames,
+    // Silence beats a dangling pointer: if the tool is not in this session,
+    // naming it would send the reader after something unreachable.
+    fallbackInstruction: "",
+    purpose: "to see the page structure at that moment",
+  });
+  if (!instruction) {
+    return [];
+  }
+
+  const reason =
+    signal.type === "hydration-error"
+      ? "A hydration error means the server and client DOM disagreed"
+      : "A click the page did not answer is usually explained by the element itself";
+
+  return [
+    "",
+    `${reason}. ${instruction}:`,
+    formatToolCall({
+      toolName: "get_replay_dom",
+      arguments: {
+        organizationSlug,
+        replayId,
+        atMs: signal.offsetMs,
+        ...(signal.nodeId !== undefined ? { rootNodeId: signal.nodeId } : {}),
+      },
+    }),
+  ];
 }
 
 function encodeCursor(cursor: ActivityCursor): string {

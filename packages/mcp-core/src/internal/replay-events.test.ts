@@ -126,6 +126,42 @@ describe("classifyReplayEvent", () => {
     }
   });
 
+  it("renders a web vital only when it missed its threshold", () => {
+    // A paint that met its threshold is not a finding. Rendering it beside a
+    // failed request invites investigation of a metric that is already fine,
+    // which is the behaviour this drops.
+    const good = signalsFrom([
+      span("web-vital", {
+        description: "largest-contentful-paint",
+        data: { size: 1200, rating: "good" },
+      }),
+    ]);
+    expect(good).toEqual([]);
+
+    const poor = signalsFrom([
+      span("web-vital", {
+        description: "largest-contentful-paint",
+        data: { size: 4800, rating: "poor" },
+      }),
+    ]);
+    expect(poor).toHaveLength(1);
+    expect(poor[0].summary).toBe("Largest contentful paint: 4800ms (poor)");
+  });
+
+  it("carries the rrweb node id as data, not only as rendered text", () => {
+    // The handoff to a structural read depends on this being a field. Parsing
+    // it back out of the detail line would break the first time that line is
+    // reworded.
+    const signals = signalsFrom([
+      breadcrumb("ui.click", {
+        message: "button#pay",
+        data: { node: { id: 4242, tagName: "button" } },
+      }),
+    ]);
+
+    expect(signals[0].nodeId).toBe(4242);
+  });
+
   it("splits web vitals by description", () => {
     expect(
       classifyReplayEvent(

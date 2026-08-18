@@ -53,7 +53,10 @@ describe("get_replay_activity", () => {
       T+3m 1.0s  network  Fetch POST example.com/api/checkout failed with 500
       T+3m 1.3s  console  Console error: TypeError: Cannot read properties of undefined (reading 'id')
       T+3m 8.4s  rage-click  Rage click on body > div#root > main > button#complete-order
-      T+3m 41.7s  dead-click  Dead click — no response from body > div#root > main > a#download-receipt"
+      T+3m 41.7s  dead-click  Dead click — no response from body > div#root > main > a#download-receipt
+
+      A click the page did not answer is usually explained by the element itself. Use the Sentry tool \`get_replay_dom\` to see the page structure at that moment:
+      get_replay_dom(organizationSlug='sentry-mcp-evals', replayId='7e07485f-12f9-416b-8b14-26260799b51f', atMs=188400, rootNodeId=96)"
     `);
   });
 
@@ -312,6 +315,46 @@ describe("get_replay_activity", () => {
           getServerContext({ constraints: { projectSlug: "frontend" } }),
         ),
       ).rejects.toThrow("outside the active project constraint");
+    });
+  });
+
+  describe("structural read handoff", () => {
+    it("prints a rooted get_replay_dom call after an unanswered click", async () => {
+      // Without a printed call the third step of the chain is only reachable by
+      // knowing it exists and searching the catalog. The map hands this tool its
+      // next call the same way.
+      const result = await callTool();
+
+      expect(result).toContain(
+        "get_replay_dom(organizationSlug='sentry-mcp-evals'",
+      );
+      // Rooted at the rage-clicked button, at the moment of the rage click.
+      expect(result).toContain("atMs=188400");
+      expect(result).toContain("rootNodeId=96");
+    });
+
+    it("does not suggest a structural read when nothing structural happened", async () => {
+      // A suggestion on every response is one nobody reads. A failed request is
+      // explained by its response, not by the DOM.
+      const result = await callTool({ kinds: ["network", "console"] });
+
+      expect(result).not.toContain("get_replay_dom");
+    });
+
+    it("stays silent when the DOM tool is not in this session", async () => {
+      // Naming an unreachable tool sends the reader after something that cannot
+      // be called.
+      const result = await callTool(
+        {},
+        getServerContext({
+          availableToolNames: new Set([
+            "get_replay_activity",
+            "get_replay_details",
+          ]),
+        }),
+      );
+
+      expect(result).not.toContain("get_replay_dom");
     });
   });
 
