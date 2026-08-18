@@ -764,6 +764,14 @@ function describeClick(
     details.push(`clicks: ${clickCount}`);
   }
 
+  // The rrweb node id, which is the handle a DOM read roots at. Reported
+  // because it is otherwise unreachable: it is stable within a recording, but
+  // nothing else in this output names it, so "show me the DOM around what was
+  // clicked" would have no way to say which element.
+  if (typeof data?.node?.id === "number") {
+    details.push(`nodeId: ${data.node.id}`);
+  }
+
   return {
     summary: `${verb} ${target}`,
     details,

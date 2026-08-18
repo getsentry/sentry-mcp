@@ -31,6 +31,125 @@
       }
     },
     {
+      "type": 2,
+      "timestamp": 1744027200200,
+      "data": {
+        "node": {
+          "type": 0,
+          "id": 1,
+          "childNodes": [
+            {
+              "type": 1,
+              "id": 2,
+              "name": "html",
+              "publicId": "",
+              "systemId": ""
+            },
+            {
+              "type": 2,
+              "id": 3,
+              "tagName": "html",
+              "attributes": {},
+              "childNodes": [
+                {
+                  "type": 2,
+                  "id": 4,
+                  "tagName": "head",
+                  "attributes": {},
+                  "childNodes": [
+                    {
+                      "type": 2,
+                      "id": 5,
+                      "tagName": "title",
+                      "attributes": {},
+                      "childNodes": [
+                        {
+                          "type": 3,
+                          "id": 6,
+                          "textContent": "Sign in"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": 2,
+                  "id": 7,
+                  "tagName": "body",
+                  "attributes": {},
+                  "childNodes": [
+                    {
+                      "type": 2,
+                      "id": 8,
+                      "tagName": "div",
+                      "attributes": {
+                        "id": "root"
+                      },
+                      "childNodes": [
+                        {
+                          "type": 2,
+                          "id": 9,
+                          "tagName": "form",
+                          "attributes": {
+                            "id": "login",
+                            "action": "/session"
+                          },
+                          "childNodes": [
+                            {
+                              "type": 2,
+                              "id": 40,
+                              "tagName": "input",
+                              "attributes": {
+                                "id": "email",
+                                "type": "email",
+                                "value": "***"
+                              },
+                              "childNodes": []
+                            },
+                            {
+                              "type": 2,
+                              "id": 41,
+                              "tagName": "input",
+                              "attributes": {
+                                "id": "password",
+                                "type": "password",
+                                "value": "***"
+                              },
+                              "childNodes": []
+                            },
+                            {
+                              "type": 2,
+                              "id": 42,
+                              "tagName": "button",
+                              "attributes": {
+                                "id": "sign-in",
+                                "type": "submit"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "id": 43,
+                                  "textContent": "Sign in"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "initialOffset": {
+          "top": 0,
+          "left": 0
+        }
+      }
+    },
+    {
       "type": 5,
       "timestamp": 1744027200.5,
       "data": {
@@ -168,6 +287,209 @@
   ],
   [
     {
+      "type": 2,
+      "timestamp": 1744027380000,
+      "data": {
+        "node": {
+          "type": 0,
+          "id": 1,
+          "childNodes": [
+            {
+              "type": 1,
+              "id": 2,
+              "name": "html",
+              "publicId": "",
+              "systemId": ""
+            },
+            {
+              "type": 2,
+              "id": 3,
+              "tagName": "html",
+              "attributes": {},
+              "childNodes": [
+                {
+                  "type": 2,
+                  "id": 4,
+                  "tagName": "head",
+                  "attributes": {},
+                  "childNodes": [
+                    {
+                      "type": 2,
+                      "id": 5,
+                      "tagName": "title",
+                      "attributes": {},
+                      "childNodes": [
+                        {
+                          "type": 3,
+                          "id": 6,
+                          "textContent": "Checkout"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": 2,
+                  "id": 60,
+                  "tagName": "body",
+                  "attributes": {},
+                  "childNodes": [
+                    {
+                      "type": 2,
+                      "id": 61,
+                      "tagName": "div",
+                      "attributes": {
+                        "id": "root"
+                      },
+                      "childNodes": [
+                        {
+                          "type": 2,
+                          "id": 62,
+                          "tagName": "main",
+                          "attributes": {},
+                          "childNodes": [
+                            {
+                              "type": 2,
+                              "id": 63,
+                              "tagName": "h1",
+                              "attributes": {},
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "id": 64,
+                                  "textContent": "Checkout"
+                                }
+                              ]
+                            },
+                            {
+                              "type": 2,
+                              "id": 80,
+                              "tagName": "form",
+                              "attributes": {
+                                "id": "checkout-form"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 2,
+                                  "id": 81,
+                                  "tagName": "div",
+                                  "attributes": {
+                                    "class": "address-block"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 2,
+                                      "id": 82,
+                                      "tagName": "input",
+                                      "attributes": {
+                                        "id": "unit",
+                                        "name": "unit",
+                                        "value": "***"
+                                      },
+                                      "childNodes": []
+                                    },
+                                    {
+                                      "type": 2,
+                                      "id": 83,
+                                      "tagName": "input",
+                                      "attributes": {
+                                        "id": "zip",
+                                        "name": "zip",
+                                        "value": "***"
+                                      },
+                                      "childNodes": []
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": 2,
+                                  "id": 84,
+                                  "tagName": "label",
+                                  "attributes": {
+                                    "for": "quantity"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "id": 85,
+                                      "textContent": "Quantity"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": 2,
+                                  "id": 90,
+                                  "tagName": "input",
+                                  "attributes": {
+                                    "id": "quantity",
+                                    "name": "quantity",
+                                    "type": "number",
+                                    "value": "1"
+                                  },
+                                  "childNodes": []
+                                },
+                                {
+                                  "type": 2,
+                                  "id": 96,
+                                  "tagName": "button",
+                                  "attributes": {
+                                    "id": "complete-order",
+                                    "type": "button"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "id": 97,
+                                      "textContent": "Complete order"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": 2,
+                              "id": 118,
+                              "tagName": "a",
+                              "attributes": {
+                                "id": "download-receipt",
+                                "href": "/receipts/latest"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "id": 119,
+                                  "textContent": "Download receipt"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "initialOffset": {
+          "top": 0,
+          "left": 0
+        }
+      }
+    },
+    {
+      "type": 3,
+      "timestamp": 1744027380300,
+      "data": {
+        "source": 5,
+        "id": 90,
+        "text": "3",
+        "isChecked": false,
+        "userTriggered": true
+      }
+    },
+    {
       "type": 5,
       "timestamp": 1744027380600,
       "data": {
@@ -190,6 +512,16 @@
             }
           }
         }
+      }
+    },
+    {
+      "type": 3,
+      "timestamp": 1744027380800,
+      "data": {
+        "source": 3,
+        "id": 60,
+        "x": 0,
+        "y": 412
       }
     },
     {
@@ -235,6 +567,61 @@
             "logger": "console"
           }
         }
+      }
+    },
+    {
+      "type": 3,
+      "timestamp": 1744027381400,
+      "data": {
+        "source": 0,
+        "texts": [],
+        "attributes": [],
+        "removes": [],
+        "adds": [
+          {
+            "parentId": 62,
+            "nextId": null,
+            "node": {
+              "type": 2,
+              "id": 130,
+              "tagName": "div",
+              "attributes": {
+                "id": "order-error",
+                "role": "alert"
+              },
+              "childNodes": [
+                {
+                  "type": 3,
+                  "id": 131,
+                  "textContent": "Payment failed. Please try again."
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": 3,
+      "timestamp": 1744027382000,
+      "data": {
+        "source": 0,
+        "texts": [
+          {
+            "id": 97,
+            "value": "Processing\u2026"
+          }
+        ],
+        "attributes": [
+          {
+            "id": 96,
+            "attributes": {
+              "disabled": ""
+            }
+          }
+        ],
+        "removes": [],
+        "adds": []
       }
     },
     {

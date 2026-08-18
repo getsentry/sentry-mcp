@@ -110,6 +110,16 @@ describe("get_replay_activity", () => {
       expect(result).toContain("response body: 87 bytes <not captured>");
     });
 
+    it("reports the rrweb node id a DOM read can root at", async () => {
+      // The handoff to `get_replay_dom`: the id is stable within a recording
+      // and reaches us on every click breadcrumb, but nothing else in this
+      // output names it, so without this line "show me the DOM around what was
+      // rage-clicked" has no handle to pass along.
+      const result = await callTool({ grain: "detail", kinds: ["click"] });
+
+      expect(result).toContain("nodeId: 96");
+    });
+
     it("omits payload lines at standard grain", async () => {
       const result = await callTool({ kinds: ["network"] });
 
