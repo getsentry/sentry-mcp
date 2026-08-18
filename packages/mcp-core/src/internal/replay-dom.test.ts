@@ -32,12 +32,24 @@ function text(id: number, textContent: string) {
   return { id, type: NODE_TYPE_TEXT, textContent };
 }
 
+/** Ids for the document frame, kept clear of the small ids tests use. */
+const DOCUMENT_ID = 1;
+const HTML_ID = 9001;
+const BODY_ID = 9002;
+
 /**
  * A FullSnapshot wrapping the given body children.
  *
- * Mirrors the real shape: an id-less document wrapper containing `html`,
- * containing `body`. The wrapper carries no id, which is why reconstruction has
- * to descend through it rather than expect a root id.
+ * The document node carries an id, which is the detail that matters: verified
+ * against the `@sentry-internal/rrweb-snapshot` build Sentry ships, where
+ * `serializeNodeWithId` assigns an id to every node including the Document
+ * (`genId()` starts at 1, so it is normally id 1). A reconstruction's root is
+ * therefore a `nodeType: 0` node rather than an element, and a renderer that
+ * expects an element root produces nothing at all.
+ *
+ * `html` and `body` would really be 2 and 3. They are numbered out of the way
+ * here so each test can use small ids for the nodes it cares about — rrweb ids
+ * are opaque integers, and nothing under test depends on them being sequential.
  */
 function snapshot(offsetMs: number, bodyChildren: unknown[]) {
   return {
@@ -45,9 +57,12 @@ function snapshot(offsetMs: number, bodyChildren: unknown[]) {
     timestamp: START_MS + offsetMs,
     data: {
       node: {
+        id: DOCUMENT_ID,
         type: NODE_TYPE_DOCUMENT,
         childNodes: [
-          element(1, "html", {}, [element(2, "body", {}, bodyChildren)]),
+          element(HTML_ID, "html", {}, [
+            element(BODY_ID, "body", {}, bodyChildren),
+          ]),
         ],
       },
     },
@@ -104,12 +119,14 @@ function childTags(node: DomNode | undefined, nodes: Map<number, DomNode>) {
 }
 
 describe("FullSnapshot ingest", () => {
-  it("descends through the id-less document wrapper", () => {
+  it("roots at the document node, which is not an element", () => {
     const result = reconstruct([snapshot(400, [element(3, "div")])]);
 
-    // The wrapper has no id, so `html` — the first identified node — is root.
-    expect(result.rootId).toBe(1);
-    expect(result.nodes.get(1)?.tagName).toBe("html");
+    // rrweb assigns the Document an id like any other node, so the root of a
+    // reconstruction is a `nodeType: 0` node. Rendering has to descend past it.
+    expect(result.rootId).toBe(DOCUMENT_ID);
+    expect(result.nodes.get(DOCUMENT_ID)?.nodeType).toBe(NODE_TYPE_DOCUMENT);
+    expect(result.nodes.get(HTML_ID)?.tagName).toBe("html");
     expect(result.missingSnapshot).toBe(false);
     expect(result.snapshotOffsetMs).toBe(400);
   });
@@ -117,8 +134,8 @@ describe("FullSnapshot ingest", () => {
   it("records parent and child links in both directions", () => {
     const result = reconstruct([snapshot(0, [element(3, "button")])]);
 
-    expect(result.nodes.get(2)?.childIds).toEqual([3]);
-    expect(result.nodes.get(3)?.parentId).toBe(2);
+    expect(result.nodes.get(BODY_ID)?.childIds).toEqual([3]);
+    expect(result.nodes.get(3)?.parentId).toBe(BODY_ID);
   });
 
   it("keeps text as child nodes rather than element properties", () => {
@@ -178,11 +195,11 @@ describe("mutations", () => {
     const result = reconstruct([
       snapshot(0, [element(3, "header"), element(4, "footer")]),
       mutation(100, {
-        adds: [{ parentId: 2, nextId: 4, node: element(5, "main") }],
+        adds: [{ parentId: BODY_ID, nextId: 4, node: element(5, "main") }],
       }),
     ]);
 
-    expect(childTags(result.nodes.get(2), result.nodes)).toEqual([
+    expect(childTags(result.nodes.get(BODY_ID), result.nodes)).toEqual([
       "header",
       "main",
       "footer",
@@ -193,11 +210,11 @@ describe("mutations", () => {
     const result = reconstruct([
       snapshot(0, [element(3, "header")]),
       mutation(100, {
-        adds: [{ parentId: 2, nextId: null, node: element(5, "main") }],
+        adds: [{ parentId: BODY_ID, nextId: null, node: element(5, "main") }],
       }),
     ]);
 
-    expect(childTags(result.nodes.get(2), result.nodes)).toEqual([
+    expect(childTags(result.nodes.get(BODY_ID), result.nodes)).toEqual([
       "header",
       "main",
     ]);
@@ -225,13 +242,13 @@ describe("mutations", () => {
       snapshot(0, [
         element(3, "div", {}, [element(4, "span", {}, [text(5, "hi")])]),
       ]),
-      mutation(100, { removes: [{ parentId: 2, id: 3 }] }),
+      mutation(100, { removes: [{ parentId: BODY_ID, id: 3 }] }),
     ]);
 
     expect(result.nodes.has(3)).toBe(false);
     expect(result.nodes.has(4)).toBe(false);
     expect(result.nodes.has(5)).toBe(false);
-    expect(result.nodes.get(2)?.childIds).toEqual([]);
+    expect(result.nodes.get(BODY_ID)?.childIds).toEqual([]);
   });
 
   it("relocates a node without duplicating its subtree", () => {
@@ -449,6 +466,46 @@ describe("rendering", () => {
       ]),
     ]);
   }
+
+  it("renders from the document root by descending to the first element", () => {
+    // The regression this guards: rrweb roots a snapshot at the Document node,
+    // which is not an element, and a renderer that walks from it directly emits
+    // nothing at all. Rendering unrooted must still produce a tree.
+    const rendered = renderDomTree(reconstruct([checkoutSnapshot()]), {
+      lens: "full",
+    });
+
+    expect(rendered.lines[0]).toBe("html  id=9001");
+    expect(rendered.rootNotFound).toBe(false);
+    expect(rendered.nodesRendered).toBeGreaterThan(1);
+  });
+
+  it("descends past a doctype sibling to reach html", () => {
+    // A real snapshot's document has the doctype as its first child, so a
+    // depth-first search for the first element would stop on the wrong node.
+    const withDoctype = {
+      type: 2,
+      timestamp: START_MS,
+      data: {
+        node: {
+          id: DOCUMENT_ID,
+          type: NODE_TYPE_DOCUMENT,
+          childNodes: [
+            { id: 8000, type: 1, name: "html", publicId: "", systemId: "" },
+            element(HTML_ID, "html", {}, [
+              element(BODY_ID, "body", {}, [element(3, "button")]),
+            ]),
+          ],
+        },
+      },
+    } as unknown as ReplayRecordingEvent;
+
+    const rendered = renderDomTree(reconstruct([withDoctype]), {
+      lens: "full",
+    });
+
+    expect(rendered.lines[0]).toBe("html  id=9001");
+  });
 
   it("renders a tree with connectors and node ids", () => {
     const rendered = renderDomTree(reconstruct([checkoutSnapshot()]), {

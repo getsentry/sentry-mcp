@@ -603,8 +603,41 @@ const INTERACTIVE_TAGS = new Set([
   "dialog",
 ]);
 
-/** Attributes that make an otherwise-inert element interactive. */
-const INTERACTIVE_ATTRIBUTES = ["role", "onclick", "tabindex", "href"];
+/**
+ * Attributes whose mere presence makes an otherwise-inert element interactive.
+ *
+ * `role` is deliberately absent: it is matched by value below, because
+ * `role="alert"` is not something a user can act on and presence-matching would
+ * pull every status banner into a tree labelled interactive.
+ */
+const INTERACTIVE_ATTRIBUTES = ["onclick", "tabindex", "href"];
+
+/**
+ * ARIA roles that describe a control, from the WAI-ARIA widget roles.
+ *
+ * Document-structure and live-region roles are excluded: they describe what an
+ * element *is*, not something to do to it.
+ */
+const INTERACTIVE_ROLES = new Set([
+  "button",
+  "checkbox",
+  "combobox",
+  "gridcell",
+  "link",
+  "listbox",
+  "menuitem",
+  "menuitemcheckbox",
+  "menuitemradio",
+  "option",
+  "radio",
+  "searchbox",
+  "slider",
+  "spinbutton",
+  "switch",
+  "tab",
+  "textbox",
+  "treeitem",
+]);
 
 /** Attributes worth rendering, in this order, when present. */
 const RENDERED_ATTRIBUTES = [
@@ -681,11 +714,26 @@ export function renderDomTree(
     };
   }
 
+  // The tree renders elements, and a recording's root is normally the Document
+  // node, which is not one. Descend to the first element beneath it — `html`,
+  // past any doctype — rather than render nothing. Only the root needs this:
+  // non-element children elsewhere are text, whose content is read into the
+  // parent's line.
+  const renderRootId = resolveRenderRoot(nodes, startId);
+  if (renderRootId === null) {
+    return {
+      lines: [],
+      nodesRendered: 0,
+      truncated: false,
+      rootNotFound: false,
+    };
+  }
+
   // Under the interactive lens, an element is kept when it is interactive or
   // when it has a kept descendant — otherwise a button would be rendered with
   // no indication of where it sits.
   const keep =
-    lens === "full" ? null : collectInteractiveAncestry(nodes, startId);
+    lens === "full" ? null : collectInteractiveAncestry(nodes, renderRootId);
 
   const lines: string[] = [];
   let nodesRendered = 0;
@@ -729,9 +777,39 @@ export function renderDomTree(
     }
   };
 
-  walk(startId, 0, "", true);
+  walk(renderRootId, 0, "", true);
 
   return { lines, nodesRendered, truncated, rootNotFound: false };
+}
+
+/**
+ * The first element at or beneath `startId`, breadth-first.
+ *
+ * rrweb assigns the Document node an id like any other, so a snapshot's root is
+ * a `nodeType: 0` node whose children are the doctype and `html`. Rendering
+ * from it directly produces an empty tree. Breadth-first so a doctype sibling
+ * cannot lead the search away from `html`.
+ */
+function resolveRenderRoot(
+  nodes: Map<number, DomNode>,
+  startId: number,
+): number | null {
+  const queue = [startId];
+  while (queue.length > 0) {
+    const id = queue.shift();
+    if (id === undefined) {
+      continue;
+    }
+    const node = nodes.get(id);
+    if (!node) {
+      continue;
+    }
+    if (node.nodeType === NODE_TYPE_ELEMENT) {
+      return id;
+    }
+    queue.push(...node.childIds);
+  }
+  return null;
 }
 
 /**
@@ -778,7 +856,11 @@ function isInteractive(node: DomNode): boolean {
   if (node.tagName && INTERACTIVE_TAGS.has(node.tagName.toLowerCase())) {
     return true;
   }
-  return INTERACTIVE_ATTRIBUTES.some((name) => name in node.attributes);
+  if (INTERACTIVE_ATTRIBUTES.some((name) => name in node.attributes)) {
+    return true;
+  }
+  const role = node.attributes.role;
+  return typeof role === "string" && INTERACTIVE_ROLES.has(role.toLowerCase());
 }
 
 /**
@@ -798,15 +880,22 @@ function describeElement(node: DomNode, nodes: Map<number, DomNode>): string {
   if (node.inputValue !== undefined) {
     parts.push(`[value=${JSON.stringify(truncateText(node.inputValue))}]`);
   }
-  if (node.inputChecked !== undefined) {
-    parts.push(`[checked=${node.inputChecked}]`);
+  // rrweb reports `isChecked` on every input event, not only on checkboxes and
+  // radios, so a false value carries no information — and `[checked=false]` on
+  // a text field reads as a fact about it. An unchecked control is the absence
+  // of the attribute, exactly as in HTML.
+  if (node.inputChecked === true) {
+    parts.push("[checked]");
   }
 
   const rendered = RENDERED_ATTRIBUTES.filter(
     (name) => name in node.attributes && name !== "value",
   ).map((name) => {
     const value = node.attributes[name];
-    return value === true ? `[${name}]` : `[${name}=${value}]`;
+    // A boolean HTML attribute serializes as the empty string —
+    // `getAttribute("disabled")` returns `""` — so an empty value is presence,
+    // not an empty value, and `[disabled=]` would be nonsense.
+    return value === true || value === "" ? `[${name}]` : `[${name}=${value}]`;
   });
   parts.push(...rendered);
 
