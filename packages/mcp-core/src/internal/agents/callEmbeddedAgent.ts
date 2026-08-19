@@ -4,12 +4,18 @@ import {
   type Tool,
   APICallError,
   NoObjectGeneratedError,
+  NoOutputGeneratedError,
   RetryError,
   stepCountIs,
 } from "ai";
 import { getAgentProvider } from "./provider-factory";
-import { UserInputError, LLMProviderError } from "../../errors";
-import { logWarn } from "../../telem/logging";
+import {
+  AgentExecutionError,
+  ConfigurationError,
+  UserInputError,
+  LLMProviderError,
+} from "../../errors";
+import { logIssue, logWarn } from "../../telem/logging";
 import type { z } from "zod";
 
 /**
@@ -145,7 +151,10 @@ export async function callEmbeddedAgent<
     });
 
     if (!result.experimental_output) {
-      throw new Error("Failed to generate output");
+      // Same user-visible failure mode as AI SDK NoOutputGeneratedError.
+      throw new NoOutputGeneratedError({
+        message: "No output generated.",
+      });
     }
 
     const rawOutput = result.experimental_output;
@@ -220,9 +229,47 @@ export async function callEmbeddedAgent<
       );
     }
 
-    // Re-throw unexpected errors to be handled by the caller (logged to Sentry)
-    throw error;
+    // Expected application errors thrown above (schema/user-input/config paths)
+    // must keep their original type so callers do not treat them as unexpected.
+    // ConfigurationError can come from provider.getProviderOptions() (e.g. bad
+    // OPENROUTER_REASONING_EFFORT) and must surface, not silently fall back.
+    if (
+      error instanceof UserInputError ||
+      error instanceof ConfigurationError ||
+      error instanceof LLMProviderError ||
+      error instanceof AgentExecutionError
+    ) {
+      throw error;
+    }
+
+    // Unexpected agent failures (including NoOutputGeneratedError): file one
+    // Sentry issue, then throw a typed error so AI-powered tools can fall back
+    // or return a graceful response instead of hard-failing the MCP tool.
+    throw toAgentExecutionError(error);
   }
+}
+
+function toAgentExecutionError(error: unknown): AgentExecutionError {
+  const eventId = logIssue(error, {
+    loggerScope: ["agents", "embedded"],
+    contexts: {
+      embeddedAgent: {
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        isNoOutputGenerated: NoOutputGeneratedError.isInstance(error),
+      },
+    },
+  });
+
+  const detail =
+    error instanceof Error && error.message
+      ? error.message
+      : "An unexpected error occurred while running the AI agent.";
+
+  return new AgentExecutionError(
+    `The AI agent failed to complete this request: ${detail}`,
+    { cause: error, eventId },
+  );
 }
 
 function extractBalancedJsonObjects(text: string): string[] {
