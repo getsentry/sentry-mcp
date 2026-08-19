@@ -467,6 +467,55 @@ describe("rendering", () => {
     ]);
   }
 
+  it("keeps real product copy intact rather than cutting mid-sentence", () => {
+    // Measured from a real onboarding page: product copy runs 60-100 chars, so
+    // the previous 80-char cap severed the longest line two words from its end
+    // — complete-looking enough to quote, and wrong. Confirming exact wording is
+    // a primary use of this tool, so the cap must clear real copy.
+    const copy =
+      "Catch breaking changes, automatically root cause issues in production, and fix what you missed.";
+    const rendered = renderDomTree(
+      reconstruct([snapshot(0, [element(10, "p", {}, [text(11, copy)])])]),
+      { lens: "full" },
+    );
+
+    expect(rendered.lines.join("\n")).toContain(`"${copy}"`);
+    expect(rendered.lines.join("\n")).not.toContain("…");
+  });
+
+  it("elides text that is genuinely unbounded, and marks it", () => {
+    // A single pathological node should not become the whole response. The
+    // ellipsis matters: without it the fragment reads as the entire value.
+    const rendered = renderDomTree(
+      reconstruct([
+        snapshot(0, [element(10, "p", {}, [text(11, "x".repeat(1000))])]),
+      ]),
+      { lens: "full" },
+    );
+    const line = rendered.lines.join("\n");
+
+    expect(line).toContain("…");
+    expect(line.length).toBeLessThan(600);
+  });
+
+  it("holds form values to a tighter cap than rendered copy", () => {
+    // Values are usually masked; an unmasked one this long is a payload, where
+    // the length is the informative part rather than the content.
+    const rendered = renderDomTree(
+      reconstruct([
+        snapshot(0, [
+          element(10, "input", { id: "token", value: "v".repeat(300) }),
+        ]),
+      ]),
+      { lens: "full" },
+    );
+    const line = rendered.lines.join("\n");
+
+    expect(line).toContain("…");
+    // 80-char cap, not the 400 allowed for rendered text.
+    expect(line.length).toBeLessThan(200);
+  });
+
   it("prunes a deep branch locally, leaving later siblings intact", () => {
     // The real failure this reproduces: on a live page `head` is deep enough
     // that aborting the walk at the depth limit hid `body` and everything under

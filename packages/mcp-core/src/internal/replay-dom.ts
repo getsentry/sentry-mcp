@@ -653,7 +653,31 @@ const RENDERED_ATTRIBUTES = [
   "readonly",
 ];
 
-const MAX_TEXT_LENGTH = 80;
+/**
+ * Rendered text kept per element before eliding.
+ *
+ * Confirming the exact wording a user was shown is a primary use of this tool,
+ * and a cap that lands mid-sentence defeats it. Measured against real product
+ * copy, which clusters between 60 and 100 characters: at 80 the longest line on
+ * a real onboarding page ("Catch breaking changes, automatically root cause
+ * issues in production, and fix what you missed.", 95 chars) was cut two words
+ * from the end, which is the worst possible outcome — it looks complete enough
+ * to quote and is not.
+ *
+ * The node budget is what bounds output size; this only bounds a single
+ * pathological node, so it can afford to be generous.
+ */
+const MAX_TEXT_LENGTH = 400;
+
+/**
+ * Form values kept before eliding.
+ *
+ * Shorter than rendered text on purpose. Values are usually masked to `***`,
+ * and an unmasked one long enough to hit this is a payload rather than
+ * something a reader is reading — a serialized token or a pasted blob. Their
+ * length is the informative part, not their content.
+ */
+const MAX_VALUE_LENGTH = 80;
 
 /**
  * Depth allowed before a branch is pruned.
@@ -925,7 +949,9 @@ function describeElement(node: DomNode, nodes: Map<number, DomNode>): string {
   // The current value, not the attribute: input events supersede it, and the
   // attribute records only what the page shipped with.
   if (node.inputValue !== undefined) {
-    parts.push(`[value=${JSON.stringify(truncateText(node.inputValue))}]`);
+    parts.push(
+      `[value=${JSON.stringify(truncateText(node.inputValue, MAX_VALUE_LENGTH))}]`,
+    );
   }
   // rrweb reports `isChecked` on every input event, not only on checkboxes and
   // radios, so a false value carries no information — and `[checked=false]` on
@@ -990,8 +1016,12 @@ function directText(node: DomNode, nodes: Map<number, DomNode>): string | null {
   return joined ? truncateText(joined) : null;
 }
 
-function truncateText(value: string): string {
-  return value.length > MAX_TEXT_LENGTH
-    ? `${value.slice(0, MAX_TEXT_LENGTH)}…`
-    : value;
+/**
+ * Shorten a string, marking that it was shortened.
+ *
+ * The ellipsis is load-bearing: without it a truncated string reads as the whole
+ * value, and the entire point of rendering text here is that it can be quoted.
+ */
+function truncateText(value: string, limit = MAX_TEXT_LENGTH): string {
+  return value.length > limit ? `${value.slice(0, limit)}…` : value;
 }
