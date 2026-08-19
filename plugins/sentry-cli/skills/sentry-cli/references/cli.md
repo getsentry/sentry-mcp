@@ -11,6 +11,10 @@ requires:
 
 CLI-related commands
 
+### `sentry cli completion <shell>`
+
+Print the shell completion script
+
 ### `sentry cli defaults <key value...>`
 
 View and manage default settings
