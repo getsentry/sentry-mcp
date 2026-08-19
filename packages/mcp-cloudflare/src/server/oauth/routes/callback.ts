@@ -12,7 +12,7 @@ import {
 import { isRegisteredRedirectUri } from "../../lib/redirect-uri";
 import type { Env, WorkerProps } from "../../types";
 import { setSentryUserFromRequest } from "../../utils/sentry-user";
-import { SENTRY_TOKEN_URL } from "../constants";
+import { SENTRY_TOKEN_URL, sentryBaseUrl } from "../constants";
 import {
   appendAuthorizationResponseIss,
   createOAuthFailureResponse,
@@ -230,10 +230,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   // This is the Sentry callback URL, not the downstream MCP client's redirect URI
   const sentryCallbackUrl = new URL("/oauth/callback", c.req.url).href;
   const [payload, errResponse] = await exchangeCodeForAccessToken({
-    upstream_url: new URL(
-      SENTRY_TOKEN_URL,
-      `https://${c.env.SENTRY_HOST || "sentry.io"}`,
-    ).href,
+    upstream_url: new URL(SENTRY_TOKEN_URL, sentryBaseUrl(c.env)).href,
     client_id: c.env.SENTRY_CLIENT_ID,
     client_secret: c.env.SENTRY_CLIENT_SECRET,
     code: c.req.query("code"),
@@ -290,6 +287,47 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   const sessionStartedAt = Date.now();
   const userLabel = getUpstreamUserLabel(payload);
 
+  // --- Biscuit agent token bootstrap (hackweek POC) ---
+  // When enabled, mint a biscuit using the raw Sentry token, store
+  // the biscuit as the session's accessToken, then discard the raw token.
+  let effectiveAccessToken = payload.access_token;
+  let biscuitProps: Partial<WorkerProps> = {};
+
+  if (c.env.BISCUIT_AGENT_TOKENS === "1" && constraintOrganizationSlug) {
+    const biscuitSessionId = crypto.randomUUID();
+    try {
+      const mintUrl = `${sentryBaseUrl(c.env)}/api/0/organizations/${constraintOrganizationSlug}/agent/biscuit-token/`;
+      const mintResp = await fetch(mintUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${payload.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionId: biscuitSessionId,
+          maxScopes: Array.from(grantedScopes),
+        }),
+      });
+      if (mintResp.ok) {
+        const biscuitData = (await mintResp.json()) as {
+          token: string;
+          expiresAt: string;
+          scopes: string[];
+          maxScopes: string[];
+        };
+        effectiveAccessToken = biscuitData.token;
+        biscuitProps = {
+          tokenType: "biscuit",
+          biscuitSessionId,
+          biscuitMaxScopes: biscuitData.maxScopes,
+          biscuitExpiresAt: biscuitData.expiresAt,
+        };
+      }
+    } catch {
+      // Non-fatal: fall back to raw token
+    }
+  }
+
   const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
     request: oauthReqInfo as AuthRequest,
     userId: payload.user.id,
@@ -310,7 +348,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       id: payload.user.id,
 
       // Sentry-specific fields
-      accessToken: payload.access_token,
+      accessToken: effectiveAccessToken,
       refreshToken: payload.refresh_token,
       // Cache upstream expiry so future refresh grants can avoid
       // unnecessary upstream refresh calls when still valid
@@ -327,6 +365,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
       constraintOrganizationSlug,
       constraintProjectSlug,
+
+      // Biscuit-specific fields (only populated when BISCUIT_AGENT_TOKENS=1)
+      ...biscuitProps,
 
       // Note: sentryHost and mcpUrl come from env, not OAuth props
     } as WorkerProps,

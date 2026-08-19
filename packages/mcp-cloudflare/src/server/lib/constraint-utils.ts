@@ -122,10 +122,12 @@ export async function verifyConstraintsAccess(
   {
     accessToken,
     sentryHost = "sentry.io",
+    sentryProtocol = "https",
     cache,
   }: {
     accessToken: string | undefined | null;
     sentryHost?: string;
+    sentryProtocol?: "http" | "https";
     cache?: CacheOptions;
   },
 ): Promise<
@@ -180,7 +182,11 @@ export async function verifyConstraintsAccess(
   }
 
   // Use shared API client for consistent behavior and error handling
-  const api = new SentryApiService({ accessToken, host: sentryHost });
+  const api = new SentryApiService({
+    accessToken,
+    host: sentryHost,
+    protocol: sentryProtocol,
+  });
 
   // Verify organization using API client
   let regionUrl: string | null | undefined = null;

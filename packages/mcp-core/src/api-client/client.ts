@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { BiscuitTokenManager } from "../auth/biscuit-token-manager";
 import { DEFAULT_SEARCH_ISSUES_PERIOD } from "../constants";
 import { ConfigurationError } from "../errors";
 import { logIssue, logWarn } from "../telem/logging";
@@ -500,6 +501,7 @@ export class SentryApiService {
   private clientName: string | null;
   private clientFamily: string | null;
   private utmSource: string | null;
+  private biscuitTokenManager: BiscuitTokenManager | null;
   protected host: string;
   protected protocol: SentryProtocol;
   protected apiPrefix: string;
@@ -525,6 +527,7 @@ export class SentryApiService {
     clientName = null,
     clientFamily = null,
     utmSource = null,
+    biscuitTokenManager = null,
   }: {
     accessToken?: string | null;
     host?: string;
@@ -533,12 +536,14 @@ export class SentryApiService {
     clientName?: string | null;
     clientFamily?: string | null;
     utmSource?: string | null;
+    biscuitTokenManager?: BiscuitTokenManager | null;
   }) {
     this.accessToken = accessToken;
     this.clientId = clientId;
     this.clientName = clientName;
     this.clientFamily = clientFamily;
     this.utmSource = utmSource;
+    this.biscuitTokenManager = biscuitTokenManager;
     this.host = host;
     this.protocol = protocol;
     this.apiPrefix = `${protocol}://${host}/api/0`;
@@ -701,8 +706,11 @@ export class SentryApiService {
       "Content-Type": "application/json",
       "User-Agent": USER_AGENT,
     };
-    if (this.accessToken) {
-      headers.Authorization = `Bearer ${this.accessToken}`;
+    const effectiveToken = this.biscuitTokenManager
+      ? this.biscuitTokenManager.getCurrentToken()
+      : this.accessToken;
+    if (effectiveToken) {
+      headers.Authorization = `Bearer ${effectiveToken}`;
     }
     if (this.clientId) {
       headers["X-Sentry-MCP-Client-Id"] = this.clientId;

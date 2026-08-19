@@ -28,14 +28,17 @@ import {
   setUser,
   wrapMcpServerWithSentry,
 } from "@sentry/core";
-import { isApiAuthenticationErrorDeep } from "./api-client";
+import {
+  isApiAuthenticationErrorDeep,
+  isApiPermissionErrorDeep,
+} from "./api-client";
 import { MCP_SERVER_NAME } from "./constants";
 import {
   formatErrorForUser,
   isExpectedToolError,
 } from "./internal/error-handling";
 import type { Skill } from "./skills";
-import { type LogIssueOptions, logIssue } from "./telem/logging";
+import { type LogIssueOptions, logIssue, logWarn } from "./telem/logging";
 import {
   executeToolHandler,
   getAvailableTools,
@@ -312,6 +315,14 @@ function configureServer({
       setTag("app.server.mode.experimental", experimentalMode);
 
       try {
+        // Always refresh the biscuit token before each tool call.
+        // This serves two purposes: (1) picks up write grants if the
+        // user approved elevation, and (2) keeps the per-request token
+        // fresh since the KV-stored token is a long-lived credential.
+        if (context.biscuitTokenManager) {
+          await context.biscuitTokenManager.tryElevateViaRefresh();
+        }
+
         const rawParams =
           params && typeof params === "object" && !Array.isArray(params)
             ? (params as Record<string, unknown>)
@@ -398,6 +409,51 @@ function configureServer({
           try {
             await context.onUpstreamUnauthorized();
           } catch {}
+        }
+
+        // Biscuit 403: insufficient scopes — create an elevation request
+        // and ask the user to approve in-browser. The next tool call will
+        // pick up the write grant via tryElevateViaRefresh() above.
+        //
+        // TODO: Once the Cloudflare transport supports stateful SSE
+        // sessions, switch to throwing UrlElicitationRequiredError so the
+        // client opens the browser automatically.
+        const is403 = isApiPermissionErrorDeep(error);
+        const hasBTM = !!context.biscuitTokenManager;
+        const notElevated =
+          hasBTM && !context.biscuitTokenManager!.isElevated();
+        if (is403 && hasBTM && notElevated) {
+          try {
+            const maxScopes = context.biscuitTokenManager!.getMaxScopes();
+            const elevation =
+              await context.biscuitTokenManager!.createElevationRequest(
+                maxScopes,
+              );
+
+            if (elevation) {
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: [
+                      "This action requires elevated permissions.",
+                      "Please open the following URL to approve:",
+                      "",
+                      elevation.url,
+                      "",
+                      "After approving, retry the same tool call.",
+                    ].join("\n"),
+                  },
+                ],
+                isError: true,
+              };
+            }
+          } catch (elevationErr) {
+            logWarn("Biscuit elevation request failed", {
+              loggerScope: ["server", "elevation"],
+              extra: { error: String(elevationErr) },
+            });
+          }
         }
 
         // CRITICAL: Tool errors MUST be returned as formatted text responses,

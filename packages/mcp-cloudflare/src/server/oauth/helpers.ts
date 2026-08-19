@@ -439,6 +439,7 @@ export async function exchangeCodeForAccessToken({
 
 export type TokenExchangeEnv = {
   SENTRY_HOST?: string;
+  SENTRY_INSECURE_HTTP?: string;
 };
 
 // Values avoid the substring "token" so Sentry's default PII scrubber
@@ -501,6 +502,7 @@ async function probeUpstreamAccessToken(
     const api = new SentryApiService({
       accessToken: props.accessToken,
       host: env.SENTRY_HOST || "sentry.io",
+      protocol: env.SENTRY_INSECURE_HTTP === "1" ? "http" : "https",
     });
     await api.getAuthenticatedUser();
     return { outcome: "cached_valid_probed", status: 200 };
@@ -637,11 +639,44 @@ export async function tokenExchangeCallback(
       // refresh can take the local fast path instead of re-probing upstream.
       // Any Sentry-side revocation still surfaces on real MCP tool calls,
       // which hit the upstream API directly with the user's access token.
-      const nextProps = {
+      let nextProps = {
         ...props,
         accessTokenExpiresAt:
           Date.now() + PROBED_ACCESS_TOKEN_TTL_SECONDS * 2 * 1000,
       } satisfies WorkerProps & Record<string, unknown>;
+
+      // Refresh the biscuit token so the KV copy stays alive
+      if (props.tokenType === "biscuit") {
+        try {
+          const sentryHost = env.SENTRY_HOST || "sentry.io";
+          const protocol = env.SENTRY_INSECURE_HTTP === "1" ? "http" : "https";
+          const refreshUrl = `${protocol}://${sentryHost}/api/0/organizations/${props.constraintOrganizationSlug}/agent/biscuit-token/refresh/`;
+          const refreshResp = await fetch(refreshUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${props.accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({}),
+          });
+          if (refreshResp.ok) {
+            const biscuitData = (await refreshResp.json()) as {
+              token: string;
+              expiresAt: string;
+              scopes: string[];
+              maxScopes: string[];
+            };
+            nextProps = {
+              ...nextProps,
+              accessToken: biscuitData.token,
+              biscuitExpiresAt: biscuitData.expiresAt,
+            };
+          }
+        } catch {
+          // Non-fatal: keep the existing biscuit token
+        }
+      }
+
       return buildSuccessfulTokenExchangeResult(
         nextProps,
         PROBED_ACCESS_TOKEN_TTL_SECONDS,

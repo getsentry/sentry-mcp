@@ -47,6 +47,13 @@ export type WorkerProps = {
 
   // Note: full URL constraints are still extracted per-request from the MCP path
   // Note: sentryHost and mcpUrl come from env, not OAuth props
+
+  // Biscuit agent token fields (hackweek POC)
+  /** When set, accessToken is a biscuit (sntryb_) rather than a raw Sentry token */
+  tokenType?: "sentry" | "biscuit";
+  biscuitSessionId?: string;
+  biscuitMaxScopes?: string[];
+  biscuitExpiresAt?: string;
 };
 
 export interface Env {
@@ -77,4 +84,8 @@ export interface Env {
   // Backward-compatible fallback while deployments roll out dedicated MCP limiters.
   MCP_RATE_LIMITER?: RateLimit;
   AUTORAG_INDEX_NAME?: string;
+  /** Enable biscuit agent tokens (hackweek POC) */
+  BISCUIT_AGENT_TOKENS?: string;
+  /** Use http:// instead of https:// for SENTRY_HOST (local dev only) */
+  SENTRY_INSECURE_HTTP?: string;
 }

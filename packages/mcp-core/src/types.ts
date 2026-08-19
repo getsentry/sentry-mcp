@@ -5,6 +5,7 @@
  * and server context. Uses advanced TypeScript patterns for type-safe parameter
  * extraction and handler registration.
  */
+import type { BiscuitTokenManager } from "./auth/biscuit-token-manager";
 import type { Skill } from "./skills";
 
 /**
@@ -75,4 +76,7 @@ export type ServerContext = {
    * errors are swallowed.
    */
   onUpstreamUnauthorized?: () => void | Promise<void>;
+  /** Biscuit token manager for agent-scoped auth (POC). When set, accessToken
+   *  is the initial biscuit and the manager handles refresh/elevation. */
+  biscuitTokenManager?: BiscuitTokenManager;
 };

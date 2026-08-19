@@ -341,3 +341,16 @@ export function isApiAuthenticationErrorDeep(error: unknown): boolean {
   }
   return false;
 }
+
+/**
+ * Like isApiAuthenticationErrorDeep but for ApiPermissionError (403).
+ */
+export function isApiPermissionErrorDeep(error: unknown): boolean {
+  let current: unknown = error;
+  for (let i = 0; i < 3; i++) {
+    if (current instanceof ApiPermissionError) return true;
+    if (!(current instanceof Error)) return false;
+    current = current.cause;
+  }
+  return false;
+}

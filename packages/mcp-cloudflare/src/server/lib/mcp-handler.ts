@@ -14,6 +14,10 @@
 
 import type { ExportedHandler } from "@cloudflare/workers-types";
 import * as Sentry from "@sentry/cloudflare";
+import {
+  BiscuitTokenManager,
+  type BiscuitTokenManagerConfig,
+} from "@sentry/mcp-core/auth";
 import { buildServer } from "@sentry/mcp-core/server";
 import {
   ACTIVE_SKILLS,
@@ -61,6 +65,7 @@ type OAuthMcpContext = {
   tokenConstraintOrganizationSlug?: string | null;
   tokenConstraintProjectSlug?: string | null;
   onUpstreamUnauthorized: () => void | Promise<void>;
+  biscuitTokenManager?: BiscuitTokenManager;
 };
 
 type SentryBearerMcpContext = {
@@ -318,7 +323,6 @@ async function handleAuthenticatedMcpRequest(
   const organizationSlug = groups?.org || null;
   const projectSlug = groups?.project || null;
 
-
   // Check for experimental mode query parameter
   const isExperimentalMode = url.searchParams.get("experimental") === "1";
 
@@ -410,6 +414,8 @@ async function handleAuthenticatedMcpRequest(
             {
               accessToken: auth.accessToken,
               sentryHost,
+              sentryProtocol:
+                env.SENTRY_INSECURE_HTTP === "1" ? "http" : "https",
               cache: {
                 kv: env.MCP_CACHE,
                 userId: auth.userId,
@@ -447,11 +453,14 @@ async function handleAuthenticatedMcpRequest(
     grantedSkills: auth.grantedSkills,
     constraints,
     sentryHost,
+    sentryProtocol: env.SENTRY_INSECURE_HTTP === "1" ? "http" : "https",
     mcpUrl: env.MCP_URL,
     experimentalMode: isExperimentalMode,
     transport: "http",
     onUpstreamUnauthorized:
       auth.kind === "oauth" ? auth.onUpstreamUnauthorized : undefined,
+    biscuitTokenManager:
+      auth.kind === "oauth" ? auth.biscuitTokenManager : undefined,
   };
 
   // The modern handler requires a factory and creates a fresh SDK v2 server
@@ -460,7 +469,7 @@ async function handleAuthenticatedMcpRequest(
     () =>
       buildServer({
         context: serverContext,
-            experimentalMode: isExperimentalMode,
+        experimentalMode: isExperimentalMode,
         sdkVersion: "v2",
       }),
     {
@@ -592,6 +601,30 @@ const mcpHandler: ExportedHandler<Env> = {
 
     let upstreamUnauthorizedHandled = false;
 
+    // Construct BiscuitTokenManager when the grant carries a biscuit token
+    let biscuitTokenManager: BiscuitTokenManager | undefined;
+    if (
+      rawProps.tokenType === "biscuit" &&
+      rawProps.biscuitSessionId &&
+      rawProps.constraintOrganizationSlug
+    ) {
+      const sentryHost = env.SENTRY_HOST || "sentry.io";
+      biscuitTokenManager = new BiscuitTokenManager({
+        initialToken: {
+          token: accessToken,
+          expiresAt:
+            rawProps.biscuitExpiresAt ??
+            new Date(Date.now() + 300_000).toISOString(),
+          scopes: [],
+          maxScopes: rawProps.biscuitMaxScopes ?? [],
+        },
+        organizationSlug: rawProps.constraintOrganizationSlug,
+        sessionId: rawProps.biscuitSessionId,
+        sentryHost,
+        sentryProtocol: env.SENTRY_INSECURE_HTTP === "1" ? "http" : "https",
+      });
+    }
+
     return handleAuthenticatedMcpRequest(request, env, ctx, {
       kind: "oauth",
       userId,
@@ -601,6 +634,7 @@ const mcpHandler: ExportedHandler<Env> = {
       grantedSkills: validSkills,
       tokenConstraintOrganizationSlug: rawProps.constraintOrganizationSlug,
       tokenConstraintProjectSlug: rawProps.constraintProjectSlug,
+      biscuitTokenManager,
       onUpstreamUnauthorized: () => {
         if (upstreamUnauthorizedHandled) return;
         upstreamUnauthorizedHandled = true;

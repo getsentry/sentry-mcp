@@ -14,7 +14,7 @@ import {
   getClientRegistrationMethodTelemetry,
 } from "../telemetry";
 import type { Env } from "../../types";
-import { SENTRY_AUTH_URL } from "../constants";
+import { SENTRY_AUTH_URL, sentryBaseUrl } from "../constants";
 import {
   getUpstreamAuthorizeUrl,
   validateResourceParameter,
@@ -44,10 +44,7 @@ async function redirectToUpstream(
   responseHeaders.set(
     "location",
     getUpstreamAuthorizeUrl({
-      upstream_url: new URL(
-        SENTRY_AUTH_URL,
-        `https://${env.SENTRY_HOST || "sentry.io"}`,
-      ).href,
+      upstream_url: new URL(SENTRY_AUTH_URL, sentryBaseUrl(env)).href,
       scope: Object.keys(SCOPES).join(" "),
       client_id: env.SENTRY_CLIENT_ID,
       redirect_uri: new URL("/oauth/callback", request.url).href,
