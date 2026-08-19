@@ -22,7 +22,9 @@
   "scripts": {
     "docs:check": "node scripts/check-doc-links.mjs",
     "dev": "dotenv -e .env -e .env.local -- turbo dev --filter=!@sentry/mcp-server",
+    "dev:local": "sentry local run -- pnpm dev",
     "dev:stdio": "dotenv -e .env -e .env.local -- turbo dev --filter=!@sentry/mcp-cloudflare",
+    "dev:stdio:local": "sentry local run -- pnpm dev:stdio",
     "build": "turbo build after-build",
     "check:generated": "pnpm --filter @sentry/mcp-core generate-definitions && git diff --exit-code -- packages/mcp-core/src/toolDefinitions.json packages/mcp-core/src/skillDefinitions.json plugins/sentry-mcp/agents/sentry-mcp.md plugins/sentry-mcp-experimental/agents/sentry-mcp.md",
     "deploy": "turbo deploy",
@@ -70,6 +72,7 @@
     ]
   },
   "devDependencies": {
-    "@types/json-schema": "^7.0.15"
+    "@types/json-schema": "^7.0.15",
+    "sentry": "^0.38.0"
   }
 }

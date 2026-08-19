@@ -59,6 +59,7 @@ export interface Env {
   SENTRY_CLIENT_SECRET: string;
   SENTRY_ENVIRONMENT?: string;
   SENTRY_DSN?: string;
+  SENTRY_SPOTLIGHT?: string;
   SENTRY_HOST?: string;
   /** @deprecated Prefer OPENROUTER_API_KEY for hosted MCP AI features. */
   OPENAI_API_KEY?: string;

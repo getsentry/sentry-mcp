@@ -4,6 +4,7 @@ import { resolveAttribution } from "./utils";
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
+  spotlight: import.meta.env.VITE_SENTRY_SPOTLIGHT,
   sendDefaultPii: true,
   tracesSampleRate: 1,
   beforeSend: sentryBeforeSend,
