@@ -203,6 +203,14 @@ describe("dataset-fields agent tool", () => {
         key: "viewed_by_me",
         totalValues: 2,
       });
+
+      // Replay fields are mostly searchable but not sortable, and Sentry
+      // rejects a sort outside its sort_config. A flat list invites an agent
+      // to pick one that cannot work, so discovery marks which are sortable.
+      expect(fields.get("count_screens")?.sortable).toBe(true);
+      expect(fields.get("viewed_by_me")?.sortable).toBe(false);
+      expect(fields.get("click.textContent")?.sortable).toBe(false);
+      expect(fields.get("user.segment")?.sortable).toBe(false);
       expect(fields.get("user.segment")).toMatchObject({
         key: "user.segment",
         name: "User Segment",

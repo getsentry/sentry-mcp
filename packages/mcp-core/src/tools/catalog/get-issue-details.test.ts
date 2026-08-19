@@ -849,6 +849,66 @@ describe("get_issue_details", () => {
     expect(result).not.toContain("**replayId**:");
   });
 
+  it("reports a rate-limited replay lookup as unavailable, not as no replays", async () => {
+    // `replay-count` is rate limited per organization and called on every
+    // issue lookup, so under parallel triage this is a routine failure.
+    // Rendering nothing would assert the issue has no replays.
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/replay-count/",
+        () =>
+          HttpResponse.json({ detail: "Too many requests" }, { status: 429 }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    if (typeof result !== "string") {
+      throw new Error("Expected string result");
+    }
+
+    expect(result).toContain("## Session Replay");
+    expect(result).toContain("could not be looked up");
+    expect(result).toContain("may still have replays");
+  });
+
+  it("stays silent when the lookup succeeds and finds nothing", async () => {
+    // The absence of replays is a real answer and should not be dressed up as
+    // a failure.
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/replay-count/",
+        () => HttpResponse.json({}),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    if (typeof result !== "string") {
+      throw new Error("Expected string result");
+    }
+
+    expect(result).not.toContain("## Session Replay");
+  });
+
   it("serializes with issueUrl", async () => {
     const result = await getIssueDetails.handler(
       {

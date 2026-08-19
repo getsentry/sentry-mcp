@@ -135,7 +135,7 @@ export default defineTool({
       // For this call, we might want to provide context if it fails
       const [
         { event, performanceTrace, aiConversations, codeLocation },
-        { autofixState, externalIssues, relatedReplayIds },
+        { autofixState, externalIssues, relatedReplayIds, replayLookupFailed },
       ] = await Promise.all([
         apiService
           .getEventForIssue({
@@ -180,6 +180,7 @@ export default defineTool({
           performanceTrace,
           externalIssues,
           relatedReplayIds,
+          replayLookupFailed,
           aiConversations,
           codeLocation,
           experimentalMode: context.experimentalMode,
@@ -239,7 +240,7 @@ export default defineTool({
 
     const [
       { event, performanceTrace, aiConversations, codeLocation },
-      { autofixState, externalIssues, relatedReplayIds },
+      { autofixState, externalIssues, relatedReplayIds, replayLookupFailed },
     ] = await Promise.all([
       apiService
         .getLatestEventForIssue({
@@ -272,6 +273,7 @@ export default defineTool({
         performanceTrace,
         externalIssues,
         relatedReplayIds,
+        replayLookupFailed,
         aiConversations,
         codeLocation,
         experimentalMode: context.experimentalMode,
@@ -341,6 +343,7 @@ async function fetchIssueEnrichmentData({
   autofixState: AutofixRunState | undefined;
   externalIssues: ExternalIssueList | undefined;
   relatedReplayIds: string[] | undefined;
+  replayLookupFailed: boolean;
 }> {
   const issueId = String(issue.id);
   const [autofixState, externalIssues, relatedReplayIds] = await Promise.all([
@@ -350,16 +353,26 @@ async function fetchIssueEnrichmentData({
     apiService
       .getIssueExternalLinks({ organizationSlug, issueId: issue.shortId })
       .catch(() => undefined),
+    // `replay-count` is rate limited per organization as well as per user and
+    // IP, and this runs on every issue lookup. Swallowing the failure would
+    // make throttling indistinguishable from "this issue has no replays", so
+    // parallel issue triage would silently lose the Session Replay section.
     apiService
       .listReplayIdsForIssue({
         organizationSlug,
         issueId,
         dataSource: getReplayDataSource(issue),
       })
-      .catch(() => undefined),
+      .then((ids) => ({ ok: true as const, ids }))
+      .catch(() => ({ ok: false as const })),
   ]);
 
-  return { autofixState, externalIssues, relatedReplayIds };
+  return {
+    autofixState,
+    externalIssues,
+    relatedReplayIds: relatedReplayIds.ok ? relatedReplayIds.ids : undefined,
+    replayLookupFailed: !relatedReplayIds.ok,
+  };
 }
 
 async function maybeFetchPerformanceTrace({

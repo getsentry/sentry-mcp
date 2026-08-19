@@ -90,6 +90,22 @@ export interface ToolConfig<
   experimental?: boolean; // Mark tool as experimental (only shown in experimental mode)
   hideInExperimentalMode?: boolean; // Hide tool when experimental mode is active (for tools replaced by unified tools)
   requiredCapabilities?: (keyof ProjectCapabilities)[]; // Project capabilities required for this tool
+  /**
+   * Narrows the advertised input schema for a specific session.
+   *
+   * `requiredCapabilities` gates a tool as a whole. This is for tools that
+   * remain available but whose options do not all apply — `search_events`
+   * serves six datasets, and only the replay dataset needs the `replays`
+   * capability. Narrowing the advertised options keeps a routing agent from
+   * choosing one that would be rejected at handler time.
+   *
+   * Called after constraint-injected parameters are removed. Returning the
+   * schema unchanged is always valid.
+   */
+  refineInputSchema?: (
+    schema: Record<string, z.ZodType>,
+    context: ServerContext,
+  ) => Record<string, z.ZodType>;
   outputSchema?: z.ZodType;
   annotations: {
     // readOnlyHint, destructiveHint, and openWorldHint are required so every

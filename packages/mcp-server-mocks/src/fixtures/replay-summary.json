@@ -1,0 +1,25 @@
+{
+  "data": {
+    "time_ranges": [
+      {
+        "period_start": 1744027200500,
+        "period_end": 1744027214200,
+        "period_title": "Signed in and navigated to checkout"
+      },
+      {
+        "period_start": 1744027380600,
+        "period_end": 1744027388400,
+        "period_title": "Complete order failed with a server error"
+      },
+      {
+        "period_start": 1744027421700,
+        "period_end": 1744027428700,
+        "period_title": "Download receipt link did not respond"
+      }
+    ],
+    "summary": "The user signed in, moved to checkout, and tried to complete an order. The checkout request failed with a 500 and logged a TypeError, after which the user rage clicked the complete order button and then clicked an unresponsive download receipt link."
+  },
+  "num_segments": 2,
+  "created_at": "2025-04-07T12:06:00.000Z",
+  "status": "completed"
+}

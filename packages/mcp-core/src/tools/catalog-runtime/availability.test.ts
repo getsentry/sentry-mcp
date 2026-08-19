@@ -74,6 +74,93 @@ describe("catalog availability", () => {
     );
   });
 
+  describe("replay capability gating", () => {
+    const REPLAY_TOOLS = [
+      "get_replay_details",
+      "get_replay_activity",
+      "get_replay_dom",
+    ];
+
+    function getInspectContext(
+      constraints: Partial<ServerContext["constraints"]> = {},
+    ): ServerContext {
+      return getServerContext({
+        grantedSkills: new Set<Skill>(["inspect"]),
+        constraints,
+      });
+    }
+
+    it("offers every replay tool when the constrained project has replays", () => {
+      const names = getSearchableToolNames(
+        getInspectContext({
+          organizationSlug: "my-org",
+          projectSlug: "my-project",
+          projectCapabilities: { replays: true },
+        }),
+      );
+
+      expect(names).toEqual(expect.arrayContaining(REPLAY_TOOLS));
+    });
+
+    it("hides every replay tool when the constrained project has no replays", () => {
+      // Advertising a tool that can only fail costs a tool slot and invites a
+      // call that returns nothing useful.
+      const names = getSearchableToolNames(
+        getInspectContext({
+          organizationSlug: "my-org",
+          projectSlug: "my-project",
+          projectCapabilities: { replays: false },
+        }),
+      );
+
+      for (const toolName of REPLAY_TOOLS) {
+        expect(names).not.toContain(toolName);
+      }
+    });
+
+    it("keeps replay tools available when no project constrains the session", () => {
+      // Capabilities are a property of a project. Without one there is
+      // nothing to check, and hiding the tools would break unconstrained
+      // sessions.
+      const names = getSearchableToolNames(getInspectContext());
+
+      expect(names).toEqual(expect.arrayContaining(REPLAY_TOOLS));
+    });
+
+    it("keeps every replay tool off the direct surface", () => {
+      // They are catalog-only by design: the direct surface is budgeted, and
+      // replay review starts from a search or a pasted URL either way.
+      const directToolNames = getToolsForMcpRegistration({
+        tools: catalogTools,
+        context: getInspectContext({
+          organizationSlug: "my-org",
+          projectSlug: "my-project",
+          projectCapabilities: { replays: true },
+        }),
+        experimentalMode: false,
+        useDefaultSurfacePolicy: true,
+      }).map(({ tool }) => tool.name);
+
+      for (const toolName of REPLAY_TOOLS) {
+        expect(directToolNames).not.toContain(toolName);
+      }
+    });
+
+    it("hides replay tools from sessions without the inspect skill", () => {
+      const names = getSearchableToolNames(
+        getProjectManagementContext({
+          organizationSlug: "my-org",
+          projectSlug: "my-project",
+          projectCapabilities: { replays: true },
+        }),
+      );
+
+      for (const toolName of REPLAY_TOOLS) {
+        expect(names).not.toContain(toolName);
+      }
+    });
+  });
+
   it("hides create_project from project-scoped project-management sessions", () => {
     const context = getProjectManagementContext({
       organizationSlug: "my-org",

@@ -9,6 +9,7 @@ server. Each spec should live in a single Markdown file under `docs/specs/`.
 - [Embedded Agent OpenAI Routing](embedded-agent-openai-routing.md)
 - [Project Management Tools](project-management.md)
 - [Remembered OAuth Skill Defaults](remembered-oauth-skills.md)
+- [Replay Review](replay-review.md)
 - [Search Events](search-events.md)
 - [Sentry-Bearer Cloudflare Auth](sentry-bearer-cloudflare-auth.md)
 - [Subpath Constraints](subpath-constraints.md)

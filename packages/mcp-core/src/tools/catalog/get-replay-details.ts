@@ -1,18 +1,37 @@
 import { setTag } from "@sentry/core";
 import type {
-  Issue,
   ReplayDetails,
-  ReplayRecordingEvent,
+  ReplayErrorEvent,
   ReplayRecordingSegments,
+  ReplayRecordingSegmentsResult,
   SentryApiService,
   TraceMeta,
 } from "../../api-client";
+import {
+  MAX_REPLAY_SEGMENTS,
+  MAX_REPLAY_SEGMENT_BYTES,
+} from "../../api-client";
+import type {
+  ReplayKindCount,
+  ReplaySignal,
+  ReplaySignalKind,
+} from "../../internal/replay-events";
+import {
+  countReplayKinds,
+  extractReplaySignals,
+  formatReplayOffset,
+} from "../../internal/replay-events";
+import {
+  formatToolCall,
+  formatToolCallInstruction,
+} from "../../internal/tool-helpers/tool-call-formatting";
+import {
+  assertReplayWithinProjectConstraint,
+  resolveReplayParams,
+} from "../../internal/tool-helpers/replay";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/resolve-region-url";
-import { parseSentryUrl } from "../../internal/url-helpers";
-import { resolveScopedOrganizationSlug } from "../../internal/url-scope";
-import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,
@@ -26,19 +45,10 @@ interface ResolvedReplayParams {
   replayId: string;
 }
 
-interface ReplayActivityEvent {
-  timestampMs: number | null;
-  label: string;
-  details: string[];
-}
-
-type ReplayRecordingPayload = NonNullable<
-  NonNullable<ReplayRecordingEvent["data"]>["payload"]
->;
-
 interface RelatedReplayIssue {
   eventId: string;
-  issue: Issue | null;
+  shortId: string | null;
+  title: string | null;
 }
 
 interface RelatedReplayTrace {
@@ -46,9 +56,26 @@ interface RelatedReplayTrace {
   traceMeta: TraceMeta | null;
 }
 
-const MAX_ACTIVITY_EVENTS = 6;
+/** A time-bounded section of the session, from Sentry's AI summary. */
+interface ReplayChapter {
+  startMs: number;
+  endMs: number;
+  title: string;
+}
+
 const MAX_RELATED_ERRORS = 3;
 const MAX_RELATED_TRACES = 2;
+
+/** Pages shown in the flow line before it is summarized with a count. */
+const MAX_FLOW_PAGES = 6;
+
+/**
+ * Half-width of the suggested zoom window around an error.
+ *
+ * Wide enough to include the interaction that caused the failure and the
+ * fallout after it, narrow enough that the window is still a zoom.
+ */
+const ERROR_WINDOW_PADDING_MS = 5000;
 
 export default defineTool({
   name: "get_replay_details",
@@ -116,26 +143,42 @@ export default defineTool({
       replay.project_id != null ? String(replay.project_id) : null;
     const hasSegments = (replay.count_segments ?? 0) > 0;
 
-    const [{ segments }, relatedIssues, relatedTraces] = await Promise.all([
-      fetchReplaySegments({
-        apiService,
-        organizationSlug: resolved.organizationSlug,
-        replayId: resolved.replayId,
-        projectId,
-        isArchived,
-        hasSegments,
-      }),
-      fetchReplayIssues({
-        apiService,
-        organizationSlug: resolved.organizationSlug,
-        errorIds: replay.error_ids,
-      }),
-      fetchReplayTraces({
-        apiService,
-        organizationSlug: resolved.organizationSlug,
-        traceIds: replay.trace_ids,
-      }),
-    ]);
+    const [{ segments, truncatedBy }, errorEvents, relatedTraces, chapters] =
+      await Promise.all([
+        fetchReplaySegments({
+          apiService,
+          organizationSlug: resolved.organizationSlug,
+          replayId: resolved.replayId,
+          projectId,
+          isArchived,
+          hasSegments,
+        }),
+        fetchReplayErrorEvents({
+          apiService,
+          organizationSlug: resolved.organizationSlug,
+          errorIds: replay.error_ids,
+          projectId,
+        }),
+        fetchReplayTraces({
+          apiService,
+          organizationSlug: resolved.organizationSlug,
+          traceIds: replay.trace_ids,
+        }),
+        fetchReplayChapters({
+          apiService,
+          organizationSlug: resolved.organizationSlug,
+          projectId,
+          replayId: resolved.replayId,
+          startedAt: replay.started_at,
+          isArchived,
+        }),
+      ]);
+
+    const signals = extractReplaySignals(segments, {
+      startedAt: replay.started_at,
+      platform: replay.platform,
+    });
+    const kindCounts = countReplayKinds(segments);
 
     return formatReplayOutput({
       replay,
@@ -144,96 +187,59 @@ export default defineTool({
         params.replayUrl ??
         apiService.getReplayUrl(resolved.organizationSlug, replay.id),
       segments,
+      signals,
+      kindCounts,
+      chapters,
+      nextStepLines: buildNextStepLines({
+        organizationSlug: resolved.organizationSlug,
+        replayId: replay.id,
+        errorEvents,
+        startedAt: replay.started_at,
+        context,
+      }),
+      truncatedBy,
       isArchived,
-      relatedIssues,
+      relatedIssues: toRelatedIssues(replay.error_ids, errorEvents).slice(
+        0,
+        MAX_RELATED_ERRORS,
+      ),
+      omittedIssues: Math.max(0, replay.error_ids.length - MAX_RELATED_ERRORS),
       relatedTraces,
+      omittedTraces: Math.max(0, replay.trace_ids.length - MAX_RELATED_TRACES),
     });
   },
 });
-
-export function resolveReplayParams(params: {
-  replayUrl?: string | null;
-  organizationSlug?: string | null;
-  replayId?: string | null;
-}): ResolvedReplayParams {
-  if (params.replayUrl) {
-    const parsed = parseSentryUrl(params.replayUrl);
-    if (parsed.type !== "replay" || !parsed.replayId) {
-      throw new UserInputError(
-        "Invalid replay URL. URL must point to a Sentry replay resource.",
-      );
-    }
-    return {
-      organizationSlug: resolveScopedOrganizationSlug({
-        resourceLabel: "Replay",
-        scopedOrganizationSlug: params.organizationSlug,
-        urlOrganizationSlug: parsed.organizationSlug,
-      }),
-      replayId: parsed.replayId,
-    };
-  }
-
-  if (!params.organizationSlug || !params.replayId) {
-    throw new UserInputError(
-      "Provide either `replayUrl` or both `organizationSlug` and `replayId`.",
-    );
-  }
-
-  return {
-    organizationSlug: params.organizationSlug,
-    replayId: params.replayId,
-  };
-}
-
-async function assertReplayWithinProjectConstraint({
-  apiService,
-  organizationSlug,
-  replay,
-  projectSlug,
-}: {
-  apiService: SentryApiService;
-  organizationSlug: string;
-  replay: ReplayDetails;
-  projectSlug?: string | null;
-}): Promise<void> {
-  if (!projectSlug) {
-    return;
-  }
-
-  if (replay.project_id == null) {
-    throw new UserInputError(
-      `Replay is outside the active project constraint. Expected project "${projectSlug}".`,
-    );
-  }
-
-  const project = await apiService.getProject({
-    organizationSlug,
-    projectSlugOrId: projectSlug,
-  });
-
-  if (String(project.id) !== String(replay.project_id)) {
-    throw new UserInputError(
-      `Replay is outside the active project constraint. Expected project "${projectSlug}".`,
-    );
-  }
-}
 
 function formatReplayOutput({
   replay,
   organizationSlug,
   replayUrl,
   segments,
+  signals,
+  kindCounts,
+  chapters,
+  nextStepLines,
+  truncatedBy,
   isArchived,
   relatedIssues,
+  omittedIssues,
   relatedTraces,
+  omittedTraces,
 }: {
   replay: ReplayDetails;
   organizationSlug: string;
   replayUrl: string;
   segments: ReplayRecordingSegments | null;
+  signals: ReplaySignal[];
+  kindCounts: ReplayKindCount[];
+  chapters: ReplayChapter[];
+  nextStepLines: string[];
+  truncatedBy: ReplayRecordingSegmentsResult["truncatedBy"];
   isArchived: boolean;
   relatedIssues: RelatedReplayIssue[];
+  omittedIssues: number;
   relatedTraces: RelatedReplayTrace[];
+  omittedTraces: number;
 }): string {
   const lines: string[] = [];
   const user =
@@ -247,7 +253,6 @@ function formatReplayOutput({
     replay.device?.model ??
     replay.device?.family ??
     null;
-  const activityEvents = extractReplayActivityEvents(segments);
 
   // Summary
   lines.push(`# Replay ${replay.id} in **${organizationSlug}**`);
@@ -291,26 +296,41 @@ function formatReplayOutput({
     lines.push(`- **Viewed**: ${replay.has_viewed ? "Yes" : "No"}`);
   }
 
-  // Activity
+  // Map — the shape of the session rather than a sample of it. A fixed-length
+  // prose sample either truncates a long session or floods a short one, and
+  // neither tells the reader where to look.
   lines.push("");
-  lines.push("## Activity");
+  lines.push("## Map");
   lines.push("");
 
   if (isArchived) {
     lines.push("Recording is archived and not available for playback.");
-  } else if (activityEvents.length > 0) {
-    const startTime = activityEvents[0]?.timestampMs ?? null;
-    for (const event of activityEvents) {
-      const prefix =
-        event.timestampMs !== null && startTime !== null
-          ? `${formatRelativeTime(event.timestampMs - startTime)} · `
-          : "";
-      const details =
-        event.details.length > 0 ? ` · ${event.details.join(" · ")}` : "";
-      lines.push(`- ${prefix}\`${event.label}\`${details}`);
-    }
+  } else if (segments === null) {
+    lines.push("Recording is unavailable.");
+  } else if (signals.length === 0) {
+    lines.push("No activity recorded.");
   } else {
-    lines.push("No activity events recorded.");
+    lines.push(`- **Signals**: ${formatSignalSpan(signals)}`);
+
+    const flow = buildPageFlow(signals, replay.urls);
+    if (flow) {
+      lines.push(`- **Flow**: ${flow}`);
+    }
+
+    lines.push(`- **Kinds**: ${formatKindBreakdown(kindCounts, signals)}`);
+    lines.push(`- **Truncated**: ${formatTruncation(truncatedBy)}`);
+  }
+
+  // Chapters — present only when Sentry already has a summary for this replay.
+  if (chapters.length > 0) {
+    lines.push("");
+    lines.push("## Chapters");
+    lines.push("");
+    for (const chapter of chapters) {
+      lines.push(
+        `- ${formatReplayOffset(chapter.startMs)}–${formatReplayOffset(chapter.endMs)}  ${chapter.title}`,
+      );
+    }
   }
 
   // Related
@@ -321,11 +341,18 @@ function formatReplayOutput({
     lines.push("");
 
     for (const ri of relatedIssues) {
-      if (ri.issue) {
-        lines.push(`- **${ri.issue.shortId}**: ${ri.issue.title}`);
+      if (ri.shortId) {
+        lines.push(`- **${ri.shortId}**: ${ri.title ?? "Unknown error"}`);
       } else {
         lines.push(`- Event \`${ri.eventId}\``);
       }
+    }
+    // Stopping at a display limit without saying so reads as "this is all of
+    // them".
+    if (omittedIssues > 0) {
+      lines.push(
+        `- …and ${omittedIssues} more error${omittedIssues === 1 ? "" : "s"}`,
+      );
     }
 
     for (const rt of relatedTraces) {
@@ -334,6 +361,11 @@ function formatReplayOutput({
         : "";
       lines.push(`- Trace \`${rt.traceId}\`${spanInfo}`);
     }
+    if (omittedTraces > 0) {
+      lines.push(
+        `- …and ${omittedTraces} more trace${omittedTraces === 1 ? "" : "s"}`,
+      );
+    }
 
     lines.push("");
     lines.push(
@@ -341,7 +373,156 @@ function formatReplayOutput({
     );
   }
 
+  // Next — a concrete call, windowed on this replay's own failure when one is
+  // resolvable, so the reader does not have to guess where to zoom.
+  if (!isArchived && segments !== null && signals.length > 0) {
+    lines.push("");
+    lines.push("## Next");
+    lines.push("");
+    lines.push(...nextStepLines);
+  }
+
   return lines.join("\n");
+}
+
+/**
+ * Describe how much happened and over what span.
+ */
+function formatSignalSpan(signals: ReplaySignal[]): string {
+  const offsets = signals
+    .map((signal) => signal.offsetMs)
+    .filter((offset): offset is number => offset !== null);
+
+  const count = `${signals.length.toLocaleString("en-US")} signal${signals.length === 1 ? "" : "s"}`;
+  if (offsets.length === 0) {
+    return count;
+  }
+
+  const first = formatReplayOffset(Math.min(...offsets));
+  const last = formatReplayOffset(Math.max(...offsets));
+  return `${count} across ${first}–${last}`;
+}
+
+/**
+ * Render the page flow as an ordered path.
+ *
+ * Built from navigation signals when the recording has them, since those carry
+ * ordering. `replay.urls` is a fallback: it lists the pages visited but is
+ * metadata rather than a timeline.
+ */
+function buildPageFlow(signals: ReplaySignal[], urls: string[]): string | null {
+  const visited: string[] = [];
+
+  for (const signal of signals) {
+    if (signal.kind !== "navigation") {
+      continue;
+    }
+    const page = toPagePath(signal.summary.replace(/^Navigated to /, ""));
+    if (page !== visited.at(-1)) {
+      visited.push(page);
+    }
+  }
+
+  const flow = visited.length > 0 ? visited : urls;
+  if (flow.length === 0) {
+    return null;
+  }
+
+  const shown = flow.slice(0, MAX_FLOW_PAGES);
+  const suffix =
+    flow.length > MAX_FLOW_PAGES ? ` …+${flow.length - MAX_FLOW_PAGES}` : "";
+  return `${shown.join(" ▸ ")}${suffix}`;
+}
+
+/**
+ * Reduce a navigation target to its path.
+ *
+ * The flow line is about where the user went, and repeating the host on every
+ * hop crowds out that shape. `replay.urls` is already path-only, so this also
+ * keeps both sources of the flow consistent.
+ */
+function toPagePath(page: string): string {
+  const withoutHost = page.replace(/^[^/]+/, "");
+  return withoutHost.startsWith("/") ? withoutHost : `/${page}`;
+}
+
+/**
+ * Summarize each kind with its failure count.
+ *
+ * Counts come from every classified event, including ones that are never
+ * rendered, so `network 58 (2 failed)` means 58 requests of which 2 are shown.
+ * Click kinds are folded into one entry with their rage and dead counts, which
+ * is how the Sentry UI presents them.
+ */
+function formatKindBreakdown(
+  kindCounts: ReplayKindCount[],
+  signals: ReplaySignal[],
+): string {
+  const byKind = new Map(kindCounts.map((entry) => [entry.kind, entry]));
+  const parts: string[] = [];
+
+  const navigation = byKind.get("navigation");
+  if (navigation) {
+    parts.push(`navigation ${navigation.total}`);
+  }
+
+  const clicks = ["click", "dead-click", "rage-click", "slow-click"] as const;
+  const clickTotal = clicks.reduce(
+    (total, kind) => total + (byKind.get(kind)?.total ?? 0),
+    0,
+  );
+  if (clickTotal > 0) {
+    const rage = byKind.get("rage-click")?.total ?? 0;
+    const dead = byKind.get("dead-click")?.total ?? 0;
+    const notes = [
+      rage > 0 ? `${rage} rage` : null,
+      dead > 0 ? `${dead} dead` : null,
+    ].filter(Boolean);
+    parts.push(
+      `click ${clickTotal}${notes.length > 0 ? ` (${notes.join(", ")})` : ""}`,
+    );
+  }
+
+  const network = byKind.get("network");
+  if (network) {
+    parts.push(
+      `network ${network.total}${network.errors > 0 ? ` (${network.errors} failed)` : ""}`,
+    );
+  }
+
+  const consoleCount = byKind.get("console");
+  if (consoleCount) {
+    parts.push(
+      `console ${consoleCount.total}${consoleCount.errors > 0 ? ` (${consoleCount.errors} error)` : ""}`,
+    );
+  }
+
+  // Anything not called out above, so no kind disappears from the breakdown.
+  const named = new Set<ReplaySignalKind>([
+    "navigation",
+    ...clicks,
+    "network",
+    "console",
+  ]);
+  for (const entry of kindCounts) {
+    if (!named.has(entry.kind)) {
+      parts.push(`${entry.kind} ${entry.total}`);
+    }
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : `${signals.length} signals`;
+}
+
+function formatTruncation(
+  truncatedBy: ReplayRecordingSegmentsResult["truncatedBy"],
+): string {
+  if (truncatedBy === "segments") {
+    return `yes — read the first ${MAX_REPLAY_SEGMENTS} segments; later activity is not included`;
+  }
+  if (truncatedBy === "bytes") {
+    return `yes — read the first ${MAX_REPLAY_SEGMENT_BYTES / (1024 * 1024)}MB of recording; later activity is not included`;
+  }
+  return "no";
 }
 
 function formatDurationSeconds(durationSeconds: number): string {
@@ -370,48 +551,286 @@ async function fetchReplaySegments({
   hasSegments: boolean;
 }): Promise<{
   segments: ReplayRecordingSegments | null;
+  truncatedBy: ReplayRecordingSegmentsResult["truncatedBy"];
 }> {
   if (isArchived || !projectId || !hasSegments) {
-    return { segments: null };
+    return { segments: null, truncatedBy: null };
   }
 
   try {
-    const segments = await apiService.getReplayRecordingSegments({
+    const result = await apiService.getReplayRecordingSegments({
       organizationSlug,
       projectSlugOrId: projectId,
       replayId,
     });
-    return { segments };
+    return { segments: result.segments, truncatedBy: result.truncatedBy };
   } catch {
-    return { segments: null };
+    return { segments: null, truncatedBy: null };
   }
 }
 
-async function fetchReplayIssues({
+/**
+ * Resolve the replay's error events.
+ *
+ * One batched call replaces the per-error `listIssues` lookups this section
+ * used to make — up to three sequential requests — and returns event
+ * timestamps as well as issue identity, which `listIssues` cannot provide.
+ *
+ * The endpoint is PRIVATE, so failure degrades to an empty list: the map is
+ * worth returning without a Related section, but not worth failing over one.
+ */
+async function fetchReplayErrorEvents({
   apiService,
   organizationSlug,
   errorIds,
+  projectId,
 }: {
   apiService: SentryApiService;
   organizationSlug: string;
   errorIds: string[];
-}): Promise<RelatedReplayIssue[]> {
-  const ids = errorIds.slice(0, MAX_RELATED_ERRORS);
+  projectId: string | null;
+}): Promise<ReplayErrorEvent[]> {
+  if (errorIds.length === 0) {
+    return [];
+  }
 
-  return Promise.all(
-    ids.map(async (eventId) => {
-      try {
-        const [issue] = await apiService.listIssues({
-          organizationSlug,
-          query: eventId,
-          limit: 1,
-        });
-        return { eventId, issue: issue ?? null };
-      } catch {
-        return { eventId, issue: null };
-      }
+  try {
+    return await apiService.getReplayErrorEvents({
+      organizationSlug,
+      errorIds,
+      projectId: projectId ?? undefined,
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Read Sentry's AI summary and convert it into chapters.
+ *
+ * Strictly additive: any failure, any non-`completed` status, or an
+ * unparseable body yields no chapters and leaves the map untouched. Chapters
+ * therefore appear only for replays already summarized in the Sentry UI, which
+ * is the accepted cost of never starting a Seer run from here.
+ */
+async function fetchReplayChapters({
+  apiService,
+  organizationSlug,
+  projectId,
+  replayId,
+  startedAt,
+  isArchived,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  projectId: string | null;
+  replayId: string;
+  startedAt?: string | null;
+  isArchived: boolean;
+}): Promise<ReplayChapter[]> {
+  if (isArchived || !projectId) {
+    return [];
+  }
+
+  const originMs = startedAt ? Date.parse(startedAt) : Number.NaN;
+  if (Number.isNaN(originMs)) {
+    // Without a session origin the chapter windows cannot be placed on the
+    // replay's timeline, and an absolute epoch is not useful to the reader.
+    return [];
+  }
+
+  try {
+    const summary = await apiService.getReplaySummary({
+      organizationSlug,
+      projectSlugOrId: projectId,
+      replayId,
+    });
+
+    if (summary.status !== "completed") {
+      return [];
+    }
+
+    return (summary.data?.time_ranges ?? []).map((range) => ({
+      startMs: range.period_start - originMs,
+      endMs: range.period_end - originMs,
+      title: range.period_title,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Pair each of the replay's error ids with whatever the lookup resolved.
+ *
+ * `error_ids` is the source of truth for which errors this replay has; the
+ * meta lookup only enriches them with issue identity. An id that fails to
+ * resolve is still listed by id — dropping it would understate the session,
+ * and the endpoint is private enough to fail on its own.
+ */
+function toRelatedIssues(
+  errorIds: string[],
+  errorEvents: ReplayErrorEvent[],
+): RelatedReplayIssue[] {
+  const byId = new Map(errorEvents.map((event) => [event.id, event]));
+
+  return errorIds.map((eventId) => {
+    const event = byId.get(eventId);
+    return {
+      eventId,
+      shortId: event?.issue ?? null,
+      title: event?.title ?? null,
+    };
+  });
+}
+
+/**
+ * Build the suggested follow-up call.
+ *
+ * Prefers a window bracketing the replay's first resolvable error, since that
+ * is almost always what the reader is looking for. Falls back to a
+ * whole-session digest when no error timestamp resolves — the endpoint is
+ * private and may be unavailable — so there is always a concrete next call.
+ */
+function buildNextStepLines({
+  organizationSlug,
+  replayId,
+  errorEvents,
+  startedAt,
+  context,
+}: {
+  organizationSlug: string;
+  replayId: string;
+  errorEvents: ReplayErrorEvent[];
+  startedAt?: string | null;
+  context: ServerContext;
+}): string[] {
+  const instruction = formatToolCallInstruction({
+    toolName: "get_replay_activity",
+    experimentalMode: context.experimentalMode ?? false,
+    availableToolNames: context.availableToolNames,
+    directToolNames: context.directToolNames,
+    fallbackInstruction:
+      "Replay activity lookup is not available in this session",
+    purpose: "to read the signals in a time window",
+  });
+
+  const anchor = findErrorAnchor(errorEvents, startedAt);
+  if (!anchor) {
+    return [
+      `${instruction}:`,
+      formatToolCall({
+        toolName: "get_replay_activity",
+        arguments: { organizationSlug, replayId, grain: "digest" },
+      }),
+      ...structuralReadLines({
+        organizationSlug,
+        replayId,
+        // No failure to anchor on, so offer the start of the session as a
+        // starting point rather than omit the call.
+        atMs: 0,
+        context,
+      }),
+    ];
+  }
+
+  const startMs = Math.max(0, anchor.offsetMs - ERROR_WINDOW_PADDING_MS);
+  const endMs = anchor.offsetMs + ERROR_WINDOW_PADDING_MS;
+
+  return [
+    `${anchor.label} occurred at ${formatReplayOffset(anchor.offsetMs)}. ${instruction}:`,
+    formatToolCall({
+      toolName: "get_replay_activity",
+      arguments: {
+        organizationSlug,
+        replayId,
+        startMs,
+        endMs,
+        grain: "detail",
+      },
     }),
-  );
+    ...structuralReadLines({
+      organizationSlug,
+      replayId,
+      atMs: anchor.offsetMs,
+      context,
+    }),
+  ];
+}
+
+/**
+ * Name the structural read from the map itself.
+ *
+ * The map is where a reader stops when the map looks sufficient, and a chain
+ * that only names its immediate next step leaves the third tool unreachable.
+ * Observed failure: an agent read the map, concluded "the replay tooling only
+ * exposes metadata and breadcrumbs, not rendered DOM text", and went looking for
+ * the answer in application source at a release SHA. That conclusion is wrong,
+ * and nothing in the map contradicted it.
+ *
+ * Text is called out specifically because it is the non-obvious capability. The
+ * SDK masks user-entered values but not product copy, so the rendered wording of
+ * a label or message is recoverable — which is exactly the question source code
+ * at a release cannot answer reliably.
+ */
+function structuralReadLines({
+  organizationSlug,
+  replayId,
+  atMs,
+  context,
+}: {
+  organizationSlug: string;
+  replayId: string;
+  atMs: number;
+  context: ServerContext;
+}): string[] {
+  const instruction = formatToolCallInstruction({
+    toolName: "get_replay_dom",
+    experimentalMode: context.experimentalMode ?? false,
+    availableToolNames: context.availableToolNames,
+    directToolNames: context.directToolNames,
+    // Silence beats a dangling pointer to a tool this session cannot call.
+    fallbackInstruction: "",
+    purpose: "to read the page as it was rendered",
+  });
+  if (!instruction) {
+    return [];
+  }
+
+  return [
+    "",
+    `For what the page itself showed — the wording of a label or message, whether a control was present or disabled — the signals above cannot answer it. ${instruction}:`,
+    formatToolCall({
+      toolName: "get_replay_dom",
+      arguments: { organizationSlug, replayId, atMs, lens: "full" },
+    }),
+  ];
+}
+
+function findErrorAnchor(
+  errorEvents: ReplayErrorEvent[],
+  startedAt?: string | null,
+): { offsetMs: number; label: string } | null {
+  const originMs = startedAt ? Date.parse(startedAt) : Number.NaN;
+  if (Number.isNaN(originMs)) {
+    return null;
+  }
+
+  for (const event of errorEvents) {
+    if (!event.timestamp) {
+      continue;
+    }
+    const timestampMs = Date.parse(event.timestamp);
+    if (Number.isNaN(timestampMs)) {
+      continue;
+    }
+    return {
+      offsetMs: timestampMs - originMs,
+      label: event.issue ? `Error ${event.issue}` : `Error \`${event.id}\``,
+    };
+  }
+
+  return null;
 }
 
 async function fetchReplayTraces({
@@ -448,156 +867,4 @@ function formatNameVersion(
     return `${name} ${version}`;
   }
   return name ?? version ?? "Unknown";
-}
-
-function extractReplayActivityEvents(
-  segments: ReplayRecordingSegments | null,
-): ReplayActivityEvent[] {
-  if (!segments) {
-    return [];
-  }
-
-  const events: ReplayActivityEvent[] = [];
-
-  for (const segment of segments) {
-    for (const event of segment) {
-      const replayEvent = summarizeReplayEvent(event);
-      if (replayEvent) {
-        events.push(replayEvent);
-      }
-      if (events.length >= MAX_ACTIVITY_EVENTS) {
-        return events;
-      }
-    }
-  }
-
-  return events;
-}
-
-function summarizeReplayEvent(
-  event: ReplayRecordingEvent,
-): ReplayActivityEvent | null {
-  const timestampMs = getEventTimestampMillis(event.timestamp);
-  const data = event.data;
-  const tag = data?.tag ?? "";
-  const payload = data?.payload ?? null;
-
-  if (tag) {
-    const replayEvent = summarizeTaggedReplayEvent(tag, payload);
-    if (replayEvent) {
-      return { timestampMs, ...replayEvent };
-    }
-  }
-
-  if (event.type !== undefined && data) {
-    const href = data.href ?? null;
-    if (href) {
-      return {
-        timestampMs,
-        label: "page.view",
-        details: [`href=${href}`],
-      };
-    }
-  }
-
-  return null;
-}
-
-function summarizeTaggedReplayEvent(
-  tag: string,
-  payload: ReplayRecordingPayload | null,
-): Omit<ReplayActivityEvent, "timestampMs"> | null {
-  if (tag === "performanceSpan") {
-    const op = firstString(payload?.op);
-    const description = firstString(payload?.description);
-    const durationMs = payload?.data?.duration ?? null;
-
-    if (description || op) {
-      return {
-        label: op ?? "performanceSpan",
-        details: [
-          description ? `description=${description}` : null,
-          durationMs !== null ? `duration_ms=${durationMs}` : null,
-        ].filter((value): value is string => value !== null),
-      };
-    }
-  }
-
-  if (tag === "ui.click") {
-    const message = firstString(payload?.message, payload?.description);
-    if (message) {
-      return {
-        label: tag,
-        details: [`message=${quoteDetail(message)}`],
-      };
-    }
-  }
-
-  const knownKeys = ["message", "description", "category", "type"] as const;
-  const details: string[] = [];
-  for (const key of knownKeys) {
-    const value = firstString(payload?.[key]);
-    if (value) {
-      details.push(`${key}=${quoteDetail(value)}`);
-    }
-  }
-  const extra = summarizeObject(payload, new Set<string>(knownKeys));
-  if (extra) {
-    details.push(extra);
-  }
-
-  return details.length > 0 ? { label: tag, details } : null;
-}
-
-function getEventTimestampMillis(value: unknown): number | null {
-  if (typeof value !== "number") {
-    return null;
-  }
-  return value > 1e12 ? value : value * 1000;
-}
-
-function formatRelativeTime(offsetMs: number): string {
-  const offsetSeconds = Math.max(0, Math.round(offsetMs / 1000));
-  if (offsetSeconds < 60) {
-    return `T+${offsetSeconds}s`;
-  }
-
-  const minutes = Math.floor(offsetSeconds / 60);
-  const seconds = offsetSeconds % 60;
-  return seconds > 0 ? `T+${minutes}m ${seconds}s` : `T+${minutes}m`;
-}
-
-function summarizeObject(
-  value: Record<string, unknown> | null,
-  excludedKeys: ReadonlySet<string> = new Set(),
-): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const entries = Object.entries(value)
-    .filter(
-      ([key, nested]) =>
-        !excludedKeys.has(key) &&
-        (typeof nested === "string" || typeof nested === "number"),
-    )
-    .slice(0, 3)
-    .map(([key, nested]) => `${key}=${nested}`);
-
-  return entries.length > 0
-    ? `payload=${quoteDetail(entries.join(", "))}`
-    : null;
-}
-
-function firstString(...values: unknown[]): string | null {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
-  }
-  return null;
-}
-
-function quoteDetail(value: string): string {
-  return JSON.stringify(value.trim());
 }

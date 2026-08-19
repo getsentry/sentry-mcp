@@ -10,10 +10,23 @@ import {
 export const DEFAULT_REPLAY_SORT = "-started_at";
 export const DEFAULT_REPLAY_STATS_PERIOD = "14d";
 
+/**
+ * Replay sorts Sentry accepts.
+ *
+ * Mirrors `sort_config` in
+ * `sentry/replays/usecases/query/configs/aggregate_sort.py`, which is the
+ * authority for both the scalar and aggregated query paths; anything absent
+ * from it raises a `ParseError`. Fields that are searchable but not in that
+ * config — `count_traces`, `count_segments`, `viewed_by_me`,
+ * `device.model_id` — are deliberately excluded.
+ */
 export const REPLAY_SORT_FIELDS = [
   "activity",
+  // Upstream aliases `browser`, `os`, and `os_name` onto the `.name` variants.
+  "browser",
   "browser.name",
   "browser.version",
+  "count_screens",
   "count_dead_clicks",
   "count_errors",
   "count_infos",
@@ -27,8 +40,10 @@ export const REPLAY_SORT_FIELDS = [
   "dist",
   "duration",
   "finished_at",
+  "os",
   "os.name",
   "os.version",
+  "os_name",
   "platform",
   "project_id",
   "sdk.name",

@@ -11,14 +11,275 @@
     },
     {
       "type": 5,
-      "timestamp": 1744027210,
+      "timestamp": 1744027200100,
+      "data": {
+        "tag": "options",
+        "payload": {
+          "shouldRecordCanvas": false,
+          "sessionSampleRate": 0.1,
+          "errorSampleRate": 1,
+          "useCompressionOption": true,
+          "blockAllMedia": true,
+          "maskAllText": true,
+          "maskAllInputs": true,
+          "useCompression": true,
+          "networkDetailHasUrls": false,
+          "networkCaptureBodies": false,
+          "networkRequestHasHeaders": false,
+          "networkResponseHasHeaders": false
+        }
+      }
+    },
+    {
+      "type": 2,
+      "timestamp": 1744027200200,
+      "data": {
+        "node": {
+          "type": 0,
+          "id": 1,
+          "childNodes": [
+            {
+              "type": 1,
+              "id": 2,
+              "name": "html",
+              "publicId": "",
+              "systemId": ""
+            },
+            {
+              "type": 2,
+              "id": 3,
+              "tagName": "html",
+              "attributes": {},
+              "childNodes": [
+                {
+                  "type": 2,
+                  "id": 4,
+                  "tagName": "head",
+                  "attributes": {},
+                  "childNodes": [
+                    {
+                      "type": 2,
+                      "id": 5,
+                      "tagName": "title",
+                      "attributes": {},
+                      "childNodes": [
+                        {
+                          "type": 3,
+                          "id": 6,
+                          "textContent": "Sign in"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": 2,
+                  "id": 7,
+                  "tagName": "body",
+                  "attributes": {},
+                  "childNodes": [
+                    {
+                      "type": 2,
+                      "id": 8,
+                      "tagName": "div",
+                      "attributes": {
+                        "id": "root"
+                      },
+                      "childNodes": [
+                        {
+                          "type": 2,
+                          "id": 9,
+                          "tagName": "form",
+                          "attributes": {
+                            "id": "login",
+                            "action": "/session"
+                          },
+                          "childNodes": [
+                            {
+                              "type": 2,
+                              "id": 40,
+                              "tagName": "input",
+                              "attributes": {
+                                "id": "email",
+                                "type": "email",
+                                "value": "***"
+                              },
+                              "childNodes": []
+                            },
+                            {
+                              "type": 2,
+                              "id": 41,
+                              "tagName": "input",
+                              "attributes": {
+                                "id": "password",
+                                "type": "password",
+                                "value": "***"
+                              },
+                              "childNodes": []
+                            },
+                            {
+                              "type": 2,
+                              "id": 42,
+                              "tagName": "button",
+                              "attributes": {
+                                "id": "sign-in",
+                                "type": "submit"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "id": 43,
+                                  "textContent": "Sign in"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "initialOffset": {
+          "top": 0,
+          "left": 0
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027200.5,
+      "data": {
+        "tag": "performanceSpan",
+        "payload": {
+          "op": "navigation.navigate",
+          "description": "https://example.com/login",
+          "startTimestamp": 1744027200.5,
+          "endTimestamp": 1744027201.04,
+          "data": {
+            "size": 18420,
+            "decodedBodySize": 74210,
+            "encodedBodySize": 18420,
+            "duration": 540,
+            "domInteractive": 318,
+            "domContentLoadedEventStart": 402,
+            "domContentLoadedEventEnd": 407,
+            "loadEventStart": 531,
+            "loadEventEnd": 540,
+            "redirectCount": 0
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027201.2,
+      "data": {
+        "tag": "performanceSpan",
+        "payload": {
+          "op": "resource.script",
+          "description": "https://cdn.example.com/vendor.js",
+          "startTimestamp": 1744027201.2,
+          "endTimestamp": 1744027201.58,
+          "data": {
+            "size": 145820,
+            "decodedBodySize": 402118,
+            "encodedBodySize": 145820,
+            "statusCode": 200
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027212400,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "ui.click",
+          "message": "body > div#root > form#login > button#sign-in",
+          "timestamp": 1744027212.4,
+          "data": {
+            "nodeId": 42,
+            "node": {
+              "id": 42,
+              "tagName": "button",
+              "textContent": "Sign in",
+              "attributes": {
+                "id": "sign-in",
+                "type": "submit"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027213.1,
+      "data": {
+        "tag": "performanceSpan",
+        "payload": {
+          "op": "resource.fetch",
+          "description": "https://example.com/api/login",
+          "startTimestamp": 1744027213.1,
+          "endTimestamp": 1744027213.34,
+          "data": {
+            "method": "POST",
+            "statusCode": 200,
+            "request": {
+              "size": 48,
+              "headers": {}
+            },
+            "response": {
+              "size": 132,
+              "headers": {}
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027214000,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "navigation",
+          "timestamp": 1744027214,
+          "data": {
+            "from": "/login",
+            "to": "/checkout"
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027214.2,
       "data": {
         "tag": "performanceSpan",
         "payload": {
           "op": "navigation.navigate",
           "description": "https://example.com/checkout",
+          "startTimestamp": 1744027214.2,
+          "endTimestamp": 1744027214.91,
           "data": {
-            "duration": 710
+            "size": 24680,
+            "decodedBodySize": 98304,
+            "encodedBodySize": 24680,
+            "duration": 710,
+            "domInteractive": 412,
+            "domContentLoadedEventStart": 480,
+            "domContentLoadedEventEnd": 486,
+            "loadEventStart": 700,
+            "loadEventEnd": 710,
+            "redirectCount": 0
           }
         }
       }
@@ -26,12 +287,400 @@
   ],
   [
     {
-      "type": 5,
-      "timestamp": 1744027220,
+      "type": 2,
+      "timestamp": 1744027380000,
       "data": {
-        "tag": "ui.click",
+        "node": {
+          "type": 0,
+          "id": 1,
+          "childNodes": [
+            {
+              "type": 1,
+              "id": 2,
+              "name": "html",
+              "publicId": "",
+              "systemId": ""
+            },
+            {
+              "type": 2,
+              "id": 3,
+              "tagName": "html",
+              "attributes": {},
+              "childNodes": [
+                {
+                  "type": 2,
+                  "id": 4,
+                  "tagName": "head",
+                  "attributes": {},
+                  "childNodes": [
+                    {
+                      "type": 2,
+                      "id": 5,
+                      "tagName": "title",
+                      "attributes": {},
+                      "childNodes": [
+                        {
+                          "type": 3,
+                          "id": 6,
+                          "textContent": "Checkout"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": 2,
+                  "id": 60,
+                  "tagName": "body",
+                  "attributes": {},
+                  "childNodes": [
+                    {
+                      "type": 2,
+                      "id": 61,
+                      "tagName": "div",
+                      "attributes": {
+                        "id": "root"
+                      },
+                      "childNodes": [
+                        {
+                          "type": 2,
+                          "id": 62,
+                          "tagName": "main",
+                          "attributes": {},
+                          "childNodes": [
+                            {
+                              "type": 2,
+                              "id": 63,
+                              "tagName": "h1",
+                              "attributes": {},
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "id": 64,
+                                  "textContent": "Checkout"
+                                }
+                              ]
+                            },
+                            {
+                              "type": 2,
+                              "id": 80,
+                              "tagName": "form",
+                              "attributes": {
+                                "id": "checkout-form"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 2,
+                                  "id": 81,
+                                  "tagName": "div",
+                                  "attributes": {
+                                    "class": "address-block"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 2,
+                                      "id": 82,
+                                      "tagName": "input",
+                                      "attributes": {
+                                        "id": "unit",
+                                        "name": "unit",
+                                        "value": "***"
+                                      },
+                                      "childNodes": []
+                                    },
+                                    {
+                                      "type": 2,
+                                      "id": 83,
+                                      "tagName": "input",
+                                      "attributes": {
+                                        "id": "zip",
+                                        "name": "zip",
+                                        "value": "***"
+                                      },
+                                      "childNodes": []
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": 2,
+                                  "id": 84,
+                                  "tagName": "label",
+                                  "attributes": {
+                                    "for": "quantity"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "id": 85,
+                                      "textContent": "Quantity"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": 2,
+                                  "id": 90,
+                                  "tagName": "input",
+                                  "attributes": {
+                                    "id": "quantity",
+                                    "name": "quantity",
+                                    "type": "number",
+                                    "value": "1"
+                                  },
+                                  "childNodes": []
+                                },
+                                {
+                                  "type": 2,
+                                  "id": 96,
+                                  "tagName": "button",
+                                  "attributes": {
+                                    "id": "complete-order",
+                                    "type": "button"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "id": 97,
+                                      "textContent": "Complete order"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": 2,
+                              "id": 118,
+                              "tagName": "a",
+                              "attributes": {
+                                "id": "download-receipt",
+                                "href": "/receipts/latest"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "id": 119,
+                                  "textContent": "Download receipt"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "initialOffset": {
+          "top": 0,
+          "left": 0
+        }
+      }
+    },
+    {
+      "type": 3,
+      "timestamp": 1744027380300,
+      "data": {
+        "source": 5,
+        "id": 90,
+        "text": "3",
+        "isChecked": false,
+        "userTriggered": true
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027380600,
+      "data": {
+        "tag": "breadcrumb",
         "payload": {
-          "message": "Clicked submit order"
+          "type": "default",
+          "category": "ui.click",
+          "message": "body > div#root > main > button#complete-order",
+          "timestamp": 1744027380.6,
+          "data": {
+            "nodeId": 96,
+            "node": {
+              "id": 96,
+              "tagName": "button",
+              "textContent": "Complete order",
+              "attributes": {
+                "id": "complete-order",
+                "type": "button"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": 3,
+      "timestamp": 1744027380800,
+      "data": {
+        "source": 3,
+        "id": 60,
+        "x": 0,
+        "y": 412
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027381,
+      "data": {
+        "tag": "performanceSpan",
+        "payload": {
+          "op": "resource.fetch",
+          "description": "https://example.com/api/checkout",
+          "startTimestamp": 1744027381,
+          "endTimestamp": 1744027382.24,
+          "data": {
+            "method": "POST",
+            "statusCode": 500,
+            "request": {
+              "size": 214,
+              "headers": {}
+            },
+            "response": {
+              "size": 87,
+              "headers": {}
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027381300,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "console",
+          "level": "error",
+          "message": "TypeError: Cannot read properties of undefined (reading 'id')",
+          "timestamp": 1744027381.3,
+          "data": {
+            "arguments": [
+              "TypeError: Cannot read properties of undefined (reading 'id')"
+            ],
+            "logger": "console"
+          }
+        }
+      }
+    },
+    {
+      "type": 3,
+      "timestamp": 1744027381400,
+      "data": {
+        "source": 0,
+        "texts": [],
+        "attributes": [],
+        "removes": [],
+        "adds": [
+          {
+            "parentId": 62,
+            "nextId": null,
+            "node": {
+              "type": 2,
+              "id": 130,
+              "tagName": "div",
+              "attributes": {
+                "id": "order-error",
+                "role": "alert"
+              },
+              "childNodes": [
+                {
+                  "type": 3,
+                  "id": 131,
+                  "textContent": "Payment failed. Please try again."
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": 3,
+      "timestamp": 1744027382000,
+      "data": {
+        "source": 0,
+        "texts": [
+          {
+            "id": 97,
+            "value": "Processing\u2026"
+          }
+        ],
+        "attributes": [
+          {
+            "id": 96,
+            "attributes": {
+              "disabled": ""
+            }
+          }
+        ],
+        "removes": [],
+        "adds": []
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027388400,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "ui.slowClickDetected",
+          "message": "body > div#root > main > button#complete-order",
+          "timestamp": 1744027388.4,
+          "data": {
+            "nodeId": 96,
+            "node": {
+              "id": 96,
+              "tagName": "button",
+              "textContent": "Complete order",
+              "attributes": {
+                "id": "complete-order",
+                "type": "button"
+              }
+            },
+            "url": "https://example.com/checkout",
+            "route": "/checkout",
+            "timeAfterClickMs": 7000,
+            "endReason": "timeout",
+            "clickCount": 5
+          }
+        }
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027421700,
+      "data": {
+        "tag": "breadcrumb",
+        "payload": {
+          "type": "default",
+          "category": "ui.slowClickDetected",
+          "message": "body > div#root > main > a#download-receipt",
+          "timestamp": 1744027421.7,
+          "data": {
+            "nodeId": 118,
+            "node": {
+              "id": 118,
+              "tagName": "a",
+              "textContent": "Download receipt",
+              "attributes": {
+                "id": "download-receipt",
+                "href": "/receipts/latest"
+              }
+            },
+            "url": "https://example.com/checkout",
+            "route": "/checkout",
+            "timeAfterClickMs": 7000,
+            "endReason": "timeout",
+            "clickCount": 1
+          }
         }
       }
     }

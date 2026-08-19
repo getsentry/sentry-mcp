@@ -1,14 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import {
   mswServer,
   organizationFixture,
+  PAGED_REPLAY_ID,
   replayDetailsFixture,
 } from "@sentry/mcp-server-mocks";
-import getReplayDetails, { resolveReplayParams } from "./get-replay-details.js";
+import getReplayDetails from "./get-replay-details.js";
+import { resolveReplayParams } from "../../internal/tool-helpers/replay.js";
 import { getServerContext } from "../../test-setup.js";
 
 describe("get_replay_details", () => {
+  // Overrides are not reset automatically, and a leaked stub silently changes
+  // what a later test is measuring.
+  afterEach(() => {
+    mswServer.resetHandlers();
+  });
+
   it("loads replay details from replayUrl", async () => {
     const result = await getReplayDetails.handler(
       {
@@ -32,25 +40,40 @@ describe("get_replay_details", () => {
       - **Device**: MacBook Pro
       - **Release**: frontend@1.2.3
       - **Errors**: 1
-      - **Rage Clicks**: 0
-      - **Dead Clicks**: 1
+      - **Rage Clicks**: 1
+      - **Dead Clicks**: 2
       - **Warnings**: 2
       - **Infos**: 3
       - **Recording Segments**: 2
       - **Archived**: No
 
-      ## Activity
+      ## Map
 
-      - T+0s · \`page.view\` · href=https://example.com/login
-      - T+10s · \`navigation.navigate\` · description=https://example.com/checkout · duration_ms=710
-      - T+20s · \`ui.click\` · message="Clicked submit order"
+      - **Signals**: 8 signals across T+0.5s–T+3m 41.7s
+      - **Flow**: /login ▸ /checkout
+      - **Kinds**: navigation 3 · click 4 (1 rage, 1 dead) · network 2 (1 failed) · console 1 (1 error)
+      - **Truncated**: no
+
+      ## Chapters
+
+      - T+0.5s–T+14.2s  Signed in and navigated to checkout
+      - T+3m 0.6s–T+3m 8.4s  Complete order failed with a server error
+      - T+3m 41.7s–T+3m 48.7s  Download receipt link did not respond
 
       ## Related
 
       - **CLOUDFLARE-MCP-41**: Error: Tool list_organizations is already registered
       - Trace \`a4d1aae7216b47ff8117cf4e09ce9d0a\` (112 spans)
 
-      Use \`get_sentry_resource\` to inspect any issue or trace listed above."
+      Use \`get_sentry_resource\` to inspect any issue or trace listed above.
+
+      ## Next
+
+      Error CLOUDFLARE-MCP-41 occurred at T+3m 1.3s. Use the Sentry tool \`get_replay_activity\` to read the signals in a time window:
+      get_replay_activity(organizationSlug='sentry-mcp-evals', replayId='7e07485f-12f9-416b-8b14-26260799b51f', startMs=176300, endMs=186300, grain='detail')
+
+      For what the page itself showed — the wording of a label or message, whether a control was present or disabled — the signals above cannot answer it. Use the Sentry tool \`get_replay_dom\` to read the page as it was rendered:
+      get_replay_dom(organizationSlug='sentry-mcp-evals', replayId='7e07485f-12f9-416b-8b14-26260799b51f', atMs=181300, lens='full')"
     `);
   });
 
@@ -119,14 +142,14 @@ describe("get_replay_details", () => {
       - **Device**: MacBook Pro
       - **Release**: frontend@1.2.3
       - **Errors**: 1
-      - **Rage Clicks**: 0
-      - **Dead Clicks**: 1
+      - **Rage Clicks**: 1
+      - **Dead Clicks**: 2
       - **Warnings**: 2
       - **Infos**: 3
       - **Recording Segments**: 2
       - **Archived**: Yes
 
-      ## Activity
+      ## Map
 
       Recording is archived and not available for playback.
 
@@ -181,16 +204,22 @@ describe("get_replay_details", () => {
       - **Device**: MacBook Pro
       - **Release**: frontend@1.2.3
       - **Errors**: 1
-      - **Rage Clicks**: 0
-      - **Dead Clicks**: 1
+      - **Rage Clicks**: 1
+      - **Dead Clicks**: 2
       - **Warnings**: 2
       - **Infos**: 3
       - **Recording Segments**: 2
       - **Archived**: No
 
-      ## Activity
+      ## Map
 
-      No activity events recorded.
+      Recording is unavailable.
+
+      ## Chapters
+
+      - T+0.5s–T+14.2s  Signed in and navigated to checkout
+      - T+3m 0.6s–T+3m 8.4s  Complete order failed with a server error
+      - T+3m 41.7s–T+3m 48.7s  Download receipt link did not respond
 
       ## Related
 
@@ -330,7 +359,107 @@ describe("get_replay_details", () => {
     );
   });
 
-  it("does not repeat explicit payload fields in generic replay events", async () => {
+  it("reports a replay whose recording has no segments", async () => {
+    // Distinct from a failed fetch: the request succeeded and the recording
+    // is genuinely empty, which the reader should not confuse with an error.
+    mswServer.use(
+      http.get(
+        `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+        () => HttpResponse.json([]),
+      ),
+    );
+
+    const result = await getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: replayDetailsFixture.id,
+        regionUrl: "https://us.sentry.io",
+      },
+      getServerContext(),
+    );
+
+    expect(result).toContain("No activity recorded.");
+    expect(result).not.toContain("Recording is unavailable.");
+    // With nothing to zoom into, suggesting a window would be noise.
+    expect(result).not.toContain("## Next");
+  });
+
+  it("reads a recording that spans multiple segment pages", async () => {
+    // A recording longer than one page was previously cut off at the page
+    // boundary without any indication, so the map understated the session.
+    const result = await getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: PAGED_REPLAY_ID,
+        regionUrl: "https://us.sentry.io",
+      },
+      getServerContext(),
+    );
+
+    // The fixture's five segments span three pages, so the last signal is
+    // only reachable by following two `Link` cursors. Reading the first page
+    // alone would report a session ending at T+1m 0.0s.
+    expect(result).toContain(
+      "- **Signals**: 5 signals across T+1.0s–T+4m 0.0s",
+    );
+    expect(result).toContain("- **Kinds**: click 4 · console 1 (1 error)");
+    // Following the header is not the same as hitting a bound.
+    expect(result).toContain("- **Truncated**: no");
+  });
+
+  it("says the map is partial when the byte budget stops the read", async () => {
+    // Silence here is the dangerous failure: a truncated recording renders as
+    // a complete one, and "no errors in this replay" becomes a false negative.
+    // The budget is enforced on bytes off the wire, so one oversized page
+    // trips it — padding an ignored field keeps the signals intact.
+    const oversizedPage = [
+      [
+        {
+          type: 5,
+          timestamp: 1744027200500,
+          data: {
+            tag: "breadcrumb",
+            payload: {
+              type: "default",
+              category: "ui.click",
+              timestamp: 1744027200500,
+              message: "button#pay",
+              // Pushes the page past MAX_REPLAY_SEGMENT_BYTES on its own.
+              padding: "x".repeat(11 * 1024 * 1024),
+            },
+          },
+        },
+      ],
+    ];
+
+    mswServer.use(
+      http.get(
+        `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+        () => HttpResponse.json(oversizedPage),
+      ),
+    );
+
+    const result = await getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: replayDetailsFixture.id,
+        regionUrl: "https://us.sentry.io",
+      },
+      getServerContext(),
+    );
+
+    expect(result).toContain("- **Truncated**: yes");
+    expect(result).toContain("later activity is not included");
+    // What was read is still reported; truncation degrades the map's
+    // completeness, not its usefulness.
+    expect(result).toContain("- **Signals**: 1 signal");
+  });
+
+  it("ignores events whose tag is not one the SDK emits", async () => {
+    // `tag: "console"` is not a shape the SDK produces — meaning lives in
+    // `payload.category` under `tag: "breadcrumb"`. Such an event is
+    // unclassifiable, and inventing a rendering for it is what produced the
+    // old `breadcrumb`-labeled output.
     mswServer.use(
       http.get(
         `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
@@ -344,11 +473,8 @@ describe("get_replay_details", () => {
                   tag: "console",
                   payload: {
                     message: "Payment request failed",
-                    description: "POST /api/orders returned 500",
                     category: "network",
                     type: "error",
-                    endpoint: "/api/orders",
-                    status: 500,
                   },
                 },
               },
@@ -367,9 +493,47 @@ describe("get_replay_details", () => {
       getServerContext(),
     );
 
-    expect(result).toContain(
-      '- T+0s · `console` · message="Payment request failed" · description="POST /api/orders returned 500" · category="network" · type="error" · payload="endpoint=/api/orders, status=500"',
+    expect(result).toContain("No activity recorded.");
+    expect(result).not.toContain("Payment request failed");
+  });
+
+  it("classifies a real SDK-shaped console error", async () => {
+    mswServer.use(
+      http.get(
+        `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+        () =>
+          HttpResponse.json([
+            [
+              {
+                type: 5,
+                timestamp: 1744027205000,
+                data: {
+                  tag: "breadcrumb",
+                  payload: {
+                    type: "default",
+                    category: "console",
+                    level: "error",
+                    message: "Payment request failed",
+                    data: { logger: "console" },
+                  },
+                },
+              },
+            ],
+          ]),
+        { once: true },
+      ),
     );
+
+    const result = await getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: replayDetailsFixture.id,
+        regionUrl: "https://us.sentry.io",
+      },
+      getServerContext(),
+    );
+
+    expect(result).toContain("**Kinds**: console 1 (1 error)");
   });
 
   it("ignores array payloads instead of rendering numeric keys", async () => {
@@ -406,6 +570,172 @@ describe("get_replay_details", () => {
     expect(result).not.toContain('payload="0=');
   });
 
+  describe("summary chapters", () => {
+    const SUMMARIZE_URL = `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/summarize/`;
+
+    async function loadReplay() {
+      return getReplayDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          replayId: replayDetailsFixture.id,
+          regionUrl: "https://us.sentry.io",
+        },
+        getServerContext(),
+      );
+    }
+
+    it("issues exactly one read and never starts a summary task", async () => {
+      // Starting would spend a Seer LLM run per call for a section that would
+      // not be ready anyway; polling would put unbounded latency on the map.
+      const calls: string[] = [];
+      mswServer.use(
+        http.all(SUMMARIZE_URL, ({ request }) => {
+          calls.push(request.method);
+          return HttpResponse.json({ data: null, status: "processing" });
+        }),
+      );
+
+      await loadReplay();
+
+      expect(calls).toEqual(["GET"]);
+    });
+
+    // A stale summary can carry chapter data alongside a non-completed
+    // status. Rendering it would present partial or superseded analysis as
+    // current, so the status — not the presence of data — decides.
+    const staleChapters = {
+      time_ranges: [
+        {
+          period_start: 1744027200500,
+          period_end: 1744027214200,
+          period_title: "Stale chapter from a superseded run",
+        },
+      ],
+      summary: "Superseded.",
+    };
+
+    for (const [label, respond] of [
+      [
+        "a permission error",
+        () => HttpResponse.json({ detail: "no" }, { status: 403 }),
+      ],
+      [
+        "a still-running task",
+        () => HttpResponse.json({ data: null, status: "processing" }),
+      ],
+      [
+        "a not-started task",
+        () => HttpResponse.json({ data: null, status: "not_started" }),
+      ],
+      [
+        "an error status",
+        () => HttpResponse.json({ data: null, status: "error" }),
+      ],
+      [
+        "a still-running task that carries stale chapter data",
+        () => HttpResponse.json({ data: staleChapters, status: "processing" }),
+      ],
+      [
+        "an errored task that carries stale chapter data",
+        () => HttpResponse.json({ data: staleChapters, status: "error" }),
+      ],
+      ["an unparseable body", () => HttpResponse.json({ nonsense: true })],
+      [
+        "a server failure",
+        () => HttpResponse.json({ detail: "boom" }, { status: 500 }),
+      ],
+      // Seer can take tens of seconds on a long replay. A connection timeout
+      // is raised as a ConfigurationError, which would abort the whole tool
+      // if it escaped the chapters lookup.
+      ["the connection times out", () => HttpResponse.error()],
+      [
+        "the body is not JSON at all",
+        () => HttpResponse.text("<html>gateway</html>"),
+      ],
+    ] as const) {
+      it(`omits chapters on ${label} without degrading the map`, async () => {
+        mswServer.use(http.get(SUMMARIZE_URL, respond));
+
+        const result = await loadReplay();
+
+        expect(result).not.toContain("## Chapters");
+        // The map is the primary content; chapters are additive by
+        // construction and must never take it down with them.
+        expect(result).toContain("## Map");
+        expect(result).toContain(
+          "**Kinds**: navigation 3 · click 4 (1 rage, 1 dead) · network 2 (1 failed) · console 1 (1 error)",
+        );
+      });
+    }
+  });
+
+  describe("suggested next call", () => {
+    const EVENTS_META_URL =
+      "https://us.sentry.io/api/0/organizations/sentry-mcp-evals/replays-events-meta/";
+
+    async function loadReplay() {
+      return getReplayDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          replayId: replayDetailsFixture.id,
+          regionUrl: "https://us.sentry.io",
+        },
+        getServerContext(),
+      );
+    }
+
+    it("brackets a resolved error timestamp", async () => {
+      const result = await loadReplay();
+
+      // The fixture error lands at T+3m 1.3s (181,300ms), so the window is
+      // that offset padded either side.
+      expect(result).toContain("Error CLOUDFLARE-MCP-41 occurred at T+3m 1.3s");
+      expect(result).toContain("startMs=176300, endMs=186300, grain='detail'");
+    });
+
+    for (const [label, respond] of [
+      [
+        "the private endpoint is unauthorized",
+        () => HttpResponse.json({ detail: "no" }, { status: 403 }),
+      ],
+      [
+        "the lookup fails",
+        () => HttpResponse.json({ detail: "boom" }, { status: 500 }),
+      ],
+      ["no events resolve", () => HttpResponse.json({ data: [] })],
+      [
+        "the timestamp is unusable",
+        () =>
+          HttpResponse.json({
+            data: [{ id: "7ca573c0f4814912aaa9bdc77d1a7d51", timestamp: "?" }],
+          }),
+      ],
+    ] as const) {
+      it(`falls back to a whole-session digest when ${label}`, async () => {
+        mswServer.use(http.get(EVENTS_META_URL, respond));
+
+        const result = await loadReplay();
+
+        expect(result).toContain("grain='digest'");
+        expect(result).not.toContain("startMs=");
+        // Degrading the suggestion must not degrade the map.
+        expect(result).toContain("**Signals**: 8 signals");
+      });
+    }
+
+    it("still lists an error id the lookup could not resolve", async () => {
+      // `error_ids` is the replay's own record that an error occurred, so
+      // dropping it would understate the session.
+      mswServer.use(
+        http.get(EVENTS_META_URL, () => HttpResponse.json({ data: [] })),
+      );
+
+      const result = await loadReplay();
+
+      expect(result).toContain("- Event `7ca573c0f4814912aaa9bdc77d1a7d51`");
+    });
+  });
+
   describe("tool definition", () => {
     it("requires the replay read scopes used by the backend endpoints", () => {
       expect(getReplayDetails.requiredScopes).toEqual([
@@ -423,5 +753,49 @@ describe("get_replay_details", () => {
         "regionUrl",
       ]);
     });
+  });
+});
+
+describe("structural read pointer", () => {
+  afterEach(() => {
+    mswServer.resetHandlers();
+  });
+
+  function readMap(context = getServerContext()) {
+    return getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: replayDetailsFixture.id,
+      },
+      context,
+    );
+  }
+
+  it("names the DOM read from the map, not only from activity", async () => {
+    // Observed failure: an agent read the map, concluded the replay tooling
+    // exposes "metadata/breadcrumbs — not rendered DOM text", and went to read
+    // application source at a release SHA instead. The map is where a reader
+    // stops, so the third tool has to be named there too.
+    const result = await readMap();
+
+    expect(result).toContain(
+      "get_replay_dom(organizationSlug='sentry-mcp-evals'",
+    );
+    expect(result).toContain("the wording of a label or message");
+    expect(result).toContain("lens='full'");
+  });
+
+  it("stays silent when the DOM tool is absent from the session", async () => {
+    // Naming a tool this session cannot call sends the reader after nothing.
+    const result = await readMap(
+      getServerContext({
+        availableToolNames: new Set([
+          "get_replay_details",
+          "get_replay_activity",
+        ]),
+      }),
+    );
+
+    expect(result).not.toContain("get_replay_dom");
   });
 });

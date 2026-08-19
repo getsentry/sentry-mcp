@@ -73,9 +73,11 @@ import {
   ReleaseDetailsSchema,
   ReleaseListSchema,
   ReplayDetailsSchema,
+  ReplayErrorEventsResponseSchema,
   ReplayIdsByResourceSchema,
   ReplayListResponseSchema,
   ReplayRecordingSegmentsSchema,
+  ReplaySummarySchema,
   RepositoryListSchema,
   SpansSearchResponseSchema,
   StacktraceLinkSchema,
@@ -132,7 +134,9 @@ import type {
   ReleaseDetails,
   ReleaseList,
   ReplayDetails,
+  ReplayErrorEvent,
   ReplayList,
+  ReplaySummary,
   ReplayRecordingSegments,
   StacktraceLink,
   TagList,
@@ -255,6 +259,74 @@ function getNextCursor(linkHeader: string | null): string | null {
 type RequestOptions = {
   host?: string;
   allowStatuses?: number[];
+};
+
+/**
+ * Segment ceiling for a single recording read.
+ *
+ * Matches the clamp Sentry's own summarize endpoint applies
+ * (`MAX_SEGMENTS_TO_SUMMARIZE`), so MCP never reads more of a recording than
+ * Sentry's summarizer does.
+ */
+export const MAX_REPLAY_SEGMENTS = 150;
+
+/**
+ * Byte ceiling for a single recording read, measured on raw JSON before
+ * parsing.
+ *
+ * Segment count is a poor proxy for memory — sizes vary by orders of magnitude
+ * — so this is the binding guard. The headroom below the Workers 128MB limit is
+ * deliberate: parsed rrweb objects expand several times over their serialized
+ * size, and the budget has to survive that expansion plus rendering.
+ *
+ * Provisional. QA against real replays should confirm or move it.
+ */
+export const MAX_REPLAY_SEGMENT_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Fields requested from the replays index.
+ *
+ * Without an explicit allow-list Sentry returns its default column set, which
+ * is wider than anything rendered. Every name here must appear in
+ * `VALID_FIELD_SET` in `sentry/replays/validators.py` — invalid fields are
+ * rejected outright with a 400 — and those names are coarser than the ones
+ * discovery advertises (`browser`, not `browser.name`).
+ *
+ * `replay_type` and `ota_updates` appear in responses but are absent from
+ * `VALID_FIELD_SET`, so requesting them 400s. They are deliberately omitted.
+ */
+export const REPLAY_INDEX_FIELDS = [
+  "id",
+  "project_id",
+  "started_at",
+  "finished_at",
+  "duration",
+  "environment",
+  "is_archived",
+  "count_errors",
+  "count_dead_clicks",
+  "count_rage_clicks",
+  "urls",
+  "browser",
+  "os",
+  "device",
+  "sdk",
+  "user",
+  "releases",
+  "trace_ids",
+] as const;
+
+/**
+ * A recording read, plus whether it stopped early and why.
+ *
+ * `truncatedBy` is not an error: a partial read is useful, but callers must be
+ * able to say so rather than presenting it as the whole session.
+ */
+export type ReplayRecordingSegmentsResult = {
+  segments: ReplayRecordingSegments;
+  truncatedBy: "segments" | "bytes" | null;
+  segmentsRead: number;
+  bytesRead: number;
 };
 
 export type TraceItemType = "spans" | "logs" | "tracemetrics";
@@ -3218,7 +3290,9 @@ export class SentryApiService {
       statsPeriod,
       start,
       end,
-      fields,
+      // Ask for exactly what is rendered. Omitting `field` entirely makes
+      // Sentry return its default column set instead.
+      fields = [...REPLAY_INDEX_FIELDS],
     }: {
       organizationSlug: string;
       query?: string;
@@ -3983,7 +4057,216 @@ export class SentryApiService {
     return replayIdsByResource[normalizedIssueId] ?? [];
   }
 
+  /**
+   * Downloads a replay's recording segments.
+   *
+   * Sentry paginates this endpoint at 100 segments per page and reports
+   * continuation through the `Link` header. `per_page` cannot raise that — its
+   * default and maximum are both 100 — so following the header's cursor is the
+   * only way to read past segment 100. There is no `download` parameter on this
+   * endpoint; the index always downloads bodies.
+   *
+   * Reading is bounded twice over, because a long session can be arbitrarily
+   * large and `mcp-cloudflare` runs under a 128MB Workers ceiling:
+   *
+   * - {@link MAX_REPLAY_SEGMENTS} segments, matching the clamp Sentry's own
+   *   summarize endpoint applies, so we read no more of a recording than
+   *   Sentry's summarizer does.
+   * - {@link MAX_REPLAY_SEGMENT_BYTES} of raw JSON, measured before parsing.
+   *   This is the real guard: segment sizes vary by orders of magnitude, and
+   *   parsed rrweb objects expand well beyond their serialized size.
+   *
+   * The caller is told which bound stopped the read so it can report the gap
+   * rather than presenting a partial recording as complete.
+   */
   async getReplayRecordingSegments(
+    params: {
+      organizationSlug: string;
+      projectSlugOrId: string;
+      replayId: string;
+      maxSegments?: number;
+      maxBytes?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReplayRecordingSegmentsResult> {
+    const segments: ReplayRecordingSegments = [];
+    const stats = await this.streamReplayRecordingSegments(
+      params,
+      (segment) => {
+        segments.push(segment);
+      },
+      opts,
+    );
+
+    return { ...stats, segments };
+  }
+
+  /**
+   * Reads a recording segment by segment, without retaining it.
+   *
+   * {@link getReplayRecordingSegments} accumulates every segment before
+   * returning, which is fine for signal extraction — signals are a tiny
+   * projection of the events they come from — but not for anything that must
+   * fold a whole recording into a running state. DOM reconstruction applies
+   * thousands of mutations and keeps only the resulting node map, so holding
+   * the raw events as well would double the peak for no benefit.
+   *
+   * `onSegment` is called once per segment in wire order. Returning `"stop"`
+   * ends the read immediately, which lets a caller that has passed the moment
+   * it cares about avoid paging the rest of the session.
+   *
+   * The budgets and their reporting are identical to the buffering read: the
+   * caller is told which bound stopped it, so a partial fold is never
+   * presented as a whole one.
+   */
+  async streamReplayRecordingSegments(
+    {
+      organizationSlug,
+      projectSlugOrId,
+      replayId,
+      maxSegments = MAX_REPLAY_SEGMENTS,
+      maxBytes = MAX_REPLAY_SEGMENT_BYTES,
+    }: {
+      organizationSlug: string;
+      projectSlugOrId: string;
+      replayId: string;
+      maxSegments?: number;
+      maxBytes?: number;
+    },
+    onSegment: (
+      segment: ReplayRecordingSegments[number],
+      index: number,
+    ) => "stop" | void,
+    opts?: RequestOptions,
+  ): Promise<Omit<ReplayRecordingSegmentsResult, "segments">> {
+    let cursor: string | null = null;
+    let bytesRead = 0;
+    let segmentsRead = 0;
+    let stopped = false;
+    let truncatedBy: ReplayRecordingSegmentsResult["truncatedBy"] = null;
+
+    do {
+      const params = new URLSearchParams();
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
+
+      const path = apiPath`/projects/${organizationSlug}/${projectSlugOrId}/replays/${replayId}/recording-segments/`;
+      const response = await this.request(
+        params.toString() ? `${path}?${params.toString()}` : path,
+        { method: "GET" },
+        opts,
+      );
+
+      // Read as text so the byte budget measures what actually crossed the
+      // wire, before parsing expands it into an object graph.
+      const text = await response.text();
+      bytesRead += text.length;
+
+      let body: unknown;
+      try {
+        body = JSON.parse(text);
+      } catch (error) {
+        throw new Error(
+          `Failed to parse replay recording segments: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+
+      const page = ReplayRecordingSegmentsSchema.parse(body);
+      for (const segment of page) {
+        if (segmentsRead >= maxSegments) {
+          truncatedBy = "segments";
+          break;
+        }
+        const outcome = onSegment(segment, segmentsRead);
+        segmentsRead += 1;
+        if (outcome === "stop") {
+          // The caller has what it needs. This is not truncation: the read
+          // ended by choice, with nothing missing from what was asked for.
+          stopped = true;
+          break;
+        }
+      }
+
+      if (truncatedBy || stopped) {
+        break;
+      }
+      if (bytesRead >= maxBytes) {
+        // Keep what this page delivered — it is already parsed — but stop
+        // before requesting another.
+        truncatedBy = "bytes";
+        break;
+      }
+
+      cursor = getNextCursor(response.headers.get("link"));
+    } while (cursor);
+
+    return { truncatedBy, segmentsRead, bytesRead };
+  }
+
+  /**
+   * Resolves a replay's error event IDs to issue identity and event timestamps.
+   *
+   * `replay.error_ids` are event IDs, and resolving them through `listIssues`
+   * returns issues, which carry no event timestamp. This endpoint resolves the
+   * whole batch in one call and returns both, so it replaces the per-error
+   * issue lookups as well as supplying the millisecond-resolution timestamps a
+   * suggested zoom window needs.
+   *
+   * The endpoint is `ApiPublishStatus.PRIVATE` and may change without notice,
+   * so callers should degrade rather than fail when it errors.
+   *
+   * @returns Error events for the requested IDs; empty when none are given
+   */
+  async getReplayErrorEvents(
+    {
+      organizationSlug,
+      errorIds,
+      projectId,
+      statsPeriod = "90d",
+    }: {
+      organizationSlug: string;
+      errorIds: string[];
+      projectId?: string;
+      statsPeriod?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReplayErrorEvent[]> {
+    if (errorIds.length === 0) {
+      return [];
+    }
+
+    const params = new URLSearchParams();
+    // One batched lookup rather than a request per error.
+    params.set("query", `id:[${errorIds.join(",")}]`);
+    params.set("statsPeriod", statsPeriod);
+    params.append("project", projectId ?? "-1");
+
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/replays-events-meta/` +
+        `?${params.toString()}`,
+      undefined,
+      opts,
+    );
+
+    return ReplayErrorEventsResponseSchema.parse(body).data;
+  }
+
+  /**
+   * Reads the state of a replay's AI summary.
+   *
+   * Deliberately a single read. It does not POST to start a summary task and
+   * does not poll: Seer's start route enqueues background work and returns an
+   * empty body, so starting would spend an LLM run per call and still report
+   * `processing` on the immediate read, while polling would put unbounded
+   * latency on a section that is optional by construction.
+   *
+   * The endpoint is `ApiPublishStatus.EXPERIMENTAL` and triple-gated on the
+   * `session-replay` feature, the `replay-ai-summaries` feature, and Seer
+   * access, returning 403 otherwise. Callers must treat every non-`completed`
+   * outcome as "not available right now" and omit the section.
+   */
+  async getReplaySummary(
     {
       organizationSlug,
       projectSlugOrId,
@@ -3994,14 +4277,14 @@ export class SentryApiService {
       replayId: string;
     },
     opts?: RequestOptions,
-  ): Promise<ReplayRecordingSegments> {
+  ): Promise<ReplaySummary> {
     const body = await this.requestJSON(
-      apiPath`/projects/${organizationSlug}/${projectSlugOrId}/replays/${replayId}/recording-segments/` +
-        `?download=true`,
+      apiPath`/projects/${organizationSlug}/${projectSlugOrId}/replays/${replayId}/summarize/`,
       undefined,
       opts,
     );
-    return ReplayRecordingSegmentsSchema.parse(body);
+
+    return ReplaySummarySchema.parse(body);
   }
 
   async updateIssue(
