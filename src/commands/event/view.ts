@@ -453,6 +453,19 @@ export function parsePositionalArgs(args: string[]): ParsedPositionalArgs {
     };
   }
 
+  // Detect issue short ID as second arg (e.g., "my-org/my-project BRUNCHIE-APP-29").
+  // Auto-redirect to that issue's latest event instead of treating the short
+  // ID as an event hex ID (which would fail validation).
+  if (looksLikeIssueShortId(second)) {
+    const extraEventIds = args.length > 2 ? args.slice(2) : undefined;
+    return {
+      eventId: LATEST_EVENT_SENTINEL,
+      targetArg: first,
+      issueShortId: second,
+      extraEventIds,
+    };
+  }
+
   // Two or more args - first is target, second is event ID.
   // Any additional args are extra event IDs (from newline-separated input).
   const extraEventIds = args.length > 2 ? args.slice(2) : undefined;
@@ -888,9 +901,12 @@ async function resolveIssueShortcut(
   // alongside a hex event ID. Resolve the issue to get org/project.
   if (issueShortId) {
     // Use the explicit org from the parsed target if available (e.g.,
-    // "figma/" → org-all with org "figma"), otherwise fall back to
-    // auto-detection via DSN/env/config.
-    const explicitOrg = parsed.type === "org-all" ? parsed.org : undefined;
+    // "figma/" → org-all, or "figma/project" → explicit, both carry the
+    // org), otherwise fall back to auto-detection via DSN/env/config.
+    const explicitOrg =
+      parsed.type === "org-all" || parsed.type === "explicit"
+        ? parsed.org
+        : undefined;
     const resolved = await resolveOrg({ org: explicitOrg, cwd });
     if (!resolved) {
       throw new ContextError(
