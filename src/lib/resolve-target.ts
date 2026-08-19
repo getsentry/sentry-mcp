@@ -952,9 +952,9 @@ export async function fetchProjectId(
 }
 
 /**
- * Resolve a project slug to its numeric ID for log queries, tolerating failures.
+ * Resolve a project slug to its numeric ID for Events API queries, tolerating failures.
  *
- * Log listing and lookup scope by the `project` query param instead of the
+ * Log/trace/span listing scopes by the `project` query param instead of the
  * `project:<slug>` search filter, which only matches projects that are actively
  * selected in the org (see #1317). This helper resolves the slug so callers can
  * pass a numeric ID.

@@ -303,6 +303,7 @@ describe("listCommand.func", () => {
     listTransactionsSpy = vi.spyOn(apiClient, "listTransactions");
     findProjectsBySlugSpy = vi.spyOn(apiClient, "findProjectsBySlug");
     resolveOrgAndProjectSpy = vi.spyOn(resolveTarget, "resolveOrgAndProject");
+    vi.spyOn(resolveTarget, "resolveLogProjectId").mockResolvedValue(4242);
     resolveCursorSpy = vi.spyOn(paginationDb, "resolveCursor").mockReturnValue({
       cursor: undefined,
       direction: "next" as const,
@@ -473,6 +474,7 @@ describe("listCommand.func", () => {
         limit: 50,
         sort: "duration",
         cursor: undefined,
+        projectId: 4242,
         statsPeriod: "7d",
       }
     );

@@ -538,6 +538,7 @@ describe("listCommand.func (project mode)", () => {
         return { org: "test-org", project: "test-project" };
       }
     );
+    vi.spyOn(resolveTarget, "resolveLogProjectId").mockResolvedValue(4242);
     resolveCursorSpy.mockReturnValue({
       cursor: undefined,
       direction: "next" as const,
@@ -820,6 +821,7 @@ describe("listCommand.func (project mode)", () => {
     const callArgs = listSpansSpy.mock.calls[0];
     const options = callArgs[2];
     expect(options.allProjects).toBeUndefined();
+    expect(options.projectId).toBe(4242);
   });
 
   test("hint shows -c next with project target when more pages available", async () => {
