@@ -408,6 +408,7 @@ Manage mobile build artifacts
 
 CLI-related commands
 
+- `sentry cli completion <shell>` — Print the shell completion script
 - `sentry cli defaults <key value...>` — View and manage default settings
 - `sentry cli feedback <message...>` — Send feedback about the CLI
 - `sentry cli fix` — Diagnose and repair CLI database issues
