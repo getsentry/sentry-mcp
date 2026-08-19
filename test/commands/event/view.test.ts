@@ -1138,6 +1138,45 @@ describe("viewCommand.func", () => {
     getLatestEventSpy.mockRestore();
   });
 
+  test("org/project + short-ID second arg passes explicit org through to resolveOrg", async () => {
+    // Regression: with an explicit "org/project" target and an issue short ID
+    // as the second arg, the org must be forwarded to resolveOrg instead of
+    // being dropped (which would fall back to auto-detection and miss/mishit).
+    const resolveOrgSpy = vi
+      .spyOn(resolveTarget, "resolveOrg")
+      .mockResolvedValue({ org: "my-org" });
+    const getIssueByShortIdSpy = vi
+      .spyOn(apiClient, "getIssueByShortId")
+      .mockResolvedValue({ id: "999", shortId: "CAM-82X" } as never);
+    const getLatestEventSpy = vi
+      .spyOn(apiClient, "getLatestEvent")
+      .mockResolvedValue(sampleEvent);
+    getSpanTreeLinesSpy.mockResolvedValue({
+      lines: [],
+      spans: null,
+      traceId: null,
+      success: false,
+    });
+
+    const { context } = createMockContext();
+    const func = await viewCommand.loader();
+    await func.call(
+      context,
+      { json: true, web: false, spans: 0 },
+      "my-org/my-project",
+      "CAM-82X"
+    );
+
+    expect(resolveOrgSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ org: "my-org" })
+    );
+    expect(getLatestEventSpy).toHaveBeenCalled();
+
+    resolveOrgSpy.mockRestore();
+    getIssueByShortIdSpy.mockRestore();
+    getLatestEventSpy.mockRestore();
+  });
+
   test("logs normalized slug warning when underscores present", async () => {
     getEventSpy.mockResolvedValue(sampleEvent);
     getSpanTreeLinesSpy.mockResolvedValue({
