@@ -278,6 +278,15 @@ describe("listTransactions", () => {
     expect(capturedUrl).not.toMatch(/[?&]project=my-project/);
   });
 
+  test("scopes via the project param when projectId is provided (#1317)", async () => {
+    mockOk({ data: [], meta: TX_META });
+
+    await listTransactions("my-org", "my-project", { projectId: 4242 });
+
+    expect(capturedUrl).toContain("project=4242");
+    expect(decodeURIComponent(capturedUrl)).not.toContain("project:my-project");
+  });
+
   test("numeric project ID goes as project param", async () => {
     mockOk({ data: [], meta: TX_META });
 
@@ -468,6 +477,15 @@ describe("listSpans", () => {
     expect(decodeURIComponent(capturedUrl)).not.toContain(
       "project%3Amy-project"
     );
+  });
+
+  test("scopes via the project param when projectId is provided (#1317)", async () => {
+    mockOk({ data: [], meta: SPAN_META });
+
+    await listSpans("my-org", "my-project", { projectId: 4242 });
+
+    expect(capturedUrl).toContain("project=4242");
+    expect(decodeURIComponent(capturedUrl)).not.toContain("project:my-project");
   });
 
   test("auto-paginates when limit > 100", async () => {

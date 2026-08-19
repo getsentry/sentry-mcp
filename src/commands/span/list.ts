@@ -40,7 +40,10 @@ import {
   TARGET_PATTERN_NOTE,
 } from "../../lib/list-command.js";
 import { withProgress } from "../../lib/polling.js";
-import { resolveOrgProjectFromArg } from "../../lib/resolve-target.js";
+import {
+  resolveLogProjectId,
+  resolveOrgProjectFromArg,
+} from "../../lib/resolve-target.js";
 import { sanitizeQuery } from "../../lib/search-query.js";
 import {
   appendPeriodHint,
@@ -452,6 +455,9 @@ async function handleProjectMode(
     cwd,
     COMMAND_NAME
   );
+  // Resolve slug → numeric ID so the Events query scopes via the `project`
+  // param. `project:<slug>` only matches actively-selected projects (#1317).
+  const projectId = await resolveLogProjectId(org, project);
   const apiQuery = flags.query ? translateSpanQuery(flags.query) : undefined;
 
   const contextKey = buildPaginationContextKey(
@@ -473,6 +479,7 @@ async function handleProjectMode(
         sort: flags.sort,
         limit: flags.limit,
         cursor,
+        projectId,
         ...timeRangeToApiParams(timeRange),
         extraFields: extraApiFields,
       }).catch((error: unknown): never => {
