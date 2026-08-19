@@ -5,8 +5,28 @@
  * ProGuard mappings are chunked as raw bytes (no ZIP wrapping).
  */
 
-import { describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { hashBuffer } from "../../../src/lib/api/chunk-upload.js";
+import { apiRequestToRegion } from "../../../src/lib/api/infrastructure.js";
+import { uploadProguardMappings } from "../../../src/lib/api/proguard.js";
+
+vi.mock("../../../src/lib/api/infrastructure.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../src/lib/api/infrastructure.js")
+    >();
+  return { ...actual, apiRequestToRegion: vi.fn() };
+});
+vi.mock("../../../src/lib/region.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../src/lib/region.js")>();
+  return {
+    ...actual,
+    resolveOrgRegion: vi.fn(async () => "https://us.sentry.io"),
+  };
+});
+
+const apiMock = vi.mocked(apiRequestToRegion);
 
 describe("hashBuffer", () => {
   test("single chunk for small content", () => {
@@ -72,5 +92,59 @@ describe("hashBuffer", () => {
 
     expect(chunks).toHaveLength(0);
     expect(overallChecksum).toMatch(/^[0-9a-f]{40}$/);
+  });
+});
+
+describe("uploadProguardMappings", () => {
+  const CHUNK_UPLOAD_OPTIONS = {
+    url: "https://us.sentry.io/api/0/chunk-upload/",
+    chunkSize: 8192,
+    chunksPerRequest: 64,
+    maxRequestSize: 1_048_576,
+    hashAlgorithm: "sha1",
+    concurrency: 8,
+    compression: ["gzip"],
+  };
+
+  beforeEach(() => {
+    apiMock.mockReset();
+  });
+
+  test("assemble request names each mapping with a leading-slash /proguard/ path", async () => {
+    let assembleBody: Record<string, { name: string; chunks: string[] }> = {};
+
+    apiMock.mockImplementation(
+      async (_regionUrl, endpoint, options?: { body?: unknown }) => {
+        if (endpoint.includes("chunk-upload/")) {
+          return { data: CHUNK_UPLOAD_OPTIONS } as never;
+        }
+        // DIF assemble endpoint: report every checksum as already "ok" so the
+        // upload short-circuits without needing to mock chunk uploads too.
+        assembleBody = options?.body as typeof assembleBody;
+        const response: Record<string, { state: string }> = {};
+        for (const checksum of Object.keys(assembleBody)) {
+          response[checksum] = { state: "ok" };
+        }
+        return { data: response } as never;
+      }
+    );
+
+    await uploadProguardMappings({
+      org: "test-org",
+      project: "test-project",
+      mappings: [
+        {
+          path: "mapping.txt",
+          uuid: "5db7294d-87fc-5726-a5c0-4a90679657a5",
+          content: Buffer.from("void\n"),
+        },
+      ],
+    });
+
+    const [entry] = Object.values(assembleBody);
+    // Leading slash required for the server to recognize the DIF as proguard.
+    expect(entry?.name).toBe(
+      "/proguard/5db7294d-87fc-5726-a5c0-4a90679657a5.txt"
+    );
   });
 });

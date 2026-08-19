@@ -162,7 +162,7 @@ export async function uploadProguardMappings(
   const assembleBody: Record<string, { name: string; chunks: string[] }> = {};
   for (const cm of chunkedMappings) {
     assembleBody[cm.overallChecksum] = {
-      name: `proguard/${cm.mapping.uuid}.txt`,
+      name: `/proguard/${cm.mapping.uuid}.txt`,
       chunks: cm.chunks.map((c: ChunkInfo) => c.sha1),
     };
   }
