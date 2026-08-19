@@ -2,10 +2,12 @@ import {
   clientKeyFixture,
   mswServer,
   projectFixture,
+  teamFixture,
 } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, it, expect } from "vitest";
-import createProject from "./create-project.js";
+import createProject, { selectDefaultTeam } from "./create-project.js";
+import { UserInputError } from "../../errors.js";
 
 const context = {
   constraints: {
@@ -48,6 +50,7 @@ describe("create_project", () => {
       **ID**: 4509109104082945
       **Slug**: cloudflare-mcp
       **Name**: cloudflare-mcp
+      **Team**: the-goats
       **SENTRY_DSN**: https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945
 
       ## Response Notes
@@ -488,6 +491,268 @@ describe("create_project", () => {
   it("accepts slug and repository linking parameters", () => {
     expect(createProject.inputSchema).toHaveProperty("slug");
     expect(createProject.inputSchema).toHaveProperty("repository");
+    expect(createProject.inputSchema).toHaveProperty("teamSlug");
     expect(createProject.description).toContain("repository");
+    expect(createProject.description).toContain("teamSlug is optional");
+  });
+
+  it("infers a default team when teamSlug is omitted", async () => {
+    let createPath = "";
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/teams/",
+        () => HttpResponse.json([teamFixture]),
+      ),
+      http.post(
+        "https://sentry.io/api/0/teams/sentry-mcp-evals/the-goats/projects/",
+        ({ request }) => {
+          createPath = new URL(request.url).pathname;
+          return HttpResponse.json(projectFixture);
+        },
+      ),
+    );
+
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: null,
+        name: "cloudflare-mcp",
+        slug: null,
+        platform: "node",
+        regionUrl: null,
+        repository: null,
+      },
+      context,
+    );
+
+    expect(createPath).toBe(
+      "/api/0/teams/sentry-mcp-evals/the-goats/projects/",
+    );
+    expect(result).toContain("**Team**: the-goats (default)");
+    expect(result).toContain(
+      "teamSlug was omitted, so the project was created on default team `the-goats`",
+    );
+  });
+
+  it("prefers member teams and earliest dateCreated when inferring", async () => {
+    let createPath = "";
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/teams/",
+        () =>
+          HttpResponse.json([
+            {
+              ...teamFixture,
+              id: "1",
+              slug: "backend",
+              name: "backend",
+              isMember: false,
+              hasAccess: true,
+              dateCreated: "2020-01-01T00:00:00.000Z",
+            },
+            {
+              ...teamFixture,
+              id: "2",
+              slug: "frontend",
+              name: "frontend",
+              isMember: true,
+              hasAccess: true,
+              dateCreated: "2024-01-01T00:00:00.000Z",
+            },
+            {
+              ...teamFixture,
+              id: "3",
+              slug: "platform",
+              name: "platform",
+              isMember: true,
+              hasAccess: true,
+              dateCreated: "2021-01-01T00:00:00.000Z",
+            },
+          ]),
+      ),
+      http.post(
+        "https://sentry.io/api/0/teams/sentry-mcp-evals/platform/projects/",
+        ({ request }) => {
+          createPath = new URL(request.url).pathname;
+          return HttpResponse.json({
+            ...projectFixture,
+            slug: "cloudflare-mcp",
+          });
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+        () => HttpResponse.json([clientKeyFixture]),
+      ),
+    );
+
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: null,
+        name: "cloudflare-mcp",
+        slug: null,
+        platform: "node",
+        regionUrl: null,
+        repository: null,
+      },
+      context,
+    );
+
+    expect(createPath).toBe(
+      "/api/0/teams/sentry-mcp-evals/platform/projects/",
+    );
+    expect(result).toContain("**Team**: platform (default)");
+  });
+
+  it("keeps an explicit teamSlug without listing teams", async () => {
+    let listedTeams = false;
+    let createPath = "";
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/teams/",
+        () => {
+          listedTeams = true;
+          return HttpResponse.json([teamFixture]);
+        },
+      ),
+      http.post(
+        "https://sentry.io/api/0/teams/sentry-mcp-evals/the-goats/projects/",
+        ({ request }) => {
+          createPath = new URL(request.url).pathname;
+          return HttpResponse.json(projectFixture);
+        },
+      ),
+    );
+
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: "the-goats",
+        name: "cloudflare-mcp",
+        slug: null,
+        platform: "node",
+        regionUrl: null,
+        repository: null,
+      },
+      context,
+    );
+
+    expect(listedTeams).toBe(false);
+    expect(createPath).toBe(
+      "/api/0/teams/sentry-mcp-evals/the-goats/projects/",
+    );
+    expect(result).toContain("**Team**: the-goats");
+    expect(result).not.toContain("(default)");
+  });
+
+  it("rejects omitted teamSlug when the organization has no teams", async () => {
+    let createCalls = 0;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/teams/",
+        () => HttpResponse.json([]),
+      ),
+      http.post(
+        "https://sentry.io/api/0/teams/sentry-mcp-evals/the-goats/projects/",
+        () => {
+          createCalls += 1;
+          return HttpResponse.json(
+            { detail: "unexpected create" },
+            { status: 500 },
+          );
+        },
+      ),
+    );
+
+    await expect(
+      createProject.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          teamSlug: null,
+          name: "cloudflare-mcp",
+          slug: null,
+          platform: "node",
+          regionUrl: null,
+          repository: null,
+        },
+        context,
+      ),
+    ).rejects.toThrow(UserInputError);
+    await expect(
+      createProject.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          teamSlug: null,
+          name: "cloudflare-mcp",
+          slug: null,
+          platform: "node",
+          regionUrl: null,
+          repository: null,
+        },
+        context,
+      ),
+    ).rejects.toThrow('No teams found in organization "sentry-mcp-evals"');
+    expect(createCalls).toBe(0);
+  });
+});
+
+describe("selectDefaultTeam", () => {
+  it("returns null for an empty list", () => {
+    expect(selectDefaultTeam([])).toBeNull();
+  });
+
+  it("prefers member teams over older non-member teams", () => {
+    const selected = selectDefaultTeam([
+      {
+        id: "1",
+        slug: "old",
+        name: "old",
+        isMember: false,
+        hasAccess: true,
+        dateCreated: "2019-01-01T00:00:00.000Z",
+      },
+      {
+        id: "2",
+        slug: "mine",
+        name: "mine",
+        isMember: true,
+        hasAccess: true,
+        dateCreated: "2024-01-01T00:00:00.000Z",
+      },
+    ]);
+
+    expect(selected?.slug).toBe("mine");
+  });
+
+  it("falls back to hasAccess then earliest created slug", () => {
+    const selected = selectDefaultTeam([
+      {
+        id: "1",
+        slug: "zeta",
+        name: "zeta",
+        isMember: false,
+        hasAccess: true,
+        dateCreated: "2022-01-01T00:00:00.000Z",
+      },
+      {
+        id: "2",
+        slug: "alpha",
+        name: "alpha",
+        isMember: false,
+        hasAccess: true,
+        dateCreated: "2022-01-01T00:00:00.000Z",
+      },
+      {
+        id: "3",
+        slug: "no-access",
+        name: "no-access",
+        isMember: false,
+        hasAccess: false,
+        dateCreated: "2018-01-01T00:00:00.000Z",
+      },
+    ]);
+
+    expect(selected?.slug).toBe("alpha");
   });
 });
