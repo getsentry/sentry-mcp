@@ -878,7 +878,7 @@ export type RequestEntry = {
     fragment?: string | null;
     query?: [string, string][] | string | Record<string, string> | null;
     data?: unknown;
-    headers?: [string, string][] | null;
+    headers?: [string, string][] | Record<string, string> | null;
     cookies?: [string, string][] | Record<string, string> | null;
     env?: Record<string, string> | null;
     inferredContentType?: string | null;

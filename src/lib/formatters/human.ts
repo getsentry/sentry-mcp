@@ -1051,7 +1051,10 @@ function buildRequestMarkdown(requestEntry: RequestEntry): string {
   lines.push(`\`${method} ${data.url}\``);
 
   if (data.headers) {
-    for (const [key, value] of data.headers) {
+    const headerEntries = Array.isArray(data.headers)
+      ? data.headers
+      : Object.entries(data.headers);
+    for (const [key, value] of headerEntries) {
       if (key.toLowerCase() === "user-agent") {
         const truncatedUA =
           value.length > 100 ? `${value.slice(0, 97)}...` : value;
