@@ -550,10 +550,10 @@ export function renderMarkdown(md: string): string {
     // Parse and render to get structural formatting (headings, tables, lists),
     // then strip ANSI codes. This produces human-readable output with aligned
     // tables and proper heading emphasis, without ANSI escape sequences.
-    const tokens = marked.lexer(md);
+    const tokens = marked.lexer(md ?? "");
     return stripAnsi(renderBlocks(tokens)).trimEnd();
   }
-  const tokens = marked.lexer(md);
+  const tokens = marked.lexer(md ?? "");
   return renderBlocks(tokens).trimEnd();
 }
 
@@ -570,7 +570,7 @@ export function renderMarkdown(md: string): string {
  * @returns Styled string (TTY) or plain text (non-TTY / plain mode)
  */
 export function renderInlineMarkdown(md: string): string {
-  const tokens = marked.lexer(md);
+  const tokens = marked.lexer(md ?? "");
   const rendered = renderInline(tokens.flatMap(flattenInline));
   return isPlainOutput() ? stripAnsi(rendered) : rendered;
 }
