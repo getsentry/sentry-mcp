@@ -332,6 +332,24 @@ const TRANSACTION_FIELDS = [
   "project",
 ];
 
+/**
+ * Resolve the numeric project ID to send via the `project` query param.
+ *
+ * Prefers an explicit `projectId` from the caller; otherwise falls back to the
+ * slug when it is itself all-digits (a numeric project ID passed as the slug).
+ * Returns `undefined` when neither yields a numeric ID, signalling that the
+ * caller should scope via `project:<slug>` search syntax instead.
+ */
+function resolveNumericProjectId(
+  projectSlug: string,
+  projectId: number | undefined
+): number | undefined {
+  if (projectId !== undefined) {
+    return projectId;
+  }
+  return isAllDigits(projectSlug) ? Number(projectSlug) : undefined;
+}
+
 type ListTransactionsOptions = {
   /** Search query using Sentry query syntax */
   query?: string;
@@ -347,6 +365,12 @@ type ListTransactionsOptions = {
   start?: string;
   /** Absolute end datetime (ISO-8601). Mutually exclusive with statsPeriod. */
   end?: string;
+  /**
+   * Numeric project ID. When provided, uses the `project` query param instead
+   * of `project:<slug>` search syntax, avoiding "not actively selected" errors
+   * (same class of bug as #1317 / #312).
+   */
+  projectId?: number;
 };
 
 /**
@@ -363,8 +387,14 @@ async function fetchTransactionsPage(
   options: ListTransactionsOptions,
   perPage: number
 ): Promise<PaginatedResponse<TransactionListItem[]>> {
-  const isNumericProject = isAllDigits(projectSlug);
-  const projectFilter = isNumericProject ? "" : `project:${projectSlug}`;
+  // Prefer the numeric `project=` param — `project:<slug>` in the search query
+  // only matches projects that are actively selected (#1317).
+  const numericProjectId = resolveNumericProjectId(
+    projectSlug,
+    options.projectId
+  );
+  const projectFilter =
+    numericProjectId === undefined ? `project:${projectSlug}` : "";
   const fullQuery = [projectFilter, options.query].filter(Boolean).join(" ");
 
   const { data: response, headers } =
@@ -375,7 +405,10 @@ async function fetchTransactionsPage(
         params: {
           dataset: "transactions",
           field: TRANSACTION_FIELDS,
-          project: isNumericProject ? projectSlug : undefined,
+          project:
+            numericProjectId === undefined
+              ? undefined
+              : String(numericProjectId),
           // Convert empty string to undefined so ky omits the param entirely;
           // sending `query=` causes the Sentry API to behave differently than
           // omitting the parameter.
@@ -406,8 +439,8 @@ async function fetchTransactionsPage(
  * Uses the Explore/Events API with dataset=transactions.
  *
  * Handles project slug vs numeric ID automatically:
- * - Numeric IDs are passed as the `project` parameter
- * - Slugs are added to the query string as `project:{slug}`
+ * - Numeric IDs (or `options.projectId`) are passed as the `project` parameter
+ * - Slugs fall back to `project:{slug}` in the query string when no ID is known
  *
  * When `limit` exceeds {@link API_MAX_PER_PAGE}, transparently fetches multiple
  * pages using cursor-based pagination (bounded by {@link MAX_PAGINATION_PAGES}).
@@ -477,6 +510,12 @@ type ListSpansOptions = {
   end?: string;
   /** When true, search across all projects (sends project=-1). Used for trace mode. */
   allProjects?: boolean;
+  /**
+   * Numeric project ID. When provided (and not `allProjects`), uses the
+   * `project` query param instead of `project:<slug>` search syntax, avoiding
+   * "not actively selected" errors (same class of bug as #1317 / #312).
+   */
+  projectId?: number;
 };
 
 /**
@@ -493,15 +532,15 @@ async function fetchSpansPage(
   options: ListSpansOptions,
   perPage: number
 ): Promise<PaginatedResponse<SpanListItem[]>> {
-  const isNumericProject = isAllDigits(projectSlug);
-  let projectFilter: string;
-  if (options.allProjects) {
-    projectFilter = "";
-  } else if (isNumericProject) {
-    projectFilter = "";
-  } else {
-    projectFilter = `project:${projectSlug}`;
-  }
+  // Prefer the numeric `project=` param — `project:<slug>` in the search query
+  // only matches projects that are actively selected (#1317).
+  const numericProjectId = options.allProjects
+    ? undefined
+    : resolveNumericProjectId(projectSlug, options.projectId);
+  const projectFilter =
+    options.allProjects || numericProjectId !== undefined
+      ? ""
+      : `project:${projectSlug}`;
   const fullQuery = [projectFilter, options.query].filter(Boolean).join(" ");
 
   const fields = options.extraFields?.length
@@ -511,8 +550,8 @@ async function fetchSpansPage(
   let projectParam: string | undefined;
   if (options.allProjects) {
     projectParam = "-1";
-  } else if (isNumericProject) {
-    projectParam = projectSlug;
+  } else if (numericProjectId !== undefined) {
+    projectParam = String(numericProjectId);
   }
 
   const { data: response, headers } = await apiRequestToRegion<SpansResponse>(
