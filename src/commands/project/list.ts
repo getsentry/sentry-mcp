@@ -233,7 +233,7 @@ async function resolveOrgsForAutoDetect(cwd: string): Promise<OrgResolution> {
 /** Column definitions for the project table. */
 const PROJECT_COLUMNS: Column<ProjectWithOrg>[] = [
   { header: "ORG", value: (p) => p.orgSlug || "" },
-  { header: "PROJECT", value: (p) => p.slug },
+  { header: "PROJECT", value: (p) => p.slug || "" },
   { header: "NAME", value: (p) => escapeMarkdownCell(p.name) },
   { header: "PLATFORM", value: (p) => p.platform || "" },
 ];
