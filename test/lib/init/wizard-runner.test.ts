@@ -990,6 +990,44 @@ describe("runWizard", () => {
     expect(spinnerMock.stop).not.toHaveBeenCalledWith("Using existing project");
   });
 
+  test("captures the created Sentry project identity and forwards it to formatResult", async () => {
+    const identity = {
+      orgSlug: "acme",
+      projectSlug: "my-app",
+      projectId: "4507",
+      dsn: "https://k@o0.ingest.sentry.io/4507",
+      url: "https://acme.sentry.io/settings/projects/my-app/",
+    };
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["ensure-sentry-project"]],
+      steps: {
+        "ensure-sentry-project": {
+          suspendPayload: {
+            type: "tool",
+            operation: "create-sentry-project",
+            cwd: "/tmp/test",
+            params: { name: "my-app", platform: "javascript-react" },
+          },
+        },
+      },
+    };
+    executeToolSpy.mockResolvedValue({ ok: true, data: identity });
+    mockResumeResults = [{ status: "success" }];
+
+    await runWizard(makeOptions());
+
+    // The identity comes from the local tool result, not the server output —
+    // the CLI creates the project itself, so it passes what it already knows
+    // as formatResult's 4th arg to build the Issues link without a round-trip.
+    expect(formatResultSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      identity
+    );
+  });
+
   test("shows --yes hint when LoggingUI prompt fails", async () => {
     const { LoggingUIPromptError } = await import(
       "../../../src/lib/init/ui/logging-ui.js"

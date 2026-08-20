@@ -177,10 +177,190 @@ describe("formatResult", () => {
     );
 
     const summary = summaryCall(calls);
-    expect(summary).toEqual({
-      fields: [],
-      changedFiles: [{ action: "create", path: "instrument.ts" }],
+    expect(summary?.fields).toEqual([]);
+    expect(summary?.changedFiles).toEqual([
+      { action: "create", path: "instrument.ts" },
+    ]);
+    // The structured completion payload is always attached for the InkUI
+    // completion screen; its internals are covered by dedicated tests.
+    expect(summary?.completion).toBeDefined();
+  });
+});
+
+describe("formatResult completion payload", () => {
+  test("builds the Issues-stream URL, MCP endpoint, and next-step metadata", () => {
+    const { ui, calls } = createMockUI();
+    formatResult(
+      {
+        status: "success",
+        result: {
+          platform: "next.js",
+          projectDir: "/work/my-app",
+          features: ["errorMonitoring", "performanceMonitoring"],
+          commands: ["pnpm add @sentry/nextjs"],
+          orgSlug: "acme",
+          projectSlug: "my-app",
+          projectId: "4507",
+          docsUrl: "https://docs.sentry.io/platforms/javascript/guides/nextjs/",
+          changedFiles: [{ action: "create", path: "instrument.ts" }],
+        },
+      },
+      ui
+    );
+
+    const completion = summaryCall(calls)?.completion;
+    expect(completion).toBeDefined();
+    // Primary CTA points at the project-scoped Issues stream, not settings.
+    expect(completion?.issuesUrl).toContain("/issues/?project=4507");
+    expect(completion?.issuesUrl).toContain("acme");
+    expect(completion?.projectName).toBe("my-app");
+    expect(completion?.features).toHaveLength(2);
+    expect(completion?.changedFileCount).toBe(1);
+    expect(completion?.agentInstallCommand).toBe("npx @sentry/ai install");
+    expect(completion?.startCommand).toBe("pnpm dev");
+    expect(completion?.verification).toEqual({ received: false });
+  });
+
+  test("a verified event deep-links the exact event", () => {
+    const { ui, calls } = createMockUI();
+    formatResult(
+      {
+        status: "success",
+        result: { orgSlug: "acme", projectSlug: "my-app", projectId: "4507" },
+      },
+      ui,
+      { verified: true, kind: "envelope", eventId: "abc123def" }
+    );
+
+    const completion = summaryCall(calls)?.completion;
+    expect(completion?.verification.received).toBe(true);
+    expect(completion?.verification.eventUrl).toContain("event.id:abc123def");
+  });
+
+  test("recovers the org from the settings URL when the server omits slugs", () => {
+    const { ui, calls } = createMockUI();
+    formatResult(
+      {
+        status: "success",
+        result: {
+          platform: "python",
+          // Older server: only the settings URL, no orgSlug.
+          sentryProjectUrl: "https://acme.sentry.io/settings/projects/api/",
+        },
+      },
+      ui
+    );
+
+    const completion = summaryCall(calls)?.completion;
+    // Issues stream is recovered from the settings URL's org.
+    expect(completion?.issuesUrl).toBe("https://acme.sentry.io/issues/");
+  });
+
+  test("keeps the raw project URL only when the org can't be recovered", () => {
+    const { ui, calls } = createMockUI();
+    formatResult(
+      {
+        status: "success",
+        result: { platform: "python", sentryProjectUrl: "not-a-url" },
+      },
+      ui
+    );
+
+    const completion = summaryCall(calls)?.completion;
+    expect(completion?.issuesUrl).toBe("not-a-url");
+  });
+});
+
+describe("formatResult with locally-captured project identity", () => {
+  // The CLI creates the Sentry project itself, so it captures the identity from
+  // the create-sentry-project tool result and passes it as the 4th arg. This is
+  // now the primary source of org/project/projectId in prod — the server no
+  // longer echoes them back (cli-init-api#239 closed).
+  const identity = {
+    orgSlug: "acme",
+    projectSlug: "my-app",
+    projectId: "4507",
+    dsn: "https://k@o0.ingest.sentry.io/4507",
+    url: "https://acme.sentry.io/settings/projects/my-app/",
+  };
+
+  test("builds the Issues link from the captured identity when the server sends no slugs", () => {
+    const { ui, calls } = createMockUI();
+    formatResult(
+      {
+        status: "success",
+        result: { platform: "next.js", commands: ["pnpm add @sentry/nextjs"] },
+      },
+      ui,
+      undefined,
+      identity
+    );
+
+    const completion = summaryCall(calls)?.completion;
+    expect(completion?.issuesUrl).toBe(
+      "https://acme.sentry.io/issues/?project=4507"
+    );
+    expect(completion?.projectName).toBe("my-app");
+  });
+
+  test("captured identity takes precedence over stale server-echoed slugs", () => {
+    const { ui, calls } = createMockUI();
+    formatResult(
+      {
+        status: "success",
+        result: {
+          platform: "next.js",
+          orgSlug: "stale-org",
+          projectSlug: "stale-project",
+          projectId: "9999",
+        },
+      },
+      ui,
+      undefined,
+      identity
+    );
+
+    const completion = summaryCall(calls)?.completion;
+    expect(completion?.projectName).toBe("my-app");
+    expect(completion?.issuesUrl).toContain("acme");
+    expect(completion?.issuesUrl).toContain("project=4507");
+    expect(completion?.issuesUrl).not.toContain("stale");
+  });
+
+  test("backfills the summary Project field from the captured identity URL", () => {
+    const { ui, calls } = createMockUI();
+    formatResult(
+      { status: "success", result: { platform: "next.js" } },
+      ui,
+      undefined,
+      identity
+    );
+
+    const summary = summaryCall(calls);
+    expect(summary?.fields).toContainEqual({
+      label: "Project",
+      value: "https://acme.sentry.io/settings/projects/my-app/",
     });
+  });
+
+  test("drops the dry-run sentinel projectId instead of leaking ?project=(dry-run)", () => {
+    const { ui, calls } = createMockUI();
+    formatResult(
+      { status: "success", result: { platform: "next.js" } },
+      ui,
+      undefined,
+      {
+        orgSlug: "acme",
+        projectSlug: "my-app",
+        projectId: "(dry-run)",
+        url: "https://sentry.io/dry-run",
+      }
+    );
+
+    const completion = summaryCall(calls)?.completion;
+    // Non-numeric id is dropped → org-wide, unfiltered Issues stream.
+    expect(completion?.issuesUrl).toBe("https://acme.sentry.io/issues/");
+    expect(completion?.issuesUrl).not.toContain("(dry-run)");
   });
 });
 

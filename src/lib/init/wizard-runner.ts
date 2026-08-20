@@ -66,6 +66,7 @@ import { describeTool, executeTool } from "./tools/registry.js";
 import type {
   InteractivePayload,
   ResolvedInitContext,
+  SentryProjectIdentity,
   SuspendPayload,
   ToolPayload,
   ToolResult,
@@ -75,7 +76,7 @@ import type {
 import { getUIAsync } from "./ui/factory.js";
 import { LoggingUIPromptError } from "./ui/logging-ui.js";
 import type { SpinnerHandle, WelcomeOptions, WizardUI } from "./ui/types.js";
-import { verifySetup } from "./verify-setup.js";
+import { type VerifyResult, verifySetup } from "./verify-setup.js";
 import {
   precomputeDirListing,
   precomputeSentryDetection,
@@ -96,6 +97,16 @@ type CompactPhaseHistoryEntry = {
   data?: { files: Record<string, null> };
 };
 
+/**
+ * Mutable holder for the Sentry project identity captured mid-run.
+ *
+ * The `create-sentry-project` / `ensure-sentry-project` tool runs locally and
+ * returns the org/project identifiers, but that result only travels back to the
+ * server in `resumeData`. This ref lets the runner retain it so the final
+ * completion screen can build the Issues link without a server round-trip.
+ */
+type SentryProjectRef = { current?: SentryProjectIdentity };
+
 type StepContext = {
   payload: InteractivePayload | ToolPayload;
   stepId: string;
@@ -103,7 +114,38 @@ type StepContext = {
   spinState: SpinState;
   context: ResolvedInitContext;
   ui: WizardUI;
+  sentryProject: SentryProjectRef;
 };
+
+/** Tool operations that create/resolve the Sentry project and return its identity. */
+const SENTRY_PROJECT_OPERATIONS = new Set<ToolPayload["operation"]>([
+  "create-sentry-project",
+  "ensure-sentry-project",
+]);
+
+/** Narrow a tool result's `data` to a Sentry project identity, if it has one. */
+function extractSentryProjectIdentity(
+  data: unknown
+): SentryProjectIdentity | undefined {
+  if (!data || typeof data !== "object") {
+    return;
+  }
+  const d = data as Record<string, unknown>;
+  if (
+    typeof d.orgSlug === "string" &&
+    typeof d.projectSlug === "string" &&
+    typeof d.projectId === "string"
+  ) {
+    return {
+      orgSlug: d.orgSlug,
+      projectSlug: d.projectSlug,
+      projectId: d.projectId,
+      dsn: typeof d.dsn === "string" ? d.dsn : undefined,
+      url: typeof d.url === "string" ? d.url : undefined,
+    };
+  }
+  return;
+}
 
 function nextPhase(
   stepPhases: Map<string, number>,
@@ -344,7 +386,7 @@ async function handleSuspendedStep(
   stepPhases: Map<string, number>,
   stepHistory: Map<string, CompactPhaseHistoryEntry[]>
 ): Promise<Record<string, unknown>> {
-  const { payload, stepId, spin, spinState, context, ui } = ctx;
+  const { payload, stepId, spin, spinState, context, ui, sentryProject } = ctx;
 
   if (payload.type === "tool") {
     const message =
@@ -370,6 +412,19 @@ async function handleSuspendedStep(
     }
 
     const toolResult = await executeTool(payload, context);
+
+    // The CLI creates the Sentry project itself — retain the identity it just
+    // resolved so the completion screen can build the Issues link locally,
+    // without the server having to echo org/project/projectId back.
+    if (
+      SENTRY_PROJECT_OPERATIONS.has(payload.operation) &&
+      toolResult.ok !== false
+    ) {
+      const identity = extractSentryProjectIdentity(toolResult.data);
+      if (identity) {
+        sentryProject.current = identity;
+      }
+    }
 
     if (toolResult.message) {
       // Tool messages (e.g. "Using existing project ...") describe a
@@ -1095,6 +1150,9 @@ export async function runWizard(initialOptions: WizardOptions): Promise<void> {
 
   const stepPhases = new Map<string, number>();
   const stepHistory = new Map<string, CompactPhaseHistoryEntry[]>();
+  // Populated when the create/ensure-sentry-project tool runs; read at the end
+  // to build the completion screen's Issues link from local data.
+  const sentryProjectRef: SentryProjectRef = {};
 
   syncWorkflowStepStatuses(result, ui);
 
@@ -1150,6 +1208,7 @@ export async function runWizard(initialOptions: WizardOptions): Promise<void> {
           spinState,
           context,
           ui,
+          sentryProject: sentryProjectRef,
         },
         stepPhases,
         stepHistory
@@ -1240,7 +1299,14 @@ export async function runWizard(initialOptions: WizardOptions): Promise<void> {
     ui.setStep?.(activeStepId, "completed");
   }
 
-  await handleFinalResult(result, spin, spinState, ui, directory);
+  await handleFinalResult(
+    result,
+    spin,
+    spinState,
+    ui,
+    directory,
+    sentryProjectRef.current
+  );
   setTag("wizard.outcome", "completed");
   if (result.result?.platform) {
     setTag("wizard.platform", String(result.result.platform));
@@ -1277,13 +1343,14 @@ function syncWorkflowStepStatuses(
   }
 }
 
-// biome-ignore lint/nursery/useMaxParams: existing 4-param shape; cwd is a defaulted extension
+// biome-ignore lint/nursery/useMaxParams: cwd and sentryProject are optional trailing extensions
 export async function handleFinalResult(
   result: WorkflowRunResult,
   spin: SpinnerHandle,
   spinState: SpinState,
   ui: WizardUI,
-  cwd?: string
+  cwd?: string,
+  sentryProject?: SentryProjectIdentity
 ): Promise<void> {
   const hasError = result.status !== "success" || result.result?.exitCode;
 
@@ -1309,12 +1376,13 @@ export async function handleFinalResult(
 
   // Run verification before printing the final summary so the user
   // sees the result inline with the rest of the output.
+  let verify: VerifyResult | undefined;
   if (cwd) {
     if (spinState.running) {
       spin.message("Verifying setup...");
     }
     try {
-      await verifySetup(result, ui, cwd);
+      verify = await verifySetup(result, ui, cwd);
     } catch (error) {
       logger.debug("Verification threw unexpectedly", error);
     }
@@ -1324,7 +1392,7 @@ export async function handleFinalResult(
     spin.stop("Done");
     spinState.running = false;
   }
-  formatResult(result, ui);
+  formatResult(result, ui, verify, sentryProject);
 }
 
 /**

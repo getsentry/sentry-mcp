@@ -64,7 +64,12 @@ import {
 } from "./ink-shortcuts.js";
 import { BLOCK_LINE_COUNT, LEARN_SEQUENCE } from "./learn-content.js";
 import { SENTRY_TIPS, type SentryTip } from "./sentry-tips.js";
-import type { PromptDetail, WizardSummary } from "./types.js";
+import type {
+  CompletionActions,
+  PromptDetail,
+  WizardCompletion,
+  WizardSummary,
+} from "./types.js";
 import type {
   ActivePrompt,
   FileReadEntry,
@@ -232,8 +237,29 @@ function AppBody({ store }: AppProps): React.ReactNode {
     return bindings;
   }, [snapshot.requestCancel, tabs.length]);
   useInkShortcuts("init-app", appShortcuts, {
-    isActive: snapshot.layout === "workflow" && snapshot.prompt === null,
+    isActive:
+      snapshot.layout === "workflow" &&
+      snapshot.prompt === null &&
+      snapshot.outroState === null,
   });
+
+  if (snapshot.outroState?.kind === "success") {
+    return (
+      <InitRenderBoundary errorColor={COLOR_ERROR}>
+        <CompletionScreen
+          actions={snapshot.outroState.actions}
+          cliVersion={snapshot.cliVersion}
+          columns={columns}
+          completion={snapshot.summary?.completion ?? null}
+          onDismiss={snapshot.outroState.dismiss}
+          postExitActions={snapshot.postExitActions}
+          rows={rows}
+          store={store}
+          width={width}
+        />
+      </InitRenderBoundary>
+    );
+  }
 
   if (snapshot.layout === "intro" || snapshot.prompt?.kind === "welcome") {
     const inner = (
@@ -570,7 +596,7 @@ function ActionList<T extends string>({
               width="100%"
             >
               <Text color={ACCENT}>
-                {isCursor ? `${ICONS.triangleSmallRight} ` : "  "}
+                {isCursor ? `${ICONS.triangleRight} ` : "  "}
               </Text>
               <Text bold={isCursor}>{choice.label}</Text>
               {choice.hint ? <Text color={MUTED}> {choice.hint}</Text> : null}
@@ -580,9 +606,7 @@ function ActionList<T extends string>({
         return (
           <Box flexDirection="row" key={choice.value}>
             <Box flexShrink={0} width={4}>
-              <Text color={ACCENT}>
-                {isCursor ? ICONS.triangleSmallRight : " "}
-              </Text>
+              <Text color={ACCENT}>{isCursor ? ICONS.triangleRight : " "}</Text>
             </Box>
             <Text bold={isCursor}>{choice.label}</Text>
             {choice.hint ? <Text color={MUTED}> {choice.hint}</Text> : null}
@@ -605,6 +629,416 @@ function FeedbackBanner({
       <Text backgroundColor={ACCENT} color={FEEDBACK_BANNER_FG}>
         {formatFeedbackBanner(width, cliVersion)}
       </Text>
+    </Box>
+  );
+}
+
+// ────────────────────────── Completion Screen ─────────────────────────
+
+type CompletionActionId = "issues" | "agent" | "finish";
+
+/** Build the "What's next?" menu from the completion data + current state.
+ * Pick one, run it, and come back — the plugin item shows its queued state so
+ * doing several reads clearly. */
+function buildCompletionMenu({
+  agentCommand,
+  agentQueued,
+  completion,
+  primaryUrl,
+}: {
+  agentCommand: string | undefined;
+  agentQueued: boolean;
+  completion: WizardCompletion | null;
+  primaryUrl: string | undefined;
+}): ChoiceRow<CompletionActionId>[] {
+  const list: ChoiceRow<CompletionActionId>[] = [];
+  if (primaryUrl) {
+    list.push(
+      completion?.verification.eventUrl
+        ? {
+            value: "issues",
+            label: "View my first event",
+            hint: "opens the exact event",
+          }
+        : {
+            value: "issues",
+            label: "Open my Issues feed",
+            hint: "see your first error",
+          }
+    );
+  }
+  if (agentCommand) {
+    list.push({
+      value: "agent",
+      label: agentQueued
+        ? "Agent plugin — queued ✓"
+        : "Install the Sentry agent plugin",
+      hint: agentQueued ? "runs when you finish" : agentCommand,
+    });
+  }
+  list.push({ value: "finish", label: "Finish" });
+  return list;
+}
+
+/**
+ * The interactive exit screen. Speaks the same visual language as the rest of
+ * init — no boxed hero, glyph-aligned rows, and the prompt option idiom — with
+ * a clear hierarchy:
+ *   - what happened (Sentry installed, what was enabled), unnumbered context,
+ *   1. see your first error — the focal step,
+ *   2. next steps (MCP, agent plugin) as a driveable menu.
+ */
+function CompletionScreen({
+  actions,
+  cliVersion,
+  columns,
+  completion,
+  onDismiss,
+  postExitActions,
+  rows,
+  store,
+  width,
+}: {
+  actions: CompletionActions;
+  cliVersion: string | null;
+  columns: number;
+  completion: WizardCompletion | null;
+  onDismiss: () => void;
+  postExitActions: string[];
+  rows: number;
+  store: WizardStore;
+  width: number;
+}): React.ReactNode {
+  const [note, setNote] = useState("");
+
+  const verified = completion?.verification.received ?? false;
+  const primaryUrl = completion?.verification.eventUrl ?? completion?.issuesUrl;
+  const agentCommand = completion?.agentInstallCommand;
+  const agentQueued = agentCommand
+    ? postExitActions.includes(agentCommand)
+    : false;
+
+  const menuChoices = useMemo(
+    () =>
+      buildCompletionMenu({
+        agentCommand,
+        agentQueued,
+        completion,
+        primaryUrl,
+      }),
+    [agentCommand, agentQueued, completion, primaryUrl]
+  );
+
+  const onMenuChoose = useCallback(
+    (value: CompletionActionId) => {
+      switch (value) {
+        case "issues":
+          if (primaryUrl) {
+            actions.openUrl(primaryUrl);
+            setNote("Opened Sentry in your browser.");
+          }
+          break;
+        case "agent":
+          if (agentCommand) {
+            if (agentQueued) {
+              store.dequeuePostExitAction(agentCommand);
+              setNote("");
+            } else {
+              store.queuePostExitAction(agentCommand);
+              setNote(`Queued — ${agentCommand} runs when you finish.`);
+            }
+          }
+          break;
+        case "finish":
+          onDismiss();
+          break;
+        default:
+          break;
+      }
+    },
+    [actions, agentCommand, agentQueued, onDismiss, primaryUrl, store]
+  );
+
+  // `o` opens the first-error link directly (the hint next to it), separate
+  // from arrowing to "Open my Issues feed" in the menu.
+  const openShortcuts = useMemo<ShortcutBinding[]>(
+    () =>
+      primaryUrl
+        ? [
+            {
+              key: "o",
+              action: "open",
+              priority: 45,
+              match: (input, key) =>
+                !key.ctrl && (input === "o" || input === "O"),
+              run: () => {
+                actions.openUrl(primaryUrl);
+                setNote("Opened Sentry in your browser.");
+              },
+            },
+          ]
+        : [],
+    [actions, primaryUrl]
+  );
+  useInkShortcuts("completion-open", openShortcuts);
+
+  return (
+    <Box
+      flexDirection="column"
+      height={rows}
+      marginLeft={getInkFrameMargin(columns, width)}
+      width={width}
+    >
+      <Box flexDirection="column" flexGrow={1} paddingTop={1}>
+        <CompletionHeader completion={completion} />
+        <CompletionWhatWeSetUp completion={completion} />
+        <CompletionFirstError completion={completion} verified={verified} />
+        <CompletionMenu
+          choices={menuChoices}
+          onChoose={onMenuChoose}
+          onDismiss={onDismiss}
+        />
+        {note ? (
+          <Box flexShrink={0} marginTop={1} paddingX={1}>
+            <Box flexShrink={0} width={3}>
+              <Text color={COLOR_SUCCESS}>
+                {ICON_BY_SEVERITY.success.glyph}
+              </Text>
+            </Box>
+            <Text color={MUTED} wrap="truncate">
+              {note}
+            </Text>
+          </Box>
+        ) : null}
+        <Box flexGrow={1} />
+        <ShortcutFooter color={MUTED_DIM} />
+        <FeedbackBanner cliVersion={cliVersion} width={width} />
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * A `<marker> Title` section header. The `marker` numbers the two action
+ * sections ("1", "2") so they read as a sequence; the passive "what we set up"
+ * context passes a blank marker. Colour encodes importance: omit `color` for
+ * the focal steps (bright white), `MUTED_DIM` for the supporting context.
+ */
+function CompletionSectionHeader({
+  color,
+  marker,
+  title,
+}: {
+  color?: string;
+  marker: string;
+  title: string;
+}): React.ReactNode {
+  return (
+    <Box flexShrink={0}>
+      <Box flexShrink={0} width={3}>
+        <Text bold color={color}>
+          {marker}
+        </Text>
+      </Box>
+      <Text bold color={color}>
+        {title}
+      </Text>
+    </Box>
+  );
+}
+
+/**
+ * The ✔ headline. When there's a feature list to show it flows straight into
+ * it ("Sentry is set up in <project>, with:"), so the list needs no separate
+ * subheader. The ✔ shares the glyph column with the numbered steps below.
+ */
+function CompletionHeader({
+  completion,
+}: {
+  completion: WizardCompletion | null;
+}): React.ReactNode {
+  const projectName = completion?.projectName ?? "your project";
+  const hasSetup =
+    (completion?.featureBlurbs.length ?? 0) > 0 ||
+    (completion?.features.length ?? 0) > 0;
+  return (
+    <Box flexShrink={0} paddingX={1}>
+      <Box flexShrink={0} width={3}>
+        <Text bold color={COLOR_SUCCESS}>
+          {ICON_BY_SEVERITY.success.glyph}
+        </Text>
+      </Box>
+      <Text bold>Sentry is set up in </Text>
+      <Text bold color={ACCENT}>
+        {projectName}
+      </Text>
+      {hasSetup ? <Text color={MUTED}>, with:</Text> : null}
+    </Box>
+  );
+}
+
+/** "4 files changed" — the quiet footnote under the feature list. */
+function completionSummaryText(
+  completion: WizardCompletion | null
+): string | null {
+  const n = completion?.changedFileCount ?? 0;
+  if (n <= 0) {
+    return null;
+  }
+  return `${n} ${n === 1 ? "file" : "files"} changed`;
+}
+
+/**
+ * The project info under the header's "…set up in <project>, with:" lead-in:
+ * one small line per enabled feature (AI blurbs when available, plain labels
+ * otherwise) plus a changed-files footnote.
+ */
+function CompletionWhatWeSetUp({
+  completion,
+}: {
+  completion: WizardCompletion | null;
+}): React.ReactNode {
+  if (!completion) {
+    return null;
+  }
+  const { featureBlurbs, features } = completion;
+  const footnote = completionSummaryText(completion);
+  if (featureBlurbs.length === 0 && features.length === 0 && !footnote) {
+    return null;
+  }
+  return (
+    <Box flexDirection="column" flexShrink={0} paddingX={1}>
+      <Box flexDirection="column" paddingLeft={3}>
+        {featureBlurbs.length > 0
+          ? featureBlurbs.map(({ label, blurb }) => (
+              <Box flexDirection="row" flexShrink={0} key={label}>
+                <Box flexShrink={0} width={20}>
+                  <Text bold color={MUTED}>
+                    {label}
+                  </Text>
+                </Box>
+                <Box flexShrink={1}>
+                  <Text color={MUTED} wrap="wrap">
+                    {blurb}
+                  </Text>
+                </Box>
+              </Box>
+            ))
+          : features.map((label) => (
+              <Text bold color={MUTED} key={label}>
+                {label}
+              </Text>
+            ))}
+        {footnote ? <Text color={MUTED_DIM}>{footnote}</Text> : null}
+      </Box>
+    </Box>
+  );
+}
+
+/** Copy for the first-error section, by state. */
+function firstErrorInstruction(
+  verified: boolean,
+  startCommand: string | undefined
+): string {
+  if (verified) {
+    return "Your app is already sending events — here's the one you just sent:";
+  }
+  if (startCommand) {
+    return `Run ${startCommand}, make it throw an error, and it lands here:`;
+  }
+  return "Run your app, make it throw an error, and it lands here:";
+}
+
+/** The one thing to do next — the emphasized (ACCENT) section. */
+function CompletionFirstError({
+  completion,
+  verified,
+}: {
+  completion: WizardCompletion | null;
+  verified: boolean;
+}): React.ReactNode {
+  const primaryUrl = completion?.verification.eventUrl ?? completion?.issuesUrl;
+  const instruction = firstErrorInstruction(verified, completion?.startCommand);
+  return (
+    <Box flexDirection="column" flexShrink={0} marginTop={1} paddingX={1}>
+      <CompletionSectionHeader
+        marker="1"
+        title={verified ? "First event received" : "See your first error"}
+      />
+      <Box flexDirection="column" paddingLeft={3}>
+        <Text color={MUTED} wrap="truncate">
+          {instruction}
+        </Text>
+        {primaryUrl ? (
+          <Box>
+            <Text color={COLOR_SUCCESS}>{"→ "}</Text>
+            <Text color={COLOR_INFO} wrap="truncate">
+              {primaryUrl}
+            </Text>
+            <Text color={MUTED_DIM}>{"  (o) to open"}</Text>
+          </Box>
+        ) : null}
+      </Box>
+    </Box>
+  );
+}
+
+/** Option rows for the completion menu: a bold ▶ cursor (bigger than the
+ * prompt's small ▸ so the selection is unmistakable), bold label on focus. */
+function CompletionOptions<T extends string>({
+  choices,
+  highlighted,
+}: {
+  choices: ChoiceRow<T>[];
+  highlighted: number;
+}): React.ReactNode {
+  // Indent so the cursor sits directly under the section title (e.g. below the
+  // "N" of "Next steps"), not under the section's number marker.
+  return (
+    <Box flexDirection="column" paddingLeft={3}>
+      {choices.map((choice, index) => {
+        const isCursor = index === highlighted;
+        return (
+          <Box
+            flexDirection="row"
+            height={1}
+            key={choice.value}
+            overflow="hidden"
+          >
+            <Box flexShrink={0} width={3}>
+              <Text bold color={ACCENT}>
+                {isCursor ? ICONS.triangleRight : " "}
+              </Text>
+            </Box>
+            <Text bold={isCursor}>{choice.label}</Text>
+            {choice.hint ? <Text color={MUTED}> {choice.hint}</Text> : null}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+/** Optional next steps — a de-emphasized (MUTED) `◇` section + driveable menu. */
+function CompletionMenu({
+  choices,
+  onChoose,
+  onDismiss,
+}: {
+  choices: ChoiceRow<CompletionActionId>[];
+  onChoose: (value: CompletionActionId) => void;
+  onDismiss: () => void;
+}): React.ReactNode {
+  const highlighted = useChoiceNavigation<CompletionActionId>({
+    choices,
+    onCancel: onDismiss,
+    onChoose,
+    scope: "completion-menu",
+  });
+  return (
+    <Box flexDirection="column" flexShrink={0} marginTop={1} paddingX={1}>
+      <CompletionSectionHeader marker="2" title="Next steps" />
+      <CompletionOptions choices={choices} highlighted={highlighted} />
     </Box>
   );
 }
@@ -2133,9 +2567,7 @@ function SelectPromptOptionRow({
     return (
       <Box flexDirection="row" height={1} overflow="hidden" width="100%">
         <Box flexShrink={0} width={2}>
-          <Text color={ACCENT}>
-            {isCursor ? ICONS.triangleSmallRight : " "}
-          </Text>
+          <Text color={ACCENT}>{isCursor ? ICONS.triangleRight : " "}</Text>
         </Box>
         <Box flexShrink={0} width={centeredLabelWidth}>
           <Text bold={isCursor}>{option.label}</Text>
@@ -2149,7 +2581,7 @@ function SelectPromptOptionRow({
   return (
     <Box flexDirection="row" height={1} overflow="hidden">
       <Box flexShrink={0} width={3}>
-        <Text color={ACCENT}>{isCursor ? ICONS.triangleSmallRight : " "}</Text>
+        <Text color={ACCENT}>{isCursor ? ICONS.triangleRight : " "}</Text>
       </Box>
       <Text bold={isCursor}>{option.label}</Text>
       {option.hint !== undefined && option.hint !== "" ? (
@@ -2535,7 +2967,7 @@ function MultiSelectPromptOptionRow({
           width="100%"
         >
           <Text color={ACCENT}>
-            {isCursor ? `${ICONS.triangleSmallRight} ` : "  "}
+            {isCursor ? `${ICONS.triangleRight} ` : "  "}
           </Text>
           <Text color={markerColor}>{marker} </Text>
           <MultiSelectOptionLabel
@@ -2556,9 +2988,7 @@ function MultiSelectPromptOptionRow({
     <Box flexDirection="column" width="100%">
       <Box flexDirection="row" height={1} overflow="hidden">
         <Box flexShrink={0} width={3}>
-          <Text color={ACCENT}>
-            {isCursor ? ICONS.triangleSmallRight : " "}
-          </Text>
+          <Text color={ACCENT}>{isCursor ? ICONS.triangleRight : " "}</Text>
         </Box>
         <Text color={markerColor}>{marker} </Text>
         <MultiSelectOptionLabel

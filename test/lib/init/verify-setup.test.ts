@@ -140,13 +140,14 @@ describe("verifySetup", () => {
     );
     const { ui, calls } = createMockUI();
 
-    await expect(
-      verifySetup(
-        { status: "success", result: { platform: "javascript-nextjs" } },
-        ui,
-        tmpDir
-      )
-    ).resolves.toBeUndefined();
+    const result = await verifySetup(
+      { status: "success", result: { platform: "javascript-nextjs" } },
+      ui,
+      tmpDir
+    );
+    // The SDK never phoned home, so nothing to verify or deep-link.
+    expect(result.verified).toBe(false);
+    expect(result.eventId).toBeUndefined();
 
     expect(calls).toContainEqual({
       kind: "log.warn",
