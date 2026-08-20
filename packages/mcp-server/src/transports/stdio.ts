@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 /**
  * Standard I/O Transport for MCP Server.
  *
@@ -19,7 +19,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
  * await startStdio(server, context);
  * ```
  */
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { LIB_VERSION } from "@sentry/mcp-core/version";
 import * as Sentry from "@sentry/node";
 

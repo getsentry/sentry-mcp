@@ -70,6 +70,20 @@ For self-hosted instances without TLS:
 npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.internal:9000 --insecure-http
 ```
 
+#### Biscuit Mode (Experimental)
+
+Use `--biscuit-mode` to mint an ephemeral biscuit agent token at startup. This
+downsopes the session to read-only by default and prompts the user for approval
+(via URL elicitation) when a write operation is attempted.
+
+```shell
+npx @sentry/mcp-server@latest --biscuit-mode --organization-slug=my-org
+```
+
+Requires `--organization-slug`. The regular auth token (from device code flow or
+`--access-token`) is used once at startup to mint the biscuit, then all
+subsequent tool calls use the scoped biscuit token.
+
 #### Remote with an Explicit Sentry Token
 
 Remote clients that support custom HTTP headers can pass an upstream Sentry API

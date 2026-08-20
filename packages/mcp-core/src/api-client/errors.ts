@@ -124,9 +124,17 @@ export class ApiClientError extends ApiError {
  * Includes special handling for multi-project access errors.
  */
 export class ApiPermissionError extends ApiClientError {
-  constructor(message: string, detail?: string, responseBody?: unknown) {
+  public readonly requiredScopes?: string[];
+
+  constructor(
+    message: string,
+    detail?: string,
+    responseBody?: unknown,
+    requiredScopes?: string[],
+  ) {
     super(message, 403, detail, responseBody);
     this.name = "ApiPermissionError";
+    this.requiredScopes = requiredScopes;
     Object.setPrototypeOf(this, ApiPermissionError.prototype);
   }
 
@@ -246,11 +254,26 @@ export class ApiServerError extends ApiError {
  * This centralizes the logic for determining which error class to instantiate.
  * This is only used for actual API responses, so status is required.
  */
+/**
+ * Parse scope names from an RFC 6750 WWW-Authenticate header.
+ * Example: Bearer error="insufficient_scope", scope="event:write org:read"
+ */
+export function parseScopesFromWwwAuthenticate(
+  header: string | null | undefined,
+): string[] | undefined {
+  if (!header) return undefined;
+  const match = /scope="([^"]+)"/.exec(header);
+  if (!match) return undefined;
+  const scopes = match[1].split(/\s+/).filter(Boolean);
+  return scopes.length > 0 ? scopes : undefined;
+}
+
 export function createApiError(
   message: string,
   status: number,
   detail?: string,
   responseBody?: unknown,
+  wwwAuthenticate?: string | null,
 ): ApiError {
   // Apply message improvements for known error patterns
   let improvedMessage = message;
@@ -273,7 +296,12 @@ export function createApiError(
       return new ApiAuthenticationError(message, detail, responseBody);
 
     case 403:
-      return new ApiPermissionError(message, detail, responseBody);
+      return new ApiPermissionError(
+        message,
+        detail,
+        responseBody,
+        parseScopesFromWwwAuthenticate(wwwAuthenticate),
+      );
 
     case 404:
       // TODO: Could extract resource type/ID from the request context

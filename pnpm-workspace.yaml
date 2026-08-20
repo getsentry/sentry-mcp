@@ -90,3 +90,6 @@ minimumReleaseAgeExclude:
   - '@ai-sdk/react@3.0.232'
   - ai@6.0.230
   - agents@0.20.1
+
+patchedDependencies:
+  '@modelcontextprotocol/server': patches/@modelcontextprotocol__server.patch

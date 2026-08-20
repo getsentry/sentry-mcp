@@ -20,7 +20,14 @@
  * ```
  */
 
+import { randomUUID } from "node:crypto";
 import { buildServer } from "@sentry/mcp-core/server";
+import {
+  BiscuitTokenManager,
+  isBiscuitToken,
+  type BiscuitTokenInfo,
+} from "@sentry/mcp-core/auth";
+import { mintBiscuitToken } from "./auth/mint-biscuit";
 import { startStdio } from "./transports/stdio";
 import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "@sentry/mcp-core/version";
@@ -90,6 +97,45 @@ async function main() {
   const cfg = await resolveAccessToken(partialCfg).catch((err) => {
     die(err instanceof Error ? err.message : String(err));
   });
+
+  // Bootstrap biscuit token manager: either wrap an existing sntryb_ token
+  // or mint a new one from the regular auth token when --biscuit-mode is set.
+  let biscuitTokenManager: BiscuitTokenManager | undefined;
+  if (cli.biscuitMode || isBiscuitToken(cfg.accessToken)) {
+    if (!cfg.organizationSlug) {
+      die("--organization-slug is required for biscuit mode");
+    }
+
+    const sessionId = randomUUID();
+    let tokenInfo: BiscuitTokenInfo;
+
+    if (isBiscuitToken(cfg.accessToken)) {
+      tokenInfo = {
+        token: cfg.accessToken,
+        expiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+        scopes: [],
+        maxScopes: [],
+      };
+    } else {
+      console.warn("Minting biscuit token...");
+      tokenInfo = await mintBiscuitToken({
+        accessToken: cfg.accessToken,
+        organizationSlug: cfg.organizationSlug,
+        sessionId,
+        sentryHost: cfg.sentryHost,
+        sentryProtocol: cfg.sentryProtocol,
+      });
+      console.warn("Biscuit token minted successfully.");
+    }
+
+    biscuitTokenManager = new BiscuitTokenManager({
+      initialToken: tokenInfo,
+      organizationSlug: cfg.organizationSlug,
+      sessionId,
+      sentryHost: cfg.sentryHost,
+      sentryProtocol: cfg.sentryProtocol,
+    });
+  }
 
   // Configure embedded agent provider
   if (cfg.agentProvider) {
@@ -304,7 +350,6 @@ async function main() {
       (process.env.NODE_ENV !== "production" ? "development" : "production"),
   });
 
-
   // Log experimental mode status
   if (cli.experimental) {
     console.warn(
@@ -341,7 +386,7 @@ async function main() {
   });
 
   const context = {
-    accessToken: cfg.accessToken,
+    accessToken: biscuitTokenManager?.getCurrentToken() ?? cfg.accessToken,
     grantedSkills: cfg.finalSkills,
     constraints: {
       organizationSlug: cfg.organizationSlug ?? null,
@@ -354,6 +399,7 @@ async function main() {
     openaiBaseUrl: cfg.openaiBaseUrl,
     experimentalMode: cli.experimental,
     transport: "stdio" as const,
+    biscuitTokenManager,
   };
 
   // Build server with context to filter tools based on granted skills
@@ -361,6 +407,7 @@ async function main() {
   const server = buildServer({
     context,
     experimentalMode: cli.experimental,
+    sdkVersion: "v2",
   });
 
   startStdio(server, context).catch(async (err) => {

@@ -1,0 +1,28 @@
+diff --git a/dist/mcp-D7GmuPnv.cjs b/dist/mcp-D7GmuPnv.cjs
+index 275f8337354523bb679eea70d0b7cfbff8eb7e99..91b22160c3dd7ce393b618a6aeda03e98afa98d1 100644
+--- a/dist/mcp-D7GmuPnv.cjs
++++ b/dist/mcp-D7GmuPnv.cjs
+@@ -889,8 +889,7 @@ var Server = class extends require_src.Protocol {
+ 			result = await handler(request, ctxForHandler);
+ 		} catch (error) {
+ 			if (error instanceof require_src.ProtocolError && error.code === require_src.ProtocolErrorCode.UrlElicitationRequired) {
+-				if (!servedModern) throw error;
+-				throw new require_src.ProtocolError(require_src.ProtocolErrorCode.InternalError, `URL elicitation cannot be signalled by throwing UrlElicitationRequiredError on protocol revision ${this._negotiatedProtocolVersion}: return inputRequired({ inputRequests: { …: inputRequired.elicitUrl(...) } }) from the handler instead. The urlElicitationRequired error (-32042) of earlier revisions is not available on this revision.`);
++				throw error;
+ 			}
+ 			throw error;
+ 		}
+diff --git a/dist/mcp-DXXb3Vv3.mjs b/dist/mcp-DXXb3Vv3.mjs
+index 49d5128ad085cc2339925155bf3130109c3b0ff4..1828223a61bd5ed0a19c6a459d06e26ed20667e4 100644
+--- a/dist/mcp-DXXb3Vv3.mjs
++++ b/dist/mcp-DXXb3Vv3.mjs
+@@ -887,8 +887,7 @@ var Server = class extends Protocol {
+ 			result = await handler(request, ctxForHandler);
+ 		} catch (error) {
+ 			if (error instanceof ProtocolError && error.code === ProtocolErrorCode.UrlElicitationRequired) {
+-				if (!servedModern) throw error;
+-				throw new ProtocolError(ProtocolErrorCode.InternalError, `URL elicitation cannot be signalled by throwing UrlElicitationRequiredError on protocol revision ${this._negotiatedProtocolVersion}: return inputRequired({ inputRequests: { …: inputRequired.elicitUrl(...) } }) from the handler instead. The urlElicitationRequired error (-32042) of earlier revisions is not available on this revision.`);
++				throw error;
+ 			}
+ 			throw error;
+ 		}

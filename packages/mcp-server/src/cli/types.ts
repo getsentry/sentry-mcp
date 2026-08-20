@@ -17,6 +17,7 @@ export type CliArgs = {
   allSkills?: boolean;
   disableSkills?: string;
   experimental?: boolean;
+  biscuitMode?: boolean;
   organizationSlug?: string;
   projectSlug?: string;
   help?: boolean;
@@ -55,6 +56,7 @@ export type MergedArgs = {
   allSkills?: boolean;
   disableSkills?: string;
   experimental?: boolean;
+  biscuitMode?: boolean;
   organizationSlug?: string;
   projectSlug?: string;
   help?: boolean;

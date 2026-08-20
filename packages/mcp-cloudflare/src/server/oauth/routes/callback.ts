@@ -287,13 +287,22 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   const sessionStartedAt = Date.now();
   const userLabel = getUpstreamUserLabel(payload);
 
-  // --- Biscuit agent token bootstrap (hackweek POC) ---
-  // When enabled, mint a biscuit using the raw Sentry token, store
-  // the biscuit as the session's accessToken, then discard the raw token.
+  // --- Biscuit agent token bootstrap ---
+  // If the token exchange returned a biscuit directly (agent app), use it.
+  // Otherwise fall back to the legacy separate-mint path.
   let effectiveAccessToken = payload.access_token;
   let biscuitProps: Partial<WorkerProps> = {};
 
-  if (c.env.BISCUIT_AGENT_TOKENS === "1" && constraintOrganizationSlug) {
+  if (payload.token_format === "biscuit" && payload.biscuit_session_id) {
+    effectiveAccessToken = payload.access_token;
+    biscuitProps = {
+      tokenType: "biscuit",
+      biscuitSessionId: payload.biscuit_session_id,
+      biscuitMaxScopes: payload.biscuit_max_scopes,
+      biscuitExpiresAt: payload.biscuit_expires_at,
+    };
+  } else if (c.env.BISCUIT_AGENT_TOKENS === "1" && constraintOrganizationSlug) {
+    // Legacy fallback: mint biscuit via separate HTTP call
     const biscuitSessionId = crypto.randomUUID();
     try {
       const mintUrl = `${sentryBaseUrl(c.env)}/api/0/organizations/${constraintOrganizationSlug}/agent/biscuit-token/`;

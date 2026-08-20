@@ -22,6 +22,7 @@ Common optional flags:
   --insecure-http         Use http:// for self-hosted --host values
   --sentry-dsn <dsn>      Override DSN used for telemetry reporting
   --experimental          Enable forward-looking tool variants and experimental features
+  --biscuit-mode          Mint an ephemeral biscuit token at startup (requires --organization-slug)
 
 Embedded agent configuration:
   --agent-provider <provider>   LLM provider: openai, azure-openai, anthropic, or openrouter (auto-detects from API keys)

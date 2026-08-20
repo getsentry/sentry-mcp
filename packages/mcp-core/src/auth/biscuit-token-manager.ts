@@ -78,12 +78,6 @@ export class BiscuitTokenManager {
 
   async refresh(requestedScopes?: string[]): Promise<BiscuitTokenInfo | null> {
     const url = `${this.sentryProtocol}://${this.sentryHost}/api/0/organizations/${this.organizationSlug}/agent/biscuit-token/refresh/`;
-    console.log(
-      "[biscuit-refresh] calling refresh:",
-      url,
-      "requestedScopes:",
-      requestedScopes,
-    );
     try {
       const body: Record<string, unknown> = {};
       if (requestedScopes) {
@@ -98,20 +92,12 @@ export class BiscuitTokenManager {
         body: JSON.stringify(body),
       });
       if (!response.ok) {
-        const errBody = await response.text().catch(() => "<unreadable>");
-        console.log(
-          "[biscuit-refresh] refresh failed:",
-          response.status,
-          errBody,
-        );
         return null;
       }
       const data = (await response.json()) as BiscuitTokenInfo;
-      console.log("[biscuit-refresh] refresh succeeded, scopes:", data.scopes);
       this.current = data;
       return data;
-    } catch (err) {
-      console.log("[biscuit-refresh] refresh threw:", String(err));
+    } catch {
       return null;
     }
   }
@@ -121,15 +107,7 @@ export class BiscuitTokenManager {
    * If a write grant exists on the backend, the token comes back elevated.
    */
   async tryElevateViaRefresh(): Promise<boolean> {
-    console.log(
-      "[biscuit-refresh] tryElevateViaRefresh called, maxScopes:",
-      this.current.maxScopes,
-    );
     const result = await this.refresh(this.current.maxScopes);
-    console.log(
-      "[biscuit-refresh] refresh result:",
-      result ? { scopes: result.scopes } : null,
-    );
     if (!result) return false;
     return result.scopes.length > this.baselineCount();
   }
@@ -153,7 +131,6 @@ export class BiscuitTokenManager {
     requestedScopes: string[],
   ): Promise<{ elevationId: string; url: string; expiresAt: string } | null> {
     const url = `${this.sentryProtocol}://${this.sentryHost}/api/0/organizations/${this.organizationSlug}/agent/biscuit-token/elevation/`;
-    console.log("[biscuit-elevation] Creating elevation request:", url);
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -163,17 +140,8 @@ export class BiscuitTokenManager {
         },
         body: JSON.stringify({ requestedScopes }),
       });
-      console.log(
-        "[biscuit-elevation] Elevation response status:",
-        response.status,
-      );
       if (!response.ok) {
         const body = await response.text().catch(() => "<unreadable>");
-        console.log(
-          "[biscuit-elevation] Elevation failed:",
-          response.status,
-          body,
-        );
         logWarn(`Elevation request failed: ${response.status}`, {
           loggerScope: ["biscuit", "elevation"],
           extra: { status: response.status, body, url },

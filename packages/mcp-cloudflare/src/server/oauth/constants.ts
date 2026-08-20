@@ -24,4 +24,10 @@ export const TokenResponseSchema = z.object({
     name: z.string().nullable(),
   }),
   scope: z.string(),
+  // Agent biscuit token fields (present when app is_agent + org-scoped)
+  token_format: z.string().optional(),
+  biscuit_session_id: z.string().optional(),
+  biscuit_scopes: z.array(z.string()).optional(),
+  biscuit_max_scopes: z.array(z.string()).optional(),
+  biscuit_expires_at: z.string().optional(),
 });

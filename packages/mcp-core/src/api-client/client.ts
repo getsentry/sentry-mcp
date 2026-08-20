@@ -824,6 +824,8 @@ export class SentryApiService {
         });
       }
 
+      const wwwAuthenticate = response.headers?.get?.("www-authenticate");
+
       if (parsed) {
         const { data, success, error } = ApiErrorSchema.safeParse(parsed);
 
@@ -834,6 +836,7 @@ export class SentryApiService {
             response.status,
             data.detail,
             parsed,
+            wwwAuthenticate,
           );
         }
 
@@ -860,6 +863,7 @@ export class SentryApiService {
         response.status,
         errorText,
         undefined,
+        wwwAuthenticate,
       );
     }
 

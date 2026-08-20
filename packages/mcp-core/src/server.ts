@@ -20,7 +20,13 @@ import { McpServer as LegacyMcpServer } from "@modelcontextprotocol/sdk/server/m
  * ```
  */
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
+import {
+  McpServer as ModernMcpServer,
+  UrlElicitationRequiredError,
+  inputRequired,
+  inputResponse,
+  type ServerContext as SdkServerContext,
+} from "@modelcontextprotocol/server";
 import {
   getActiveSpan,
   type SpanAttributeValue,
@@ -29,6 +35,7 @@ import {
   wrapMcpServerWithSentry,
 } from "@sentry/core";
 import {
+  ApiPermissionError,
   isApiAuthenticationErrorDeep,
   isApiPermissionErrorDeep,
 } from "./api-client";
@@ -51,6 +58,17 @@ import tools from "./tools/index";
 import type { StructuredToolOutput } from "./tools/types";
 import type { ServerContext } from "./types";
 import { LIB_VERSION } from "./version";
+
+/** Walk the cause chain and return the first ApiPermissionError, if any. */
+function findPermissionError(error: unknown): ApiPermissionError | undefined {
+  let current: unknown = error;
+  for (let i = 0; i < 3; i++) {
+    if (current instanceof ApiPermissionError) return current;
+    if (!(current instanceof Error)) return undefined;
+    current = current.cause;
+  }
+  return undefined;
+}
 
 function getSkillGrantedAttributeName(skill: Skill): string {
   return `app.consent.skill.${skill.replaceAll("-", "_")}.granted`;
@@ -260,7 +278,14 @@ function configureServer({
       outputSchema: tool.outputSchema,
       annotations: tool.annotations,
     };
-    const handleToolCall = async (params: unknown): Promise<CallToolResult> => {
+    const handleToolCall = async (
+      params: unknown,
+      rawCtx?: unknown,
+    ): Promise<CallToolResult> => {
+      // v2 SDK passes SdkServerContext; v1 passes RequestHandlerExtra
+      // (which lacks mcpReq). The optional chaining on sdkCtx?.mcpReq
+      // handles both cases safely.
+      const sdkCtx = rawCtx as SdkServerContext | undefined;
       // Get the active MCP server span and attach request-scoped attributes.
       const activeSpan = getActiveSpan();
 
@@ -315,6 +340,23 @@ function configureServer({
       setTag("app.server.mode.experimental", experimentalMode);
 
       try {
+        // If the user declined elevation on a previous inputRequired
+        // round-trip, return an error instead of re-executing.
+        if (sdkCtx?.mcpReq?.inputResponses) {
+          const resp = inputResponse(sdkCtx.mcpReq.inputResponses, "elevation");
+          if (resp.kind === "elicit" && resp.action !== "accept") {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "Permission elevation was declined.",
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
+
         // Always refresh the biscuit token before each tool call.
         // This serves two purposes: (1) picks up write grants if the
         // user approved elevation, and (2) keeps the per-request token
@@ -399,6 +441,11 @@ function configureServer({
           }
         }
 
+        // -32042 must propagate as a JSON-RPC error, not a tool result.
+        if (error instanceof UrlElicitationRequiredError) {
+          throw error;
+        }
+
         // Upstream 401 during a tool call — route via the transport so it
         // can revoke the MCP grant; swallow callback errors since the
         // formatted tool response still needs to land.
@@ -414,41 +461,61 @@ function configureServer({
         // Biscuit 403: insufficient scopes — create an elevation request
         // and ask the user to approve in-browser. The next tool call will
         // pick up the write grant via tryElevateViaRefresh() above.
-        //
-        // TODO: Once the Cloudflare transport supports stateful SSE
-        // sessions, switch to throwing UrlElicitationRequiredError so the
-        // client opens the browser automatically.
         const is403 = isApiPermissionErrorDeep(error);
         const hasBTM = !!context.biscuitTokenManager;
         const notElevated =
           hasBTM && !context.biscuitTokenManager!.isElevated();
         if (is403 && hasBTM && notElevated) {
           try {
+            // Extract the specific scope(s) the endpoint requires from the
+            // RFC 6750 WWW-Authenticate header, so we only ask the user to
+            // approve what's actually needed instead of all max scopes.
+            const permErr = findPermissionError(error);
             const maxScopes = context.biscuitTokenManager!.getMaxScopes();
+            const maxSet = new Set(maxScopes);
+            const requiredScopes = permErr?.requiredScopes?.filter((s) =>
+              maxSet.has(s),
+            );
+            const scopesToRequest =
+              requiredScopes && requiredScopes.length > 0
+                ? requiredScopes
+                : maxScopes;
             const elevation =
               await context.biscuitTokenManager!.createElevationRequest(
-                maxScopes,
+                scopesToRequest,
               );
 
             if (elevation) {
-              return {
-                content: [
-                  {
-                    type: "text" as const,
-                    text: [
-                      "This action requires elevated permissions.",
-                      "Please open the following URL to approve:",
-                      "",
-                      elevation.url,
-                      "",
-                      "After approving, retry the same tool call.",
-                    ].join("\n"),
+              // Stdio is bidirectional — the v2 SDK's legacy shim can
+              // push URL elicitation to 2025-era clients over the pipe.
+              if (context.transport === "stdio") {
+                return inputRequired({
+                  inputRequests: {
+                    elevation: inputRequired.elicitUrl({
+                      url: elevation.url,
+                      message:
+                        "This action requires elevated permissions. Please approve in your browser.",
+                    }),
                   },
-                ],
-                isError: true,
-              };
+                }) as unknown as CallToolResult;
+              }
+
+              // Throw -32042 UrlElicitationRequiredError so MCP clients
+              // (Claude Code, etc.) auto-open the approval URL in the browser.
+              throw new UrlElicitationRequiredError([
+                {
+                  mode: "url" as const,
+                  elicitationId: elevation.elevationId,
+                  url: elevation.url,
+                  message:
+                    "This action requires elevated permissions. Please approve in your browser.",
+                },
+              ]);
             }
           } catch (elevationErr) {
+            if (elevationErr instanceof UrlElicitationRequiredError) {
+              throw elevationErr;
+            }
             logWarn("Biscuit elevation request failed", {
               loggerScope: ["server", "elevation"],
               extra: { error: String(elevationErr) },

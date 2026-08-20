@@ -13,7 +13,11 @@
   "license": "FSL-1.1-ALv2",
   "author": "Sentry",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": ["sentry", "mcp", "model-context-protocol"],
+  "keywords": [
+    "sentry",
+    "mcp",
+    "model-context-protocol"
+  ],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -24,7 +28,9 @@
   "bin": {
     "sentry-mcp": "./dist/index.js"
   },
-  "files": ["./dist/*"],
+  "files": [
+    "./dist/*"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -45,6 +51,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
     "@sentry/node": "catalog:",
     "@sentry/core": "catalog:",
     "dotenv": "catalog:",

@@ -23,6 +23,7 @@ import {
 import { SCOPES } from "../../../constants";
 import { signState, type OAuthState } from "../state";
 import { logWarn } from "@sentry/mcp-core/telem/logging";
+import { getScopesForSkills, parseSkills } from "@sentry/mcp-core/skills";
 import { parseResourceMcpConstraints } from "../resource-scope";
 
 /**
@@ -39,13 +40,14 @@ async function redirectToUpstream(
   oauthReqInfo: AuthRequest | AuthRequestWithSkills,
   headers: HeadersInit = {},
   stateOverride?: string,
+  scopeOverride?: string,
 ) {
   const responseHeaders = new Headers(headers);
   responseHeaders.set(
     "location",
     getUpstreamAuthorizeUrl({
       upstream_url: new URL(SENTRY_AUTH_URL, sentryBaseUrl(env)).href,
-      scope: Object.keys(SCOPES).join(" "),
+      scope: scopeOverride ?? Object.keys(SCOPES).join(" "),
       client_id: env.SENTRY_CLIENT_ID,
       redirect_uri: new URL("/oauth/callback", request.url).href,
       state: stateOverride ?? btoa(JSON.stringify(oauthReqInfo)),
@@ -329,11 +331,21 @@ export default new Hono<{ Bindings: Env }>()
       },
     });
 
+    // Compute the Sentry API scopes that match the selected skills so we
+    // only request what the user actually approved on the MCP consent page.
+    const { valid: validSkills } = parseSkills(skills);
+    const scopeSet =
+      validSkills.size > 0
+        ? await getScopesForSkills(validSkills)
+        : new Set(Object.keys(SCOPES));
+    const scopeString = Array.from(scopeSet).join(" ");
+
     return redirectToUpstream(
       c.env,
       c.req.raw,
       oauthReqWithSkills,
       headers,
       signedState,
+      scopeString,
     );
   });

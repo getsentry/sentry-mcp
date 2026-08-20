@@ -20,6 +20,7 @@ export function parseArgv(argv: string[]): CliArgs {
     "all-skills": { type: "boolean" as const },
     "disable-skills": { type: "string" as const },
     experimental: { type: "boolean" as const },
+    "biscuit-mode": { type: "boolean" as const },
     help: { type: "boolean" as const, short: "h" as const },
     version: { type: "boolean" as const, short: "v" as const },
   };
@@ -69,6 +70,7 @@ export function parseArgv(argv: string[]): CliArgs {
     allSkills: values["all-skills"] === true,
     disableSkills: values["disable-skills"] as string | undefined,
     experimental: values.experimental === true,
+    biscuitMode: values["biscuit-mode"] === true,
     help: (values.help as boolean | undefined) === true,
     version: (values.version as boolean | undefined) === true,
     unknownArgs:
@@ -116,6 +118,7 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     allSkills: cli.allSkills === true,
     disableSkills: cli.disableSkills ?? env.disableSkills,
     experimental: cli.experimental === true,
+    biscuitMode: cli.biscuitMode === true,
     organizationSlug: cli.organizationSlug,
     projectSlug: cli.projectSlug,
     help: cli.help === true,
