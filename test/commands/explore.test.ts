@@ -886,17 +886,46 @@ describe("sentry explore", () => {
   });
 
   describe("validation", () => {
-    test("rejects --environment on non-replay datasets", async () => {
+    test("translates --environment into query filter terms on non-replay datasets", async () => {
       resolveTargetSpy.mockResolvedValue({ org: "test-org" });
+      queryEventsSpy.mockResolvedValue({
+        data: MOCK_EVENTS_RESPONSE,
+        nextCursor: undefined,
+      });
       const { context } = createContext();
 
-      await expect(
-        func.call(
-          context,
-          { ...DEFAULT_FLAGS, environment: ["production"] },
-          "test-org/"
-        )
-      ).rejects.toThrow(ValidationError);
+      await func.call(
+        context,
+        { ...DEFAULT_FLAGS, environment: ["production"] },
+        "test-org/"
+      );
+
+      expect(queryEventsSpy).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({ query: "environment:production" })
+      );
+    });
+
+    test("translates multiple --environment values into environment:[...] syntax", async () => {
+      resolveTargetSpy.mockResolvedValue({ org: "test-org" });
+      queryEventsSpy.mockResolvedValue({
+        data: MOCK_EVENTS_RESPONSE,
+        nextCursor: undefined,
+      });
+      const { context } = createContext();
+
+      await func.call(
+        context,
+        { ...DEFAULT_FLAGS, environment: ["production", "canary"] },
+        "test-org/"
+      );
+
+      expect(queryEventsSpy).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({
+          query: "environment:[production,canary]",
+        })
+      );
     });
 
     test("rejects replay detail-only fields on the replay dataset", async () => {
