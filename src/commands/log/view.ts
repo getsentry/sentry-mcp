@@ -27,7 +27,12 @@ import {
 import { formatLogDetails } from "../../lib/formatters/index.js";
 import { filterFields } from "../../lib/formatters/json.js";
 import { CommandOutput } from "../../lib/formatters/output.js";
-import { ageInDaysFromUuidV7, validateHexId } from "../../lib/hex-id.js";
+import {
+  ageInDaysFromUuidV7,
+  HEX_ID_RE,
+  normalizeHexId,
+  validateHexId,
+} from "../../lib/hex-id.js";
 import {
   handleRecoveryResult,
   recoverHexId,
@@ -65,6 +70,29 @@ type ViewFlags = {
 const USAGE_HINT = "sentry log view <org>/<project> <log-id> [<log-id>...]";
 
 /**
+ * Resolve a single-slash positional arg (`before/after`) as `org/log-id`, or
+ * return `null` when `after` is not a valid 32-char hex log ID and should fall
+ * through to `parseSlashSeparatedArg`.
+ *
+ * This guard must run before `parseSlashSeparatedArg` because that function
+ * throws `ContextError` for any single-slash arg, treating it as `org/project`
+ * with a missing log ID (CLI-1AK).
+ */
+function parseSingleSlashLogArg(
+  beforeSlash: string,
+  afterSlash: string
+): { rawLogIds: string[]; targetArg: string | undefined } | null {
+  // "org/LOG-ID" or "project/LOG-ID" → treat beforeSlash as target, afterSlash as log ID.
+  if (afterSlash && HEX_ID_RE.test(normalizeHexId(afterSlash))) {
+    return {
+      rawLogIds: [normalizeHexId(afterSlash)],
+      targetArg: beforeSlash || undefined,
+    };
+  }
+  return null;
+}
+
+/**
  * Parse positional arguments for log view.
  * Handles:
  * - `<log-id>` — single log ID (auto-detect org/project)
@@ -84,6 +112,7 @@ const USAGE_HINT = "sentry log view <org>/<project> <log-id> [<log-id>...]";
  * @returns Parsed raw log IDs and optional target arg
  * @throws {ContextError} If no arguments provided
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: positional arg parsing has many format branches by design
 export function parsePositionalArgs(args: string[]): {
   rawLogIds: string[];
   targetArg: string | undefined;
@@ -100,8 +129,25 @@ export function parsePositionalArgs(args: string[]): {
   }
 
   if (args.length === 1) {
-    // Single arg — could be slash-separated org/project/logId or a plain ID
-    // (possibly containing newlines)
+    // Single arg — could be slash-separated org/project/logId, org/logId, or a plain ID
+    // (possibly containing newlines).
+    // Guard: detect exactly-one-slash args before parseSlashSeparatedArg, which
+    // throws ContextError for "org/logId" thinking it's "org/project" with no ID.
+    const trimmedFirst = first.trim();
+    const slashIdx = trimmedFirst.indexOf("/");
+    if (slashIdx !== -1 && trimmedFirst.indexOf("/", slashIdx + 1) === -1) {
+      const singleSlash = parseSingleSlashLogArg(
+        trimmedFirst.slice(0, slashIdx),
+        trimmedFirst.slice(slashIdx + 1)
+      );
+      if (singleSlash) {
+        if (singleSlash.rawLogIds.length === 0) {
+          throw new ContextError("Log ID", USAGE_HINT, []);
+        }
+        return singleSlash;
+      }
+    }
+
     const { id, targetArg } = parseSlashSeparatedArg(
       first,
       "Log ID",
