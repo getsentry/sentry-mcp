@@ -2,6 +2,9 @@ export type DirEntry = {
   name: string;
   path: string;
   type: "file" | "directory";
+  /** File size in bytes; omitted for directories. Lets the agent skip huge
+   *  files without reading them, like `ls -l`. */
+  size?: number;
 };
 
 export type ExistingProjectData = {

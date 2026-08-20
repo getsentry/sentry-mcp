@@ -36,10 +36,17 @@ export async function listDir(payload: ListDirPayload): Promise<ToolResult> {
     maxDepth,
     maxEntries,
     recursive,
+    truncated: false,
   };
 
   await walkDirectory(targetPath, 0, state);
-  return { ok: true, data: { entries: state.entries } };
+  return {
+    ok: true,
+    data: {
+      entries: state.entries,
+      ...(state.truncated ? { truncated: true } : {}),
+    },
+  };
 }
 
 type WalkState = {
@@ -49,13 +56,14 @@ type WalkState = {
   maxDepth: number;
   maxEntries: number;
   recursive: boolean;
+  truncated: boolean;
 };
 
-async function readDirEntries(dir: string): Promise<fs.Dirent[]> {
+async function readDirEntries(dir: string): Promise<fs.Dirent[] | undefined> {
   try {
     return await fs.promises.readdir(dir, { withFileTypes: true });
   } catch {
-    return [];
+    return;
   }
 }
 
@@ -93,11 +101,32 @@ function toDirEntry(
     }
   }
 
+  if (entry.isDirectory()) {
+    return {
+      name: entry.name,
+      path: normalizePath(relNative),
+      type: "directory",
+    };
+  }
+
+  // Only regular files carry size. lstat avoids following a path that changed
+  // into a symlink after readdir; special files are never opened.
   return {
     name: entry.name,
     path: normalizePath(relNative),
-    type: entry.isDirectory() ? "directory" : "file",
+    type: "file",
+    ...(entry.isFile() ? fileSize(abs) : {}),
   };
+}
+
+/** Return a regular file's byte size without opening or reading its contents. */
+function fileSize(abs: string): { size?: number } {
+  try {
+    const stat = fs.lstatSync(abs);
+    return stat.isFile() ? { size: stat.size } : {};
+  } catch {
+    return {};
+  }
 }
 
 async function walkDirectory(
@@ -106,11 +135,19 @@ async function walkDirectory(
   state: WalkState
 ): Promise<void> {
   if (depth > state.maxDepth || state.entries.length >= state.maxEntries) {
+    state.truncated = true;
     return;
   }
 
-  for (const entry of await readDirEntries(dir)) {
+  const entries = await readDirEntries(dir);
+  if (!entries) {
+    state.truncated = true;
+    return;
+  }
+
+  for (const entry of entries) {
     if (state.entries.length >= state.maxEntries) {
+      state.truncated = true;
       return;
     }
     const nextEntry = toDirEntry(state, dir, entry);
@@ -119,7 +156,11 @@ async function walkDirectory(
     }
     state.entries.push(nextEntry);
     if (shouldRecurseInto(entry, state)) {
-      await walkDirectory(dir + NATIVE_SEP + entry.name, depth + 1, state);
+      if (depth >= state.maxDepth) {
+        state.truncated = true;
+      } else {
+        await walkDirectory(dir + NATIVE_SEP + entry.name, depth + 1, state);
+      }
     }
   }
 }
