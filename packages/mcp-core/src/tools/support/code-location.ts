@@ -1,5 +1,6 @@
 import {
   ApiClientError,
+  ApiServerError,
   ErrorEntrySchema,
   type SentryApiService,
   ThreadsEntrySchema,
@@ -11,7 +12,7 @@ import {
   type Frame,
   findMostRelevantInAppFrame,
 } from "../../internal/code-location";
-import { logIssue } from "../../telem/logging";
+import { logIssue, logWarn } from "../../telem/logging";
 
 const CODE_LOCATION_TIMEOUT_MS = 3000;
 
@@ -89,21 +90,28 @@ export async function resolveCodeLocation({
       url: sourceUrl,
     };
   } catch (error) {
-    if (
-      !controller.signal.aborted &&
-      !(error instanceof ApiClientError) &&
-      !(error instanceof ConfigurationError)
-    ) {
-      logIssue(error, {
-        loggerScope: ["tools", "get-issue-details", "code-location"],
-        contexts: {
-          request: {
-            organizationSlug,
-            projectSlug,
-            groupId: event.groupID,
+    if (!controller.signal.aborted) {
+      if (error instanceof ApiServerError) {
+        // 5xx from stacktrace-link is expected (e.g. unresolvable browser URLs);
+        // log as a warning for observability without creating a Sentry issue.
+        logWarn(error, {
+          loggerScope: ["tools", "get-issue-details", "code-location"],
+        });
+      } else if (
+        !(error instanceof ApiClientError) &&
+        !(error instanceof ConfigurationError)
+      ) {
+        logIssue(error, {
+          loggerScope: ["tools", "get-issue-details", "code-location"],
+          contexts: {
+            request: {
+              organizationSlug,
+              projectSlug,
+              groupId: event.groupID,
+            },
           },
-        },
-      });
+        });
+      }
     }
     return undefined;
   } finally {
