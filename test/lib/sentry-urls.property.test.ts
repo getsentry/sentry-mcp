@@ -22,11 +22,13 @@ import {
   buildLogsUrl,
   buildOrgSettingsUrl,
   buildOrgUrl,
+  buildProjectIssuesUrl,
   buildProjectUrl,
   buildSeerSettingsUrl,
   buildTraceUrl,
   getOrgBaseUrl,
   isSentrySaasUrl,
+  parseOrgProjectFromSettingsUrl,
 } from "../../src/lib/sentry-urls.js";
 import { DEFAULT_NUM_RUNS } from "../model-based/helpers.js";
 
@@ -78,6 +80,9 @@ const traceIdArb = stringMatching(/^[a-f0-9]{32}$/);
 
 /** Valid dashboard IDs (numeric strings) */
 const dashboardIdArb = stringMatching(/^[1-9][0-9]{0,8}$/);
+
+/** Valid project IDs (numeric strings, same shape as other Sentry IDs) */
+const projectIdArb = stringMatching(/^[1-9][0-9]{0,8}$/);
 
 /** Common Sentry regions */
 const sentryRegionArb = constantFrom("us", "de", "eu", "staging");
@@ -296,6 +301,75 @@ describe("buildEventSearchUrl properties", () => {
       }),
       { numRuns: DEFAULT_NUM_RUNS }
     );
+  });
+});
+
+describe("buildProjectIssuesUrl properties", () => {
+  test("with a project ID, output filters the Issues stream by project", async () => {
+    await fcAssert(
+      property(tuple(slugArb, projectIdArb), ([orgSlug, projectId]) => {
+        const result = buildProjectIssuesUrl(orgSlug, projectId);
+        expect(result).toBe(
+          `${getOrgBaseUrl(orgSlug)}/issues/?project=${projectId}`
+        );
+        expect(new URL(result).searchParams.get("project")).toBe(projectId);
+      }),
+      { numRuns: DEFAULT_NUM_RUNS }
+    );
+  });
+
+  test("without a project ID, output is the org-wide Issues stream", async () => {
+    await fcAssert(
+      property(slugArb, (orgSlug) => {
+        const result = buildProjectIssuesUrl(orgSlug);
+        expect(result).toBe(`${getOrgBaseUrl(orgSlug)}/issues/`);
+      }),
+      { numRuns: DEFAULT_NUM_RUNS }
+    );
+  });
+
+  test("output is a valid URL that points at the Issues stream", async () => {
+    await fcAssert(
+      property(tuple(slugArb, projectIdArb), ([orgSlug, projectId]) => {
+        const result = buildProjectIssuesUrl(orgSlug, projectId);
+        expect(() => new URL(result)).not.toThrow();
+        expect(new URL(result).pathname).toBe("/issues/");
+      }),
+      { numRuns: DEFAULT_NUM_RUNS }
+    );
+  });
+});
+
+describe("parseOrgProjectFromSettingsUrl properties", () => {
+  test("round-trips org and project through a settings URL (SaaS)", async () => {
+    await fcAssert(
+      property(tuple(slugArb, slugArb), ([orgSlug, projectSlug]) => {
+        const url = buildProjectUrl(orgSlug, projectSlug);
+        expect(parseOrgProjectFromSettingsUrl(url)).toEqual({
+          orgSlug,
+          projectSlug,
+        });
+      }),
+      { numRuns: DEFAULT_NUM_RUNS }
+    );
+  });
+
+  test("round-trips org and project through a settings URL (self-hosted)", async () => {
+    process.env.SENTRY_URL = "https://sentry.example.com";
+    await fcAssert(
+      property(tuple(slugArb, slugArb), ([orgSlug, projectSlug]) => {
+        const url = buildProjectUrl(orgSlug, projectSlug);
+        expect(parseOrgProjectFromSettingsUrl(url)).toEqual({
+          orgSlug,
+          projectSlug,
+        });
+      }),
+      { numRuns: DEFAULT_NUM_RUNS }
+    );
+  });
+
+  test("returns empty for unparseable input", () => {
+    expect(parseOrgProjectFromSettingsUrl("not a url")).toEqual({});
   });
 });
 

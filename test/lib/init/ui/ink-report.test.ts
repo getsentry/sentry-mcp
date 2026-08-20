@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { stripAnsi } from "../../../../src/lib/formatters/plain-detect.js";
 import {
   formatFailureReport,
+  formatSuccessExitLine,
   formatSuccessReport,
 } from "../../../../src/lib/init/ui/ink-report.js";
 
@@ -252,5 +253,53 @@ describe("Ink post-dispose feedback reports", () => {
       ].join("\n")
     );
     expect(output.endsWith("\n")).toBe(true);
+  });
+});
+
+describe("formatSuccessExitLine", () => {
+  const baseCompletion = {
+    projectName: "my-app",
+    features: [],
+    featureBlurbs: [],
+    changedFileCount: 3,
+    issuesUrl: "https://acme.sentry.io/issues/",
+    agentInstallCommand: "npx @sentry/ai install",
+  };
+
+  test("is a compact confirmation — no changed-files or feature dump", () => {
+    const output = stripAnsi(
+      formatSuccessExitLine({
+        fields: [{ label: "Platform", value: "next.js" }],
+        changedFiles: [{ action: "create", path: "instrument.ts" }],
+        featureBlurbs: [{ label: "Errors", blurb: "Captures exceptions." }],
+        completion: { ...baseCompletion, verification: { received: false } },
+      })
+    );
+    expect(output).toContain("Sentry is watching my-app");
+    expect(output).toContain("See your first error");
+    expect(output).toContain("https://acme.sentry.io/issues/");
+    // The full summary stays on the interactive screen, not the exit echo.
+    expect(output).not.toContain("Here's what we set up");
+    expect(output).not.toContain("Changed files");
+    expect(output).not.toContain("instrument.ts");
+    // No feedback prompt chained onto the success exit.
+    expect(output).not.toContain("sentry cli feedback");
+  });
+
+  test("celebrates and deep-links the event when verified", () => {
+    const output = stripAnsi(
+      formatSuccessExitLine({
+        fields: [],
+        completion: {
+          ...baseCompletion,
+          verification: {
+            received: true,
+            eventUrl: "https://acme.sentry.io/issues/?query=event.id:abc",
+          },
+        },
+      })
+    );
+    expect(output).toContain("View your first event");
+    expect(output).toContain("event.id:abc");
   });
 });

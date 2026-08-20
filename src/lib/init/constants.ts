@@ -11,6 +11,9 @@ export const INIT_REQUEST_CONFLICT_CODE = "init_request_conflict" as const;
 
 export const SENTRY_DOCS_URL = "https://docs.sentry.io/platforms/";
 
+/** Command that installs the Sentry coding-agent plugin (skills) into detected agents. */
+export const SENTRY_AGENT_INSTALL_COMMAND = "npx @sentry/ai install";
+
 export const MAX_FILE_BYTES = 262_144; // 256KB per file
 export const MAX_OUTPUT_BYTES = 65_536; // 64KB stdout/stderr truncation
 export const DEFAULT_COMMAND_TIMEOUT_MS = 120_000; // 2 minutes

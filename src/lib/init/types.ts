@@ -277,8 +277,28 @@ export type WizardOutput = {
   exitCode?: number;
   docsUrl?: string;
   sentryProjectUrl?: string;
+  orgSlug?: string;
+  projectSlug?: string;
+  projectId?: string;
   message?: string;
   featureBlurbs?: Array<{ feature: string; blurb: string }>;
+};
+
+/**
+ * Sentry project identity captured locally during the run.
+ *
+ * The CLI creates (or resolves) the Sentry project itself via the
+ * `create-sentry-project` / `ensure-sentry-project` tool, so it already knows
+ * the org/project identifiers first-hand — the server does not need to echo
+ * them back in the final output. Captured from the tool result in the wizard
+ * runner and used to build the Issues / event URLs on the completion screen.
+ */
+export type SentryProjectIdentity = {
+  orgSlug: string;
+  projectSlug: string;
+  projectId: string;
+  dsn?: string;
+  url?: string;
 };
 
 // Interactive payloads

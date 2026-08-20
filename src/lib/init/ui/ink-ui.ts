@@ -46,6 +46,7 @@
  * as `dist/ink-app.js` alongside the CJS bundle.
  */
 
+import { spawn } from "node:child_process";
 import { openSync } from "node:fs";
 import { createRequire } from "node:module";
 import { ReadStream } from "node:tty";
@@ -54,6 +55,7 @@ const _require = createRequire(import.meta.url);
 
 import { setTag } from "@sentry/node-core/light";
 import { FULL_BANNER_LINES } from "../../banner.js";
+import { openBrowser } from "../../browser.js";
 import { CLI_VERSION } from "../../constants.js";
 import { stripAnsi } from "../../formatters/plain-detect.js";
 import {
@@ -61,7 +63,11 @@ import {
   type WizardPromptKind,
 } from "../../telemetry.js";
 import { formatFeedbackHint, type InitFeedbackOutcome } from "../feedback.js";
-import { formatFailureReport, formatSuccessReport } from "./ink-report.js";
+import {
+  formatFailureReport,
+  formatSuccessExitLine,
+  formatSuccessReport,
+} from "./ink-report.js";
 import { LEARN_SEQUENCE } from "./learn-content.js";
 import { SENTRY_TIPS } from "./sentry-tips.js";
 import {
@@ -122,6 +128,47 @@ function createPendingWelcome(): PendingWelcome {
     settled: false,
   };
   return pending;
+}
+
+/** Handle that keeps the wizard alive on the completion screen until the user
+ * dismisses it. `[Symbol.asyncDispose]` awaits `promise`. */
+type PendingOutro = {
+  promise: Promise<void>;
+  resolve: () => void;
+  settled: boolean;
+};
+
+function createPendingOutro(): PendingOutro {
+  let resolve!: () => void;
+  const pending: PendingOutro = {
+    promise: new Promise<void>((r) => {
+      resolve = r;
+    }),
+    resolve: () => {
+      if (pending.settled) {
+        return;
+      }
+      pending.settled = true;
+      resolve();
+    },
+    settled: false,
+  };
+  return pending;
+}
+
+/** Run one shell command with the real terminal attached, resolving when it
+ * exits. Used for post-exit actions (e.g. the interactive agent installer)
+ * after the alternate screen has been torn down. Never rejects. */
+function runInheritedCommand(command: string): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(command, { shell: true, stdio: "inherit" });
+      child.on("close", () => resolve());
+      child.on("error", () => resolve());
+    } catch {
+      resolve();
+    }
+  });
 }
 
 function seedWelcomePrompt(
@@ -415,6 +462,7 @@ export class InkUI implements WizardUI {
    * `[Symbol.asyncDispose]` awaits this so the `using` block keeps the
    * UI alive until the user has seen and acknowledged the final screen.
    */
+  private pendingOutro: PendingOutro | undefined;
 
   constructor(
     instance: InkInstance,
@@ -468,8 +516,26 @@ export class InkUI implements WizardUI {
 
   outro(message: string): void {
     const clean = stripAnsi(message);
-    this.appendLog("success", clean);
     this.outroMessage = clean;
+    // Keep the interactive completion screen mounted until the user dismisses
+    // it (see `[Symbol.asyncDispose]`), pausing the sidebar tip rotation so the
+    // final screen is stable.
+    this.pauseSidebarTimers();
+    this.pendingOutro ??= createPendingOutro();
+    // Bind the screen's side effects here (main bundle) so the Ink sidecar
+    // never imports Node built-ins (browser launch).
+    this.store.setOutro({
+      kind: "success",
+      dismiss: () => this.dismissOutro(),
+      actions: {
+        openUrl: (url) => {
+          // Best-effort; openBrowser never throws, catch keeps it non-blocking.
+          openBrowser(url).catch(() => {
+            // ignore
+          });
+        },
+      },
+    });
   }
 
   cancel(message: string): void {
@@ -790,9 +856,34 @@ export class InkUI implements WizardUI {
 
   // ── Disposal ──────────────────────────────────────────────────────
 
-  [Symbol.asyncDispose](): Promise<void> {
+  async [Symbol.asyncDispose](): Promise<void> {
+    // Keep the completion screen alive until the user acknowledges it, then
+    // tear down the alternate screen and run any commands they queued (e.g.
+    // the agent-plugin installer) in their real terminal.
+    const pendingOutro = this.pendingOutro;
+    if (pendingOutro && !pendingOutro.settled && !this.torndown) {
+      await pendingOutro.promise;
+    }
     this.tearDown();
-    return Promise.resolve();
+    await this.runPostExitActions();
+  }
+
+  /** Resolve the completion-screen handoff so async disposal can proceed. */
+  private dismissOutro(): void {
+    this.pendingOutro?.resolve();
+  }
+
+  /**
+   * Run commands the completion screen queued, now that the alternate screen is
+   * gone and the real terminal is restored. Interactive installers (e.g.
+   * `npx @sentry/ai install`) need the real TTY, which the alt-screen denied.
+   */
+  private async runPostExitActions(): Promise<void> {
+    const actions = this.store.getSnapshot().postExitActions;
+    for (const command of actions) {
+      process.stdout.write(`\n$ ${command}\n`);
+      await runInheritedCommand(command);
+    }
   }
 
   /**
@@ -909,6 +1000,12 @@ export class InkUI implements WizardUI {
    * teardown.
    */
   requestCancel(): void {
+    // On the completion screen, Ctrl+C is just "I'm done" — acknowledge the
+    // handoff and let async disposal exit cleanly (0), not the 130 abort path.
+    if (this.pendingOutro && !this.pendingOutro.settled) {
+      this.dismissOutro();
+      return;
+    }
     const promptCancel = this.activePromptCancel;
     if (promptCancel) {
       // Prompt path — let the runner unwind via WizardCancelledError.
@@ -966,11 +1063,13 @@ export class InkUI implements WizardUI {
     if (!this.outroMessage) {
       return;
     }
-    return formatSuccessReport(
-      this.outroMessage,
-      this.store.getSnapshot().summary ?? undefined,
-      this.feedbackHint
-    );
+    const summary = this.store.getSnapshot().summary ?? undefined;
+    // The interactive completion screen already showed the full summary; on
+    // exit leave only a compact confirmation rather than re-dumping everything.
+    if (summary?.completion) {
+      return formatSuccessExitLine(summary);
+    }
+    return formatSuccessReport(this.outroMessage, summary, this.feedbackHint);
   }
 
   // ── Internal helpers ──────────────────────────────────────────────

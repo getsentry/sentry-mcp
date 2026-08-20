@@ -321,6 +321,22 @@ async function cleanupProcessTree(child: ChildProcess): Promise<void> {
 }
 
 /**
+ * Outcome of {@link verifySetup}, surfaced to the completion screen so it can
+ * celebrate a received event (and deep-link it) instead of only telling the
+ * user to go trigger one.
+ */
+export type VerifyResult = {
+  /** True when the SDK delivered an envelope to the local sidecar — the
+   * strongest signal that events are actually flowing to Sentry. */
+  verified: boolean;
+  /** Outcome detail, for callers that want more than the boolean. */
+  kind: VerifyOutcome["kind"] | "skipped";
+  /** event_id of the first intercepted event, when one could be parsed.
+   * Only set when {@link verified} is true. */
+  eventId?: string;
+};
+
+/**
  * Run the dev server, spawn the child process, and verify that the Sentry
  * SDK is working or at minimum that the app starts without errors.
  *
@@ -332,7 +348,7 @@ export async function verifySetup(
   result: WorkflowRunResult,
   ui: WizardUI,
   cwd: string
-): Promise<void> {
+): Promise<VerifyResult> {
   const detected = await detectDevCommand(cwd);
   if (!detected) {
     ui.log.info("Skipping verification — could not detect a dev command");
@@ -342,7 +358,7 @@ export async function verifySetup(
         "wizard.verify": "no_dev_command",
       },
     });
-    return;
+    return { verified: false, kind: "skipped" };
   }
 
   logger.debug(`Verification command: ${detected.args.join(" ")}`);
@@ -359,13 +375,31 @@ export async function verifySetup(
   } catch (error) {
     logger.debug("Failed to start verification server", error);
     ui.log.warn("Skipping verification — could not start local server.");
-    return;
+    return { verified: false, kind: "skipped" };
   }
 
   const spotlightUrl = `http://localhost:${boundPort}/stream`;
   let subscriptionId: string | undefined;
+  // Capture the first event's id so the completion screen can deep-link the
+  // exact event. Best-effort: a missing/malformed id just means no deep-link.
+  let firstEventId: string | undefined;
   const envelopeReceived = new Promise<void>((r) => {
-    subscriptionId = buffer.subscribe(() => r());
+    subscriptionId = buffer.subscribe((container) => {
+      if (firstEventId === undefined) {
+        try {
+          const parsed = container.getParsedEnvelope();
+          const header = parsed?.envelope?.[0] as
+            | { event_id?: string }
+            | undefined;
+          if (typeof header?.event_id === "string" && header.event_id) {
+            firstEventId = header.event_id;
+          }
+        } catch {
+          // best-effort — fall back to the project Issues stream
+        }
+      }
+      r();
+    });
   });
   const childEnv = buildVerifyEnv(spotlightUrl, detected, cwd);
 
@@ -384,7 +418,7 @@ export async function verifySetup(
     logger.debug("Failed to spawn verification child", error);
     await shutdownServer(server);
     ui.log.warn("Skipping verification — could not start the dev command.");
-    return;
+    return { verified: false, kind: "skipped" };
   }
 
   // Track whether the user sent an interrupt so we can re-emit it after
@@ -458,7 +492,7 @@ export async function verifySetup(
   // the wizard would continue as if nothing happened.
   if (signalReceived) {
     process.kill(process.pid, signalReceived);
-    return;
+    return { verified: false, kind: "skipped" };
   }
 
   // If the child crashed (non-zero exit) but the startup watcher resolved
@@ -474,6 +508,13 @@ export async function verifySetup(
   }
 
   reportOutcome(effectiveOutcome, { ui, result, detected, getLines });
+
+  const verified = effectiveOutcome.kind === "envelope";
+  return {
+    verified,
+    kind: effectiveOutcome.kind,
+    eventId: verified ? firstEventId : undefined,
+  };
 }
 
 type VerifyOutcome =

@@ -22,6 +22,7 @@ import {
   shortStepLabel,
 } from "../clack-utils.js";
 import type {
+  CompletionActions,
   PromptDetail,
   SpinnerExitCode,
   WelcomeOptions,
@@ -170,12 +171,18 @@ export type Overlay = {
   retryCount: number;
 } | null;
 
-/** Outro screen state — overrides normal tab content when set. */
-export type OutroState =
-  | { kind: "success"; message: string }
-  | { kind: "error"; message: string; errors: string[] }
-  | { kind: "cancel"; message: string }
-  | null;
+/**
+ * Outro screen state — when set, the App shows the interactive completion
+ * screen instead of the normal tab content. Failure/cancel outcomes don't use
+ * this; they're rendered through the post-dispose report path.
+ */
+export type OutroState = {
+  kind: "success";
+  /** Acknowledge the interactive completion screen and let the wizard exit. */
+  dismiss: () => void;
+  /** Side-effect callbacks (browser, MCP config) provided by InkUI. */
+  actions: CompletionActions;
+} | null;
 
 /** Learn card progressive reveal state. */
 export type LearnState = {
@@ -243,11 +250,49 @@ export type WizardSnapshot = {
   overlay: Overlay;
   /** When set, overrides the normal tab content with an outro screen. */
   outroState: OutroState;
+  /**
+   * Shell commands the completion screen queued to run in the user's real
+   * terminal after the alternate screen tears down (e.g. the interactive
+   * agent-plugin installer, which must not run inside Ink's alt-screen).
+   */
+  postExitActions: string[];
   /** Learn sequence progressive reveal state. */
   learnState: LearnState;
 };
 
 export type Listener = () => void;
+
+/** Default checklist: every visible step, pending. */
+function defaultChecklistSteps(): StepEntry[] {
+  return CHECKLIST_VISIBLE_STEPS.map((id) => ({
+    id,
+    label: shortStepLabel(id),
+    status: "pending" as StepStatus,
+  }));
+}
+
+/** Baseline snapshot; callers override any subset via the constructor. */
+function baseSnapshot(): WizardSnapshot {
+  return {
+    layout: "workflow",
+    cliVersion: null,
+    bannerRows: [],
+    logs: [],
+    spinner: { active: false, frame: 0, message: "" },
+    prompt: null,
+    tipIndex: 0,
+    summary: null,
+    filesRead: [],
+    steps: defaultChecklistSteps(),
+    requestCancel: undefined,
+    statusMessages: [],
+    statusExpanded: false,
+    overlay: null,
+    outroState: null,
+    postExitActions: [],
+    learnState: { blockIndex: 0, lineIndex: 0, complete: false },
+  };
+}
 
 /**
  * Minimal external store with the React 18+ `useSyncExternalStore`
@@ -259,34 +304,12 @@ export class WizardStore {
   private readonly listeners = new Set<Listener>();
 
   constructor(initial: Partial<WizardSnapshot> = {}) {
-    this.snapshot = {
-      layout: initial.layout ?? "workflow",
-      cliVersion: initial.cliVersion ?? null,
-      bannerRows: initial.bannerRows ?? [],
-      logs: initial.logs ?? [],
-      spinner: initial.spinner ?? { active: false, frame: 0, message: "" },
-      prompt: initial.prompt ?? null,
-      tipIndex: initial.tipIndex ?? 0,
-      summary: initial.summary ?? null,
-      filesRead: initial.filesRead ?? [],
-      steps:
-        initial.steps ??
-        CHECKLIST_VISIBLE_STEPS.map((id) => ({
-          id,
-          label: shortStepLabel(id),
-          status: "pending" as StepStatus,
-        })),
-      requestCancel: initial.requestCancel,
-      statusMessages: initial.statusMessages ?? [],
-      statusExpanded: initial.statusExpanded ?? false,
-      overlay: initial.overlay ?? null,
-      outroState: initial.outroState ?? null,
-      learnState: initial.learnState ?? {
-        blockIndex: 0,
-        lineIndex: 0,
-        complete: false,
-      },
-    };
+    // Only keys the caller actually set override the baseline (undefined values
+    // are dropped so they don't clobber a default).
+    const overrides = Object.fromEntries(
+      Object.entries(initial).filter(([, value]) => value !== undefined)
+    ) as Partial<WizardSnapshot>;
+    this.snapshot = { ...baseSnapshot(), ...overrides };
   }
 
   getSnapshot = (): WizardSnapshot => this.snapshot;
@@ -500,6 +523,28 @@ export class WizardStore {
 
   setOutro(state: OutroState): void {
     this.update({ outroState: state });
+  }
+
+  /** Queue a shell command to run after the alternate screen tears down. */
+  queuePostExitAction(command: string): void {
+    if (this.snapshot.postExitActions.includes(command)) {
+      return;
+    }
+    this.update({
+      postExitActions: [...this.snapshot.postExitActions, command],
+    });
+  }
+
+  /** Drop a previously-queued post-exit command (e.g. the user toggled it off). */
+  dequeuePostExitAction(command: string): void {
+    if (!this.snapshot.postExitActions.includes(command)) {
+      return;
+    }
+    this.update({
+      postExitActions: this.snapshot.postExitActions.filter(
+        (c) => c !== command
+      ),
+    });
   }
 
   advanceLearnLine(): void {

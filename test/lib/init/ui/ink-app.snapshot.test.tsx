@@ -1295,3 +1295,87 @@ describe("Ink App snapshot", () => {
     expect(store.getSnapshot().requestCancel).toBeUndefined();
   });
 });
+
+describe("completion screen", () => {
+  function completionStore(verified: boolean): WizardStore {
+    const completion = {
+      projectName: "my-app",
+      features: ["Errors", "Tracing"],
+      featureBlurbs: [
+        { label: "Error Monitoring", blurb: "Captures unhandled exceptions." },
+        { label: "Tracing", blurb: "Measures request performance." },
+      ],
+      changedFileCount: 4,
+      issuesUrl: "https://acme.sentry.io/issues/?project=4507",
+      verification: verified
+        ? {
+            received: true,
+            eventUrl: "https://acme.sentry.io/issues/?query=event.id:abc123",
+          }
+        : { received: false },
+      agentInstallCommand: "npx @sentry/ai install",
+      startCommand: "pnpm dev",
+    };
+    return new WizardStore({
+      layout: "workflow",
+      cliVersion: "9.9.9",
+      summary: { fields: [], completion },
+      outroState: {
+        kind: "success",
+        dismiss: () => {
+          // no-op in tests
+        },
+        actions: {
+          openUrl: () => {
+            // no-op in tests
+          },
+        },
+      },
+    });
+  }
+
+  test("guides the user to their first error when unverified", async () => {
+    const text = stripAnsi(
+      (await renderApp(completionStore(false), 100)).allOutput()
+    );
+    // Header flows into the per-feature project info via ", with:".
+    expect(text).toContain("Sentry is set up in my-app");
+    expect(text).toContain(", with:");
+    expect(text).toContain("Error Monitoring");
+    expect(text).toContain("Captures unhandled exceptions.");
+    // Just the file count — no platform key in this footnote.
+    expect(text).toContain("4 files changed");
+    expect(text).toContain("See your first error");
+    expect(text).toContain("pnpm dev");
+    expect(text).toContain("/issues/?project=4507");
+    // The link carries an inline "(o) to open" shortcut hint.
+    expect(text).toContain("(o) to open");
+    expect(text).toContain("Open my Issues feed");
+    expect(text).toContain("Install the Sentry agent plugin");
+    // The raw MCP-config option was dropped — the plugin covers it.
+    expect(text).not.toContain("Set up the Sentry MCP");
+    expect(text).toContain("Finish");
+    // "Open the setup docs" was removed from the next steps.
+    expect(text).not.toContain("Open the setup docs");
+  });
+
+  test("celebrates and deep-links the first event when verified", async () => {
+    const text = stripAnsi(
+      (await renderApp(completionStore(true), 100)).allOutput()
+    );
+    expect(text).toContain("Sentry is set up in my-app");
+    expect(text).toContain("First event received");
+    expect(text).toContain("View my first event");
+    expect(text).toContain("event.id:abc123");
+  });
+
+  test("pressing o opens the first-error link", async () => {
+    const text = stripAnsi(
+      (
+        await renderApp(completionStore(false), 100, { input: ["o"] })
+      ).allOutput()
+    );
+    // The `o` handler fires and confirms via a note.
+    expect(text).toContain("Opened Sentry in your browser.");
+  });
+});
