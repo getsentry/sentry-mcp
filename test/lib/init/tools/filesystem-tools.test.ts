@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -72,8 +73,107 @@ describe("filesystem tools", () => {
 
     expect(result.ok).toBe(true);
     expect(entries.map((entry) => entry.path)).toContain("src/app.ts");
+    expect(entries.find((entry) => entry.path === "src/app.ts")).toMatchObject({
+      size: 18,
+      type: "file",
+    });
     expect(precomputed.map((entry) => entry.path)).toContain("src/app.ts");
   });
+
+  test("reports when a bounded recursive listing is incomplete", async () => {
+    fs.mkdirSync(path.join(testDir, "nested", "deeper"), { recursive: true });
+    fs.writeFileSync(path.join(testDir, "nested", "deeper", "app.ts"), "x");
+    fs.writeFileSync(path.join(testDir, "root.ts"), "x");
+
+    const byDepth = await executeTool(
+      {
+        type: "tool",
+        operation: "list-dir",
+        cwd: testDir,
+        params: { path: ".", recursive: true, maxDepth: 0, maxEntries: 100 },
+      },
+      makeContext(testDir)
+    );
+    const byEntries = await executeTool(
+      {
+        type: "tool",
+        operation: "list-dir",
+        cwd: testDir,
+        params: { path: ".", recursive: true, maxDepth: 10, maxEntries: 1 },
+      },
+      makeContext(testDir)
+    );
+
+    expect(byDepth.data).toMatchObject({ truncated: true });
+    expect(byEntries.data).toMatchObject({ truncated: true });
+    expect((byEntries.data as { entries: unknown[] }).entries).toHaveLength(1);
+  });
+
+  test("reports an unreadable directory as an incomplete listing", async () => {
+    const readdirSpy = vi
+      .spyOn(fs.promises, "readdir")
+      .mockRejectedValueOnce(new Error("permission denied"));
+
+    try {
+      const result = await executeTool(
+        {
+          type: "tool",
+          operation: "list-dir",
+          cwd: testDir,
+          params: { path: ".", recursive: true },
+        },
+        makeContext(testDir)
+      );
+
+      expect(result).toMatchObject({
+        data: { entries: [], truncated: true },
+        ok: true,
+      });
+    } finally {
+      readdirSpy.mockRestore();
+    }
+  });
+
+  test.runIf(process.platform !== "win32")(
+    "lists special files without opening them or attaching a size",
+    async () => {
+      const fifoPath = path.join(testDir, "stream.pipe");
+      execFileSync("mkfifo", [fifoPath]);
+      fs.writeFileSync(path.join(testDir, "regular.ts"), "export {};\n");
+      const openSpy = vi.spyOn(fs, "openSync");
+      const readSpy = vi.spyOn(fs, "readSync");
+
+      try {
+        const result = await executeTool(
+          {
+            type: "tool",
+            operation: "list-dir",
+            cwd: testDir,
+            params: { path: "." },
+          },
+          makeContext(testDir)
+        );
+        const entry = (
+          result.data as { entries: Record<string, unknown>[] }
+        ).entries.find(({ path: entryPath }) => entryPath === "stream.pipe");
+        const regular = (
+          result.data as { entries: Record<string, unknown>[] }
+        ).entries.find(({ path: entryPath }) => entryPath === "regular.ts");
+
+        expect(entry).toEqual({
+          name: "stream.pipe",
+          path: "stream.pipe",
+          type: "file",
+        });
+        expect(regular).toMatchObject({ size: 11, type: "file" });
+        expect(openSpy).not.toHaveBeenCalled();
+        expect(readSpy).not.toHaveBeenCalled();
+      } finally {
+        openSpy.mockRestore();
+        readSpy.mockRestore();
+      }
+    }
+  );
 
   test("reads files and checks existence in batches", async () => {
     fs.writeFileSync(path.join(testDir, "exists.txt"), "hello");
