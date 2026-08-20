@@ -87,6 +87,32 @@ export function formatSuccessReport(
   return lines.join("\n");
 }
 
+/**
+ * Compact success echo left in the user's scrollback after the completion
+ * screen closes. The screen already showed everything; here we keep only a
+ * warm confirmation plus the one thing that stays useful post-exit — the link
+ * to your errors (no key hints, since there's nothing to press anymore).
+ */
+export function formatSuccessExitLine(
+  summary: WizardSummary | undefined
+): string {
+  const completion = summary?.completion;
+  const project = completion?.projectName ?? "your project";
+  const icon = chalk.hex(REPORT_SUCCESS)("✔");
+  const lines: string[] = [
+    "",
+    `${icon}  ${chalk.bold(`All set — Sentry is watching ${project}`)}`,
+  ];
+  const target = completion?.verification.eventUrl ?? completion?.issuesUrl;
+  if (target) {
+    const label = completion?.verification.received
+      ? "View your first event"
+      : "See your first error";
+    lines.push(`   ${chalk.hex(REPORT_MUTED)(`${label} → ${target}`)}`);
+  }
+  return lines.join("\n");
+}
+
 function appendFeedbackHint(lines: string[], feedbackHint?: string): void {
   if (!feedbackHint) {
     return;

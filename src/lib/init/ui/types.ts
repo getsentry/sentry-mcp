@@ -182,6 +182,51 @@ export type WizardSummary = {
   changedFiles?: { action: string; path: string }[];
   /** AI-generated per-feature blurbs personalised to the analysed project. */
   featureBlurbs?: { label: string; blurb: string }[];
+  /**
+   * Structured data for the interactive completion screen (InkUI only).
+   * `LoggingUI` ignores it — the flat `fields` above cover the non-TTY case.
+   */
+  completion?: WizardCompletion;
+};
+
+/**
+ * Everything the interactive exit screen needs to turn "we changed some files"
+ * into "go see your first error" — one first-error hero plus a menu of next
+ * steps (open Issues, install the MCP / agent plugin, read the docs).
+ */
+export type WizardCompletion = {
+  /** Human-facing project name shown in the header. */
+  projectName: string;
+  /** Enabled-feature display labels, e.g. ["Errors", "Tracing", "Replay"]. */
+  features: string[];
+  /**
+   * AI-written one-liner per enabled feature ("what we set up"). Empty when
+   * the blurb agent didn't run; the screen then falls back to plain labels.
+   */
+  featureBlurbs: { label: string; blurb: string }[];
+  /** Number of files the wizard created/edited. */
+  changedFileCount: number;
+  /** Project-scoped Issues stream — the primary call-to-action. */
+  issuesUrl?: string;
+  /**
+   * Verification outcome. `received` is true when init's verify step caught an
+   * event; `eventUrl` deep-links that exact event when its id was captured.
+   */
+  verification: { received: boolean; eventUrl?: string };
+  /** Command that installs the Sentry coding-agent plugin. */
+  agentInstallCommand?: string;
+  /** Best-effort "start your app" command shown in the recipe, e.g. "pnpm dev". */
+  startCommand?: string;
+};
+
+/**
+ * Side-effectful actions the completion screen invokes. Provided by `InkUI`
+ * (which lives in the main bundle) so the pre-bundled Ink sidecar never has to
+ * import Node built-ins (browser launch) itself.
+ */
+export type CompletionActions = {
+  /** Open a URL in the user's browser. Best-effort, non-blocking. */
+  openUrl: (url: string) => void;
 };
 
 /**
