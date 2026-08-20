@@ -207,6 +207,34 @@ describe("parsePositionalArgs", () => {
       if (result.kind !== "deferred") throw new Error("unreachable");
       expect(result.rawTraceArg).toBe(slashForm);
     });
+
+    test("org/project/spanId (missing trace ID) throws a trace-focused ContextError (CLI-1GP)", () => {
+      try {
+        parsePositionalArgs([`my-org/my-project/${VALID_SPAN_ID}`]);
+        expect.unreachable("Should have thrown");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ContextError);
+        const msg = (error as ContextError).message;
+        // Points at the missing trace ID, not a missing span ID.
+        expect(msg).toContain("trace ID");
+        expect(msg).toContain(VALID_SPAN_ID);
+        // Does not misdirect the user to `span list` with the span ID.
+        expect(msg).not.toContain(
+          `span list my-org/my-project/${VALID_SPAN_ID}`
+        );
+      }
+    });
+
+    test("org/project/badTrace/spanId surfaces the trace validation detail", () => {
+      try {
+        parsePositionalArgs([`my-org/my-project/not-a-trace/${VALID_SPAN_ID}`]);
+        expect.unreachable("Should have thrown");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ContextError);
+        const msg = (error as ContextError).message;
+        expect(msg).toContain("trace ID");
+      }
+    });
   });
 
   describe("error cases", () => {
