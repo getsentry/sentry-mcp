@@ -159,7 +159,19 @@ async function readCommonConfigFile(
     }
 
     const buffer = Buffer.alloc(opened.stat.size);
-    const { bytesRead } = await opened.handle.read(buffer, 0, buffer.length, 0);
+    let bytesRead = 0;
+    while (bytesRead < buffer.length) {
+      const readResult = await opened.handle.read(
+        buffer,
+        bytesRead,
+        buffer.length - bytesRead,
+        bytesRead
+      );
+      if (readResult.bytesRead === 0) {
+        return { status: "unreadable" };
+      }
+      bytesRead += readResult.bytesRead;
+    }
     if (projectFileChanged(opened.stat, await opened.handle.stat())) {
       return { status: "unreadable" };
     }
