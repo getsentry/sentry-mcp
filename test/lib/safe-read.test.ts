@@ -6,10 +6,11 @@
  */
 
 import { execSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { MAX_FILE_BYTES } from "../../src/lib/init/constants.js";
 import { applyPatchset } from "../../src/lib/init/tools/apply-patchset.js";
 import { readFiles } from "../../src/lib/init/tools/read-files.js";
 import type { DirEntry } from "../../src/lib/init/types.js";
@@ -273,5 +274,30 @@ describe("workflow-inputs preReadCommonFiles FIFO safety", () => {
     const cache = await preReadCommonFiles(dir, listing);
     expect(cache["package.json"]).toBe('{"name":"x"}');
     expect(cache["tsconfig.json"]).toBeNull();
+  });
+
+  test("rejects a common-config alias to sensitive metadata", async () => {
+    writeFileSync(
+      join(dir, ".netrc"),
+      "machine example.test login user password secret\n"
+    );
+    symlinkSync(".netrc", join(dir, "package.json"));
+
+    const listing: DirEntry[] = [
+      { name: "package.json", path: "package.json", type: "file" },
+    ];
+
+    const cache = await preReadCommonFiles(dir, listing);
+    expect(cache["package.json"]).toBeNull();
+  });
+
+  test("skips an oversized common config instead of truncating it", async () => {
+    writeFileSync(join(dir, "package.json"), "x".repeat(MAX_FILE_BYTES + 1));
+    const listing: DirEntry[] = [
+      { name: "package.json", path: "package.json", type: "file" },
+    ];
+
+    const cache = await preReadCommonFiles(dir, listing);
+    expect(cache).not.toHaveProperty("package.json");
   });
 });

@@ -1,8 +1,12 @@
-import fs from "node:fs";
-import path from "node:path";
 import { MAX_FILE_BYTES } from "./constants.js";
 import { detectSentry } from "./tools/detect-sentry.js";
 import { listDir } from "./tools/list-dir.js";
+import {
+  closeProjectFile,
+  type OpenedProjectFile,
+  openProjectFile,
+  projectFileChanged,
+} from "./tools/project-file.js";
 import type { DirEntry } from "./types.js";
 
 /**
@@ -118,30 +122,59 @@ export async function preReadCommonFiles(
     if (totalBytes >= MAX_PREREAD_TOTAL_BYTES) {
       break;
     }
-    try {
-      const absPath = path.join(directory, filePath);
-      const stat = await fs.promises.stat(absPath);
-      // Guard against FIFOs / sockets / devices — `fs.readFile` on a
-      // FIFO blocks indefinitely waiting for a writer. `stat` follows
-      // symlinks, so a symlink → FIFO is also caught here.
-      if (!stat.isFile()) {
-        cache[filePath] = null;
-        continue;
-      }
-      if (stat.size > MAX_FILE_BYTES) {
-        continue;
-      }
-      const content = await fs.promises.readFile(absPath, "utf-8");
-      if (totalBytes + content.length <= MAX_PREREAD_TOTAL_BYTES) {
-        cache[filePath] = content;
-        totalBytes += content.length;
-      }
-    } catch {
+    const result = await readCommonConfigFile(directory, filePath);
+    if (result.status === "unreadable") {
       cache[filePath] = null;
+      continue;
+    }
+    if (
+      result.status === "read" &&
+      totalBytes + result.bytes <= MAX_PREREAD_TOTAL_BYTES
+    ) {
+      cache[filePath] = result.content;
+      totalBytes += result.bytes;
     }
   }
 
   return cache;
+}
+
+type CommonConfigRead =
+  | { status: "skipped" | "unreadable" }
+  | { bytes: number; content: string; status: "read" };
+
+async function readCommonConfigFile(
+  directory: string,
+  filePath: string
+): Promise<CommonConfigRead> {
+  let opened: OpenedProjectFile | undefined;
+  try {
+    const result = await openProjectFile(directory, filePath);
+    if ("error" in result) {
+      return { status: "unreadable" };
+    }
+    opened = result;
+    if (opened.stat.size > MAX_FILE_BYTES) {
+      return { status: "skipped" };
+    }
+
+    const buffer = Buffer.alloc(opened.stat.size);
+    const { bytesRead } = await opened.handle.read(buffer, 0, buffer.length, 0);
+    if (projectFileChanged(opened.stat, await opened.handle.stat())) {
+      return { status: "unreadable" };
+    }
+    return {
+      bytes: bytesRead,
+      content: buffer.subarray(0, bytesRead).toString("utf-8"),
+      status: "read",
+    };
+  } catch {
+    return { status: "unreadable" };
+  } finally {
+    if (opened) {
+      await closeProjectFile(opened.handle);
+    }
+  }
 }
 
 /**
