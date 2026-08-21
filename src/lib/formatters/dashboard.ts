@@ -19,11 +19,18 @@ import type {
   TimeseriesResult,
   WidgetDataResult,
 } from "../../types/dashboard.js";
+import { getEnv } from "../env.js";
+import {
+  canRenderSixel,
+  terminalPixelHeight,
+  terminalPixelWidth,
+} from "../sixel.js";
+import { SERIES_PALETTE } from "./chart-core.js";
 import { COLORS, muted, terminalLink } from "./colors.js";
 import { renderMarkdown } from "./markdown.js";
-
 import type { HumanRenderer } from "./output.js";
 import { isPlainOutput } from "./plain-detect.js";
+import { renderDashboardAsSixel } from "./sixel-dashboard.js";
 import { downsample, sparkline } from "./sparkline.js";
 
 // ---------------------------------------------------------------------------
@@ -39,6 +46,8 @@ export type DashboardViewData = {
   url: string;
   dateCreated?: string;
   environment?: string[];
+  /** Per-invocation sixel opt-in from `dashboard view --sixel`. */
+  sixel?: boolean;
   widgets: DashboardViewWidget[];
 };
 
@@ -83,6 +92,12 @@ function getTermWidth(): number {
     return Math.max(MIN_TERM_WIDTH, cols);
   }
   return DEFAULT_TERM_WIDTH;
+}
+
+/** Actual terminal width for pixel-exact sixel output, without ASCII's floor. */
+function getSixelTermWidth(): number | undefined {
+  const columns = process.stdout.columns;
+  return columns && columns > 0 ? columns : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -1211,29 +1226,6 @@ function renderTimeBarRows(
 }
 
 /**
- * Chart color palette based on Sentry's categorical chart hues.
- *
- * Derived from sentry/static/app/utils/theme/scraps/tokens/color.tsx
- * (categorical.dark / categorical.light), adjusted to a mid-luminance
- * range so every color achieves ≥3:1 contrast on **both** dark (#1e1e1e)
- * and light (#f0f0f0) terminal backgrounds.
- *
- * "Other" always gets muted gray (handled by seriesColor).
- */
-const SERIES_PALETTE = [
-  "#7553FF", // blurple (Sentry primary)
-  "#F0369A", // pink
-  "#C06F20", // orange  (darkened from #FF9838)
-  "#3D8F09", // green   (darkened from #67C800)
-  "#8B6AC8", // purple  (lightened from #5D3EB2)
-  "#E45560", // salmon  (darkened from #FA6769)
-  "#B82D90", // magenta
-  "#9E8B18", // yellow  (darkened from #FFD00E)
-  "#228A83", // teal    (fills hue gap)
-  "#7B50D0", // indigo  (lightened from #50219C)
-] as const;
-
-/**
  * Fill characters for plain/no-color mode.
  *
  * Descending density so the most prominent series gets the densest fill.
@@ -1241,7 +1233,13 @@ const SERIES_PALETTE = [
  */
 const PLAIN_FILLS = ["█", "▓", "▒", "#", "=", "*", "+", "~", ":", "."] as const;
 
-/** Get the color for a series by index. "Other" gets muted gray. */
+/**
+ * Get the color for a series by index. "Other" gets muted gray.
+ *
+ * Shares {@link SERIES_PALETTE} with the pixel chart core so the ASCII and
+ * sixel renderers use identical hues; only the "Other" bucket differs (ANSI
+ * muted vs the core's hex gray).
+ */
 function seriesColor(label: string, index: number): string {
   if (label === "Other") {
     return COLORS.muted;
@@ -1537,8 +1535,10 @@ function renderPlaceholderContent(message: string): string[] {
  * Returns raw content lines (no title, no border). The caller handles
  * border wrapping and height enforcement.
  */
+type ContentWidget = Pick<DashboardViewWidget, "displayType" | "data">;
+
 function renderContentLines(opts: {
-  widget: DashboardViewWidget;
+  widget: ContentWidget;
   innerWidth: number;
   contentHeight: number;
 }): string[] {
@@ -1546,7 +1546,7 @@ function renderContentLines(opts: {
   const { data } = widget;
 
   switch (data.type) {
-    case "timeseries":
+    case "timeseries": {
       if (widget.displayType === "categorical_bar") {
         return renderVerticalBarsContent(data, { innerWidth, contentHeight });
       }
@@ -1555,6 +1555,7 @@ function renderContentLines(opts: {
         return renderTimeseriesBarsContent(data, { innerWidth, contentHeight });
       }
       return renderTimeseriesContent(data, innerWidth);
+    }
 
     case "table":
       return renderTableContent(data, innerWidth);
@@ -1616,7 +1617,7 @@ function renderWidgetLines(
  * If longer, it is truncated (ANSI-aware via character iteration).
  */
 /** ANSI escape sequence type for the truncation state machine. */
-type EscapeType = "none" | "start" | "csi" | "osc";
+type EscapeType = "none" | "start" | "csi" | "osc" | "dcs";
 
 /** Check if a character is an ASCII letter (CSI sequence terminator). */
 function isAsciiLetter(ch: string): boolean {
@@ -1635,6 +1636,15 @@ function advanceEscape(
   ch: string,
   buffer: string
 ): boolean {
+  return advanceEscapeInner(state, ch, buffer.at(-1));
+}
+
+function advanceEscapeInner(
+  state: { type: EscapeType },
+  ch: string,
+  prev: string | undefined
+): boolean {
+  const stTerminator = ch === "\\" && prev === "\x1b";
   switch (state.type) {
     case "none":
       if (ch === "\x1b") {
@@ -1647,6 +1657,8 @@ function advanceEscape(
         state.type = "csi";
       } else if (ch === "]") {
         state.type = "osc";
+      } else if (ch === "P") {
+        state.type = "dcs";
       } else {
         state.type = "none";
       }
@@ -1658,7 +1670,13 @@ function advanceEscape(
       return true;
     case "osc":
       // OSC ends at BEL (\x07) or ST (\x1b\\)
-      if (ch === "\x07" || (ch === "\\" && buffer.at(-1) === "\x1b")) {
+      if (ch === "\x07" || stTerminator) {
+        state.type = "none";
+      }
+      return true;
+    case "dcs":
+      // DCS ends at ST (\x1b\\)
+      if (stTerminator) {
         state.type = "none";
       }
       return true;
@@ -1675,7 +1693,7 @@ function fitToWidth(line: string, targetWidth: number): string {
   // Truncate: walk characters, tracking visible width
   let result = "";
   let width = 0;
-  const esc = { type: "none" as "none" | "start" | "csi" | "osc" };
+  const esc: { type: EscapeType } = { type: "none" };
   for (const ch of line) {
     if (advanceEscape(esc, ch, result)) {
       result += ch;
@@ -1840,9 +1858,57 @@ export function formatDashboardWithData(data: DashboardViewData): string {
   const termWidth = getTermWidth();
   const lines: string[] = [];
   lines.push(...renderHeader(data, termWidth));
-  lines.push(...renderGrid(data.widgets, termWidth));
+
+  const sixel = renderCompleteDashboardAsSixel(data, getSixelTermWidth());
+  if (sixel) {
+    lines.push(sixel);
+  } else {
+    lines.push(...renderGrid(data.widgets, termWidth));
+  }
+
   lines.push("");
   return lines.join("\n");
+}
+
+/**
+ * Render the complete dashboard as one sixel canvas only when the terminal
+ * exposes both cell dimensions. A sixel-only feature must never partially
+ * replace the framebuffer: unavailable geometry always returns the complete
+ * established character rendering.
+ */
+function renderCompleteDashboardAsSixel(
+  data: DashboardViewData,
+  termWidth: number | undefined
+): string | undefined {
+  const env = getEnv();
+  const optedIn =
+    data.sixel === true ||
+    env.SENTRY_DASHBOARD_SIXEL === "1" ||
+    data.widgets.some((widget) => widget.displayType === "timeseries_sixel");
+  if (!(optedIn && termWidth) || isPlainOutput() || !canRenderSixel()) {
+    return;
+  }
+  const pixelWidth = terminalPixelWidth(termWidth);
+  const cellHeight = terminalPixelHeight(1);
+  if (!(pixelWidth && cellHeight)) {
+    return;
+  }
+  const cellWidth = Math.floor(pixelWidth / termWidth);
+  if (cellWidth < 1) {
+    return;
+  }
+  return renderDashboardAsSixel(data, {
+    pixelWidth,
+    cellWidth,
+    cellHeight,
+    renderTextContent(widget, innerWidth, contentHeight) {
+      return renderContentLines({
+        widget,
+        innerWidth,
+        contentHeight,
+      });
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------

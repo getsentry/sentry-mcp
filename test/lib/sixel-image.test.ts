@@ -258,6 +258,18 @@ describe("encodeImageToSixel", () => {
     expect(sixel).toContain('"1;1;800;');
   });
 
+  test("preserves an explicitly bounded wide canvas", () => {
+    const img = solidImage(1024, 10, [10, 20, 30, 255]);
+    const sixel = encodeImageToSixel(img, 1024, true);
+    expect(sixel).toContain('"1;1;1024;');
+  });
+
+  test("preserves an explicitly bounded tall canvas", () => {
+    const img = solidImage(10, 3000, [10, 20, 30, 255]);
+    const sixel = encodeImageToSixel(img, 10, true);
+    expect(sixel).toContain('"1;1;10;3000');
+  });
+
   test("bounds the height of a narrow but very tall image", () => {
     // 40px wide (within budget) but 5000px tall — scaled uniformly to the
     // DEFAULT_MAX_HEIGHT (2000) so the escape sequence stays bounded. Width
