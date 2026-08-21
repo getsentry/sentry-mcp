@@ -218,7 +218,10 @@ beforeEach(() => {
   savedPlainOutput = process.env.SENTRY_PLAIN_OUTPUT;
   process.env.SENTRY_PLAIN_OUTPUT = "0";
 
-  mockStartResult = { status: "success", result: { platform: "React" } };
+  mockStartResult = {
+    status: "success",
+    result: { exitCode: 0, platform: "React" },
+  };
   mockResumeResults = [];
   resumeCallCount = 0;
   mockRunByIdResult = new Error("runById not configured");
@@ -293,6 +296,7 @@ beforeEach(() => {
   sharedResumeAsyncMock = vi.fn(() => {
     const result = mockResumeResults[resumeCallCount] ?? {
       status: "success",
+      result: { exitCode: 0 },
     };
     resumeCallCount += 1;
     return Promise.resolve(withV1SuspendEnvelopes(result));
@@ -667,7 +671,7 @@ describe("runWizard", () => {
         "apply-codemods": { suspendPayload: payload },
       },
     };
-    mockResumeResults = [{ status: "success" }];
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
 
     await runWizard(makeOptions());
 
@@ -696,7 +700,7 @@ describe("runWizard", () => {
         "apply-codemods": { suspendPayload: protocolPayload },
       },
     };
-    mockResumeResults = [{ status: "success" }];
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
 
     await runWizard(makeOptions());
 
@@ -729,7 +733,7 @@ describe("runWizard", () => {
         },
       },
     };
-    mockResumeResults = [{ status: "success" }];
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
 
     await runWizard(makeOptions());
 
@@ -767,7 +771,7 @@ describe("runWizard", () => {
         },
       },
     };
-    mockResumeResults = [{ status: "success" }];
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
 
     await runWizard(makeOptions());
 
@@ -793,7 +797,7 @@ describe("runWizard", () => {
         },
       },
     };
-    mockResumeResults = [{ status: "success" }];
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
 
     await runWizard(makeOptions({ dryRun: true }));
 
@@ -993,7 +997,7 @@ describe("runWizard", () => {
         },
       },
     };
-    mockResumeResults = [{ status: "success" }];
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
 
     await runWizard(makeOptions());
 
@@ -1065,7 +1069,7 @@ describe("runWizard", () => {
       message: "Using existing project",
       data: {},
     });
-    mockResumeResults = [{ status: "success" }];
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
 
     await runWizard(makeOptions());
 
@@ -1099,7 +1103,7 @@ describe("runWizard", () => {
       },
     };
     executeToolSpy.mockResolvedValue({ ok: true, data: identity });
-    mockResumeResults = [{ status: "success" }];
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
 
     await runWizard(makeOptions());
 
@@ -1218,7 +1222,9 @@ describe("runWizard — MastraClient lifecycle", () => {
         createRun: vi.fn(() =>
           Promise.resolve({
             startAsync: startAsyncMock,
-            resumeAsync: vi.fn(() => Promise.resolve({ status: "success" })),
+            resumeAsync: vi.fn(() =>
+              Promise.resolve({ status: "success", result: { exitCode: 0 } })
+            ),
           })
         ),
       } as any;
@@ -1235,6 +1241,15 @@ describe("runWizard — MastraClient lifecycle", () => {
 // ─── Additional coverage tests ───────────────────────────────────────────────
 
 describe("runWizard — workflow exit codes", () => {
+  test("rejects workflow success without an explicit exit code", async () => {
+    mockStartResult = { status: "success", result: { platform: "React" } };
+
+    const error = await runWizard(makeOptions()).catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(WizardError);
+    expect((error as WizardError).exitCode).not.toBe(0);
+  });
+
   // handleFinalResult calls mapWorkflowExitCode when the workflow result
   // carries a non-zero exitCode. Each case maps a server-internal code to
   // the CLI's semantic EXIT constant.
@@ -1358,7 +1373,7 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
     let capturedResume: Record<string, unknown> | undefined;
     makeStaleStepRun((args) => {
       capturedResume = args.resumeData as Record<string, unknown>;
-      return Promise.resolve({ status: "success" });
+      return Promise.resolve({ status: "success", result: { exitCode: 0 } });
     });
 
     await runWizard(makeOptions());
@@ -1387,7 +1402,10 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
         status: "suspended",
         suspendPayload: { ...protocolPayload, detail: "new display text" },
       })
-      .mockResolvedValueOnce({ status: "success" });
+      .mockResolvedValueOnce({
+        status: "success",
+        result: { exitCode: 0 },
+      });
     let resumeCount = 0;
     makeStaleStepRun(() => {
       resumeCount += 1;
@@ -1410,6 +1428,7 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
     };
     const currentRunState: WorkflowRunResult = {
       status: "success",
+      result: { exitCode: 0 },
       suspended: [],
     };
     runByIdMock.mockImplementation(
@@ -1423,7 +1442,7 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
       if (resumeCount === 1) {
         return Promise.reject(staleStepError(409));
       }
-      return Promise.resolve({ status: "success" });
+      return Promise.resolve({ status: "success", result: { exitCode: 0 } });
     });
 
     await runWizard(makeOptions());
@@ -1456,6 +1475,7 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
     };
     runByIdMock.mockResolvedValue({
       status: "success",
+      result: { exitCode: 0 },
       suspended: [],
     });
     let resumeCount = 0;
@@ -1487,7 +1507,10 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
         status: "suspended",
         suspendPayload: protocolPayload,
       })
-      .mockResolvedValueOnce({ status: "success" });
+      .mockResolvedValueOnce({
+        status: "success",
+        result: { exitCode: 0 },
+      });
 
     let resumeCount = 0;
     makeStaleStepRun(() => {
@@ -1538,7 +1561,7 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
       if (resumeCount === 1) {
         return Promise.reject(staleStepError());
       }
-      return Promise.resolve({ status: "success" });
+      return Promise.resolve({ status: "success", result: { exitCode: 0 } });
     });
 
     await runWizard(makeOptions());
@@ -1611,7 +1634,7 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
       suspended: [["tool-step"]],
       steps: { "tool-step": { suspendPayload: toolPayload } },
     };
-    mockRunByIdResult = { status: "success" };
+    mockRunByIdResult = { status: "success", result: { exitCode: 0 } };
 
     let resumeCount = 0;
     makeStaleStepRun(() => {
@@ -1708,7 +1731,7 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
           steps: { "apply-codemods": { suspendPayload: applyPayload } },
         });
       }
-      return Promise.resolve({ status: "success" });
+      return Promise.resolve({ status: "success", result: { exitCode: 0 } });
     });
 
     await runWizard(makeOptions());
@@ -1895,7 +1918,7 @@ describe("runWizard — additional coverage", () => {
         "step-b": { suspendPayload: payload },
       },
     };
-    mockResumeResults = [{ status: "success" }];
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
 
     await expect(runWizard(makeOptions())).rejects.toThrow(WizardError);
 
@@ -1915,7 +1938,7 @@ describe("runWizard — additional coverage", () => {
         "step-b": { suspendPayload: payload },
       },
     };
-    mockResumeResults = [{ status: "success" }];
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
 
     await runWizard(makeOptions());
 
@@ -1947,7 +1970,7 @@ describe("runWizard — additional coverage", () => {
         suspended: [["detect-platform"]],
         steps: { "detect-platform": { suspendPayload: payloadB } },
       },
-      { status: "success" },
+      { status: "success", result: { exitCode: 0 } },
     ];
 
     await runWizard(makeOptions());
@@ -2002,6 +2025,7 @@ describe("runWizard — additional coverage", () => {
     mockResumeResults = [
       {
         status: "success",
+        result: { exitCode: 0 },
         steps: {
           "discover-context": { status: "success" },
           "detect-platform": { status: "success" },
@@ -2088,7 +2112,7 @@ describe("runWizard — additional coverage", () => {
         },
       },
     };
-    mockResumeResults = [{ status: "success" }];
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
 
     await runWizard(makeOptions());
 
@@ -2171,7 +2195,7 @@ describe("runWizard — progress rotation for long-running steps", () => {
     ).toBe(true);
 
     // Resolve the resume and let the wizard finish
-    resolveResume({ status: "success" });
+    resolveResume({ status: "success", result: { exitCode: 0 } });
     await vi.advanceTimersByTimeAsync(100);
     await runPromise;
   });
@@ -2228,7 +2252,7 @@ describe("runWizard — progress rotation for long-running steps", () => {
     // After exhausting messages, should show elapsed time
     expect(messages.some((m) => /\(\d+s\)/.test(m))).toBe(true);
 
-    resolveResume({ status: "success" });
+    resolveResume({ status: "success", result: { exitCode: 0 } });
     await vi.advanceTimersByTimeAsync(100);
     await runPromise;
   });
@@ -2284,7 +2308,7 @@ describe("runWizard — progress rotation for long-running steps", () => {
     // No new messages should have been added by the rotation timer
     expect(messagesAfter).toBe(messagesBefore);
 
-    resolveResume({ status: "success" });
+    resolveResume({ status: "success", result: { exitCode: 0 } });
     await vi.advanceTimersByTimeAsync(100);
     await runPromise;
   });
