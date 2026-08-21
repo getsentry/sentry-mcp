@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-feedback
-version: 0.43.0
+version: 0.44.0-dev.0
 description: Search and inspect User Feedback
 requires:
   bins: ["sentry"]
