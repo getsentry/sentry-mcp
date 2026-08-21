@@ -132,6 +132,59 @@ let capturedClientOptions: { abortSignal?: AbortSignal; retries?: number }[] =
   [];
 
 let savedPlainOutput: string | undefined;
+let testRequestSequence = 0;
+let testEnvelopeByPayload = new WeakMap<
+  object,
+  { protocolVersion: 1; requestId: string }
+>();
+
+/** Model the current server: every valid suspend payload carries a v1 ID. */
+function withV1SuspendEnvelope(raw: unknown): unknown {
+  if (
+    typeof raw !== "object" ||
+    raw === null ||
+    !("type" in raw) ||
+    !["tool", "interactive"].includes(String(raw.type)) ||
+    "protocolVersion" in raw ||
+    "requestId" in raw
+  ) {
+    return raw;
+  }
+
+  let envelope = testEnvelopeByPayload.get(raw);
+  if (!envelope) {
+    testRequestSequence += 1;
+    envelope = {
+      protocolVersion: 1,
+      requestId: `00000000-0000-4000-8000-${String(testRequestSequence).padStart(12, "0")}`,
+    };
+    testEnvelopeByPayload.set(raw, envelope);
+  }
+  return { ...raw, ...envelope };
+}
+
+function withV1SuspendEnvelopes(result: WorkflowRunResult): WorkflowRunResult {
+  const steps = result.steps
+    ? Object.fromEntries(
+        Object.entries(result.steps).map(([stepId, step]) => [
+          stepId,
+          step.suspendPayload === undefined
+            ? step
+            : {
+                ...step,
+                suspendPayload: withV1SuspendEnvelope(step.suspendPayload),
+              },
+        ])
+      )
+    : undefined;
+  return {
+    ...result,
+    ...(steps ? { steps } : {}),
+    ...(result.suspendPayload === undefined
+      ? {}
+      : { suspendPayload: withV1SuspendEnvelope(result.suspendPayload) }),
+  };
+}
 
 function forceStdinTty<T>(action: () => Promise<T>): Promise<T> {
   const originalDescriptor = Object.getOwnPropertyDescriptor(
@@ -169,6 +222,8 @@ beforeEach(() => {
   mockResumeResults = [];
   resumeCallCount = 0;
   mockRunByIdResult = new Error("runById not configured");
+  testRequestSequence = 0;
+  testEnvelopeByPayload = new WeakMap();
   process.exitCode = 0;
 
   spinnerMock.start.mockClear();
@@ -227,18 +282,20 @@ beforeEach(() => {
     .spyOn(process.stderr, "write")
     .mockImplementation(() => true as any);
 
-  startAsyncMock = vi.fn(() => Promise.resolve(mockStartResult));
+  startAsyncMock = vi.fn(() =>
+    Promise.resolve(withV1SuspendEnvelopes(mockStartResult))
+  );
   runByIdMock = vi.fn(() =>
     mockRunByIdResult instanceof Error
       ? Promise.reject(mockRunByIdResult)
-      : Promise.resolve(mockRunByIdResult)
+      : Promise.resolve(withV1SuspendEnvelopes(mockRunByIdResult))
   );
   sharedResumeAsyncMock = vi.fn(() => {
     const result = mockResumeResults[resumeCallCount] ?? {
       status: "success",
     };
     resumeCallCount += 1;
-    return Promise.resolve(result);
+    return Promise.resolve(withV1SuspendEnvelopes(result));
   });
   const run = {
     runId: "test-run-id",
@@ -770,6 +827,34 @@ describe("runWizard", () => {
     await expect(runWizard(makeOptions())).rejects.toThrow(WizardError);
   });
 
+  test.each([
+    ["a missing envelope", {}],
+    ["an unsupported version", { protocolVersion: 2, requestId: "request" }],
+    ["a missing request ID", { protocolVersion: 1 }],
+    ["an empty request ID", { protocolVersion: 1, requestId: "" }],
+  ])("rejects suspend payloads with %s", async (_label, envelope) => {
+    startAsyncMock.mockResolvedValueOnce({
+      status: "suspended",
+      suspended: [["detect-platform"]],
+      steps: {
+        "detect-platform": {
+          suspendPayload: {
+            type: "tool",
+            operation: "list-dir",
+            cwd: "/tmp/test",
+            params: { path: "." },
+            ...envelope,
+          },
+        },
+      },
+    });
+
+    await expect(runWizard(makeOptions())).rejects.toThrow(
+      "Invalid init protocol envelope"
+    );
+    expect(executeToolSpy).not.toHaveBeenCalled();
+  });
+
   test("fails when a suspended step has no payload", async () => {
     mockStartResult = {
       status: "suspended",
@@ -902,6 +987,7 @@ describe("runWizard", () => {
             cwd: "/tmp/test",
             params: {
               paths: ["src/settings.py", "src/urls.py"],
+              resultVersion: 2,
             },
           },
         },
@@ -1201,7 +1287,9 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
           Promise.resolve({
             runId: "test-run-id",
             startAsync: startAsyncMock,
-            resumeAsync: vi.fn(resumeAsyncImpl),
+            resumeAsync: vi.fn(async (args) =>
+              withV1SuspendEnvelopes(await resumeAsyncImpl(args))
+            ),
           })
         ),
         runById: runByIdRef,
@@ -1384,15 +1472,20 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
 
   test("keeps polling when runById returns the same suspended payload snapshot", async () => {
     vi.useFakeTimers();
+    const protocolPayload: SuspendPayload = {
+      ...toolPayload,
+      protocolVersion: 1,
+      requestId: "8c7ee6b9-e955-4514-9164-f01844584a28",
+    };
     mockStartResult = {
       status: "suspended",
       suspended: [["tool-step"]],
-      steps: { "tool-step": { suspendPayload: toolPayload } },
+      steps: { "tool-step": { suspendPayload: protocolPayload } },
     };
     runByIdMock
       .mockResolvedValueOnce({
         status: "suspended",
-        suspendPayload: toolPayload,
+        suspendPayload: protocolPayload,
       })
       .mockResolvedValueOnce({ status: "success" });
 
@@ -1416,7 +1509,7 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
       type: "tool",
       operation: "read-files",
       cwd: "/tmp/test",
-      params: { paths: ["old-package.json"] },
+      params: { paths: ["old-package.json"], resultVersion: 2 },
     };
     const activePayload: ToolPayload = {
       type: "tool",
@@ -1573,7 +1666,7 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
       type: "tool",
       operation: "read-files",
       cwd: "/tmp/test",
-      params: { paths: ["package.json"] },
+      params: { paths: ["package.json"], resultVersion: 2 },
     };
     const applyPayload: ToolPayload = {
       type: "tool",
@@ -1589,7 +1682,16 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
     executeToolSpy
       .mockResolvedValueOnce({
         ok: true,
-        data: { files: { "package.json": largeContent } },
+        data: {
+          files: {
+            "package.json": {
+              content: largeContent,
+              status: "ok",
+              truncated: false,
+            },
+          },
+          version: 2,
+        },
       })
       .mockResolvedValueOnce({
         ok: false,
@@ -1800,7 +1902,7 @@ describe("runWizard — additional coverage", () => {
     expect(executeToolSpy).not.toHaveBeenCalledWith(payload, makeContext());
   });
 
-  test("uses legacy fallback only when no active step info exists and one payload is present", async () => {
+  test("uses the sole payload fallback when no active step info exists", async () => {
     const payload: ToolPayload = {
       type: "tool",
       operation: "run-commands",
@@ -1831,7 +1933,7 @@ describe("runWizard — additional coverage", () => {
       type: "tool",
       operation: "read-files",
       cwd: "/tmp/test",
-      params: { paths: ["package.json"] },
+      params: { paths: ["package.json"], resultVersion: 2 },
     };
 
     mockStartResult = {
@@ -1886,7 +1988,7 @@ describe("runWizard — additional coverage", () => {
       type: "tool",
       operation: "read-files",
       cwd: "/tmp/test",
-      params: { paths: ["package.json"] },
+      params: { paths: ["package.json"], resultVersion: 2 },
     };
 
     mockStartResult = {
@@ -2004,7 +2106,7 @@ describe("runWizard — progress rotation for long-running steps", () => {
       type: "tool" as const,
       operation: "read-files",
       cwd: "/tmp/test",
-      params: { paths: ["src/app.tsx"] },
+      params: { paths: ["src/app.tsx"], resultVersion: 2 },
     };
     mockStartResult = {
       status: "suspended",
@@ -2080,7 +2182,7 @@ describe("runWizard — progress rotation for long-running steps", () => {
       type: "tool" as const,
       operation: "read-files",
       cwd: "/tmp/test",
-      params: { paths: ["src/app.tsx"] },
+      params: { paths: ["src/app.tsx"], resultVersion: 2 },
     };
     mockStartResult = {
       status: "suspended",
