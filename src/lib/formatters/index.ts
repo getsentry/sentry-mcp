@@ -14,6 +14,7 @@ export * from "./markdown.js";
 export * from "./numbers.js";
 export * from "./output.js";
 export * from "./seer.js";
+export * from "./sixel-timeseries.js";
 export * from "./sparkline.js";
 export * from "./table.js";
 export * from "./time-utils.js";
