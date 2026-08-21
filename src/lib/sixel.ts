@@ -226,6 +226,23 @@ export function terminalPixelWidth(
 }
 
 /**
+ * The usable image height in device pixels for a number of terminal rows.
+ *
+ * Returns `undefined` when the terminal did not report cell height. Callers
+ * rendering positioned sixel layouts must require this measurement rather than
+ * guessing, because a guessed row height corrupts the dashboard grid.
+ */
+export function terminalPixelHeight(
+  rows: number = process.stdout.rows ?? 24
+): number | undefined {
+  const caps = detectSixelCaps();
+  if (!(caps.supported && caps.cellHeight && caps.cellHeight > 0)) {
+    return;
+  }
+  return rows * caps.cellHeight;
+}
+
+/**
  * The baked sixel banner escape string when the terminal supports sixel and the
  * image fits `columns`; otherwise `undefined` so the caller falls back to the
  * block-art banner.
