@@ -939,8 +939,21 @@ export class InkUI implements WizardUI {
     }
     // Leave the alternate screen buffer so the user's original
     // scrollback is restored.
+    //
+    // When the user queued an interactive post-exit action (the agent-plugin
+    // installer), also clear the restored screen and home the cursor. Exiting
+    // the alt buffer returns the cursor to the row where `sentry init` was
+    // invoked — usually low on the screen — so without this the exit summary
+    // and the installer's own full-screen UI would render from mid-screen with
+    // a blank gap above. Clearing gives the handoff the same clean top-of-screen
+    // start as wizard startup (line ~362). The normal exit (no installer) is
+    // left untouched so its compact summary flows into scrollback as before.
+    const hasPostExitActions =
+      this.store.getSnapshot().postExitActions.length > 0;
     try {
-      process.stdout.write("\x1b[?1049l");
+      process.stdout.write(
+        hasPostExitActions ? "\x1b[?1049l\x1b[2J\x1b[H" : "\x1b[?1049l"
+      );
     } catch {
       // best-effort — stdout may already be destroyed
     }
