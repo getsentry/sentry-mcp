@@ -1329,6 +1329,39 @@ function syncWorkflowStepStatuses(
   }
 }
 
+type WorkflowFailure = {
+  message: string;
+  resultForDisplay: WorkflowRunResult;
+  workflowCode: number | undefined;
+};
+
+function getWorkflowFailure(
+  result: WorkflowRunResult
+): WorkflowFailure | undefined {
+  const workflowCode = result.result?.exitCode;
+  if (result.status === "success" && workflowCode === 0) {
+    return;
+  }
+
+  const missingExitCodeMessage =
+    result.status === "success" && workflowCode === undefined
+      ? "Workflow reported success without an explicit exit code"
+      : undefined;
+  const message =
+    missingExitCodeMessage ??
+    result.error ??
+    result.result?.message ??
+    "Workflow returned an error";
+
+  return {
+    message,
+    resultForDisplay: missingExitCodeMessage
+      ? { ...result, error: message }
+      : result,
+    workflowCode,
+  };
+}
+
 // biome-ignore lint/nursery/useMaxParams: cwd and sentryProject are optional trailing extensions
 export async function handleFinalResult(
   result: WorkflowRunResult,
@@ -1338,26 +1371,22 @@ export async function handleFinalResult(
   cwd?: string,
   sentryProject?: SentryProjectIdentity
 ): Promise<void> {
-  const hasError = result.status !== "success" || result.result?.exitCode;
+  const failure = getWorkflowFailure(result);
 
-  if (hasError) {
+  if (failure) {
     if (spinState.running) {
       spin.stop("Failed", 1);
       spinState.running = false;
     }
-    formatError(result, ui);
+    formatError(failure.resultForDisplay, ui);
 
     // Map workflow-internal exit codes to semantic EXIT.* constants
-    const workflowCode = result.result?.exitCode;
-    const exitCode = mapWorkflowExitCode(workflowCode);
+    const exitCode = mapWorkflowExitCode(failure.workflowCode);
     setTag("wizard.outcome", "errored");
-    if (workflowCode !== undefined) {
-      setTag("wizard.exit_code", workflowCode);
+    if (failure.workflowCode !== undefined) {
+      setTag("wizard.exit_code", failure.workflowCode);
     }
-    throw new WizardError(
-      result.error ?? result.result?.message ?? "Workflow returned an error",
-      { exitCode }
-    );
+    throw new WizardError(failure.message, { exitCode });
   }
 
   // Run verification before printing the final summary so the user

@@ -47,16 +47,20 @@ function makeSpinState(running = false) {
 
 /** Minimal WizardUI stub — only the methods formatError touches. */
 function makeUI() {
-  const noop = () => null;
   return {
-    log: { error: noop, warn: noop, info: noop, message: noop },
-    cancel: noop,
-    feedback: noop,
-    summary: noop,
-    outro: noop,
-    intro: noop,
-    setStep: noop,
-    markFilesAnalyzed: noop,
+    log: {
+      error: vi.fn(),
+      warn: vi.fn(),
+      info: vi.fn(),
+      message: vi.fn(),
+    },
+    cancel: vi.fn(),
+    feedback: vi.fn(),
+    summary: vi.fn(),
+    outro: vi.fn(),
+    intro: vi.fn(),
+    setStep: vi.fn(),
+    markFilesAnalyzed: vi.fn(),
   } as any;
 }
 
@@ -80,6 +84,41 @@ beforeEach(() => {
 });
 
 describe("handleFinalResult", () => {
+  describe("success contract", () => {
+    test.each([
+      { status: "success" } as WorkflowRunResult,
+      { status: "success", result: {} } as WorkflowRunResult,
+    ])("rejects a successful workflow without an explicit zero exit", async (result) => {
+      const ui = makeUI();
+      const error = await handleFinalResult(
+        result,
+        makeSpinnerHandle(),
+        makeSpinState(),
+        ui
+      ).catch((caught) => caught);
+
+      expect(error).toBeInstanceOf(WizardError);
+      expect((error as WizardError).exitCode).not.toBe(0);
+      expect((error as WizardError).message).toBe(
+        "Workflow reported success without an explicit exit code"
+      );
+      expect(ui.log.error).toHaveBeenCalledWith(
+        "Workflow reported success without an explicit exit code"
+      );
+    });
+
+    test("accepts a successful workflow with exit code zero", async () => {
+      await expect(
+        handleFinalResult(
+          { status: "success", result: { exitCode: 0 } },
+          makeSpinnerHandle(),
+          makeSpinState(),
+          makeUI()
+        )
+      ).resolves.toBeUndefined();
+    });
+  });
+
   describe("WizardError message", () => {
     test("uses bail message from result.result.message when present", async () => {
       const result = makeBailResult({
