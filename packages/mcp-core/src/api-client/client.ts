@@ -730,7 +730,24 @@ export class SentryApiService {
       response = await fetch(url, {
         ...options,
         headers,
+        redirect: "manual",
       });
+      // Handle redirects manually to preserve the HTTP method and body.
+      // fetch's default redirect:'follow' converts POST→GET on 301/302/303,
+      // which causes the keys list endpoint to be called instead of creating a key.
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (location) {
+          const method = (options.method || "GET").toUpperCase();
+          // 307/308 always preserve method; GET/HEAD are safe to follow directly.
+          // For all other cases (e.g. POST 302) re-issue with the original method and body.
+          response = await fetch(location, {
+            ...options,
+            headers,
+            redirect: "manual",
+          });
+        }
+      }
     } catch (error) {
       // Extract the root cause from the error chain
       let rootCause = error;
