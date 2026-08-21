@@ -1,5 +1,4 @@
-import fs from "node:fs";
-import path from "node:path";
+import type fs from "node:fs";
 import { MAX_FILE_BYTES } from "../constants.js";
 import type {
   ReadFileErrorCode,
@@ -8,7 +7,11 @@ import type {
   ReadFileV2Result,
   ToolResult,
 } from "../types.js";
-import { safePath } from "./shared.js";
+import {
+  type OpenedProjectFile,
+  openProjectFile,
+  projectFileChanged,
+} from "./project-file.js";
 import type { InitToolDefinition } from "./types.js";
 
 const DEFAULT_MAX_LINES = 1000;
@@ -17,28 +20,11 @@ const MAX_V2_CONTENT_BYTES = 40_000;
 const MAX_READ_LINES = 2000;
 const MAX_READ_PATHS = 20;
 const PATH_SEGMENT_RE = /[/\\\\]/u;
-const SENSITIVE_PATH_TOKEN_RE = /[\\/{},()[\]!+@?*]+/u;
-const SENSITIVE_PATH_TOKENS = new Set([
-  ".git",
-  ".git-credentials",
-  ".hg",
-  ".netrc",
-  ".npmrc",
-  ".pypirc",
-  ".svn",
-  ".yarnrc",
-  ".yarnrc.yml",
-]);
 
 type ReadBounds = {
   maxBytes: number;
   maxLines: number;
   startLine: number;
-};
-
-type OpenedProjectFile = {
-  handle: fs.promises.FileHandle;
-  stat: fs.Stats;
 };
 
 /**
@@ -81,9 +67,6 @@ async function readSingleFileV1(
   filePath: string,
   maxBytes: number
 ): Promise<string | null> {
-  if (isSensitiveReadPath(filePath)) {
-    return null;
-  }
   let opened: OpenedProjectFile | undefined;
   try {
     const result = await openProjectFile(cwd, filePath);
@@ -94,7 +77,7 @@ async function readSingleFileV1(
     const bytesToRead = Math.min(opened.stat.size, maxBytes);
     const buffer = Buffer.alloc(bytesToRead);
     await opened.handle.read(buffer, 0, bytesToRead, 0);
-    if (fileChanged(opened.stat, await opened.handle.stat())) {
+    if (projectFileChanged(opened.stat, await opened.handle.stat())) {
       return null;
     }
     return buffer.toString("utf-8");
@@ -143,9 +126,6 @@ async function readSingleFileV2(
   filePath: string,
   bounds: ReadBounds
 ): Promise<ReadFileV2Result> {
-  if (isSensitiveReadPath(filePath)) {
-    return { error: "unreadable", status: "error" };
-  }
   let opened: OpenedProjectFile | undefined;
   try {
     const result = await openProjectFile(cwd, filePath);
@@ -154,7 +134,7 @@ async function readSingleFileV2(
     }
     opened = result;
     if (opened.stat.size === 0) {
-      if (fileChanged(opened.stat, await opened.handle.stat())) {
+      if (projectFileChanged(opened.stat, await opened.handle.stat())) {
         return { error: "unreadable", status: "error" };
       }
       return bounds.startLine === 1
@@ -167,7 +147,7 @@ async function readSingleFileV2(
     }
 
     const page = await readTextPage(opened.handle, opened.stat.size, bounds);
-    if (fileChanged(opened.stat, await opened.handle.stat())) {
+    if (projectFileChanged(opened.stat, await opened.handle.stat())) {
       return { error: "unreadable", status: "error" };
     }
     return page;
@@ -276,73 +256,6 @@ function priorLinesOrError(
     : { content: buffer.subarray(startOffset, endOffset) };
 }
 
-async function openProjectFile(
-  cwd: string,
-  filePath: string
-): Promise<OpenedProjectFile | { error: ReadFileErrorCode }> {
-  let handle: fs.promises.FileHandle | undefined;
-  try {
-    const absPath = safePath(cwd, filePath);
-    handle = await fs.promises.open(
-      absPath,
-      // biome-ignore lint/suspicious/noBitwiseOperators: fs open flags are a bitmask.
-      fs.constants.O_RDONLY | fs.constants.O_NONBLOCK
-    );
-    const stat = await handle.stat();
-    if (!stat.isFile()) {
-      await closeQuietly(handle);
-      return { error: "not-file" };
-    }
-    if (!(await openedPathIsAllowed(cwd, absPath, stat))) {
-      await closeQuietly(handle);
-      return { error: "unreadable" };
-    }
-    return { handle, stat };
-  } catch (error) {
-    await handle?.close().catch(() => {
-      // Preserve the primary open error when cleanup fails.
-    });
-    return { error: readErrorCode(error) };
-  }
-}
-
-async function closeQuietly(handle: fs.promises.FileHandle): Promise<void> {
-  await handle.close().catch(() => {
-    // Descriptor cleanup must not replace the primary read classification.
-  });
-}
-
-async function openedPathIsAllowed(
-  cwd: string,
-  absPath: string,
-  openedStat: fs.Stats
-): Promise<boolean> {
-  const [realCwd, realPath] = await Promise.all([
-    fs.promises.realpath(cwd),
-    fs.promises.realpath(absPath),
-  ]);
-  if (realPath !== realCwd && !realPath.startsWith(`${realCwd}${path.sep}`)) {
-    return false;
-  }
-  const relativeRealPath = path.relative(realCwd, realPath);
-  if (isSensitiveReadPath(relativeRealPath)) {
-    return false;
-  }
-  const resolvedStat = await fs.promises.stat(realPath);
-  return (
-    resolvedStat.dev === openedStat.dev && resolvedStat.ino === openedStat.ino
-  );
-}
-
-function fileChanged(initial: fs.Stats, final: fs.Stats): boolean {
-  return (
-    final.dev !== initial.dev ||
-    final.ino !== initial.ino ||
-    final.size !== initial.size ||
-    final.mtimeMs !== initial.mtimeMs
-  );
-}
-
 function validateReadRequest(payload: ReadFilesPayload): string | undefined {
   const params = (payload as { params?: unknown }).params;
   if (typeof params !== "object" || params === null) {
@@ -402,20 +315,6 @@ function isInvalidPositiveInteger(value: unknown): boolean {
   return (
     value !== undefined &&
     (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1)
-  );
-}
-
-function isSensitiveReadPath(filePath: string): boolean {
-  const tokens = filePath
-    .toLowerCase()
-    .split(SENSITIVE_PATH_TOKEN_RE)
-    .filter(Boolean);
-  return tokens.some(
-    (token) =>
-      SENSITIVE_PATH_TOKENS.has(token) ||
-      token === ".dev.vars" ||
-      token === ".env" ||
-      token.startsWith(".env.")
   );
 }
 
