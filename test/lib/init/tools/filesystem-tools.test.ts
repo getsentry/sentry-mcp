@@ -305,13 +305,20 @@ describe("filesystem tools", () => {
     });
   });
 
-  test("keeps read-files bounds and sensitive-path policy local", async () => {
+  test("reads regular metadata files while preserving sandbox and text bounds", async () => {
     fs.writeFileSync(path.join(testDir, ".env.local"), "SECRET=value\n");
+    fs.writeFileSync(
+      path.join(testDir, ".netrc"),
+      "machine example.test login user password secret\n"
+    );
     fs.writeFileSync(path.join(testDir, ".pypirc"), "token=secret\n");
+    fs.writeFileSync(
+      path.join(testDir, ".npmrc"),
+      "//registry/:_authToken=secret\n"
+    );
     fs.writeFileSync(path.join(testDir, "binary.txt"), Buffer.from([0, 1, 2]));
-    fs.symlinkSync(".env.local", path.join(testDir, "config.txt"));
 
-    const sensitive = await executeTool(
+    const environment = await executeTool(
       {
         type: "tool",
         operation: "read-files",
@@ -329,7 +336,7 @@ describe("filesystem tools", () => {
       },
       makeContext(testDir)
     );
-    const omittedSensitive = await executeTool(
+    const packageMetadata = await executeTool(
       {
         type: "tool",
         operation: "read-files",
@@ -338,30 +345,95 @@ describe("filesystem tools", () => {
       },
       makeContext(testDir)
     );
-    const sensitiveAlias = await executeTool(
+    const netrc = await executeTool(
       {
         type: "tool",
         operation: "read-files",
         cwd: testDir,
-        params: { paths: ["config.txt"], resultVersion: 2 },
+        params: { paths: [".netrc"], resultVersion: 2 },
       },
       makeContext(testDir)
     );
-
-    expect(sensitive.data).toEqual({
-      files: { ".env.local": { error: "unreadable", status: "error" } },
+    const legacyNpmConfig = await executeTool(
+      {
+        type: "tool",
+        operation: "read-files",
+        cwd: testDir,
+        params: { paths: [".npmrc"] },
+      },
+      makeContext(testDir)
+    );
+    expect(environment.data).toEqual({
+      files: {
+        ".env.local": {
+          content: "SECRET=value\n",
+          status: "ok",
+          truncated: false,
+        },
+      },
       version: 2,
     });
-    expect(omittedSensitive.data).toEqual({
-      files: { ".pypirc": { error: "unreadable", status: "error" } },
+    expect(packageMetadata.data).toEqual({
+      files: {
+        ".pypirc": {
+          content: "token=secret\n",
+          status: "ok",
+          truncated: false,
+        },
+      },
       version: 2,
+    });
+    expect(netrc.data).toEqual({
+      files: {
+        ".netrc": {
+          content: "machine example.test login user password secret\n",
+          status: "ok",
+          truncated: false,
+        },
+      },
+      version: 2,
+    });
+    expect(legacyNpmConfig.data).toEqual({
+      files: { ".npmrc": "//registry/:_authToken=secret\n" },
     });
     expect(binary.data).toEqual({
       files: { "binary.txt": { error: "not-text", status: "error" } },
       version: 2,
     });
-    expect(sensitiveAlias.data).toEqual({
-      files: { "config.txt": { error: "unreadable", status: "error" } },
+  });
+
+  test("rejects aliases to sensitive files in V1 and V2", async () => {
+    fs.writeFileSync(
+      path.join(testDir, ".netrc"),
+      "machine example.test login user password secret\n"
+    );
+    fs.symlinkSync(".netrc", path.join(testDir, "credentials.txt"));
+    fs.symlinkSync(".netrc", path.join(testDir, ".pypirc"));
+
+    const legacyAlias = await executeTool(
+      {
+        type: "tool",
+        operation: "read-files",
+        cwd: testDir,
+        params: { paths: ["credentials.txt"] },
+      },
+      makeContext(testDir)
+    );
+    const sensitiveNameAlias = await executeTool(
+      {
+        type: "tool",
+        operation: "read-files",
+        cwd: testDir,
+        params: { paths: [".pypirc"], resultVersion: 2 },
+      },
+      makeContext(testDir)
+    );
+
+    expect(legacyAlias.data).toEqual({
+      files: { "credentials.txt": null },
+    });
+    expect(sensitiveNameAlias.data).toEqual({
+      files: { ".pypirc": { error: "unreadable", status: "error" } },
       version: 2,
     });
   });
