@@ -15,11 +15,49 @@ const SENSITIVE_PATH_TOKENS = new Set([
   ".yarnrc",
   ".yarnrc.yml",
 ]);
+const CONTROL_CHARACTER_RE = /\p{Cc}/u;
+const WINDOWS_DRIVE_RE = /^[A-Za-z]:/u;
+const WINDOWS_RESERVED_SEGMENT_RE =
+  /^(?:aux|con|nul|prn|com[1-9]|lpt[1-9])(?:\..*)?$/iu;
 
 export type OpenedProjectFile = {
   handle: fs.promises.FileHandle;
   stat: fs.Stats;
 };
+
+/**
+ * Normalize a portable filesystem-root-relative file path.
+ *
+ * Tool requests may use either slash style, but aliases that resolve
+ * differently across operating systems are rejected before filesystem I/O.
+ */
+export function normalizeProjectFilePath(filePath: string): string | undefined {
+  const portablePath = filePath.replaceAll("\\", "/");
+  if (
+    portablePath.startsWith("/") ||
+    WINDOWS_DRIVE_RE.test(portablePath) ||
+    CONTROL_CHARACTER_RE.test(portablePath)
+  ) {
+    return;
+  }
+
+  const segments = portablePath.split("/");
+  if (
+    segments.some(
+      (segment) =>
+        segment.length === 0 ||
+        segment === "." ||
+        segment === ".." ||
+        segment.includes(":") ||
+        segment.endsWith(".") ||
+        segment.endsWith(" ") ||
+        WINDOWS_RESERVED_SEGMENT_RE.test(segment)
+    )
+  ) {
+    return;
+  }
+  return segments.join("/");
+}
 
 /**
  * Open a stable regular file inside a project root.

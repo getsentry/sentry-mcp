@@ -12,7 +12,6 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { isDeepStrictEqual } from "node:util";
 
 import { MastraClient } from "@mastra/client-js";
 import {
@@ -181,18 +180,15 @@ function hasHttpStatus(value: unknown): value is { status: number } {
   );
 }
 
-/** Read a complete v1 identity while keeping legacy server payloads valid. */
-function initProtocolEnvelope(
-  payload: SuspendPayload
-): { protocolVersion: 1; requestId: string } | undefined {
-  return payload.protocolVersion === INIT_PROTOCOL_VERSION &&
-    typeof payload.requestId === "string" &&
-    payload.requestId.length > 0
-    ? {
-        protocolVersion: INIT_PROTOCOL_VERSION,
-        requestId: payload.requestId,
-      }
-    : undefined;
+/** Copy the validated v1 request identity onto a resume payload. */
+function initProtocolEnvelope(payload: SuspendPayload): {
+  protocolVersion: 1;
+  requestId: string;
+} {
+  return {
+    protocolVersion: INIT_PROTOCOL_VERSION,
+    requestId: payload.requestId,
+  };
 }
 
 function hasActiveStepsPath(value: Record<string, unknown>): value is Record<
@@ -555,7 +551,7 @@ function assertWorkflowResult(raw: unknown): WorkflowRunResult {
   return obj as WorkflowRunResult;
 }
 
-/** Parse legacy or complete v1 suspend payloads, rejecting partial envelopes. */
+/** Parse suspend payloads and require the complete v1 transport identity. */
 function assertSuspendPayload(raw: unknown): SuspendPayload {
   if (!raw || typeof raw !== "object") {
     throw new Error("Invalid suspend payload: expected object");
@@ -567,13 +563,14 @@ function assertSuspendPayload(raw: unknown): SuspendPayload {
   ) {
     throw new Error(`Unknown suspend payload type: ${String(obj.type)}`);
   }
-  const payload = obj as SuspendPayload;
-  const hasProtocolFields =
-    Object.hasOwn(obj, "protocolVersion") || Object.hasOwn(obj, "requestId");
-  if (hasProtocolFields && !initProtocolEnvelope(payload)) {
+  if (
+    obj.protocolVersion !== INIT_PROTOCOL_VERSION ||
+    typeof obj.requestId !== "string" ||
+    obj.requestId.length === 0
+  ) {
     throw new Error("Invalid init protocol envelope");
   }
-  return payload;
+  return obj as SuspendPayload;
 }
 
 /** Keep transport identity at the wire boundary, outside local tool and UI contracts. */
@@ -792,11 +789,7 @@ function runStateRecoveryBackoffMs(): number[] {
   return delays;
 }
 
-/**
- * A v1 request advances only when the active request ID changed. Legacy
- * servers fall back to payload equality during the temporary compatibility
- * window.
- */
+/** A v1 request advances only when the active request ID changed. */
 function isRecoverableRunState(
   result: WorkflowRunResult,
   resumedStepId: string,
@@ -811,16 +804,7 @@ function isRecoverableRunState(
     return false;
   }
 
-  const resumedEnvelope = initProtocolEnvelope(resumedPayload);
-  const recoveredEnvelope = initProtocolEnvelope(recovered.payload);
-  if (resumedEnvelope && recoveredEnvelope) {
-    return recoveredEnvelope.requestId !== resumedEnvelope.requestId;
-  }
-
-  return !(
-    recovered.stepId === resumedStepId &&
-    isDeepStrictEqual(recovered.payload, resumedPayload)
-  );
+  return recovered.payload.requestId !== resumedPayload.requestId;
 }
 
 /**
@@ -899,8 +883,10 @@ async function resumeWithRecovery(
     ui,
     progressRotation,
   } = args;
-  const envelope = initProtocolEnvelope(payload);
-  const wireResumeData = envelope ? { ...resumeData, ...envelope } : resumeData;
+  const wireResumeData = {
+    ...resumeData,
+    ...initProtocolEnvelope(payload),
+  };
   try {
     const raw = await withTimeout(
       withInitServiceAuthClassification(

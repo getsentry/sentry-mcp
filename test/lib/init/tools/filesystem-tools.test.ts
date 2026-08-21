@@ -50,6 +50,138 @@ describe("filesystem tools", () => {
     expect(result.error).toContain("outside project directory");
   });
 
+  test("rejects an external cwd symlink for every filesystem and shell tool", async () => {
+    const outsideDir = fs.mkdtempSync(
+      path.join(path.dirname(testDir), "init-tools-outside-")
+    );
+    const escapedCwd = path.join(testDir, "escape");
+    fs.writeFileSync(path.join(outsideDir, "sentinel.txt"), "OUTSIDE\n");
+    fs.symlinkSync(outsideDir, escapedCwd, "dir");
+    const payloads: ToolPayload[] = [
+      {
+        type: "tool",
+        operation: "list-dir",
+        cwd: escapedCwd,
+        params: { path: "." },
+      },
+      {
+        type: "tool",
+        operation: "read-files",
+        cwd: escapedCwd,
+        params: { paths: ["sentinel.txt"], resultVersion: 2 },
+      },
+      {
+        type: "tool",
+        operation: "file-exists-batch",
+        cwd: escapedCwd,
+        params: { paths: ["sentinel.txt"] },
+      },
+      {
+        type: "tool",
+        operation: "grep",
+        cwd: escapedCwd,
+        params: { searches: [{ pattern: "OUTSIDE" }] },
+      },
+      {
+        type: "tool",
+        operation: "glob",
+        cwd: escapedCwd,
+        params: { patterns: ["**/*"] },
+      },
+      {
+        type: "tool",
+        operation: "run-commands",
+        cwd: escapedCwd,
+        params: { commands: ["node --version"] },
+      },
+      {
+        type: "tool",
+        operation: "apply-patchset",
+        cwd: escapedCwd,
+        params: {
+          patches: [
+            {
+              action: "create",
+              path: "created-by-tool.txt",
+              patch: "created outside the project\n",
+            },
+          ],
+        },
+      },
+    ];
+
+    try {
+      for (const payload of payloads) {
+        const result = await executeTool(payload, makeContext(testDir));
+        expect(result.ok, payload.operation).toBe(false);
+        expect(result.error, payload.operation).toContain(
+          "outside project directory"
+        );
+      }
+      expect(fs.existsSync(path.join(outsideDir, "created-by-tool.txt"))).toBe(
+        false
+      );
+    } finally {
+      fs.rmSync(outsideDir, { recursive: true, force: true });
+    }
+  });
+
+  test("allows a cwd symlink that resolves inside the selected project", async () => {
+    fs.mkdirSync(path.join(testDir, "real", "nested"), { recursive: true });
+    fs.writeFileSync(
+      path.join(testDir, "real", "nested", "inside.txt"),
+      "inside\n"
+    );
+    fs.symlinkSync(
+      path.join(testDir, "real"),
+      path.join(testDir, "alias"),
+      "dir"
+    );
+
+    const result = await executeTool(
+      {
+        type: "tool",
+        operation: "read-files",
+        cwd: path.join(testDir, "alias"),
+        params: { paths: ["nested/inside.txt"], resultVersion: 2 },
+      },
+      makeContext(testDir)
+    );
+
+    expect(result.data).toEqual({
+      files: {
+        "nested/inside.txt": {
+          content: "inside\n",
+          status: "ok",
+          truncated: false,
+        },
+      },
+      version: 2,
+    });
+  });
+
+  test("rejects sibling-prefix and missing cwd values", async () => {
+    const siblingDir = `${testDir}-sibling`;
+    fs.mkdirSync(siblingDir);
+    try {
+      for (const cwd of [siblingDir, path.join(testDir, "missing")]) {
+        const result = await executeTool(
+          {
+            type: "tool",
+            operation: "list-dir",
+            cwd,
+            params: { path: "." },
+          },
+          makeContext(testDir)
+        );
+        expect(result.ok, cwd).toBe(false);
+        expect(result.error, cwd).toContain("outside project directory");
+      }
+    } finally {
+      fs.rmSync(siblingDir, { recursive: true, force: true });
+    }
+  });
+
   test("lists and precomputes directory contents", async () => {
     fs.writeFileSync(path.join(testDir, "index.ts"), "export {};\n");
     fs.mkdirSync(path.join(testDir, "src"));
@@ -183,7 +315,10 @@ describe("filesystem tools", () => {
         type: "tool",
         operation: "read-files",
         cwd: testDir,
-        params: { paths: ["exists.txt", "missing.txt"] },
+        params: {
+          paths: ["exists.txt", "missing.txt"],
+          resultVersion: 2,
+        },
       },
       makeContext(testDir)
     );
@@ -197,17 +332,25 @@ describe("filesystem tools", () => {
       makeContext(testDir)
     );
 
-    expect((readResult.data as any).files["exists.txt"]).toBe("hello");
-    expect((readResult.data as any).files["missing.txt"]).toBeNull();
+    expect((readResult.data as any).files["exists.txt"]).toEqual({
+      content: "hello",
+      status: "ok",
+      truncated: false,
+    });
+    expect((readResult.data as any).files["missing.txt"]).toEqual({
+      error: "not-found",
+      status: "error",
+    });
     expect((existsResult.data as any).exists["exists.txt"]).toBe(true);
     expect((existsResult.data as any).exists["missing.txt"]).toBe(false);
   });
 
   test("returns independent bounded V2 line ranges", async () => {
-    fs.writeFileSync(
-      path.join(testDir, "large.txt"),
-      Array.from({ length: 8 }, (_, index) => `line-${index + 1}`).join("\n")
+    const lines = Array.from(
+      { length: 8 },
+      (_, index) => `line-${index + 1}:${"x".repeat(19_990)}\n`
     );
+    fs.writeFileSync(path.join(testDir, "large.txt"), lines.join(""));
 
     const first = await executeTool(
       {
@@ -215,7 +358,6 @@ describe("filesystem tools", () => {
         operation: "read-files",
         cwd: testDir,
         params: {
-          maxLines: 3,
           paths: ["large.txt"],
           resultVersion: 2,
         },
@@ -228,7 +370,6 @@ describe("filesystem tools", () => {
         operation: "read-files",
         cwd: testDir,
         params: {
-          maxLines: 2,
           paths: ["large.txt"],
           resultVersion: 2,
           startLine: 5,
@@ -240,7 +381,7 @@ describe("filesystem tools", () => {
     expect(first.data).toEqual({
       files: {
         "large.txt": {
-          content: "line-1\nline-2\nline-3\n",
+          content: lines.slice(0, 2).join(""),
           status: "ok",
           truncated: true,
         },
@@ -250,7 +391,7 @@ describe("filesystem tools", () => {
     expect(later.data).toEqual({
       files: {
         "large.txt": {
-          content: "line-5\nline-6\n",
+          content: lines.slice(4, 6).join(""),
           status: "ok",
           truncated: true,
         },
@@ -260,7 +401,11 @@ describe("filesystem tools", () => {
   });
 
   test("preserves exact line endings in V2 snapshots", async () => {
-    fs.writeFileSync(path.join(testDir, "windows.txt"), "first\r\nsecond\r\n");
+    const firstLine = `${"x".repeat(39_997)}\r\n`;
+    fs.writeFileSync(
+      path.join(testDir, "windows.txt"),
+      `${firstLine}second\r\n`
+    );
 
     const result = await executeTool(
       {
@@ -268,7 +413,6 @@ describe("filesystem tools", () => {
         operation: "read-files",
         cwd: testDir,
         params: {
-          maxLines: 1,
           paths: ["windows.txt"],
           resultVersion: 2,
         },
@@ -279,13 +423,64 @@ describe("filesystem tools", () => {
     expect(result.data).toEqual({
       files: {
         "windows.txt": {
-          content: "first\r\n",
+          content: firstLine,
           status: "ok",
           truncated: true,
         },
       },
       version: 2,
     });
+  });
+
+  test("finds a continuation and fills its window after short descriptor reads", async () => {
+    const filePath = path.join(testDir, "short-reads.txt");
+    const content = "first\nsecond\nthird\n";
+    fs.writeFileSync(filePath, content);
+    const actualHandle = await fs.promises.open(filePath, "r");
+    const shortRead = vi.fn(
+      (
+        buffer: Buffer,
+        offset: number,
+        length: number,
+        position: number | null
+      ) => actualHandle.read(buffer, offset, Math.min(length, 3), position)
+    );
+    const openSpy = vi.spyOn(fs.promises, "open").mockResolvedValue({
+      close: vi.fn().mockResolvedValue(undefined),
+      read: shortRead,
+      stat: () => actualHandle.stat(),
+    } as unknown as fs.promises.FileHandle);
+
+    try {
+      const result = await executeTool(
+        {
+          type: "tool",
+          operation: "read-files",
+          cwd: testDir,
+          params: {
+            paths: ["short-reads.txt"],
+            resultVersion: 2,
+            startLine: 2,
+          },
+        },
+        makeContext(testDir)
+      );
+
+      expect(result.data).toEqual({
+        files: {
+          "short-reads.txt": {
+            content: "second\nthird\n",
+            status: "ok",
+            truncated: false,
+          },
+        },
+        version: 2,
+      });
+      expect(shortRead.mock.calls.length).toBeGreaterThan(1);
+    } finally {
+      openSpy.mockRestore();
+      await actualHandle.close();
+    }
   });
 
   test("rejects malformed V2 read requests before local I/O", async () => {
@@ -301,6 +496,138 @@ describe("filesystem tools", () => {
 
     expect(result).toEqual({
       error: "read-files params must be an object",
+      ok: false,
+    });
+  });
+
+  test("rejects read requests without the V2 result contract", async () => {
+    const result = await executeTool(
+      {
+        type: "tool",
+        operation: "read-files",
+        cwd: testDir,
+        params: { paths: ["package.json"] },
+      } as unknown as ToolPayload,
+      makeContext(testDir)
+    );
+
+    expect(result).toEqual({
+      error: "read-files requires resultVersion 2",
+      ok: false,
+    });
+  });
+
+  test("canonicalizes slash styles while preserving ordinary spaces", async () => {
+    fs.mkdirSync(path.join(testDir, "dir with spaces", "nested dir"), {
+      recursive: true,
+    });
+    fs.mkdirSync(path.join(testDir, "posix"));
+    fs.writeFileSync(
+      path.join(testDir, "dir with spaces", "nested dir", "file name.ts"),
+      "mixed separators\n"
+    );
+    fs.writeFileSync(path.join(testDir, "posix", "file.ts"), "posix path\n");
+
+    const result = await executeTool(
+      {
+        type: "tool",
+        operation: "read-files",
+        cwd: testDir,
+        params: {
+          paths: ["dir with spaces\\nested dir/file name.ts", "posix/file.ts"],
+          resultVersion: 2,
+        },
+      },
+      makeContext(testDir)
+    );
+
+    expect(result.data).toEqual({
+      files: {
+        "dir with spaces/nested dir/file name.ts": {
+          content: "mixed separators\n",
+          status: "ok",
+          truncated: false,
+        },
+        "posix/file.ts": {
+          content: "posix path\n",
+          status: "ok",
+          truncated: false,
+        },
+      },
+      version: 2,
+    });
+  });
+
+  test("rejects non-portable read paths before opening requested files", async () => {
+    const invalidPaths = [
+      "/etc/passwd",
+      "\\etc\\passwd",
+      "C:/repo/package.json",
+      "C:\\repo\\package.json",
+      "C:repo/package.json",
+      "\\\\server\\share\\package.json",
+      "//server/share/package.json",
+      "../outside.txt",
+      "apps/../../outside.txt",
+      "./package.json",
+      "apps/./package.json",
+      "apps//package.json",
+      "apps\\\\package.json",
+      "apps/",
+      "package\0.json",
+      "package\n.json",
+      "package\u007f.json",
+      "folder /package.json",
+      "package.json.",
+      "CON",
+      "con.txt",
+      "apps/NUL.json",
+      "COM1",
+      "lpt9.log",
+      "package.json:secret",
+    ];
+    const openSpy = vi.spyOn(fs.promises, "open");
+
+    try {
+      for (const filePath of invalidPaths) {
+        const result = await executeTool(
+          {
+            type: "tool",
+            operation: "read-files",
+            cwd: testDir,
+            params: { paths: [filePath], resultVersion: 2 },
+          },
+          makeContext(testDir)
+        );
+
+        expect(result, filePath).toEqual({
+          error:
+            "read-files paths must be portable filesystem-root-relative paths without aliases",
+          ok: false,
+        });
+      }
+      expect(openSpy).not.toHaveBeenCalled();
+    } finally {
+      openSpy.mockRestore();
+    }
+  });
+
+  test("rejects duplicate aliases after path normalization", async () => {
+    const result = await executeTool(
+      {
+        type: "tool",
+        operation: "read-files",
+        cwd: testDir,
+        params: {
+          paths: ["apps/web/package.json", "apps\\web\\package.json"],
+          resultVersion: 2,
+        },
+      },
+      makeContext(testDir)
+    );
+
+    expect(result).toEqual({
+      error: "read-files paths must be unique after path normalization",
       ok: false,
     });
   });
@@ -354,12 +681,12 @@ describe("filesystem tools", () => {
       },
       makeContext(testDir)
     );
-    const legacyNpmConfig = await executeTool(
+    const npmConfig = await executeTool(
       {
         type: "tool",
         operation: "read-files",
         cwd: testDir,
-        params: { paths: [".npmrc"] },
+        params: { paths: [".npmrc"], resultVersion: 2 },
       },
       makeContext(testDir)
     );
@@ -393,8 +720,15 @@ describe("filesystem tools", () => {
       },
       version: 2,
     });
-    expect(legacyNpmConfig.data).toEqual({
-      files: { ".npmrc": "//registry/:_authToken=secret\n" },
+    expect(npmConfig.data).toEqual({
+      files: {
+        ".npmrc": {
+          content: "//registry/:_authToken=secret\n",
+          status: "ok",
+          truncated: false,
+        },
+      },
+      version: 2,
     });
     expect(binary.data).toEqual({
       files: { "binary.txt": { error: "not-text", status: "error" } },
@@ -402,7 +736,7 @@ describe("filesystem tools", () => {
     });
   });
 
-  test("rejects aliases to sensitive files in V1 and V2", async () => {
+  test("rejects aliases to sensitive files", async () => {
     fs.writeFileSync(
       path.join(testDir, ".netrc"),
       "machine example.test login user password secret\n"
@@ -410,12 +744,12 @@ describe("filesystem tools", () => {
     fs.symlinkSync(".netrc", path.join(testDir, "credentials.txt"));
     fs.symlinkSync(".netrc", path.join(testDir, ".pypirc"));
 
-    const legacyAlias = await executeTool(
+    const alias = await executeTool(
       {
         type: "tool",
         operation: "read-files",
         cwd: testDir,
-        params: { paths: ["credentials.txt"] },
+        params: { paths: ["credentials.txt"], resultVersion: 2 },
       },
       makeContext(testDir)
     );
@@ -429,13 +763,44 @@ describe("filesystem tools", () => {
       makeContext(testDir)
     );
 
-    expect(legacyAlias.data).toEqual({
-      files: { "credentials.txt": null },
+    expect(alias.data).toEqual({
+      files: {
+        "credentials.txt": { error: "unreadable", status: "error" },
+      },
+      version: 2,
     });
     expect(sensitiveNameAlias.data).toEqual({
       files: { ".pypirc": { error: "unreadable", status: "error" } },
       version: 2,
     });
+  });
+
+  test("rejects regular-file symlinks that escape the project root", async () => {
+    const outsideDir = fs.mkdtempSync(path.join("/tmp", "init-tools-outside-"));
+    const sentinel = "OUTSIDE_PROJECT_SENTINEL";
+    try {
+      const outsideFile = path.join(outsideDir, "outside.txt");
+      fs.writeFileSync(outsideFile, sentinel);
+      fs.symlinkSync(outsideFile, path.join(testDir, "inside.txt"));
+
+      const result = await executeTool(
+        {
+          type: "tool",
+          operation: "read-files",
+          cwd: testDir,
+          params: { paths: ["inside.txt"], resultVersion: 2 },
+        },
+        makeContext(testDir)
+      );
+
+      expect(result.data).toEqual({
+        files: { "inside.txt": { error: "unreadable", status: "error" } },
+        version: 2,
+      });
+      expect(JSON.stringify(result)).not.toContain(sentinel);
+    } finally {
+      fs.rmSync(outsideDir, { recursive: true, force: true });
+    }
   });
 
   test("finds later lines without exposing a cursor protocol", async () => {
@@ -450,7 +815,6 @@ describe("filesystem tools", () => {
         operation: "read-files",
         cwd: testDir,
         params: {
-          maxLines: 1,
           paths: ["deep.txt"],
           resultVersion: 2,
           startLine: 2,
@@ -471,7 +835,7 @@ describe("filesystem tools", () => {
     });
   });
 
-  test("bounds V2 content across a multi-file request", async () => {
+  test("allows 20 normal V2 paths, bounds their content, and rejects 21", async () => {
     const paths = Array.from({ length: 20 }, (_, index) => `file-${index}.txt`);
     for (const filePath of paths) {
       fs.writeFileSync(path.join(testDir, filePath), "x\n".repeat(5000));
@@ -482,12 +846,26 @@ describe("filesystem tools", () => {
         type: "tool",
         operation: "read-files",
         cwd: testDir,
-        params: { maxBytes: 40_000, paths, resultVersion: 2 },
+        params: { paths, resultVersion: 2 },
+      },
+      makeContext(testDir)
+    );
+    const overLimit = await executeTool(
+      {
+        type: "tool",
+        operation: "read-files",
+        cwd: testDir,
+        params: {
+          paths: [...paths, "file-20.txt"],
+          resultVersion: 2,
+        },
       },
       makeContext(testDir)
     );
     const files = (
-      result.data as { files: Record<string, { content: string }> }
+      result.data as {
+        files: Record<string, { content: string; truncated: boolean }>;
+      }
     ).files;
 
     expect(result.ok).toBe(true);
@@ -496,54 +874,22 @@ describe("filesystem tools", () => {
         (total, file) => total + Buffer.byteLength(file.content),
         0
       )
-    ).toBeLessThanOrEqual(40_000);
-  });
-
-  test("reads a short line that starts at the deep-scan boundary", async () => {
-    const scanBytes = 4 * 1024 * 1024;
-    const prefix = "x\n".repeat(scanBytes / 2);
-    fs.writeFileSync(path.join(testDir, "boundary.txt"), `${prefix}target\n`);
-
-    const result = await executeTool(
-      {
-        type: "tool",
-        operation: "read-files",
-        cwd: testDir,
-        params: {
-          maxLines: 1,
-          paths: ["boundary.txt"],
-          resultVersion: 2,
-          startLine: scanBytes / 2 + 1,
-        },
-      },
-      makeContext(testDir)
-    );
-
-    expect(result.data).toEqual({
-      files: {
-        "boundary.txt": {
-          content: "target\n",
-          status: "ok",
-          truncated: false,
-        },
-      },
-      version: 2,
+    ).toBe(40_000);
+    expect(Object.values(files).every((file) => file.truncated)).toBe(true);
+    expect(overLimit).toEqual({
+      error: "read-files requires between 1 and 20 paths",
+      ok: false,
     });
   });
 
-  test("reports an existing line beyond the deep-scan boundary", async () => {
-    const scanBytes = 4 * 1024 * 1024;
-    const prefix = `${"x".repeat(scanBytes)}\n`;
-    fs.writeFileSync(path.join(testDir, "too-deep.txt"), `${prefix}target\n`);
-
+  test("rejects a continuation request with more than one path", async () => {
     const result = await executeTool(
       {
         type: "tool",
         operation: "read-files",
         cwd: testDir,
         params: {
-          maxLines: 1,
-          paths: ["too-deep.txt"],
+          paths: ["first.txt", "second.txt"],
           resultVersion: 2,
           startLine: 2,
         },
@@ -551,33 +897,183 @@ describe("filesystem tools", () => {
       makeContext(testDir)
     );
 
+    expect(result).toEqual({
+      error: "read-files range reads require exactly one path",
+      ok: false,
+    });
+  });
+
+  test("does not impose a separate line limit on V2 reads", async () => {
+    const content = "x\n".repeat(1500);
+    fs.writeFileSync(path.join(testDir, "many-lines.txt"), content);
+
+    const result = await executeTool(
+      {
+        type: "tool",
+        operation: "read-files",
+        cwd: testDir,
+        params: { paths: ["many-lines.txt"], resultVersion: 2 },
+      },
+      makeContext(testDir)
+    );
+
     expect(result.data).toEqual({
       files: {
-        "too-deep.txt": { error: "range-too-deep", status: "error" },
+        "many-lines.txt": { content, status: "ok", truncated: false },
       },
       version: 2,
     });
   });
 
-  test("rejects incomplete lines and invalid UTF-8 instead of clipping", async () => {
-    fs.writeFileSync(
-      path.join(testDir, "long-line.txt"),
-      `${"x".repeat(50_000)}\n`
+  test("rejects byte-budget knobs instead of enabling another profile", async () => {
+    const result = await executeTool(
+      {
+        type: "tool",
+        operation: "read-files",
+        cwd: testDir,
+        params: {
+          maxBytes: 262_144,
+          paths: ["large.txt"],
+          resultVersion: 2,
+        },
+      } as ToolPayload,
+      makeContext(testDir)
     );
+
+    expect(result).toEqual({
+      error: "read-files params include unsupported fields",
+      ok: false,
+    });
+  });
+
+  test("streams a continuation beyond 4 MiB with bounded read buffers", async () => {
+    const filePath = path.join(testDir, "deep-continuation.txt");
+    const splitUtf8Prefix = `${"x".repeat(5 * 1024 * 1024 - 1)}é\n`;
+    fs.writeFileSync(filePath, `${splitUtf8Prefix}target\n`);
+    const actualHandle = await fs.promises.open(filePath, "r");
+    const requestedLengths: number[] = [];
+    const streamedRead = vi.fn(
+      (
+        buffer: Buffer,
+        offset: number,
+        length: number,
+        position: number | null
+      ) => {
+        requestedLengths.push(length);
+        return actualHandle.read(buffer, offset, length, position);
+      }
+    );
+    const openSpy = vi.spyOn(fs.promises, "open").mockResolvedValue({
+      close: vi.fn().mockResolvedValue(undefined),
+      read: streamedRead,
+      stat: () => actualHandle.stat(),
+    } as unknown as fs.promises.FileHandle);
+
+    try {
+      const result = await executeTool(
+        {
+          type: "tool",
+          operation: "read-files",
+          cwd: testDir,
+          params: {
+            paths: ["deep-continuation.txt"],
+            resultVersion: 2,
+            startLine: 2,
+          },
+        },
+        makeContext(testDir)
+      );
+
+      expect(result.data).toEqual({
+        files: {
+          "deep-continuation.txt": {
+            content: "target\n",
+            status: "ok",
+            truncated: false,
+          },
+        },
+        version: 2,
+      });
+      expect(Math.max(...requestedLengths)).toBeLessThanOrEqual(64 * 1024);
+      expect(streamedRead.mock.calls.length).toBeGreaterThan(64);
+    } finally {
+      openSpy.mockRestore();
+      await actualHandle.close();
+    }
+  });
+
+  test("stops reading an enormous first line at the output budget", async () => {
+    const filePath = path.join(testDir, "enormous-line.txt");
+    fs.writeFileSync(filePath, `${"x".repeat(8 * 1024 * 1024)}\n`);
+    const actualHandle = await fs.promises.open(filePath, "r");
+    let totalBytesRead = 0;
+    const boundedRead = vi.fn(
+      async (
+        buffer: Buffer,
+        offset: number,
+        length: number,
+        position: number | null
+      ) => {
+        const result = await actualHandle.read(
+          buffer,
+          offset,
+          length,
+          position
+        );
+        totalBytesRead += result.bytesRead;
+        return result;
+      }
+    );
+    const openSpy = vi.spyOn(fs.promises, "open").mockResolvedValue({
+      close: vi.fn().mockResolvedValue(undefined),
+      read: boundedRead,
+      stat: () => actualHandle.stat(),
+    } as unknown as fs.promises.FileHandle);
+
+    try {
+      const result = await executeTool(
+        {
+          type: "tool",
+          operation: "read-files",
+          cwd: testDir,
+          params: {
+            paths: ["enormous-line.txt"],
+            resultVersion: 2,
+          },
+        },
+        makeContext(testDir)
+      );
+
+      expect(result.data).toEqual({
+        files: {
+          "enormous-line.txt": { error: "line-too-long", status: "error" },
+        },
+        version: 2,
+      });
+      expect(totalBytesRead).toBe(40_000);
+    } finally {
+      openSpy.mockRestore();
+      await actualHandle.close();
+    }
+  });
+
+  test("rejects invalid UTF-8 and incomplete multibyte lines", async () => {
     fs.writeFileSync(
       path.join(testDir, "invalid-utf8.txt"),
       Buffer.from([0x61, 0x62, 0x63, 0xff])
     );
-    fs.writeFileSync(path.join(testDir, "multibyte.txt"), "é\n");
+    fs.writeFileSync(
+      path.join(testDir, "multibyte.txt"),
+      `${"é".repeat(20_001)}\n`
+    );
 
-    const read = (filePath: string, maxBytes?: number) =>
+    const read = (filePath: string) =>
       executeTool(
         {
           type: "tool",
           operation: "read-files",
           cwd: testDir,
           params: {
-            maxBytes,
             paths: [filePath],
             resultVersion: 2,
           },
@@ -585,19 +1081,13 @@ describe("filesystem tools", () => {
         makeContext(testDir)
       );
 
-    expect((await read("long-line.txt")).data).toEqual({
-      files: {
-        "long-line.txt": { error: "line-too-long", status: "error" },
-      },
-      version: 2,
-    });
     expect((await read("invalid-utf8.txt")).data).toEqual({
       files: {
         "invalid-utf8.txt": { error: "not-text", status: "error" },
       },
       version: 2,
     });
-    expect((await read("multibyte.txt", 1)).data).toEqual({
+    expect((await read("multibyte.txt")).data).toEqual({
       files: {
         "multibyte.txt": { error: "line-too-long", status: "error" },
       },

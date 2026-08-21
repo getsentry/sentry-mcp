@@ -107,13 +107,10 @@ export type ReadFilesPayload = {
   cwd: string;
   params: {
     paths: string[];
-    maxBytes?: number;
-    /** Maximum text lines returned per file by the bounded V2 reader. */
-    maxLines?: number;
-    /** First 1-based line to inspect. V2 range reads support one path. */
+    /** First 1-based line to inspect. Range reads support one path. */
     startLine?: number;
-    /** Opts into bounded, structured read results. */
-    resultVersion?: 2;
+    /** Structured read-results protocol used by sentry init. */
+    resultVersion: 2;
   };
 };
 
@@ -123,7 +120,6 @@ export type ReadFileErrorCode =
   | "not-file"
   | "not-found"
   | "not-text"
-  | "range-too-deep"
   | "unreadable";
 
 export type ReadFileV2Result =
@@ -332,13 +328,8 @@ export type ConfirmPayload = {
   prompt: string;
 };
 
-type LegacyInitProtocolEnvelope = {
-  protocolVersion?: never;
-  requestId?: never;
-};
-
 export type SuspendPayload = (ToolPayload | InteractivePayload) &
-  (InitProtocolEnvelope | LegacyInitProtocolEnvelope);
+  InitProtocolEnvelope;
 
 export type WorkflowRunResult = {
   status: "suspended" | "success" | "failed";

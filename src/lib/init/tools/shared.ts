@@ -50,25 +50,37 @@ export function safePath(cwd: string, relative: string): string {
 }
 
 /**
- * Reject tool executions whose requested cwd escapes the selected project root.
+ * Resolve a tool cwd inside the selected project root, or reject it.
+ *
+ * The returned real path pins any safe cwd symlink before tool execution.
  */
 export function validateToolSandbox(
   payload: Pick<ToolPayload, "cwd">,
   directory: string
-): ToolResult | undefined {
-  const normalizedCwd = path.resolve(payload.cwd);
-  const normalizedDir = path.resolve(directory);
-  if (
-    normalizedCwd !== normalizedDir &&
-    !normalizedCwd.startsWith(normalizedDir + path.sep)
-  ) {
-    return {
-      ok: false,
-      error: `Blocked: cwd "${payload.cwd}" is outside project directory "${directory}"`,
-    };
+): { cwd: string } | ToolResult {
+  try {
+    const realDirectory = fs.realpathSync(path.resolve(directory));
+    const realCwd = fs.realpathSync(path.resolve(payload.cwd));
+    const relativeCwd = path.relative(realDirectory, realCwd);
+    const isInsideDirectory =
+      relativeCwd === "" ||
+      (relativeCwd !== ".." &&
+        !relativeCwd.startsWith(`..${path.sep}`) &&
+        !path.isAbsolute(relativeCwd));
+
+    if (isInsideDirectory && fs.statSync(realCwd).isDirectory()) {
+      // Execute against the resolved directory so a symlinked cwd cannot be
+      // retargeted between this boundary check and the tool implementation.
+      return { cwd: realCwd };
+    }
+  } catch {
+    // Missing or unreadable roots fail closed at the shared tool boundary.
   }
 
-  return;
+  return {
+    ok: false,
+    error: `Blocked: cwd "${payload.cwd}" is outside project directory "${directory}" or cannot be resolved`,
+  };
 }
 
 /**

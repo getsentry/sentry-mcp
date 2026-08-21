@@ -1,5 +1,5 @@
 import type fs from "node:fs";
-import { MAX_FILE_BYTES } from "../constants.js";
+import { TextDecoder } from "node:util";
 import type {
   ReadFileErrorCode,
   ReadFilesPayload,
@@ -8,106 +8,54 @@ import type {
   ToolResult,
 } from "../types.js";
 import {
+  normalizeProjectFilePath,
   type OpenedProjectFile,
   openProjectFile,
   projectFileChanged,
 } from "./project-file.js";
 import type { InitToolDefinition } from "./types.js";
 
-const DEFAULT_MAX_LINES = 1000;
-const MAX_SCAN_BYTES = 4 * 1024 * 1024;
-const MAX_V2_CONTENT_BYTES = 40_000;
-const MAX_READ_LINES = 2000;
+const MAX_READ_OUTPUT_BYTES = 40_000;
 const MAX_READ_PATHS = 20;
+const FILE_READ_CHUNK_BYTES = 64 * 1024;
 const PATH_SEGMENT_RE = /[/\\\\]/u;
 
-type ReadBounds = {
-  maxBytes: number;
-  maxLines: number;
+type ReadWindow = {
+  outputBytes: number;
   startLine: number;
+};
+
+type LineScan = {
+  consumedBytes: number;
+  found: boolean;
+  skippedLines: number;
 };
 
 /**
  * Read one or more files from the sandboxed project directory.
  *
- * Legacy requests keep their original string-or-null response. V2 requests
- * return independent, bounded line ranges; callers may issue another read or
+ * Returns independent, bounded line ranges. Callers may issue another read or
  * use grep when they need different evidence. The CLI keeps no continuation
  * state between calls.
  */
 export async function readFiles(
   payload: ReadFilesPayload
 ): Promise<ToolResult> {
-  const error = validateReadRequest(payload);
-  if (error) {
-    return { error, ok: false };
+  const validated = validateReadRequest(payload);
+  if ("error" in validated) {
+    return { error: validated.error, ok: false };
   }
-
-  if (payload.params.resultVersion === 2) {
-    return readFilesV2(payload, boundedV2MaxBytes(payload.params.maxBytes));
-  }
-  const maxBytes = boundedLegacyMaxBytes(payload.params.maxBytes);
-
-  const results = await Promise.all(
-    payload.params.paths.map(async (filePath) => {
-      const content = await readSingleFileV1(payload.cwd, filePath, maxBytes);
-      return [filePath, content] as const;
-    })
+  const perFileOutputBytes = Math.max(
+    1,
+    Math.floor(MAX_READ_OUTPUT_BYTES / validated.paths.length)
   );
-
-  return {
-    data: { files: Object.fromEntries(results) },
-    ok: true,
-  };
-}
-
-/** Preserve the wire behavior expected by APIs predating read-files v2. */
-async function readSingleFileV1(
-  cwd: string,
-  filePath: string,
-  maxBytes: number
-): Promise<string | null> {
-  let opened: OpenedProjectFile | undefined;
-  try {
-    const result = await openProjectFile(cwd, filePath);
-    if ("error" in result) {
-      return null;
-    }
-    opened = result;
-    const bytesToRead = Math.min(opened.stat.size, maxBytes);
-    const buffer = Buffer.alloc(bytesToRead);
-    await opened.handle.read(buffer, 0, bytesToRead, 0);
-    if (projectFileChanged(opened.stat, await opened.handle.stat())) {
-      return null;
-    }
-    return buffer.toString("utf-8");
-  } catch {
-    return null;
-  } finally {
-    await opened?.handle.close().catch(() => {
-      // Preserve the legacy null-or-string result when cleanup fails.
-    });
-  }
-}
-
-async function readFilesV2(
-  payload: ReadFilesPayload,
-  maxBytes: number
-): Promise<ToolResult> {
-  const startLine = payload.params.startLine ?? 1;
-  const maxLines = boundedMaxLines(payload.params.maxLines);
-  const perFileMaxBytes = Math.min(
-    maxBytes,
-    Math.max(1, Math.floor(MAX_V2_CONTENT_BYTES / payload.params.paths.length))
-  );
-  const bounds = {
-    maxBytes: perFileMaxBytes,
-    maxLines,
-    startLine,
-  } satisfies ReadBounds;
+  const window = {
+    outputBytes: perFileOutputBytes,
+    startLine: validated.startLine,
+  } satisfies ReadWindow;
   const results = await Promise.all(
-    payload.params.paths.map(async (filePath) => {
-      const result = await readSingleFileV2(payload.cwd, filePath, bounds);
+    validated.paths.map(async (filePath) => {
+      const result = await readSingleFileV2(payload.cwd, filePath, window);
       return [filePath, result] as const;
     })
   );
@@ -124,7 +72,7 @@ async function readFilesV2(
 async function readSingleFileV2(
   cwd: string,
   filePath: string,
-  bounds: ReadBounds
+  window: ReadWindow
 ): Promise<ReadFileV2Result> {
   let opened: OpenedProjectFile | undefined;
   try {
@@ -137,7 +85,7 @@ async function readSingleFileV2(
       if (projectFileChanged(opened.stat, await opened.handle.stat())) {
         return { error: "unreadable", status: "error" };
       }
-      return bounds.startLine === 1
+      return window.startLine === 1
         ? {
             content: "",
             status: "ok",
@@ -146,7 +94,7 @@ async function readSingleFileV2(
         : { error: "invalid-range", status: "error" };
     }
 
-    const page = await readTextPage(opened.handle, opened.stat.size, bounds);
+    const page = await readTextPage(opened.handle, opened.stat.size, window);
     if (projectFileChanged(opened.stat, await opened.handle.stat())) {
       return { error: "unreadable", status: "error" };
     }
@@ -163,141 +111,172 @@ async function readSingleFileV2(
 async function readTextPage(
   handle: fs.promises.FileHandle,
   fileSize: number,
-  bounds: ReadBounds
+  window: ReadWindow
 ): Promise<ReadFileV2Result> {
-  const scanBudget =
-    bounds.startLine === 1 ? bounds.maxBytes : MAX_SCAN_BYTES + bounds.maxBytes;
-  const scanBytes = Math.min(fileSize, scanBudget);
-  const scanBuffer = Buffer.alloc(scanBytes);
-  const { bytesRead } = await handle.read(scanBuffer, 0, scanBytes, 0);
-  const readable = scanBuffer.subarray(0, bytesRead);
-  if (!isTextBuffer(readable, bytesRead < fileSize)) {
-    return { error: "not-text", status: "error" };
+  const located = await locateLineStart(handle, fileSize, window.startLine);
+  if ("error" in located) {
+    return { error: located.error, status: "error" };
   }
 
-  const startOffset = lineStartOffset(readable, bounds.startLine);
-  if (startOffset === undefined) {
+  const pageBytes = Math.min(window.outputBytes, fileSize - located.offset);
+  const page = Buffer.alloc(pageBytes);
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let bytesRead = 0;
+  while (bytesRead < pageBytes) {
+    const result = await handle.read(
+      page,
+      bytesRead,
+      pageBytes - bytesRead,
+      located.offset + bytesRead
+    );
+    if (result.bytesRead === 0) {
+      return { error: "unreadable", status: "error" };
+    }
+    const nextBytesRead = bytesRead + result.bytesRead;
+    if (
+      !isTextChunk(
+        decoder,
+        page.subarray(bytesRead, nextBytesRead),
+        located.offset + nextBytesRead < fileSize
+      )
+    ) {
+      return { error: "not-text", status: "error" };
+    }
+    bytesRead = nextBytesRead;
+  }
+
+  if (located.offset + bytesRead === fileSize) {
     return {
-      error: bytesRead < fileSize ? "range-too-deep" : "invalid-range",
-      status: "error",
+      content: page.toString("utf-8"),
+      status: "ok",
+      truncated: false,
     };
   }
-  if (startOffset > MAX_SCAN_BYTES) {
-    return { error: "range-too-deep", status: "error" };
-  }
-  const selected = selectCompleteLines(readable, fileSize, startOffset, bounds);
-  if ("error" in selected) {
-    return { error: selected.error, status: "error" };
+
+  const lastNewline = page.lastIndexOf(0x0a);
+  if (lastNewline === -1) {
+    return { error: "line-too-long", status: "error" };
   }
   return {
-    content: selected.content.toString("utf-8"),
+    content: page.subarray(0, lastNewline + 1).toString("utf-8"),
     status: "ok",
-    truncated: startOffset + selected.content.length < fileSize,
+    truncated: true,
   };
 }
 
-function lineStartOffset(
-  buffer: Buffer,
+async function locateLineStart(
+  handle: fs.promises.FileHandle,
+  fileSize: number,
   startLine: number
-): number | undefined {
+): Promise<
+  { offset: number } | { error: "invalid-range" | "not-text" | "unreadable" }
+> {
+  if (startLine === 1) {
+    return { offset: 0 };
+  }
+
+  const buffer = Buffer.alloc(Math.min(FILE_READ_CHUNK_BYTES, fileSize));
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let linesToSkip = startLine - 1;
+  let position = 0;
+  while (position < fileSize) {
+    const result = await handle.read(
+      buffer,
+      0,
+      Math.min(buffer.length, fileSize - position),
+      position
+    );
+    if (result.bytesRead === 0) {
+      return { error: "unreadable" };
+    }
+
+    const chunk = buffer.subarray(0, result.bytesRead);
+    const scan = scanLineBreaks(chunk, linesToSkip);
+    const nextPosition = position + scan.consumedBytes;
+    if (
+      !isTextChunk(
+        decoder,
+        chunk.subarray(0, scan.consumedBytes),
+        !scan.found && nextPosition < fileSize
+      )
+    ) {
+      return { error: "not-text" };
+    }
+    if (scan.found) {
+      return nextPosition < fileSize
+        ? { offset: nextPosition }
+        : { error: "invalid-range" };
+    }
+    linesToSkip -= scan.skippedLines;
+    position += result.bytesRead;
+  }
+  return { error: "invalid-range" };
+}
+
+function scanLineBreaks(buffer: Buffer, linesToSkip: number): LineScan {
   let offset = 0;
-  for (let line = 1; line < startLine; line += 1) {
+  for (let skippedLines = 0; skippedLines < linesToSkip; skippedLines += 1) {
     const newline = buffer.indexOf(0x0a, offset);
     if (newline === -1) {
-      return;
+      return {
+        consumedBytes: buffer.length,
+        found: false,
+        skippedLines,
+      };
     }
     offset = newline + 1;
   }
-  return offset < buffer.length ? offset : undefined;
+  return {
+    consumedBytes: offset,
+    found: true,
+    skippedLines: linesToSkip,
+  };
 }
 
-function selectCompleteLines(
-  buffer: Buffer,
-  fileSize: number,
-  startOffset: number,
-  bounds: ReadBounds
-): { content: Buffer } | { error: "line-too-long" } {
-  let offset = startOffset;
-  for (let lines = 0; lines < bounds.maxLines; lines += 1) {
-    const lineEnd = completeLineEnd(buffer, fileSize, offset);
-    if (lineEnd === undefined) {
-      return priorLinesOrError(buffer, startOffset, offset);
-    }
-    if (lineEnd - startOffset > bounds.maxBytes) {
-      return priorLinesOrError(buffer, startOffset, offset);
-    }
-    offset = lineEnd;
-    if (offset === buffer.length) {
-      break;
-    }
-  }
-  return { content: buffer.subarray(startOffset, offset) };
-}
-
-function completeLineEnd(
-  buffer: Buffer,
-  fileSize: number,
-  offset: number
-): number | undefined {
-  const newline = buffer.indexOf(0x0a, offset);
-  if (newline !== -1) {
-    return newline + 1;
-  }
-  return buffer.length === fileSize ? buffer.length : undefined;
-}
-
-function priorLinesOrError(
-  buffer: Buffer,
-  startOffset: number,
-  endOffset: number
-): { content: Buffer } | { error: "line-too-long" } {
-  return endOffset === startOffset
-    ? { error: "line-too-long" }
-    : { content: buffer.subarray(startOffset, endOffset) };
-}
-
-function validateReadRequest(payload: ReadFilesPayload): string | undefined {
+function validateReadRequest(
+  payload: ReadFilesPayload
+): { error: string } | { paths: string[]; startLine: number } {
   const params = (payload as { params?: unknown }).params;
   if (typeof params !== "object" || params === null) {
-    return "read-files params must be an object";
+    return { error: "read-files params must be an object" };
   }
-  const { maxBytes, maxLines, paths, resultVersion, startLine } =
-    params as Partial<ReadFilesPayload["params"]>;
-  const pathError = validateReadPaths(paths);
-  if (pathError) {
-    return pathError;
+  const { paths, resultVersion, startLine } = params as Partial<
+    ReadFilesPayload["params"]
+  >;
+  if (resultVersion !== 2) {
+    return { error: "read-files requires resultVersion 2" };
   }
-  const validPaths = paths as string[];
-  if (isInvalidPositiveInteger(maxBytes)) {
-    return "read-files maxBytes must be a positive safe integer";
+  const supportedKeys = new Set(["paths", "resultVersion", "startLine"]);
+  if (Object.keys(params).some((key) => !supportedKeys.has(key))) {
+    return { error: "read-files params include unsupported fields" };
   }
-  if (resultVersion !== undefined && resultVersion !== 2) {
-    return "read-files resultVersion is not supported";
+  const normalizedPaths = normalizeReadPaths(paths);
+  if ("error" in normalizedPaths) {
+    return normalizedPaths;
   }
   if (isInvalidPositiveInteger(startLine)) {
-    return "read-files startLine must be a positive safe integer";
+    return {
+      error: "read-files startLine must be a positive safe integer",
+    };
   }
-  if (isInvalidPositiveInteger(maxLines)) {
-    return "read-files maxLines must be a positive safe integer";
+  const normalizedStartLine = startLine ?? 1;
+  if (normalizedStartLine > 1 && normalizedPaths.paths.length !== 1) {
+    return { error: "read-files range reads require exactly one path" };
   }
-  if (
-    (startLine !== undefined || maxLines !== undefined) &&
-    resultVersion !== 2
-  ) {
-    return "read-files line ranges require resultVersion 2";
-  }
-  if ((startLine ?? 1) > 1 && validPaths.length !== 1) {
-    return "read-files range reads require exactly one path";
-  }
+  return { paths: normalizedPaths.paths, startLine: normalizedStartLine };
 }
 
-function validateReadPaths(paths: unknown): string | undefined {
+function normalizeReadPaths(
+  paths: unknown
+): { error: string } | { paths: string[] } {
   if (
     !Array.isArray(paths) ||
     paths.length === 0 ||
     paths.length > MAX_READ_PATHS
   ) {
-    return `read-files requires between 1 and ${MAX_READ_PATHS} paths`;
+    return {
+      error: `read-files requires between 1 and ${MAX_READ_PATHS} paths`,
+    };
   }
   if (
     paths.some(
@@ -307,8 +286,22 @@ function validateReadPaths(paths: unknown): string | undefined {
         filePath.length > 1000
     )
   ) {
-    return "read-files paths must be non-empty bounded strings";
+    return { error: "read-files paths must be non-empty bounded strings" };
   }
+  const normalizedPaths = (paths as string[]).map(normalizeProjectFilePath);
+  if (normalizedPaths.some((filePath) => filePath === undefined)) {
+    return {
+      error:
+        "read-files paths must be portable filesystem-root-relative paths without aliases",
+    };
+  }
+  const canonicalPaths = normalizedPaths as string[];
+  if (new Set(canonicalPaths).size !== canonicalPaths.length) {
+    return {
+      error: "read-files paths must be unique after path normalization",
+    };
+  }
+  return { paths: canonicalPaths };
 }
 
 function isInvalidPositiveInteger(value: unknown): boolean {
@@ -318,25 +311,11 @@ function isInvalidPositiveInteger(value: unknown): boolean {
   );
 }
 
-function boundedLegacyMaxBytes(value: number | undefined): number {
-  return value === undefined
-    ? MAX_FILE_BYTES
-    : Math.max(1, Math.min(value, MAX_FILE_BYTES));
-}
-
-function boundedV2MaxBytes(value: number | undefined): number {
-  return value === undefined
-    ? MAX_V2_CONTENT_BYTES
-    : Math.max(1, Math.min(value, MAX_V2_CONTENT_BYTES));
-}
-
-function boundedMaxLines(value: number | undefined): number {
-  return value === undefined
-    ? DEFAULT_MAX_LINES
-    : Math.max(1, Math.min(value, MAX_READ_LINES));
-}
-
-function isTextBuffer(buffer: Buffer, mayEndMidCharacter: boolean): boolean {
+function isTextChunk(
+  decoder: TextDecoder,
+  buffer: Buffer,
+  hasMoreBytes: boolean
+): boolean {
   if (
     buffer.some(
       (byte) =>
@@ -346,9 +325,7 @@ function isTextBuffer(buffer: Buffer, mayEndMidCharacter: boolean): boolean {
     return false;
   }
   try {
-    new TextDecoder("utf-8", { fatal: true }).decode(buffer, {
-      stream: mayEndMidCharacter,
-    });
+    decoder.decode(buffer, { stream: hasMoreBytes });
     return true;
   } catch {
     return false;
