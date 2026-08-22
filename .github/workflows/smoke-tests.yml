@@ -49,78 +49,103 @@ jobs:
 
       - name: Start local dev server
         working-directory: packages/mcp-cloudflare
+        env:
+          # Keep smoke non-interactive and avoid first-run telemetry side effects.
+          WRANGLER_SEND_METRICS: "false"
+          CI: "true"
         run: |
-          # Start wrangler in background and capture output
+          set -euo pipefail
+
+          # App CLI is intentionally pinned below latest Wrangler (see catalog).
+          # wrangler@4.125.0 can still abort mid-smoke with an empty ERROR around
+          # OAuth metadata routes (ECONNRESET -> process exit). Do not pass
+          # `--ip 127.0.0.1`; default localhost binding is what CI validates.
+          #
+          # Prefer the Vite-built redirected config under dist/ so assets resolve
+          # the same way as post-build local smoke (not raw public/).
+          pnpm exec wrangler --version | tee wrangler.version
           pnpm exec wrangler dev --port 8788 --local > wrangler.log 2>&1 &
           WRANGLER_PID=$!
-          echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
+          echo "WRANGLER_PID=$WRANGLER_PID" >> "$GITHUB_ENV"
           echo "Waiting for server to start (PID: $WRANGLER_PID)..."
 
-          # Wait for server to be ready (up to 2 minutes)
           MAX_ATTEMPTS=24
           ATTEMPT=0
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            # Check if wrangler process is still running
-            if ! kill -0 $WRANGLER_PID 2>/dev/null; then
+          while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
+            if ! kill -0 "$WRANGLER_PID" 2>/dev/null; then
               echo "❌ Wrangler process died unexpectedly!"
-              echo "📋 Last 50 lines of wrangler.log:"
-              tail -50 wrangler.log
+              echo "📋 Last 80 lines of wrangler.log:"
+              tail -80 wrangler.log || true
               exit 1
             fi
-            
-            if curl -s -f -o /dev/null http://localhost:8788/; then
-              echo "✅ Server is ready!"
+
+            # Accept only HTTP 200 on `/` so a bare Worker without SPA assets
+            # cannot look "ready" while homepage smoke will fail.
+            status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:8788/ || echo 000)"
+            if [ "$status" = "200" ]; then
+              echo "✅ Server is ready (GET / -> 200)!"
               echo "📋 Wrangler startup log:"
               cat wrangler.log
               break
-            else
-              echo "⏳ Waiting for server to start (attempt $((ATTEMPT+1))/$MAX_ATTEMPTS)..."
-              # Show partial log every 5 attempts
-              if [ $((ATTEMPT % 5)) -eq 0 ] && [ $ATTEMPT -gt 0 ]; then
-                echo "📋 Current wrangler.log output:"
-                tail -20 wrangler.log
-              fi
             fi
-            
+
+            echo "⏳ Waiting for server to start (attempt $((ATTEMPT+1))/$MAX_ATTEMPTS, status=$status)..."
+            if [ $((ATTEMPT % 5)) -eq 0 ] && [ "$ATTEMPT" -gt 0 ]; then
+              echo "📋 Current wrangler.log output:"
+              tail -20 wrangler.log || true
+            fi
+
             ATTEMPT=$((ATTEMPT+1))
             sleep 5
           done
 
-          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+          if [ "$ATTEMPT" -eq "$MAX_ATTEMPTS" ]; then
             echo "❌ Server failed to start after $MAX_ATTEMPTS attempts"
             echo "📋 Full wrangler.log:"
-            cat wrangler.log
+            cat wrangler.log || true
             exit 1
           fi
 
       - name: Run smoke tests against local server
         env:
           PREVIEW_URL: http://localhost:8788
+          WRANGLER_SEND_METRICS: "false"
+          CI: "true"
         working-directory: packages/smoke-tests
         run: |
+          set -euo pipefail
           echo "🧪 Running smoke tests against local server at $PREVIEW_URL"
 
-          # Give server a bit more time to stabilize after startup
           echo "⏳ Waiting 5 seconds for server to stabilize..."
           sleep 5
 
-          # Verify server is still responding before running tests
-          if ! curl -s -f -o /dev/null http://localhost:8788/; then
-            echo "❌ Server is not responding before tests!"
+          if ! kill -0 "${WRANGLER_PID:-}" 2>/dev/null; then
+            echo "❌ Wrangler process is not running before tests!"
             echo "📋 Wrangler log:"
-            cat ../mcp-cloudflare/wrangler.log
+            cat ../mcp-cloudflare/wrangler.log || true
+            exit 1
+          fi
+
+          status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:8788/ || echo 000)"
+          if [ "$status" != "200" ]; then
+            echo "❌ Server is not healthy before tests (GET / -> $status)!"
+            echo "📋 Wrangler log:"
+            cat ../mcp-cloudflare/wrangler.log || true
             exit 1
           fi
 
           echo "✅ Server is responding, running tests..."
+          TEST_EXIT_CODE=0
           pnpm test:ci || TEST_EXIT_CODE=$?
 
-          # If tests failed, show server logs for debugging
-          if [ "${TEST_EXIT_CODE:-0}" -ne 0 ]; then
+          if [ "$TEST_EXIT_CODE" -ne 0 ]; then
             echo "❌ Tests failed with exit code ${TEST_EXIT_CODE}"
+            if ! kill -0 "${WRANGLER_PID:-}" 2>/dev/null; then
+              echo "💥 Wrangler process died during smoke tests"
+            fi
             echo "📋 Wrangler log at time of failure:"
-            cat ../mcp-cloudflare/wrangler.log
-            exit ${TEST_EXIT_CODE}
+            cat ../mcp-cloudflare/wrangler.log || true
+            exit "$TEST_EXIT_CODE"
           fi
 
       - name: Publish Smoke Test Report
