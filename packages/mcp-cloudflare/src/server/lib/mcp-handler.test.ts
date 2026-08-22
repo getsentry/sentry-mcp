@@ -1,6 +1,6 @@
 import type { ExecutionContext, RateLimit } from "@cloudflare/workers-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DIRECT_AUTH_ASSERTION_TOKEN } from "../../test-utils/fetch-mock-setup";
+import { DIRECT_AUTH_ASSERTION_TOKEN } from "../../test-utils/direct-auth";
 import type { Env } from "../types";
 
 const { sentryMetricsCount, sentrySetUser } = vi.hoisted(() => ({
