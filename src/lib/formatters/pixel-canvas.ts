@@ -8,6 +8,11 @@
  */
 
 import type { DecodedImage } from "../sixel-image.js";
+import {
+  COZETTE_CELL_HEIGHT,
+  COZETTE_CELL_WIDTH,
+  getCozetteGlyph,
+} from "./cozette-font.js";
 
 /** An RGB color tuple with one 0-255 value per channel. */
 export type Rgb = [number, number, number];
@@ -147,130 +152,95 @@ function copyOpaquePixel(
   destination.data[targetOffset + 3] = source.data[sourceOffset + 3] ?? 255;
 }
 
-/** 5x7 glyphs for dashboard labels and table content. */
-const FONT: Record<string, string[]> = {
-  A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
-  B: ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
-  C: ["01111", "10000", "10000", "10000", "10000", "10000", "01111"],
-  D: ["11110", "10001", "10001", "10001", "10001", "10001", "11110"],
-  E: ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
-  F: ["11111", "10000", "10000", "11110", "10000", "10000", "10000"],
-  G: ["01111", "10000", "10000", "10111", "10001", "10001", "01111"],
-  H: ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
-  I: ["11111", "00100", "00100", "00100", "00100", "00100", "11111"],
-  J: ["00111", "00010", "00010", "00010", "10010", "10010", "01100"],
-  K: ["10001", "10010", "10100", "11000", "10100", "10010", "10001"],
-  L: ["10000", "10000", "10000", "10000", "10000", "10000", "11111"],
-  M: ["10001", "11011", "10101", "10101", "10001", "10001", "10001"],
-  N: ["10001", "11001", "10101", "10011", "10001", "10001", "10001"],
-  O: ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
-  P: ["11110", "10001", "10001", "11110", "10000", "10000", "10000"],
-  Q: ["01110", "10001", "10001", "10001", "10101", "10010", "01101"],
-  R: ["11110", "10001", "10001", "11110", "10100", "10010", "10001"],
-  S: ["01111", "10000", "10000", "01110", "00001", "00001", "11110"],
-  T: ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
-  U: ["10001", "10001", "10001", "10001", "10001", "10001", "01110"],
-  V: ["10001", "10001", "10001", "10001", "10001", "01010", "00100"],
-  W: ["10001", "10001", "10001", "10101", "10101", "10101", "01010"],
-  X: ["10001", "10001", "01010", "00100", "01010", "10001", "10001"],
-  Y: ["10001", "10001", "01010", "00100", "00100", "00100", "00100"],
-  Z: ["11111", "00001", "00010", "00100", "01000", "10000", "11111"],
-  "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
-  "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
-  "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
-  "3": ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
-  "4": ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
-  "5": ["11111", "10000", "10000", "11110", "00001", "00001", "11110"],
-  "6": ["01110", "10000", "10000", "11110", "10001", "10001", "01110"],
-  "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
-  "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
-  "9": ["01110", "10001", "10001", "01111", "00001", "00001", "01110"],
-  " ": ["00000", "00000", "00000", "00000", "00000", "00000", "00000"],
-  ".": ["00000", "00000", "00000", "00000", "00000", "00110", "00110"],
-  ",": ["00000", "00000", "00000", "00000", "00110", "00110", "00100"],
-  ":": ["00000", "00110", "00110", "00000", "00110", "00110", "00000"],
-  ";": ["00000", "00110", "00110", "00000", "00110", "00110", "00100"],
-  "-": ["00000", "00000", "00000", "01110", "00000", "00000", "00000"],
-  _: ["00000", "00000", "00000", "00000", "00000", "00000", "11111"],
-  "/": ["00001", "00010", "00100", "01000", "10000", "00000", "00000"],
-  "\\": ["10000", "01000", "00100", "00010", "00001", "00000", "00000"],
-  "(": ["00010", "00100", "01000", "01000", "01000", "00100", "00010"],
-  ")": ["01000", "00100", "00010", "00010", "00010", "00100", "01000"],
-  "[": ["01110", "01000", "01000", "01000", "01000", "01000", "01110"],
-  "]": ["01110", "00010", "00010", "00010", "00010", "00010", "01110"],
-  "=": ["00000", "11111", "00000", "11111", "00000", "00000", "00000"],
-  "+": ["00000", "00100", "00100", "11111", "00100", "00100", "00000"],
-  "?": ["01110", "10001", "00001", "00010", "00100", "00000", "00100"],
-  "!": ["00100", "00100", "00100", "00100", "00100", "00000", "00100"],
-  "#": ["01010", "11111", "01010", "01010", "11111", "01010", "00000"],
-  "%": ["11001", "11010", "00100", "01000", "10110", "00110", "00000"],
-  "@": ["01110", "10001", "10111", "10101", "10111", "10000", "01111"],
-  "*": ["00000", "10101", "01110", "11111", "01110", "10101", "00000"],
-  "|": ["00100", "00100", "00100", "00100", "00100", "00100", "00100"],
-  "<": ["00010", "00100", "01000", "10000", "01000", "00100", "00010"],
-  ">": ["01000", "00100", "00010", "00001", "00010", "00100", "01000"],
-  "&": ["01100", "10010", "10100", "01000", "10101", "10010", "01101"],
-  "'": ["00100", "00100", "00010", "00000", "00000", "00000", "00000"],
-  '"': ["01010", "01010", "00100", "00000", "00000", "00000", "00000"],
-  "█": ["11111", "11111", "11111", "11111", "11111", "11111", "11111"],
-  "■": ["01110", "11111", "11111", "11111", "11111", "11111", "01110"],
-};
-
-/** Visible fallback for a Unicode glyph outside the compact bitmap font. */
-const UNKNOWN_GLYPH = [
-  "11111",
-  "10001",
-  "10101",
-  "10101",
-  "10101",
-  "10001",
-  "11111",
-];
-
-/** Draw a single line of compact bitmap text, clipped to its terminal cells. */
+/** Draw a Cozette text line, scaled and clipped to its terminal cells. */
 export function drawPixelText(
   image: DecodedImage,
   text: string,
   options: PixelTextOptions
 ): void {
-  const scale = Math.max(
-    1,
-    Math.min(
-      Math.floor((options.cellWidth - 2) / 5),
-      Math.floor((options.cellHeight - 2) / 7)
-    )
-  );
+  const cellWidth = Math.max(1, Math.floor(options.cellWidth));
+  const cellHeight = Math.max(1, Math.floor(options.cellHeight));
 
   let column = 0;
   for (const rawChar of text) {
     if (column >= options.maxColumns) {
       break;
     }
-    const glyph = FONT[rawChar.toUpperCase()] ?? UNKNOWN_GLYPH;
-    const glyphWidth = 5 * scale;
-    const glyphHeight = 7 * scale;
-    const glyphX =
-      options.x +
-      column * options.cellWidth +
-      Math.max(0, Math.floor((options.cellWidth - glyphWidth) / 2));
-    const glyphY =
-      options.y +
-      Math.max(0, Math.floor((options.cellHeight - glyphHeight) / 2));
-
-    for (let row = 0; row < glyph.length; row += 1) {
-      const pattern = glyph[row] ?? "00000";
-      for (let pixel = 0; pixel < pattern.length; pixel += 1) {
-        if (pattern[pixel] === "1") {
-          drawPixelRect(image, {
-            x: glyphX + pixel * scale,
-            y: glyphY + row * scale,
-            width: scale,
-            height: scale,
-            color: options.color,
-          });
-        }
-      }
-    }
+    drawCozetteGlyph(image, getCozetteGlyph(rawChar), {
+      x: options.x + column * cellWidth,
+      y: options.y,
+      cellWidth,
+      cellHeight,
+      color: options.color,
+    });
     column += 1;
   }
+}
+
+type CozetteGlyphOptions = {
+  x: number;
+  y: number;
+  cellWidth: number;
+  cellHeight: number;
+  color: Rgb;
+};
+
+function drawCozetteGlyph(
+  image: DecodedImage,
+  glyph: Uint8Array,
+  options: CozetteGlyphOptions
+): void {
+  for (let row = 0; row < COZETTE_CELL_HEIGHT; row += 1) {
+    const pattern = glyph[row] ?? 0;
+    for (let column = 0; column < COZETTE_CELL_WIDTH; column += 1) {
+      if (!isCozettePixelSet(pattern, column)) {
+        continue;
+      }
+      drawCozettePixel(image, { ...options, row, column });
+    }
+  }
+}
+
+function isCozettePixelSet(pattern: number, column: number): boolean {
+  const divisor = 2 ** (COZETTE_CELL_WIDTH - 1 - column);
+  return Math.floor(pattern / divisor) % 2 === 1;
+}
+
+type CozettePixelOptions = CozetteGlyphOptions & {
+  row: number;
+  column: number;
+};
+
+function drawCozettePixel(
+  image: DecodedImage,
+  options: CozettePixelOptions
+): void {
+  const x =
+    options.x +
+    scaleCoordinate(options.column, options.cellWidth, COZETTE_CELL_WIDTH);
+  const y =
+    options.y +
+    scaleCoordinate(options.row, options.cellHeight, COZETTE_CELL_HEIGHT);
+  const right =
+    options.x +
+    scaleCoordinate(options.column + 1, options.cellWidth, COZETTE_CELL_WIDTH);
+  const bottom =
+    options.y +
+    scaleCoordinate(options.row + 1, options.cellHeight, COZETTE_CELL_HEIGHT);
+  drawPixelRect(image, {
+    x,
+    y,
+    width: right - x,
+    height: bottom - y,
+    color: options.color,
+  });
+}
+
+/** Scale a Cozette bitmap coordinate to its terminal-cell boundary. */
+function scaleCoordinate(
+  coordinate: number,
+  cellSize: number,
+  glyphSize: number
+): number {
+  return Math.floor((coordinate * cellSize) / glyphSize);
 }

@@ -34,6 +34,7 @@
     "dist/node-sqlite3-wasm.wasm",
     "dist/vendor/symbolic_bg.wasm",
     "LICENSE.md",
+    "THIRD_PARTY_LICENSES.md",
     "README.md"
   ],
   "license": "FSL-1.1-Apache-2.0",
