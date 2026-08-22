@@ -39,6 +39,7 @@ Think of it as:
 - OAuth Architecture: [OAuth Architecture](oauth-architecture.md) - OAuth flow and token management
 - Chat Interface: [Cloudflare Architecture](architecture.md) - See "Chat Interface" section
 - Deployment: [Cloudflare Release](../releases/cloudflare.md) - Deploying to Cloudflare Workers
+- Wrangler pin: [Wrangler Pin](wrangler-pin.md) - Why the app CLI stays on 4.80.0 and how to upgrade safely
 
 ## Quick Links
 
