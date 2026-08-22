@@ -718,13 +718,18 @@ export function isTextualContentType(contentType: string | null): boolean {
  *
  * @param endpoint - API endpoint path (e.g., "/organizations/")
  * @param options - Request options including method, body, params, and custom headers
- * @returns Response status, headers, and parsed body
+ * @returns Response status, status text, headers, and parsed body
  * @throws {AuthError} Only on authentication failure (not on API errors)
  */
 export async function rawApiRequest(
   endpoint: string,
   options: ApiRequestOptions & { headers?: Record<string, string> } = {}
-): Promise<{ status: number; headers: Headers; body: unknown }> {
+): Promise<{
+  status: number;
+  statusText: string;
+  headers: Headers;
+  body: unknown;
+}> {
   const { method = "GET", body, params, headers: customHeaders = {} } = options;
 
   const config = getDefaultSdkConfig();
@@ -781,6 +786,7 @@ export async function rawApiRequest(
 
   return {
     status: response.status,
+    statusText: response.statusText,
     headers: response.headers,
     body: responseBody,
   };

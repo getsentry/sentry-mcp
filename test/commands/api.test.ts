@@ -19,6 +19,7 @@ import {
   extractJsonBody,
   formatApiResponse,
   formatBinaryErrorBody,
+  isApiErrorStatus,
   normalizeEndpoint,
   normalizeFields,
   parseDataBody,
@@ -1028,6 +1029,113 @@ describe("resolveApiResponseOutput", () => {
     }
   });
 
+  test("empty error body throws OutputError with the HTTP status and request", () => {
+    try {
+      resolveApiResponseOutput(
+        {
+          status: 404,
+          statusText: "Not Found",
+          headers: new Headers(),
+          body: "",
+        },
+        {
+          silent: false,
+          isTTY: false,
+          method: "GET",
+          endpoint: "issues/7670740039/committers/",
+        }
+      );
+      throw new Error("expected throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(OutputError);
+      expect((error as OutputError).data).toBe(
+        "HTTP 404 Not Found — GET /api/0/issues/7670740039/committers/"
+      );
+    }
+  });
+
+  test("whitespace-only error body throws OutputError with the HTTP status", () => {
+    try {
+      resolveApiResponseOutput(
+        {
+          status: 404,
+          statusText: "Not Found",
+          headers: new Headers(),
+          body: " \n",
+        },
+        {
+          silent: false,
+          isTTY: false,
+          method: "GET",
+          endpoint: "missing/",
+        }
+      );
+      throw new Error("expected throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(OutputError);
+      expect((error as OutputError).data).toBe(
+        "HTTP 404 Not Found — GET /api/0/missing/"
+      );
+    }
+  });
+
+  test.each([
+    [199, "Informational"],
+    [300, "Multiple Choices"],
+    [304, "Not Modified"],
+  ])("non-2xx status %i throws OutputError", (status, statusText) => {
+    try {
+      resolveApiResponseOutput(
+        {
+          status,
+          statusText,
+          headers: new Headers(),
+          body: "",
+        },
+        {
+          silent: false,
+          isTTY: false,
+          method: "GET",
+          endpoint: "missing/",
+        }
+      );
+      throw new Error("expected throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(OutputError);
+      expect((error as OutputError).data).toBe(
+        `HTTP ${status} ${statusText} — GET /api/0/missing/`
+      );
+    }
+  });
+
+  test("JSON errors preserve the empty body in an HTTP response envelope", () => {
+    try {
+      resolveApiResponseOutput(
+        {
+          status: 404,
+          statusText: "Not Found",
+          headers: new Headers(),
+          body: "",
+        },
+        {
+          silent: false,
+          isTTY: false,
+          json: true,
+          method: "GET",
+          endpoint: "missing/",
+        }
+      );
+      throw new Error("expected throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(OutputError);
+      expect((error as OutputError).data).toEqual({
+        status: 404,
+        statusText: "Not Found",
+        body: "",
+      });
+    }
+  });
+
   test("error + binary body throws OutputError with a byte summary, never raw bytes", () => {
     try {
       resolveApiResponseOutput(
@@ -1071,6 +1179,17 @@ describe("resolveApiResponseOutput", () => {
       { silent: false, isTTY: true }
     );
     expect(out).toBe(png);
+  });
+});
+
+describe("isApiErrorStatus", () => {
+  test.each([
+    [199, true],
+    [200, false],
+    [299, false],
+    [300, true],
+  ])("classifies HTTP %i consistently", (status, expected) => {
+    expect(isApiErrorStatus(status)).toBe(expected);
   });
 });
 

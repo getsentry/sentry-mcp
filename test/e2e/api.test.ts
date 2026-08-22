@@ -64,6 +64,79 @@ describe("sentry api", () => {
     expect(Array.isArray(data)).toBe(true);
   });
 
+  test("--json includes the HTTP response envelope", async () => {
+    await ctx.setAuthToken(TEST_TOKEN);
+
+    const result = await ctx.run(["api", "organizations/", "--json"]);
+
+    expect(result.exitCode).toBe(0);
+    const data = JSON.parse(result.stdout);
+    expect(data).toMatchObject({
+      status: 200,
+      statusText: "OK",
+      body: expect.any(Array),
+    });
+  });
+
+  test("--json applies --fields to the API body inside the envelope", async () => {
+    await ctx.setAuthToken(TEST_TOKEN);
+
+    const result = await ctx.run([
+      "api",
+      "organizations/",
+      "--json",
+      "--fields",
+      "name",
+    ]);
+
+    expect(result.exitCode, result.stderr + result.stdout).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({
+      status: 200,
+      statusText: "OK",
+      body: [{ name: "Test Organization" }, { name: "Test Organization 2" }],
+    });
+  });
+
+  test("--dry-run --json applies --fields to the request preview", async () => {
+    await ctx.setAuthToken(TEST_TOKEN);
+
+    const result = await ctx.run([
+      "api",
+      "organizations/",
+      "--dry-run",
+      "--json",
+      "--fields",
+      "method",
+    ]);
+
+    expect(result.exitCode, result.stderr + result.stdout).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({ method: "GET" });
+  });
+
+  test("empty error bodies report the HTTP status and request", async () => {
+    await ctx.setAuthToken(TEST_TOKEN);
+
+    const result = await ctx.run(["api", "empty-error/"]);
+
+    expect(result.exitCode).toBe(EXIT.OUTPUT_ERROR);
+    expect(result.stdout).toContain(
+      "HTTP 404 Not Found — GET /api/0/empty-error/"
+    );
+  });
+
+  test("--json preserves empty error bodies in the response envelope", async () => {
+    await ctx.setAuthToken(TEST_TOKEN);
+
+    const result = await ctx.run(["api", "empty-error/", "--json"]);
+
+    expect(result.exitCode).toBe(EXIT.OUTPUT_ERROR);
+    expect(JSON.parse(result.stdout)).toEqual({
+      status: 404,
+      statusText: "Not Found",
+      body: "",
+    });
+  });
+
   test(
     "invalid endpoint returns non-zero exit code",
     { timeout: 15_000 },
@@ -179,7 +252,7 @@ describe("sentry api", () => {
       // Verbose output goes to stderr via logger.debug()
       // consola formats as: [debug] [api] > GET /api/0/organizations/
       expect(result.stderr).toMatch(/> GET \/api\/0\/organizations\//);
-      expect(result.stderr).toMatch(/< HTTP \d{3}/);
+      expect(result.stderr).toMatch(/< HTTP 200 OK/);
       expect(result.stderr).toMatch(/< content-type:/i);
       // stdout should still contain the response body
       const data = JSON.parse(result.stdout);
