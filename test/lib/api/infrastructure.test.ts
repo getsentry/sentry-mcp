@@ -669,4 +669,19 @@ describe("rawApiRequest binary handling", () => {
     const result = await rawApiRequest("some/text/");
     expect(result.body).toBe("not json");
   });
+
+  test("returns the HTTP status text with the response", async () => {
+    globalThis.fetch = mockFetch(
+      async () =>
+        new Response("", {
+          status: 404,
+          statusText: "Not Found",
+        })
+    );
+
+    const result = await rawApiRequest("missing/");
+    expect(result.status).toBe(404);
+    expect(result.statusText).toBe("Not Found");
+    expect(result.body).toBe("");
+  });
 });

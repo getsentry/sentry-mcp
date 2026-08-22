@@ -184,6 +184,11 @@ export const apiRoutes: MockRoute[] = [
   },
   {
     method: "GET",
+    path: "/api/0/empty-error/",
+    response: () => ({ status: 404 }),
+  },
+  {
+    method: "GET",
     path: "/api/0/organizations/:orgSlug/",
     response: (_req, params) => {
       if (params.orgSlug === TEST_ORG) {

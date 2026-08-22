@@ -12,6 +12,7 @@ import type { SentryContext } from "../context.js";
 import { buildSearchParams, rawApiRequest } from "../lib/api-client.js";
 import { buildCommand } from "../lib/command.js";
 import { OutputError, ValidationError } from "../lib/errors.js";
+import { filterFields } from "../lib/formatters/json.js";
 import { CommandOutput } from "../lib/formatters/output.js";
 import { validateEndpoint } from "../lib/input-validation.js";
 import { logger } from "../lib/logger.js";
@@ -925,6 +926,117 @@ export function formatBinaryErrorBody(
 }
 
 /**
+ * Format an empty textual error body with enough request context to diagnose
+ * a routing miss. Sentry can return an empty body for unmatched API routes.
+ * @internal Exported for testing
+ */
+export function formatEmptyErrorBody(
+  status: number,
+  statusText: string | undefined,
+  method: string | undefined,
+  endpoint: string | undefined
+): string {
+  const statusLabel = [status, statusText].filter(Boolean).join(" ");
+  const request = method && endpoint ? ` — ${method} /api/0/${endpoint}` : "";
+  return `HTTP ${statusLabel}${request}`;
+}
+
+type ApiResponseOutputOptions = {
+  silent: boolean;
+  isTTY: boolean | undefined;
+  json?: boolean;
+  method?: string;
+  endpoint?: string;
+};
+
+type ApiResponseOutput = {
+  status: number;
+  statusText?: string;
+  headers: Headers;
+  body: unknown;
+};
+
+/** Throw the appropriate output error for a non-successful API response. */
+function throwApiResponseError(
+  response: ApiResponseOutput,
+  options: ApiResponseOutputOptions
+): never {
+  const isBinary = response.body instanceof Uint8Array;
+  const errorBody = isBinary
+    ? formatBinaryErrorBody(
+        response.status,
+        response.headers,
+        response.body as Uint8Array
+      )
+    : response.body;
+
+  if (options.json) {
+    throw new OutputError({
+      status: response.status,
+      statusText: response.statusText ?? "",
+      body: errorBody,
+    });
+  }
+
+  if (isBinary) {
+    throw new OutputError(errorBody);
+  }
+  if (
+    response.body === null ||
+    response.body === undefined ||
+    (typeof response.body === "string" && response.body.trim() === "")
+  ) {
+    throw new OutputError(
+      formatEmptyErrorBody(
+        response.status,
+        response.statusText,
+        options.method,
+        options.endpoint
+      )
+    );
+  }
+  throw new OutputError(response.body);
+}
+
+/** Add HTTP metadata to textual responses in JSON output mode. */
+function formatApiResponseOutput(
+  response: ApiResponseOutput,
+  output: unknown,
+  json: boolean
+): unknown {
+  if (!json || output instanceof Uint8Array) {
+    return output;
+  }
+  return {
+    status: response.status,
+    statusText: response.statusText,
+    body: output,
+  };
+}
+
+/** Preserve API body field filtering inside the response envelope. */
+function formatApiResponseJson(data: unknown, fields?: string[]): unknown {
+  if (
+    data === null ||
+    typeof data !== "object" ||
+    Array.isArray(data) ||
+    !("status" in data) ||
+    !("body" in data)
+  ) {
+    return fields && fields.length > 0 ? filterFields(data, fields) : data;
+  }
+
+  const response = data as ApiResponseOutput;
+  return {
+    ...response,
+    body:
+      fields && fields.length > 0
+        ? filterFields(response.body, fields)
+        : response.body,
+  };
+}
+
+/**
  * Resolve the full URL that rawApiRequest would use for a request.
  *
  * Mirrors the URL construction in rawApiRequest:
@@ -1129,8 +1241,14 @@ function logRequest(
 }
 
 /** Log incoming response details in `< ` curl-verbose style. */
-function logResponse(response: { status: number; headers: Headers }): void {
-  log.debug(`< HTTP ${response.status}`);
+function logResponse(response: {
+  status: number;
+  statusText?: string;
+  headers: Headers;
+}): void {
+  log.debug(
+    `< HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}`
+  );
   response.headers.forEach((value, key) => {
     log.debug(`< ${key}: ${value}`);
   });
@@ -1143,7 +1261,8 @@ function logResponse(response: { status: number; headers: Headers }): void {
  * - silent: no body (OutputError(null) on error for exit code only)
  * - binary error: short status/content-type summary (never dump bytes)
  * - binary success: raw Uint8Array (the func decides TTY rendering/warning)
- * - text/JSON: body as-is for the formatter path
+ * - text: body as-is for the formatter path
+ * - JSON: body wrapped with HTTP status metadata by the command
  *
  * Extracted from the command func to keep cognitive complexity under the lint threshold.
  *
@@ -1151,12 +1270,16 @@ function logResponse(response: { status: number; headers: Headers }): void {
  * @throws {OutputError} on HTTP error statuses
  * @internal Exported for testing
  */
+/** Every status outside the 2xx range is an API error. */
+export function isApiErrorStatus(status: number): boolean {
+  return status < 200 || status >= 300;
+}
+
 export function resolveApiResponseOutput(
-  response: { status: number; headers: Headers; body: unknown },
-  options: { silent: boolean; isTTY: boolean | undefined }
+  response: ApiResponseOutput,
+  options: ApiResponseOutputOptions
 ): unknown {
-  const isError = response.status >= 400;
-  const isBinary = response.body instanceof Uint8Array;
+  const isError = isApiErrorStatus(response.status);
 
   if (options.silent) {
     if (isError) {
@@ -1166,16 +1289,7 @@ export function resolveApiResponseOutput(
   }
 
   if (isError) {
-    if (isBinary) {
-      throw new OutputError(
-        formatBinaryErrorBody(
-          response.status,
-          response.headers,
-          response.body as Uint8Array
-        )
-      );
-    }
-    throw new OutputError(response.body);
+    throwApiResponseError(response, options);
   }
 
   // Binary success: return raw bytes. The command func decides whether to
@@ -1226,7 +1340,7 @@ export function resolveBinaryTtyOutput(
 }
 
 export const apiCommand = buildCommand({
-  output: { human: formatApiResponse },
+  output: { human: formatApiResponse, jsonTransform: formatApiResponseJson },
   docs: {
     brief: "Make an authenticated API request",
     fullDescription:
@@ -1383,7 +1497,7 @@ export const apiCommand = buildCommand({
       headers,
     });
 
-    const isError = response.status >= 400;
+    const isError = isApiErrorStatus(response.status);
 
     if (verbose) {
       logResponse(response);
@@ -1403,6 +1517,9 @@ export const apiCommand = buildCommand({
     const output = resolveApiResponseOutput(response, {
       silent: flags.silent,
       isTTY: this.stdout.isTTY,
+      json: flags.json,
+      method: flags.method,
+      endpoint: normalizedEndpoint,
     });
     if (output === undefined) {
       return;
@@ -1425,7 +1542,10 @@ export const apiCommand = buildCommand({
     }
 
     // Binary Uint8Array bodies are written raw by renderCommandOutput (no
-    // formatter, no trailing newline). Text/JSON go through formatApiResponse.
-    return yield new CommandOutput(output);
+    // formatter, no trailing newline). Textual JSON responses expose the HTTP
+    // metadata so callers can distinguish an empty success from an error.
+    return yield new CommandOutput(
+      formatApiResponseOutput(response, output, flags.json)
+    );
   },
 });
