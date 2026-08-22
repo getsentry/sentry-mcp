@@ -82,7 +82,7 @@ catalog:
   vitest: ^4.1.10
   vitest-evals: ^0.4.0
   workers-mcp: 0.1.0-3
-  wrangler: 4.125.0
+  wrangler: 4.80.0
   zod: ^4.4.3
 
 minimumReleaseAgeExclude:
