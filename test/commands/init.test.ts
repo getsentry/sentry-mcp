@@ -189,13 +189,18 @@ describe("init command func", () => {
       const ctx = makeContext();
       await func.call(ctx, {
         ...DEFAULT_FLAGS,
-        features: ["errors,tracing,replay,sourcemaps"],
+        features: [
+          "errors,tracing,replay,sourcemaps,attachments,agent-tracing,mcp-observability",
+        ],
       });
       expect(capturedArgs?.features).toEqual([
         "errorMonitoring",
         "performanceMonitoring",
         "sessionReplay",
         "sourceMaps",
+        "attachments",
+        "aiMonitoring",
+        "mcpObservability",
       ]);
     });
 
@@ -204,7 +209,7 @@ describe("init command func", () => {
       await func.call(ctx, {
         ...DEFAULT_FLAGS,
         features: [
-          "errorMonitoring,performanceMonitoring,sessionReplay,sourceMaps",
+          "errorMonitoring,performanceMonitoring,sessionReplay,sourceMaps,attachments,aiMonitoring,mcpObservability",
         ],
       });
       expect(capturedArgs?.features).toEqual([
@@ -212,6 +217,9 @@ describe("init command func", () => {
         "performanceMonitoring",
         "sessionReplay",
         "sourceMaps",
+        "attachments",
+        "aiMonitoring",
+        "mcpObservability",
       ]);
     });
 
@@ -223,7 +231,7 @@ describe("init command func", () => {
       });
       await expect(promise).rejects.toThrow(ValidationError);
       await expect(promise).rejects.toThrow(
-        "Supported features: errors, tracing, logs, replay, metrics, profiling, sourcemaps, crons, ai-monitoring"
+        "Supported features: errors, tracing, logs, replay, metrics, profiling, sourcemaps, crons, attachments, ai-monitoring, agent-tracing, mcp-observability"
       );
       expect(runWizardSpy).not.toHaveBeenCalled();
       expect(findProjectsSpy).not.toHaveBeenCalled();

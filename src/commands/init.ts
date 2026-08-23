@@ -56,8 +56,13 @@ const FEATURE_ALIASES = {
   sourcemaps: "sourceMaps",
   sourceMaps: "sourceMaps",
   crons: "crons",
+  attachments: "attachments",
   "ai-monitoring": "aiMonitoring",
   aiMonitoring: "aiMonitoring",
+  "agent-tracing": "aiMonitoring",
+  agentTracing: "aiMonitoring",
+  "mcp-observability": "mcpObservability",
+  mcpObservability: "mcpObservability",
 } as const;
 
 const SUPPORTED_FEATURE_NAMES = [
@@ -69,7 +74,10 @@ const SUPPORTED_FEATURE_NAMES = [
   "profiling",
   "sourcemaps",
   "crons",
+  "attachments",
   "ai-monitoring",
+  "agent-tracing",
+  "mcp-observability",
 ] as const;
 
 const SUPPORTED_FEATURE_TEXT = SUPPORTED_FEATURE_NAMES.join(", ");
@@ -334,7 +342,7 @@ export const initCommand = buildCommand<
         kind: "parsed",
         parse: String,
         brief:
-          "Features to enable: errors,tracing,logs,replay,metrics,profiling,sourcemaps,crons,ai-monitoring",
+          "Features to enable: errors,tracing,logs,replay,metrics,profiling,sourcemaps,crons,attachments,agent-tracing,mcp-observability",
         variadic: true,
         optional: true,
       },

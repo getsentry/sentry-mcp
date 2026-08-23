@@ -1384,6 +1384,47 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
     });
   });
 
+  test("sends the explicit agent-checkpoint acknowledgement", async () => {
+    const checkpointPayload: SuspendPayload = {
+      cwd: "/tmp/test",
+      detail: "Checking Sentry support for the detected project",
+      operation: "agent-checkpoint",
+      params: {},
+      protocolVersion: 1,
+      requestId: "5f61cbd5-1051-4b52-928f-06eb78ba40ee",
+      type: "tool",
+    };
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["detect-platform"]],
+      steps: {
+        "detect-platform": { suspendPayload: checkpointPayload },
+      },
+    };
+    executeToolSpy.mockResolvedValue({
+      data: { acknowledged: true },
+      ok: true,
+    });
+    let capturedResume: Record<string, unknown> | undefined;
+    makeStaleStepRun((args) => {
+      capturedResume = args.resumeData as Record<string, unknown>;
+      return Promise.resolve({ status: "success", result: { exitCode: 0 } });
+    });
+
+    await runWizard(makeOptions());
+
+    expect(executeToolSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: "agent-checkpoint" }),
+      expect.anything()
+    );
+    expect(capturedResume).toMatchObject({
+      data: { acknowledged: true },
+      ok: true,
+      protocolVersion: 1,
+      requestId: checkpointPayload.requestId,
+    });
+  });
+
   test("uses request identity instead of mutable payload details during recovery", async () => {
     vi.useFakeTimers();
     const requestId = "8c7ee6b9-e955-4514-9164-f01844584a28";
