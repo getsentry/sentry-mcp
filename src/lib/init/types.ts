@@ -76,6 +76,7 @@ export type InitProtocolEnvelope = {
 
 // Tool suspend payloads
 export type ToolPayload =
+  | AgentCheckpointPayload
   | ListDirPayload
   | ReadFilesPayload
   | FileExistsBatchPayload
@@ -88,6 +89,28 @@ export type ToolPayload =
   | DetectSentryPayload;
 
 export type ToolOperation = ToolPayload["operation"];
+
+/**
+ * Suspend request used to continue a persisted server-side agent session.
+ * The CLI acknowledges it without inspecting or mutating the local project.
+ */
+export type AgentCheckpointPayload = {
+  /** Discriminator for locally handled workflow tools. */
+  type: "tool";
+  /** Stable no-op operation name. */
+  operation: "agent-checkpoint";
+  /** Optional progress copy displayed while the checkpoint is acknowledged. */
+  detail?: string;
+  /** Workflow filesystem root; not accessed by this operation. */
+  cwd: string;
+  /** Reserved operation arguments; currently always empty. */
+  params: Record<string, never>;
+};
+
+/** Explicit no-op acknowledgement validated by the init service boundary. */
+export type AgentCheckpointData = {
+  acknowledged: true;
+};
 
 export type ListDirPayload = {
   type: "tool";

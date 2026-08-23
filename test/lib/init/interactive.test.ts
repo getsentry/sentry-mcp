@@ -490,7 +490,7 @@ describe("handleMultiSelect", () => {
     });
   });
 
-  test("shows defaults first, sorts optional features, and omits User Feedback", async () => {
+  test("shows defaults first, sorts optional features, and omits unsupported features", async () => {
     const { ui, calls, respond } = createMockUI();
     respond.multiselect(["sessionReplay"]);
     respond.select("continue");
@@ -509,7 +509,9 @@ describe("handleMultiSelect", () => {
           "sessionReplay",
           "logs",
           "crons",
+          "attachments",
           "aiMonitoring",
+          "mcpObservability",
           "userFeedback",
         ],
       },
@@ -528,8 +530,8 @@ describe("handleMultiSelect", () => {
       "sessionReplay",
       "performanceMonitoring",
       "aiMonitoring",
-      "metrics",
       "crons",
+      "mcpObservability",
       "profiling",
       "sourceMaps",
     ]);
@@ -544,6 +546,8 @@ describe("handleMultiSelect", () => {
         text: "Based on your project, these features are available to set up.",
       },
     ]);
+    expect(multiselectCall?.options).not.toContain("metrics");
+    expect(multiselectCall?.options).not.toContain("attachments");
     expect(multiselectCall?.options).not.toContain("userFeedback");
 
     const reviewCall = calls.find((call) => call.kind === "select");
@@ -607,9 +611,10 @@ describe("handleMultiSelect", () => {
   });
 
   test.each([
-    "aiMonitoring",
-    "mcpObservability",
-  ])("review includes tracing when %s enables it implicitly", async (dependencyFeature) => {
+    ["aiMonitoring", "Agent Tracing"],
+    ["mcpObservability", "MCP Observability"],
+    ["profiling", "Profiling"],
+  ])("review includes tracing when %s enables it implicitly", async (dependencyFeature, dependencyLabel) => {
     const { ui, calls, respond } = createMockUI();
     respond.multiselect([dependencyFeature]);
     respond.select("continue");
@@ -636,9 +641,7 @@ describe("handleMultiSelect", () => {
     const reviewDetails = reviewCall?.details?.map((detail) => detail.text);
     expect(reviewDetails).toContain("✓ Error Monitoring");
     expect(reviewDetails).toContain("✓ Tracing");
-    expect(reviewDetails).toContain(
-      `✓ ${dependencyFeature === "aiMonitoring" ? "AI Monitoring" : "MCP Observability"}`
-    );
+    expect(reviewDetails).toContain(`✓ ${dependencyLabel}`);
   });
 
   test("Back restores the normalized AI selection including Tracing", async () => {

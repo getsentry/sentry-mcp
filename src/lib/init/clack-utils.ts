@@ -54,7 +54,7 @@ const FEATURE_INFO: Record<string, { label: string; description: string }> = {
       "Pinpoint the functions and lines of code responsible for performance issues",
   },
   logs: {
-    label: "Logging",
+    label: "Logs",
     description: "See logs in context with errors and performance issues",
   },
   metrics: {
@@ -68,11 +68,15 @@ const FEATURE_INFO: Record<string, { label: string; description: string }> = {
       "Turn minified production stack traces back into your original source code",
   },
   crons: {
-    label: "Crons",
+    label: "Crons & Uptime Monitors",
     description: "Detect failed, missed, or delayed scheduled jobs",
   },
+  attachments: {
+    label: "Attachments",
+    description: "Link user-supplied data to captured events",
+  },
   aiMonitoring: {
-    label: "AI Monitoring",
+    label: "Agent Tracing",
     description:
       "Understand AI calls, latency, token usage, cost, and failures",
   },
@@ -104,17 +108,18 @@ export function featureDescription(id: string): string | undefined {
 
 const FEATURE_DISPLAY_ORDER = [
   "errorMonitoring",
+  "logs",
   "sessionReplay",
   "performanceMonitoring",
-  "logs",
-  "metrics",
-  "profiling",
-  "sourceMaps",
-  "crons",
   "aiMonitoring",
+  "attachments",
+  "crons",
+  "metrics",
   "mcpObservability",
-  "userFeedback",
+  "profiling",
   "reactFeatures",
+  "sourceMaps",
+  "userFeedback",
 ];
 
 /** Sort features into the canonical order used by summaries and final output. */
@@ -134,7 +139,7 @@ export const STEP_LABELS: Record<string, string> = {
   "select-target-app": "Selecting target application",
   "resolve-dir": "Resolving project directory",
   "check-existing-sentry": "Checking for existing Sentry installation",
-  "detect-platform": "Detecting platform and framework",
+  "detect-platform": "Analyzing project and Sentry features",
   "ensure-sentry-project": "Setting up Sentry project",
   "select-features": "Selecting features",
   "plan-codemods": "Planning code modifications",
@@ -204,7 +209,7 @@ export const STEP_ACTIVE_LABELS: Record<string, string> = {
   "select-target-app": "Selecting target application...",
   "resolve-dir": "Resolving project directory...",
   "check-existing-sentry": "Checking for existing Sentry setup...",
-  "detect-platform": "Detecting framework and platform...",
+  "detect-platform": "Analyzing project and Sentry support...",
   "ensure-sentry-project": "Configuring Sentry project...",
   "select-features": "Preparing feature selection...",
   "plan-codemods": "Planning code changes...",
@@ -221,8 +226,8 @@ export const STEP_ACTIVE_LABELS: Record<string, string> = {
  * Falls back to the full label if a step isn't listed here.
  */
 export const STEP_LABELS_SHORT: Record<string, string> = {
-  "discover-context": "Analyzing project",
-  "detect-platform": "Detecting platform",
+  "discover-context": "Discovering project",
+  "detect-platform": "Checking Sentry support",
   "ensure-sentry-project": "Setting up project",
   "select-features": "Selecting features",
   "plan-codemods": "Planning changes",
@@ -256,9 +261,11 @@ export const STEP_PROGRESS_MESSAGES: Record<string, string[]> = {
   ],
   "detect-platform": [
     "Scanning project files...",
-    "Identifying framework and language...",
-    "Analyzing project configuration...",
-    "Determining SDK compatibility...",
+    "Identifying framework and runtime...",
+    "Matching the Sentry SDK...",
+    "Searching official Sentry docs...",
+    "Checking feature support...",
+    "Validating project recommendations...",
   ],
 };
 

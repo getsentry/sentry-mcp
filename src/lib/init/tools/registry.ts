@@ -1,5 +1,6 @@
 import { ApiError } from "../../errors.js";
 import type { ToolOperation, ToolPayload, ToolResult } from "../types.js";
+import { agentCheckpointTool } from "./agent-checkpoint.js";
 import { applyPatchsetTool } from "./apply-patchset.js";
 import {
   createSentryProjectTool,
@@ -16,6 +17,7 @@ import { formatToolError, validateToolSandbox } from "./shared.js";
 import type { AnyInitToolDefinition, ToolContext } from "./types.js";
 
 const toolDefinitions = [
+  agentCheckpointTool,
   listDirTool,
   readFilesTool,
   fileExistsBatchTool,
@@ -34,6 +36,7 @@ const toolRegistry = new Map<ToolOperation, AnyInitToolDefinition>(
 
 /** Sentry API operations never inspect or mutate the local filesystem. */
 const CWD_INDEPENDENT_OPERATIONS = new Set<ToolOperation>([
+  "agent-checkpoint",
   "create-sentry-project",
   "ensure-sentry-project",
 ]);

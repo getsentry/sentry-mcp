@@ -46,8 +46,12 @@ const DEFAULT_FEATURES = new Set<string>(DEFAULT_FEATURE_ORDER);
 const DEFAULT_FEATURE_RANK = new Map<string, number>(
   DEFAULT_FEATURE_ORDER.map((feature, index) => [feature, index])
 );
-// Feedback setup needs an in-app placement choice this wizard cannot make yet.
-const UNSUPPORTED_INIT_FEATURES = new Set(["userFeedback"]);
+// These features need code-level choices this selector cannot configure yet.
+const UNSUPPORTED_INIT_FEATURES = new Set([
+  "attachments",
+  "metrics",
+  "userFeedback",
+]);
 const FEATURE_SELECTION_CONTEXT =
   "Based on your project, these features are available to set up.";
 
@@ -69,7 +73,8 @@ function normalizeFeatureSelection(features: string[]): string[] {
   // the reviewed, resumed, and restored-on-Back selections identical.
   if (
     features.includes("aiMonitoring") ||
-    features.includes("mcpObservability")
+    features.includes("mcpObservability") ||
+    features.includes("profiling")
   ) {
     normalized.add("performanceMonitoring");
   }
