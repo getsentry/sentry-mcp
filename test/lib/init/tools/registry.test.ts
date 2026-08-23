@@ -19,6 +19,24 @@ function makeContext(): ResolvedInitContext {
 }
 
 describe("tool registry", () => {
+  test("acknowledges an agent checkpoint without local work", async () => {
+    const payload: ToolPayload = {
+      cwd: "/outside/project",
+      detail: "Reviewing official Sentry feature support...",
+      operation: "agent-checkpoint",
+      params: {},
+      type: "tool",
+    };
+
+    expect(describeTool(payload)).toBe(
+      "Reviewing official Sentry feature support..."
+    );
+    await expect(executeTool(payload, makeContext())).resolves.toEqual({
+      data: { acknowledged: true },
+      ok: true,
+    });
+  });
+
   test("describes tool payloads via the registered definition", () => {
     const payload: ToolPayload = {
       type: "tool",

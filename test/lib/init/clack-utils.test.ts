@@ -50,9 +50,11 @@ describe("featureLabel", () => {
   test("returns label for known feature", () => {
     expect(featureLabel("errorMonitoring")).toBe("Error Monitoring");
     expect(featureLabel("performanceMonitoring")).toBe("Tracing");
-    expect(featureLabel("logs")).toBe("Logging");
-    expect(featureLabel("crons")).toBe("Crons");
-    expect(featureLabel("aiMonitoring")).toBe("AI Monitoring");
+    expect(featureLabel("logs")).toBe("Logs");
+    expect(featureLabel("crons")).toBe("Crons & Uptime Monitors");
+    expect(featureLabel("attachments")).toBe("Attachments");
+    expect(featureLabel("aiMonitoring")).toBe("Agent Tracing");
+    expect(featureLabel("mcpObservability")).toBe("MCP Observability");
     expect(featureLabel("userFeedback")).toBe("User Feedback");
   });
 
@@ -87,6 +89,9 @@ describe("featureDescription", () => {
     expect(featureDescription("crons")).toBe(
       "Detect failed, missed, or delayed scheduled jobs"
     );
+    expect(featureDescription("attachments")).toBe(
+      "Link user-supplied data to captured events"
+    );
     expect(featureDescription("aiMonitoring")).toBe(
       "Understand AI calls, latency, token usage, cost, and failures"
     );
@@ -115,16 +120,18 @@ describe("sortFeatures", () => {
         "errorMonitoring",
         "sourceMaps",
         "crons",
+        "attachments",
         "aiMonitoring",
         "mcpObservability",
       ])
     ).toEqual([
       "errorMonitoring",
       "logs",
-      "sourceMaps",
-      "crons",
       "aiMonitoring",
+      "attachments",
+      "crons",
       "mcpObservability",
+      "sourceMaps",
       "userFeedback",
     ]);
   });

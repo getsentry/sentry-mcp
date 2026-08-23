@@ -18,7 +18,7 @@ Initialize Sentry in your project (experimental)
 **Flags:**
 - `-y, --yes - Accept non-interactive defaults (requires --features outside a TTY)`
 - `-n, --dry-run - Show what would happen without making changes`
-- `--features <value>... - Features to enable: errors,tracing,logs,replay,metrics,profiling,sourcemaps,crons,ai-monitoring`
+- `--features <value>... - Features to enable: errors,tracing,logs,replay,metrics,profiling,sourcemaps,crons,attachments,agent-tracing,mcp-observability`
 - `-t, --team <value> - Team slug to create the project under`
 - `--app <value> - App to initialize in a monorepo (required with --yes when multiple apps are detected)`
 - `--tui - Use the Ink-based interactive UI (default). Pass --no-tui to fall back to plain log output.`
