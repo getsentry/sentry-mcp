@@ -88,7 +88,6 @@ import {
   UptimeCheckListSchema,
   UptimeMonitorListSchema,
   UptimeMonitorSchema,
-  UserRegionsSchema,
   UserReportListSchema,
   UserSchema,
 } from "./schema";
