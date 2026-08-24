@@ -40,6 +40,7 @@ function buildIsolatedEnv(
   const env: NodeJS.ProcessEnv = { ...process.env };
   if (options?.token) {
     env.SENTRY_AUTH_TOKEN = options.token;
+    env.SENTRY_FORCE_ENV_TOKEN = "1";
   }
   if (options?.url) {
     env.SENTRY_HOST = options.url;

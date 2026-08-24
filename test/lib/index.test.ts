@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import createSentrySDK, { SentryError } from "../../src/index.js";
-import { mockFetch } from "../helpers.js";
+import { setAuthToken } from "../../src/lib/db/auth.js";
+import { mockFetch, useTestConfigDir } from "../helpers.js";
+
+useTestConfigDir("sdk-library-");
 
 describe("createSentrySDK() library API", () => {
   // Silence unmocked fetch calls from resolution cascade.
@@ -8,13 +11,17 @@ describe("createSentrySDK() library API", () => {
   // the org/project resolution cascade which hits real API endpoints.
   // A silent 404 prevents preload warnings while preserving error behavior.
   let originalFetch: typeof globalThis.fetch;
+  let authorizationHeaders: string[];
 
   beforeEach(() => {
     originalFetch = globalThis.fetch;
+    authorizationHeaders = [];
     // Return empty successes rather than 404s so the resolution cascade
     // terminates cleanly without triggering follow-up requests that could
     // outlive the test and spill into later test files.
-    globalThis.fetch = mockFetch(async (input) => {
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const request = new Request(input, init);
+      authorizationHeaders.push(request.headers.get("Authorization") ?? "");
       let url: string;
       if (typeof input === "string") {
         url = input;
@@ -26,7 +33,7 @@ describe("createSentrySDK() library API", () => {
       if (url.includes("/regions/")) {
         return new Response(JSON.stringify({ regions: [] }), { status: 200 });
       }
-      if (url.includes("/organizations/")) {
+      if (url.includes("/organizations")) {
         return new Response(JSON.stringify([]), { status: 200 });
       }
       // Return empty 200 for all other endpoints (projects, issues, etc.)
@@ -131,6 +138,16 @@ describe("createSentrySDK() library API", () => {
     } catch (err) {
       expect(err).toBeInstanceOf(SentryError);
     }
+  });
+
+  test("explicit token overrides stored OAuth credentials", async () => {
+    setAuthToken("stored-oauth-token", 3600);
+    const sdk = createSentrySDK({ token: "explicit-sdk-token" });
+
+    await sdk.auth.status();
+
+    expect(authorizationHeaders).toContain("Bearer explicit-sdk-token");
+    expect(authorizationHeaders).not.toContain("Bearer stored-oauth-token");
   });
 
   test("sdk.run returns AsyncIterable for streaming flag --follow", () => {
