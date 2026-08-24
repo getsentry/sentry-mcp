@@ -28,7 +28,7 @@ function createEventsUrl(options?: {
   return url;
 }
 
-describe("fetchMock setup", () => {
+describe("network mock setup", () => {
   it("mirrors errors dataset validation from the shared MSW mocks", async () => {
     const validResponse = await fetch(
       createEventsUrl({

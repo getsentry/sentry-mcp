@@ -30,7 +30,7 @@ catalog:
   "@ai-sdk/react": ^3.0.232
   "@biomejs/biome": ^2.5.5
   "@cloudflare/vite-plugin": ^1.31.0
-  "@cloudflare/vitest-pool-workers": 0.14.1
+  "@cloudflare/vitest-plugin": 1.0.0
   "@cloudflare/workers-oauth-provider": ^0.8.2
   "@cloudflare/workers-types": ^4.20260405.1
   "@modelcontextprotocol/sdk": 1.30.0
@@ -62,7 +62,8 @@ catalog:
   lint-staged: ^15.5.2
   lucide-react: ^0.503.0
   miniflare: 4.20260401.0
-  msw: ^2.10.2
+  "@msw/cloudflare": ^0.0.1
+  msw: ^2.14.0
   open: ^10.1.2
   react: ^19.2.8
   react-dom: ^19.2.8
