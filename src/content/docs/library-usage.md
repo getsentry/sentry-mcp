@@ -119,12 +119,14 @@ const help = await sdk.run("help", "issue");
 ## Authentication
 
 The `token` option provides an auth token for the current invocation. When
-omitted, it falls back to environment variables and stored credentials:
+omitted, it falls back to stored credentials and environment variables:
 
 1. `token` option (highest priority)
-2. `SENTRY_AUTH_TOKEN` environment variable
-3. `SENTRY_TOKEN` environment variable
-4. Stored OAuth token from `sentry auth login`
+2. Stored OAuth token from `sentry auth login` (if not expired)
+3. `SENTRY_AUTH_TOKEN` environment variable
+4. `SENTRY_TOKEN` environment variable
+
+Set `SENTRY_FORCE_ENV_TOKEN=1` to make environment variable tokens take priority over stored OAuth.
 
 ```typescript
 // Explicit token
