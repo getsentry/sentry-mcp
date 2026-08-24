@@ -13,6 +13,7 @@ import {
 } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
+import type { Skill } from "../../skills";
 import {
   getStructuredContent,
   getTextContent,
@@ -1338,6 +1339,65 @@ describe("get_issue_details", () => {
     );
     // When Seer data is available, these would pass:
     // expect(result).toContain("## Seer AI Analysis");
+  });
+
+  it("skips the autofix request when the seer skill is not granted", async () => {
+    let autofixRequested = false;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        () => {
+          autofixRequested = true;
+          return HttpResponse.json({ autofix: null });
+        },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      {
+        ...baseContext,
+        grantedSkills: new Set<Skill>(["inspect"]),
+      },
+    );
+
+    expect(autofixRequested).toBe(false);
+    expect(result).toContain("# Issue CLOUDFLARE-MCP-41");
+  });
+
+  it("requests autofix state when the seer skill is granted", async () => {
+    let autofixRequested = false;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        () => {
+          autofixRequested = true;
+          return HttpResponse.json({ autofix: null });
+        },
+      ),
+    );
+
+    await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      {
+        ...baseContext,
+        grantedSkills: new Set<Skill>(["inspect", "seer"]),
+      },
+    );
+
+    expect(autofixRequested).toBe(true);
   });
 
   it.skip("includes Seer analysis when in progress - processing state", async () => {
