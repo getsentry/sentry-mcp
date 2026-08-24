@@ -167,6 +167,7 @@ export default defineTool({
           apiService,
           organizationSlug: orgSlug,
           issue,
+          seerEnabled: isSeerGranted(context),
         }),
       ]);
 
@@ -259,6 +260,7 @@ export default defineTool({
         apiService,
         organizationSlug: orgSlug,
         issue,
+        seerEnabled: isSeerGranted(context),
       }),
     ]);
 
@@ -326,17 +328,20 @@ async function fetchEventEnrichment({
 
 /**
  * Fetches supplementary data for an issue in parallel: Seer analysis and external links.
- * Both calls are non-blocking -- failures are silently caught so they never
- * prevent the primary issue details from being returned.
+ * All calls are non-blocking -- failures are silently caught so they never
+ * prevent the primary issue details from being returned. Seer analysis is
+ * skipped entirely when the `seer` skill is not granted.
  */
 async function fetchIssueEnrichmentData({
   apiService,
   organizationSlug,
   issue,
+  seerEnabled,
 }: {
   apiService: SentryApiService;
   organizationSlug: string;
   issue: Issue;
+  seerEnabled: boolean;
 }): Promise<{
   autofixState: AutofixRunState | undefined;
   externalIssues: ExternalIssueList | undefined;
@@ -344,9 +349,12 @@ async function fetchIssueEnrichmentData({
 }> {
   const issueId = String(issue.id);
   const [autofixState, externalIssues, relatedReplayIds] = await Promise.all([
-    apiService
-      .getAutofixState({ organizationSlug, issueId: issue.shortId })
-      .catch(() => undefined),
+    maybeFetchAutofixState({
+      apiService,
+      organizationSlug,
+      issue,
+      seerEnabled,
+    }),
     apiService
       .getIssueExternalLinks({ organizationSlug, issueId: issue.shortId })
       .catch(() => undefined),
@@ -360,6 +368,39 @@ async function fetchIssueEnrichmentData({
   ]);
 
   return { autofixState, externalIssues, relatedReplayIds };
+}
+
+/**
+ * Whether Seer output can be used at all in this session.
+ *
+ * A session started with `--disable-skills=seer` (or `--skills` that omits it)
+ * drops Seer output on the floor, so requesting it is pure overhead -- and on
+ * deployments without Seer the autofix endpoint answers 500, making it a
+ * guaranteed-failing request on every issue lookup. An unknown granted set
+ * keeps the previous behaviour and fetches.
+ */
+function isSeerGranted(context: ServerContext): boolean {
+  return context.grantedSkills ? context.grantedSkills.has("seer") : true;
+}
+
+async function maybeFetchAutofixState({
+  apiService,
+  organizationSlug,
+  issue,
+  seerEnabled,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  issue: Issue;
+  seerEnabled: boolean;
+}): Promise<AutofixRunState | undefined> {
+  if (!seerEnabled) {
+    return undefined;
+  }
+
+  return apiService
+    .getAutofixState({ organizationSlug, issueId: issue.shortId })
+    .catch(() => undefined);
 }
 
 async function maybeFetchPerformanceTrace({
