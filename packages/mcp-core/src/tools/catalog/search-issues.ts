@@ -2,6 +2,7 @@ import { getActiveSpan, setTag } from "@sentry/core";
 import { z } from "zod";
 import { SEARCH_ISSUES_PERIOD_VALUES } from "../../constants";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
+import { withProviderFallback } from "../../internal/agents/provider-fallback";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
@@ -17,7 +18,7 @@ const ProjectSlugOrIdSchema = z.string().trim().superRefine(validateSlugOrId);
 
 function buildIssueSearchRepairPrompt(params: {
   query: string;
-  sort: "date" | "freq" | "new" | "user";
+  sort: "date" | "freq" | "new" | "user" | "recommended";
 }): string {
   return [
     "Fix this Sentry issue search request.",
@@ -80,10 +81,10 @@ export default defineTool({
       .default("is:unresolved")
       .describe("Natural language or Sentry issue search query syntax."),
     sort: z
-      .enum(["date", "freq", "new", "user"])
+      .enum(["date", "freq", "new", "user", "recommended"])
       .default("date")
       .describe(
-        "Sort order: date (last seen), freq (frequency), new (first seen), user (user count)",
+        "Sort order: date (last seen), freq (frequency), new (first seen), user (user count), recommended (Sentry's prioritized ranking)",
       ),
     projectSlugOrId: ProjectSlugOrIdSchema.nullable()
       .default(null)
@@ -128,7 +129,7 @@ export default defineTool({
     }
 
     let query: string;
-    let sort: "date" | "freq" | "new" | "user";
+    let sort: "date" | "freq" | "new" | "user" | "recommended";
     let explanation: string | undefined;
 
     let projectId: string | undefined;
@@ -148,18 +149,31 @@ export default defineTool({
     }
 
     if (hasAgentProvider()) {
-      // Agent mode: repair requests before calling Sentry.
-      const agentResult = await searchIssuesAgent({
-        query: buildIssueSearchRepairPrompt({
+      // Agent mode: repair requests before calling Sentry. If the optional AI
+      // provider is unavailable, preserve the original query and continue.
+      const translatedQuery = await withProviderFallback<
+        Awaited<ReturnType<typeof searchIssuesAgent>>["result"]
+      >({
+        operation: "search_issues.rewrite",
+        fallback: () => ({
           query: params.query,
           sort: params.sort,
+          explanation: "",
         }),
-        organizationSlug: params.organizationSlug,
-        apiService,
-        projectId,
+        run: async () =>
+          (
+            await searchIssuesAgent({
+              query: buildIssueSearchRepairPrompt({
+                query: params.query,
+                sort: params.sort,
+              }),
+              organizationSlug: params.organizationSlug,
+              apiService,
+              projectId,
+            })
+          ).result,
       });
 
-      const translatedQuery = agentResult.result;
       query = translatedQuery.query ?? params.query;
       sort = translatedQuery.sort || params.sort;
       explanation = translatedQuery.explanation;

@@ -48,7 +48,6 @@
   },
   "dependencies": {
     "@ai-sdk/mcp": "catalog:",
-    "@ai-sdk/openai": "catalog:",
     "@ai-sdk/react": "catalog:",
     "@cloudflare/workers-oauth-provider": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",

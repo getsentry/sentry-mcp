@@ -1,7 +1,6 @@
 import { setTag } from "@sentry/core";
-import { z } from "zod";
-import { ApiNotFoundError } from "../../api-client";
 import type { SentryApiService } from "../../api-client";
+import { ApiNotFoundError } from "../../api-client";
 import type {
   AutofixRunState,
   DefaultEvent,
@@ -27,6 +26,7 @@ import {
   parseIssueParams,
 } from "../../internal/tool-helpers/issue";
 import {
+  ParamEventId,
   ParamIssueShortId,
   ParamIssueUrl,
   ParamOrganizationSlug,
@@ -88,7 +88,7 @@ export default defineTool({
     organizationSlug: ParamOrganizationSlug.optional(),
     regionUrl: ParamRegionUrl.nullable().default(null),
     issueId: ParamIssueShortId.optional(),
-    eventId: z.string().trim().describe("The ID of the event.").optional(),
+    eventId: ParamEventId.optional(),
     issueUrl: ParamIssueUrl.optional(),
   },
   annotations: {

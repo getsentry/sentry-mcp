@@ -40,9 +40,12 @@
  */
 import type { z } from "zod";
 import type {
+  AgenticOnboardingRunSchema,
+  AgenticOnboardingStatusUpdateSchema,
   AssignedToSchema,
   AIConversationSummaryListSchema,
   AIConversationSummarySchema,
+  AIConversationDetailsResponseSchema,
   AIConversationSpanListSchema,
   AIConversationSpanSchema,
   AIConversationUserSchema,
@@ -85,6 +88,10 @@ import type {
   MonitorSchema,
   MonitorStatsSchema,
   MonitorStatSchema,
+  UptimeCheckListSchema,
+  UptimeCheckSchema,
+  UptimeMonitorListSchema,
+  UptimeMonitorSchema,
   MetricAlertRuleListSchema,
   MetricAlertRuleSchema,
   OrganizationListSchema,
@@ -120,6 +127,10 @@ import type {
   UserReportListSchema,
 } from "./schema";
 
+export type AgenticOnboardingRun = z.infer<typeof AgenticOnboardingRunSchema>;
+export type AgenticOnboardingStatusUpdate = z.infer<
+  typeof AgenticOnboardingStatusUpdateSchema
+>;
 export type User = z.infer<typeof UserSchema>;
 export type Organization = z.infer<typeof OrganizationSchema>;
 export type Team = z.infer<typeof TeamSchema>;
@@ -140,6 +151,8 @@ export type IssueComment = z.infer<typeof IssueCommentSchema>;
 export type Monitor = z.infer<typeof MonitorSchema>;
 export type MonitorCheckIn = z.infer<typeof MonitorCheckInSchema>;
 export type MonitorStat = z.infer<typeof MonitorStatSchema>;
+export type UptimeMonitor = z.infer<typeof UptimeMonitorSchema>;
+export type UptimeCheck = z.infer<typeof UptimeCheckSchema>;
 
 // Individual event types
 export type ErrorEvent = z.infer<typeof ErrorEventSchema>;
@@ -186,6 +199,8 @@ export type IssueCommentList = z.infer<typeof IssueCommentListSchema>;
 export type MonitorList = z.infer<typeof MonitorListSchema>;
 export type MonitorCheckInList = z.infer<typeof MonitorCheckInListSchema>;
 export type MonitorStats = z.infer<typeof MonitorStatsSchema>;
+export type UptimeMonitorList = z.infer<typeof UptimeMonitorListSchema>;
+export type UptimeCheckList = z.infer<typeof UptimeCheckListSchema>;
 export type EventAttachmentList = z.infer<typeof EventAttachmentListSchema>;
 export type TagList = z.infer<typeof TagListSchema>;
 export type ClientKeyList = z.infer<typeof ClientKeyListSchema>;
@@ -203,6 +218,9 @@ export type Trace = z.infer<typeof TraceSchema>;
 export type AIConversationSpan = z.infer<typeof AIConversationSpanSchema>;
 export type AIConversationSpanList = z.infer<
   typeof AIConversationSpanListSchema
+>;
+export type AIConversationDetails = z.infer<
+  typeof AIConversationDetailsResponseSchema
 >;
 export type AIConversationUser = z.infer<typeof AIConversationUserSchema>;
 export type AIConversationSummary = z.infer<typeof AIConversationSummarySchema>;

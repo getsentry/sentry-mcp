@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import getEventAttachment from "./get-event-attachment.js";
 
 describe("get_event_attachment", () => {
@@ -110,7 +110,7 @@ describe("get_event_attachment", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
-        eventId: "octet-stream-event-id",
+        eventId: "d49541c747cb4d8aa3efb70ca5aba244",
         attachmentId: "456",
         regionUrl: null,
       },

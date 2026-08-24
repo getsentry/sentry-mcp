@@ -302,6 +302,24 @@ describe("EventSchema", () => {
     expect(result.type).toBe("error");
   });
 
+  it("should parse null dateReceived and null generic occurrence", () => {
+    const genericEvent = {
+      id: "2d9a3f30ee5a4a95b712e78b87631f9a",
+      title: "Metric regression",
+      message: null,
+      platform: null,
+      type: "generic",
+      entries: [],
+      dateCreated: "2025-01-01T00:00:00Z",
+      dateReceived: null,
+      occurrence: null,
+    };
+
+    const result = EventSchema.parse(genericEvent);
+    expect(result.dateReceived).toBeNull();
+    expect(result).toHaveProperty("occurrence", null);
+  });
+
   it("should allow partially populated user geo payloads", () => {
     const errorEvent = {
       id: "geo123",
@@ -1092,5 +1110,55 @@ describe("TransactionProfileSchema", () => {
     );
 
     expect(parsed.profile.frames[0]?.function).toBeUndefined();
+  });
+
+  it("defaults omitted thread_metadata to an empty object", () => {
+    // Sentry's SentrySampledProfile type marks thread_metadata optional, and
+    // the project profiling endpoint proxies the profiling-service payload
+    // without normalizing it. Regression coverage for MCP-SERVER-FSD.
+    const profile = TransactionProfileSchema.parse({
+      event_id: "cfe78a5c892d4a64a962d837673398d2",
+      profile_id: "cfe78a5c892d4a64a962d837673398d2",
+      platform: "python",
+      version: "2",
+      profile: {
+        frames: [{ function: "handle_request", in_app: true }],
+        samples: [{ stack_id: 0, thread_id: 1, elapsed_since_start_ns: 0 }],
+        stacks: [[0]],
+      },
+      transaction: {
+        name: "/api/users",
+        trace_id: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+        id: "7ca573c0f4814912aaa9bdc77d1a7d51",
+        active_thread_id: 1,
+      },
+    });
+
+    expect(profile.profile.thread_metadata).toEqual({});
+  });
+
+  it("defaults null thread_metadata to an empty object", () => {
+    // Observed V1 payloads can send null even though the frontend type only
+    // marks the field optional. Match ProfileChunkSchema's null-coalesce.
+    const profile = TransactionProfileSchema.parse({
+      event_id: "cfe78a5c892d4a64a962d837673398d2",
+      profile_id: "cfe78a5c892d4a64a962d837673398d2",
+      platform: "python",
+      version: "2",
+      profile: {
+        frames: [{ function: "handle_request", in_app: true }],
+        samples: [{ stack_id: 0, thread_id: 1, elapsed_since_start_ns: 0 }],
+        stacks: [[0]],
+        thread_metadata: null,
+      },
+      transaction: {
+        name: "/api/users",
+        trace_id: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+        id: "7ca573c0f4814912aaa9bdc77d1a7d51",
+        active_thread_id: 1,
+      },
+    });
+
+    expect(profile.profile.thread_metadata).toEqual({});
   });
 });

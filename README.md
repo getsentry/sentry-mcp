@@ -107,7 +107,8 @@ EMBEDDED_AGENT_PROVIDER=     # Required when multiple provider keys are set: 'op
 OPENAI_API_KEY=              # Required if using OpenAI
 ANTHROPIC_API_KEY=           # Required if using Anthropic
 OPENROUTER_API_KEY=          # Required if using OpenRouter
-OPENROUTER_MODEL=            # Optional OpenRouter model, defaults to 'openai/gpt-5'
+OPENROUTER_MODEL=            # Optional OpenRouter model, defaults to 'openai/gpt-5.6-luna'
+OPENROUTER_REASONING_EFFORT= # Optional OpenRouter reasoning effort, defaults to 'high'
 
 # Optional overrides
 SENTRY_HOST=                 # For self-hosted deployments

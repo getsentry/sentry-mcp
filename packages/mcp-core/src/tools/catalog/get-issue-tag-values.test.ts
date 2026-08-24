@@ -160,34 +160,28 @@ describe("get_issue_tag_values", () => {
     ).rejects.toThrow(UserInputError);
   });
 
-  it("throws error when tagKey contains path traversal characters", async () => {
-    await expect(
-      getIssueTagValues.handler(
-        {
-          organizationSlug: "sentry-mcp-evals",
-          issueId: "CLOUDFLARE-MCP-41",
-          tagKey: "../../../admin",
-          regionUrl: null,
-          issueUrl: undefined,
-        },
-        getServerContext(),
-      ),
-    ).rejects.toThrow();
+  /**
+   * These assert against the input schema rather than the handler because the
+   * handler receives already-validated params. Driving the handler directly skips
+   * Zod, so an earlier version of these tests passed only because MSW rejected the
+   * unmocked URL, not because the traversal was caught.
+   */
+  it.each([
+    ["dot segments", "../../../admin"],
+    ["slashes", "url/path"],
+    ["backslashes", "..\\..\\admin"],
+    ["encoded dot segments", "%2e%2e%2fadmin"],
+    ["leading dot", ".hidden"],
+  ])("rejects tagKey containing %s", (_label, tagKey) => {
+    expect(getIssueTagValues.inputSchema.tagKey.safeParse(tagKey).success).toBe(
+      false,
+    );
   });
 
-  it("throws error when tagKey contains slashes", async () => {
-    await expect(
-      getIssueTagValues.handler(
-        {
-          organizationSlug: "sentry-mcp-evals",
-          issueId: "CLOUDFLARE-MCP-41",
-          tagKey: "url/path",
-          regionUrl: null,
-          issueUrl: undefined,
-        },
-        getServerContext(),
-      ),
-    ).rejects.toThrow();
+  it("accepts a conventional tag key", () => {
+    expect(getIssueTagValues.inputSchema.tagKey.safeParse("url").success).toBe(
+      true,
+    );
   });
 
   it("handles null values in topValues gracefully", async () => {

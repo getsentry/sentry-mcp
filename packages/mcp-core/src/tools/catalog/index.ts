@@ -8,6 +8,11 @@ import findDashboards from "./find-dashboards";
 import getDashboardDetails from "./get-dashboard-details";
 import findMonitors from "./find-monitors";
 import getMonitorDetails from "./get-monitor-details";
+import findUptimeMonitors from "./find-uptime-monitors";
+import getUptimeMonitorDetails from "./get-uptime-monitor-details";
+import createUptimeMonitor from "./create-uptime-monitor";
+import updateUptimeMonitor from "./update-uptime-monitor";
+import deleteUptimeMonitor from "./delete-uptime-monitor";
 import findAlertRules from "./find-alert-rules";
 import getAlertRule from "./get-alert-rule";
 import getIssueDetails from "./get-issue-details";
@@ -44,6 +49,7 @@ import getLatestBaseSnapshot from "./get-latest-base-snapshot";
 import getAIConversationDetails from "./get-ai-conversation-details";
 import searchAIConversations from "./search-ai-conversations";
 import addIssueNote from "./add-issue-note";
+import onboardingStatusUpdate from "./onboarding-status-update";
 import type { ToolConfig } from "../types";
 
 /**
@@ -66,6 +72,11 @@ const catalogTools = {
   get_dashboard_details: getDashboardDetails,
   find_monitors: findMonitors,
   get_monitor_details: getMonitorDetails,
+  find_uptime_monitors: findUptimeMonitors,
+  get_uptime_monitor_details: getUptimeMonitorDetails,
+  create_uptime_monitor: createUptimeMonitor,
+  update_uptime_monitor: updateUptimeMonitor,
+  delete_uptime_monitor: deleteUptimeMonitor,
   find_alert_rules: findAlertRules,
   get_alert_rule: getAlertRule,
   get_issue_details: getIssueDetails,
@@ -102,6 +113,7 @@ const catalogTools = {
   get_ai_conversation_details: getAIConversationDetails,
   search_ai_conversations: searchAIConversations,
   add_issue_note: addIssueNote,
+  onboarding_status_update: onboardingStatusUpdate,
 } as const satisfies Record<string, ToolConfig<any>>;
 
 export default catalogTools;

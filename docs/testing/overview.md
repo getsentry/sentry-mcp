@@ -43,6 +43,7 @@ Our testing approach prioritizes **functional coverage** over implementation det
 - Standard library behavior (Promise.all, Array.map, etc.)
 - Third-party package internals (Zod validation, MSW mocking, etc.)
 - Implementation details (private methods, internal state)
+- Agent/system prompt text or prompt wording (assert behavior via tool inputs/outputs and Sentry API requests instead)
 - Obvious behavior that will break immediately if wrong
 
 ### Example: Context Passing
@@ -279,7 +280,7 @@ describeEval("tool-name", {
 ### Running Evals
 
 ```bash
-# Requires OPENAI_API_KEY in .env
+# Requires OPENROUTER_API_KEY in .env
 pnpm eval
 
 # Run specific eval

@@ -79,6 +79,7 @@ type DefinitionTool = {
   inputSchema: Record<string, ZodTypeAny>;
   outputSchema?: ZodTypeAny;
   skills: string[];
+  includeInSkillDefinitions?: boolean;
   requiredScopes: string[];
   experimental?: boolean;
   hideInExperimentalMode?: boolean;
@@ -253,6 +254,7 @@ async function generateSkillDefinitions() {
       const t = tool as DefinitionTool;
       return (
         isSkillDefinitionTool(t) &&
+        t.includeInSkillDefinitions !== false &&
         Array.isArray(t.skills) &&
         t.skills.includes(skill.id)
       );

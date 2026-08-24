@@ -1,18 +1,21 @@
 const AUTH_PARAM_SEPARATOR = /,\s*(?=[A-Za-z_][A-Za-z0-9_-]*\s*=)/;
 const AUTH_CHALLENGE = /^(\S+)(?:\s+(.+))?$/;
 
-export type OAuthTokenShape =
+export type OAuthBearerShape =
   | "missing"
-  | "non_bearer"
-  | "empty_bearer"
+  | "non_scheme"
+  | "empty_scheme"
   | "wrapper"
   | "malformed";
 
+// Scrubber-safe buckets: avoid default Sentry sensitive substrings in emitted
+// values (token, bearer, auth/oauth, credentials) so they are not replaced
+// with "[Filtered]".
 export type OAuthErrorCode =
   | "invalid_request"
   | "invalid_client"
   | "invalid_grant"
-  | "invalid_token"
+  | "invalid_access"
   | "invalid_target"
   | "unsupported_grant_type"
   | "invalid_client_metadata"
@@ -21,9 +24,89 @@ export type OAuthErrorCode =
 
 export type OAuthErrorTelemetry = {
   oauthError?: OAuthErrorCode;
-  oauthErrorDescription?: string;
-  oauthTokenShape?: OAuthTokenShape;
+  oauthErrorReason?: string;
+  oauthBearerShape?: OAuthBearerShape;
 };
+
+/**
+ * Scrubber-safe attribute keys for OAuth diagnostics.
+ *
+ * Default Sentry data scrubbing treats keys/values containing sensitive
+ * substrings (`auth` including inside `oauth`, `token`, `bearer`,
+ * `credentials`, …) as sensitive, replacing values with `[Filtered]`.
+ * Keep metric *names* under `app.oauth.*` for continuity; put filterable
+ * dimensions under these keys and use scrubber-safe bucket values.
+ */
+export const ACCESS_METHOD_ATTRIBUTE = "app.access.method" as const;
+export const OAUTH_ERROR_ATTRIBUTE = "app.access.error.code" as const;
+export const OAUTH_ERROR_REASON_ATTRIBUTE =
+  "app.access.error.reason" as const;
+export const OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE =
+  "app.access.request.header_shape" as const;
+export const OAUTH_REFRESH_OUTCOME_ATTRIBUTE =
+  "app.access.refresh.outcome" as const;
+export const OAUTH_GRANT_SHAPE_ATTRIBUTE = "app.access.grant.shape" as const;
+export const OAUTH_GRANT_ID_HASH_ATTRIBUTE = "app.access.grant.id_hash" as const;
+export const OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE =
+  "app.access.grant.age_bucket" as const;
+export const OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE =
+  "app.access.grant.revoked_reason" as const;
+export const OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE =
+  "app.access.upstream.expires_in_bucket" as const;
+export const OAUTH_PROBE_STATUS_CODE_ATTRIBUTE =
+  "app.access.probe.status_code" as const;
+export const OAUTH_PROBE_REASON_ATTRIBUTE = "app.access.probe.reason" as const;
+
+/**
+ * Low-cardinality OAuth client registration method.
+ * CIMD clients present an HTTPS URL as client_id; DCR clients receive an
+ * opaque registered client_id from /oauth/register.
+ */
+export const CLIENT_REGISTRATION_METHOD_ATTRIBUTE =
+  "app.client.registration.method" as const;
+
+export type ClientRegistrationMethod = "cimd" | "dcr" | "unknown";
+
+/**
+ * Classifies an OAuth client_id as CIMD, DCR, or unknown without emitting
+ * the raw client_id. HTTPS URL client_ids are CIMD; opaque non-URL ids are
+ * treated as DCR under the current server client model.
+ */
+export function resolveClientRegistrationMethod(
+  clientId: unknown,
+): ClientRegistrationMethod {
+  if (typeof clientId !== "string") {
+    return "unknown";
+  }
+
+  const trimmed = clientId.trim();
+  if (!trimmed) {
+    return "unknown";
+  }
+
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "https:" ? "cimd" : "unknown";
+  } catch {
+    return "dcr";
+  }
+}
+
+/**
+ * Returns the bounded client-registration-method attribute for metrics,
+ * spans, and logs.
+ */
+export function getClientRegistrationMethodTelemetry(
+  clientId: unknown,
+): Record<
+  typeof CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+  ClientRegistrationMethod
+> {
+  return {
+    [CLIENT_REGISTRATION_METHOD_ATTRIBUTE]:
+      resolveClientRegistrationMethod(clientId),
+  };
+}
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -99,8 +182,8 @@ export function getOAuthGrantLifecycleTelemetry(props: {
   upstreamExpiresAt?: unknown;
 }): Record<string, string> {
   return {
-    "app.oauth.grant.age_bucket": bucketElapsedMs(props.sessionStartedAt),
-    "app.oauth.upstream.expires_in_bucket": bucketRemainingMs(
+    [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: bucketElapsedMs(props.sessionStartedAt),
+    [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: bucketRemainingMs(
       props.upstreamExpiresAt,
     ),
   };
@@ -122,12 +205,14 @@ export function bucketOAuthErrorCode(
     case "invalid_request":
     case "invalid_client":
     case "invalid_grant":
-    case "invalid_token":
     case "invalid_target":
     case "unsupported_grant_type":
     case "invalid_client_metadata":
     case "not_implemented":
       return normalized;
+    case "invalid_token":
+      // Scrubber-safe: avoid emitting token/bearer substrings.
+      return "invalid_access";
     default:
       return normalized ? "other" : undefined;
   }
@@ -145,26 +230,27 @@ export function bucketOAuthErrorDescription(
 
   const normalized = value.toLowerCase();
 
+  // Bucket values deliberately avoid token/bearer/auth/credentials substrings.
   if (normalized.includes("missing or invalid access token")) {
-    return "missing_or_invalid_access_token";
+    return "missing_or_invalid_access";
   }
   if (normalized.includes("missing, invalid, or expired access token")) {
-    return "missing_invalid_or_expired_access_token";
+    return "missing_invalid_or_expired_access";
   }
   if (normalized.includes("invalid access token")) {
-    return "invalid_access_token";
+    return "invalid_access";
   }
   if (normalized.includes("access token expired")) {
-    return "access_token_expired";
+    return "access_expired";
   }
   if (normalized.includes("audience does not match")) {
-    return "token_audience_mismatch";
+    return "access_audience_mismatch";
   }
   if (normalized.includes("grant not found")) {
     return "grant_not_found";
   }
   if (normalized.includes("invalid refresh token")) {
-    return "invalid_refresh_token";
+    return "invalid_refresh";
   }
   if (normalized.includes("content-type")) {
     return "invalid_content_type";
@@ -234,7 +320,7 @@ async function parseResponseJsonBody(
 /**
  * Classifies the bearer token shape without exposing the token value.
  */
-export function getOAuthTokenShape(request: Request): OAuthTokenShape {
+export function getOAuthBearerShape(request: Request): OAuthBearerShape {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader) {
     return "missing";
@@ -242,12 +328,12 @@ export function getOAuthTokenShape(request: Request): OAuthTokenShape {
 
   const match = authHeader.match(/^Bearer\s*(.*)$/i);
   if (!match) {
-    return "non_bearer";
+    return "non_scheme";
   }
 
   const token = match[1]?.trim();
   if (!token) {
-    return "empty_bearer";
+    return "empty_scheme";
   }
 
   const parts = token.split(":");
@@ -276,7 +362,7 @@ export function getOAuthGrantTelemetry(
   grantId: string | null,
 ): Record<string, string> {
   return grantId
-    ? { "app.oauth.grant.id_hash": fingerprintOAuthGrantId(grantId) }
+    ? { [OAUTH_GRANT_ID_HASH_ATTRIBUTE]: fingerprintOAuthGrantId(grantId) }
     : {};
 }
 
@@ -290,7 +376,7 @@ export async function getOAuthErrorTelemetry(
   const telemetry: OAuthErrorTelemetry = {};
 
   if (response.status === 401) {
-    telemetry.oauthTokenShape = getOAuthTokenShape(request);
+    telemetry.oauthBearerShape = getOAuthBearerShape(request);
   }
 
   const authenticateParams = parseAuthenticateParams(
@@ -299,12 +385,12 @@ export async function getOAuthErrorTelemetry(
   const headerError = bucketOAuthErrorCode(authenticateParams.error);
   if (headerError) {
     telemetry.oauthError = headerError;
-    telemetry.oauthErrorDescription = bucketOAuthErrorDescription(
+    telemetry.oauthErrorReason = bucketOAuthErrorDescription(
       authenticateParams.error_description,
     );
-    if (!telemetry.oauthErrorDescription) {
+    if (!telemetry.oauthErrorReason) {
       const json = await parseResponseJsonBody(response);
-      telemetry.oauthErrorDescription = bucketOAuthErrorDescription(
+      telemetry.oauthErrorReason = bucketOAuthErrorDescription(
         json?.error_description,
       );
     }
@@ -322,7 +408,7 @@ export async function getOAuthErrorTelemetry(
   }
 
   telemetry.oauthError = bodyError;
-  telemetry.oauthErrorDescription = bucketOAuthErrorDescription(
+  telemetry.oauthErrorReason = bucketOAuthErrorDescription(
     json.error_description,
   );
   return telemetry;

@@ -3,13 +3,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assert, test } from "vitest";
 import catalogTools from "./catalog/index.js";
+import {
+  findIncompatibleJsonSchemaUnions,
+  formatJsonSchemaUnionViolations,
+  zodFieldMapToJsonSchema,
+} from "./catalog-runtime/schema.js";
 import * as tools from "./index.js";
 import {
   EXPERIMENTAL_TOP_LEVEL_TOOL_NAMES,
-  TOP_LEVEL_TOOL_NAMES,
-  WRAPPER_TOOL_NAMES,
   isDefaultTopLevelToolName,
   isTopLevelToolName,
+  TOP_LEVEL_TOOL_NAMES,
+  WRAPPER_TOOL_NAMES,
 } from "./surfaces.js";
 import { isToolVisibleInMode, resolveDescription } from "./types.js";
 
@@ -122,6 +127,25 @@ test("tool registry keys match tool names", () => {
       toolName,
       `tool registry key '${toolName}' must match tool name '${tool.name}'`,
     );
+  }
+});
+
+test("direct tool input schemas ban root and nested JSON Schema unions", () => {
+  for (const experimentalMode of [false, true]) {
+    for (const tool of Object.values(tools.default)) {
+      if (!isTopLevelToolName(tool.name, experimentalMode)) {
+        continue;
+      }
+
+      const violations = findIncompatibleJsonSchemaUnions(
+        zodFieldMapToJsonSchema(tool.inputSchema),
+      );
+      assert.deepEqual(
+        violations,
+        [],
+        `${tool.name} input schema must not use root or nested anyOf/oneOf/allOf (found ${formatJsonSchemaUnionViolations(violations)})`,
+      );
+    }
   }
 });
 

@@ -111,6 +111,7 @@ function mockConversationEndpoint(
   org = "test-org",
   conversationId = "conv-123",
   spans = conversationSpans,
+  title: string | null = null,
 ) {
   mswServer.use(
     http.get(
@@ -120,7 +121,7 @@ function mockConversationEndpoint(
         expect(url.searchParams.get("statsPeriod")).toBe("30d");
         expect(url.searchParams.get("per_page")).toBe("1000");
         expect(url.searchParams.get("project")).toBe("-1");
-        return HttpResponse.json(spans);
+        return HttpResponse.json({ conversationId, title, spans });
       },
     ),
   );
@@ -128,7 +129,12 @@ function mockConversationEndpoint(
 
 describe("get_ai_conversation_details", () => {
   it("returns structured conversation details", async () => {
-    mockConversationEndpoint();
+    mockConversationEndpoint(
+      "test-org",
+      "conv-123",
+      conversationSpans,
+      "Checkout worker timeouts",
+    );
 
     const result = await getAIConversationDetails.handler(
       {
@@ -145,6 +151,7 @@ describe("get_ai_conversation_details", () => {
     expect(structuredContent).not.toHaveProperty("focusedSpanPresent");
     expect(structuredContent).not.toHaveProperty("messages");
     expect(structuredContent).not.toHaveProperty("spanIds");
+    expect(structuredContent.title).toBe("Checkout worker timeouts");
     expect(structuredContent.timeline[0].genAi).toMatchObject({
       operationType: "ai_client",
       requestModel: "gpt-5-mini",
@@ -356,6 +363,7 @@ describe("get_ai_conversation_details", () => {
             "type": "message",
           },
         ],
+        "title": "Checkout worker timeouts",
         "toolCallCount": 1,
         "totalTokens": 100,
         "traceIds": [
@@ -539,7 +547,11 @@ describe("get_ai_conversation_details", () => {
           );
           expect(url.searchParams.get("end")).toBe("2026-05-23T02:34:56.137Z");
           expect(url.searchParams.get("project")).toBe("4510944073809921");
-          return HttpResponse.json(conversationSpans);
+          return HttpResponse.json({
+            conversationId: "conv-123",
+            title: null,
+            spans: conversationSpans,
+          });
         },
       ),
     );
@@ -570,7 +582,11 @@ describe("get_ai_conversation_details", () => {
             "2026-05-23T00:23:27.667Z",
           );
           expect(url.searchParams.get("end")).toBe("2026-05-23T02:34:56.137Z");
-          return HttpResponse.json([]);
+          return HttpResponse.json({
+            conversationId: "conv-empty",
+            title: null,
+            spans: [],
+          });
         },
       ),
     );
@@ -588,6 +604,7 @@ describe("get_ai_conversation_details", () => {
     assertStructuredOnlyResult(result);
     expect(getStructuredContent(result)).toMatchObject({
       conversationId: "conv-empty",
+      title: null,
       lookupWindow: {
         start: "2026-05-23T00:23:27.667Z",
         end: "2026-05-23T02:34:56.137Z",

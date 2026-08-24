@@ -77,6 +77,13 @@ export function createScopedAuthorizationServerMetadataResponse(
 const ROOT_AUTHORIZATION_SERVER_METADATA_PATH =
   "/.well-known/oauth-authorization-server";
 
+// Soft-compat for broken Codex clients that drop callback `iss` after requiring
+// it when this metadata flag is advertised (Codex 0.146.0 / desktop
+// 0.146.0-alpha.9.2 via rmcp 1.8.0). Keep emitting callback `iss`; only skip
+// advertising support for now.
+// TODO(2026-10-02): set this back to true once broken Codex clients age out.
+const ADVERTISE_AUTHORIZATION_RESPONSE_ISS_PARAMETER_SUPPORTED = false;
+
 /**
  * workers-oauth-provider emits root AS metadata but does not advertise RFC 9207
  * support. When we append `iss` on authorization responses, patch the provider
@@ -86,6 +93,10 @@ export async function patchRootAuthorizationServerMetadata(
   response: Response,
   url: URL,
 ): Promise<Response> {
+  if (!ADVERTISE_AUTHORIZATION_RESPONSE_ISS_PARAMETER_SUPPORTED) {
+    return response;
+  }
+
   if (
     !response.ok ||
     url.pathname !== ROOT_AUTHORIZATION_SERVER_METADATA_PATH

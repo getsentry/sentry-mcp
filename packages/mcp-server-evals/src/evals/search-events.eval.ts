@@ -1,7 +1,7 @@
 import { describeEval } from "vitest-evals";
 import { FIXTURES, NoOpTaskRunner, ToolPredictionScorer } from "./utils";
 
-// Note: This eval requires OPENAI_API_KEY to be set in the environment
+// Note: This eval requires OPENROUTER_API_KEY to be set in the environment
 // The search_events tool uses the AI SDK to translate natural language queries
 describeEval("search-events", {
   data: async () => {

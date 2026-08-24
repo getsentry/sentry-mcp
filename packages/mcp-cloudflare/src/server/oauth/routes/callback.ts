@@ -5,6 +5,10 @@ import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { Hono } from "hono";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import { resolveClientFamilyFromName } from "../../lib/client-family";
+import {
+  CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+  getClientRegistrationMethodTelemetry,
+} from "../telemetry";
 import { isRegisteredRedirectUri } from "../../lib/redirect-uri";
 import type { Env, WorkerProps } from "../../types";
 import { setSentryUserFromRequest } from "../../utils/sentry-user";
@@ -333,9 +337,17 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   // browser, not the MCP client. Derive client family from the DCR-registered
   // client_name (resolved above).
   const clientFamily = resolveClientFamilyFromName(registeredClientName);
+  const registrationMethodTelemetry = getClientRegistrationMethodTelemetry(
+    oauthReqInfo.clientId,
+  );
+  Sentry.getActiveSpan()?.setAttribute(
+    CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+    registrationMethodTelemetry[CLIENT_REGISTRATION_METHOD_ATTRIBUTE],
+  );
   Sentry.metrics.count("app.oauth.callback_completed", 1, {
     attributes: {
       "app.client.family": clientFamily,
+      ...registrationMethodTelemetry,
     },
   });
   for (const skill of grantedSkills) {

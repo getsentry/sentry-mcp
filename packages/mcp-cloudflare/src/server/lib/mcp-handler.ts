@@ -25,8 +25,10 @@ import type { ServerContext } from "@sentry/mcp-core/types";
 import { createMcpHandler } from "agents/mcp/server";
 import { annotateResponseMetric } from "../metrics";
 import {
+  ACCESS_METHOD_ATTRIBUTE,
   getOAuthGrantLifecycleTelemetry,
   getOAuthGrantTelemetry,
+  OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE,
 } from "../oauth/telemetry";
 import type { WorkerProps } from "../types";
 import type { Env } from "../types";
@@ -35,7 +37,10 @@ import {
   checkRateLimit,
 } from "../utils/rate-limiter";
 import { setSentryUserFromRequest } from "../utils/sentry-user";
-import { UTM_SOURCE_ATTRIBUTE, resolveUtmSourceFromUrl } from "./attribution";
+import {
+  UTM_SOURCE_ATTRIBUTE,
+  resolveUtmSourceFromRequest,
+} from "./attribution";
 import { resolveClientFamily } from "./client-family";
 import { verifyConstraintsAccess } from "./constraint-utils";
 
@@ -110,7 +115,7 @@ function logGrantReauthorization(
   logWarn("OAuth grant rejected for reauthorization", {
     loggerScope: ["cloudflare", "mcp-handler"],
     extra: {
-      "app.oauth.grant_revoked.reason": reason,
+      [OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE]: reason,
       "app.client.family": clientFamily,
       userId,
       clientId,
@@ -139,7 +144,7 @@ function revokeStaleGrant(
   if (grantId) {
     Sentry.metrics.count("app.oauth.grant_revoked", 1, {
       attributes: {
-        "app.oauth.grant_revoked.reason": revokeReason,
+        [OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE]: revokeReason,
         "app.client.family": clientFamily,
         ...lifecycleTelemetry,
       },
@@ -316,8 +321,8 @@ async function handleAuthenticatedMcpRequest(
   // Check for experimental mode query parameter
   const isExperimentalMode = url.searchParams.get("experimental") === "1";
 
-  // Read utm_source for attribution tracking
-  const utmSource = resolveUtmSourceFromUrl(url);
+  // Read utm_source for attribution tracking (header preferred, query fallback)
+  const utmSource = resolveUtmSourceFromRequest(request, url);
 
   const sentryHost = env.SENTRY_HOST || "sentry.io";
   const clientFamily = resolveClientFamily(request.headers.get("user-agent"));
@@ -328,7 +333,10 @@ async function handleAuthenticatedMcpRequest(
 
   const activeSpan = Sentry.getActiveSpan();
   activeSpan?.setAttribute("app.transport", "http");
-  activeSpan?.setAttribute("app.auth.kind", auth.kind);
+  activeSpan?.setAttribute(
+    ACCESS_METHOD_ATTRIBUTE,
+    auth.kind === "oauth" ? "mcp_grant" : "sentry_access",
+  );
   activeSpan?.setAttribute("app.client.family", clientFamily);
   activeSpan?.setAttribute("app.server.mode.experimental", isExperimentalMode);
   if (utmSource) {
@@ -351,7 +359,7 @@ async function handleAuthenticatedMcpRequest(
       : {
           identifier: auth.accessToken,
           keyPrefix: "mcp:sentry-token" as const,
-          scope: "sentry-token" as const,
+          scope: "sentry_access" as const,
         };
   const rateLimitResult = await checkRateLimit(
     rateLimitConfig.identifier,
@@ -433,6 +441,7 @@ async function handleAuthenticatedMcpRequest(
     clientId: auth.kind === "oauth" ? auth.clientId : undefined,
     clientName: auth.kind === "oauth" ? auth.clientName : undefined,
     clientFamily,
+    utmSource,
     accessToken: auth.accessToken,
     grantedSkills: auth.grantedSkills,
     constraints,
@@ -516,8 +525,8 @@ const mcpHandler: ExportedHandler<Env> = {
       );
     }
 
-    // Attribute values avoid the substring "token" so Sentry's default PII
-    // scrubber doesn't replace them with "[Filtered]" on ingest.
+    // Attribute values avoid sensitive substrings (token/bearer/auth/credentials)
+    // so Sentry's default PII scrubber doesn't replace them with "[Filtered]".
     if (!rawProps.refreshToken) {
       return revokeStaleGrant(
         ctx,
@@ -603,7 +612,7 @@ const mcpHandler: ExportedHandler<Env> = {
         }
         Sentry.metrics.count("app.oauth.grant_revoked", 1, {
           attributes: {
-            "app.oauth.grant_revoked.reason": "upstream_rejected_in_use",
+            [OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE]: "upstream_rejected_in_use",
             "app.client.family": clientFamily,
             ...lifecycleTelemetry,
           },

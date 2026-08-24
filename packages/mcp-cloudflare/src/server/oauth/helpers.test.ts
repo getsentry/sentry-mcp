@@ -23,6 +23,12 @@ vi.mock("@sentry/cloudflare", () => ({
 }));
 
 import {
+  OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE,
+  OAUTH_GRANT_SHAPE_ATTRIBUTE,
+  OAUTH_REFRESH_OUTCOME_ATTRIBUTE,
+  OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE,
+} from "./telemetry";
+import {
   appendAuthorizationResponseIss,
   createResourceValidationError,
   exchangeCodeForAccessToken,
@@ -248,9 +254,11 @@ describe("tokenExchangeCallback", () => {
       1,
       {
         attributes: expect.objectContaining({
-          "app.oauth.token_exchange.outcome": "cached_valid_local",
-          "app.oauth.grant.age_bucket": "1d_7d",
-          "app.oauth.upstream.expires_in_bucket": "1d_7d",
+          [OAUTH_REFRESH_OUTCOME_ATTRIBUTE]: "cached_valid_local",
+          [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: "1d_7d",
+          [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: "1d_7d",
+          "app.client.registration.method":
+            expect.stringMatching(/^(cimd|dcr|unknown)$/),
         }),
       },
     );
@@ -681,6 +689,17 @@ describe("validateResourceParameter", () => {
     it("should allow resource with query parameters", () => {
       const result = validateResourceParameter(
         "https://mcp.sentry.dev/mcp?foo=bar",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
+    // Regression: Claude plugin attribution URL must remain a valid RFC 8707
+    // resource even though path-scoped AS metadata advertises a query-free
+    // issuer (RFC 8414 forbids query components on issuer).
+    it("should allow plugin utm_source resource parameter", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/mcp?utm_source=plugin",
         "https://mcp.sentry.dev/oauth/authorize",
       );
       expect(result).toBe(true);

@@ -1,12 +1,15 @@
 import { z } from "zod";
-import { callEmbeddedAgent } from "../../../internal/agents/callEmbeddedAgent";
 import type { SentryApiService } from "../../../api-client";
-import { createOtelLookupTool } from "../../../internal/agents/tools/otel-semantics";
+import { callEmbeddedAgent } from "../../../internal/agents/callEmbeddedAgent";
 import { createDatasetFieldsTool } from "../../../internal/agents/tools/dataset-fields";
+import { createOtelLookupTool } from "../../../internal/agents/tools/otel-semantics";
 import { createWhoamiTool } from "../../../internal/agents/tools/whoami";
-import { createDatasetAttributesTool } from "./utils";
-import { systemPrompt } from "./config";
 import { PUBLIC_EVENTS_DATASETS } from "../../../utils/events-datasets";
+import { systemPrompt } from "./config";
+import {
+  createDatasetAttributesTool,
+  createValidateEventsSearchTool,
+} from "./utils";
 
 const SEARCH_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
 
@@ -100,6 +103,11 @@ export async function searchEventsAgent(
     organizationSlug: options.organizationSlug,
     projectId: options.projectId,
   });
+  const validateSearchTool = createValidateEventsSearchTool({
+    apiService: options.apiService,
+    organizationSlug: options.organizationSlug,
+    projectId: options.projectId,
+  });
   const otelLookupTool = createOtelLookupTool({
     apiService: options.apiService,
     organizationSlug: options.organizationSlug,
@@ -122,6 +130,7 @@ export async function searchEventsAgent(
     prompt: options.query,
     tools: {
       datasetAttributes: datasetAttributesTool,
+      validateSearch: validateSearchTool,
       replayFields: replayFieldsTool,
       otelSemantics: otelLookupTool,
       whoami: whoamiTool,

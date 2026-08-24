@@ -141,6 +141,16 @@ export function registerFetchMockInterceptors(fetchMock: FetchMockLike) {
               responseOptions: { headers: JSON_HEADERS },
             };
           }
+          if (
+            getMockRequestHeader(req.headers, "x-sentry-mcp-utm-source") !==
+            "plugin"
+          ) {
+            return {
+              statusCode: 400,
+              data: { detail: "Missing MCP UTM source header" },
+              responseOptions: { headers: JSON_HEADERS },
+            };
+          }
 
           return {
             statusCode: 200,

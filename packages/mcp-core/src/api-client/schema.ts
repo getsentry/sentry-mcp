@@ -630,6 +630,65 @@ export const MonitorStatSchema = z
 
 export const MonitorStatsSchema = z.array(MonitorStatSchema);
 
+/**
+ * Uptime monitor (detector) schemas.
+ *
+ * Verified against getsentry/sentry:
+ * - src/sentry/uptime/endpoints/serializers.py (UptimeDetectorSerializer)
+ * - src/sentry/uptime/endpoints/validators.py (UptimeMonitorValidator)
+ * - src/sentry/uptime/models.py (IntervalSeconds, SupportedHTTPMethods)
+ * Response fields are camelCase from CamelSnakeSerializer.
+ */
+export const UptimeMonitorSchema = z
+  .object({
+    id: ApiResourceIdSchema,
+    projectSlug: z.string(),
+    environment: z.string().nullable().optional(),
+    name: z.string(),
+    status: z.string(),
+    uptimeStatus: z.union([z.number(), z.string()]).optional(),
+    mode: z.number().optional(),
+    owner: ApiActorSchema.nullable().optional(),
+    recoveryThreshold: z.number().optional(),
+    downtimeThreshold: z.number().optional(),
+    url: z.string(),
+    method: z.string().optional(),
+    body: z.string().nullable().optional(),
+    headers: z
+      .array(z.tuple([z.string(), z.string()]))
+      .or(z.array(z.array(z.string())))
+      .optional(),
+    intervalSeconds: z.number(),
+    timeoutMs: z.number(),
+    traceSampling: z.boolean().optional(),
+    responseCaptureEnabled: z.boolean().optional(),
+    assertion: z.unknown().nullable().optional(),
+  })
+  .passthrough();
+
+export const UptimeMonitorListSchema = z.array(UptimeMonitorSchema);
+
+export const UptimeCheckSchema = z
+  .object({
+    uptimeCheckId: z.string().optional(),
+    timestamp: z.string().optional(),
+    scheduledCheckTime: z.string().optional(),
+    checkStatus: z.string().optional(),
+    checkStatusReason: z.string().nullable().optional(),
+    assertionFailureData: z.unknown().nullable().optional(),
+    httpStatusCode: z.number().nullable().optional(),
+    durationMs: z.number().optional(),
+    traceId: z.string().optional(),
+    traceItemId: z.string().optional(),
+    incidentStatus: z.number().optional(),
+    environment: z.string().optional(),
+    region: z.string().optional(),
+    regionName: z.string().optional(),
+  })
+  .passthrough();
+
+export const UptimeCheckListSchema = z.array(UptimeCheckSchema);
+
 export const ReleaseDetailsSchema = ReleaseSchema.extend({
   adoptionStages: z.unknown().optional(),
   authors: z.array(ApiActorSchema).optional(),
@@ -1035,7 +1094,7 @@ const BaseEventSchema = z.object({
   // It's safer to type as unknown since its structure varies
   _meta: z.unknown().optional(),
   // dateReceived is when the server received the event (may not be present in all contexts)
-  dateReceived: z.string().datetime().optional(),
+  dateReceived: z.string().datetime().nullish(),
 });
 
 export const ErrorEventSchema = BaseEventSchema.omit({
@@ -1127,7 +1186,7 @@ export const GenericEventSchema = BaseEventSchema.omit({
   type: z.literal("generic"),
   culprit: z.string().nullable().optional(),
   dateCreated: z.string().datetime(),
-  occurrence: OccurrenceSchema.optional(),
+  occurrence: OccurrenceSchema.nullish(),
 });
 
 export const UnknownEventSchema = BaseEventSchema.omit({
@@ -1545,6 +1604,15 @@ export const AIConversationSpanSchema = z
 
 export const AIConversationSpanListSchema = z.array(AIConversationSpanSchema);
 
+/** Conversation details response envelope (`conversationId`, `title`, `spans`). */
+export const AIConversationDetailsResponseSchema = z
+  .object({
+    conversationId: z.string(),
+    title: z.string().nullable(),
+    spans: AIConversationSpanListSchema,
+  })
+  .passthrough();
+
 /**
  * Schemas validated against getsentry/sentry:
  * - `src/sentry/api/endpoints/organization_ai_conversations.py`
@@ -1563,6 +1631,8 @@ export const AIConversationUserSchema = z
 export const AIConversationSummarySchema = z
   .object({
     conversationId: z.string(),
+    // AI-generated title from conversation metadata when available.
+    title: z.string().nullable(),
     flow: z.array(z.string()),
     errors: z.number(),
     llmCalls: z.number(),
@@ -1942,7 +2012,10 @@ export const TransactionProfileSchema = z
       frames: z.array(ProfileFrameSchema),
       samples: z.array(TransactionProfileSampleSchema),
       stacks: z.array(z.array(z.number())),
-      thread_metadata: ProfileThreadMetadataSchema,
+      thread_metadata: z.preprocess(
+        (value) => value ?? {},
+        ProfileThreadMetadataSchema,
+      ),
     }),
     transaction: z
       .object({
@@ -1994,3 +2067,83 @@ export const TransactionProfileSchema = z
       .optional(),
   })
   .passthrough();
+
+export const AgenticOnboardingStageSchema = z.enum([
+  "connect_mcp",
+  "analyze_project",
+  "create_project",
+  "instrument_app",
+  "plan_test_error",
+  "send_verification_error",
+  "receive_verification_error",
+  "prepare_production",
+  "check_stack_trace_quality",
+]);
+
+export const AgenticOnboardingStageStatusSchema = z.enum([
+  "active",
+  "waiting",
+  "completed",
+  "skipped",
+  "failed",
+  "bypassed",
+]);
+
+export const AgenticOnboardingStageStatusUpdateSchema = z.enum([
+  "active",
+  "waiting",
+  "completed",
+  "skipped",
+  "failed",
+]);
+
+export const AgenticOnboardingStageStateSchema = z.object({
+  stage: AgenticOnboardingStageSchema,
+  status: AgenticOnboardingStageStatusSchema.nullable(),
+  eventNote: z.string().nullable(),
+});
+
+export const AgenticOnboardingRunStatusSchema = z.enum([
+  "active",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+export const AgenticOnboardingRunStatusUpdateSchema = z.enum([
+  "completed",
+  "failed",
+]);
+
+export const AgenticOnboardingStatusUpdateSchema = z.object({
+  schemaVersion: z.literal(1),
+  runToken: z.string().regex(/^[A-Za-z0-9]{10}$/),
+  stage: AgenticOnboardingStageSchema,
+  status: AgenticOnboardingStageStatusUpdateSchema,
+  runStatus: AgenticOnboardingRunStatusUpdateSchema.optional(),
+  eventNote: z.string().trim().min(1).max(256).optional(),
+  projectSlugs: z.array(z.string().trim().min(1)).min(1).max(100).optional(),
+  issueIds: z.array(z.string().trim().min(1)).min(1).max(100).optional(),
+});
+
+export const AgenticOnboardingRunSchema = z.object({
+  schemaVersion: z.literal(1),
+  runId: z.string(),
+  channelId: z.string(),
+  clientRunId: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  sequence: z.number().int().nonnegative(),
+  expiresAt: z.string(),
+  continueUpdates: z.boolean(),
+  runStatus: AgenticOnboardingRunStatusSchema,
+  projectSlugs: z
+    .array(z.string())
+    .nullable()
+    .transform((projectSlugs) => projectSlugs ?? []),
+  issueIds: z
+    .array(z.string())
+    .nullable()
+    .transform((issueIds) => issueIds ?? []),
+  stages: z.array(AgenticOnboardingStageStateSchema),
+});

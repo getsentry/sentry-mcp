@@ -155,6 +155,7 @@ Expected response item shape:
 ```typescript
 interface AIConversationSummary {
   conversationId: string;
+  title: string | null;
   flow: string[];
   startTimestamp: number;
   endTimestamp: number;
@@ -201,6 +202,7 @@ The top-level structured result should include:
 Each result should include:
 
 - Conversation ID.
+- AI-generated title when Sentry has conversation metadata (`null` otherwise).
 - Sentry URL: `/explore/conversations/{conversationId}/`.
 - Start, end, and derived duration.
 - Flow, when available.
@@ -238,6 +240,7 @@ raw span dump and not a lossy grouping invented by MCP.
 Current expected behavior:
 
 - Input is organization slug plus conversation ID.
+- Output includes `title` when Sentry has conversation metadata (`null` otherwise).
 - Output includes a chronological transcript timeline.
 - Timeline events are sorted by event timestamp and include a `type`
   discriminator.

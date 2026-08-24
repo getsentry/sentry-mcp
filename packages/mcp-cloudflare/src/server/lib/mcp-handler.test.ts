@@ -17,6 +17,11 @@ vi.mock("@sentry/cloudflare", () => ({
 }));
 
 import mcpHandler, { handleSentryBearerMcpRequest } from "./mcp-handler";
+import {
+  OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE,
+  OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE,
+  OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE,
+} from "../oauth/telemetry";
 
 interface OAuthProps {
   id: string;
@@ -58,6 +63,7 @@ function createMcpRequest(
     path?: string;
     id?: number | string;
     bearerToken?: string;
+    headers?: Record<string, string>;
   } = {},
 ): Request {
   const { path = "/mcp", id = 1, bearerToken } = options;
@@ -67,6 +73,7 @@ function createMcpRequest(
     Accept: "application/json, text/event-stream",
     "CF-Connecting-IP": "192.0.2.1",
     Host: "localhost",
+    ...options.headers,
   };
   if (bearerToken) {
     headers.Authorization = `Bearer ${bearerToken}`;
@@ -99,7 +106,9 @@ function createTestEnv(): Env {
     SENTRY_CLIENT_ID: "test-client-id",
     SENTRY_CLIENT_SECRET: "test-client-secret",
     SENTRY_HOST: "sentry.io",
-    OPENAI_API_KEY: "test-openai-key",
+    OPENROUTER_API_KEY: "test-openrouter-key",
+    OPENROUTER_MODEL: "openai/gpt-5.6-luna",
+    EMBEDDED_AGENT_PROVIDER: "openrouter",
     OAUTH_KV: {} as KVNamespace,
     OAUTH_PROVIDER: {
       listUserGrants: vi.fn().mockResolvedValue({ items: [] }),
@@ -160,9 +169,9 @@ describe("MCP Handler", () => {
         1,
         {
           attributes: expect.objectContaining({
-            "app.oauth.grant_revoked.reason": "stale_props_no_refresh",
-            "app.oauth.grant.age_bucket": "1d_7d",
-            "app.oauth.upstream.expires_in_bucket": "1d_7d",
+            [OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE]: "stale_props_no_refresh",
+            [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: "1d_7d",
+            [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: "1d_7d",
           }),
         },
       );
@@ -197,9 +206,9 @@ describe("MCP Handler", () => {
         1,
         {
           attributes: expect.objectContaining({
-            "app.oauth.grant_revoked.reason": "stale_props_no_refresh",
-            "app.oauth.grant.age_bucket": "1d_7d",
-            "app.oauth.upstream.expires_in_bucket": "1d_7d",
+            [OAUTH_GRANT_REVOKED_REASON_ATTRIBUTE]: "stale_props_no_refresh",
+            [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: "1d_7d",
+            [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: "1d_7d",
           }),
         },
       );
@@ -338,14 +347,18 @@ describe("MCP Handler", () => {
       expect(toolNames).toContain("update_issue");
     });
 
-    it("passes Sentry-Bearer direct tokens to upstream Sentry API calls", async () => {
-      const request = createMcpRequest("tools/call", {
-        name: "execute_sentry_tool",
-        arguments: {
-          name: "whoami",
-          arguments: {},
+    it("passes direct tokens and sanitized UTM source to upstream Sentry API calls", async () => {
+      const request = createMcpRequest(
+        "tools/call",
+        {
+          name: "execute_sentry_tool",
+          arguments: {
+            name: "whoami",
+            arguments: {},
+          },
         },
-      });
+        { headers: { "X-Sentry-Utm-Source": "plugin" } },
+      );
       const ctx = {
         waitUntil: vi.fn(),
         passThroughOnException: vi.fn(),
@@ -439,7 +452,7 @@ describe("MCP Handler", () => {
       expect(response.status).toBe(429);
       expect(await response.text()).toContain("Rate limit exceeded");
       expect(response.headers.get("x-sentry-rate-limit-scope")).toBe(
-        "sentry-token",
+        "sentry_access",
       );
     });
 

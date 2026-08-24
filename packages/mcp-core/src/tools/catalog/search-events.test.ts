@@ -1,10 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import searchEvents from "./search-events";
-import { MAX_EVENTS_VALIDATION_ATTEMPTS } from "../support/search-events/utils";
-import { generateText } from "ai";
+import { APICallError, generateText } from "ai";
+import { HttpResponse, http } from "msw";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UserInputError } from "../../errors";
+import searchEvents from "./search-events";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -125,6 +124,56 @@ describe("search_events", () => {
     process.env.OPENROUTER_API_KEY = "";
     mockGenerateText.mockResolvedValue(mockAIResponse("errors"));
     mockValidEventsValidation();
+  });
+
+  it("falls back to the original query when the AI provider is unavailable", async () => {
+    mockGenerateText.mockRejectedValue(
+      new APICallError({
+        message: "Workspace budget exceeded",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        requestBodyValues: {},
+        statusCode: 402,
+        isRetryable: false,
+      }),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("errors");
+          expect(url.searchParams.get("query")).toBe("level:error");
+          expect(url.searchParams.get("sort")).toBe("-timestamp");
+          return HttpResponse.json({ data: [] });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "errors",
+        query: "level:error",
+        fields: null,
+        sort: null,
+        period: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        accessToken: "test-token",
+        userId: "user-123",
+        clientId: "client-123",
+        grantedSkills: new Set(),
+        constraints: {},
+        sentryHost: "sentry.io",
+      },
+    );
+
+    expect(result).toContain("No results found");
   });
 
   it("should handle spans dataset queries", async () => {
@@ -1991,6 +2040,8 @@ describe("search_events", () => {
   });
 
   it("should repair direct search params with the agent when available", async () => {
+    let eventsRequestUrl: URL | undefined;
+
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse("logs", "severity:error", [
         "timestamp",
@@ -2003,9 +2054,7 @@ describe("search_events", () => {
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/",
         ({ request }) => {
-          const url = new URL(request.url);
-          expect(url.searchParams.get("dataset")).toBe("logs");
-          expect(url.searchParams.get("query")).toBe("severity:error");
+          eventsRequestUrl = new URL(request.url);
           return HttpResponse.json({
             data: [
               {
@@ -2020,7 +2069,7 @@ describe("search_events", () => {
       ),
     );
 
-    await searchEvents.handler(
+    const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
         regionUrl: null,
@@ -2044,10 +2093,17 @@ describe("search_events", () => {
       },
     );
 
-    const prompt = mockGenerateText.mock.calls[0]?.[0]?.prompt;
-    expect(prompt).toContain("Fix this Sentry event search request");
-    expect(prompt).toContain("severity:error");
-    expect(prompt).toContain('"dataset": "errors"');
+    // Assert behavior via Sentry API inputs + tool output, not agent prompt text.
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(eventsRequestUrl).toBeDefined();
+    expect(eventsRequestUrl!.searchParams.get("dataset")).toBe("logs");
+    expect(eventsRequestUrl!.searchParams.get("query")).toBe("severity:error");
+    expect(eventsRequestUrl!.searchParams.getAll("field")).toEqual([
+      "timestamp",
+      "message",
+      "severity",
+    ]);
+    expect(result).toContain("Connection failed to database");
   });
 
   it("should handle AI agent errors gracefully", async () => {
@@ -2454,10 +2510,11 @@ describe("search_events", () => {
     expect(result).toContain("Database Error");
   });
 
-  it("repairs invalid search params and calls events with updated parameters after validation fails", async () => {
-    let validateCalls = 0;
+  it("uses one agent pass to complete incomplete requests before final validation", async () => {
     let eventsRequestUrl: URL | undefined;
 
+    // Incomplete request (no fields/sort) forces the agent path. The agent is
+    // expected to validateSearch internally; the handler only gates once.
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse(
         "spans",
@@ -2472,47 +2529,7 @@ describe("search_events", () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/validate/",
-        () => {
-          validateCalls += 1;
-          if (validateCalls === 1) {
-            return HttpResponse.json({
-              valid: false,
-              projects: [],
-              dataset: [],
-              environment: [],
-              field: [
-                {
-                  name: "spon.duration",
-                  valid: false,
-                  attrType: null,
-                  error: "Unknown attribute",
-                },
-              ],
-              query: {
-                valid: false,
-                error: "Invalid syntax",
-                fields: [
-                  {
-                    name: "spon.duration",
-                    valid: false,
-                    attrType: null,
-                    error: "Unknown attribute",
-                  },
-                ],
-              },
-              orderby: [
-                {
-                  name: "-spon.duration",
-                  valid: false,
-                  attrType: null,
-                  error: "Orderby must also be a selected field",
-                },
-              ],
-            });
-          }
-
-          return HttpResponse.json(validEventsValidationResponse);
-        },
+        () => HttpResponse.json(validEventsValidationResponse),
       ),
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/",
@@ -2537,9 +2554,9 @@ describe("search_events", () => {
         regionUrl: null,
         projectSlug: null,
         dataset: "spans",
-        query: "spon.duration:>100 span.op:db",
-        fields: ["spon.duration"],
-        sort: "-spon.duration",
+        query: "slow database queries",
+        fields: null,
+        sort: null,
         period: "24h",
         limit: 10,
         includeExplanation: false,
@@ -2555,69 +2572,288 @@ describe("search_events", () => {
       },
     );
 
-    expect(validateCalls).toBe(2);
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
     expect(eventsRequestUrl).toBeDefined();
     expect(eventsRequestUrl!.searchParams.get("dataset")).toBe("spans");
     expect(eventsRequestUrl!.searchParams.get("query")).toBe(
       "span.duration:>100 span.op:db",
     );
-    expect(eventsRequestUrl!.searchParams.get("query")).not.toContain(
-      "spon.duration",
-    );
     expect(eventsRequestUrl!.searchParams.getAll("field")).toEqual([
       "span.op",
       "span.duration",
     ]);
-    expect(eventsRequestUrl!.searchParams.getAll("field")).not.toContain(
-      "spon.duration",
-    );
     expect(eventsRequestUrl!.searchParams.get("sort")).toBe("-span.duration");
     expect(eventsRequestUrl!.searchParams.get("statsPeriod")).toBe("7d");
     expect(result).toContain("span1");
   });
 
-  it("repairs invalid query syntax with the agent after validation fails", async () => {
+  it("fails complete structured requests honestly without an external repair loop", async () => {
     let validateCalls = 0;
-
-    mockGenerateText.mockResolvedValueOnce(
-      mockAIResponse("spans", "span.op:db", ["span.op", "span.duration"]),
-    );
 
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/validate/",
         () => {
           validateCalls += 1;
-          if (validateCalls === 1) {
-            return HttpResponse.json({
-              valid: false,
-              projects: [],
-              dataset: [],
-              environment: [],
-              field: [],
-              query: {
+          return HttpResponse.json({
+            valid: false,
+            projects: [],
+            dataset: [],
+            environment: [],
+            field: [
+              {
+                name: "spon.duration",
                 valid: false,
-                error: "Invalid syntax",
-                fields: [],
+                attrType: null,
+                error: "Unknown attribute",
               },
-              orderby: [],
-            });
-          }
-
-          return HttpResponse.json(validEventsValidationResponse);
+            ],
+            query: {
+              valid: false,
+              error: "Invalid syntax",
+              fields: [
+                {
+                  name: "spon.duration",
+                  valid: false,
+                  attrType: null,
+                  error: "Unknown attribute",
+                },
+              ],
+            },
+            orderby: [],
+          });
         },
       ),
-      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
-        HttpResponse.json({
-          data: [
-            {
-              id: "span1",
-              "span.op": "db",
-              "span.duration": 42,
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () => {
+        throw new Error("searchEvents should not be called");
+      }),
+    );
+
+    await expect(
+      searchEvents.handler(
+        {
+          organizationSlug: "test-org",
+          regionUrl: null,
+          projectSlug: null,
+          dataset: "spans",
+          query: "spon.duration:>100",
+          fields: ["spon.duration"],
+          sort: "-spon.duration",
+          period: "24h",
+          limit: 10,
+          includeExplanation: false,
+        },
+        {
+          constraints: {
+            organizationSlug: null,
+            regionUrl: null,
+            projectSlug: null,
+          },
+          accessToken: "test-token",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow(/Search validation failed/);
+
+    expect(validateCalls).toBe(1);
+    expect(mockGenerateText).not.toHaveBeenCalled();
+  });
+
+  it("rejects agent rewrites that downgrade structured filters to message full-text", async () => {
+    // Tweet failure mode: agent rewrites conv_id:X -> message:"*X*". Keep the
+    // structured filter and fail validation honestly instead of lucky hits.
+    const validatedQueries: string[] = [];
+
+    mockGenerateText.mockResolvedValue(
+      mockAIResponse(
+        "logs",
+        'message:"*ZYGC-86ZR*"',
+        ["timestamp", "message", "trace"],
+        undefined,
+        "-timestamp",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          validatedQueries.push(url.searchParams.get("query") ?? "");
+          return HttpResponse.json({
+            valid: false,
+            projects: [],
+            dataset: [],
+            environment: [],
+            field: [],
+            query: {
+              valid: false,
+              error: null,
+              fields: [
+                {
+                  name: "conv_id",
+                  valid: false,
+                  attrType: null,
+                  error: "Unknown attribute",
+                },
+              ],
             },
-          ],
-        }),
+            orderby: [],
+          });
+        },
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () => {
+        throw new Error("searchEvents should not be called on downgrade");
+      }),
+    );
+
+    await expect(
+      searchEvents.handler(
+        {
+          organizationSlug: "test-org",
+          regionUrl: null,
+          projectSlug: null,
+          dataset: "logs",
+          query: "conv_id:ZYGC-86ZR",
+          fields: null,
+          sort: null,
+          period: "24h",
+          limit: 10,
+          includeExplanation: false,
+        },
+        {
+          constraints: {
+            organizationSlug: null,
+            regionUrl: null,
+            projectSlug: null,
+          },
+          accessToken: "test-token",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow(/Search validation failed/);
+
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    // Final validation must keep the structured filter, not the message rewrite.
+    expect(validatedQueries.at(-1)).toBe("conv_id:ZYGC-86ZR");
+    expect(validatedQueries.at(-1)).not.toContain("message:");
+  });
+
+  it("rejects partial full-text downgrades when a duplicate structured key remains", async () => {
+    // Set-based key comparison would miss this: custom remains present after
+    // custom:foo is dropped into message full-text.
+    const validatedQueries: string[] = [];
+
+    mockGenerateText.mockResolvedValue(
+      mockAIResponse(
+        "logs",
+        'custom:bar message:"*foo*"',
+        ["timestamp", "message", "trace"],
+        undefined,
+        "-timestamp",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          validatedQueries.push(url.searchParams.get("query") ?? "");
+          return HttpResponse.json({
+            valid: false,
+            projects: [],
+            dataset: [],
+            environment: [],
+            field: [],
+            query: {
+              valid: false,
+              error: null,
+              fields: [
+                {
+                  name: "custom",
+                  valid: false,
+                  attrType: null,
+                  error: "Unknown attribute",
+                },
+              ],
+            },
+            orderby: [],
+          });
+        },
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () => {
+        throw new Error("searchEvents should not be called on downgrade");
+      }),
+    );
+
+    await expect(
+      searchEvents.handler(
+        {
+          organizationSlug: "test-org",
+          regionUrl: null,
+          projectSlug: null,
+          dataset: "logs",
+          query: "custom:foo custom:bar",
+          fields: null,
+          sort: null,
+          period: "24h",
+          limit: 10,
+          includeExplanation: false,
+        },
+        {
+          constraints: {
+            organizationSlug: null,
+            regionUrl: null,
+            projectSlug: null,
+          },
+          accessToken: "test-token",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow(/Search validation failed/);
+
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(validatedQueries.at(-1)).toBe("custom:foo custom:bar");
+    expect(validatedQueries.at(-1)).not.toContain("message:");
+  });
+
+  it("allows real attribute renames that are not full-text downgrades", async () => {
+    let eventsRequestUrl: URL | undefined;
+
+    // errors is not a trusted structured-trace dataset, so the handler uses the
+    // downgrade guard only. A real rename must still execute.
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "errors",
+        "error.type:TimeoutError",
+        ["issue", "title", "error.type", "timestamp"],
+        undefined,
+        "-timestamp",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () => HttpResponse.json(validEventsValidationResponse),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          eventsRequestUrl = new URL(request.url);
+          return HttpResponse.json({
+            data: [
+              {
+                id: "err1",
+                issue: "PROJ-1",
+                title: "TimeoutError",
+                "error.type": "TimeoutError",
+                timestamp: "2024-01-15T10:30:00Z",
+              },
+            ],
+          });
+        },
       ),
     );
 
@@ -2626,10 +2862,10 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        dataset: "spans",
-        query: "span.op:db AND",
-        fields: ["span.duration"],
-        sort: "-span.duration",
+        dataset: "errors",
+        query: "eror.type:TimeoutError",
+        fields: null,
+        sort: null,
         period: "24h",
         limit: 10,
         includeExplanation: false,
@@ -2645,13 +2881,22 @@ describe("search_events", () => {
       },
     );
 
-    expect(validateCalls).toBe(2);
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
-    expect(result).toContain("span1");
+    expect(eventsRequestUrl).toBeDefined();
+    expect(eventsRequestUrl!.searchParams.get("dataset")).toBe("errors");
+    expect(eventsRequestUrl!.searchParams.get("query")).toBe(
+      "error.type:TimeoutError",
+    );
+    expect(eventsRequestUrl!.searchParams.getAll("field")).toEqual([
+      "issue",
+      "title",
+      "error.type",
+      "timestamp",
+    ]);
+    expect(result).toContain("TimeoutError");
   });
 
-  it("keeps prior fields when validation repair returns an empty fields array", async () => {
-    let validateCalls = 0;
+  it("keeps caller fields when the agent returns an empty fields array", async () => {
     let eventsRequestUrl: URL | undefined;
 
     mockGenerateText.mockResolvedValueOnce(
@@ -2667,33 +2912,7 @@ describe("search_events", () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/validate/",
-        () => {
-          validateCalls += 1;
-          if (validateCalls === 1) {
-            return HttpResponse.json({
-              valid: false,
-              projects: [],
-              dataset: [],
-              environment: [],
-              field: [
-                {
-                  name: "spon.duration",
-                  valid: false,
-                  attrType: null,
-                  error: "Unknown attribute",
-                },
-              ],
-              query: {
-                valid: false,
-                error: "Invalid syntax",
-                fields: [],
-              },
-              orderby: [],
-            });
-          }
-
-          return HttpResponse.json(validEventsValidationResponse);
-        },
+        () => HttpResponse.json(validEventsValidationResponse),
       ),
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/",
@@ -2712,9 +2931,9 @@ describe("search_events", () => {
         regionUrl: null,
         projectSlug: null,
         dataset: "spans",
-        query: "spon.duration:>100",
+        query: "span.duration:>100",
         fields: ["span.duration"],
-        sort: "-span.duration",
+        sort: null,
         period: "24h",
         limit: 10,
         includeExplanation: false,
@@ -2736,8 +2955,7 @@ describe("search_events", () => {
     ]);
   });
 
-  it("merges repaired environment into the events search query for non-replay datasets", async () => {
-    let validateCalls = 0;
+  it("merges agent environment into the events search query for non-replay datasets", async () => {
     let eventsRequestUrl: URL | undefined;
 
     mockGenerateText.mockResolvedValueOnce(
@@ -2755,26 +2973,7 @@ describe("search_events", () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/validate/",
-        () => {
-          validateCalls += 1;
-          if (validateCalls === 1) {
-            return HttpResponse.json({
-              valid: false,
-              projects: [],
-              dataset: [],
-              environment: [],
-              field: [],
-              query: {
-                valid: false,
-                error: "Invalid syntax",
-                fields: [],
-              },
-              orderby: [],
-            });
-          }
-
-          return HttpResponse.json(validEventsValidationResponse);
-        },
+        () => HttpResponse.json(validEventsValidationResponse),
       ),
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/",
@@ -2793,9 +2992,9 @@ describe("search_events", () => {
         regionUrl: null,
         projectSlug: null,
         dataset: "spans",
-        query: "spon.duration:>100",
-        fields: ["span.duration"],
-        sort: "-span.duration",
+        query: "span.duration:>100",
+        fields: null,
+        sort: null,
         period: "24h",
         limit: 10,
         includeExplanation: false,
@@ -2817,7 +3016,7 @@ describe("search_events", () => {
     );
   });
 
-  it("rejects search after MAX_EVENTS_VALIDATION_ATTEMPTS without calling events", async () => {
+  it("does not call events when final validation fails", async () => {
     let validateCalls = 0;
 
     mockGenerateText.mockResolvedValue(
@@ -2864,8 +3063,8 @@ describe("search_events", () => {
           projectSlug: null,
           dataset: "spans",
           query: "tags[missing]:true",
-          fields: ["span.duration"],
-          sort: "-span.duration",
+          fields: null,
+          sort: null,
           period: "24h",
           limit: 10,
           includeExplanation: false,
@@ -2880,12 +3079,10 @@ describe("search_events", () => {
           userId: "1",
         },
       ),
-    ).rejects.toThrow(/Search validation failed after repair attempts/);
+    ).rejects.toThrow(/Search validation failed/);
 
-    expect(validateCalls).toBe(1 + MAX_EVENTS_VALIDATION_ATTEMPTS);
-    expect(mockGenerateText).toHaveBeenCalledTimes(
-      MAX_EVENTS_VALIDATION_ATTEMPTS,
-    );
+    expect(validateCalls).toBe(1);
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
   });
 
   it("rejects search immediately when validation fails without an agent provider", async () => {

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import searchIssueEvents from "./search-issue-events";
-import { generateText } from "ai";
+import { APICallError, generateText } from "ai";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
 
@@ -150,6 +150,88 @@ describe("search_issue_events", () => {
       - Set up alerts: Configure alert rules for these error patterns
       "
     `);
+  });
+
+  it("falls back to the original query when the AI provider is unavailable", async () => {
+    mockGenerateText.mockRejectedValue(
+      new APICallError({
+        message: "AI provider unavailable",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        requestBodyValues: {},
+        statusCode: 503,
+        isRetryable: true,
+      }),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe("environment:production");
+          expect(url.searchParams.get("sort")).toBe("-timestamp");
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const result = await searchIssueEvents.handler(
+      {
+        organizationSlug: "test-org",
+        issueId: "MCP-41",
+        query: "environment:production",
+        sort: "-timestamp",
+        period: "7d",
+        projectSlug: null,
+        regionUrl: null,
+        limit: 50,
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    expect(result).toContain("No results found");
+  });
+
+  it("defaults empty-string sort during provider fallback", async () => {
+    mockGenerateText.mockRejectedValue(
+      new APICallError({
+        message: "AI provider unavailable",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        requestBodyValues: {},
+        statusCode: 503,
+        isRetryable: true,
+      }),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/*/issues/*/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe("environment:production");
+          expect(url.searchParams.get("sort")).toBe("-timestamp");
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const result = await searchIssueEvents.handler(
+      {
+        organizationSlug: "test-org",
+        issueId: "MCP-41",
+        query: "environment:production",
+        sort: "",
+        period: "7d",
+        projectSlug: null,
+        regionUrl: null,
+        limit: 50,
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    expect(result).toContain("No results found");
   });
 
   it("should include user geo details in formatted event output", async () => {
