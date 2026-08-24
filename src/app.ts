@@ -19,6 +19,7 @@ import { dartSymbolMapRoute } from "./commands/dart-symbol-map/index.js";
 import { dashboardRoute } from "./commands/dashboard/index.js";
 import { listCommand as dashboardListCommand } from "./commands/dashboard/list.js";
 import { debugFilesRoute } from "./commands/debug-files/index.js";
+import { docsRoute } from "./commands/docs/index.js";
 import { eventRoute } from "./commands/event/index.js";
 import { listCommand as eventListCommand } from "./commands/event/list.js";
 import { exploreCommand } from "./commands/explore.js";
@@ -118,6 +119,7 @@ export const routes = buildRouteMap({
     "dart-symbol-map": dartSymbolMapRoute,
     "debug-files": debugFilesRoute,
     dashboard: dashboardRoute,
+    docs: docsRoute,
     org: orgRoute,
     platform: platformRoute,
     project: projectRoute,

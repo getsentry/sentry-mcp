@@ -472,6 +472,15 @@ Manage Sentry dashboards
 
 → Full flags and examples: `references/dashboard.md`
 
+### Docs
+
+Search and query current Sentry documentation
+
+- `sentry docs list <keywords...>` — Find Sentry documentation pages by keyword
+- `sentry docs query <question...>` — Ask a cited question about Sentry documentation
+
+→ Full flags and examples: `references/docs.md`
+
 ### Platform
 
 List valid Sentry platform identifiers
