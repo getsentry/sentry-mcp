@@ -192,6 +192,7 @@ describe("proposeCompletions: Stricli integration", () => {
     "project",
     "replay",
     "dashboard",
+    "docs",
     "trace",
     "span",
     "log",
