@@ -81,6 +81,7 @@
     "check:errors": "pnpm tsx script/check-error-patterns.ts",
     "check:patches": "pnpm tsx script/check-patches.ts",
     "check:docs-sections": "pnpm tsx script/generate-docs-sections.ts --check",
+    "check:env-coverage": "pnpm tsx script/check-env-coverage.ts",
     "check:stale-refs": "pnpm tsx script/check-stale-references.ts"
   },
   "devDependencies": {
