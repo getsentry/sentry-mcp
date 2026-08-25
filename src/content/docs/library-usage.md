@@ -153,6 +153,7 @@ const sdk = createSentrySDK({ token: "...", text: true, cwd: "/my/project" });
 | `project` | `string` | Auto-detected | Default project slug |
 | `text` | `boolean` | `false` | Return human-readable text instead of parsed JSON (`run()` only) |
 | `cwd` | `string` | `process.cwd()` | Working directory for DSN auto-detection |
+| `headers` | `Record<string, string>` | — | Extra HTTP headers for self-hosted instances behind a reverse proxy (same as [`SENTRY_CUSTOM_HEADERS`](./configuration/#sentry_custom_headers)); ignored for sentry.io |
 | `signal` | `AbortSignal` | — | Abort signal for cancelling streaming commands |
 
 ## Return Values
