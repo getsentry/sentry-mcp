@@ -15,6 +15,7 @@ import {
   applyCustomHeaders,
   getCustomHeaders,
   parseCustomHeaders,
+  setCustomHeadersOverride,
 } from "../../src/lib/custom-headers.js";
 import { setDefaultHeaders } from "../../src/lib/db/defaults.js";
 import { useTestConfigDir } from "../helpers.js";
@@ -240,6 +241,100 @@ describe("getCustomHeaders", () => {
     const second = getCustomHeaders();
     // Same reference (cached)
     expect(first).toBe(second);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setCustomHeadersOverride — structured headers from SentryOptions.headers
+// ---------------------------------------------------------------------------
+
+describe("setCustomHeadersOverride", () => {
+  useTestConfigDir("custom-headers-override-test-", {
+    isolateProjectRoot: true,
+  });
+
+  let savedHeaders: string | undefined;
+  let savedHost: string | undefined;
+
+  beforeEach(() => {
+    savedHeaders = process.env.SENTRY_CUSTOM_HEADERS;
+    savedHost = process.env.SENTRY_HOST;
+    delete process.env.SENTRY_CUSTOM_HEADERS;
+    process.env.SENTRY_HOST = "https://sentry.example.com";
+    _resetCustomHeadersCache();
+  });
+
+  afterEach(() => {
+    if (savedHeaders !== undefined) {
+      process.env.SENTRY_CUSTOM_HEADERS = savedHeaders;
+    } else {
+      delete process.env.SENTRY_CUSTOM_HEADERS;
+    }
+    if (savedHost !== undefined) {
+      process.env.SENTRY_HOST = savedHost;
+    } else {
+      delete process.env.SENTRY_HOST;
+    }
+    _resetCustomHeadersCache();
+  });
+
+  test("returns the structured headers without a string round-trip", () => {
+    setCustomHeadersOverride({
+      "X-IAP-Token": "abc123",
+      "X-Url": "https://example.com/a;b",
+    });
+    expect(getCustomHeaders()).toEqual([
+      ["X-IAP-Token", "abc123"],
+      ["X-Url", "https://example.com/a;b"],
+    ]);
+  });
+
+  test("takes precedence over SENTRY_CUSTOM_HEADERS", () => {
+    process.env.SENTRY_CUSTOM_HEADERS = "X-Env: from-env";
+    setCustomHeadersOverride({ "X-Option": "from-option" });
+    expect(getCustomHeaders()).toEqual([["X-Option", "from-option"]]);
+  });
+
+  test("an empty map disables inherited env headers", () => {
+    process.env.SENTRY_CUSTOM_HEADERS = "X-Env: from-env";
+    setCustomHeadersOverride({});
+    expect(getCustomHeaders()).toEqual([]);
+  });
+
+  test("clearing falls back to SENTRY_CUSTOM_HEADERS", () => {
+    process.env.SENTRY_CUSTOM_HEADERS = "X-Env: from-env";
+    setCustomHeadersOverride({ "X-Option": "from-option" });
+    setCustomHeadersOverride(undefined);
+    expect(getCustomHeaders()).toEqual([["X-Env", "from-env"]]);
+  });
+
+  test("is ignored when targeting SaaS", () => {
+    delete process.env.SENTRY_HOST;
+    setCustomHeadersOverride({ "X-IAP-Token": "abc123" });
+    expect(getCustomHeaders()).toEqual([]);
+  });
+
+  test("trims names and values", () => {
+    setCustomHeadersOverride({ " X-Trim ": "  value  " });
+    expect(getCustomHeaders()).toEqual([["X-Trim", "value"]]);
+  });
+
+  test("throws ConfigError on empty header name", () => {
+    expect(() => setCustomHeadersOverride({ "  ": "value" })).toThrow(
+      "empty header name"
+    );
+  });
+
+  test("throws ConfigError on invalid header name", () => {
+    expect(() => setCustomHeadersOverride({ "X Bad": "value" })).toThrow(
+      "Invalid header name 'X Bad' in SentryOptions.headers"
+    );
+  });
+
+  test("throws ConfigError on reserved header name", () => {
+    expect(() => setCustomHeadersOverride({ Authorization: "x" })).toThrow(
+      "Cannot override reserved header 'Authorization' in SentryOptions.headers"
+    );
   });
 });
 
