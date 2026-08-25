@@ -409,11 +409,26 @@ describe("setCommitsAuto", () => {
     expect(repoRequestCount).toBe(2);
   });
 
-  test("throws ValidationError when local git remote is not available", async () => {
+  test("throws an actionable ValidationError when no git remote is configured", async () => {
     mockGetRepositoryName.mockReturnValue(null);
 
+    // A missing 'origin' remote (e.g. a fresh `git init`) is an expected
+    // precondition, not a crash. It must surface as a CliError (exit 21,
+    // rendered via format() — no stack trace) with actionable guidance, and
+    // keep field "repository" so default mode can fall back to local git.
+    await expect(
+      setCommitsAuto("test-org", "1.0.0", "/tmp")
+    ).rejects.toMatchObject({
+      name: "ValidationError",
+      field: "repository",
+      exitCode: 21,
+    });
+
     await expect(setCommitsAuto("test-org", "1.0.0", "/tmp")).rejects.toThrow(
-      /Could not determine repository name/
+      /Could not determine the repository from the local git remote/
+    );
+    await expect(setCommitsAuto("test-org", "1.0.0", "/tmp")).rejects.toThrow(
+      /--local/
     );
   });
 });
