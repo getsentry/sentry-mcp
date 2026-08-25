@@ -3,9 +3,9 @@
  *
  * Wraps `createTransport` from @sentry/core with a custom request executor
  * that compresses outgoing envelope bodies with zstd level 3 (libzstd
- * default). When running on a host without zstd support (Node < 22.15
- * without the polyfill installed), falls back to gzip — matches the
- * SDK's default behavior byte-for-byte so there's no regression.
+ * default). When running on a host without zstd support (Node < 22.15,
+ * where `node:zlib` lacks the zstd APIs), falls back to gzip — matches
+ * the SDK's default behavior byte-for-byte so there's no regression.
  *
  * Codec selection is one-shot, performed at factory-construction time.
  * No per-request branching: if `node:zlib` zstd support is available

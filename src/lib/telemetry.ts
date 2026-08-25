@@ -589,8 +589,8 @@ export function initSentry(
     enabled,
     // Compress outgoing envelopes with zstd (level 3) instead of gzip —
     // smaller payloads, faster compress/decompress on both sides.
-    // Automatic gzip fallback when running on Node < 22.15 without the
-    // `Bun.zstdCompress` polyfill (see script/node-polyfills.ts).
+    // Automatic gzip fallback when running on Node < 22.15, where
+    // `node:zlib`'s zstd support is unavailable.
     transport: makeCompressedTransport,
     // Pass custom CA certificates to the transport for corporate TLS proxies.
     // The zstd-transport reads `caCerts` and passes it as `ca:` to
