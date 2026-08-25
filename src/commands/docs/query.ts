@@ -4,6 +4,7 @@ import { detectDocsContext } from "../../lib/docs-context.js";
 import { queryDocs } from "../../lib/docs-service.js";
 import { ValidationError } from "../../lib/errors.js";
 import { CommandOutput } from "../../lib/formatters/output.js";
+import { withProgress } from "../../lib/polling.js";
 
 type QueryFlags = { readonly fields?: string[]; readonly json: boolean };
 type QueryOutput = {
@@ -11,6 +12,14 @@ type QueryOutput = {
   detectedContext: Awaited<ReturnType<typeof detectDocsContext>>;
   sources: string[];
 };
+
+/** Friendly wait messages for a docs-MCP request without measurable stages. */
+const DOCS_QUERY_PROGRESS_MESSAGES = [
+  "Finding the relevant bits…",
+  "Cross-checking the details…",
+  "It’s getting there…",
+  "Collecting trusted sources…",
+] as const;
 
 function formatQueryHuman(data: QueryOutput): string {
   return data.answer;
@@ -45,7 +54,16 @@ export const queryCommand = buildCommand({
       );
     }
     const detectedContext = await detectDocsContext(this.cwd);
-    const result = await queryDocs(query, detectedContext);
+    const result = await withProgress(
+      {
+        interactiveOnly: true,
+        json: _flags.json,
+        message: "Searching Sentry docs…",
+        rotatingMessages: DOCS_QUERY_PROGRESS_MESSAGES,
+        rotationIntervalMs: 4000,
+      },
+      async () => queryDocs(query, detectedContext)
+    );
     yield new CommandOutput<QueryOutput>({ ...result, detectedContext });
   },
 });
