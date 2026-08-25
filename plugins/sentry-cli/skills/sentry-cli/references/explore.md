@@ -22,7 +22,7 @@ Query aggregate event data (Explore)
 - `-d, --dataset <value> - Dataset to query (errors, spans, metrics, logs, replays) - (default: "errors")`
 - `-q, --query <value> - Search query (Sentry search syntax)`
 - `-s, --sort <value> - Sort field (prefix with - for desc, e.g., "-count()")`
-- `-e, --environment <value>... - Replay environment filter for --dataset replays (repeatable, comma-separated)`
+- `-e, --environment <value>... - Environment filter (repeatable, comma-separated)`
 - `-n, --limit <value> - Number of rows (1-1000) - (default: "25")`
 - `-t, --period <value> - Time range: "7d", "2026-07-01..2026-08-01", ">=2026-07-01" - (default: "24h")`
 - `-f, --fresh - Bypass cache, re-detect projects, and fetch fresh data`

@@ -245,6 +245,17 @@ export const ENV_VAR_REGISTRY: readonly EnvVarEntry[] = [
     devGuide: "Disable CLI telemetry (error tracking)",
   },
   {
+    name: "DO_NOT_TRACK",
+    description:
+      "Industry-standard opt-out for telemetry ([consoledonottrack.com](https://consoledonottrack.com/)). When set to `1`, the CLI disables all telemetry, equivalent to `SENTRY_CLI_NO_TELEMETRY=1`.",
+    example: "1",
+  },
+  {
+    name: "SENTRY_PIPELINE",
+    description:
+      "Identifies the Sentry build plugin that invoked the CLI (e.g., `sentry-webpack-plugin/3.0.0`). Used internally by `sentry build upload` to attribute uploads to the correct plugin. You typically don't need to set this manually — it is set automatically by Sentry build integrations.",
+  },
+  {
     name: "SENTRY_CLI_NO_UPDATE_CHECK",
     description:
       "Disable the automatic update check that runs periodically in the background.",

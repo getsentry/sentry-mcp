@@ -57,6 +57,9 @@ sentry dashboard view 12345
 # Auto-refresh every 30 seconds
 sentry dashboard view "Backend Performance" --refresh 30
 
+# Render as a sixel image (for terminals that support sixel graphics)
+sentry dashboard view "Backend Performance" --sixel
+
 # Open in browser
 sentry dashboard view 12345 -w
 ```

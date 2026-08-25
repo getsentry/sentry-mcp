@@ -15,6 +15,18 @@ CLI-related commands
 
 Print the shell completion script
 
+**Examples:**
+
+```bash
+# Print completions for your current shell (auto-detected from $SHELL)
+sentry cli completion
+
+# Generate for a specific shell
+sentry cli completion zsh > ~/.local/share/zsh/site-functions/_sentry
+eval "$(sentry cli completion bash)"
+sentry cli completion fish > ~/.config/fish/completions/sentry.fish
+```
+
 ### `sentry cli defaults <key value...>`
 
 View and manage default settings

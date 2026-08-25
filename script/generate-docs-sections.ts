@@ -207,7 +207,7 @@ function generateProjectStructure(allRoutes: RouteInfo[]): string {
   }
 
   lines.push("│   ├── lib/            # Shared utilities");
-  lines.push("│   └── types/          # TypeScript types and Zod schemas");
+  lines.push("│   └── types/          # TypeScript types and Valibot schemas");
   lines.push("├── test/               # Test files (mirrors src/ structure)");
   lines.push("├── script/             # Build and utility scripts");
   lines.push("├── plugins/            # Agent skill files");
