@@ -1,7 +1,7 @@
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import searchAIConversations from "./search-ai-conversations";
+import searchAIConversations from "./search-agent-conversations";
 import { getServerContext } from "../../test-setup";
 import {
   assertStructuredOnlyResult,
@@ -48,7 +48,7 @@ const longConversation = {
   lastOutput: `${"The worker timed out while calling inventory. ".repeat(20)}Next step.`,
 };
 
-describe("search_ai_conversations", () => {
+describe("search_agent_conversations", () => {
   it("returns conversation-shaped search results", async () => {
     mswServer.use(
       http.get(

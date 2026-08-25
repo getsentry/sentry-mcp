@@ -1,4 +1,4 @@
-// Catalog-only AI Conversations search. This owns the MCP-facing projection for
+// Catalog-only Agent Conversations search. This owns the MCP-facing projection for
 // Sentry's conversation list endpoint and intentionally exposes backend default
 // ordering until alternate sorting is applied by the API.
 import { z } from "zod";
@@ -183,19 +183,19 @@ function buildArtifact(
 }
 
 export default defineTool({
-  name: "search_ai_conversations",
+  name: "search_agent_conversations",
   skills: ["inspect", "triage", "seer"],
   requiredScopes: ["event:read", "project:read"],
   description: [
-    "Search Sentry AI Conversations and return one summary row per conversation.",
+    "Search Sentry Agent Conversations, formerly called AI Conversations, and return one summary row per conversation.",
     "",
-    "Use this tool to find or list AI Conversations. Results are conversation summaries, not raw span rows.",
+    "Use this tool to find or list Agent Conversations. Results are conversation summaries, not raw span rows.",
     "Each row includes title (when available), cost, tokens, call counts, previews, and other list metadata.",
-    "Use get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.",
+    "Use get_agent_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.",
     "",
     "<examples>",
-    "search_ai_conversations(organizationSlug='my-org', query='failed conversations', period='7d')",
-    "search_ai_conversations(organizationSlug='my-org', query='checkout', project='backend')",
+    "search_agent_conversations(organizationSlug='my-org', query='failed conversations', period='7d')",
+    "search_agent_conversations(organizationSlug='my-org', query='checkout', project='backend')",
     "</examples>",
   ].join("\n"),
   inputSchema: {
