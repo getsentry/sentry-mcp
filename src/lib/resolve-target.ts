@@ -182,7 +182,10 @@ export type ResolveOrgOptions = {
 
 /**
  * Resolve organization and project from DSN detection.
- * Uses cached project info when available, otherwise fetches and caches it.
+ *
+ * A SaaS DSN already encodes org+project identity, so this never makes a
+ * discovery API call: it returns cached slugs when available and otherwise
+ * builds the target from the DSN's numeric IDs (valid API identifiers).
  *
  * @param cwd - Current working directory to search for DSN
  * @returns Resolved target with org/project info, or null if DSN not found
@@ -197,7 +200,19 @@ export async function resolveFromDsn(
 
   const detectedFrom = getDsnSourceDescription(dsn);
 
-  // Check cache first
+  // Resolution the DSN detection layer already surfaced (dsn_cache) — no lookup.
+  if (dsn.resolved) {
+    return {
+      org: dsn.resolved.orgSlug,
+      project: dsn.resolved.projectSlug,
+      projectId: toNumericId(dsn.projectId),
+      orgDisplay: dsn.resolved.orgName,
+      projectDisplay: dsn.resolved.projectName,
+      detectedFrom,
+    };
+  }
+
+  // Locally cached slugs — no lookup.
   const cached = getCachedProject(dsn.orgId, dsn.projectId);
   if (cached) {
     return {
@@ -210,40 +225,33 @@ export async function resolveFromDsn(
     };
   }
 
-  // Cache miss — fetch project details and cache them
-  const projectInfo = await getProject(dsn.orgId, dsn.projectId);
+  // The DSN already encodes org+project identity, so skip the getProject
+  // discovery call (and its auth round-trip). Enrich the org slug from the
+  // local regions cache when available, otherwise fall back to the numeric IDs
+  // — the API accepts both as {org,project}_id_or_slug path params.
+  return dsnTargetFromNumericIds(dsn.orgId, dsn.projectId, detectedFrom);
+}
 
-  if (projectInfo.organization) {
-    const orgName = resolveOrgDisplayName(
-      projectInfo.organization.slug,
-      projectInfo.organization.name
-    );
-    setCachedProject(dsn.orgId, dsn.projectId, {
-      orgSlug: projectInfo.organization.slug,
-      orgName,
-      projectSlug: projectInfo.slug,
-      projectName: projectInfo.name,
-      projectId: projectInfo.id,
-    });
-
-    return {
-      org: projectInfo.organization.slug,
-      project: projectInfo.slug,
-      projectId: toNumericId(projectInfo.id),
-      orgDisplay: orgName,
-      projectDisplay: projectInfo.name,
-      detectedFrom,
-    };
-  }
-
-  // Fallback to numeric IDs if org info missing (rare edge case)
+/**
+ * Build a {@link ResolvedTarget} straight from a DSN's numeric org/project IDs
+ * without any API discovery. The org slug is resolved from the local regions
+ * cache when present; both IDs are otherwise valid API identifiers.
+ */
+function dsnTargetFromNumericIds(
+  orgId: string,
+  projectId: string,
+  detectedFrom: string,
+  packagePath?: string
+): ResolvedTarget {
+  const org = getOrgByNumericId(orgId)?.slug ?? orgId;
   return {
-    org: dsn.orgId,
-    project: dsn.projectId,
-    projectId: toNumericId(projectInfo.id),
-    orgDisplay: dsn.orgId,
-    projectDisplay: projectInfo.name,
+    org,
+    project: projectId,
+    projectId: toNumericId(projectId),
+    orgDisplay: org,
+    projectDisplay: projectId,
     detectedFrom,
+    packagePath,
   };
 }
 
@@ -389,10 +397,11 @@ export async function resolveDsnByPublicKey(
 
 /**
  * Resolve a single detected DSN to a ResolvedTarget.
- * Uses cache when available, otherwise fetches from API.
  *
  * Supports two resolution paths:
- * 1. DSNs with orgId: Use getProject(orgId, projectId) API
+ * 1. DSNs with orgId: the DSN already encodes org+project identity, so no
+ *    discovery API call is made — cached slugs are used when available,
+ *    otherwise the target is built from the DSN's numeric IDs.
  * 2. DSNs without orgId: Use findProjectByDsnKey(publicKey) API
  *
  * @param dsn - Detected DSN to resolve
@@ -404,15 +413,27 @@ async function resolveDsnToTarget(
   // For DSNs without orgId (self-hosted or some SaaS patterns),
   // resolve by searching for the project via DSN public key
   if (!dsn.orgId) {
-    return resolveDsnByPublicKey(dsn);
+    return await resolveDsnByPublicKey(dsn);
   }
 
-  // Capture narrowed values before the closure (TS loses narrowing across closures)
   const orgId = dsn.orgId;
   const { projectId: dsnProjectId, packagePath } = dsn;
   const detectedFrom = getDsnSourceDescription(dsn);
 
-  // Check cache first
+  // Resolution the DSN detection layer already surfaced (dsn_cache) — no lookup.
+  if (dsn.resolved) {
+    return {
+      org: dsn.resolved.orgSlug,
+      project: dsn.resolved.projectSlug,
+      projectId: toNumericId(dsnProjectId),
+      orgDisplay: dsn.resolved.orgName,
+      projectDisplay: dsn.resolved.projectName,
+      detectedFrom,
+      packagePath,
+    };
+  }
+
+  // Locally cached slugs — no lookup.
   const cached = getCachedProject(orgId, dsnProjectId);
   if (cached) {
     return {
@@ -426,46 +447,14 @@ async function resolveDsnToTarget(
     };
   }
 
-  // Cache miss — fetch project details and cache them
-  const result = await withAuthGuard(async () => {
-    const projectInfo = await getProject(orgId, dsnProjectId);
-
-    if (projectInfo.organization) {
-      const orgName = resolveOrgDisplayName(
-        projectInfo.organization.slug,
-        projectInfo.organization.name
-      );
-      setCachedProject(orgId, dsnProjectId, {
-        orgSlug: projectInfo.organization.slug,
-        orgName,
-        projectSlug: projectInfo.slug,
-        projectName: projectInfo.name,
-        projectId: projectInfo.id,
-      });
-
-      return {
-        org: projectInfo.organization.slug,
-        project: projectInfo.slug,
-        projectId: toNumericId(projectInfo.id),
-        orgDisplay: orgName,
-        projectDisplay: projectInfo.name,
-        detectedFrom,
-        packagePath,
-      };
-    }
-
-    // Fallback to numeric IDs if org info missing
-    return {
-      org: orgId,
-      project: dsnProjectId,
-      projectId: toNumericId(projectInfo.id),
-      orgDisplay: orgId,
-      projectDisplay: projectInfo.name,
-      detectedFrom,
-      packagePath,
-    };
-  });
-  return result.ok ? result.value : null;
+  // The DSN already encodes org+project identity, so skip the getProject
+  // discovery call (and its auth round-trip) and build the target directly.
+  return dsnTargetFromNumericIds(
+    orgId,
+    dsnProjectId,
+    detectedFrom,
+    packagePath
+  );
 }
 
 /** Minimum directory name length for inference (avoids matching too broadly) */
