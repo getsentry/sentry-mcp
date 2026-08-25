@@ -57,6 +57,7 @@ describe("promptAndStartTrial", () => {
   let startProductTrialSpy: ReturnType<typeof spyOn>;
   let loggerPromptSpy: ReturnType<typeof spyOn>;
   let loggerWithTagSpy: ReturnType<typeof spyOn>;
+  let logDebugCalls: string[];
   let logInfoCalls: string[];
   let logWarnCalls: string[];
   let logSuccessCalls: string[];
@@ -71,6 +72,7 @@ describe("promptAndStartTrial", () => {
   };
 
   beforeEach(() => {
+    logDebugCalls = [];
     logInfoCalls = [];
     logWarnCalls = [];
     logSuccessCalls = [];
@@ -86,6 +88,9 @@ describe("promptAndStartTrial", () => {
     loggerPromptSpy = vi.spyOn({ prompt: async () => false }, "prompt");
     const mockLogInstance = {
       prompt: loggerPromptSpy,
+      debug: (...args: unknown[]) => {
+        logDebugCalls.push(args.map(String).join(" "));
+      },
       info: (...args: unknown[]) => {
         logInfoCalls.push(args.map(String).join(" "));
       },
