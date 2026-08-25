@@ -329,8 +329,8 @@ const result = await build({
   ...commonBuildOptions,
   format: "cjs",
   outfile: "./dist/index.cjs",
-  // Inject Bun polyfills and import.meta.url shim for CJS compatibility
-  inject: ["./script/node-polyfills.ts", "./script/import-meta-url.js"],
+  // Inject the import.meta.url shim for CJS compatibility.
+  inject: ["./script/import-meta-url.js"],
   define: {
     ...commonDefine,
     // Replace import.meta.url with the injected shim variable for CJS
@@ -342,8 +342,7 @@ const esmResult = await build({
   ...commonBuildOptions,
   format: "esm",
   outfile: "./dist/index.mjs",
-  // ESM has native import.meta.url — only the Bun polyfills need injecting.
-  inject: ["./script/node-polyfills.ts"],
+  // ESM has native import.meta.url and needs no injected shims.
   define: { ...commonDefine },
   banner: { js: ESM_INTEROP_BANNER },
   // ESM-only: keep node:zlib access dynamic so version-gated zstd exports don't

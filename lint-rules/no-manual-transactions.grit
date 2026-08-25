@@ -1,6 +1,5 @@
 file($name, $body) where {
   $name <: not r".*migration\.ts$",
-  $name <: not r".*node-polyfills\.ts$",
   $name <: not r".*db/sqlite\.ts$",
   $body <: contains `$db.exec($sql)` as $match where {
     $sql <: or {
