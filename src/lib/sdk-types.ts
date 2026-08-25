@@ -48,6 +48,14 @@ export type SentryOptions = {
   cwd?: string;
 
   /**
+   * Extra HTTP headers to send with every request to a self-hosted Sentry
+   * instance, for reverse proxies that require them (e.g., Google IAP,
+   * Cloudflare Access). Same rules as `SENTRY_CUSTOM_HEADERS`, which this
+   * option replaces when set (even when empty); ignored when targeting sentry.io.
+   */
+  headers?: Record<string, string>;
+
+  /**
    * Abort signal for cancelling streaming commands.
    * When aborted, streaming iterables stop on the next poll cycle.
    * Consumer `break` in `for await...of` also triggers abort automatically.
