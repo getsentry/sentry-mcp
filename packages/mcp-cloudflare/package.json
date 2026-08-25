@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "license": "FSL-1.1-ALv2",
-  "files": ["./dist/*"],
+  "files": [
+    "./dist/*"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
