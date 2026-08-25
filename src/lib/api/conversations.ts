@@ -26,7 +26,9 @@ import { logger } from "../logger.js";
 import { resolveOrgRegion } from "../region.js";
 
 import {
+  API_MAX_PER_PAGE,
   apiRequestToRegion,
+  autoPaginate,
   MAX_PAGINATION_PAGES,
   type PaginatedResponse,
   parseLinkHeader,
@@ -34,22 +36,27 @@ import {
 
 const log = logger.withTag("api.conversations");
 
-export async function listConversations(
+/**
+ * Fetch a single page of conversations from the AI-conversations endpoint.
+ *
+ * Internal helper used by {@link listConversations} for both single-page and
+ * multi-page (auto-paginating) fetches.
+ */
+async function fetchConversationsPage(
+  regionUrl: string,
   orgSlug: string,
   options: {
     query?: string;
-    limit?: number;
     cursor?: string;
     statsPeriod?: string;
     start?: string;
     end?: string;
     project?: string;
-  } = {}
+  },
+  perPage: number
 ): Promise<PaginatedResponse<ConversationListItem[]>> {
-  const regionUrl = await resolveOrgRegion(orgSlug);
-
   const params: Record<string, string> = {
-    per_page: String(options.limit ?? 10),
+    per_page: String(perPage),
   };
   if (options.statsPeriod) {
     params.statsPeriod = options.statsPeriod;
@@ -79,6 +86,45 @@ export async function listConversations(
   const { nextCursor } = parseLinkHeader(headers.get("link") ?? null);
 
   return { data, nextCursor };
+}
+
+/**
+ * List AI conversations for an organization.
+ *
+ * When `limit` exceeds {@link API_MAX_PER_PAGE}, transparently fetches multiple
+ * pages using cursor-based pagination (bounded by {@link MAX_PAGINATION_PAGES}).
+ *
+ * @param orgSlug - Organization slug
+ * @param options - Query options (query, limit, cursor, statsPeriod, etc.)
+ * @returns Paginated response with conversation items and optional next cursor
+ */
+export async function listConversations(
+  orgSlug: string,
+  options: {
+    query?: string;
+    limit?: number;
+    cursor?: string;
+    statsPeriod?: string;
+    start?: string;
+    end?: string;
+    project?: string;
+  } = {}
+): Promise<PaginatedResponse<ConversationListItem[]>> {
+  const regionUrl = await resolveOrgRegion(orgSlug);
+  const limit = options.limit ?? 10;
+  const perPage = Math.min(limit, API_MAX_PER_PAGE);
+
+  return autoPaginate(
+    (cursor) =>
+      fetchConversationsPage(
+        regionUrl,
+        orgSlug,
+        { ...options, cursor },
+        perPage
+      ),
+    limit,
+    options.cursor
+  );
 }
 
 export async function getConversationSpans(

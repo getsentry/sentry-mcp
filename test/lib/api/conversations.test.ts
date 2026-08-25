@@ -236,6 +236,46 @@ describe("listConversations", () => {
     expect(result.data).toHaveLength(1);
     expect(result.data[0].conversationId).toBe("conv-abc");
   });
+
+  test("caps per_page at API_MAX_PER_PAGE when limit exceeds it", async () => {
+    const { getCapturedUrl } = mockOk([]);
+
+    await listConversations(ORG, { limit: 200 });
+
+    expect(getCapturedUrl()).toContain("per_page=100");
+    expect(getCapturedUrl()).not.toContain("per_page=200");
+  });
+
+  test("accumulates results across pages when limit > API_MAX_PER_PAGE", async () => {
+    const item = (id: string) => ({
+      conversationId: id,
+      flow: [],
+      errors: 0,
+      llmCalls: 0,
+      toolCalls: 0,
+      totalTokens: 0,
+      totalCost: 0,
+      startTimestamp: 1_716_500_000,
+      endTimestamp: 1_716_500_060,
+      traceCount: 0,
+      traceIds: [],
+      firstInput: "",
+      lastOutput: "",
+      toolNames: [],
+      toolErrors: 0,
+    });
+
+    const { getCapturedUrls } = mockSequential([
+      { body: [item("c1")], headers: linkHeader("cursor1") },
+      { body: [item("c2")], headers: linkHeader("cursor2", "false") },
+    ]);
+
+    const result = await listConversations(ORG, { limit: 200 });
+
+    expect(result.data).toHaveLength(2);
+    expect(result.data.map((c) => c.conversationId)).toEqual(["c1", "c2"]);
+    expect(getCapturedUrls()[0]).toContain("per_page=100");
+  });
 });
 
 // ============================================================================
