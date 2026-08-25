@@ -526,7 +526,7 @@ CliError (base, exitCode=1)
 - Pass `alternatives: []` when defaults are irrelevant (e.g., for missing Trace ID, Event ID)
 - Use `" and "` in `resource` for plural grammar: `"Trace ID and span ID"` → "are required"
 
-**CI enforcement:** `pnpm run check:errors` scans for `ContextError` with multiline commands, `CliError` with ad-hoc "Try:" strings, and silent `catch` blocks (advisory).
+**CI enforcement:** `pnpm run check:errors` scans for `ContextError` with multiline commands, `CliError` with ad-hoc "Try:" strings, and silent `catch` blocks (ratchet baseline — new ones fail CI).
 
 ```typescript
 // Usage examples
@@ -572,9 +572,12 @@ Use `logger.withTag("command-name")` for tagged logging in command files.
 
 **CI enforcement:** `pnpm run check:errors` includes a silent-catch scan that flags
 `catch` blocks which are empty, comment-only, or return-only without surfacing the
-error. It is currently **advisory** (warns, does not fail CI) because of a pre-existing
-backlog; run with `SENTRY_STRICT_SILENT_CATCH=1` to enforce. Do not add new silent
-catches — they will appear in the scan output during review.
+error. It is enforced with a **ratchet baseline** (`script/silent-catch-baseline.json`)
+recording the per-file count of the pre-existing backlog: a *new* silent catch (a file
+exceeding its baseline, or one not in the baseline) fails CI, and removing silent
+catches without lowering the baseline also fails — so the backlog can only shrink.
+When you fix or intentionally add a silent catch, refresh the baseline with
+`pnpm run check:errors -- --update` and commit it.
 
 ### Auto-Recovery for Wrong Entity Types
 

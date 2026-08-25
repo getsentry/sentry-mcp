@@ -16,36 +16,41 @@
  *    `noEmptyBlockStatements` only catches syntactically empty `catch {}`;
  *    this catches comment-only and return-only blocks too.
  *
+ * Silent catches are enforced with a **ratchet baseline**
+ * (`silent-catch-baseline.json`): the repo has a pre-existing backlog of
+ * best-effort catches (UI teardown, cleanup paths, etc.). The baseline records
+ * the known per-file count so that:
+ *   - a *new* silent catch (a file exceeding its baseline, or a file absent from
+ *     the baseline) fails CI, and
+ *   - removing silent catches without lowering the baseline also fails CI, so
+ *     the backlog can only shrink.
+ * Run with `--update` to regenerate the baseline after intentionally changing
+ * the set of silent catches.
+ *
  * Usage:
- *   tsx script/check-error-patterns.ts
+ *   tsx script/check-error-patterns.ts            # check (fails CI on drift)
+ *   tsx script/check-error-patterns.ts --update   # rewrite the baseline
  *
  * Exit codes:
- *   0 - No anti-patterns found
- *   1 - Anti-patterns detected
+ *   0 - No anti-patterns found and silent-catch baseline is in sync
+ *   1 - Anti-patterns detected or silent-catch baseline drifted
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { glob } from "tinyglobby";
 
-type Violation = { file: string; line: number; message: string };
+export type Violation = { file: string; line: number; message: string };
+
+/** Per-file count of grandfathered silent catch blocks. */
+export type SilentCatchBaseline = Record<string, number>;
 
 const CONTEXT_ERROR_RE = /new ContextError\(/g;
 const TRY_PATTERN_RE = /["'`]Try:/;
 
-const files = await glob("src/**/*.ts");
-
-/** Hard violations — these fail CI. */
-const violations: Violation[] = [];
-
-/**
- * Advisory silent-catch findings. Reported as warnings but do NOT fail CI yet:
- * the repo has a pre-existing backlog of intentional best-effort catches (e.g.
- * UI teardown, cleanup paths). The check surfaces them for incremental cleanup
- * and so new ones are visible in review. Set SENTRY_STRICT_SILENT_CATCH=1 to
- * promote them to hard failures once the backlog is cleared.
- */
-const silentCatchWarnings: Violation[] = [];
-const STRICT_SILENT_CATCH = process.env.SENTRY_STRICT_SILENT_CATCH === "1";
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+export const BASELINE_PATH = join(SCRIPT_DIR, "silent-catch-baseline.json");
 
 /** Characters that open a nesting level in JavaScript source. */
 function isOpener(ch: string): boolean {
@@ -225,7 +230,11 @@ function extractSecondArg(content: string, startIdx: number): string | null {
  * Detect `new ContextError(` where the second argument contains `\n`.
  * This catches resolution-failure prose stuffed into the command parameter.
  */
-function checkContextErrorNewlines(content: string, filePath: string): void {
+export function findContextErrorNewlines(
+  content: string,
+  filePath: string
+): Violation[] {
+  const found: Violation[] = [];
   let match = CONTEXT_ERROR_RE.exec(content);
   while (match !== null) {
     const startIdx = match.index + match[0].length;
@@ -233,7 +242,7 @@ function checkContextErrorNewlines(content: string, filePath: string): void {
 
     if (secondArg?.includes("\\n")) {
       const line = content.slice(0, match.index).split("\n").length;
-      violations.push({
+      found.push({
         file: filePath,
         line,
         message:
@@ -242,13 +251,18 @@ function checkContextErrorNewlines(content: string, filePath: string): void {
     }
     match = CONTEXT_ERROR_RE.exec(content);
   }
+  return found;
 }
 
 /**
  * Detect `new CliError(... "Try:" ...)` — ad-hoc "Try:" strings that bypass
  * the structured ResolutionError pattern.
  */
-function checkAdHocTryPatterns(content: string, filePath: string): void {
+export function findAdHocTryPatterns(
+  content: string,
+  filePath: string
+): Violation[] {
+  const found: Violation[] = [];
   const lines = content.split("\n");
   let inCliError = false;
 
@@ -258,7 +272,7 @@ function checkAdHocTryPatterns(content: string, filePath: string): void {
       inCliError = true;
     }
     if (inCliError && TRY_PATTERN_RE.test(line)) {
-      violations.push({
+      found.push({
         file: filePath,
         line: i + 1,
         message:
@@ -271,6 +285,7 @@ function checkAdHocTryPatterns(content: string, filePath: string): void {
       inCliError = false;
     }
   }
+  return found;
 }
 
 /** Matches the start of a catch block in both statement and promise form. */
@@ -319,7 +334,11 @@ function stripComments(snippet: string): string {
  * empty or contain only a bare `return;`/`return <value>;` with no logging or
  * re-throw. These hide errors and violate the AGENTS.md no-silent-catch rule.
  */
-function checkSilentCatch(content: string, filePath: string): void {
+export function findSilentCatches(
+  content: string,
+  filePath: string
+): Violation[] {
+  const found: Violation[] = [];
   let match = CATCH_RE.exec(content);
   while (match !== null) {
     const openBraceIdx = match.index + match[0].length - 1;
@@ -337,8 +356,7 @@ function checkSilentCatch(content: string, filePath: string): void {
       (code.length === 0 || returnOnly);
     if (silent) {
       const line = content.slice(0, match.index).split("\n").length;
-      const target = STRICT_SILENT_CATCH ? violations : silentCatchWarnings;
-      target.push({
+      found.push({
         file: filePath,
         line,
         message:
@@ -347,43 +365,176 @@ function checkSilentCatch(content: string, filePath: string): void {
     }
     match = CATCH_RE.exec(content);
   }
+  return found;
 }
 
-for (const filePath of files) {
-  const content = await readFile(filePath, "utf-8");
-  checkContextErrorNewlines(content, filePath);
-  checkAdHocTryPatterns(content, filePath);
-  checkSilentCatch(content, filePath);
-}
+export type ScanResult = {
+  /** Hard violations — always fail CI. */
+  violations: Violation[];
+  /** Every silent catch found, across all scanned files. */
+  silentCatches: Violation[];
+};
 
-if (silentCatchWarnings.length > 0) {
-  console.warn(
-    `⚠ ${silentCatchWarnings.length} silent catch block(s) found (advisory; not failing CI).`
-  );
-  console.warn(
-    "  Add log.debug()/log.warn() or re-throw. Run with SENTRY_STRICT_SILENT_CATCH=1 to enforce.\n"
-  );
-  for (const v of silentCatchWarnings) {
-    console.warn(`  ${v.file}:${v.line}`);
+/** Scan the given files and collect violations and silent catches. */
+export async function scanFiles(files: string[]): Promise<ScanResult> {
+  const violations: Violation[] = [];
+  const silentCatches: Violation[] = [];
+  for (const filePath of files) {
+    const content = await readFile(filePath, "utf-8");
+    violations.push(...findContextErrorNewlines(content, filePath));
+    violations.push(...findAdHocTryPatterns(content, filePath));
+    silentCatches.push(...findSilentCatches(content, filePath));
   }
-  console.warn("");
+  return { violations, silentCatches };
 }
 
-if (violations.length === 0) {
-  console.log("✓ No error class anti-patterns found");
+/** Group silent catches into a per-file count map. */
+export function countByFile(silentCatches: Violation[]): SilentCatchBaseline {
+  const counts: SilentCatchBaseline = {};
+  for (const v of silentCatches) {
+    counts[v.file] = (counts[v.file] ?? 0) + 1;
+  }
+  return counts;
+}
+
+export type BaselineDrift = {
+  /** Files with more silent catches than the baseline allows (or new files). */
+  regressions: { file: string; baseline: number; actual: number }[];
+  /** Files with fewer silent catches than the baseline records. */
+  improvements: { file: string; baseline: number; actual: number }[];
+};
+
+/**
+ * Compare the current per-file silent-catch counts against the committed
+ * baseline. A regression (new silent catch) always fails CI. An improvement
+ * (silent catch removed without updating the baseline) also fails so the
+ * baseline stays honest and can only ratchet down.
+ */
+export function compareToBaseline(
+  actual: SilentCatchBaseline,
+  baseline: SilentCatchBaseline
+): BaselineDrift {
+  const regressions: BaselineDrift["regressions"] = [];
+  const improvements: BaselineDrift["improvements"] = [];
+  const files = new Set([...Object.keys(actual), ...Object.keys(baseline)]);
+  for (const file of files) {
+    const a = actual[file] ?? 0;
+    const b = baseline[file] ?? 0;
+    if (a > b) {
+      regressions.push({ file, baseline: b, actual: a });
+    } else if (a < b) {
+      improvements.push({ file, baseline: b, actual: a });
+    }
+  }
+  regressions.sort((x, y) => x.file.localeCompare(y.file));
+  improvements.sort((x, y) => x.file.localeCompare(y.file));
+  return { regressions, improvements };
+}
+
+/** Load the committed baseline, treating a missing file as an empty baseline. */
+async function loadBaseline(): Promise<SilentCatchBaseline> {
+  try {
+    return JSON.parse(await readFile(BASELINE_PATH, "utf-8"));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return {};
+    }
+    throw error;
+  }
+}
+
+/** Serialize the baseline with stable key ordering and a trailing newline. */
+function serializeBaseline(counts: SilentCatchBaseline): string {
+  const sorted: SilentCatchBaseline = {};
+  for (const key of Object.keys(counts).sort()) {
+    sorted[key] = counts[key] as number;
+  }
+  return `${JSON.stringify(sorted, null, 2)}\n`;
+}
+
+async function main(): Promise<void> {
+  const update = process.argv.includes("--update");
+  const files = await glob("src/**/*.ts");
+  const { violations, silentCatches } = await scanFiles(files);
+  const actual = countByFile(silentCatches);
+
+  if (update) {
+    await writeFile(BASELINE_PATH, serializeBaseline(actual));
+    const total = silentCatches.length;
+    console.log(
+      `✓ Wrote silent-catch baseline: ${total} catch(es) across ${Object.keys(actual).length} file(s).`
+    );
+  }
+
+  const baseline = update ? actual : await loadBaseline();
+  const { regressions, improvements } = compareToBaseline(actual, baseline);
+
+  let failed = false;
+
+  if (violations.length > 0) {
+    failed = true;
+    console.error(
+      `✗ Found ${violations.length} error class anti-pattern(s):\n`
+    );
+    for (const v of violations) {
+      console.error(`  ${v.file}:${v.line}`);
+      console.error(`    ${v.message}\n`);
+    }
+    console.error(
+      "Fix: Use ResolutionError for resolution failures, ValidationError for input errors."
+    );
+    console.error(
+      "See ContextError JSDoc in src/lib/errors.ts for usage guidance.\n"
+    );
+  }
+
+  if (regressions.length > 0) {
+    failed = true;
+    const added = regressions.reduce((n, r) => n + (r.actual - r.baseline), 0);
+    console.error(
+      `✗ ${added} new silent catch block(s) beyond the baseline:\n`
+    );
+    for (const r of regressions) {
+      console.error(`  ${r.file}: ${r.baseline} → ${r.actual}`);
+    }
+    console.error(
+      "\nEvery catch must re-throw, log.debug()/log.warn(), or return a fallback " +
+        "with a log.debug() explaining the suppression (AGENTS.md)."
+    );
+    console.error(
+      "If a silent catch is truly intentional, run `pnpm run check:errors -- --update`.\n"
+    );
+  }
+
+  if (improvements.length > 0) {
+    failed = true;
+    const removed = improvements.reduce(
+      (n, r) => n + (r.baseline - r.actual),
+      0
+    );
+    console.error(
+      `✗ ${removed} silent catch block(s) removed but the baseline is stale:\n`
+    );
+    for (const r of improvements) {
+      console.error(`  ${r.file}: ${r.baseline} → ${r.actual}`);
+    }
+    console.error(
+      "\nNice — the backlog shrank. Lock it in with `pnpm run check:errors -- --update`.\n"
+    );
+  }
+
+  if (failed) {
+    process.exit(1);
+  }
+
+  const total = silentCatches.length;
+  console.log(
+    `✓ No error class anti-patterns found (silent-catch baseline: ${total} grandfathered).`
+  );
   process.exit(0);
 }
 
-console.error(`✗ Found ${violations.length} error class anti-pattern(s):\n`);
-for (const v of violations) {
-  console.error(`  ${v.file}:${v.line}`);
-  console.error(`    ${v.message}\n`);
+// Only run when invoked directly, not when imported by tests.
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  await main();
 }
-console.error(
-  "Fix: Use ResolutionError for resolution failures, ValidationError for input errors."
-);
-console.error(
-  "See ContextError JSDoc in src/lib/errors.ts for usage guidance."
-);
-
-process.exit(1);
