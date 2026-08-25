@@ -77,8 +77,8 @@ export async function promptAndStartTrial(
   try {
     const trials = await getProductTrials(orgSlug);
     trial = findAvailableTrial(trials, "seer");
-  } catch {
-    // Can't check trial status — degrade gracefully
+  } catch (error) {
+    log.debug("Failed to check trial availability", error);
     return false;
   }
 
@@ -115,7 +115,8 @@ export async function promptAndStartTrial(
     await startProductTrial(orgSlug, trial.category);
     log.success("Seer trial activated!");
     return true;
-  } catch {
+  } catch (error) {
+    log.debug("Trial start API call failed", error);
     log.warn(
       "Failed to start trial. Please try again or visit your Sentry settings:"
     );
