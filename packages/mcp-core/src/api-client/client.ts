@@ -4636,7 +4636,7 @@ export class SentryApiService {
       }
 
       const response = await this.request(
-        apiPath`/organizations/${organizationSlug}/ai-conversations/${conversationId}/` +
+        apiPath`/organizations/${organizationSlug}/agents/conversations/${conversationId}/` +
           `?${queryParams.toString()}`,
         undefined,
         opts,
@@ -4718,7 +4718,7 @@ export class SentryApiService {
     }
 
     const response = await this.request(
-      apiPath`/organizations/${organizationSlug}/ai-conversations/` +
+      apiPath`/organizations/${organizationSlug}/agents/conversations/` +
         `?${queryParams.toString()}`,
       undefined,
       opts,

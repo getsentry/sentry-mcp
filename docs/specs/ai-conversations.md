@@ -113,7 +113,7 @@ Parameter behavior:
 Use the Sentry AI Conversations list endpoint:
 
 ```text
-GET /api/0/organizations/{organizationSlug}/ai-conversations/
+GET /api/0/organizations/{organizationSlug}/agents/conversations/
 ```
 
 Do not implement conversation search through
@@ -465,7 +465,7 @@ get_sentry_resource({
 Add focused tests for:
 
 1. Basic search:
-   - Calls `/organizations/{org}/ai-conversations/`.
+   - Calls `/organizations/{org}/agents/conversations/`.
    - Passes `query`, `per_page`, and time parameters.
    - Returns one structured summary per conversation.
 2. Empty results:
