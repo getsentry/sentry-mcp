@@ -24,6 +24,14 @@ _.pid
 _.seed
 *.pid.lock
 
+# Crash dumps
+
+/core
+core.[0-9]*
+*.core
+*.dmp
+vgcore.*
+
 # Dependency directories
 
 node_modules/
