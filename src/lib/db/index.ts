@@ -6,6 +6,7 @@
 
 import { chmodSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { getEnv } from "../env.js";
 import { logger } from "../logger.js";
@@ -69,7 +70,6 @@ function registerExitHandler(): void {
 }
 
 export function getConfigDir(): string {
-  const { homedir } = _require("node:os");
   return (
     getEnv()[CONFIG_DIR_ENV_VAR] || join(homedir(), DEFAULT_CONFIG_DIR_NAME)
   );
