@@ -19,6 +19,9 @@ const DEFAULT_POLL_INTERVAL_MS = 1000;
 /** Animation interval for spinner updates — 50ms gives 20fps, matching the ora/inquirer standard */
 const ANIMATION_INTERVAL_MS = 50;
 
+/** Default interval between automatic progress-message updates. */
+const DEFAULT_PROGRESS_ROTATION_INTERVAL_MS = 4000;
+
 /** Default timeout in milliseconds (6 minutes) */
 const DEFAULT_TIMEOUT_MS = 360_000;
 
@@ -157,11 +160,27 @@ function startSpinner(initialMessage: string): {
  * Options for {@link withProgress}.
  */
 export type WithProgressOptions = {
-  /** Initial spinner message */
+  /** Initial spinner message displayed until a rotating message replaces it. */
   message: string;
   /** Suppress progress output (JSON mode). When true, the operation runs
    *  without a spinner — matching the behaviour of {@link poll}. */
   json?: boolean;
+  /**
+   * Suppress progress when stdout is not a terminal, even if rich output is
+   * explicitly forced. Use for terminal-only feedback that must not enter a
+   * machine-readable pipe.
+   */
+  interactiveOnly?: boolean;
+  /**
+   * Messages to show in sequence while the operation is pending. Omit or pass
+   * an empty array to leave the initial message in place.
+   */
+  rotatingMessages?: readonly string[];
+  /**
+   * Milliseconds between rotating-message updates. Defaults to 4 seconds and
+   * is ignored when {@link rotatingMessages} is empty.
+   */
+  rotationIntervalMs?: number;
 };
 
 /**
@@ -177,7 +196,9 @@ export type WithProgressOptions = {
  *
  * The callback receives a `setMessage` function to update the displayed
  * message as work progresses (e.g. to show page counts during pagination).
- * Progress is automatically cleared when the operation completes.
+ * Optional rotating messages provide friendly feedback for operations whose
+ * progress cannot be measured directly. Progress is automatically cleared
+ * when the operation completes or fails.
  *
  * @param options - Spinner configuration
  * @param fn - Async operation to run; receives `setMessage` to update the displayed text
@@ -200,7 +221,11 @@ export async function withProgress<T>(
   options: WithProgressOptions,
   fn: (setMessage: (msg: string) => void) => Promise<T>
 ): Promise<T> {
-  if (options.json || isPlainOutput()) {
+  if (
+    options.json ||
+    isPlainOutput() ||
+    (options.interactiveOnly && !process.stdout.isTTY)
+  ) {
     // JSON mode or non-TTY: skip the spinner entirely, pass a no-op setMessage
     return fn(() => {
       /* spinner suppressed */
@@ -208,10 +233,29 @@ export async function withProgress<T>(
   }
 
   const spinner = startSpinner(options.message);
+  const rotatingMessages = options.rotatingMessages ?? [];
+  const rotationIntervalMs =
+    options.rotationIntervalMs ?? DEFAULT_PROGRESS_ROTATION_INTERVAL_MS;
+  let rotationTimer: NodeJS.Timeout | undefined;
+
+  if (rotatingMessages.length > 0 && rotationIntervalMs > 0) {
+    let messageIndex = 0;
+    rotationTimer = setInterval(() => {
+      const message = rotatingMessages[messageIndex];
+      if (message !== undefined) {
+        spinner.setMessage(message);
+      }
+      messageIndex = (messageIndex + 1) % rotatingMessages.length;
+    }, rotationIntervalMs);
+    rotationTimer.unref();
+  }
 
   try {
     return await fn(spinner.setMessage);
   } finally {
+    if (rotationTimer) {
+      clearInterval(rotationTimer);
+    }
     spinner.stop();
     process.stdout.write("\r\x1b[K");
   }
