@@ -25,16 +25,22 @@ For monorepos or when DSN detection picks up the wrong project, use a [`.sentryc
 
 ### Supported Languages
 
-The CLI can detect DSNs from source code in these languages:
+The CLI scans source files for DSN URLs (the `https://…@….ingest.sentry.io/…` pattern) using a universal regex — no language-specific parsing is needed. Any text file with a recognized extension is scanned, including:
 
-| Language | File Extensions | Detection Pattern |
-|----------|-----------------|-------------------|
-| JavaScript/TypeScript | `.js`, `.ts`, `.jsx`, `.tsx`, `.mjs`, `.cjs` | `Sentry.init({ dsn: "..." })` |
-| Python | `.py` | `sentry_sdk.init(dsn="...")` |
-| Go | `.go` | `sentry.Init(sentry.ClientOptions{Dsn: "..."})` |
-| Java | `.java` | `Sentry.init(options -> options.setDsn("..."))` |
-| Ruby | `.rb` | `Sentry.init { |config| config.dsn = "..." }` |
-| PHP | `.php` | `\Sentry\init(['dsn' => '...'])` |
+| Language Family | File Extensions |
+|----------------|-----------------|
+| JavaScript/TypeScript | `.js`, `.ts`, `.jsx`, `.tsx`, `.mjs`, `.cjs`, `.astro`, `.vue`, `.svelte` |
+| Python | `.py` |
+| Go | `.go` |
+| JVM (Java, Kotlin, Scala, Groovy) | `.java`, `.kt`, `.kts`, `.scala`, `.groovy` |
+| .NET (C#, F#, VB) | `.cs`, `.fs`, `.vb` |
+| Ruby | `.rb`, `.erb` |
+| PHP | `.php` |
+| Swift/Objective-C | `.swift`, `.m`, `.mm` |
+| Rust | `.rs` |
+| Dart/Flutter | `.dart` |
+| Elixir/Erlang | `.ex`, `.exs`, `.erl` |
+| Config files | `.json`, `.yaml`, `.yml`, `.toml`, `.xml`, `.properties` |
 
 ### Caching
 

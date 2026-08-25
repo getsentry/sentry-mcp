@@ -131,6 +131,18 @@ Feedback is sent via Sentry's telemetry system. If telemetry is disabled (`SENTR
 sentry cli fix
 ```
 
+### Print shell completions
+
+```bash
+# Print completions for your current shell (auto-detected from $SHELL)
+sentry cli completion
+
+# Generate for a specific shell
+sentry cli completion zsh > ~/.local/share/zsh/site-functions/_sentry
+eval "$(sentry cli completion bash)"
+sentry cli completion fish > ~/.config/fish/completions/sentry.fish
+```
+
 ### Configure shell integration
 
 ```bash

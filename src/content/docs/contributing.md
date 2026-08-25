@@ -89,7 +89,7 @@ cli/
 │   │   ├── init.ts      # Initialize Sentry in your project (experimental)
 │   │   └── schema.ts    # Browse the Sentry API schema
 │   ├── lib/            # Shared utilities
-│   └── types/          # TypeScript types and Zod schemas
+│   └── types/          # TypeScript types and Valibot schemas
 ├── test/               # Test files (mirrors src/ structure)
 ├── script/             # Build and utility scripts
 ├── plugins/            # Agent skill files
