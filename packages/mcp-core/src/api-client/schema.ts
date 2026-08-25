@@ -1347,7 +1347,8 @@ export const EventAttachmentSchema = z.object({
   size: z.number(),
   mimetype: z.string(),
   dateCreated: z.string().datetime(),
-  sha1: z.string(),
+  // Objectstore-backed attachments intentionally store an empty-string SHA1, so
+  // we neither require nor surface checksum metadata from this endpoint.
   headers: z.record(z.string(), z.string()).optional(),
 });
 

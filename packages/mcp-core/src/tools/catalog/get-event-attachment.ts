@@ -117,8 +117,7 @@ export default defineTool({
       output += `**Type:** ${attachment.attachment.type}\n`;
       output += `**Size:** ${attachment.attachment.size} bytes\n`;
       output += `**MIME Type:** ${effectiveMimeType}\n`;
-      output += `**Created:** ${attachment.attachment.dateCreated}\n`;
-      output += `**SHA1:** ${attachment.attachment.sha1}\n\n`;
+      output += `**Created:** ${attachment.attachment.dateCreated}\n\n`;
       output += `**Download URL:** ${attachment.downloadUrl}\n\n`;
 
       if (isBinary) {
@@ -166,8 +165,7 @@ export default defineTool({
       output += `**Type:** ${attachment.type}\n`;
       output += `**Size:** ${attachment.size} bytes\n`;
       output += `**MIME Type:** ${attachment.mimetype}\n`;
-      output += `**Created:** ${attachment.dateCreated}\n`;
-      output += `**SHA1:** ${attachment.sha1}\n\n`;
+      output += `**Created:** ${attachment.dateCreated}\n\n`;
       output += "To download this attachment with the attachmentId provided:\n";
       output += `${formatToolCallInstruction({
         toolName: "get_event_attachment",

@@ -1607,7 +1607,6 @@ export const restHandlers = buildHandlers([
           size: 1024,
           mimetype: "application/octet-stream",
           dateCreated: "2025-04-08T21:15:04.000Z",
-          sha1: "abc123def456",
           headers: { "Content-Type": "application/octet-stream" },
         },
       ]),
