@@ -26,8 +26,8 @@ import { isAllDigits } from "../utils.js";
 import {
   API_MAX_PER_PAGE,
   apiRequestToRegion,
-  autoPaginate,
   getOrgSdkConfig,
+  paginate,
   parseLinkHeader,
   unwrapPaginatedResult,
   unwrapResult,
@@ -198,42 +198,43 @@ export async function listLogs(
       ]
     : LOG_FIELDS;
 
-  const limit = options.limit ?? API_MAX_PER_PAGE;
-  const perPage = Math.min(limit, API_MAX_PER_PAGE);
+  const { data } = await paginate(
+    options,
+    async (perPage, cursor) => {
+      const result = await listOrganizationEvents({
+        ...config,
+        path: { organization_id_or_slug: orgSlug },
+        query: {
+          dataset: "logs",
+          field: fields,
+          project:
+            numericProjectId === undefined ? undefined : [numericProjectId],
+          query: fullQuery || undefined,
+          per_page: perPage,
+          cursor,
+          statsPeriod:
+            options.start || options.end
+              ? undefined
+              : (options.statsPeriod ?? "30d"),
+          start: options.start,
+          end: options.end,
+          sort: toApiSort(options.sort),
+        } as Parameters<typeof listOrganizationEvents>[0]["query"],
+      });
 
-  const { data } = await autoPaginate(async (cursor) => {
-    const result = await listOrganizationEvents({
-      ...config,
-      path: { organization_id_or_slug: orgSlug },
-      query: {
-        dataset: "logs",
-        field: fields,
-        project:
-          numericProjectId === undefined ? undefined : [numericProjectId],
-        query: fullQuery || undefined,
-        per_page: perPage,
-        cursor,
-        statsPeriod:
-          options.start || options.end
-            ? undefined
-            : (options.statsPeriod ?? "30d"),
-        start: options.start,
-        end: options.end,
-        sort: toApiSort(options.sort),
-      } as Parameters<typeof listOrganizationEvents>[0]["query"],
-    });
-
-    const { data: raw, nextCursor } = unwrapPaginatedResult<unknown>(
-      result,
-      "Failed to list logs"
-    );
-    const logsResponse = safeParseResponse(
-      LogsResponseSchema,
-      raw,
-      "Failed to list logs"
-    );
-    return { data: logsResponse.data, nextCursor };
-  }, limit);
+      const { data: raw, nextCursor } = unwrapPaginatedResult<unknown>(
+        result,
+        "Failed to list logs"
+      );
+      const logsResponse = safeParseResponse(
+        LogsResponseSchema,
+        raw,
+        "Failed to list logs"
+      );
+      return { data: logsResponse.data, nextCursor };
+    },
+    API_MAX_PER_PAGE
+  );
 
   return data;
 }
@@ -410,32 +411,34 @@ export async function listTraceLogs(
   options: ListTraceLogsOptions = {}
 ): Promise<TraceLog[]> {
   const regionUrl = await resolveOrgRegion(orgSlug);
-  const limit = options.limit ?? API_MAX_PER_PAGE;
-  const perPage = Math.min(limit, API_MAX_PER_PAGE);
 
-  const { data } = await autoPaginate(async (cursor) => {
-    const { data: response, headers } = await apiRequestToRegion<{
-      data: TraceLog[];
-    }>(regionUrl, `/organizations/${orgSlug}/trace-logs/`, {
-      params: {
-        traceId,
-        statsPeriod:
-          options.start || options.end
-            ? undefined
-            : (options.statsPeriod ?? "14d"),
-        start: options.start,
-        end: options.end,
-        per_page: perPage,
-        cursor,
-        query: options.query,
-        sort: toApiSort(options.sort),
-      },
-      schema: TraceLogsResponseSchema,
-    });
+  const { data } = await paginate(
+    options,
+    async (perPage, cursor) => {
+      const { data: response, headers } = await apiRequestToRegion<{
+        data: TraceLog[];
+      }>(regionUrl, `/organizations/${orgSlug}/trace-logs/`, {
+        params: {
+          traceId,
+          statsPeriod:
+            options.start || options.end
+              ? undefined
+              : (options.statsPeriod ?? "14d"),
+          start: options.start,
+          end: options.end,
+          per_page: perPage,
+          cursor,
+          query: options.query,
+          sort: toApiSort(options.sort),
+        },
+        schema: TraceLogsResponseSchema,
+      });
 
-    const { nextCursor } = parseLinkHeader(headers.get("link") ?? null);
-    return { data: response.data, nextCursor };
-  }, limit);
+      const { nextCursor } = parseLinkHeader(headers.get("link") ?? null);
+      return { data: response.data, nextCursor };
+    },
+    API_MAX_PER_PAGE
+  );
 
   return data;
 }
