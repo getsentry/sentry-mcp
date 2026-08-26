@@ -72,6 +72,6 @@ Endpoints that return binary data — image attachments, minidumps, debug files 
 sentry api "projects/my-org/my-project/events/EVENT_ID/attachments/ATTACHMENT_ID/?download=1" > screenshot.png
 ```
 
-When the response is a PNG or JPEG image **and** you're on a sixel-capable terminal, the image is rendered inline instead of dumping raw bytes into your session. Redirecting or piping stdout always keeps the raw bytes. Set `SENTRY_NO_SIXEL=1` to disable inline rendering.
+When the response is a PNG or JPEG image **and** you're on a graphics-capable terminal, the image is rendered inline instead of dumping raw bytes into your session. Terminals that speak the newer kitty graphics protocol (kitty, WezTerm, Ghostty, recent Konsole) are used in preference to sixel, which remains the fallback for older terminals. Redirecting or piping stdout always keeps the raw bytes. Set `SENTRY_NO_GRAPHICS=1` (or run `sentry cli defaults graphics off`) to disable inline rendering; `SENTRY_NO_SIXEL` is still honored as a deprecated alias.
 
 For full API documentation, see the [Sentry API Reference](https://docs.sentry.io/api/).
