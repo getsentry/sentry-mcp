@@ -7,7 +7,7 @@ import {
   type TranscriptResult,
 } from "../../../src/lib/formatters/conversation.js";
 import type {
-  AIConversationSpan,
+  AgentConversationSpan,
   ConversationListItem,
 } from "../../../src/types/conversation.js";
 
@@ -27,8 +27,8 @@ function makeListItem(
 }
 
 function makeSpan(
-  overrides: Partial<AIConversationSpan> = {}
-): AIConversationSpan {
+  overrides: Partial<AgentConversationSpan> = {}
+): AgentConversationSpan {
   return {
     span_id: "aabb112233445566",
     trace: "00112233445566778899aabbccddeeff",
@@ -285,7 +285,7 @@ describe("formatTranscriptResult", () => {
     const spans = [makeSpan()];
     const transcript = buildTranscriptResult("conv-123", "my-org", spans);
     const output = formatTranscriptResult(transcript);
-    expect(output).toContain("AI Conversation: conv-123");
+    expect(output).toContain("Agent Conversation: conv-123");
     expect(output).toContain("my-org");
     expect(output).toContain("my-project");
     expect(output).toContain("user");
@@ -301,7 +301,7 @@ describe("formatTranscriptResult", () => {
       "Refund a duplicate charge"
     );
     const output = formatTranscriptResult(transcript);
-    expect(output).toContain("AI Conversation: conv-123");
+    expect(output).toContain("Agent Conversation: conv-123");
     expect(output).toContain("Refund a duplicate charge");
   });
 

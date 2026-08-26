@@ -57,7 +57,6 @@ const FEATURE_ALIASES = {
   sourceMaps: "sourceMaps",
   crons: "crons",
   attachments: "attachments",
-  "ai-monitoring": "aiMonitoring",
   aiMonitoring: "aiMonitoring",
   "agent-tracing": "aiMonitoring",
   agentTracing: "aiMonitoring",
@@ -75,7 +74,6 @@ const SUPPORTED_FEATURE_NAMES = [
   "sourcemaps",
   "crons",
   "attachments",
-  "ai-monitoring",
   "agent-tracing",
   "mcp-observability",
 ] as const;

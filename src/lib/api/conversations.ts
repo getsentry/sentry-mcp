@@ -1,23 +1,23 @@
 /**
- * AI Conversations API functions
+ * Agent conversations API functions
  *
- * Functions for listing and retrieving AI conversation data from the Sentry
- * Explore AI-conversations endpoints.
+ * Functions for listing and retrieving agent conversation data from the Sentry
+ * Explore agent conversations endpoints.
  *
- * The `/organizations/{org}/ai-conversations/` endpoints are PRIVATE and not
+ * The `/organizations/{org}/agents/conversations/` endpoints are PRIVATE and not
  * yet in `@sentry/api` (getsentry/sentry-api-schema). Call them via
  * `apiRequestToRegion` with local Valibot schemas (same pattern as `logs.ts` /
  * `traces.ts`). Details response shape is documented on
- * `AIConversationDetailsSchema`. Pagination uses `parseLinkHeader`. Revisit
+ * `AgentConversationDetailsSchema`. Pagination uses `parseLinkHeader`. Revisit
  * once these endpoints land in `@sentry/api`.
  */
 
 import { array } from "valibot";
 
 import {
-  type AIConversationDetails,
-  AIConversationDetailsSchema,
-  type AIConversationSpan,
+  type AgentConversationDetails,
+  AgentConversationDetailsSchema,
+  type AgentConversationSpan,
   type ConversationListItem,
   ConversationListItemSchema,
 } from "../../types/conversation.js";
@@ -37,7 +37,7 @@ import {
 const log = logger.withTag("api.conversations");
 
 /**
- * Fetch a single page of conversations from the AI-conversations endpoint.
+ * Fetch a single page of conversations from the agent conversations endpoint.
  *
  * Internal helper used by {@link listConversations} for both single-page and
  * multi-page (auto-paginating) fetches.
@@ -79,7 +79,7 @@ async function fetchConversationsPage(
 
   const { data, headers } = await apiRequestToRegion<ConversationListItem[]>(
     regionUrl,
-    `/organizations/${orgSlug}/ai-conversations/`,
+    `/organizations/${orgSlug}/agents/conversations/`,
     { params, schema: array(ConversationListItemSchema) }
   );
 
@@ -89,7 +89,7 @@ async function fetchConversationsPage(
 }
 
 /**
- * List AI conversations for an organization.
+ * List agent conversations for an organization.
  *
  * When `limit` exceeds {@link API_MAX_PER_PAGE}, transparently fetches multiple
  * pages using cursor-based pagination (bounded by {@link MAX_PAGINATION_PAGES}).
@@ -136,7 +136,7 @@ export async function getConversationSpans(
     perPage?: number;
   } = {}
 ): Promise<{
-  spans: AIConversationSpan[];
+  spans: AgentConversationSpan[];
   truncated: boolean;
   title: string | null;
 }> {
@@ -150,7 +150,7 @@ export async function getConversationSpans(
     params.project = options.project;
   }
 
-  const spans: AIConversationSpan[] = [];
+  const spans: AgentConversationSpan[] = [];
   let title: string | null = null;
   let cursor: string | undefined;
 
@@ -159,11 +159,12 @@ export async function getConversationSpans(
       params.cursor = cursor;
     }
 
-    const { data, headers } = await apiRequestToRegion<AIConversationDetails>(
-      regionUrl,
-      `/organizations/${orgSlug}/ai-conversations/${encodeURIComponent(conversationId)}/`,
-      { params, schema: AIConversationDetailsSchema }
-    );
+    const { data, headers } =
+      await apiRequestToRegion<AgentConversationDetails>(
+        regionUrl,
+        `/organizations/${orgSlug}/agents/conversations/${encodeURIComponent(conversationId)}/`,
+        { params, schema: AgentConversationDetailsSchema }
+      );
 
     if (page === 0) {
       title = data.title;

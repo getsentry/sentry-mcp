@@ -19,15 +19,15 @@ export {
   ProjectAliasesSchema,
   SentryConfigSchema,
 } from "./config.js";
-// AI Conversations types
+// Agent conversations types
 export type {
-  AIConversationDetails,
-  AIConversationSpan,
+  AgentConversationDetails,
+  AgentConversationSpan,
   ConversationListItem,
 } from "./conversation.js";
 export {
-  AIConversationDetailsSchema,
-  AIConversationSpanSchema,
+  AgentConversationDetailsSchema,
+  AgentConversationSpanSchema,
   ConversationListItemSchema,
 } from "./conversation.js";
 // Dashboard types

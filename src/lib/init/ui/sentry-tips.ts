@@ -62,8 +62,8 @@ export const SENTRY_TIPS: SentryTip[] = [
     body: "Profiling adds function-level cost to the same debugging story. Pair it with a trace to see which code path burned CPU during a slow transaction.",
   },
   {
-    title: "AI Monitoring for LLM apps",
-    body: "If your app calls an LLM, Sentry's AI Monitoring surfaces token cost, latency, and failure rate per model and per route. Catch a regression in prompt cost before the bill arrives.",
+    title: "Agent Tracing for LLM apps",
+    body: "If your app calls an LLM, Sentry's Agent Tracing surfaces token cost, latency, and failure rate per model and per route. Catch a regression in prompt cost before the bill arrives.",
   },
   {
     title: "Seer: AI-powered debugging",
