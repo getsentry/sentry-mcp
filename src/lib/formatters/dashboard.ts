@@ -19,8 +19,9 @@ import type {
   TimeseriesResult,
   WidgetDataResult,
 } from "../../types/dashboard.js";
-import { getEnv } from "../env.js";
+import { encodeImageToKitty } from "../kitty-image.js";
 import {
+  canRenderKitty,
   canRenderSixel,
   terminalPixelHeight,
   terminalPixelWidth,
@@ -46,8 +47,6 @@ export type DashboardViewData = {
   url: string;
   dateCreated?: string;
   environment?: string[];
-  /** Per-invocation sixel opt-in from `dashboard view --sixel`. */
-  sixel?: boolean;
   widgets: DashboardViewWidget[];
 };
 
@@ -1871,21 +1870,17 @@ export function formatDashboardWithData(data: DashboardViewData): string {
 }
 
 /**
- * Render the complete dashboard as one sixel canvas only when the terminal
- * exposes both cell dimensions. A sixel-only feature must never partially
- * replace the framebuffer: unavailable geometry always returns the complete
- * established character rendering.
+ * Render the complete dashboard as one graphics canvas (kitty when available,
+ * otherwise sixel) when graphics are enabled and the terminal exposes both cell
+ * dimensions. Never partially replaces the framebuffer: unavailable geometry
+ * always returns the complete established character rendering.
  */
 function renderCompleteDashboardAsSixel(
   data: DashboardViewData,
   termWidth: number | undefined
 ): string | undefined {
-  const env = getEnv();
-  const optedIn =
-    data.sixel === true ||
-    env.SENTRY_DASHBOARD_SIXEL === "1" ||
-    data.widgets.some((widget) => widget.displayType === "timeseries_sixel");
-  if (!(optedIn && termWidth) || isPlainOutput() || !canRenderSixel()) {
+  const canKitty = canRenderKitty();
+  if (!termWidth || isPlainOutput() || !(canKitty || canRenderSixel())) {
     return;
   }
   const pixelWidth = terminalPixelWidth(termWidth);
@@ -1908,6 +1903,9 @@ function renderCompleteDashboardAsSixel(
         contentHeight,
       });
     },
+    encodeImage: canKitty
+      ? (image) => encodeImageToKitty(image, image.width, true)
+      : undefined,
   });
 }
 
