@@ -1,7 +1,7 @@
 /**
- * sentry conversation view
+ * sentry agent-conversation view
  *
- * View the transcript of a specific AI conversation.
+ * View the transcript of a specific agent conversation.
  */
 
 import type { SentryContext } from "../../context.js";
@@ -27,7 +27,7 @@ type ViewFlags = {
   readonly fresh: boolean;
 };
 
-const USAGE_HINT = "sentry conversation view [<org>/]<conversation-id>";
+const USAGE_HINT = "sentry agent-conversation view [<org>/]<conversation-id>";
 
 /**
  * Split a `[<org>/]<conversation-id>` positional into its parts.
@@ -58,15 +58,15 @@ function parseConversationTarget(target: string): {
 
 export const viewCommand = buildCommand({
   docs: {
-    brief: "View an AI conversation transcript",
+    brief: "View an agent conversation transcript",
     fullDescription:
-      "View the full transcript of an AI conversation.\n\n" +
+      "View the full transcript of an agent conversation.\n\n" +
       "The org is optional and auto-detected from your project context when\n" +
       "omitted. Prefix the ID with an org slug to target a specific org.\n\n" +
       "Examples:\n" +
-      "  sentry conversation view conv-123\n" +
-      "  sentry conversation view my-org/conv-123\n" +
-      "  sentry conversation view my-org/conv-123 --json\n",
+      "  sentry agent-conversation view conv-123\n" +
+      "  sentry agent-conversation view my-org/conv-123\n" +
+      "  sentry agent-conversation view my-org/conv-123 --json\n",
   },
   output: {
     human: formatTranscriptResult,

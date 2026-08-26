@@ -1,8 +1,8 @@
 /**
- * AI Conversation types and Valibot schemas.
+ * Agent conversation types and Valibot schemas.
  *
  * Schemas for conversation list items, the details envelope, and raw
- * conversation spans returned by the Sentry Explore AI-conversations endpoints.
+ * conversation spans returned by the Sentry Explore agent conversations endpoints.
  */
 
 import {
@@ -20,7 +20,7 @@ import {
 
 export const ConversationListItemSchema = object({
   conversationId: string(),
-  /** Stored conversation title when available (added by ai-monitoring list API). */
+  /** Stored conversation title when available (added by agent tracing list API). */
   title: optional(nullable(string())),
   flow: array(string()),
   errors: number(),
@@ -55,7 +55,7 @@ export type ConversationListItem = InferOutput<
 const NullableString = optional(nullable(string()));
 const NullableStringOrNumber = optional(nullable(union([string(), number()])));
 
-export const AIConversationSpanSchema = looseObject({
+export const AgentConversationSpanSchema = looseObject({
   "gen_ai.conversation.id": string(),
   span_id: string(),
   trace: string(),
@@ -90,23 +90,25 @@ export const AIConversationSpanSchema = looseObject({
   "user.email": NullableString,
 });
 
-export type AIConversationSpan = InferOutput<typeof AIConversationSpanSchema>;
+export type AgentConversationSpan = InferOutput<
+  typeof AgentConversationSpanSchema
+>;
 
 /**
  * Conversation details envelope returned by
- * `GET /organizations/{org}/ai-conversations/{conversationId}/`.
+ * `GET /organizations/{org}/agents/conversations/{conversationId}/`.
  *
  * As of getsentry/sentry#121143 the endpoint always returns this object
  * (conversation-level metadata + a page of spans) instead of a bare span
  * array. Pagination still uses the `Link` header; each page is an envelope
  * whose `spans` field holds that page's rows.
  */
-export const AIConversationDetailsSchema = looseObject({
+export const AgentConversationDetailsSchema = looseObject({
   conversationId: string(),
   title: nullable(string()),
-  spans: array(AIConversationSpanSchema),
+  spans: array(AgentConversationSpanSchema),
 });
 
-export type AIConversationDetails = InferOutput<
-  typeof AIConversationDetailsSchema
+export type AgentConversationDetails = InferOutput<
+  typeof AgentConversationDetailsSchema
 >;

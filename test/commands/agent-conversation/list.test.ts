@@ -1,7 +1,7 @@
 /**
  * Conversation List Command Tests
  *
- * Tests for the `sentry conversation list` command func() body, covering:
+ * Tests for the `sentry agent-conversation list` command func() body, covering:
  * - Organization resolution from positional arg
  * - Organization resolution via resolveOrg fallback
  * - Error when org cannot be resolved
@@ -15,7 +15,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { listCommand } from "../../../src/commands/conversation/list.js";
+import { listCommand } from "../../../src/commands/agent-conversation/list.js";
 
 vi.mock("../../../src/lib/api-client.js", async (importOriginal) => {
   const actual =
@@ -394,7 +394,7 @@ describe("listCommand.func", () => {
     await func.call(context, HUMAN_FLAGS, ORG);
 
     const output = stdoutWrite.mock.calls.map((c) => c[0]).join("");
-    expect(output).toContain("No AI conversations found");
+    expect(output).toContain("No agent conversations found");
   });
 
   test("handles empty results with hasMore (page boundary)", async () => {
@@ -453,7 +453,7 @@ describe("listCommand.func", () => {
     await func.call(context, JSON_FLAGS, ORG);
 
     expect(advancePaginationStateSpy).toHaveBeenCalledWith(
-      "conversation-list",
+      "agent-conversation-list",
       expect.any(String),
       "next",
       "next-cursor"

@@ -920,7 +920,7 @@ describe("Ink App snapshot", () => {
       details: [
         { text: "We'll add these features:" },
         ...[
-          "AI Monitoring",
+          "Agent Tracing",
           "Application Metrics",
           "Crons",
           "Error Monitoring",

@@ -231,7 +231,7 @@ describe("init command func", () => {
       });
       await expect(promise).rejects.toThrow(ValidationError);
       await expect(promise).rejects.toThrow(
-        "Supported features: errors, tracing, logs, replay, metrics, profiling, sourcemaps, crons, attachments, ai-monitoring, agent-tracing, mcp-observability"
+        "Supported features: errors, tracing, logs, replay, metrics, profiling, sourcemaps, crons, attachments, agent-tracing, mcp-observability"
       );
       expect(runWizardSpy).not.toHaveBeenCalled();
       expect(findProjectsSpy).not.toHaveBeenCalled();
