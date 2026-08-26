@@ -446,6 +446,37 @@ export async function autoPaginate<T>(
 }
 
 /**
+ * Wire a single-page fetcher into a limit-bounded, auto-paginating list call.
+ *
+ * Centralizes the two things every list endpoint kept re-deriving by hand and
+ * occasionally got wrong (see #1458): capping `per_page` at
+ * {@link API_MAX_PER_PAGE} and threading `limit` plus the initial cursor into
+ * {@link autoPaginate}. Callers still own region resolution and
+ * endpoint-specific query building inside `fetchPage`.
+ *
+ * @param options - Caller list options; `limit` bounds total rows, `cursor` is the start cursor
+ * @param fetchPage - Fetches one page given the capped `perPage` and a page cursor
+ * @param defaultLimit - Applied when `options.limit` is undefined
+ * @returns Accumulated items with optional nextCursor
+ */
+export function paginate<T>(
+  options: { limit?: number; cursor?: string },
+  fetchPage: (
+    perPage: number,
+    cursor: string | undefined
+  ) => Promise<PaginatedResponse<T[]>>,
+  defaultLimit = 10
+): Promise<PaginatedResponse<T[]>> {
+  const limit = options.limit ?? defaultLimit;
+  const perPage = Math.min(limit, API_MAX_PER_PAGE);
+  return autoPaginate(
+    (cursor) => fetchPage(perPage, cursor),
+    limit,
+    options.cursor
+  );
+}
+
+/**
  * Make an authenticated request to a specific Sentry region.
  * Returns both parsed response data and raw headers for pagination support.
  * Used for internal endpoints not covered by @sentry/api SDK functions.

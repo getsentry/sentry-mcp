@@ -28,9 +28,9 @@ import { resolveOrgRegion } from "../region.js";
 import {
   API_MAX_PER_PAGE,
   apiRequestToRegion,
-  autoPaginate,
   MAX_PAGINATION_PAGES,
   type PaginatedResponse,
+  paginate,
   parseLinkHeader,
 } from "./infrastructure.js";
 
@@ -111,19 +111,8 @@ export async function listConversations(
   } = {}
 ): Promise<PaginatedResponse<ConversationListItem[]>> {
   const regionUrl = await resolveOrgRegion(orgSlug);
-  const limit = options.limit ?? 10;
-  const perPage = Math.min(limit, API_MAX_PER_PAGE);
-
-  return autoPaginate(
-    (cursor) =>
-      fetchConversationsPage(
-        regionUrl,
-        orgSlug,
-        { ...options, cursor },
-        perPage
-      ),
-    limit,
-    options.cursor
+  return paginate(options, (perPage, cursor) =>
+    fetchConversationsPage(regionUrl, orgSlug, { ...options, cursor }, perPage)
   );
 }
 

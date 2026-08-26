@@ -19,7 +19,8 @@
     "./lint-rules/no-inline-touch-cache.grit",
     "./lint-rules/no-stderr-write-in-commands.grit",
     "./lint-rules/no-args-join-in-release.grit",
-    "./lint-rules/no-generic-is-record.grit"
+    "./lint-rules/no-generic-is-record.grit",
+    "./lint-rules/prefer-paginate-helper.grit"
   ],
   "files": {
     // custom-ca.ts excluded: Biome's type analysis hits the 200k type limit

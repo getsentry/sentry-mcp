@@ -30,8 +30,8 @@ import { isAllDigits } from "../utils.js";
 import {
   API_MAX_PER_PAGE,
   apiRequestToRegion,
-  autoPaginate,
   type PaginatedResponse,
+  paginate,
   parseLinkHeader,
 } from "./infrastructure.js";
 
@@ -456,20 +456,14 @@ export async function listTransactions(
   options: ListTransactionsOptions = {}
 ): Promise<PaginatedResponse<TransactionListItem[]>> {
   const regionUrl = await resolveOrgRegion(orgSlug);
-  const limit = options.limit || 10;
-  const perPage = Math.min(limit, API_MAX_PER_PAGE);
-
-  return autoPaginate(
-    (cursor) =>
-      fetchTransactionsPage(
-        regionUrl,
-        orgSlug,
-        projectSlug,
-        { ...options, cursor },
-        perPage
-      ),
-    limit,
-    options.cursor
+  return paginate(options, (perPage, cursor) =>
+    fetchTransactionsPage(
+      regionUrl,
+      orgSlug,
+      projectSlug,
+      { ...options, cursor },
+      perPage
+    )
   );
 }
 
@@ -599,19 +593,13 @@ export async function listSpans(
   options: ListSpansOptions = {}
 ): Promise<PaginatedResponse<SpanListItem[]>> {
   const regionUrl = await resolveOrgRegion(orgSlug);
-  const limit = options.limit || 10;
-  const perPage = Math.min(limit, API_MAX_PER_PAGE);
-
-  return autoPaginate(
-    (cursor) =>
-      fetchSpansPage(
-        regionUrl,
-        orgSlug,
-        projectSlug,
-        { ...options, cursor },
-        perPage
-      ),
-    limit,
-    options.cursor
+  return paginate(options, (perPage, cursor) =>
+    fetchSpansPage(
+      regionUrl,
+      orgSlug,
+      projectSlug,
+      { ...options, cursor },
+      perPage
+    )
   );
 }
