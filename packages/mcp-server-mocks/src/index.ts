@@ -416,13 +416,12 @@ export const restHandlers = buildHandlers([
         expiresAt: "2026-08-13T12:00:00Z",
         continueUpdates: true,
         runStatus: "active",
-        projectSlugs: [],
-        issueIds: [],
         stages: [
           {
             stage: "connect_mcp",
             status: "completed",
             eventNote: null,
+            extra: null,
           },
         ],
       });

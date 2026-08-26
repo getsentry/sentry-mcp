@@ -4292,59 +4292,159 @@
           "pattern": "^[A-Za-z0-9]{10}$",
           "description": "The 10-character onboarding run token supplied by Sentry."
         },
-        "stage": {
-          "type": "string",
-          "enum": [
-            "connect_mcp",
-            "analyze_project",
-            "create_project",
-            "instrument_app",
-            "plan_test_error",
-            "send_verification_error",
-            "receive_verification_error",
-            "prepare_production",
-            "check_stack_trace_quality"
+        "update": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "waiting",
+                    "completed",
+                    "skipped",
+                    "failed"
+                  ],
+                  "description": "The stage's current status."
+                },
+                "runStatus": {
+                  "description": "Set only when the entire onboarding run has completed or failed.",
+                  "type": "string",
+                  "enum": ["completed", "failed"]
+                },
+                "eventNote": {
+                  "description": "Short context to display with this progress event. Required when status is failed.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "stage": {
+                  "type": "string",
+                  "const": "create_project",
+                  "description": "Report progress while creating or selecting Sentry projects."
+                },
+                "extra": {
+                  "description": "Project metadata accepted only by the create_project stage.",
+                  "type": "object",
+                  "properties": {
+                    "projectSlugs": {
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Sentry project slugs created or selected during onboarding. Values accumulate across updates; include each project as it becomes usable while active, then all known projects when completed."
+                    }
+                  },
+                  "required": ["projectSlugs"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["status", "stage"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "waiting",
+                    "completed",
+                    "skipped",
+                    "failed"
+                  ],
+                  "description": "The stage's current status."
+                },
+                "runStatus": {
+                  "description": "Set only when the entire onboarding run has completed or failed.",
+                  "type": "string",
+                  "enum": ["completed", "failed"]
+                },
+                "eventNote": {
+                  "description": "Short context to display with this progress event. Required when status is failed.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "stage": {
+                  "type": "string",
+                  "const": "receive_verification_error",
+                  "description": "Report progress while receiving the verification error in Sentry."
+                },
+                "extra": {
+                  "description": "Issue metadata accepted only by the receive_verification_error stage.",
+                  "type": "object",
+                  "properties": {
+                    "issueIds": {
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Sentry issue IDs observed after sending the verification error. Values accumulate across updates; include each matching issue as it is confirmed, then all known issues when completed."
+                    }
+                  },
+                  "required": ["issueIds"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["status", "stage"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "waiting",
+                    "completed",
+                    "skipped",
+                    "failed"
+                  ],
+                  "description": "The stage's current status."
+                },
+                "runStatus": {
+                  "description": "Set only when the entire onboarding run has completed or failed.",
+                  "type": "string",
+                  "enum": ["completed", "failed"]
+                },
+                "eventNote": {
+                  "description": "Short context to display with this progress event. Required when status is failed.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "stage": {
+                  "type": "string",
+                  "enum": [
+                    "connect_mcp",
+                    "analyze_project",
+                    "instrument_app",
+                    "plan_test_error",
+                    "send_verification_error",
+                    "prepare_production",
+                    "check_stack_trace_quality"
+                  ],
+                  "description": "Report progress for a stage that does not accept extra metadata."
+                }
+              },
+              "required": ["status", "stage"],
+              "additionalProperties": false
+            }
           ],
-          "description": "The onboarding stage being updated."
-        },
-        "status": {
-          "type": "string",
-          "enum": ["active", "waiting", "completed", "skipped", "failed"],
-          "description": "The stage's current status."
-        },
-        "runStatus": {
-          "description": "Set only when the entire onboarding run has completed or failed.",
-          "type": "string",
-          "enum": ["completed", "failed"]
-        },
-        "eventNote": {
-          "description": "Short context to display with this progress event. Required when status is failed.",
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
-        },
-        "projectSlugs": {
-          "description": "Validated Sentry project slugs. Send only for create_project. Values accumulate across updates; include each project as it becomes usable while active, then all known projects when completed.",
-          "minItems": 1,
-          "maxItems": 100,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "issueIds": {
-          "description": "Validated Sentry issue IDs returned by MCP. Send only for receive_verification_error. Values accumulate across updates; include each matching issue as it is confirmed, then all known issues when completed.",
-          "minItems": 1,
-          "maxItems": 100,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
+          "description": "The stage-specific onboarding progress update."
         }
       },
-      "required": ["organizationSlug", "runToken", "stage", "status"]
+      "required": ["organizationSlug", "runToken", "update"]
     },
     "requiredScopes": ["org:read"],
     "skills": ["inspect", "seer", "docs", "triage", "project-management"],

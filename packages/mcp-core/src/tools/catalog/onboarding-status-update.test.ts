@@ -36,13 +36,12 @@ describe("onboarding_status_update", () => {
             expiresAt: "2026-08-13T12:00:00Z",
             continueUpdates: true,
             runStatus: "active",
-            projectSlugs: ["private-project", "worker-project"],
-            issueIds: [],
             stages: [
               {
                 stage: "analyze_project",
                 status: "bypassed",
                 eventNote: null,
+                extra: null,
               },
             ],
           });
@@ -55,10 +54,12 @@ describe("onboarding_status_update", () => {
         organizationSlug: "sentry-mcp-evals",
         regionUrl: "https://us.sentry.io",
         runToken: "a1B2c3D4e5",
-        stage: "create_project",
-        status: "completed",
-        eventNote: "Project already existed.",
-        projectSlugs: ["private-project", "worker-project"],
+        update: {
+          stage: "create_project",
+          status: "completed",
+          eventNote: "Project already existed.",
+          extra: { projectSlugs: ["private-project", "worker-project"] },
+        },
       },
       context,
     );
@@ -69,7 +70,7 @@ describe("onboarding_status_update", () => {
       stage: "create_project",
       status: "completed",
       eventNote: "Project already existed.",
-      projectSlugs: ["private-project", "worker-project"],
+      extra: { projectSlugs: ["private-project", "worker-project"] },
     });
     expect(result).toMatchInlineSnapshot(
       `"Onboarding status updated. Continue updates: yes."`,
@@ -80,16 +81,44 @@ describe("onboarding_status_update", () => {
 
   it("does not accept the backend-derived bypassed status as input", () => {
     expect(
-      onboardingStatusUpdate.inputSchema.status.safeParse("bypassed").success,
+      onboardingStatusUpdate.inputSchema.update.safeParse({
+        stage: "connect_mcp",
+        status: "bypassed",
+      }).success,
     ).toBe(false);
     expect(onboardingStatusUpdate.inputSchema).not.toHaveProperty(
       "failureReason",
     );
     expect(
-      onboardingStatusUpdate.inputSchema.projectSlugs.safeParse([]).success,
+      onboardingStatusUpdate.inputSchema.update.safeParse({
+        stage: "create_project",
+        status: "completed",
+        extra: { projectSlugs: [] },
+      }).success,
     ).toBe(false);
     expect(
-      onboardingStatusUpdate.inputSchema.issueIds.safeParse([]).success,
+      onboardingStatusUpdate.inputSchema.update.safeParse({
+        stage: "receive_verification_error",
+        status: "completed",
+        extra: { issueIds: [] },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects metadata that does not belong to the stage", () => {
+    expect(
+      onboardingStatusUpdate.inputSchema.update.safeParse({
+        stage: "receive_verification_error",
+        status: "completed",
+        extra: { projectSlugs: ["private-project"] },
+      }).success,
+    ).toBe(false);
+    expect(
+      onboardingStatusUpdate.inputSchema.update.safeParse({
+        stage: "connect_mcp",
+        status: "completed",
+        extra: { issueIds: ["123"] },
+      }).success,
     ).toBe(false);
   });
 
@@ -100,15 +129,14 @@ describe("onboarding_status_update", () => {
           organizationSlug: "sentry-mcp-evals",
           regionUrl: null,
           runToken: "a1B2c3D4e5",
-          stage: "connect_mcp",
-          status: "completed",
+          update: { stage: "connect_mcp", status: "completed" },
         },
         context,
       ),
     ).resolves.toBe("Onboarding status updated. Continue updates: yes.");
   });
 
-  it("accepts nullable reference lists from the backend", async () => {
+  it("accepts nullable stage extras from the backend", async () => {
     mswServer.use(
       http.post(
         "https://us.sentry.io/api/0/organizations/sentry-mcp-evals/onboarding/agent/status/",
@@ -124,8 +152,6 @@ describe("onboarding_status_update", () => {
             expiresAt: "2026-08-13T12:00:00Z",
             continueUpdates: true,
             runStatus: "active",
-            projectSlugs: null,
-            issueIds: null,
             stages: [],
           }),
       ),
@@ -137,8 +163,7 @@ describe("onboarding_status_update", () => {
           organizationSlug: "sentry-mcp-evals",
           regionUrl: "https://us.sentry.io",
           runToken: "a1B2c3D4e5",
-          stage: "connect_mcp",
-          status: "completed",
+          update: { stage: "connect_mcp", status: "completed" },
         },
         context,
       ),
@@ -161,8 +186,6 @@ describe("onboarding_status_update", () => {
             expiresAt: "2026-08-13T12:00:00Z",
             continueUpdates: false,
             runStatus: "completed",
-            projectSlugs: [],
-            issueIds: [],
             stages: [],
           }),
       ),
@@ -174,9 +197,11 @@ describe("onboarding_status_update", () => {
           organizationSlug: "sentry-mcp-evals",
           regionUrl: "https://us.sentry.io",
           runToken: "a1B2c3D4e5",
-          stage: "check_stack_trace_quality",
-          status: "completed",
-          runStatus: "completed",
+          update: {
+            stage: "check_stack_trace_quality",
+            status: "completed",
+            runStatus: "completed",
+          },
         },
         context,
       ),
