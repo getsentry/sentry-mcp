@@ -834,6 +834,8 @@ async function generateAllSkillFiles(
     "",
     "Help users interact with Sentry from the command line using the `sentry` CLI.",
     "",
+    "> **Core rule for agents: just run the command.** The `sentry` CLI auto-detects your org and project (from `.sentryclirc`, DSNs in `.env`/source, and the directory name), so **do not** list organizations and then list their projects to work out which one this checkout maps to — that manual discovery only duplicates work the CLI already does on every command. Pass an explicit `<org>/<project>` only when the CLI reports it can't detect the target or picks the wrong one.",
+    "",
   ];
 
   // Agent guidance section — bump heading levels down by one so they nest
