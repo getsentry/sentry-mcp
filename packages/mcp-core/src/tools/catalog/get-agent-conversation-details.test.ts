@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import getAIConversationDetails from "./get-ai-conversation-details";
+import getAIConversationDetails from "./get-agent-conversation-details";
 import getSentryResource from "./get-sentry-resource";
 import {
   assertStructuredOnlyResult,
@@ -127,7 +127,7 @@ function mockConversationEndpoint(
   );
 }
 
-describe("get_ai_conversation_details", () => {
+describe("get_agent_conversation_details", () => {
   it("returns structured conversation details", async () => {
     mockConversationEndpoint(
       "test-org",
