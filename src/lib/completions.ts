@@ -262,11 +262,11 @@ export function generateBashCompletion(binaryName: string): string {
     .join("\n");
 
   const uniqueEnumFlags = [...new Set(enumFlagNames)];
-  const enumCaseEntries = uniqueEnumFlags.map((f) => `"${f}"`).join("|");
+  const enumFlagWords = uniqueEnumFlags.join(" ");
 
   // Build the enum flag test only if there are any enum flags
-  const enumBranch = enumCaseEntries
-    ? `elif [[ "\${prev}" == @(${enumCaseEntries}) ]]; then
+  const enumBranch = enumFlagWords
+    ? `elif [[ " ${enumFlagWords} " == *" \${prev} "* ]]; then
         # Enum value completion (static)
         local val_var="$(__${binaryName}_varname "\${cmd}")_$(__${binaryName}_varname "\${subcmd}")_$(__${binaryName}_varname "\${prev#--}")_values"
         if [[ -n "\${!val_var+x}" ]]; then

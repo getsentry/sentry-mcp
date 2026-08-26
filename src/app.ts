@@ -5,6 +5,8 @@ import {
   UnexpectedPositionalError,
   UnsatisfiedPositionalError,
 } from "@stricli/core";
+import { conversationRoute } from "./commands/agent-conversation/index.js";
+import { listCommand as conversationListCommand } from "./commands/agent-conversation/list.js";
 import { alertRoute } from "./commands/alert/index.js";
 import { apiCommand } from "./commands/api.js";
 import { authRoute } from "./commands/auth/index.js";
@@ -13,8 +15,6 @@ import { bashHookCommand } from "./commands/bash-hook.js";
 import { buildRoute } from "./commands/build/index.js";
 import { cliRoute } from "./commands/cli/index.js";
 import { codeMappingsRoute } from "./commands/code-mappings/index.js";
-import { conversationRoute } from "./commands/conversation/index.js";
-import { listCommand as conversationListCommand } from "./commands/conversation/list.js";
 import { dartSymbolMapRoute } from "./commands/dart-symbol-map/index.js";
 import { dashboardRoute } from "./commands/dashboard/index.js";
 import { listCommand as dashboardListCommand } from "./commands/dashboard/list.js";
@@ -87,7 +87,7 @@ import { buildRouteMap } from "./lib/route-map.js";
  * Used to suggest the correct command when users type e.g. `sentry projects view cli`.
  */
 const PLURAL_TO_SINGULAR: Record<string, string> = {
-  conversations: "conversation",
+  "agent-conversations": "agent-conversation",
   dashboards: "dashboard",
   events: "event",
   issues: "issue",
@@ -115,7 +115,7 @@ export const routes = buildRouteMap({
     build: buildRoute,
     cli: cliRoute,
     "code-mappings": codeMappingsRoute,
-    conversation: conversationRoute,
+    "agent-conversation": conversationRoute,
     "dart-symbol-map": dartSymbolMapRoute,
     "debug-files": debugFilesRoute,
     dashboard: dashboardRoute,
@@ -151,7 +151,7 @@ export const routes = buildRouteMap({
     "send-event": sendEventCommand,
     "send-envelope": sendEnvelopeCommand,
     "bash-hook": bashHookCommand,
-    conversations: conversationListCommand,
+    "agent-conversations": conversationListCommand,
     dashboards: dashboardListCommand,
     issues: issueListCommand,
     orgs: orgListCommand,
@@ -175,7 +175,7 @@ export const routes = buildRouteMap({
       "sentry is a command-line interface for interacting with Sentry. " +
       "It provides commands for authentication, viewing issues, and making API calls.",
     hideRoute: {
-      conversations: true,
+      "agent-conversations": true,
       dashboards: true,
       events: true,
       issues: true,

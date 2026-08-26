@@ -1,12 +1,12 @@
 /**
- * AI Conversations formatters
+ * Agent conversations formatters
  *
  * Human-readable formatting for conversation list and detail views.
  * Transcript parsing logic ported from sentry-mcp get-ai-conversation-details.
  */
 
 import type {
-  AIConversationSpan,
+  AgentConversationSpan,
   ConversationListItem,
 } from "../../types/conversation.js";
 import {
@@ -163,7 +163,7 @@ function numeric(value: string | number | null | undefined): number {
   return 0;
 }
 
-function getOperationType(span: AIConversationSpan): string | undefined {
+function getOperationType(span: AgentConversationSpan): string | undefined {
   const explicit = span["gen_ai.operation.type"];
   if (explicit) {
     return explicit;
@@ -274,7 +274,7 @@ function collectMessages(value: unknown): { role?: string; content: string }[] {
     .filter((m): m is { role?: string; content: string } => Boolean(m));
 }
 
-function extractUserContent(span: AIConversationSpan): string | null {
+function extractUserContent(span: AgentConversationSpan): string | null {
   const raw =
     span["gen_ai.input.messages"] ?? span["gen_ai.request.messages"] ?? null;
   if (!raw) {
@@ -288,7 +288,7 @@ function extractUserContent(span: AIConversationSpan): string | null {
   return userMsg?.content ?? messages.at(-1)?.content ?? null;
 }
 
-function extractAssistantContent(span: AIConversationSpan): string | null {
+function extractAssistantContent(span: AgentConversationSpan): string | null {
   const outputMessages = span["gen_ai.output.messages"];
   if (outputMessages) {
     if (outputMessages === "[Filtered]") {
@@ -304,7 +304,9 @@ function extractAssistantContent(span: AIConversationSpan): string | null {
   return span["gen_ai.response.text"] ?? span["gen_ai.response.object"] ?? null;
 }
 
-export function extractTurns(spans: AIConversationSpan[]): ConversationTurn[] {
+export function extractTurns(
+  spans: AgentConversationSpan[]
+): ConversationTurn[] {
   const sorted = [...spans].sort(
     (a, b) => a["precise.start_ts"] - b["precise.start_ts"]
   );
@@ -466,7 +468,7 @@ export function formatTranscriptResult(result: TranscriptResult): string {
   }
 
   const lines: string[] = [
-    `# AI Conversation: ${escapeMarkdownInline(result.conversationId)}`,
+    `# Agent Conversation: ${escapeMarkdownInline(result.conversationId)}`,
     "",
     mdKvTable(rows),
     "",
@@ -486,7 +488,7 @@ export function formatTranscriptResult(result: TranscriptResult): string {
 export function buildTranscriptResult(
   conversationId: string,
   org: string,
-  spans: AIConversationSpan[],
+  spans: AgentConversationSpan[],
   title: string | null = null
 ): TranscriptResult {
   const turns = extractTurns(spans);

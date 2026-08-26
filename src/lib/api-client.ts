@@ -6,7 +6,7 @@
  *
  * Domain modules live in `src/lib/api/` and are organized by entity:
  * - infrastructure: shared helpers, types, constants, raw request functions
- * - conversations: AI conversation listing and detail
+ * - conversations: agent conversation listing and detail
  * - organizations: org CRUD and region discovery
  * - projects: project CRUD, search, DSN keys
  * - teams: team CRUD, project teams

@@ -430,14 +430,14 @@ Manage code mappings for stack trace linking
 
 → Full flags and examples: `references/code-mappings.md`
 
-### Conversation
+### Agent-conversation
 
-List and view AI conversations
+List and view agent conversations
 
-- `sentry conversation list <org>` — List recent AI conversations
-- `sentry conversation view <org/conversation-id>` — View an AI conversation transcript
+- `sentry agent-conversation list <org>` — List recent agent conversations
+- `sentry agent-conversation view <org/conversation-id>` — View an agent conversation transcript
 
-→ Full flags and examples: `references/conversation.md`
+→ Full flags and examples: `references/agent-conversation.md`
 
 ### Dart-symbol-map
 

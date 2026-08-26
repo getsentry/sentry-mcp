@@ -1,7 +1,7 @@
 /**
  * Conversation View Command Tests
  *
- * Tests for the `sentry conversation view` command func() body, covering:
+ * Tests for the `sentry agent-conversation view` command func() body, covering:
  * - Resolving org + conversationId from a single `<org>/<conversation-id>` arg
  * - Resolving org via resolveOrg when only the conversation-id is given
  * - Throwing error when no args provided
@@ -13,7 +13,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { viewCommand } from "../../../src/commands/conversation/view.js";
+import { viewCommand } from "../../../src/commands/agent-conversation/view.js";
 
 vi.mock("../../../src/lib/api-client.js", async (importOriginal) => {
   const actual =
@@ -71,7 +71,7 @@ vi.mock("../../../src/lib/resolve-target.js", async (importOriginal) => {
 import { ContextError } from "../../../src/lib/errors.js";
 // biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
 import * as resolveTarget from "../../../src/lib/resolve-target.js";
-import type { AIConversationSpan } from "../../../src/types/conversation.js";
+import type { AgentConversationSpan } from "../../../src/types/conversation.js";
 
 // ============================================================================
 // Helpers
@@ -108,8 +108,8 @@ function mockWithProgress(
 }
 
 function makeSpan(
-  overrides: Partial<AIConversationSpan> = {}
-): AIConversationSpan {
+  overrides: Partial<AgentConversationSpan> = {}
+): AgentConversationSpan {
   return {
     "gen_ai.conversation.id": CONVERSATION_ID,
     span_id: "aabb112233445566",
@@ -131,7 +131,7 @@ function makeSpan(
   };
 }
 
-const sampleSpans: AIConversationSpan[] = [
+const sampleSpans: AgentConversationSpan[] = [
   makeSpan(),
   makeSpan({
     span_id: "ccdd112233445566",

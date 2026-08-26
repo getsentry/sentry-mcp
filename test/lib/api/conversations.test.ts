@@ -105,14 +105,14 @@ afterEach(() => {
 // ============================================================================
 
 describe("listConversations", () => {
-  test("hits /organizations/{org}/ai-conversations/ with GET", async () => {
+  test("hits /organizations/{org}/agents/conversations/ with GET", async () => {
     const { getCapturedUrl, getCapturedMethod } = mockOk([]);
 
     await listConversations(ORG);
 
     expect(getCapturedMethod()).toBe("GET");
     expect(getCapturedUrl()).toContain(
-      `/api/0/organizations/${ORG}/ai-conversations/`
+      `/api/0/organizations/${ORG}/agents/conversations/`
     );
   });
 
@@ -313,14 +313,14 @@ describe("getConversationSpans", () => {
     };
   }
 
-  test("hits /organizations/{org}/ai-conversations/{conversationId}/ with GET", async () => {
+  test("hits /organizations/{org}/agents/conversations/{conversationId}/ with GET", async () => {
     const { getCapturedUrl, getCapturedMethod } = mockOk(makeEnvelope([]));
 
     await getConversationSpans(ORG, CONV_ID);
 
     expect(getCapturedMethod()).toBe("GET");
     expect(getCapturedUrl()).toContain(
-      `/api/0/organizations/${ORG}/ai-conversations/${CONV_ID}/`
+      `/api/0/organizations/${ORG}/agents/conversations/${CONV_ID}/`
     );
   });
 
@@ -429,7 +429,7 @@ describe("getConversationSpans", () => {
     await getConversationSpans(ORG, specialId);
 
     expect(getCapturedUrl()).toContain(
-      `/ai-conversations/${encodeURIComponent(specialId)}/`
+      `/agents/conversations/${encodeURIComponent(specialId)}/`
     );
   });
 });
