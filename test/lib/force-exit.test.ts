@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import {
-  requestInitForceExit,
-  scheduleInitForceExitIfRequested,
-} from "../../../src/lib/init/force-exit.js";
+import { scheduleForceExit } from "../../src/lib/force-exit.js";
 
 const originalPlatform = process.platform;
 const originalNodeEnv = process.env.NODE_ENV;
@@ -17,12 +14,9 @@ function setPlatform(platform: NodeJS.Platform): void {
 beforeEach(() => {
   setPlatform("linux");
   process.env.NODE_ENV = "test";
-  scheduleInitForceExitIfRequested();
 });
 
 afterEach(() => {
-  process.env.NODE_ENV = "test";
-  scheduleInitForceExitIfRequested();
   vi.restoreAllMocks();
   setPlatform(originalPlatform);
   if (originalNodeEnv === undefined) {
@@ -32,16 +26,8 @@ afterEach(() => {
   }
 });
 
-describe("init force-exit safety net", () => {
-  test("does nothing until init requests the safety net", () => {
-    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
-
-    scheduleInitForceExitIfRequested();
-
-    expect(setTimeoutSpy).not.toHaveBeenCalled();
-  });
-
-  test("schedules the macOS safety net after the outer pipeline finishes", () => {
+describe("force-exit safety net", () => {
+  test("schedules an unref'd 100ms timer on macOS outside tests", () => {
     const unref = vi.fn();
     const timeout = { unref } as unknown as ReturnType<typeof setTimeout>;
     const setTimeoutSpy = vi
@@ -49,23 +35,29 @@ describe("init force-exit safety net", () => {
       .mockReturnValue(timeout);
     setPlatform("darwin");
     process.env.NODE_ENV = "production";
-    requestInitForceExit();
 
-    scheduleInitForceExitIfRequested();
+    scheduleForceExit();
 
     expect(setTimeoutSpy).toHaveBeenCalledOnce();
     expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 100);
     expect(unref).toHaveBeenCalledOnce();
   });
 
-  test("consumes requests without scheduling outside macOS", () => {
+  test("does nothing outside macOS", () => {
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
-    requestInitForceExit();
-
-    scheduleInitForceExitIfRequested();
-    setPlatform("darwin");
     process.env.NODE_ENV = "production";
-    scheduleInitForceExitIfRequested();
+
+    scheduleForceExit();
+
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+  });
+
+  test("does nothing in the test environment even on macOS", () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    setPlatform("darwin");
+    process.env.NODE_ENV = "test";
+
+    scheduleForceExit();
 
     expect(setTimeoutSpy).not.toHaveBeenCalled();
   });

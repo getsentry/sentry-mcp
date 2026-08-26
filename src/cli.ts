@@ -245,9 +245,7 @@ export async function runCli(cliArgs: string[]): Promise<void> {
   const { runInteractiveLogin } = await import("./lib/interactive-login.js");
   const { recoverWithAutoLogin } = await import("./lib/auto-auth.js");
   const { getEnvLogLevel, setLogLevel } = await import("./lib/logger.js");
-  const { scheduleInitForceExitIfRequested } = await import(
-    "./lib/init/force-exit.js"
-  );
+  const { scheduleForceExit } = await import("./lib/force-exit.js");
   const { isTrialEligible, promptAndStartTrial } = await import(
     "./lib/seer-trial.js"
   );
@@ -643,8 +641,9 @@ export async function runCli(cliArgs: string[]): Promise<void> {
     // Abort any pending version check to allow clean exit
     abortPendingVersionCheck();
     // Runs after auto-auth, scope recovery, and command retry have reached a
-    // terminal result, so the init-specific macOS timer cannot interrupt them.
-    scheduleInitForceExitIfRequested();
+    // terminal result, so the macOS/Bun force-exit timer cannot interrupt
+    // them. Covers every command, not just init (see #1237).
+    scheduleForceExit();
   }
 
   // Show update notification after command completes
