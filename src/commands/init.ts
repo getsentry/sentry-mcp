@@ -25,7 +25,6 @@ import { looksLikePath, parseOrgProjectArg } from "../lib/arg-parsing.js";
 import { buildCommand } from "../lib/command.js";
 import { refreshToken } from "../lib/db/auth.js";
 import { ContextError, ValidationError } from "../lib/errors.js";
-import { requestInitForceExit } from "../lib/init/force-exit.js";
 import { warmOrgDetection } from "../lib/init/org-prefetch.js";
 import { runWizard } from "../lib/init/wizard-runner.js";
 import { validateResourceId } from "../lib/input-validation.js";
@@ -419,10 +418,7 @@ export const initCommand = buildCommand<
       warmOrgDetection(targetDir);
     }
 
-    // 6. Run the wizard. The outer CLI pipeline schedules the macOS/Bun
-    // force-exit safety net after recovery middleware (including auto-auth)
-    // has finished, so it cannot interrupt login or command retry.
-    requestInitForceExit();
+    // 6. Run the wizard.
     await runWizard({
       directory: targetDir,
       yes: flags.yes,
