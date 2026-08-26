@@ -9,6 +9,8 @@
  *   - Primary Device Attributes (`ESC [ c`) — attribute `4` means sixel.
  *   - Text-area cell size (`ESC [ 16 t` → `ESC [ 6 ; H ; W t`) — used to check
  *     the fixed-pixel image actually fits the current column width.
+ *   - Kitty graphics query (`ESC _ G ... a=q ... ESC \`) — an `OK` reply means
+ *     the terminal speaks the newer kitty protocol, preferred over sixel.
  * The probe is gated behind an interactive TTY, honors plain-output/opt-out
  * signals, has a short timeout, restores terminal state, and never throws.
  * The result is cached for the process.
@@ -17,20 +19,26 @@
 import { execSync } from "node:child_process";
 import { closeSync, openSync, readSync, writeSync } from "node:fs";
 import { BANNER_SIXEL } from "../generated/banner-sixel.js";
+import { getGraphicsPreference } from "./db/defaults.js";
 import { getEnv } from "./env.js";
 import { isPlainOutput, isTruthyEnv } from "./formatters/plain-detect.js";
 
-/** Terminal sixel capabilities discovered by the probe. */
+/** Terminal graphics capabilities discovered by the probe. */
 export type SixelCaps = {
   /** True when the terminal advertised sixel support (DA1 attribute 4). */
   supported: boolean;
+  /**
+   * True when the terminal advertised kitty graphics support (it answered the
+   * graphics query with `OK`). Preferred over sixel when present.
+   */
+  kitty?: boolean;
   /** Character-cell width in pixels (from `CSI 16 t`), when reported. */
   cellWidth?: number;
   /** Character-cell height in pixels (from `CSI 16 t`), when reported. */
   cellHeight?: number;
 };
 
-/** Shared "no sixel" result. */
+/** Shared "no graphics" result. */
 const UNSUPPORTED: SixelCaps = { supported: false };
 
 /** Primary DA reply: `ESC [ ? <p;p;...> c` — attribute list; `4` == sixel. */
@@ -41,6 +49,17 @@ const DA1_RE = /\x1b\[\?([0-9;]*)c/;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: parsing terminal escapes
 const CELL_SIZE_RE = /\x1b\[6;(\d+);(\d+)t/;
 
+/** Kitty graphics query reply: `ESC _ G i=<id>;OK ESC \`. */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: parsing terminal escapes
+const KITTY_RE = /\x1b_G[^\x1b]*;OK/;
+
+/**
+ * Kitty graphics query. Uploads a 1×1 RGB pixel (`f=24`) directly (`t=d`) with
+ * `a=q` so the terminal only answers with support status and draws nothing. A
+ * kitty-capable terminal replies `ESC _ G i=31;OK ESC \`; others ignore it.
+ */
+const KITTY_QUERY = "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\";
+
 let cached: SixelCaps | undefined;
 
 /** Clear the cached probe result. Test-only. */
@@ -49,19 +68,24 @@ export function __resetSixelCache(): void {
 }
 
 /**
- * Parse a terminal's reply to the DA1 + cell-size queries.
+ * Parse a terminal's reply to the DA1 + cell-size + kitty queries.
  *
  * Pure and side-effect free so it can be unit-tested without a terminal.
- * Returns {@link UNSUPPORTED} unless the DA1 attribute list contains `4`.
+ * Returns {@link UNSUPPORTED} unless the DA1 attribute list contains `4`
+ * (sixel) or the terminal answered the kitty graphics query with `OK`.
  */
 export function parseSixelCaps(reply: string): SixelCaps {
   const da = reply.match(DA1_RE);
   const attrs = da?.[1]?.split(";") ?? [];
-  if (!attrs.includes("4")) {
+  const kitty = KITTY_RE.test(reply);
+  if (!(attrs.includes("4") || kitty)) {
     return UNSUPPORTED;
   }
+  const caps: SixelCaps = { supported: attrs.includes("4") };
+  if (kitty) {
+    caps.kitty = true;
+  }
   const size = reply.match(CELL_SIZE_RE);
-  const caps: SixelCaps = { supported: true };
   if (size) {
     caps.cellHeight = Number(size[1]);
     caps.cellWidth = Number(size[2]);
@@ -91,7 +115,7 @@ export function sixelFits(
  */
 export function optedOut(): boolean {
   // Use the isolation-aware env (matches isPlainOutput) so library/test runs
-  // that call setEnv() see consistent TERM / SENTRY_NO_SIXEL values.
+  // that call setEnv() see consistent TERM / SENTRY_NO_GRAPHICS values.
   const env = getEnv();
   return (
     !(process.stdout.isTTY && process.stdin.isTTY) ||
@@ -99,6 +123,7 @@ export function optedOut(): boolean {
     isPlainOutput() ||
     !env.TERM ||
     env.TERM === "dumb" ||
+    isTruthyEnv(env.SENTRY_NO_GRAPHICS ?? "") ||
     isTruthyEnv(env.SENTRY_NO_SIXEL ?? "")
   );
 }
@@ -159,8 +184,10 @@ function probe(): SixelCaps {
     savedStty = execSync("stty -g < /dev/tty", { encoding: "utf8" }).trim();
     // min 0 time 3 => each read blocks up to ~300ms for (more) reply bytes.
     execSync("stty -echo -icanon min 0 time 3 < /dev/tty");
-    // Cell-size query first, Primary DA last: DA's `c` is the drain sentinel.
-    writeSync(fd, "\x1b[16t\x1b[c");
+    // Cell-size and kitty queries first, Primary DA last: DA's `c` is the
+    // drain sentinel every terminal answers, so the optional cell-size and
+    // kitty replies (which capable terminals send ahead of it) are all drained.
+    writeSync(fd, `\x1b[16t${KITTY_QUERY}\x1b[c`);
     return parseSixelCaps(readReply(fd));
   } catch {
     return UNSUPPORTED;
@@ -192,7 +219,8 @@ export function detectSixelCaps(): SixelCaps {
 
 /**
  * True when the current terminal can display sixel graphics right now: it's an
- * interactive TTY, not opted out (plain-output / SENTRY_NO_SIXEL / non-unix),
+ * interactive TTY, not opted out (plain-output / SENTRY_NO_GRAPHICS /
+ * SENTRY_NO_SIXEL / non-unix), the persistent graphics=off default is not set,
  * and it advertised sixel support in the DA1 probe.
  *
  * Used by callers that render arbitrary images (not just the baked banner),
@@ -202,7 +230,28 @@ export function canRenderSixel(): boolean {
   if (optedOut()) {
     return false;
   }
+  if (getGraphicsPreference() === false) {
+    return false;
+  }
   return detectSixelCaps().supported;
+}
+
+/**
+ * True when the current terminal can display kitty graphics right now: it's an
+ * interactive TTY, not opted out (plain-output / SENTRY_NO_GRAPHICS /
+ * SENTRY_NO_SIXEL / non-unix), the persistent graphics=off default is not set,
+ * and it answered the kitty graphics query with `OK`. Newer terminals prefer
+ * this protocol, so callers rendering arbitrary images (e.g. `sentry api`
+ * attachments) check this before falling back to {@link canRenderSixel}.
+ */
+export function canRenderKitty(): boolean {
+  if (optedOut()) {
+    return false;
+  }
+  if (getGraphicsPreference() === false) {
+    return false;
+  }
+  return detectSixelCaps().kitty === true;
 }
 
 /**
@@ -219,7 +268,9 @@ export function terminalPixelWidth(
   columns: number = process.stdout.columns ?? 80
 ): number | undefined {
   const caps = detectSixelCaps();
-  if (!(caps.supported && caps.cellWidth && caps.cellWidth > 0)) {
+  if (
+    !((caps.supported || caps.kitty) && caps.cellWidth && caps.cellWidth > 0)
+  ) {
     return;
   }
   return columns * caps.cellWidth;
@@ -236,7 +287,9 @@ export function terminalPixelHeight(
   rows: number = process.stdout.rows ?? 24
 ): number | undefined {
   const caps = detectSixelCaps();
-  if (!(caps.supported && caps.cellHeight && caps.cellHeight > 0)) {
+  if (
+    !((caps.supported || caps.kitty) && caps.cellHeight && caps.cellHeight > 0)
+  ) {
     return;
   }
   return rows * caps.cellHeight;
@@ -255,6 +308,9 @@ export function sixelBanner(
   // SENTRY_PLAIN_OUTPUT, SENTRY_NO_SIXEL, or a non-TTY stream) still suppresses
   // the image even if capabilities were cached as supported earlier.
   if (optedOut()) {
+    return;
+  }
+  if (getGraphicsPreference() === false) {
     return;
   }
   const caps = detectSixelCaps();

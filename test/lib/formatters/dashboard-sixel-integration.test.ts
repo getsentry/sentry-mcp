@@ -65,29 +65,22 @@ function makeDashboardData(
 }
 
 describe("dashboard sixel integration", () => {
-  let savedSixelEnv: string | undefined;
   let savedPlainOutput: string | undefined;
   let savedColumns: number | undefined;
 
   beforeEach(() => {
-    savedSixelEnv = process.env.SENTRY_DASHBOARD_SIXEL;
     savedPlainOutput = process.env.SENTRY_PLAIN_OUTPUT;
     savedColumns = process.stdout.columns;
-    process.env.SENTRY_DASHBOARD_SIXEL = "1";
     process.env.SENTRY_PLAIN_OUTPUT = "0";
     process.stdout.columns = 40;
     vi.spyOn(sixelModule, "canRenderSixel").mockReturnValue(true);
+    vi.spyOn(sixelModule, "canRenderKitty").mockReturnValue(false);
     vi.spyOn(sixelModule, "terminalPixelWidth").mockReturnValue(320);
     vi.spyOn(sixelModule, "terminalPixelHeight").mockReturnValue(12);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    if (savedSixelEnv === undefined) {
-      delete process.env.SENTRY_DASHBOARD_SIXEL;
-    } else {
-      process.env.SENTRY_DASHBOARD_SIXEL = savedSixelEnv;
-    }
     if (savedPlainOutput === undefined) {
       delete process.env.SENTRY_PLAIN_OUTPUT;
     } else {
@@ -114,23 +107,22 @@ describe("dashboard sixel integration", () => {
     expect(output).toContain('"1;1;320;144');
   });
 
-  test("uses displayType=timeseries_sixel as an opt-in signal", () => {
+  test("prefers kitty encoding when the terminal supports it", () => {
+    vi.spyOn(sixelModule, "canRenderKitty").mockReturnValue(true);
     const data = makeDashboardData({
       widgets: [
         makeWidget({
-          title: "Explicit Sixel",
-          displayType: "timeseries_sixel",
+          title: "Kitty Chart",
+          displayType: "line",
           layout: { x: 0, y: 0, w: 6, h: 2 },
         }),
       ],
     });
-    // Disable the env flag so only the displayType triggers sixel rendering.
-    delete process.env.SENTRY_DASHBOARD_SIXEL;
 
     const output = formatDashboardWithData(data);
-    expect(output).toContain(`${ESC}P`);
-    expect(output).toContain(`${ESC}\\`);
-    expect(output.split(`${ESC}P`)).toHaveLength(2);
+    // Kitty graphics use the APC introducer ESC _ G, not the sixel DCS ESC P.
+    expect(output).toContain(`${ESC}_G`);
+    expect(output).not.toContain(`${ESC}P`);
   });
 
   test("renders scalar and timeseries widgets in the same sixel canvas", () => {

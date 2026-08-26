@@ -15,9 +15,14 @@ import { OutputError, ValidationError } from "../lib/errors.js";
 import { filterFields } from "../lib/formatters/json.js";
 import { CommandOutput } from "../lib/formatters/output.js";
 import { validateEndpoint } from "../lib/input-validation.js";
+import { imageBytesToKitty } from "../lib/kitty-image.js";
 import { logger } from "../lib/logger.js";
 import { getDefaultSdkConfig } from "../lib/sentry-client.js";
-import { canRenderSixel, terminalPixelWidth } from "../lib/sixel.js";
+import {
+  canRenderKitty,
+  canRenderSixel,
+  terminalPixelWidth,
+} from "../lib/sixel.js";
 import { imageBytesToSixel } from "../lib/sixel-image.js";
 
 const log = logger.withTag("api");
@@ -1299,36 +1304,43 @@ export function resolveApiResponseOutput(
 
 /**
  * For a binary response headed to an interactive TTY, either render it inline
- * as a sixel image (when it's a supported image format and the terminal
- * advertises sixel support) or warn that raw bytes are being dumped.
+ * as an image (when it's a supported format and the terminal advertises a
+ * graphics protocol) or warn that raw bytes are being dumped. Newer terminals
+ * that speak the kitty protocol are preferred; sixel is the fallback.
  *
  * @param body - The raw response bytes.
  * @param headers - Response headers (Content-Type is used as a decode hint).
- * @param allowSixel - Whether inline sixel rendering is permitted. Pass `false`
- *   in `--json` mode: the raw bytes still stream out unchanged, but injecting a
- *   sixel escape sequence would corrupt machine-readable output. The raw-dump
- *   warning still fires so the user knows their terminal is about to be flooded.
- * @returns A sixel escape string to write instead of the raw bytes, or
+ * @param allowGraphics - Whether inline image rendering is permitted. Pass
+ *   `false` in `--json` mode: the raw bytes still stream out unchanged, but
+ *   injecting a graphics escape sequence would corrupt machine-readable output.
+ *   The raw-dump warning still fires so the user knows their terminal is about
+ *   to be flooded.
+ * @returns A graphics escape string to write instead of the raw bytes, or
  *   `undefined` to fall through to the raw-byte behavior.
  * @internal Exported for testing
  */
 export function resolveBinaryTtyOutput(
   body: Uint8Array,
   headers: Headers,
-  allowSixel = true
+  allowGraphics = true
 ): string | undefined {
-  if (allowSixel && canRenderSixel()) {
+  if (allowGraphics) {
     // Cap the rendered width to the terminal's pixel budget so a wide image
     // doesn't overflow the columns and garble the session. Falls back to the
     // encoder's default when the terminal didn't report a cell width.
     const maxWidth = terminalPixelWidth();
-    const sixel = imageBytesToSixel(
-      body,
-      headers.get("content-type"),
-      maxWidth
-    );
-    if (sixel) {
-      return sixel;
+    const contentType = headers.get("content-type");
+    if (canRenderKitty()) {
+      const kitty = imageBytesToKitty(body, contentType, maxWidth);
+      if (kitty) {
+        return kitty;
+      }
+    }
+    if (canRenderSixel()) {
+      const sixel = imageBytesToSixel(body, contentType, maxWidth);
+      if (sixel) {
+        return sixel;
+      }
     }
   }
 

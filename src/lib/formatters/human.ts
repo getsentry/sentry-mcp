@@ -2507,6 +2507,7 @@ const DEFAULT_LABELS: Record<string, string> = {
   project: "Project",
   telemetry: "Telemetry",
   "agent-skills": "Agent Skills",
+  graphics: "Graphics",
   url: "URL",
   headers: "Headers",
   "ca-cert": "CA Certificate",
@@ -2532,6 +2533,7 @@ function buildDefaultsShowRows(data: DefaultsResult): [string, string][] {
   const notSet = colorTag("muted", "not set");
   const telLabel = d.telemetry ?? "on (default)";
   const agentSkillsLabel = d["agent-skills"] ?? "on (default)";
+  const graphicsLabel = d.graphics ?? "on (default)";
 
   return [
     ["Organization", d.organization ? safeCodeSpan(d.organization) : notSet],
@@ -2541,6 +2543,7 @@ function buildDefaultsShowRows(data: DefaultsResult): [string, string][] {
       `${escapeMarkdownInline(String(telLabel))}${telemetryOverrideNote(data.telemetryEffective)}`,
     ],
     ["Agent Skills", escapeMarkdownInline(String(agentSkillsLabel))],
+    ["Graphics", escapeMarkdownInline(String(graphicsLabel))],
     ["URL", d.url ? safeCodeSpan(d.url) : notSet],
     ["Headers", d.headers ? safeCodeSpan(d.headers) : notSet],
     ["CA Certificate", d["ca-cert"] ? safeCodeSpan(d["ca-cert"]) : notSet],

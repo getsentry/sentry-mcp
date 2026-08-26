@@ -140,6 +140,7 @@ describe("defaults storage", () => {
       url: "https://sentry.example.com",
       headers: null,
       "ca-cert": null,
+      graphics: null,
     });
   });
 
@@ -153,6 +154,7 @@ describe("defaults storage", () => {
       url: null,
       headers: null,
       "ca-cert": null,
+      graphics: null,
     });
   });
 
@@ -414,6 +416,7 @@ describe("formatDefaultsResult", () => {
         organization: "my-org",
         project: "my-proj",
         telemetry: "off",
+        graphics: "off",
         url: "https://sentry.example.com",
       },
       telemetryEffective: { enabled: false, source: "preference" },
@@ -422,6 +425,7 @@ describe("formatDefaultsResult", () => {
     expect(plain).toContain("my-org");
     expect(plain).toContain("my-proj");
     expect(plain).toContain("off");
+    expect(plain).toContain("Graphics");
     expect(plain).toContain("sentry.example.com");
   });
 

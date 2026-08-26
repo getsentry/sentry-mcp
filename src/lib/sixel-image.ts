@@ -50,14 +50,14 @@ const ALPHA_THRESHOLD = 128;
  * downscaled so the sixel fits a typical terminal and stays small. Height is
  * scaled proportionally.
  */
-const DEFAULT_MAX_WIDTH = 800;
+export const DEFAULT_MAX_WIDTH = 800;
 
 /**
  * Default cap on the rendered pixel height. Long screenshots (narrow but very
  * tall) would otherwise skip width-based downscaling entirely and produce a
  * huge escape sequence with heavy CPU/memory cost, so height is bounded too.
  */
-const DEFAULT_MAX_HEIGHT = 2000;
+export const DEFAULT_MAX_HEIGHT = 2000;
 
 /**
  * Hard ceiling on either declared image dimension, checked from the header
