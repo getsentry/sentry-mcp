@@ -54,7 +54,6 @@ type ViewFlags = {
   readonly period?: TimeRange;
   readonly json: boolean;
   readonly fields?: string[];
-  readonly sixel: boolean;
 };
 
 /**
@@ -108,7 +107,7 @@ function buildViewData(
   },
   widgetResults: Map<number, WidgetDataResult>,
   widgets: DashboardWidget[],
-  opts: { period: string; url: string; sixel: boolean }
+  opts: { period: string; url: string }
 ): DashboardViewData {
   return {
     id: dashboard.id,
@@ -118,7 +117,6 @@ function buildViewData(
     url: opts.url,
     dateCreated: dashboard.dateCreated,
     environment: dashboard.environment,
-    sixel: opts.sixel,
     widgets: widgets.map((w, i) => ({
       title: w.title,
       displayType: w.displayType,
@@ -190,11 +188,6 @@ export const viewCommand = buildCommand({
         brief: "Open in browser",
         default: false,
       },
-      sixel: {
-        kind: "boolean",
-        brief: "Render the dashboard as a sixel image",
-        default: false,
-      },
       fresh: FRESH_FLAG,
       refresh: {
         kind: "parsed",
@@ -213,7 +206,6 @@ export const viewCommand = buildCommand({
     aliases: {
       ...FRESH_ALIASES,
       w: "web",
-      s: "sixel",
       r: "refresh",
       t: "period",
     },
@@ -294,7 +286,6 @@ export const viewCommand = buildCommand({
           const viewData = buildViewData(dashboard, widgetData, widgets, {
             period: formatTimeRangeFlag(timeRange),
             url,
-            sixel: flags.sixel,
           });
 
           if (!isFirstRender) {
@@ -326,7 +317,6 @@ export const viewCommand = buildCommand({
       buildViewData(dashboard, widgetData, widgets, {
         period: formatTimeRangeFlag(timeRange),
         url,
-        sixel: flags.sixel,
       })
     );
     return { hint: `Dashboard: ${url}` };

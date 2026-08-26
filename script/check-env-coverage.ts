@@ -60,10 +60,6 @@ const INTERNAL_ENV_VARS = new Map<string, string>([
     "internal scanner performance tuning, not user-facing",
   ],
   [
-    "SENTRY_DASHBOARD_SIXEL",
-    "internal sixel debug toggle; users use the --sixel flag",
-  ],
-  [
     "SENTRY_CLI_INTEGRATION_TEST_VERSION_OVERRIDE",
     "integration-test-only version override",
   ],

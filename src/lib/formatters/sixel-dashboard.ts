@@ -9,7 +9,7 @@
  */
 
 import type { WidgetDataResult } from "../../types/dashboard.js";
-import { encodeImageToSixel } from "../sixel-image.js";
+import { type DecodedImage, encodeImageToSixel } from "../sixel-image.js";
 import {
   buildCategoricalChartModel,
   buildChartModel,
@@ -90,6 +90,11 @@ export type RenderSixelDashboardOptions = {
     innerWidth: number,
     contentHeight: number
   ) => string[];
+  /**
+   * Encode the finished RGBA canvas to a terminal graphics escape string.
+   * Defaults to sixel; callers pass a kitty encoder on kitty-capable terminals.
+   */
+  encodeImage?: (image: DecodedImage) => string | undefined;
 };
 
 /** A widget paired with the layout used for the final composite. */
@@ -123,7 +128,9 @@ export function renderDashboardAsSixel(
   }
   // The canvas is already bounded by MAX_CANVAS_PIXELS and must match the
   // terminal width exactly to preserve the dashboard grid.
-  return encodeImageToSixel(image, image.width, true);
+  const encode =
+    options.encodeImage ?? ((img) => encodeImageToSixel(img, img.width, true));
+  return encode(image);
 }
 
 /** Place layout-less widgets beneath the explicit dashboard grid. */
