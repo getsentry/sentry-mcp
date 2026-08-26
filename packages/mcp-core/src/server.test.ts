@@ -1403,7 +1403,7 @@ describe("buildServer", () => {
     it("execute_sentry_tool dispatches structured catalog results", async () => {
       mswServer.use(
         http.get(
-          "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+          "https://sentry.io/api/0/organizations/test-org/agents/conversations/",
           ({ request }) => {
             const url = new URL(request.url);
             expect(url.searchParams.get("query")).toBe("checkout");
