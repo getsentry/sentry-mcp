@@ -85,7 +85,7 @@ sentry local -f error -f log    # only errors and logs
 
 Use `--quiet` to suppress tail output entirely if you only need the SSE stream.
 
-## Agent monitoring
+## Agent tracing
 
 `sentry local` shows rich output for AI agent spans when your SDK instruments with [OpenTelemetry semantic attributes](https://opentelemetry.io/docs/specs/semconv/gen-ai/):
 

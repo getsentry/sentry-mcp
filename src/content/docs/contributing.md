@@ -52,12 +52,12 @@ cli/
 │   ├── app.ts          # Stricli application setup
 │   ├── context.ts      # Dependency injection context
 │   ├── commands/       # CLI commands
+│   │   ├── agent-conversation/# list, view
 │   │   ├── alert/       # create, delete, edit, list, view
 │   │   ├── auth/        # login, logout, refresh, status, token, whoami
 │   │   ├── build/       # download, upload
 │   │   ├── cli/         # completion, defaults, feedback, fix, import, setup, uninstall, upgrade
 │   │   ├── code-mappings/# upload
-│   │   ├── conversation/# list, view
 │   │   ├── dart-symbol-map/# upload
 │   │   ├── dashboard/   # add, create, delete, edit, list, restore, revisions, view
 │   │   ├── debug-files/ # bundle-jvm, bundle-sources, check, find, print-sources, upload
