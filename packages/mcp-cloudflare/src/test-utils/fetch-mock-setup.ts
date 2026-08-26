@@ -356,6 +356,36 @@ export function registerFetchMockInterceptors(fetchMock: FetchMockLike) {
       .reply(200, eventFixture, { headers: JSON_HEADERS })
       .persist();
 
+    // ===== Event Attachments =====
+    pool
+      .intercept({
+        path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/d49541c747cb4d8aa3efb70ca5aba244/attachments/",
+      })
+      .reply(
+        200,
+        [
+          {
+            id: "456",
+            name: "attachment.bin",
+            type: "event.attachment",
+            size: 17,
+            mimetype: "application/octet-stream",
+            dateCreated: "2025-04-08T21:15:04.000Z",
+          },
+        ],
+        { headers: JSON_HEADERS },
+      )
+      .persist();
+
+    pool
+      .intercept({
+        path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/d49541c747cb4d8aa3efb70ca5aba244/attachments/456/?download=1",
+      })
+      .reply(200, "binary attachment", {
+        headers: { "Content-Type": "application/octet-stream" },
+      })
+      .persist();
+
     // ===== Traces =====
     pool
       .intercept({

@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import type { McpServer as LegacyMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import { type Span, setUser, startSpan } from "@sentry/core";
 import { mswServer } from "@sentry/mcp-server-mocks";
@@ -81,7 +82,7 @@ async function listRegisteredTools(server: ReturnType<typeof buildServer>) {
 }
 
 async function callRegisteredTool(
-  server: ReturnType<typeof buildServer>,
+  server: LegacyMcpServer | ModernMcpServer,
   name: string,
   args: Record<string, unknown>,
 ) {
@@ -187,6 +188,48 @@ describe("buildServer", () => {
     ).resolves.toMatchObject({
       content: [{ type: "text", text: "v2:ok" }],
     });
+  });
+
+  it("returns attachment bytes through the SDK v2 catalog execution path", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/d49541c747cb4d8aa3efb70ca5aba244/attachments/456/",
+        () =>
+          new HttpResponse(new Blob(["binary attachment"]), {
+            headers: { "content-type": "application/octet-stream" },
+          }),
+        { once: true },
+      ),
+    );
+
+    const server = buildServer({
+      context: baseContext,
+      sdkVersion: "v2",
+    });
+
+    const result = await callRegisteredTool(server, "execute_sentry_tool", {
+      name: "get_event_attachment",
+      arguments: {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        eventId: "d49541c747cb4d8aa3efb70ca5aba244",
+        attachmentId: "456",
+      },
+    });
+
+    expect(result).not.toMatchObject({ isError: true });
+    expect(result.content).toEqual(
+      expect.arrayContaining([
+        {
+          type: "resource",
+          resource: {
+            uri: "file://screenshot.png",
+            mimeType: "application/octet-stream",
+            blob: "YmluYXJ5IGF0dGFjaG1lbnQ=",
+          },
+        },
+      ]),
+    );
   });
 
   describe("telemetry context", () => {

@@ -406,6 +406,51 @@ describe("MCP Handler", () => {
       });
     });
 
+    it("returns binary attachment bytes in the HTTP MCP response", async () => {
+      const request = createMcpRequest("tools/call", {
+        name: "execute_sentry_tool",
+        arguments: {
+          name: "get_event_attachment",
+          arguments: {
+            organizationSlug: "sentry-mcp-evals",
+            projectSlug: "cloudflare-mcp",
+            eventId: "d49541c747cb4d8aa3efb70ca5aba244",
+            attachmentId: "456",
+          },
+        },
+      });
+      const ctx = {
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn(),
+      } as unknown as ExecutionContext;
+
+      const response = await handleSentryBearerMcpRequest(
+        request,
+        createTestEnv(),
+        ctx,
+        "sntryu_test-token",
+      );
+
+      expect(response.status).toBe(200);
+      const body = await parseSSEResponse<{
+        result: {
+          content: Array<{
+            type: string;
+            resource?: { blob?: string; mimeType?: string; uri?: string };
+          }>;
+        };
+      }>(response);
+
+      expect(body.result.content).toContainEqual({
+        type: "resource",
+        resource: {
+          uri: "file://attachment.bin",
+          mimeType: "application/octet-stream",
+          blob: "YmluYXJ5IGF0dGFjaG1lbnQ=",
+        },
+      });
+    });
+
     it("applies the Sentry-Bearer MCP rate limit per token", async () => {
       const mockTokenRateLimiter = {
         limit: vi.fn().mockResolvedValue({ success: true }),
