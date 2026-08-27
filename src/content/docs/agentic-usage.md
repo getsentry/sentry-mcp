@@ -9,17 +9,40 @@ AI coding agents can use the Sentry CLI through the skill system. The CLI detect
 
 When you install the CLI (via `curl`, Homebrew, or a package manager), `sentry cli setup` automatically installs agent skills into any detected agent root directories (`~/.claude`, `~/.agents`). Skills are also refreshed on `sentry cli upgrade`. No network fetch is needed — skill files are embedded in the binary.
 
+This uses the same `~/.agents` convention as [dotagents](https://github.com/getsentry/dotagents), Sentry's first-party tool for installing agent skills. See [Manual Installation](#manual-installation) to add the skill with dotagents yourself.
+
 To skip automatic skill installation, pass `--no-agent-skills` to `sentry cli setup`.
 
 ## Manual Installation
 
-Add the Sentry CLI skill to your agent manually:
+### dotagents (recommended)
+
+[dotagents](https://github.com/getsentry/dotagents) is Sentry's first-party tool for installing agent skills. It configures Claude, Cursor, Codex, Grok, VS Code, OpenCode, and more from a single `agents.toml`.
+
+Add the Sentry CLI skill from its well-known source:
+
+```bash
+npx @sentry/dotagents add https://cli.sentry.dev sentry-cli
+```
+
+This installs the skill globally under `~/.agents/` and makes it available across all your projects. The first `add` bootstraps `~/.agents/agents.toml` for you — no `init` step is required.
+
+To install the skill for a single repository instead, initialize project scope first, then add it:
+
+```bash
+npx @sentry/dotagents --project init
+npx @sentry/dotagents --project add https://cli.sentry.dev sentry-cli
+```
+
+### skills
+
+Alternatively, use the `skills` CLI:
 
 ```bash
 npx skills add https://cli.sentry.dev
 ```
 
-This registers the Sentry CLI as a skill that your agent can invoke when needed.
+Either command registers the Sentry CLI as a skill that your agent can invoke when needed.
 
 ## Capabilities
 
