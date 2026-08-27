@@ -25,6 +25,7 @@ import {
   formatIssueOutput,
   parseIssueParams,
 } from "../../internal/tool-helpers/issue";
+import { markdownResult } from "../../internal/tool-helpers/results";
 import {
   ParamEventId,
   ParamIssueShortId,
@@ -124,7 +125,9 @@ export default defineTool({
           query: eventId,
         });
         if (!found) {
-          return `# Event Not Found\n\nNo issue found for Event ID: ${eventId}`;
+          return markdownResult({
+            markdown: `# Event Not Found\n\nNo issue found for Event ID: ${eventId}`,
+          });
         }
         issue = found;
       }

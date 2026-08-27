@@ -1,9 +1,10 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { isTopLevelToolName } from "../../tools/surfaces";
+import { markdownResult } from "./results";
 import {
   formatToolCall,
   isToolAvailableInSession,
 } from "./tool-call-formatting";
-import { isTopLevelToolName } from "../../tools/surfaces";
 
 const MAX_SUGGESTED_ACTIONS = 3;
 
@@ -143,9 +144,11 @@ export function formatAIConversationActionInstructions({
 }
 
 /**
- * Adds concrete transcript follow-ups to otherwise markdown-first results.
- * The markdown remains the compatibility path for clients that do not read
- * structured content.
+ * Packs markdown-first issue/trace answers into structuredContent.
+ *
+ * content keeps handwritten markdown for content-first clients. structuredContent
+ * always includes that same markdown so structured-preferring clients still receive
+ * the primary answer. Optional suggestedActions are attached beside it.
  */
 export function addAIConversationSuggestedActions({
   markdown,
@@ -161,7 +164,7 @@ export function addAIConversationSuggestedActions({
   experimentalMode: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
-}): string | CallToolResult {
+}): CallToolResult {
   const suggestedActions = getAIConversationSuggestedActions({
     organizationSlug,
     aiConversations,
@@ -170,13 +173,11 @@ export function addAIConversationSuggestedActions({
     directToolNames,
   });
   if (suggestedActions.length === 0) {
-    return markdown;
+    return markdownResult({ markdown });
   }
 
-  return {
-    content: [{ type: "text", text: markdown }],
-    structuredContent: {
-      suggestedActions,
-    },
-  };
+  return markdownResult({
+    markdown,
+    suggestedActions,
+  });
 }

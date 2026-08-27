@@ -135,8 +135,11 @@ trace-scoped spans queries that use `trace:<trace_id>`.
 
 When issue or trace detail output identifies agent conversation IDs, it should
 surface a `suggestedActions` structured-content hint when the required follow-up
-is callable in the current session. If `get_agent_conversation_details` is only
-available through the catalog, the action must call `execute_sentry_tool` with
+is callable in the current session. Issue and trace detail results always pack
+the primary markdown answer into `structuredContent.markdown` as well, so
+structured-preferring clients do not lose the answer when actions are present.
+If `get_agent_conversation_details` is only available through the catalog, the
+action must call `execute_sentry_tool` with
 `name: "get_agent_conversation_details"` and the target arguments; only use the
 catalog tool name directly when it is exposed through `tools/list`. Emit either
 action only when its direct tool surface is available. The markdown `Response

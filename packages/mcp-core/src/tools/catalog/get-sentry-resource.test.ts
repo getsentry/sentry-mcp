@@ -7,9 +7,14 @@ import {
   transactionProfileV1Fixture,
 } from "@sentry/mcp-server-mocks";
 import { encode as encodePng } from "fast-png";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { getTextContent } from "../../test-utils/structured-content";
 import getSentryResource from "./get-sentry-resource.js";
+
+function resultText(result: unknown): string {
+  return typeof result === "string" ? result : getTextContent(result);
+}
 
 const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
 const originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
@@ -149,10 +154,10 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41",
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "Error: Tool list_organizations is already registered",
       );
     });
@@ -161,7 +166,7 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: "https://sentry.io/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41",
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
     });
@@ -170,7 +175,7 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: "https://sentry.io/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41",
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
     });
@@ -179,7 +184,7 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41/",
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
     });
@@ -191,10 +196,10 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41/events/7ca573c0f4814912aaa9bdc77d1a7d51",
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "**Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51",
       );
     });
@@ -203,7 +208,7 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: "https://sentry.io/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/7ca573c0f4814912aaa9bdc77d1a7d51",
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "**Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51",
       );
     });
@@ -234,8 +239,10 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: `https://test-org.sentry.io/explore/traces/trace/${traceId}`,
       });
-      expect(result).toContain(`# Trace \`${traceId}\` in **test-org**`);
-      expect(result).toContain("**Total Spans**: 112");
+      expect(resultText(result)).toContain(
+        `# Trace \`${traceId}\` in **test-org**`,
+      );
+      expect(resultText(result)).toContain("**Total Spans**: 112");
     });
 
     it("resolves trace from /performance/trace/{traceId}", async () => {
@@ -243,7 +250,9 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: `https://test-org.sentry.io/performance/trace/${traceId}`,
       });
-      expect(result).toContain(`# Trace \`${traceId}\` in **test-org**`);
+      expect(resultText(result)).toContain(
+        `# Trace \`${traceId}\` in **test-org**`,
+      );
     });
 
     it("resolves trace with span focus query param", async () => {
@@ -251,13 +260,13 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: `https://test-org.sentry.io/performance/trace/${traceId}?node=span-aa8e7f3343113fbf`,
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         `# Span \`aa8e7f3343113fbf\` in Trace \`${traceId}\` in **test-org**`,
       );
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "POST https://api.openai.com/v1/chat/completions [http.client · 1708ms · ad0f7c486cc0c787]",
       );
-      expect(result).toContain("### Tags");
+      expect(resultText(result)).toContain("### Tags");
     });
 
     it("resolves trace from /organizations/{org}/ path", async () => {
@@ -265,7 +274,9 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: `https://sentry.io/organizations/test-org/explore/traces/trace/${traceId}`,
       });
-      expect(result).toContain(`# Trace \`${traceId}\` in **test-org**`);
+      expect(resultText(result)).toContain(
+        `# Trace \`${traceId}\` in **test-org**`,
+      );
     });
 
     it("returns traces under an active project constraint", async () => {
@@ -289,7 +300,9 @@ describe("get_sentry_resource", () => {
         },
       );
 
-      expect(result).toContain(`# Trace \`${traceId}\` in **test-org**`);
+      expect(resultText(result)).toContain(
+        `# Trace \`${traceId}\` in **test-org**`,
+      );
     });
   });
 
@@ -300,11 +313,11 @@ describe("get_sentry_resource", () => {
         url: `https://my-org.sentry.io/explore/profiling/profile/backend/${transactionProfileV1Fixture.profile_id}/flamegraph/`,
       });
 
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         `# Profile ${transactionProfileV1Fixture.profile_id}`,
       );
-      expect(result).toContain("**Project**: backend");
-      expect(result).toContain("**Transaction**: /api/users");
+      expect(resultText(result)).toContain("**Project**: backend");
+      expect(resultText(result)).toContain("**Transaction**: /api/users");
     });
 
     it("dispatches transaction profile URLs with organizations path", async () => {
@@ -312,10 +325,10 @@ describe("get_sentry_resource", () => {
         url: `https://sentry.io/organizations/my-org/profiling/profile/backend/${transactionProfileV1Fixture.profile_id}/flamegraph/?frameName=handle_request`,
       });
 
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         `# Profile ${transactionProfileV1Fixture.profile_id}`,
       );
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "**Trace ID**: a4d1aae7216b47ff8117cf4e09ce9d0a",
       );
     });
@@ -325,10 +338,10 @@ describe("get_sentry_resource", () => {
         url: "https://my-org.sentry.io/profiling/profile/backend/flamegraph/?profilerId=041bde57b9844e36b8b7e5734efae5f7&start=2024-01-01T00:00:00Z&end=2024-01-01T01:00:00Z",
       });
 
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "# Continuous Profile 041bde57b9844e36b8b7e5734efae5f7",
       );
-      expect(result).toContain("## Raw Sample Analysis");
+      expect(resultText(result)).toContain("## Raw Sample Analysis");
     });
 
     it("rejects profile URLs outside the active constrained project", async () => {
@@ -357,10 +370,10 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: `https://sentry-mcp-evals.sentry.io/replays/${replayDetailsFixture.id}/`,
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         `# Replay ${replayDetailsFixture.id} in **sentry-mcp-evals**`,
       );
-      expect(result).toContain("Clicked submit order");
+      expect(resultText(result)).toContain("Clicked submit order");
     });
 
     it("dispatches monitor URL with a simple slug to get_monitor_details", async () => {
@@ -374,8 +387,10 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: "https://my-org.sentry.io/crons/daily-backup/",
       });
-      expect(result).toContain("# Monitor daily-backup in **my-org**");
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
+        "# Monitor daily-backup in **my-org**",
+      );
+      expect(resultText(result)).toContain(
         "[Open Monitor](https://my-org.sentry.io/crons/backend/daily-backup/)",
       );
     });
@@ -392,8 +407,10 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: "https://my-org.sentry.io/crons/my-project/my-monitor/",
       });
-      expect(result).toContain("# Monitor my-monitor in **my-org**");
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
+        "# Monitor my-monitor in **my-org**",
+      );
+      expect(resultText(result)).toContain(
         "[Open Monitor](https://my-org.sentry.io/crons/my-project/my-monitor/)",
       );
     });
@@ -421,8 +438,10 @@ describe("get_sentry_resource", () => {
         },
       );
 
-      expect(result).toContain("# Monitor my-monitor in **my-org**");
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
+        "# Monitor my-monitor in **my-org**",
+      );
+      expect(resultText(result)).toContain(
         "[Open Monitor](https://my-org.sentry.io/crons/backend/my-monitor/)",
       );
     });
@@ -501,8 +520,10 @@ describe("get_sentry_resource", () => {
         },
       );
 
-      expect(result).toContain("# Monitor my-monitor in **my-org**");
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
+        "# Monitor my-monitor in **my-org**",
+      );
+      expect(resultText(result)).toContain(
         "[Open Monitor](https://my-org.sentry.io/crons/backend/my-monitor/)",
       );
     });
@@ -511,7 +532,7 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: "https://my-org.sentry.io/releases/v1.2.3/",
       });
-      expect(result).toMatchInlineSnapshot(`
+      expect(resultText(result)).toMatchInlineSnapshot(`
         "# Release Detected
 
         **Organization**: my-org
@@ -529,7 +550,7 @@ describe("get_sentry_resource", () => {
       const result = await callHandler({
         url: "https://my-org.sentry.io/releases/backend@2024.01.15-abc123/",
       });
-      expect(result).toMatchInlineSnapshot(`
+      expect(resultText(result)).toMatchInlineSnapshot(`
         "# Release Detected
 
         **Organization**: my-org
@@ -565,7 +586,7 @@ describe("get_sentry_resource", () => {
           sentryProtocol: "http",
         },
       );
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "[Open Monitor](http://sentry.internal:9000/organizations/my-org/crons/backend/daily-backup/)",
       );
     });
@@ -584,7 +605,7 @@ describe("get_sentry_resource", () => {
           sentryProtocol: "http",
         },
       );
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "[Open Release](http://sentry.internal:9000/organizations/my-org/releases/v1.2.3/)",
       );
     });
@@ -626,7 +647,7 @@ describe("get_sentry_resource", () => {
         url: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41",
         resourceType: "issue",
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
     });
@@ -649,7 +670,7 @@ describe("get_sentry_resource", () => {
         organizationSlug: "sentry-mcp-evals",
         resourceId: "CLOUDFLARE-MCP-41",
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
     });
@@ -660,7 +681,7 @@ describe("get_sentry_resource", () => {
         organizationSlug: "sentry-mcp-evals",
         resourceId: "cloudflare-mcp-41",
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
     });
@@ -671,13 +692,13 @@ describe("get_sentry_resource", () => {
         organizationSlug: "sentry-mcp-evals",
         resourceId: "7ca573c0f4814912aaa9bdc77d1a7d51",
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "**Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51",
       );
-      expect(result).toContain("**user.geo**: US, United States");
+      expect(resultText(result)).toContain("**user.geo**: US, United States");
     });
 
     it("fetches trace by traceId", async () => {
@@ -702,9 +723,11 @@ describe("get_sentry_resource", () => {
         organizationSlug: "test-org",
         resourceId: traceId,
       });
-      expect(result).toContain(`# Trace \`${traceId}\` in **test-org**`);
-      expect(result).toContain("**Total Spans**: 112");
-      expect(result).toContain("**Errors**: 0");
+      expect(resultText(result)).toContain(
+        `# Trace \`${traceId}\` in **test-org**`,
+      );
+      expect(resultText(result)).toContain("**Total Spans**: 112");
+      expect(resultText(result)).toContain("**Errors**: 0");
     });
 
     it("fetches replay by replayId", async () => {
@@ -713,10 +736,10 @@ describe("get_sentry_resource", () => {
         organizationSlug: "sentry-mcp-evals",
         resourceId: replayDetailsFixture.id,
       });
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         `# Replay ${replayDetailsFixture.id} in **sentry-mcp-evals**`,
       );
-      expect(result).toContain("Clicked submit order");
+      expect(resultText(result)).toContain("Clicked submit order");
     });
 
     it("fetches snapshot by snapshot ID", async () => {
@@ -755,18 +778,18 @@ describe("get_sentry_resource", () => {
         organizationSlug: "sentry",
         resourceId: "55",
       });
-      expect(result).toContain("# Snapshot 55 in **sentry**");
-      expect(result).toContain(
+      expect(resultText(result)).toContain("# Snapshot 55 in **sentry**");
+      expect(resultText(result)).toContain(
         "**URL**: https://sentry.sentry.io/preprod/snapshots/55/",
       );
-      expect(result).toContain("**Images**: 0 total");
-      expect(result).toContain(
+      expect(resultText(result)).toContain("**Images**: 0 total");
+      expect(resultText(result)).toContain(
         "Use the Sentry tool `get_snapshot_image` to view a specific image preview",
       );
-      expect(result).toContain(
+      expect(resultText(result)).toContain(
         "- Use the Sentry tool `get_snapshot_image` to fetch original full-resolution image bytes",
       );
-      expect(result).not.toContain("?selectedSnapshot=");
+      expect(resultText(result)).not.toContain("?selectedSnapshot=");
     });
 
     it("fetches snapshot by URL and preserves no-diff image inventory compatibility", async () => {
@@ -801,10 +824,12 @@ describe("get_sentry_resource", () => {
         url: "https://sentry.sentry.io/preprod/snapshots/55/",
       });
 
-      expect(result).toContain("# Snapshot 55 in **sentry**");
-      expect(result).toContain("**Snapshot Images:**");
-      expect(result).toContain("no_change_login.png — No Change Login — auth");
-      expect(result).toContain(
+      expect(resultText(result)).toContain("# Snapshot 55 in **sentry**");
+      expect(resultText(result)).toContain("**Snapshot Images:**");
+      expect(resultText(result)).toContain(
+        "no_change_login.png — No Change Login — auth",
+      );
+      expect(resultText(result)).toContain(
         "Use the Sentry tool `get_snapshot_image` to view a specific image preview",
       );
     });
@@ -979,7 +1004,7 @@ describe("get_sentry_resource", () => {
         organizationSlug: "my-org",
         resourceId: "something",
       });
-      expect(result).toContain("# Replay something in **my-org**");
+      expect(resultText(result)).toContain("# Replay something in **my-org**");
     });
   });
 

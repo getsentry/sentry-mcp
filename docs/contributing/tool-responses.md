@@ -123,19 +123,21 @@ handle, or machine-readable projection of the same result. The current MCP spec
 defines `structuredContent` as a JSON object on `CallToolResult`, and
 `outputSchema` as the schema for that object:
 
-- Choose one response contract per tool: handwritten markdown or
-  `structuredContent`. Do not hand-write markdown and also return a large
-  structured projection from the handler.
-- Exception: markdown tools may include a small `structuredContent` object for
-  documented continuation hints, such as `suggestedActions`, when the markdown
-  remains the canonical human-readable result.
+- Prefer packing the primary answer into `structuredContent`.
+- Data tools should use `structuredResult(payload)`. The server generates
+  `content` as pretty JSON of that same payload.
+- Markdown-primary tools (for example issue/trace details) may keep handwritten
+  markdown in `content`, but must still put the answer on
+  `structuredContent`. Use `markdownResult({ markdown, ...extras })`, which
+  always includes `markdown` in `structuredContent` and may attach small
+  continuation fields such as `suggestedActions`.
+- Do not return sparse hint-only `structuredContent` (for example
+  `suggestedActions` alone) without the primary answer. Structured-preferring
+  clients can promote that field and drop text `content`.
 - If a tool declares `outputSchema`, every successful `structuredContent` result
   must conform to that schema.
-- Return structured results with `structuredResult(payload)`. The server
-  generates `content` as a compatibility fallback from the same payload.
-- When a markdown tool also returns hint-only `structuredContent`, return a full
-  `CallToolResult` with both handwritten `content` and the hint object. Do not
-  use `structuredResult(payload)` for that mixed response.
+- Do not use `structuredResult(payload)` for mixed markdown + structured
+  responses; that helper is structured-only.
 - Do not duplicate a large structured payload into a markdown artifact block.
 - Treat `structuredContent` as a stable product contract, not a raw upstream API
   passthrough. Map only documented fields that callers should depend on.

@@ -1,12 +1,12 @@
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { http, HttpResponse } from "msw";
 import {
   mswServer,
+  traceFixture,
   traceMetaFixture,
   traceMetaWithNullsFixture,
-  traceFixture,
   traceMixedFixture,
 } from "@sentry/mcp-server-mocks";
+import { HttpResponse, http } from "msw";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import {
   getStructuredContent,
   getTextContent,
@@ -156,7 +156,7 @@ describe("get_trace_details", () => {
         userId: "1",
       },
     );
-    expect(result).toMatchInlineSnapshot(`
+    expect(getTextContent(result)).toMatchInlineSnapshot(`
       "# Trace \`a4d1aae7216b47ff8117cf4e09ce9d0a\` in **sentry-mcp-evals**
 
       ## Summary
@@ -242,11 +242,11 @@ describe("get_trace_details", () => {
         userId: "1",
       },
     );
-    expect(result).toContain(
+    expect(getTextContent(result)).toContain(
       "Trace `a4d1aae7216b47ff8117cf4e09ce9d0a` in **sentry-mcp-evals**",
     );
-    expect(result).toContain("**Total Spans**: 112");
-    expect(result).toContain(
+    expect(getTextContent(result)).toContain("**Total Spans**: 112");
+    expect(getTextContent(result)).toContain(
       "**Search spans**: Use the Sentry tool `search_events`",
     );
   });
@@ -272,7 +272,7 @@ describe("get_trace_details", () => {
       },
     );
 
-    expect(result).toContain(
+    expect(getTextContent(result)).toContain(
       "**Search spans**: Use the Sentry tool `search_events`",
     );
   });
@@ -301,12 +301,16 @@ describe("get_trace_details", () => {
       },
     );
 
-    expect(result).toContain("**Search spans**: Span search is not available");
-    expect(result).toContain(
+    expect(getTextContent(result)).toContain(
+      "**Search spans**: Span search is not available",
+    );
+    expect(getTextContent(result)).toContain(
       "**Search errors**: Error search is not available",
     );
-    expect(result).toContain("**Search logs**: Log search is not available");
-    expect(result).not.toContain("search_events(");
+    expect(getTextContent(result)).toContain(
+      "**Search logs**: Log search is not available",
+    );
+    expect(getTextContent(result)).not.toContain("search_events(");
   });
 
   it("handles trace not found error", async () => {
@@ -382,8 +386,8 @@ describe("get_trace_details", () => {
       },
     );
 
-    expect(result).toContain("**Total Spans**: 112");
-    expect(result).not.toContain("**Scope**:");
+    expect(getTextContent(result)).toContain("**Total Spans**: 112");
+    expect(getTextContent(result)).not.toContain("**Scope**:");
   });
 
   it("handles empty trace response", async () => {
@@ -424,11 +428,11 @@ describe("get_trace_details", () => {
       },
     );
 
-    expect(result).toContain("**Total Spans**: 0");
-    expect(result).toContain("**Errors**: 0");
-    expect(result).toContain("## Summary");
-    expect(result).not.toContain("## Operation Breakdown");
-    expect(result).not.toContain("## Overview");
+    expect(getTextContent(result)).toContain("**Total Spans**: 0");
+    expect(getTextContent(result)).toContain("**Errors**: 0");
+    expect(getTextContent(result)).toContain("## Summary");
+    expect(getTextContent(result)).not.toContain("## Operation Breakdown");
+    expect(getTextContent(result)).not.toContain("## Overview");
   });
 
   it("handles trace meta responses with missing count fields", async () => {
@@ -464,10 +468,10 @@ describe("get_trace_details", () => {
       },
     );
 
-    expect(result).toContain("**Total Spans**: 0");
-    expect(result).toContain("**Errors**: 0");
-    expect(result).toContain("**Performance Issues**: 0");
-    expect(result).toContain("**Logs**: 0");
+    expect(getTextContent(result)).toContain("**Total Spans**: 0");
+    expect(getTextContent(result)).toContain("**Errors**: 0");
+    expect(getTextContent(result)).toContain("**Performance Issues**: 0");
+    expect(getTextContent(result)).toContain("**Logs**: 0");
   });
 
   it("handles API error gracefully", async () => {
@@ -532,10 +536,10 @@ describe("get_trace_details", () => {
       },
     );
 
-    expect(result).toContain(
+    expect(getTextContent(result)).toContain(
       "Trace `a4d1aae7216b47ff8117cf4e09ce9d0a` in **sentry-mcp-evals**",
     );
-    expect(result).toContain("**Total Spans**: 112");
+    expect(getTextContent(result)).toContain("**Total Spans**: 112");
   });
 
   it("handles trace meta with null transaction.event_id values", async () => {
@@ -570,14 +574,14 @@ describe("get_trace_details", () => {
     );
 
     // The handler should successfully process the response with null values
-    expect(result).toContain(
+    expect(getTextContent(result)).toContain(
       "Trace `a4d1aae7216b47ff8117cf4e09ce9d0a` in **sentry-mcp-evals**",
     );
-    expect(result).toContain("**Total Spans**: 85");
-    expect(result).toContain("**Errors**: 2");
+    expect(getTextContent(result)).toContain("**Total Spans**: 85");
+    expect(getTextContent(result)).toContain("**Errors**: 2");
     // The null transaction.event_id entries should be handled gracefully
     // and the trace should still be processed successfully
-    expect(result).not.toContain("null");
+    expect(getTextContent(result)).not.toContain("null");
   });
 
   it("handles mixed span/issue arrays in trace responses", async () => {
@@ -618,7 +622,7 @@ describe("get_trace_details", () => {
       },
     );
 
-    expect(result).toMatchInlineSnapshot(`
+    expect(getTextContent(result)).toMatchInlineSnapshot(`
       "# Trace \`b4d1aae7216b47ff8117cf4e09ce9d0b\` in **sentry-mcp-evals**
 
       ## Summary
@@ -704,16 +708,17 @@ describe("get_trace_details", () => {
     );
 
     const text = getTextContent(result);
-    expect(
-      getStructuredContent<{
-        suggestedActions: Array<{
-          type: string;
-          toolName: string;
-          arguments: Record<string, unknown>;
-          reason: string;
-        }>;
-      }>(result),
-    ).toEqual({
+    const structuredContent = getStructuredContent<{
+      markdown: string;
+      suggestedActions: Array<{
+        type: string;
+        toolName: string;
+        arguments: Record<string, unknown>;
+        reason: string;
+      }>;
+    }>(result);
+    expect(structuredContent.markdown).toBe(text);
+    expect(structuredContent).toMatchObject({
       suggestedActions: [
         {
           type: "tool_call",
@@ -1297,9 +1302,11 @@ describe("get_trace_details", () => {
       },
     );
 
-    expect(result).toContain(`# Span \`${spanId}\` in Trace \`${traceId}\``);
-    expect(result).toContain("Late span in a large trace");
-    expect(result).toContain("**Trace Total Spans**: 2000");
+    expect(getTextContent(result)).toContain(
+      `# Span \`${spanId}\` in Trace \`${traceId}\``,
+    );
+    expect(getTextContent(result)).toContain("Late span in a large trace");
+    expect(getTextContent(result)).toContain("**Trace Total Spans**: 2000");
   });
 
   it("reports a partial fetch when a focused span is missing from a large trace", async () => {
@@ -1387,7 +1394,7 @@ describe("get_trace_details", () => {
       },
     );
 
-    expect(result).toMatchInlineSnapshot(`
+    expect(getTextContent(result)).toMatchInlineSnapshot(`
       "# Span \`aa8e7f3384ef4ff5\` in Trace \`b4d1aae7216b47ff8117cf4e09ce9d0b\` in **sentry-mcp-evals**
 
       ## Summary
