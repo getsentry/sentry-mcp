@@ -9,7 +9,6 @@
 
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { imageSize } from "image-size";
 import { ValidationError } from "../errors.js";
 import { logger } from "../logger.js";
 import { walkFiles } from "../scan/walker.js";
@@ -30,6 +29,101 @@ export const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([
 const WALK_EXTENSIONS: ReadonlySet<string> = new Set(
   [...IMAGE_EXTENSIONS].map((ext) => `.${ext}`)
 );
+
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const JPEG_SIGNATURE = Buffer.from([0xff, 0xd8]);
+
+/** Read dimensions from a PNG header, or return undefined for another format. */
+function readPngDimensions(
+  content: Buffer
+): { width: number; height: number } | undefined {
+  if (
+    content.length >= 24 &&
+    content.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE) &&
+    content.toString("ascii", 12, 16) === "IHDR"
+  ) {
+    const width = content.readUInt32BE(16);
+    const height = content.readUInt32BE(20);
+    if (width > 0 && height > 0) {
+      return { width, height };
+    }
+  }
+}
+
+/** Return whether a JPEG marker contains a baseline or progressive frame. */
+function isJpegFrameMarker(marker: number): boolean {
+  return (
+    (marker >= 0xc0 && marker <= 0xc3) ||
+    (marker >= 0xc5 && marker <= 0xc7) ||
+    (marker >= 0xc9 && marker <= 0xcb) ||
+    (marker >= 0xcd && marker <= 0xcf)
+  );
+}
+
+/** Read a JPEG segment and return dimensions when it contains a frame. */
+function readJpegSegment(
+  content: Buffer,
+  offset: number,
+  marker: number
+): { width: number; height: number } | undefined {
+  const segmentLength = content.readUInt16BE(offset);
+  if (segmentLength < 2 || offset + segmentLength > content.length) {
+    throw new Error("Invalid JPEG segment");
+  }
+  if (isJpegFrameMarker(marker) && segmentLength >= 7) {
+    const height = content.readUInt16BE(offset + 3);
+    const width = content.readUInt16BE(offset + 5);
+    if (width > 0 && height > 0) {
+      return { width, height };
+    }
+  }
+  return;
+}
+
+/** Read dimensions from a JPEG header, or return undefined for another format. */
+function readJpegDimensions(
+  content: Buffer
+): { width: number; height: number } | undefined {
+  if (content.length < 4 || !content.subarray(0, 2).equals(JPEG_SIGNATURE)) {
+    return;
+  }
+  let offset = 2;
+  while (offset + 4 <= content.length) {
+    if (content[offset] !== 0xff) {
+      throw new Error("Invalid JPEG marker");
+    }
+    const marker = content[offset + 1];
+    if (marker === undefined) {
+      throw new Error("Invalid JPEG marker");
+    }
+    offset += 2;
+    if (marker === 0xd8 || marker === 0xd9) {
+      continue;
+    }
+    if (marker === 0xda) {
+      throw new Error("JPEG dimensions not found");
+    }
+    const dimensions = readJpegSegment(content, offset, marker);
+    if (dimensions) {
+      return dimensions;
+    }
+    const segmentLength = content.readUInt16BE(offset);
+    offset += segmentLength;
+  }
+  return;
+}
+
+/** Read dimensions from the PNG/JPEG headers accepted by snapshot uploads. */
+function readImageDimensions(content: Buffer): {
+  width: number;
+  height: number;
+} {
+  const dimensions = readPngDimensions(content) ?? readJpegDimensions(content);
+  if (dimensions) {
+    return dimensions;
+  }
+  throw new Error("Unsupported or malformed image");
+}
 
 /** Maximum pixels (width × height) allowed per image. */
 export const MAX_PIXELS_PER_IMAGE = 40_000_000;
@@ -104,7 +198,7 @@ export async function collectImages(dir: string): Promise<CollectedImage[]> {
     let width: number | undefined;
     let height: number | undefined;
     try {
-      const size = imageSize(content);
+      const size = readImageDimensions(content);
       width = size.width;
       height = size.height;
     } catch (err) {

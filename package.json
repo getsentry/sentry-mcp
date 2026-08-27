@@ -117,7 +117,6 @@
     "hono": "^4.12.34",
     "http-cache-semantics": "^4.2.0",
     "ignore": "^7.0.5",
-    "image-size": "^2.0.2",
     "ink": "^7.1.0",
     "ink-spinner": "^5.0.0",
     "jpeg-js": "^0.4.4",
