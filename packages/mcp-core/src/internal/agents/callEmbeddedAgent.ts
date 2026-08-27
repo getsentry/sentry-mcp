@@ -4,12 +4,87 @@ import {
   type Tool,
   APICallError,
   NoObjectGeneratedError,
+  NoOutputGeneratedError,
+  RetryError,
   stepCountIs,
 } from "ai";
 import { getAgentProvider } from "./provider-factory";
-import { UserInputError, LLMProviderError } from "../../errors";
-import { logWarn } from "../../telem/logging";
+import {
+  AgentExecutionError,
+  ConfigurationError,
+  UserInputError,
+  LLMProviderError,
+} from "../../errors";
+import { logIssue, logWarn } from "../../telem/logging";
 import type { z } from "zod";
+
+/**
+ * Resolve the underlying provider failure from an AI SDK error.
+ *
+ * After retries, the SDK wraps retryable 5xx/network failures in RetryError.
+ * Prefer the last error, then walk earlier errors for the first APICallError.
+ */
+function resolveProviderApiCallError(error: unknown): APICallError | null {
+  if (APICallError.isInstance(error)) {
+    return error;
+  }
+
+  if (!RetryError.isInstance(error)) {
+    return null;
+  }
+
+  if (APICallError.isInstance(error.lastError)) {
+    return error.lastError;
+  }
+
+  for (let i = error.errors.length - 1; i >= 0; i--) {
+    const candidate = error.errors[i];
+    if (APICallError.isInstance(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function toLLMProviderError(
+  error: APICallError,
+  originalError: unknown = error,
+): LLMProviderError {
+  // OpenAI region restriction error - provide specific helpful message
+  if (error.message.includes("Country, region, or territory not supported")) {
+    return new LLMProviderError(
+      "The AI provider (OpenAI) does not support requests from your region. " +
+        "This is a restriction imposed by OpenAI on certain countries and territories. " +
+        "Please contact support if you believe this is an error.",
+      { cause: originalError },
+    );
+  }
+
+  const statusCode = error.statusCode;
+
+  // 4xx: account/config/budget/rate-limit style failures
+  if (statusCode && statusCode >= 400 && statusCode < 500) {
+    return new LLMProviderError(
+      `The AI provider returned an error: ${error.message}. This may be a configuration, quota, or account issue with the upstream AI provider.`,
+      { cause: originalError },
+    );
+  }
+
+  // 5xx / missing status (network, timeouts): treat as provider outage so
+  // tool handlers can fall back instead of failing the parent MCP tool.
+  if (!statusCode || statusCode >= 500) {
+    return new LLMProviderError(
+      `The AI provider is currently unavailable${statusCode ? ` (HTTP ${statusCode})` : ""}: ${error.message}. Please try again later.`,
+      { cause: originalError },
+    );
+  }
+
+  return new LLMProviderError(
+    `The AI provider returned an error: ${error.message}. This may be a configuration, quota, or account issue with the upstream AI provider.`,
+    { cause: originalError },
+  );
+}
 
 export type ToolCall = {
   toolName: string;
@@ -76,7 +151,10 @@ export async function callEmbeddedAgent<
     });
 
     if (!result.experimental_output) {
-      throw new Error("Failed to generate output");
+      // Same user-visible failure mode as AI SDK NoOutputGeneratedError.
+      throw new NoOutputGeneratedError({
+        message: "No output generated.",
+      });
     }
 
     const rawOutput = result.experimental_output;
@@ -132,33 +210,66 @@ export async function callEmbeddedAgent<
       );
     }
 
-    // Handle LLM provider errors with user-friendly messages
-    // These are user-facing errors that should NOT be reported to Sentry
-    if (APICallError.isInstance(error)) {
-      // OpenAI region restriction error - provide specific helpful message
-      if (
-        error.message.includes("Country, region, or territory not supported")
-      ) {
-        throw new LLMProviderError(
-          "The AI provider (OpenAI) does not support requests from your region. " +
-            "This is a restriction imposed by OpenAI on certain countries and territories. " +
-            "Please contact support if you believe this is an error.",
-        );
-      }
-
-      // All 4xx errors are user-facing (account issues, rate limits, invalid keys, etc.)
-      // These should be shown to the user, not reported to Sentry
-      const statusCode = error.statusCode;
-      if (statusCode && statusCode >= 400 && statusCode < 500) {
-        throw new LLMProviderError(
-          `The AI provider returned an error: ${error.message}. This may be a configuration or account issue. Please check your AI provider settings.`,
-        );
-      }
+    // Handle LLM provider errors with user-friendly messages.
+    // These are operational availability failures that should NOT create Sentry
+    // issues per request (budget exhaustion, rate limits, provider outages).
+    // Also unwrap RetryError: after maxRetries the AI SDK wraps retryable
+    // 5xx/network failures so bare APICallError checks alone would miss them.
+    const providerError = resolveProviderApiCallError(error);
+    if (providerError) {
+      throw toLLMProviderError(providerError, error);
     }
 
-    // Re-throw 5xx and other errors to be handled by the caller (logged to Sentry)
-    throw error;
+    // RetryError without an underlying APICallError is still a provider outage
+    // (timeouts/network after retries) and should degrade the same way.
+    if (RetryError.isInstance(error)) {
+      throw new LLMProviderError(
+        `The AI provider is currently unavailable: ${error.message}. Please try again later.`,
+        { cause: error },
+      );
+    }
+
+    // Expected application errors thrown above (schema/user-input/config paths)
+    // must keep their original type so callers do not treat them as unexpected.
+    // ConfigurationError can come from provider.getProviderOptions() (e.g. bad
+    // OPENROUTER_REASONING_EFFORT) and must surface, not silently fall back.
+    if (
+      error instanceof UserInputError ||
+      error instanceof ConfigurationError ||
+      error instanceof LLMProviderError ||
+      error instanceof AgentExecutionError
+    ) {
+      throw error;
+    }
+
+    // Unexpected agent failures (including NoOutputGeneratedError): file one
+    // Sentry issue, then throw a typed error so AI-powered tools can fall back
+    // or return a graceful response instead of hard-failing the MCP tool.
+    throw toAgentExecutionError(error);
   }
+}
+
+function toAgentExecutionError(error: unknown): AgentExecutionError {
+  const eventId = logIssue(error, {
+    loggerScope: ["agents", "embedded"],
+    contexts: {
+      embeddedAgent: {
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        isNoOutputGenerated: NoOutputGeneratedError.isInstance(error),
+      },
+    },
+  });
+
+  const detail =
+    error instanceof Error && error.message
+      ? error.message
+      : "An unexpected error occurred while running the AI agent.";
+
+  return new AgentExecutionError(
+    `The AI agent failed to complete this request: ${detail}`,
+    { cause: error, eventId },
+  );
 }
 
 function extractBalancedJsonObjects(text: string): string[] {

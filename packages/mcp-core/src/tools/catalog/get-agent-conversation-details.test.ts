@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import getAIConversationDetails from "./get-ai-conversation-details";
+import getAIConversationDetails from "./get-agent-conversation-details";
 import getSentryResource from "./get-sentry-resource";
 import {
   assertStructuredOnlyResult,
@@ -115,20 +115,19 @@ function mockConversationEndpoint(
 ) {
   mswServer.use(
     http.get(
-      `https://sentry.io/api/0/organizations/${org}/ai-conversations/${conversationId}/`,
+      `https://sentry.io/api/0/organizations/${org}/agents/conversations/${conversationId}/`,
       ({ request }) => {
         const url = new URL(request.url);
         expect(url.searchParams.get("statsPeriod")).toBe("30d");
         expect(url.searchParams.get("per_page")).toBe("1000");
         expect(url.searchParams.get("project")).toBe("-1");
-        expect(url.searchParams.get("apiVersion")).toBe("2");
         return HttpResponse.json({ conversationId, title, spans });
       },
     ),
   );
 }
 
-describe("get_ai_conversation_details", () => {
+describe("get_agent_conversation_details", () => {
   it("returns structured conversation details", async () => {
     mockConversationEndpoint(
       "test-org",
@@ -539,7 +538,7 @@ describe("get_ai_conversation_details", () => {
   it("preserves scoped query parameters from conversation URLs", async () => {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/ai-conversations/conv-123/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/agents/conversations/conv-123/",
         ({ request }) => {
           const url = new URL(request.url);
           expect(url.searchParams.get("statsPeriod")).toBeNull();
@@ -548,7 +547,6 @@ describe("get_ai_conversation_details", () => {
           );
           expect(url.searchParams.get("end")).toBe("2026-05-23T02:34:56.137Z");
           expect(url.searchParams.get("project")).toBe("4510944073809921");
-          expect(url.searchParams.get("apiVersion")).toBe("2");
           return HttpResponse.json({
             conversationId: "conv-123",
             title: null,
@@ -576,7 +574,7 @@ describe("get_ai_conversation_details", () => {
   it("describes explicit lookup windows when no spans are found", async () => {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/ai-conversations/conv-empty/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/agents/conversations/conv-empty/",
         ({ request }) => {
           const url = new URL(request.url);
           expect(url.searchParams.get("statsPeriod")).toBeNull();
@@ -584,7 +582,6 @@ describe("get_ai_conversation_details", () => {
             "2026-05-23T00:23:27.667Z",
           );
           expect(url.searchParams.get("end")).toBe("2026-05-23T02:34:56.137Z");
-          expect(url.searchParams.get("apiVersion")).toBe("2");
           return HttpResponse.json({
             conversationId: "conv-empty",
             title: null,

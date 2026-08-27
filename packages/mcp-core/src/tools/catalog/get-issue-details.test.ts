@@ -13,6 +13,7 @@ import {
 } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
+import type { Skill } from "../../skills";
 import {
   getStructuredContent,
   getTextContent,
@@ -566,7 +567,7 @@ describe("get_issue_details", () => {
     },
   );
 
-  it("surfaces AI conversation IDs found by bounded span lookup", async () => {
+  it("surfaces agent conversation IDs found by bounded span lookup", async () => {
     const traceId = "11112222333344445555666677778888";
     const event = createDefaultEvent({
       contexts: {
@@ -631,10 +632,10 @@ describe("get_issue_details", () => {
 
     const text = getTextContent(result);
     expect(text).toContain(
-      "- AI conversation found in this trace: `conv-123`. Matching span: `span-123`.",
+      "- Agent conversation found in this trace: `conv-123`. Matching span: `span-123`.",
     );
     expect(text).toContain(
-      '- Use the Sentry tool `execute_sentry_tool(name=\'get_ai_conversation_details\', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})` to fetch the full transcript.',
+      '- Use the Sentry tool `execute_sentry_tool(name=\'get_agent_conversation_details\', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})` to fetch the full transcript.',
     );
     expect(
       getStructuredContent<{
@@ -651,13 +652,13 @@ describe("get_issue_details", () => {
           type: "tool_call",
           toolName: "execute_sentry_tool",
           arguments: {
-            name: "get_ai_conversation_details",
+            name: "get_agent_conversation_details",
             arguments: {
               organizationSlug: "sentry-mcp-evals",
               conversationId: "conv-123",
             },
           },
-          reason: "Fetch the full transcript for this AI conversation.",
+          reason: "Fetch the full transcript for this agent conversation.",
         },
       ],
     });
@@ -710,8 +711,8 @@ describe("get_issue_details", () => {
 
       - Commit message issue reference: \`Fixes CLOUDFLARE-MCP-41\` automatically closes the issue when the commit is merged.
       - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
-      - AI conversation found in this trace: \`conv-123\`. Matching span: \`span-123\`.
-      - Use the Sentry tool \`execute_sentry_tool(name='get_ai_conversation_details', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})\` to fetch the full transcript.
+      - Agent conversation found in this trace: \`conv-123\`. Matching span: \`span-123\`.
+      - Use the Sentry tool \`execute_sentry_tool(name='get_agent_conversation_details', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})\` to fetch the full transcript.
       - Issue event search: Use the Sentry tool \`search_issue_events\`
       - Full distributed trace and span tree: Use the Sentry tool \`get_sentry_resource\`
       - Related span search: Use the Sentry tool \`search_events\`
@@ -720,7 +721,7 @@ describe("get_issue_details", () => {
     `);
   });
 
-  it("omits AI conversation guidance when bounded span lookup finds no match", async () => {
+  it("omits agent conversation guidance when bounded span lookup finds no match", async () => {
     const traceId = "99992222333344445555666677778888";
     const event = createDefaultEvent({
       contexts: {
@@ -756,8 +757,8 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    expect(result).not.toContain("AI conversation found");
-    expect(result).not.toContain("get_ai_conversation_details");
+    expect(result).not.toContain("Agent conversation found");
+    expect(result).not.toContain("get_agent_conversation_details");
   });
 
   it("does not query spans for an invalid event trace ID", async () => {
@@ -1574,6 +1575,65 @@ describe("get_issue_details", () => {
     // expect(result).toContain("## Seer AI Analysis");
   });
 
+  it("skips the autofix request when the seer skill is not granted", async () => {
+    let autofixRequested = false;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        () => {
+          autofixRequested = true;
+          return HttpResponse.json({ autofix: null });
+        },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      {
+        ...baseContext,
+        grantedSkills: new Set<Skill>(["inspect"]),
+      },
+    );
+
+    expect(autofixRequested).toBe(false);
+    expect(result).toContain("# Issue CLOUDFLARE-MCP-41");
+  });
+
+  it("requests autofix state when the seer skill is granted", async () => {
+    let autofixRequested = false;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        () => {
+          autofixRequested = true;
+          return HttpResponse.json({ autofix: null });
+        },
+      ),
+    );
+
+    await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      {
+        ...baseContext,
+        grantedSkills: new Set<Skill>(["inspect", "seer"]),
+      },
+    );
+
+    expect(autofixRequested).toBe(true);
+  });
+
   it.skip("includes Seer analysis when in progress - processing state", async () => {
     const inProgressFixture = {
       autofix: {
@@ -2248,7 +2308,7 @@ describe("get_issue_details", () => {
         {
           toolName: "execute_sentry_tool",
           arguments: {
-            name: "get_ai_conversation_details",
+            name: "get_agent_conversation_details",
             arguments: {
               organizationSlug: "sentry-mcp-evals",
               conversationId: "conv-unsupported",
@@ -2284,8 +2344,8 @@ describe("get_issue_details", () => {
 
       ## Response Notes
 
-      - AI conversation found in this trace: \`conv-unsupported\`. Matching span: \`span-unsupported\`.
-      - Use the Sentry tool \`execute_sentry_tool(name='get_ai_conversation_details', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-unsupported"})\` to fetch the full transcript.
+      - Agent conversation found in this trace: \`conv-unsupported\`. Matching span: \`span-unsupported\`.
+      - Use the Sentry tool \`execute_sentry_tool(name='get_agent_conversation_details', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-unsupported"})\` to fetch the full transcript.
       "
     `);
 

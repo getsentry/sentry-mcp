@@ -30,7 +30,10 @@ import {
 } from "@sentry/core";
 import { isApiAuthenticationErrorDeep } from "./api-client";
 import { MCP_SERVER_NAME } from "./constants";
-import { formatErrorForUser } from "./internal/error-handling";
+import {
+  formatErrorForUser,
+  isExpectedToolError,
+} from "./internal/error-handling";
 import type { Skill } from "./skills";
 import { type LogIssueOptions, logIssue } from "./telem/logging";
 import {
@@ -377,7 +380,12 @@ function configureServer({
           activeSpan.setStatus({
             code: 2, // error
           });
-          activeSpan.recordException(error);
+          // Expected tool failures (bad input, AI provider outages, auth expiry)
+          // still mark the span as failed, but do not record exceptions so a
+          // provider budget/outage does not flood Sentry with per-request noise.
+          if (!isExpectedToolError(error)) {
+            activeSpan.recordException(error);
+          }
         }
 
         // Upstream 401 during a tool call — route via the transport so it
@@ -400,7 +408,7 @@ function configureServer({
         // with appropriate formatting for different error types:
         // - UserInputError: Clear guidance for fixing input problems
         // - ConfigurationError: Clear guidance for fixing configuration issues
-        // - LLMProviderError: Clear messaging for AI provider availability issues
+        // - LLMProviderError / AI provider outages: graceful availability message
         // - ApiError: HTTP status context with helpful messaging
         // - System errors: Sentry event IDs for debugging
         //

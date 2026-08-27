@@ -1213,7 +1213,7 @@ function formatAIConversationSection({
     directToolNames,
   });
 
-  const lines = ["## AI Conversations", ""];
+  const lines = ["## Agent Conversations", ""];
   if (aiConversations.length === 1) {
     const [conversation] = aiConversations;
     lines.push(`**Conversation ID**: \`${conversation.conversationId}\``);

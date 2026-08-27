@@ -63,6 +63,7 @@ function createMcpRequest(
     path?: string;
     id?: number | string;
     bearerToken?: string;
+    headers?: Record<string, string>;
   } = {},
 ): Request {
   const { path = "/mcp", id = 1, bearerToken } = options;
@@ -72,6 +73,7 @@ function createMcpRequest(
     Accept: "application/json, text/event-stream",
     "CF-Connecting-IP": "192.0.2.1",
     Host: "localhost",
+    ...options.headers,
   };
   if (bearerToken) {
     headers.Authorization = `Bearer ${bearerToken}`;
@@ -104,7 +106,9 @@ function createTestEnv(): Env {
     SENTRY_CLIENT_ID: "test-client-id",
     SENTRY_CLIENT_SECRET: "test-client-secret",
     SENTRY_HOST: "sentry.io",
-    OPENAI_API_KEY: "test-openai-key",
+    OPENROUTER_API_KEY: "test-openrouter-key",
+    OPENROUTER_MODEL: "openai/gpt-5.6-luna",
+    EMBEDDED_AGENT_PROVIDER: "openrouter",
     OAUTH_KV: {} as KVNamespace,
     OAUTH_PROVIDER: {
       listUserGrants: vi.fn().mockResolvedValue({ items: [] }),
@@ -343,14 +347,18 @@ describe("MCP Handler", () => {
       expect(toolNames).toContain("update_issue");
     });
 
-    it("passes Sentry-Bearer direct tokens to upstream Sentry API calls", async () => {
-      const request = createMcpRequest("tools/call", {
-        name: "execute_sentry_tool",
-        arguments: {
-          name: "whoami",
-          arguments: {},
+    it("passes direct tokens and sanitized UTM source to upstream Sentry API calls", async () => {
+      const request = createMcpRequest(
+        "tools/call",
+        {
+          name: "execute_sentry_tool",
+          arguments: {
+            name: "whoami",
+            arguments: {},
+          },
         },
-      });
+        { headers: { "X-Sentry-Utm-Source": "plugin" } },
+      );
       const ctx = {
         waitUntil: vi.fn(),
         passThroughOnException: vi.fn(),

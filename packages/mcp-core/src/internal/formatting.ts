@@ -2332,13 +2332,13 @@ function formatAIConversationResponseNote({
     const spanSuffix = conversation.spanId
       ? ` Matching span: \`${conversation.spanId}\`.`
       : "";
-    return `- AI conversation found in this trace: \`${conversation.conversationId}\`.${spanSuffix}\n${instructions.map((instruction) => `- ${instruction}`).join("\n")}\n`;
+    return `- Agent conversation found in this trace: \`${conversation.conversationId}\`.${spanSuffix}\n${instructions.map((instruction) => `- ${instruction}`).join("\n")}\n`;
   }
 
   const conversationIds = aiConversations
     .map((conversation) => `\`${conversation.conversationId}\``)
     .join(", ");
-  return `- Multiple AI conversations were found in this trace: ${conversationIds}.\n${instructions.map((instruction) => `- ${instruction}`).join("\n")}\n`;
+  return `- Multiple agent conversations were found in this trace: ${conversationIds}.\n${instructions.map((instruction) => `- ${instruction}`).join("\n")}\n`;
 }
 
 const MAX_DISPLAY_REPLAYS = 5;

@@ -55,14 +55,17 @@ export function getAIConversationSuggestedActions({
 }): SuggestedToolAction[] {
   if (
     aiConversations.length === 0 ||
-    !isToolAvailableInSession("get_ai_conversation_details", availableToolNames)
+    !isToolAvailableInSession(
+      "get_agent_conversation_details",
+      availableToolNames,
+    )
   ) {
     return [];
   }
 
   const targetIsDirect = directToolNames
-    ? directToolNames.has("get_ai_conversation_details")
-    : isTopLevelToolName("get_ai_conversation_details", experimentalMode);
+    ? directToolNames.has("get_agent_conversation_details")
+    : isTopLevelToolName("get_agent_conversation_details", experimentalMode);
   const executeToolIsDirect = directToolNames
     ? directToolNames.has("execute_sentry_tool")
     : isTopLevelToolName("execute_sentry_tool", experimentalMode);
@@ -84,18 +87,18 @@ export function getAIConversationSuggestedActions({
     return targetIsDirect
       ? {
           type: "tool_call",
-          toolName: "get_ai_conversation_details",
+          toolName: "get_agent_conversation_details",
           arguments: targetArguments,
-          reason: "Fetch the full transcript for this AI conversation.",
+          reason: "Fetch the full transcript for this agent conversation.",
         }
       : {
           type: "tool_call",
           toolName: "execute_sentry_tool",
           arguments: {
-            name: "get_ai_conversation_details",
+            name: "get_agent_conversation_details",
             arguments: targetArguments,
           },
-          reason: "Fetch the full transcript for this AI conversation.",
+          reason: "Fetch the full transcript for this agent conversation.",
         };
   });
 }
@@ -123,7 +126,9 @@ export function formatAIConversationActionInstructions({
   });
 
   if (actions.length === 0) {
-    return ["AI conversation detail lookup is not available in this session."];
+    return [
+      "Agent conversation detail lookup is not available in this session.",
+    ];
   }
 
   return actions.map(

@@ -3,11 +3,25 @@ import {
   generateText,
   APICallError,
   NoObjectGeneratedError,
+  NoOutputGeneratedError,
+  RetryError,
   type LanguageModelUsage,
 } from "ai";
 import { z } from "zod";
 import { callEmbeddedAgent } from "./callEmbeddedAgent";
-import { LLMProviderError, UserInputError } from "../../errors";
+import {
+  AgentExecutionError,
+  ConfigurationError,
+  LLMProviderError,
+  UserInputError,
+} from "../../errors";
+import { logIssue } from "../../telem/logging";
+import { getAgentProvider } from "./provider-factory";
+
+vi.mock("../../telem/logging", () => ({
+  logIssue: vi.fn(() => "mock-event-id"),
+  logWarn: vi.fn(),
+}));
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -27,14 +41,27 @@ vi.mock("ai", async (importOriginal) => {
   };
 });
 
+vi.mock("./provider-factory", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./provider-factory")>();
+  return {
+    ...actual,
+    getAgentProvider: vi.fn(actual.getAgentProvider),
+  };
+});
+
 describe("callEmbeddedAgent", () => {
   const mockGenerateText = vi.mocked(generateText);
   const testSchema = z.object({
     result: z.string(),
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const actual =
+      await vi.importActual<typeof import("./provider-factory")>(
+        "./provider-factory",
+      );
+    vi.mocked(getAgentProvider).mockImplementation(actual.getAgentProvider);
     process.env.OPENAI_API_KEY = "test-key";
     process.env.OPENROUTER_API_KEY = "";
   });
@@ -100,7 +127,7 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow(/configuration or account issue/);
+    ).rejects.toThrow(/configuration, quota, or account issue/);
   });
 
   it("throws LLMProviderError for invalid API key (401)", async () => {
@@ -151,10 +178,10 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow(/configuration or account issue/);
+    ).rejects.toThrow(/configuration, quota, or account issue/);
   });
 
-  it("re-throws 5xx APICallErrors unchanged (system errors)", async () => {
+  it("throws LLMProviderError for 5xx provider outages", async () => {
     const serverError = new APICallError({
       message: "Internal server error",
       url: "https://api.openai.com/v1/chat/completions",
@@ -172,7 +199,7 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow(APICallError);
+    ).rejects.toThrow(LLMProviderError);
 
     await expect(
       callEmbeddedAgent({
@@ -181,10 +208,10 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow("Internal server error");
+    ).rejects.toThrow(/currently unavailable.*Internal server error/);
   });
 
-  it("re-throws APICallErrors without status code unchanged", async () => {
+  it("throws LLMProviderError for provider APICallErrors without status code", async () => {
     // Some errors may not have a status code (e.g., network errors)
     const networkError = new APICallError({
       message: "Network error",
@@ -202,10 +229,113 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow(APICallError);
+    ).rejects.toThrow(LLMProviderError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(/currently unavailable.*Network error/);
   });
 
-  it("re-throws non-APICallError errors unchanged", async () => {
+  it("throws LLMProviderError for provider budget/quota failures", async () => {
+    const budgetError = new APICallError({
+      message: "Workspace monthly budget of $15000.00 exceeded. Contact your org admin.",
+      url: "https://openrouter.ai/api/v1/chat/completions",
+      requestBodyValues: {},
+      statusCode: 402,
+      isRetryable: false,
+    });
+
+    mockGenerateText.mockRejectedValue(budgetError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(LLMProviderError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(/quota, or account issue/);
+  });
+
+  it("throws LLMProviderError for RetryError-wrapped provider outages", async () => {
+    // After maxRetries, the AI SDK wraps retryable 5xx/network failures.
+    const serverError = new APICallError({
+      message: "Internal server error",
+      url: "https://api.openai.com/v1/chat/completions",
+      requestBodyValues: {},
+      statusCode: 503,
+      isRetryable: true,
+    });
+    const retryError = new RetryError({
+      message: "Failed after 3 attempts. Last error: Internal server error",
+      reason: "maxRetriesExceeded",
+      errors: [serverError, serverError, serverError],
+    });
+
+    mockGenerateText.mockRejectedValue(retryError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(LLMProviderError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(/currently unavailable.*Internal server error/);
+  });
+
+  it("throws LLMProviderError for RetryError without an APICallError cause", async () => {
+    const retryError = new RetryError({
+      message: "Failed after 3 attempts. Last error: socket hang up",
+      reason: "maxRetriesExceeded",
+      errors: [new Error("socket hang up")],
+    });
+
+    mockGenerateText.mockRejectedValue(retryError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(LLMProviderError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(/currently unavailable.*socket hang up/);
+  });
+
+  it("converts unexpected errors into AgentExecutionError after filing a Sentry issue", async () => {
     const genericError = new Error("Something went wrong");
 
     mockGenerateText.mockRejectedValue(genericError);
@@ -217,7 +347,120 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow("Something went wrong");
+    ).rejects.toBeInstanceOf(AgentExecutionError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("Something went wrong"),
+      eventId: "mock-event-id",
+      cause: genericError,
+    });
+
+    expect(logIssue).toHaveBeenCalledWith(
+      genericError,
+      expect.objectContaining({
+        loggerScope: ["agents", "embedded"],
+      }),
+    );
+  });
+
+  it("converts NoOutputGeneratedError into AgentExecutionError after filing a Sentry issue", async () => {
+    const noOutputError = new NoOutputGeneratedError({
+      message: "No output generated.",
+    });
+
+    mockGenerateText.mockRejectedValue(noOutputError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toBeInstanceOf(AgentExecutionError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("No output generated."),
+      eventId: "mock-event-id",
+      cause: noOutputError,
+    });
+
+    expect(logIssue).toHaveBeenCalledWith(
+      noOutputError,
+      expect.objectContaining({
+        loggerScope: ["agents", "embedded"],
+        contexts: {
+          embeddedAgent: expect.objectContaining({
+            isNoOutputGenerated: true,
+          }),
+        },
+      }),
+    );
+  });
+
+  it("treats missing experimental_output as NoOutputGeneratedError", async () => {
+    mockGenerateText.mockResolvedValue({
+      experimental_output: undefined,
+    } as never);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toBeInstanceOf(AgentExecutionError);
+
+    expect(logIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "AI_NoOutputGeneratedError",
+        message: "No output generated.",
+      }),
+      expect.objectContaining({
+        loggerScope: ["agents", "embedded"],
+      }),
+    );
+  });
+
+  it("rethrows ConfigurationError from getProviderOptions without filing an issue", async () => {
+    const configError = new ConfigurationError(
+      'Invalid OPENROUTER_REASONING_EFFORT "ludicrous"',
+    );
+    vi.mocked(getAgentProvider).mockReturnValue({
+      type: "openrouter",
+      label: "OpenRouter",
+      getModel: () => "mocked-model" as never,
+      getProviderOptions: () => {
+        throw configError;
+      },
+    });
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toBe(configError);
+
+    expect(logIssue).not.toHaveBeenCalled();
+    expect(mockGenerateText).not.toHaveBeenCalled();
   });
 
   describe("NoObjectGeneratedError handling", () => {

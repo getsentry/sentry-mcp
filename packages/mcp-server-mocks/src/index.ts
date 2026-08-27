@@ -1,4 +1,4 @@
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 /**
  * MSW-based Mock Server for Sentry MCP Development and Testing.
  *
@@ -37,14 +37,23 @@ import dashboardDetailsFixture from "./fixtures/dashboard-details.json" with {
 import dashboardListFixture from "./fixtures/dashboard-list.json" with {
   type: "json",
 };
+import eventsFixture from "./fixtures/event.json" with { type: "json" };
 import eventAttachmentsFixture from "./fixtures/event-attachments.json" with {
   type: "json",
 };
-import eventsFixture from "./fixtures/event.json" with { type: "json" };
+import eventsErrorsFixture from "./fixtures/events-errors.json" with {
+  type: "json",
+};
 import eventsErrorsEmptyFixture from "./fixtures/events-errors-empty.json" with {
   type: "json",
 };
-import eventsErrorsFixture from "./fixtures/events-errors.json" with {
+import eventsSpansFixture from "./fixtures/events-spans.json" with {
+  type: "json",
+};
+import eventsSpansEmptyFixture from "./fixtures/events-spans-empty.json" with {
+  type: "json",
+};
+import eventsTraceMetricsFixture from "./fixtures/events-tracemetrics.json" with {
   type: "json",
 };
 import eventsTraceMetricsAggregateFixture from "./fixtures/events-tracemetrics-aggregate.json" with {
@@ -53,47 +62,39 @@ import eventsTraceMetricsAggregateFixture from "./fixtures/events-tracemetrics-a
 import eventsTraceMetricsEmptyFixture from "./fixtures/events-tracemetrics-empty.json" with {
   type: "json",
 };
-import eventsTraceMetricsFixture from "./fixtures/events-tracemetrics.json" with {
-  type: "json",
-};
-import eventsSpansEmptyFixture from "./fixtures/events-spans-empty.json" with {
-  type: "json",
-};
-import eventsSpansFixture from "./fixtures/events-spans.json" with {
-  type: "json",
-};
 import flamegraphFixture from "./fixtures/flamegraph.json" with {
   type: "json",
 };
-import transactionProfileV1Fixture from "./fixtures/transaction-profile-v1.json" with {
-  type: "json",
-};
-import transactionProfileV1MissingFunctionFixture from "./fixtures/transaction-profile-v1-missing-function.json" with {
-  type: "json",
-};
-import profileChunkFixture from "./fixtures/profile-chunk.json" with {
-  type: "json",
-};
-import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
-  type: "json",
-};
+import issueFixture from "./fixtures/issue.json" with { type: "json" };
 import issueActivityFixture from "./fixtures/issue-activity.json" with {
   type: "json",
 };
 import issueCommentsFixture from "./fixtures/issue-comments.json" with {
   type: "json",
 };
+import issueNullCulpritFixture from "./fixtures/issue-null-culprit.json" with {
+  type: "json",
+};
+import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
+  type: "json",
+};
 import issueUserReportsFixture from "./fixtures/issue-user-reports.json" with {
   type: "json",
 };
-import issueFixture from "./fixtures/issue.json" with { type: "json" };
-import issueNullCulpritFixture from "./fixtures/issue-null-culprit.json" with {
+import monitorFixture from "./fixtures/monitor.json" with { type: "json" };
+import monitorCheckInsFixture from "./fixtures/monitor-checkins.json" with {
+  type: "json",
+};
+import monitorStatsFixture from "./fixtures/monitor-stats.json" with {
   type: "json",
 };
 import organizationFixture from "./fixtures/organization.json" with {
   type: "json",
 };
 import performanceEventFixture from "./fixtures/performance-event.json" with {
+  type: "json",
+};
+import profileChunkFixture from "./fixtures/profile-chunk.json" with {
   type: "json",
 };
 import projectFixture from "./fixtures/project.json" with { type: "json" };
@@ -104,25 +105,19 @@ import releaseCommitsFixture from "./fixtures/release-commits.json" with {
 import releaseDeploysFixture from "./fixtures/release-deploys.json" with {
   type: "json",
 };
-import monitorFixture from "./fixtures/monitor.json" with { type: "json" };
-import monitorCheckInsFixture from "./fixtures/monitor-checkins.json" with {
-  type: "json",
-};
-import monitorStatsFixture from "./fixtures/monitor-stats.json" with {
-  type: "json",
-};
-import tagsFixture from "./fixtures/tags.json" with { type: "json" };
-import teamFixture from "./fixtures/team.json" with { type: "json" };
-import traceEventFixture from "./fixtures/trace-event.json" with {
-  type: "json",
-};
-import traceItemsAttributesLogsNumberFixture from "./fixtures/trace-items-attributes-logs-number.json" with {
-  type: "json",
-};
 import replayDetailsFixture from "./fixtures/replay-details.json" with {
   type: "json",
 };
 import replayRecordingSegmentsFixture from "./fixtures/replay-recording-segments.json" with {
+  type: "json",
+};
+import tagsFixture from "./fixtures/tags.json" with { type: "json" };
+import teamFixture from "./fixtures/team.json" with { type: "json" };
+import traceFixture from "./fixtures/trace.json" with { type: "json" };
+import traceEventFixture from "./fixtures/trace-event.json" with {
+  type: "json",
+};
+import traceItemsAttributesLogsNumberFixture from "./fixtures/trace-items-attributes-logs-number.json" with {
   type: "json",
 };
 import traceItemsAttributesLogsStringFixture from "./fixtures/trace-items-attributes-logs-string.json" with {
@@ -140,14 +135,25 @@ import traceItemsAttributesTraceMetricsNumberFixture from "./fixtures/trace-item
 import traceItemsAttributesTraceMetricsStringFixture from "./fixtures/trace-items-attributes-tracemetrics-string.json" with {
   type: "json",
 };
+import traceMetaFixture from "./fixtures/trace-meta.json" with { type: "json" };
 import traceMetaWithNullsFixture from "./fixtures/trace-meta-with-nulls.json" with {
   type: "json",
 };
-import traceMetaFixture from "./fixtures/trace-meta.json" with { type: "json" };
 import traceMixedFixture from "./fixtures/trace-mixed.json" with {
   type: "json",
 };
-import traceFixture from "./fixtures/trace.json" with { type: "json" };
+import transactionProfileV1Fixture from "./fixtures/transaction-profile-v1.json" with {
+  type: "json",
+};
+import transactionProfileV1MissingFunctionFixture from "./fixtures/transaction-profile-v1-missing-function.json" with {
+  type: "json",
+};
+import uptimeChecksFixture from "./fixtures/uptime-checks.json" with {
+  type: "json",
+};
+import uptimeMonitorFixture from "./fixtures/uptime-monitor.json" with {
+  type: "json",
+};
 import userFixture from "./fixtures/user.json" with { type: "json" };
 import { issueFixture2 } from "./payloads";
 
@@ -393,6 +399,32 @@ export const restHandlers = buildHandlers([
           id: "4509106749636608", // Different ID for GET endpoint
         },
       ]);
+    },
+  },
+  {
+    method: "post",
+    path: "/api/0/organizations/sentry-mcp-evals/onboarding/agent/status/",
+    fetch: () => {
+      return HttpResponse.json({
+        schemaVersion: 1,
+        runId: "2d27f6654b754dcaa2d26af18274d142",
+        channelId: "6835652362204cb1b10719783c26983a",
+        clientRunId: "e806c6f4-fef8-47b4-a720-5ab582b2fcf0",
+        createdAt: "2026-08-12T12:00:00Z",
+        updatedAt: "2026-08-12T12:01:00Z",
+        sequence: 1,
+        expiresAt: "2026-08-13T12:00:00Z",
+        continueUpdates: true,
+        runStatus: "active",
+        stages: [
+          {
+            stage: "connect_mcp",
+            status: "completed",
+            eventNote: null,
+            extra: null,
+          },
+        ],
+      });
     },
   },
   {
@@ -993,6 +1025,63 @@ export const restHandlers = buildHandlers([
   },
   {
     method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/uptime/",
+    fetch: () => HttpResponse.json([uptimeMonitorFixture]),
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/uptime/4509100000001001/",
+    fetch: () => HttpResponse.json(uptimeMonitorFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/uptime/4509100000001001/checks/",
+    fetch: () => HttpResponse.json(uptimeChecksFixture),
+  },
+  {
+    method: "post",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/uptime/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      return HttpResponse.json(
+        {
+          ...uptimeMonitorFixture,
+          ...body,
+          id: "4509100000001002",
+          projectSlug: "cloudflare-mcp",
+          status: body.status ?? "active",
+          uptimeStatus: 1,
+          method: body.method ?? "GET",
+          headers: body.headers ?? [],
+          body: body.body ?? null,
+          assertion: body.assertion ?? null,
+          recoveryThreshold: body.recoveryThreshold ?? 1,
+          downtimeThreshold: body.downtimeThreshold ?? 3,
+          traceSampling: body.traceSampling ?? false,
+          responseCaptureEnabled: body.responseCaptureEnabled ?? true,
+        },
+        { status: 201 },
+      );
+    },
+  },
+  {
+    method: "put",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/uptime/4509100000001001/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      return HttpResponse.json({
+        ...uptimeMonitorFixture,
+        ...body,
+      });
+    },
+  },
+  {
+    method: "delete",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/uptime/4509100000001001/",
+    fetch: () => new HttpResponse(null, { status: 202 }),
+  },
+  {
+    method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/monitors/",
     fetch: () => HttpResponse.json([monitorFixture]),
   },
@@ -1517,7 +1606,6 @@ export const restHandlers = buildHandlers([
           size: 1024,
           mimetype: "application/octet-stream",
           dateCreated: "2025-04-08T21:15:04.000Z",
-          sha1: "abc123def456",
           headers: { "Content-Type": "application/octet-stream" },
         },
       ]),
@@ -1858,59 +1946,57 @@ export const mswServer = setupServer(
   ...docsHandlers,
 );
 
-// Export fixtures for use in tests
-export {
-  autofixStateFixture,
-  autofixStateExplorerFixture,
-  eventsFixture as eventFixture,
-  replayDetailsFixture,
-  replayRecordingSegmentsFixture,
-  traceMetaFixture,
-  traceMetaWithNullsFixture,
-  performanceEventFixture,
-  traceFixture,
-  traceMixedFixture,
-  traceEventFixture,
-  flamegraphFixture,
-  transactionProfileV1Fixture,
-  transactionProfileV1MissingFunctionFixture,
-  organizationFixture,
-  releaseFixture,
-  clientKeyFixture,
-  dashboardDetailsFixture,
-  dashboardListFixture,
-  userFixture,
-  eventsErrorsFixture,
-  eventsErrorsEmptyFixture,
-  eventsSpansFixture,
-  eventsSpansEmptyFixture,
-  issueFixture,
-  issueNullCulpritFixture,
-  eventsFixture,
-  projectFixture,
-  teamFixture,
-  tagsFixture,
-  traceItemsAttributesSpansStringFixture,
-  traceItemsAttributesSpansNumberFixture,
-  traceItemsAttributesLogsStringFixture,
-  traceItemsAttributesLogsNumberFixture,
-  eventAttachmentsFixture,
-  profileChunkFixture,
-};
-
 // Export fixture factories
 export {
+  createCspEvent,
+  createCspIssue,
   createDefaultEvent,
+  createFeedbackIssue,
   createGenericEvent,
-  createUnknownEvent,
   createPerformanceEvent,
   createPerformanceIssue,
   createRegressedIssue,
+  createUnknownEvent,
   createUnsupportedIssue,
-  createCspIssue,
-  createCspEvent,
-  createFeedbackIssue,
 } from "./fixtures";
-
 // Export utilities for creating mock servers
 export { setupMockServer, startMockServer } from "./utils";
+// Export fixtures for use in tests
+export {
+  autofixStateExplorerFixture,
+  autofixStateFixture,
+  clientKeyFixture,
+  dashboardDetailsFixture,
+  dashboardListFixture,
+  eventAttachmentsFixture,
+  eventsErrorsEmptyFixture,
+  eventsErrorsFixture,
+  eventsFixture as eventFixture,
+  eventsFixture,
+  eventsSpansEmptyFixture,
+  eventsSpansFixture,
+  flamegraphFixture,
+  issueFixture,
+  issueNullCulpritFixture,
+  organizationFixture,
+  performanceEventFixture,
+  profileChunkFixture,
+  projectFixture,
+  releaseFixture,
+  replayDetailsFixture,
+  replayRecordingSegmentsFixture,
+  tagsFixture,
+  teamFixture,
+  traceEventFixture,
+  traceFixture,
+  traceItemsAttributesLogsNumberFixture,
+  traceItemsAttributesLogsStringFixture,
+  traceItemsAttributesSpansNumberFixture,
+  traceItemsAttributesSpansStringFixture,
+  traceMetaFixture,
+  traceMetaWithNullsFixture,
+  traceMixedFixture,
+  transactionProfileV1Fixture,
+  transactionProfileV1MissingFunctionFixture,
+  userFixture,
+};

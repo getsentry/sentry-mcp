@@ -302,6 +302,24 @@ describe("EventSchema", () => {
     expect(result.type).toBe("error");
   });
 
+  it("should parse null dateReceived and null generic occurrence", () => {
+    const genericEvent = {
+      id: "2d9a3f30ee5a4a95b712e78b87631f9a",
+      title: "Metric regression",
+      message: null,
+      platform: null,
+      type: "generic",
+      entries: [],
+      dateCreated: "2025-01-01T00:00:00Z",
+      dateReceived: null,
+      occurrence: null,
+    };
+
+    const result = EventSchema.parse(genericEvent);
+    expect(result.dateReceived).toBeNull();
+    expect(result).toHaveProperty("occurrence", null);
+  });
+
   it("should allow partially populated user geo payloads", () => {
     const errorEvent = {
       id: "geo123",

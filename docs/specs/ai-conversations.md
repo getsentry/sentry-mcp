@@ -1,26 +1,30 @@
-# AI Conversations MCP Specification
+# Agent Conversations MCP Specification
 
 ## Overview
 
-AI Conversations should be a first-class MCP concept with conversation-shaped
+Agent Conversations should be a first-class MCP concept with conversation-shaped
 search and detail retrieval. Users should not need to know that conversations
 are implemented on top of spans or the `gen_ai.conversation.id` span attribute.
 
 The MCP interface should expose:
 
-- `search_ai_conversations` for finding and listing matching conversations
-- `get_ai_conversation_details` for fetching one conversation transcript by ID
+- `search_agent_conversations` for finding and listing matching conversations
+- `get_agent_conversation_details` for fetching one conversation transcript by ID
 - `get_sentry_resource` for fetching one conversation from a Sentry URL
+
+For backward compatibility, `search_ai_conversations` and
+`get_ai_conversation_details` remain callable as deprecated catalog aliases.
+New integrations should use the Agent tool names.
 
 Raw span search remains available for lower-level telemetry investigation, but
 it is not the primary interface for conversation discovery.
 
 ## Motivation
 
-AI Conversations string together related GenAI spans into an agent session or
+Agent Conversations string together related GenAI spans into an agent session or
 thread. The user intent is conversation-level:
 
-- "show recent AI conversations"
+- "show recent agent conversations"
 - "find failed conversations"
 - "search conversations where the user asked about checkout"
 - "show conversations that used this tool"
@@ -34,7 +38,7 @@ traces.
 
 ## User Model
 
-An AI Conversation is a logical agent session or thread made from related GenAI
+An Agent Conversation is a logical agent session or thread made from related GenAI
 telemetry. In MCP, users interact with three shapes:
 
 1. **Conversation summary**: a row in search/list results.
@@ -52,19 +56,19 @@ telemetry.
 Add one catalog-only tool:
 
 ```text
-search_ai_conversations
+search_agent_conversations
 ```
 
 Keep existing tools:
 
-- `get_ai_conversation_details`: fetches one conversation by
+- `get_agent_conversation_details`: fetches one conversation by
   `gen_ai.conversation.id`
 - `get_sentry_resource`: detects conversation URLs and routes to conversation
   details
 - `search_events`: searches raw events, logs, spans, metrics, profiles, and
   replays
 
-Do not add AI conversation tools to the top-level direct MCP surface for now.
+Do not add agent conversation tools to the top-level direct MCP surface for now.
 Catalog-only is sufficient because:
 
 - `get_sentry_resource` handles pasted Sentry conversation URLs directly.
@@ -74,7 +78,7 @@ Catalog-only is sufficient because:
 
 ## Search Interface
 
-`search_ai_conversations` answers conversation-level discovery questions. It
+`search_agent_conversations` answers conversation-level discovery questions. It
 returns one item per conversation, never one item per span.
 
 ```typescript
@@ -96,7 +100,7 @@ Parameter behavior:
 
 - `organizationSlug` is required.
 - `query` is a user-facing conversation query/filter string passed to the
-  Sentry AI Conversations list endpoint.
+  Sentry Agent Conversations list endpoint.
 - Results use the Sentry endpoint's default ordering: most recent conversation
   activity first. Do not expose alternate sort options until the backend applies
   them.
@@ -110,10 +114,10 @@ Parameter behavior:
 
 ## Backend API
 
-Use the Sentry AI Conversations list endpoint:
+Use the Sentry Agent Conversations list endpoint:
 
 ```text
-GET /api/0/organizations/{organizationSlug}/ai-conversations/
+GET /api/0/organizations/{organizationSlug}/agents/conversations/
 ```
 
 Do not implement conversation search through
@@ -124,19 +128,19 @@ span lookup when the caller already has a trace ID. That lookup must stay scoped
 to the trace, request only the fields needed to identify conversation IDs and
 matching spans plus any field required for result ordering, cap results to a
 small number, and route transcript follow-up through
-`get_ai_conversation_details`. It is not a replacement for
-`search_ai_conversations`. This follows Sentry's Spans-backed AI conversation
+`get_agent_conversation_details`. It is not a replacement for
+`search_agent_conversations`. This follows Sentry's Spans-backed agent conversation
 endpoints, which select `gen_ai.conversation.id` from spans, and existing
 trace-scoped spans queries that use `trace:<trace_id>`.
 
-When issue or trace detail output identifies AI conversation IDs, it should
+When issue or trace detail output identifies agent conversation IDs, it should
 surface a `suggestedActions` structured-content hint when the required follow-up
-is callable in the current session. If `get_ai_conversation_details` is only
+is callable in the current session. If `get_agent_conversation_details` is only
 available through the catalog, the action must call `execute_sentry_tool` with
-`name: "get_ai_conversation_details"` and the target arguments; only use the
+`name: "get_agent_conversation_details"` and the target arguments; only use the
 catalog tool name directly when it is exposed through `tools/list`. Emit either
 action only when its direct tool surface is available. The markdown `Response
-Notes` or `AI Conversations` section must mirror the same callable action and
+Notes` or `Agent Conversations` section must mirror the same callable action and
 arguments for clients that do not read `structuredContent`. Follow the shared
 suggested action contract in
 [Tool Responses](../contributing/tool-responses.md#suggested-actions).
@@ -155,6 +159,7 @@ Expected response item shape:
 ```typescript
 interface AIConversationSummary {
   conversationId: string;
+  title: string | null;
   flow: string[];
   startTimestamp: number;
   endTimestamp: number;
@@ -185,7 +190,7 @@ repository.
 
 ## Search Output
 
-`search_ai_conversations` should return structuredContent optimized for agent
+`search_agent_conversations` should return structuredContent optimized for agent
 use. Do not hand-write markdown for this tool; the server generates
 compatibility text from the same structured payload for clients that do not read
 structuredContent yet.
@@ -201,6 +206,7 @@ The top-level structured result should include:
 Each result should include:
 
 - Conversation ID.
+- AI-generated title when Sentry has conversation metadata (`null` otherwise).
 - Sentry URL: `/explore/conversations/{conversationId}/`.
 - Start, end, and derived duration.
 - Flow, when available.
@@ -219,7 +225,7 @@ conversation-level and timeline timestamp fields.
 
 Agents should use the structured fields to decide follow-ups:
 
-- Use `get_ai_conversation_details` with `conversationId` for the transcript and
+- Use `get_agent_conversation_details` with `conversationId` for the transcript and
   full structured detail.
 - Use `get_sentry_resource` with the conversation URL when the user provides or
   wants to reuse a Sentry URL.
@@ -231,7 +237,7 @@ Agents should use the structured fields to decide follow-ups:
 
 ## Detail Interface
 
-`get_ai_conversation_details` remains the transcript/detail tool. The detail
+`get_agent_conversation_details` remains the transcript/detail tool. The detail
 response should be a conversation-native projection of GenAI telemetry, not a
 raw span dump and not a lossy grouping invented by MCP.
 
@@ -277,7 +283,7 @@ underlying telemetry. Use trace/span IDs for deeper execution-tree analysis.
 
 Required refinements:
 
-- Update the description to recommend `search_ai_conversations` for discovering
+- Update the description to recommend `search_agent_conversations` for discovering
   or listing conversations.
 - Keep raw span search documented only as a fallback for low-level telemetry
   analysis.
@@ -302,9 +308,9 @@ The URL parser should extract:
 - `start`
 - `end`
 
-Fetch by URL must not require `search_ai_conversations`. If a user pastes a
+Fetch by URL must not require `search_agent_conversations`. If a user pastes a
 conversation URL, `get_sentry_resource` should route directly to
-`get_ai_conversation_details`.
+`get_agent_conversation_details`.
 
 ## Relationship To Traces
 
@@ -312,8 +318,8 @@ Traces and conversations should have parallel concepts:
 
 Conversation:
 
-- `search_ai_conversations`: returns matching conversations.
-- `get_ai_conversation_details`: returns one full conversation.
+- `search_agent_conversations`: returns matching conversations.
+- `get_agent_conversation_details`: returns one full conversation.
 
 Trace:
 
@@ -326,7 +332,7 @@ should not be the primary conversation follow-up because it only inspects one
 trace. Agents should query spans by `gen_ai.conversation.id` when they need
 conversation-related telemetry across trace boundaries.
 
-AI Conversations should not copy the current trace-search limitation.
+Agent Conversations should not copy the current trace-search limitation.
 Conversation search should be conversation-native from the start.
 
 ## Relationship To Spans
@@ -339,7 +345,7 @@ Use `search_events(dataset="spans")` only for:
 - Running aggregate telemetry analysis.
 
 Do not route ordinary conversation discovery through spans once
-`search_ai_conversations` exists.
+`search_agent_conversations` exists.
 
 ## API Client Requirements
 
@@ -371,7 +377,7 @@ metadata.
 
 ## Source Verification Requirements
 
-Before implementing or changing any AI Conversations endpoint usage, verify the
+Before implementing or changing any Agent Conversations endpoint usage, verify the
 current request and response contract against the Sentry source tree in
 `~/src/sentry`. Do not rely only on UI assumptions, API docs, or existing MCP
 schemas.
@@ -390,7 +396,11 @@ behavior, feature gates, or retention behavior differ from this spec.
 
 ## Tool Registration
 
-Register `search_ai_conversations` in the catalog.
+Register `search_agent_conversations` and `get_agent_conversation_details` in
+the catalog. Keep `search_ai_conversations` and
+`get_ai_conversation_details` as deprecated aliases for backward-compatible
+catalog execution, but do not include the aliases in generated skill
+definitions.
 
 Do not add it to:
 
@@ -408,15 +418,15 @@ pnpm run --filter @sentry/mcp-core generate-definitions
 
 Update tool descriptions so agents follow this workflow:
 
-1. Use `search_ai_conversations` to find or list AI Conversations.
-2. Use `get_ai_conversation_details` to fetch a transcript by conversation ID.
+1. Use `search_agent_conversations` to find or list Agent Conversations.
+2. Use `get_agent_conversation_details` to fetch a transcript by conversation ID.
 3. Use `get_sentry_resource` for Sentry conversation URLs.
 4. Use `search_events` with `dataset="spans"` only for raw span-level analysis.
 
 At minimum, update:
 
-- `get_ai_conversation_details` description.
-- `get_sentry_resource` AI conversation guidance.
+- `get_agent_conversation_details` description.
+- `get_sentry_resource` agent conversation guidance.
 - Generated tool and skill definitions.
 
 ## Examples
@@ -424,7 +434,7 @@ At minimum, update:
 Search recent conversations:
 
 ```typescript
-search_ai_conversations({
+search_agent_conversations({
   organizationSlug: "my-org",
   query: "recent conversations",
   period: "24h",
@@ -434,7 +444,7 @@ search_ai_conversations({
 Find failed conversations:
 
 ```typescript
-search_ai_conversations({
+search_agent_conversations({
   organizationSlug: "my-org",
   query: "failed conversations",
   period: "7d",
@@ -444,7 +454,7 @@ search_ai_conversations({
 Fetch a transcript from a result:
 
 ```typescript
-get_ai_conversation_details({
+get_agent_conversation_details({
   organizationSlug: "my-org",
   conversationId: "conversation-123",
 })
@@ -463,7 +473,7 @@ get_sentry_resource({
 Add focused tests for:
 
 1. Basic search:
-   - Calls `/organizations/{org}/ai-conversations/`.
+   - Calls `/organizations/{org}/agents/conversations/`.
    - Passes `query`, `per_page`, and time parameters.
    - Returns one structured summary per conversation.
 2. Empty results:
@@ -493,7 +503,7 @@ Add focused tests for:
 
 This feature is complete when:
 
-- Users can search and list AI Conversations without knowing about spans.
+- Users can search and list Agent Conversations without knowing about spans.
 - Search results are conversation summaries, not span rows.
 - Users can fetch details by conversation ID.
 - Users can fetch details by Sentry conversation URL.
@@ -506,6 +516,6 @@ This feature is complete when:
 ## Future Work
 
 - Add a trace-level search tool that returns one row per trace, parallel to
-  `search_ai_conversations`.
+  `search_agent_conversations`.
 - Add pagination metadata to formatted output if the API client standardizes
   cursor handling.

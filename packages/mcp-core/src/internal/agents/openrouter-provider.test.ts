@@ -1,15 +1,21 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { generateText } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getOpenRouterModel } from "./openrouter-provider.js";
+import { ConfigurationError } from "../../errors.js";
+import {
+  getOpenRouterModel,
+  getOpenRouterProviderOptions,
+} from "./openrouter-provider.js";
 
 describe("openrouter-provider", () => {
   const originalApiKey = process.env.OPENROUTER_API_KEY;
   const originalModel = process.env.OPENROUTER_MODEL;
+  const originalReasoningEffort = process.env.OPENROUTER_REASONING_EFFORT;
 
   beforeEach(() => {
     process.env.OPENROUTER_API_KEY = "test-openrouter-key";
     delete process.env.OPENROUTER_MODEL;
+    delete process.env.OPENROUTER_REASONING_EFFORT;
   });
 
   afterEach(() => {
@@ -23,6 +29,12 @@ describe("openrouter-provider", () => {
       delete process.env.OPENROUTER_MODEL;
     } else {
       process.env.OPENROUTER_MODEL = originalModel;
+    }
+
+    if (originalReasoningEffort === undefined) {
+      delete process.env.OPENROUTER_REASONING_EFFORT;
+    } else {
+      process.env.OPENROUTER_REASONING_EFFORT = originalReasoningEffort;
     }
 
     vi.unstubAllGlobals();
@@ -74,7 +86,7 @@ describe("openrouter-provider", () => {
 
   it("uses default and configured models", () => {
     expect((getOpenRouterModel() as LanguageModelV3).modelId).toBe(
-      "openai/gpt-5",
+      "openai/gpt-5.6-luna",
     );
 
     process.env.OPENROUTER_MODEL = "anthropic/claude-sonnet-4";
@@ -85,5 +97,58 @@ describe("openrouter-provider", () => {
     expect(
       (getOpenRouterModel("google/gemini-2.5-pro") as LanguageModelV3).modelId,
     ).toBe("google/gemini-2.5-pro");
+  });
+
+  it("defaults reasoning effort to high and allows override", () => {
+    expect(getOpenRouterProviderOptions()).toEqual({
+      openai: {
+        structuredOutputs: false,
+        strictJsonSchema: false,
+        reasoningEffort: "high",
+      },
+    });
+
+    process.env.OPENROUTER_REASONING_EFFORT = "low";
+
+    expect(getOpenRouterProviderOptions()).toEqual({
+      openai: {
+        structuredOutputs: false,
+        strictJsonSchema: false,
+        reasoningEffort: "low",
+      },
+    });
+
+    process.env.OPENROUTER_REASONING_EFFORT = "";
+
+    expect(getOpenRouterProviderOptions()).toEqual({
+      openai: {
+        structuredOutputs: false,
+        strictJsonSchema: false,
+      },
+    });
+  });
+
+  it("maps max to xhigh and rejects unknown reasoning effort", () => {
+    process.env.OPENROUTER_REASONING_EFFORT = "max";
+
+    expect(getOpenRouterProviderOptions()).toEqual({
+      openai: {
+        structuredOutputs: false,
+        strictJsonSchema: false,
+        reasoningEffort: "xhigh",
+      },
+    });
+
+    process.env.OPENROUTER_REASONING_EFFORT = "ludicrous";
+
+    expect(() => getOpenRouterProviderOptions()).toThrow(ConfigurationError);
+    expect(() => getOpenRouterProviderOptions()).toThrow(
+      /Invalid OPENROUTER_REASONING_EFFORT/,
+    );
+
+    // Prototype keys must not bypass validation via inherited Object props.
+    process.env.OPENROUTER_REASONING_EFFORT = "constructor";
+
+    expect(() => getOpenRouterProviderOptions()).toThrow(ConfigurationError);
   });
 });

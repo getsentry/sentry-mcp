@@ -340,6 +340,259 @@
     "surface": "catalog"
   },
   {
+    "name": "create_uptime_monitor",
+    "description": "Create a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Start monitoring a URL for availability\n- Create a new uptime check with interval and timeout\n\nBe careful when using this tool!\n\nRequired fields match Sentry's uptime API: name, url, intervalSeconds, timeoutMs.\nAdvanced response assertions are not supported in this MVP; configure them in the Sentry UI if needed.\n\n<examples>\ncreate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='API Health', url='https://api.example.com/health', intervalSeconds=60, timeoutMs=5000)\ncreate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='Checkout', url='https://example.com/checkout', intervalSeconds=300, timeoutMs=10000, method='GET', environment='production')\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Monitor display name."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to check."
+        },
+        "intervalSeconds": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "Seconds between checks. Allowed values: 60, 300, 600, 1200, 1800, 3600."
+        },
+        "timeoutMs": {
+          "default": 5000,
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000,
+          "description": "Request timeout in milliseconds (1000-60000)."
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS"],
+          "description": "HTTP method used for the uptime check request."
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "description": "Optional HTTP headers as an array of [name, value] pairs, e.g. [[\"Accept\",\"application/json\"]]."
+        },
+        "body": {
+          "type": "string",
+          "description": "Optional request body for methods that support a body."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "disabled"],
+          "description": "Monitor status. `disabled` stops checks and does not count against quota."
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(user|team):.+$",
+          "description": "Owner actor in `user:ID` or `team:ID` format."
+        },
+        "environment": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Optional environment name for created uptime issues."
+        },
+        "traceSampling": {
+          "type": "boolean",
+          "description": "Whether check requests may be considered for tracing."
+        },
+        "responseCaptureEnabled": {
+          "type": "boolean",
+          "description": "Capture response body/headers on failures."
+        },
+        "recoveryThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "Consecutive successful checks required to recover."
+        },
+        "downtimeThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "Consecutive failed checks required to mark down."
+        }
+      },
+      "required": [
+        "organizationSlug",
+        "projectSlug",
+        "name",
+        "url",
+        "intervalSeconds"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "monitor": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "projectSlug": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "uptimeStatus": {
+              "type": "string",
+              "enum": ["ok", "failed", "unknown"]
+            },
+            "url": {
+              "type": "string"
+            },
+            "method": {
+              "type": "string"
+            },
+            "intervalSeconds": {
+              "type": "number"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "string"
+            },
+            "webUrl": {
+              "type": "string",
+              "format": "uri"
+            },
+            "timeoutMs": {
+              "type": "number"
+            },
+            "recoveryThreshold": {
+              "type": "number"
+            },
+            "downtimeThreshold": {
+              "type": "number"
+            },
+            "traceSampling": {
+              "type": "boolean"
+            },
+            "responseCaptureEnabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "projectSlug",
+            "status",
+            "uptimeStatus",
+            "url",
+            "intervalSeconds",
+            "webUrl",
+            "timeoutMs"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["monitor"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["project:write"],
+    "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
+    "name": "delete_uptime_monitor",
+    "description": "Delete a Sentry HTTP uptime monitor.\n\nUse this tool when you need to permanently remove an uptime monitor.\n\nBe careful when using this tool! Deletion cannot be undone.\n\n<examples>\ndelete_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345')\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "uptimeMonitorId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Uptime monitor ID (detector id)."
+        }
+      },
+      "required": ["organizationSlug", "projectSlug", "uptimeMonitorId"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "const": true
+        },
+        "uptimeMonitorId": {
+          "type": "string"
+        },
+        "projectSlug": {
+          "type": "string"
+        }
+      },
+      "required": ["success", "uptimeMonitorId", "projectSlug"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["project:write"],
+    "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
     "name": "execute_sentry_tool",
     "description": "Execute an available Sentry MCP tool discovered through search_sentry_tools.\n\nUse this tool when you need to:\n- Call a Sentry operation returned by search_sentry_tools\n- Execute a tool by name using arguments that match its returned schema\n\n<examples>\nexecute_sentry_tool(name='find_projects', arguments={ organizationSlug: 'my-org' })\nexecute_sentry_tool(name='whoami', arguments={})\n</examples>\n\n<hints>\n- Use search_sentry_tools first if you are not sure which name or arguments to pass.\n- Arguments are validated against the target tool's schema before execution.\n- Active organization, project, and region constraints are injected automatically.\n</hints>",
     "inputSchema": {
@@ -1717,8 +1970,127 @@
     "surface": "catalog"
   },
   {
-    "name": "get_ai_conversation_details",
-    "description": "Fetch the chronological transcript and debugging details for one AI conversation.\n\nReturns a timeline of user messages, assistant messages, and tool calls, with trace/span IDs for deeper debugging. To discover or list conversations, use search_ai_conversations.",
+    "name": "find_uptime_monitors",
+    "description": "Find Sentry uptime monitors.\n\nUse this tool when you need to:\n- List HTTP uptime monitors in an organization\n- Find a monitor by name or URL before getting details\n- Check monitor status, owner, project, interval, or target URL\n- When `hasMore` is true, narrow results with project, environment, owner, or query filters\n\nThis is separate from cron monitors (`find_monitors`).\n\n<examples>\nfind_uptime_monitors(organizationSlug='my-organization')\nfind_uptime_monitors(organizationSlug='my-organization', projectSlug='backend', query='api')\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug."
+        },
+        "environment": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional environment name to limit monitors."
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional owner filter, such as `user:123`, `team:456`, `myteams`, or `unassigned`."
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional search query for monitor name or URL."
+        },
+        "limit": {
+          "default": 10,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 99,
+          "description": "Maximum number of monitors to return."
+        }
+      },
+      "required": ["organizationSlug"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "monitors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "projectSlug": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "uptimeStatus": {
+                "type": "string",
+                "enum": ["ok", "failed", "unknown"]
+              },
+              "url": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string"
+              },
+              "intervalSeconds": {
+                "type": "number"
+              },
+              "environment": {
+                "type": "string"
+              },
+              "owner": {
+                "type": "string"
+              },
+              "webUrl": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "projectSlug",
+              "status",
+              "uptimeStatus",
+              "url",
+              "intervalSeconds",
+              "webUrl"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      },
+      "required": ["monitors", "hasMore"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["org:read", "project:read"],
+    "skills": ["inspect"],
+    "surface": "catalog"
+  },
+  {
+    "name": "get_agent_conversation_details",
+    "description": "Fetch the chronological transcript and debugging details for one agent conversation, formerly called an AI conversation.\n\nReturns a timeline of user messages, assistant messages, and tool calls, with trace/span IDs for deeper debugging. To discover or list conversations, use search_agent_conversations.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1728,7 +2100,493 @@
         },
         "conversationId": {
           "type": "string",
-          "description": "The AI conversation ID from gen_ai.conversation.id."
+          "description": "The agent conversation ID from gen_ai.conversation.id."
+        },
+        "project": {
+          "description": "Numeric project ID to scope the query. Falls back to context constraint or all projects.",
+          "type": "string"
+        },
+        "start": {
+          "description": "Explicit start time for the conversation lookup window.",
+          "type": "string"
+        },
+        "end": {
+          "description": "Explicit end time for the conversation lookup window.",
+          "type": "string"
+        },
+        "regionUrl": {
+          "type": "string",
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+        }
+      },
+      "required": ["organizationSlug", "conversationId"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "organizationSlug": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "lookupWindow": {
+          "type": "object",
+          "properties": {
+            "statsPeriod": {
+              "type": "string"
+            },
+            "start": {
+              "type": "string"
+            },
+            "end": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "startTimestamp": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endTimestamp": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "traceIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "spanCount": {
+          "type": "number"
+        },
+        "aiCallCount": {
+          "type": "number"
+        },
+        "messageCount": {
+          "type": "number"
+        },
+        "toolCallCount": {
+          "type": "number"
+        },
+        "totalTokens": {
+          "type": "number"
+        },
+        "spanSummaries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "spanId": {
+                "type": "string"
+              },
+              "traceId": {
+                "type": "string"
+              },
+              "parentSpanId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "project": {
+                "type": "string"
+              },
+              "projectId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "timestamp": {
+                "type": "number"
+              },
+              "durationMs": {
+                "type": "number"
+              },
+              "spanName": {
+                "type": "string"
+              },
+              "spanOp": {
+                "type": "string"
+              },
+              "spanDescription": {
+                "type": "string"
+              },
+              "spanStatus": {
+                "type": "string"
+              },
+              "transaction": {
+                "type": "string"
+              },
+              "isTransaction": {
+                "type": "boolean"
+              },
+              "genAi": {
+                "type": "object",
+                "properties": {
+                  "operationType": {
+                    "type": "string"
+                  },
+                  "agentName": {
+                    "type": "string"
+                  },
+                  "requestModel": {
+                    "type": "string"
+                  },
+                  "responseModel": {
+                    "type": "string"
+                  },
+                  "usageTotalTokens": {
+                    "type": "number"
+                  },
+                  "costTotalTokens": {
+                    "type": "number"
+                  },
+                  "systemInstructions": {
+                    "type": "string"
+                  },
+                  "inputMessages": {
+                    "type": "string"
+                  },
+                  "outputMessages": {
+                    "type": "string"
+                  },
+                  "requestMessages": {
+                    "type": "string"
+                  },
+                  "responseText": {
+                    "type": "string"
+                  },
+                  "responseObject": {
+                    "type": "string"
+                  },
+                  "toolDefinitions": {
+                    "type": "string"
+                  },
+                  "toolName": {
+                    "type": "string"
+                  },
+                  "toolCallArguments": {
+                    "type": "string"
+                  },
+                  "toolInput": {
+                    "type": "string"
+                  },
+                  "truncatedFields": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "spanId",
+              "traceId",
+              "project",
+              "projectId",
+              "timestamp",
+              "durationMs"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "timeline": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "message"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["user", "assistant"]
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "number"
+                  },
+                  "spanId": {
+                    "type": "string"
+                  },
+                  "traceId": {
+                    "type": "string"
+                  },
+                  "userEmail": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "properties": {
+                      "agentName": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "totalTokens": {
+                        "type": "number"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "durationMs": {
+                        "type": "number"
+                      }
+                    },
+                    "required": ["totalTokens", "durationMs"],
+                    "additionalProperties": false
+                  },
+                  "genAi": {
+                    "type": "object",
+                    "properties": {
+                      "operationType": {
+                        "type": "string"
+                      },
+                      "agentName": {
+                        "type": "string"
+                      },
+                      "requestModel": {
+                        "type": "string"
+                      },
+                      "responseModel": {
+                        "type": "string"
+                      },
+                      "usageTotalTokens": {
+                        "type": "number"
+                      },
+                      "costTotalTokens": {
+                        "type": "number"
+                      },
+                      "systemInstructions": {
+                        "type": "string"
+                      },
+                      "inputMessages": {
+                        "type": "string"
+                      },
+                      "outputMessages": {
+                        "type": "string"
+                      },
+                      "requestMessages": {
+                        "type": "string"
+                      },
+                      "responseText": {
+                        "type": "string"
+                      },
+                      "responseObject": {
+                        "type": "string"
+                      },
+                      "toolDefinitions": {
+                        "type": "string"
+                      },
+                      "toolName": {
+                        "type": "string"
+                      },
+                      "toolCallArguments": {
+                        "type": "string"
+                      },
+                      "toolInput": {
+                        "type": "string"
+                      },
+                      "truncatedFields": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "type",
+                  "role",
+                  "content",
+                  "timestamp",
+                  "spanId",
+                  "traceId"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "tool_call"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "spanId": {
+                    "type": "string"
+                  },
+                  "traceId": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "number"
+                  },
+                  "durationMs": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "arguments": {
+                    "type": "string"
+                  },
+                  "input": {
+                    "type": "string"
+                  },
+                  "genAi": {
+                    "type": "object",
+                    "properties": {
+                      "operationType": {
+                        "type": "string"
+                      },
+                      "agentName": {
+                        "type": "string"
+                      },
+                      "requestModel": {
+                        "type": "string"
+                      },
+                      "responseModel": {
+                        "type": "string"
+                      },
+                      "usageTotalTokens": {
+                        "type": "number"
+                      },
+                      "costTotalTokens": {
+                        "type": "number"
+                      },
+                      "systemInstructions": {
+                        "type": "string"
+                      },
+                      "inputMessages": {
+                        "type": "string"
+                      },
+                      "outputMessages": {
+                        "type": "string"
+                      },
+                      "requestMessages": {
+                        "type": "string"
+                      },
+                      "responseText": {
+                        "type": "string"
+                      },
+                      "responseObject": {
+                        "type": "string"
+                      },
+                      "toolDefinitions": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "type",
+                  "name",
+                  "spanId",
+                  "traceId",
+                  "timestamp",
+                  "durationMs"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "conversationId",
+        "title",
+        "organizationSlug",
+        "url",
+        "lookupWindow",
+        "startTimestamp",
+        "endTimestamp",
+        "traceIds",
+        "projects",
+        "spanCount",
+        "aiCallCount",
+        "messageCount",
+        "toolCallCount",
+        "totalTokens",
+        "spanSummaries",
+        "timeline"
+      ],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["event:read", "project:read"],
+    "skills": ["inspect", "triage", "seer"],
+    "surface": "catalog"
+  },
+  {
+    "name": "get_ai_conversation_details",
+    "description": "Deprecated alias for get_agent_conversation_details.\n\nUse get_agent_conversation_details for new integrations. This alias is kept for backward compatibility.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "The agent conversation ID from gen_ai.conversation.id."
         },
         "project": {
           "description": "Numeric project ID to scope the query. Falls back to context constraint or all projects.",
@@ -3147,7 +4005,7 @@
   },
   {
     "name": "get_sentry_resource",
-    "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, AI conversations, replays, monitors, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_ai_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use the Sentry tool `get_snapshot_image` for full-resolution image bytes.\n\nResource IDs:\n- monitor: <monitorSlug>\n- snapshot: <snapshotId>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
+    "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, agent conversations, replays, monitors, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAgent Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_agent_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use the Sentry tool `get_snapshot_image` for full-resolution image bytes.\n\nResource IDs:\n- monitor: <monitorSlug>\n- snapshot: <snapshotId>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3170,7 +4028,7 @@
           ]
         },
         "resourceId": {
-          "description": "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, monitor slug when inspect monitor tools are available, or snapshot artifact ID. Required when not using a URL.",
+          "description": "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, agent conversation ID, replay ID, monitor slug when inspect monitor tools are available, or snapshot artifact ID. Required when not using a URL.",
           "type": "string"
         },
         "organizationSlug": {
@@ -3346,6 +4204,253 @@
     "surface": "catalog"
   },
   {
+    "name": "get_uptime_monitor_details",
+    "description": "Get details for a Sentry uptime monitor, including recent checks.\n\nUse this tool when you need to:\n- Inspect an uptime monitor's URL, interval, thresholds, and status\n- Review recent HTTP check results (success/failure, status code, duration)\n- Debug why an uptime monitor is failing\n\nThis is separate from cron monitors (`get_monitor_details`).\n\nRequest bodies are never returned. Sensitive header values are redacted.\n\n<examples>\nget_uptime_monitor_details(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345')\nget_uptime_monitor_details(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', period='7d', checkLimit=20)\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "uptimeMonitorId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Uptime monitor ID (detector id)."
+        },
+        "period": {
+          "type": "string",
+          "pattern": "^\\d+[hdw]$",
+          "description": "Relative time range for recent checks. Defaults to `24h` when `start` and `end` are omitted."
+        },
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "description": "Absolute start time. Must be provided with `end`; do not combine with `period`."
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+          "description": "Absolute end time. Must be provided with `start`; do not combine with `period`."
+        },
+        "checkLimit": {
+          "default": 10,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 50,
+          "description": "Maximum number of recent checks to include."
+        }
+      },
+      "required": ["organizationSlug", "projectSlug", "uptimeMonitorId"]
+    },
+    "requiredScopes": ["project:read"],
+    "skills": ["inspect"],
+    "surface": "catalog"
+  },
+  {
+    "name": "onboarding_status_update",
+    "description": "Update the progress shown in Sentry's agentic onboarding UI.\n\nUse this tool only when the Sentry getting started skill provides a run token. Call it at the workflow boundaries described by that skill.\n\n<hints>\n- Progress updates are operational UI state, not user analytics.\n- Keep eventNote brief and limited to context useful in the progress UI.\n- Do not include source code, repository paths, credentials, error output, or other sensitive data.\n- status is required for every update.\n- Set runStatus to completed or failed only when the entire onboarding run reaches that state.\n- A failed status requires a brief eventNote explaining the failure.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runToken": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9]{10}$",
+          "description": "The 10-character onboarding run token supplied by Sentry."
+        },
+        "update": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "waiting",
+                    "completed",
+                    "skipped",
+                    "failed"
+                  ],
+                  "description": "The stage's current status."
+                },
+                "runStatus": {
+                  "description": "Set only when the entire onboarding run has completed or failed.",
+                  "type": "string",
+                  "enum": ["completed", "failed"]
+                },
+                "eventNote": {
+                  "description": "Short context to display with this progress event. Required when status is failed.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "stage": {
+                  "type": "string",
+                  "const": "create_project",
+                  "description": "Report progress while creating or selecting Sentry projects."
+                },
+                "extra": {
+                  "description": "Project metadata accepted only by the create_project stage.",
+                  "type": "object",
+                  "properties": {
+                    "projectSlugs": {
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Sentry project slugs created or selected during onboarding. Values accumulate across updates; include each project as it becomes usable while active, then all known projects when completed."
+                    }
+                  },
+                  "required": ["projectSlugs"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["status", "stage"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "waiting",
+                    "completed",
+                    "skipped",
+                    "failed"
+                  ],
+                  "description": "The stage's current status."
+                },
+                "runStatus": {
+                  "description": "Set only when the entire onboarding run has completed or failed.",
+                  "type": "string",
+                  "enum": ["completed", "failed"]
+                },
+                "eventNote": {
+                  "description": "Short context to display with this progress event. Required when status is failed.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "stage": {
+                  "type": "string",
+                  "const": "receive_verification_error",
+                  "description": "Report progress while receiving the verification error in Sentry."
+                },
+                "extra": {
+                  "description": "Issue metadata accepted only by the receive_verification_error stage.",
+                  "type": "object",
+                  "properties": {
+                    "issueIds": {
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Sentry issue IDs observed after sending the verification error. Values accumulate across updates; include each matching issue as it is confirmed, then all known issues when completed."
+                    }
+                  },
+                  "required": ["issueIds"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["status", "stage"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "waiting",
+                    "completed",
+                    "skipped",
+                    "failed"
+                  ],
+                  "description": "The stage's current status."
+                },
+                "runStatus": {
+                  "description": "Set only when the entire onboarding run has completed or failed.",
+                  "type": "string",
+                  "enum": ["completed", "failed"]
+                },
+                "eventNote": {
+                  "description": "Short context to display with this progress event. Required when status is failed.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "stage": {
+                  "type": "string",
+                  "enum": [
+                    "connect_mcp",
+                    "analyze_project",
+                    "instrument_app",
+                    "plan_test_error",
+                    "send_verification_error",
+                    "prepare_production",
+                    "check_stack_trace_quality"
+                  ],
+                  "description": "Report progress for a stage that does not accept extra metadata."
+                }
+              },
+              "required": ["status", "stage"],
+              "additionalProperties": false
+            }
+          ],
+          "description": "The stage-specific onboarding progress update."
+        }
+      },
+      "required": ["organizationSlug", "runToken", "update"]
+    },
+    "requiredScopes": ["org:read"],
+    "skills": ["inspect", "seer", "docs", "triage", "project-management"],
+    "surface": "catalog"
+  },
+  {
     "name": "remove_team_from_project",
     "description": "Revoke a team's access to an existing Sentry project.\n\nUse this tool when you need to:\n- Remove a team from a project\n- Revoke team access without changing project metadata\n- Check project team assignments before removing access\n\nBe careful when using this tool because it revokes project access.\n\n<examples>\nremove_team_from_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- The team must already be assigned to the project.\n- This tool will not remove the last team assigned to a project.\n</hints>",
     "inputSchema": {
@@ -3412,8 +4517,8 @@
     "surface": "catalog"
   },
   {
-    "name": "search_ai_conversations",
-    "description": "Search Sentry AI Conversations and return one summary row per conversation.\n\nUse this tool to find or list AI Conversations. Results are conversation summaries, not raw span rows.\nUse get_ai_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_ai_conversations(organizationSlug='my-org', query='failed conversations', period='7d')\nsearch_ai_conversations(organizationSlug='my-org', query='checkout', project='backend')\n</examples>",
+    "name": "search_agent_conversations",
+    "description": "Search Sentry Agent Conversations, formerly called AI Conversations, and return one summary row per conversation.\n\nUse this tool to find or list Agent Conversations. Results are conversation summaries, not raw span rows.\nEach row includes title (when available), cost, tokens, call counts, previews, and other list metadata.\nUse get_agent_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_agent_conversations(organizationSlug='my-org', query='failed conversations', period='7d')\nsearch_agent_conversations(organizationSlug='my-org', query='checkout', project='backend')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3520,6 +4625,16 @@
             "properties": {
               "conversationId": {
                 "type": "string"
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "url": {
                 "type": "string",
@@ -3630,6 +4745,272 @@
             },
             "required": [
               "conversationId",
+              "title",
+              "url",
+              "startTimestamp",
+              "endTimestamp",
+              "durationMs",
+              "errors",
+              "aiCallCount",
+              "toolCallCount",
+              "toolErrorCount",
+              "totalTokens",
+              "totalCost",
+              "traceCount",
+              "sampleTraceIds",
+              "firstInputPreview",
+              "lastOutputPreview",
+              "flow",
+              "toolNames",
+              "user"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "organizationSlug",
+        "searchUrl",
+        "count",
+        "nextCursor",
+        "conversations"
+      ],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["event:read", "project:read"],
+    "skills": ["inspect", "triage", "seer"],
+    "surface": "catalog"
+  },
+  {
+    "name": "search_ai_conversations",
+    "description": "Deprecated alias for search_agent_conversations.\n\nUse search_agent_conversations for new integrations. This alias is kept for backward compatibility.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "query": {
+          "description": "Conversation query/filter string.",
+          "type": "string"
+        },
+        "project": {
+          "description": "Project slug or numeric project ID, or an array of projects.",
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+            },
+            {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+              }
+            }
+          ]
+        },
+        "environment": {
+          "description": "Environment name, or an array of environments.",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "period": {
+          "default": "30d",
+          "description": "Relative time range. Defaults to 30d.",
+          "type": "string",
+          "pattern": "^\\d+[hdw]$"
+        },
+        "start": {
+          "description": "Explicit start time for the search window.",
+          "type": "string"
+        },
+        "end": {
+          "description": "Explicit end time for the search window.",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Pagination cursor from a previous response.",
+          "type": "string"
+        },
+        "limit": {
+          "default": 10,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "regionUrl": {
+          "type": "string",
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+        }
+      },
+      "required": ["organizationSlug"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string"
+        },
+        "searchUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "count": {
+          "type": "number"
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conversations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "conversationId": {
+                "type": "string"
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "startTimestamp": {
+                "type": "number"
+              },
+              "endTimestamp": {
+                "type": "number"
+              },
+              "durationMs": {
+                "type": "number"
+              },
+              "errors": {
+                "type": "number"
+              },
+              "aiCallCount": {
+                "type": "number"
+              },
+              "toolCallCount": {
+                "type": "number"
+              },
+              "toolErrorCount": {
+                "type": "number"
+              },
+              "totalTokens": {
+                "type": "number"
+              },
+              "totalCost": {
+                "type": "number"
+              },
+              "traceCount": {
+                "type": "number"
+              },
+              "sampleTraceIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "firstInputPreview": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastOutputPreview": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "flow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "toolNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "user": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "email": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "username": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["email", "username"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "conversationId",
+              "title",
               "url",
               "startTimestamp",
               "endTimestamp",
@@ -3880,26 +5261,19 @@
           ]
         },
         "environment": {
-          "description": "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead.",
+          "description": "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. Omit when unused. For other datasets, filter environment in the query string instead.",
           "anyOf": [
             {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "minLength": 1
-                },
-                {
-                  "minItems": 1,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              ]
+              "type": "string",
+              "minLength": 1
             },
             {
-              "type": "null"
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
@@ -4041,9 +5415,9 @@
         },
         "sort": {
           "default": "date",
-          "description": "Sort order: date (last seen), freq (frequency), new (first seen), user (user count)",
+          "description": "Sort order: date (last seen), freq (frequency), new (first seen), user (user count), recommended (Sentry's prioritized ranking)",
           "type": "string",
-          "enum": ["date", "freq", "new", "user"]
+          "enum": ["date", "freq", "new", "user", "recommended"]
         },
         "projectSlugOrId": {
           "default": null,
@@ -4457,6 +5831,218 @@
         }
       },
       "required": ["project"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["project:write"],
+    "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
+    "name": "update_uptime_monitor",
+    "description": "Update a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Change URL, interval, timeout, method, headers, or body\n- Enable or disable a monitor (`status`)\n- Update owner, environment, or failure thresholds\n\nBe careful when using this tool!\n\nOmit a field to leave it unchanged. Pass explicit `null` to clear `owner`, `environment`, or `body`.\n\n<examples>\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', status='disabled')\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', intervalSeconds=300, timeoutMs=8000)\nupdate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345', owner=null)\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "uptimeMonitorId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Uptime monitor ID (detector id)."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "intervalSeconds": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "Seconds between checks. Allowed values: 60, 300, 600, 1200, 1800, 3600."
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000,
+          "description": "Request timeout in milliseconds (1000-60000)."
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS"],
+          "description": "HTTP method used for the uptime check request."
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "description": "Optional HTTP headers as an array of [name, value] pairs, e.g. [[\"Accept\",\"application/json\"]]."
+        },
+        "body": {
+          "description": "Request body. Pass `null` to clear the body.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "disabled"],
+          "description": "Monitor status. `disabled` stops checks and does not count against quota."
+        },
+        "owner": {
+          "description": "Owner actor in `user:ID` or `team:ID` format. Pass `null` to clear the owner.",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(user|team):.+$",
+              "description": "Owner actor in `user:ID` or `team:ID` format."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "environment": {
+          "description": "Environment name. Pass `null` to clear the environment.",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "traceSampling": {
+          "type": "boolean"
+        },
+        "responseCaptureEnabled": {
+          "type": "boolean"
+        },
+        "recoveryThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "downtimeThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["organizationSlug", "projectSlug", "uptimeMonitorId"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "monitor": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "projectSlug": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "uptimeStatus": {
+              "type": "string",
+              "enum": ["ok", "failed", "unknown"]
+            },
+            "url": {
+              "type": "string"
+            },
+            "method": {
+              "type": "string"
+            },
+            "intervalSeconds": {
+              "type": "number"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "string"
+            },
+            "webUrl": {
+              "type": "string",
+              "format": "uri"
+            },
+            "timeoutMs": {
+              "type": "number"
+            },
+            "recoveryThreshold": {
+              "type": "number"
+            },
+            "downtimeThreshold": {
+              "type": "number"
+            },
+            "traceSampling": {
+              "type": "boolean"
+            },
+            "responseCaptureEnabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "projectSlug",
+            "status",
+            "uptimeStatus",
+            "url",
+            "intervalSeconds",
+            "webUrl",
+            "timeoutMs"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["monitor"],
       "additionalProperties": false
     },
     "requiredScopes": ["project:write"],

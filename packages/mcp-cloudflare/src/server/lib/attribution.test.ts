@@ -1,13 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   UTM_SOURCE_ATTRIBUTE,
+  UTM_SOURCE_HEADER,
   resolveUtmSource,
+  resolveUtmSourceFromRequest,
   resolveUtmSourceFromUrl,
 } from "./attribution";
 
 describe("UTM_SOURCE_ATTRIBUTE", () => {
   it("is app.utm_source", () => {
     expect(UTM_SOURCE_ATTRIBUTE).toBe("app.utm_source");
+  });
+});
+
+describe("UTM_SOURCE_HEADER", () => {
+  it("is X-Sentry-Utm-Source", () => {
+    expect(UTM_SOURCE_HEADER).toBe("X-Sentry-Utm-Source");
   });
 });
 
@@ -42,5 +50,40 @@ describe("resolveUtmSourceFromUrl", () => {
   it("buckets unknown values to other", () => {
     const url = new URL("https://mcp.sentry.dev/mcp?utm_source=something-new");
     expect(resolveUtmSourceFromUrl(url)).toBe("other");
+  });
+});
+
+describe("resolveUtmSourceFromRequest", () => {
+  it("prefers the attribution header over the query param", () => {
+    const request = new Request(
+      "https://mcp.sentry.dev/mcp?utm_source=other-value",
+      {
+        headers: { [UTM_SOURCE_HEADER]: "plugin" },
+      },
+    );
+    expect(resolveUtmSourceFromRequest(request)).toBe("plugin");
+  });
+
+  it("falls back to the query param when the header is absent", () => {
+    const request = new Request("https://mcp.sentry.dev/mcp?utm_source=plugin");
+    expect(resolveUtmSourceFromRequest(request)).toBe("plugin");
+  });
+
+  it("returns null when neither header nor query is present", () => {
+    const request = new Request("https://mcp.sentry.dev/mcp");
+    expect(resolveUtmSourceFromRequest(request)).toBeNull();
+  });
+
+  it("buckets unknown header values to other", () => {
+    const request = new Request("https://mcp.sentry.dev/mcp", {
+      headers: { [UTM_SOURCE_HEADER]: "something-new" },
+    });
+    expect(resolveUtmSourceFromRequest(request)).toBe("other");
+  });
+
+  it("accepts a pre-parsed URL for the query fallback", () => {
+    const url = new URL("https://mcp.sentry.dev/mcp?utm_source=plugin");
+    const request = new Request("https://mcp.sentry.dev/mcp");
+    expect(resolveUtmSourceFromRequest(request, url)).toBe("plugin");
   });
 });

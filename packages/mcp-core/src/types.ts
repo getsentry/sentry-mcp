@@ -50,6 +50,8 @@ export type ServerContext = {
   clientName?: string | null;
   /** Bucketed client family (e.g. "claude-code", "cursor") resolved from User-Agent */
   clientFamily?: string | null;
+  /** Sanitized MCP request attribution source forwarded to Sentry API requests */
+  utmSource?: string | null;
   openaiBaseUrl?: string;
   userId?: string | null;
   userIpAddress?: string | null;
