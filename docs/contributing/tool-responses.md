@@ -121,23 +121,24 @@ MCP tools may expose `structuredContent` alongside generated text `content`.
 Use it when clients need a typed result, pagination token, stable follow-up
 handle, or machine-readable projection of the same result. The current MCP spec
 defines `structuredContent` as a JSON object on `CallToolResult`, and
-`outputSchema` as the schema for that object:
+`outputSchema` as the schema for that object.
 
-- Put the primary answer in `structuredContent`.
+Policy (encoded in `packages/mcp-core/src/internal/tool-helpers/results.ts`):
+
+- `structuredContent` is the source of truth when present.
+- `content` text is a compatibility view of that same answer.
+- Never put unique product data in only one side. If both fields are present,
+  they must be equivalent. Form-only differences (JSON vs pretty text of the
+  same payload) are fine; a second answer that exists in only one field is a
+  bug.
 - Data tools should use `structuredResult(payload)`. The server generates
   `content` as pretty JSON of that same payload.
-- Some tools still render markdown for humans (for example issue and trace
-  details). Those may keep markdown in `content`, but the answer must also
-  appear in `structuredContent`. Use `markdownResult({ markdown, ...extras })`,
-  which stores the markdown under `structuredContent.markdown` and may attach
-  small continuation fields such as `suggestedActions`.
-- Never return `structuredContent` that is only a side hint (for example
-  `suggestedActions` alone). Some clients keep only `structuredContent` and
-  drop text `content`, so the primary answer would disappear.
+- Markdown-only tools (for example issue and trace details today) should return
+  markdown and omit `structuredContent` until they have a real structured
+  payload. Do not attach sparse structured side-channels such as
+  `suggestedActions` alone on top of markdown.
 - If a tool declares `outputSchema`, every successful `structuredContent` result
   must conform to that schema.
-- Do not use `structuredResult(payload)` when the handler also returns
-  handwritten markdown. That helper is for structured-only results.
 - Do not duplicate a large structured payload into a markdown artifact block.
 - Treat `structuredContent` as a stable product contract, not a raw upstream API
   passthrough. Map only documented fields that callers should depend on.
@@ -189,8 +190,11 @@ Guidelines:
   hard cap of three.
 - Keep `reason` concise and descriptive. It should explain why the action is
   useful, not instruct the model how to behave.
-- Mirror the action in `## Response Notes` for clients that do not read
-  `structuredContent`.
+- When the tool result is markdown-only, put the follow-up only in
+  `## Response Notes` / product sections. Do not also emit sparse
+  `structuredContent.suggestedActions`.
+- When the tool result is structured, include `suggestedActions` in that same
+  structured payload and keep any markdown/compat text equivalent.
 - Do not include secrets, auth tokens, raw payloads, or sensitive user data in
   action arguments or reasons.
 

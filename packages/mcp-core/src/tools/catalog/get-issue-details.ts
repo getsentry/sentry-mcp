@@ -13,10 +13,7 @@ import type {
 } from "../../api-client/types";
 import { UserInputError } from "../../errors";
 import type { CodeLocation } from "../../internal/code-location";
-import {
-  type AIConversationReference,
-  addAIConversationSuggestedActions,
-} from "../../internal/tool-helpers/ai-conversation-actions";
+import type { AIConversationReference } from "../../internal/tool-helpers/ai-conversation-actions";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { enhanceNotFoundError } from "../../internal/tool-helpers/enhance-error";
@@ -25,7 +22,6 @@ import {
   formatIssueOutput,
   parseIssueParams,
 } from "../../internal/tool-helpers/issue";
-import { markdownResult } from "../../internal/tool-helpers/results";
 import {
   ParamEventId,
   ParamIssueShortId,
@@ -125,9 +121,7 @@ export default defineTool({
           query: eventId,
         });
         if (!found) {
-          return markdownResult({
-            markdown: `# Event Not Found\n\nNo issue found for Event ID: ${eventId}`,
-          });
+          return `# Event Not Found\n\nNo issue found for Event ID: ${eventId}`;
         }
         issue = found;
       }
@@ -174,25 +168,18 @@ export default defineTool({
         }),
       ]);
 
-      return addAIConversationSuggestedActions({
-        markdown: formatIssueOutput({
-          organizationSlug: orgSlug,
-          issue,
-          event,
-          apiService,
-          autofixState,
-          performanceTrace,
-          externalIssues,
-          relatedReplayIds,
-          aiConversations,
-          codeLocation,
-          experimentalMode: context.experimentalMode,
-          availableToolNames: context.availableToolNames,
-          directToolNames: context.directToolNames,
-        }),
+      return formatIssueOutput({
         organizationSlug: orgSlug,
+        issue,
+        event,
+        apiService,
+        autofixState,
+        performanceTrace,
+        externalIssues,
+        relatedReplayIds,
         aiConversations,
-        experimentalMode: context.experimentalMode ?? false,
+        codeLocation,
+        experimentalMode: context.experimentalMode,
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
       });
@@ -267,25 +254,18 @@ export default defineTool({
       }),
     ]);
 
-    return addAIConversationSuggestedActions({
-      markdown: formatIssueOutput({
-        organizationSlug: orgSlug,
-        issue,
-        event,
-        apiService,
-        autofixState,
-        performanceTrace,
-        externalIssues,
-        relatedReplayIds,
-        aiConversations,
-        codeLocation,
-        experimentalMode: context.experimentalMode,
-        availableToolNames: context.availableToolNames,
-        directToolNames: context.directToolNames,
-      }),
+    return formatIssueOutput({
       organizationSlug: orgSlug,
+      issue,
+      event,
+      apiService,
+      autofixState,
+      performanceTrace,
+      externalIssues,
+      relatedReplayIds,
       aiConversations,
-      experimentalMode: context.experimentalMode ?? false,
+      codeLocation,
+      experimentalMode: context.experimentalMode,
       availableToolNames: context.availableToolNames,
       directToolNames: context.directToolNames,
     });

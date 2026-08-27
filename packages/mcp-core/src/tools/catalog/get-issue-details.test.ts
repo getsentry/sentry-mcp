@@ -14,11 +14,12 @@ import {
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import type { Skill } from "../../skills";
-import {
-  getStructuredContent,
-  getTextContent,
-} from "../../test-utils/structured-content";
+import { getTextContent } from "../../test-utils/structured-content";
 import getIssueDetails from "./get-issue-details.js";
+
+function resultText(result: unknown): string {
+  return typeof result === "string" ? result : getTextContent(result);
+}
 
 const baseContext = {
   constraints: {
@@ -211,7 +212,7 @@ describe("get_issue_details", () => {
       },
     );
     expect(stacktraceLinkRequested).toBe(true);
-    expect(getTextContent(result)).toMatchInlineSnapshot(`
+    expect(resultText(result)).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
 
       **Description**: Error: Tool list_organizations is already registered
@@ -326,11 +327,11 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain(
       "**Description**: Error: Tool list_issues is already registered",
     );
-    expect(getTextContent(result)).not.toContain("**Culprit**:");
-    expect(getTextContent(result)).not.toContain("**Culprit**: null");
+    expect(resultText(result)).not.toContain("**Culprit**:");
+    expect(resultText(result)).not.toContain("**Culprit**: null");
   });
 
   it("surfaces agent conversation IDs found by bounded span lookup", async () => {
@@ -396,39 +397,16 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    const text = getTextContent(result);
+    const text = resultText(result);
     expect(text).toContain(
       "- Agent conversation found in this trace: `conv-123`. Matching span: `span-123`.",
     );
     expect(text).toContain(
       '- Use the Sentry tool `execute_sentry_tool(name=\'get_agent_conversation_details\', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})` to fetch the full transcript.',
     );
-    const structuredContent = getStructuredContent<{
-      markdown: string;
-      suggestedActions: Array<{
-        type: string;
-        toolName: string;
-        arguments: Record<string, unknown>;
-        reason: string;
-      }>;
-    }>(result);
-    expect(structuredContent.markdown).toBe(text);
-    expect(structuredContent).toMatchObject({
-      suggestedActions: [
-        {
-          type: "tool_call",
-          toolName: "execute_sentry_tool",
-          arguments: {
-            name: "get_agent_conversation_details",
-            arguments: {
-              organizationSlug: "sentry-mcp-evals",
-              conversationId: "conv-123",
-            },
-          },
-          reason: "Fetch the full transcript for this agent conversation.",
-        },
-      ],
-    });
+    expect(
+      (result as { structuredContent?: unknown }).structuredContent,
+    ).toBeUndefined();
     expect(text).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
 
@@ -524,10 +502,8 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    expect(getTextContent(result)).not.toContain("Agent conversation found");
-    expect(getTextContent(result)).not.toContain(
-      "get_agent_conversation_details",
-    );
+    expect(resultText(result)).not.toContain("Agent conversation found");
+    expect(resultText(result)).not.toContain("get_agent_conversation_details");
   });
 
   it("does not query spans for an invalid event trace ID", async () => {
@@ -626,7 +602,7 @@ describe("get_issue_details", () => {
     );
 
     // Verify that team assignment is displayed with "(Team)" suffix
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain(
       "**Assigned To**: Platform Team (Team)",
     );
   });
@@ -708,7 +684,7 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    const text = getTextContent(result);
+    const text = resultText(result);
     const threadSection = text
       .slice(text.indexOf("### Threads"), text.indexOf("### Tags"))
       .trim();
@@ -783,8 +759,8 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    expect(getTextContent(result)).not.toContain("### Threads");
-    expect(getTextContent(result)).not.toContain("Thread stacktrace lookup");
+    expect(resultText(result)).not.toContain("### Threads");
+    expect(resultText(result)).not.toContain("Thread stacktrace lookup");
   });
 
   it("includes attached and related replays when available", async () => {
@@ -832,7 +808,7 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    const text = getTextContent(result);
+    const text = resultText(result);
     const replaySection = text
       .slice(text.indexOf("## Session Replay"), text.indexOf("### Error"))
       .trim();
@@ -849,7 +825,7 @@ describe("get_issue_details", () => {
 
       Use the Sentry tool \`get_replay_details\` to inspect a replay in detail."
     `);
-    expect(getTextContent(result)).not.toContain("**replayId**:");
+    expect(resultText(result)).not.toContain("**replayId**:");
   });
 
   it("serializes with issueUrl", async () => {
@@ -870,7 +846,7 @@ describe("get_issue_details", () => {
       },
     );
 
-    expect(getTextContent(result)).toMatchInlineSnapshot(`
+    expect(resultText(result)).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
 
       **Description**: Error: Tool list_organizations is already registered
@@ -1010,7 +986,7 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    const text = getTextContent(result);
+    const text = resultText(result);
     const performanceSection = text
       .slice(text.indexOf("### Repeated Database Queries"))
       .split("### Tags")[0]
@@ -1097,7 +1073,7 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    const text = getTextContent(result);
+    const text = resultText(result);
     const performanceSection = text
       .slice(text.indexOf("### Repeated Database Queries"))
       .split("### Tags")[0]
@@ -1149,7 +1125,7 @@ describe("get_issue_details", () => {
         userId: "1",
       },
     );
-    expect(getTextContent(result)).toMatchInlineSnapshot(`
+    expect(resultText(result)).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
 
       **Description**: Error: Tool list_organizations is already registered
@@ -1329,8 +1305,8 @@ describe("get_issue_details", () => {
     );
 
     // Verify the basic issue output is present
-    expect(getTextContent(result)).toContain("# Issue CLOUDFLARE-MCP-41");
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain("# Issue CLOUDFLARE-MCP-41");
+    expect(resultText(result)).toContain(
       "Error: Tool list_organizations is already registered",
     );
     // When Seer data is available, these would pass:
@@ -1364,7 +1340,7 @@ describe("get_issue_details", () => {
     );
 
     expect(autofixRequested).toBe(false);
-    expect(getTextContent(result)).toContain("# Issue CLOUDFLARE-MCP-41");
+    expect(resultText(result)).toContain("# Issue CLOUDFLARE-MCP-41");
   });
 
   it("requests autofix state when the seer skill is granted", async () => {
@@ -1449,10 +1425,10 @@ describe("get_issue_details", () => {
       },
     );
 
-    expect(getTextContent(result)).toContain("## Seer Analysis");
-    expect(getTextContent(result)).toContain("**Status:** Processing");
-    expect(getTextContent(result)).toContain("**Root Cause Identified:**");
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain("## Seer Analysis");
+    expect(resultText(result)).toContain("**Status:** Processing");
+    expect(resultText(result)).toContain("**Root Cause Identified:**");
+    expect(resultText(result)).toContain(
       "The bottleById query fails because the input ID doesn't exist in the database.",
     );
   });
@@ -1492,8 +1468,8 @@ describe("get_issue_details", () => {
       },
     );
 
-    expect(getTextContent(result)).toContain("## Seer Analysis");
-    expect(getTextContent(result)).toContain("**Status:** Analysis failed.");
+    expect(resultText(result)).toContain("## Seer Analysis");
+    expect(resultText(result)).toContain("**Status:** Analysis failed.");
   });
 
   it.skip("includes Seer analysis when needs information - awaiting_user_input state", async () => {
@@ -1547,12 +1523,12 @@ describe("get_issue_details", () => {
       },
     );
 
-    expect(getTextContent(result)).toContain("## Seer Analysis");
-    expect(getTextContent(result)).toContain("**Root Cause Identified:**");
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain("## Seer Analysis");
+    expect(resultText(result)).toContain("**Root Cause Identified:**");
+    expect(resultText(result)).toContain(
       "Partial analysis completed but more context needed.",
     );
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain(
       "**Status:** Analysis paused - additional information needed.",
     );
   });
@@ -1611,17 +1587,17 @@ describe("get_issue_details", () => {
     );
 
     // Verify the event was processed successfully
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain(
       "# Issue DEFAULT-001 in **sentry-mcp-evals**",
     );
-    expect(getTextContent(result)).toContain("Error without exception data");
-    expect(getTextContent(result)).toContain("**Event ID**: abc123def456");
+    expect(resultText(result)).toContain("Error without exception data");
+    expect(resultText(result)).toContain("**Event ID**: abc123def456");
     // Default events should show dateCreated just like error events
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain(
       "**Occurred At**: 2025-10-02T12:00:00.000Z",
     );
-    expect(getTextContent(result)).toContain("### Error");
-    expect(getTextContent(result)).toContain("Something went wrong");
+    expect(resultText(result)).toContain("### Error");
+    expect(resultText(result)).toContain("Something went wrong");
   });
 
   it("handles CSP (Content Security Policy) violation events", async () => {
@@ -1652,19 +1628,19 @@ describe("get_issue_details", () => {
     );
 
     // Verify CSP-specific content is included
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain(
       "# Issue BLOG-CSP-4XC in **sentry-mcp-evals**",
     );
-    expect(getTextContent(result)).toContain("Blocked 'image' from 'blob:'");
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain("Blocked 'image' from 'blob:'");
+    expect(resultText(result)).toContain(
       "**Event ID**: bf5b6c7fd49f4f8da94085a43393051d",
     );
-    expect(getTextContent(result)).toContain("**Type**: csp");
+    expect(resultText(result)).toContain("**Type**: csp");
     // Should show the CSP entry data
-    expect(getTextContent(result)).toContain("### CSP Violation");
-    expect(getTextContent(result)).toContain("**Blocked URI**: blob");
-    expect(getTextContent(result)).toContain("**Violated Directive**: img-src");
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain("### CSP Violation");
+    expect(resultText(result)).toContain("**Blocked URI**: blob");
+    expect(resultText(result)).toContain("**Violated Directive**: img-src");
+    expect(resultText(result)).toContain(
       "**Document URI**: https://blog.sentry.io",
     );
   });
@@ -1735,12 +1711,12 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain(
       "# Issue MALFORMED-TAGS-001 in **sentry-mcp-evals**",
     );
-    expect(getTextContent(result)).toContain("### Tags");
-    expect(getTextContent(result)).toContain("**level**: error");
-    expect(getTextContent(result)).not.toContain("**null**");
+    expect(resultText(result)).toContain("### Tags");
+    expect(resultText(result)).toContain("**level**: error");
+    expect(resultText(result)).not.toContain("**null**");
   });
 
   it("displays context (extra) data when present", async () => {
@@ -1834,22 +1810,18 @@ describe("get_issue_details", () => {
     );
 
     // Verify the context (extra) data is displayed
-    expect(getTextContent(result)).toContain("### Extra Data");
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain("### Extra Data");
+    expect(resultText(result)).toContain(
       "Additional data attached to this event",
     );
-    expect(getTextContent(result)).toContain(
-      '**custom_field**: "custom_value"',
-    );
-    expect(getTextContent(result)).toContain('**user_action**: "submit_form"');
-    expect(getTextContent(result)).toContain("**session_data**:");
-    expect(getTextContent(result)).toContain('"session_id": "sess_12345"');
-    expect(getTextContent(result)).toContain('"user_id": "user_67890"');
-    expect(getTextContent(result)).toContain(
-      '**environment_info**: "production"',
-    );
+    expect(resultText(result)).toContain('**custom_field**: "custom_value"');
+    expect(resultText(result)).toContain('**user_action**: "submit_form"');
+    expect(resultText(result)).toContain("**session_data**:");
+    expect(resultText(result)).toContain('"session_id": "sess_12345"');
+    expect(resultText(result)).toContain('"user_id": "user_67890"');
+    expect(resultText(result)).toContain('**environment_info**: "production"');
     // Verify contexts are still displayed
-    expect(getTextContent(result)).toContain("### Additional Context");
+    expect(resultText(result)).toContain("### Additional Context");
   });
 
   it("handles regressed performance issues (generic type with empty entries)", async () => {
@@ -1888,7 +1860,7 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    expect(getTextContent(result)).toMatchInlineSnapshot(`
+    expect(resultText(result)).toMatchInlineSnapshot(`
       "# Issue MCP-SERVER-EQE in **sentry-mcp-evals**
 
       **Description**: Endpoint Regression
@@ -1970,11 +1942,11 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    expect(getTextContent(result)).toContain("## External Issue Links");
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain("## External Issue Links");
+    expect(resultText(result)).toContain(
       "**AMP-12345** (jira): https://amplitude.atlassian.net/browse/AMP-12345",
     );
-    expect(getTextContent(result)).toContain(
+    expect(resultText(result)).toContain(
       "**getsentry/sentry#12345** (github): https://github.com/getsentry/sentry/issues/12345",
     );
   });
@@ -1991,7 +1963,7 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    expect(getTextContent(result)).not.toContain("## External Issue Links");
+    expect(resultText(result)).not.toContain("## External Issue Links");
   });
 
   it("handles unsupported event types gracefully", async () => {
@@ -2058,7 +2030,7 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    const text = getTextContent(result);
+    const text = resultText(result);
 
     // Extract the Sentry Event ID from the result (it varies per run)
     const sentryEventIdMatch = text.match(
@@ -2073,29 +2045,6 @@ describe("get_issue_details", () => {
       /Sentry Event ID \*\*[a-f0-9]{32}\*\*/,
       "Sentry Event ID **<SENTRY_EVENT_ID>**",
     );
-
-    const structuredContent = getStructuredContent<{
-      markdown: string;
-      suggestedActions: Array<{
-        toolName: string;
-        arguments: Record<string, unknown>;
-      }>;
-    }>(result);
-    expect(structuredContent.markdown).toBe(text);
-    expect(structuredContent).toMatchObject({
-      suggestedActions: [
-        {
-          toolName: "execute_sentry_tool",
-          arguments: {
-            name: "get_agent_conversation_details",
-            arguments: {
-              organizationSlug: "sentry-mcp-evals",
-              conversationId: "conv-unsupported",
-            },
-          },
-        },
-      ],
-    });
 
     expect(normalizedResult).toMatchInlineSnapshot(`
       "# Issue FUTURE-TYPE-001 in **sentry-mcp-evals**

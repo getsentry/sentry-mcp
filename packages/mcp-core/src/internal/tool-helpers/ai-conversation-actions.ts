@@ -1,6 +1,4 @@
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { isTopLevelToolName } from "../../tools/surfaces";
-import { markdownResult } from "./results";
 import {
   formatToolCall,
   isToolAvailableInSession,
@@ -141,41 +139,4 @@ export function formatAIConversationActionInstructions({
         }),
       )} to fetch the full transcript.`,
   );
-}
-
-/**
- * Returns issue/trace markdown via markdownResult, optionally with transcript
- * follow-up actions. The markdown answer is always present in both content and
- * structuredContent.markdown.
- */
-export function addAIConversationSuggestedActions({
-  markdown,
-  organizationSlug,
-  aiConversations,
-  experimentalMode,
-  availableToolNames,
-  directToolNames,
-}: {
-  markdown: string;
-  organizationSlug: string;
-  aiConversations: AIConversationReference[];
-  experimentalMode: boolean;
-  availableToolNames?: ReadonlySet<string>;
-  directToolNames?: ReadonlySet<string>;
-}): CallToolResult {
-  const suggestedActions = getAIConversationSuggestedActions({
-    organizationSlug,
-    aiConversations,
-    experimentalMode,
-    availableToolNames,
-    directToolNames,
-  });
-  if (suggestedActions.length === 0) {
-    return markdownResult({ markdown });
-  }
-
-  return markdownResult({
-    markdown,
-    suggestedActions,
-  });
 }

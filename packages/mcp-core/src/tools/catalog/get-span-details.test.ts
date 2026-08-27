@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 import { getTextContent } from "../../test-utils/structured-content";
 import getSpanDetails from "./get-span-details.js";
 
+function resultText(result: unknown): string {
+  return typeof result === "string" ? result : getTextContent(result);
+}
+
 function httpGetRegional(
   sentryIoUrl: string,
   resolver: Parameters<typeof http.get>[1],
@@ -56,7 +60,7 @@ describe("get_span_details", () => {
       },
     );
 
-    expect(getTextContent(result)).toMatchInlineSnapshot(`
+    expect(resultText(result)).toMatchInlineSnapshot(`
       "# Span \`aa8e7f3384ef4ff5\` in Trace \`b4d1aae7216b47ff8117cf4e09ce9d0b\` in **sentry-mcp-evals**
 
       ## Summary
