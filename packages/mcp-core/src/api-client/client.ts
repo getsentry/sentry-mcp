@@ -290,7 +290,7 @@ type UpdateClientKeyRequest = {
   browserSdkVersion?: string;
   dynamicSdkLoaderOptions?: ClientKeyDynamicSdkLoaderOptions;
 };
-export type TraceItemAttributeType = "string" | "number" | "boolean";
+export type TraceItemAttributeType = "string" | "number" | "boolean" | "array";
 export type TraceItemAttributeSourceType = "sentry" | "user";
 
 export type TraceItemAttributeSource = {
