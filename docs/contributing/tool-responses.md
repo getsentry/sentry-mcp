@@ -123,21 +123,21 @@ handle, or machine-readable projection of the same result. The current MCP spec
 defines `structuredContent` as a JSON object on `CallToolResult`, and
 `outputSchema` as the schema for that object:
 
-- Prefer packing the primary answer into `structuredContent`.
+- Put the primary answer in `structuredContent`.
 - Data tools should use `structuredResult(payload)`. The server generates
   `content` as pretty JSON of that same payload.
-- Markdown-primary tools (for example issue/trace details) may keep handwritten
-  markdown in `content`, but must still put the answer on
-  `structuredContent`. Use `markdownResult({ markdown, ...extras })`, which
-  always includes `markdown` in `structuredContent` and may attach small
-  continuation fields such as `suggestedActions`.
-- Do not return sparse hint-only `structuredContent` (for example
-  `suggestedActions` alone) without the primary answer. Structured-preferring
-  clients can promote that field and drop text `content`.
+- Some tools still render markdown for humans (for example issue and trace
+  details). Those may keep markdown in `content`, but the answer must also
+  appear in `structuredContent`. Use `markdownResult({ markdown, ...extras })`,
+  which stores the markdown under `structuredContent.markdown` and may attach
+  small continuation fields such as `suggestedActions`.
+- Never return `structuredContent` that is only a side hint (for example
+  `suggestedActions` alone). Some clients keep only `structuredContent` and
+  drop text `content`, so the primary answer would disappear.
 - If a tool declares `outputSchema`, every successful `structuredContent` result
   must conform to that schema.
-- Do not use `structuredResult(payload)` for mixed markdown + structured
-  responses; that helper is structured-only.
+- Do not use `structuredResult(payload)` when the handler also returns
+  handwritten markdown. That helper is for structured-only results.
 - Do not duplicate a large structured payload into a markdown artifact block.
 - Treat `structuredContent` as a stable product contract, not a raw upstream API
   passthrough. Map only documented fields that callers should depend on.

@@ -144,11 +144,9 @@ export function formatAIConversationActionInstructions({
 }
 
 /**
- * Packs markdown-first issue/trace answers into structuredContent.
- *
- * content keeps handwritten markdown for content-first clients. structuredContent
- * always includes that same markdown so structured-preferring clients still receive
- * the primary answer. Optional suggestedActions are attached beside it.
+ * Returns issue/trace markdown via markdownResult, optionally with transcript
+ * follow-up actions. The markdown answer is always present in both content and
+ * structuredContent.markdown.
  */
 export function addAIConversationSuggestedActions({
   markdown,

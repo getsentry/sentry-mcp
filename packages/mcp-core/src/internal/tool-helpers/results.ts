@@ -14,11 +14,9 @@ export function structuredResult<T extends Record<string, unknown>>(
 }
 
 /**
- * Markdown-primary result that still packs the answer into structuredContent.
- *
- * content keeps handwritten markdown for content-first clients. structuredContent
- * always includes that same markdown so structured-preferring clients do not lose
- * the primary answer when optional fields (for example suggestedActions) are present.
+ * Returns handwritten markdown in content and the same answer in
+ * structuredContent.markdown. Optional extras (for example suggestedActions)
+ * are stored beside markdown, never instead of it.
  */
 export function markdownResult(
   result: {

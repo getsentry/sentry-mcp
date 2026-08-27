@@ -834,10 +834,7 @@ describe("get_issue_details", () => {
 
     const text = getTextContent(result);
     const replaySection = text
-      .slice(
-        getTextContent(result).indexOf("## Session Replay"),
-        getTextContent(result).indexOf("### Error"),
-      )
+      .slice(text.indexOf("## Session Replay"), text.indexOf("### Error"))
       .trim();
 
     expect(replaySection).toMatchInlineSnapshot(`
@@ -1015,7 +1012,7 @@ describe("get_issue_details", () => {
 
     const text = getTextContent(result);
     const performanceSection = text
-      .slice(getTextContent(result).indexOf("### Repeated Database Queries"))
+      .slice(text.indexOf("### Repeated Database Queries"))
       .split("### Tags")[0]
       .trim();
 
@@ -1102,7 +1099,7 @@ describe("get_issue_details", () => {
 
     const text = getTextContent(result);
     const performanceSection = text
-      .slice(getTextContent(result).indexOf("### Repeated Database Queries"))
+      .slice(text.indexOf("### Repeated Database Queries"))
       .split("### Tags")[0]
       .trim();
 
@@ -1337,7 +1334,7 @@ describe("get_issue_details", () => {
       "Error: Tool list_organizations is already registered",
     );
     // When Seer data is available, these would pass:
-    // expect(getTextContent(result)).toContain("## Seer AI Analysis");
+    // expect(result).toContain("## Seer AI Analysis");
   });
 
   it("skips the autofix request when the seer skill is not granted", async () => {
