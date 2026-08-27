@@ -2,7 +2,7 @@
  * Tests for snapshot image collection + validation.
  *
  * Real PNG fixtures are generated in-memory with pngjs (no committed binaries)
- * so `image-size` reads genuine headers.
+ * so the header parser reads genuine headers.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -72,6 +72,16 @@ describe("collectImages", () => {
       writeFileSync(join(r, "readme.md"), "hi");
     });
     expect(await collectImages(root)).toEqual([]);
+  });
+
+  test("skips malformed and unsupported image content without decoding it", async () => {
+    const root = tempTree((r) => {
+      writeFileSync(join(r, "malformed.png"), Buffer.from("not a PNG"));
+      writeFileSync(join(r, "unsupported.jpg"), Buffer.from("not a JPEG"));
+      writeFileSync(join(r, "jxl.png"), Buffer.from([0xff, 0x0a, 0x00, 0x00]));
+    });
+
+    await expect(collectImages(root)).resolves.toEqual([]);
   });
 });
 
