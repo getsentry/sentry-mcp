@@ -133,15 +133,18 @@ small number, and route transcript follow-up through
 endpoints, which select `gen_ai.conversation.id` from spans, and existing
 trace-scoped spans queries that use `trace:<trace_id>`.
 
-When issue or trace detail output identifies agent conversation IDs, it should
-surface a `suggestedActions` structured-content hint when the required follow-up
-is callable in the current session. If `get_agent_conversation_details` is only
-available through the catalog, the action must call `execute_sentry_tool` with
+When issue or trace detail output identifies agent conversation IDs, keep the
+result markdown-only and put the callable follow-up in the markdown
+`Response Notes` or `Agent Conversations` section. Do not attach sparse
+`structuredContent.suggestedActions` on these tools: `structuredContent` is
+source of truth when present, and a side-channel-only payload would uniquely
+diverge from the issue/trace answer.
+
+If `get_agent_conversation_details` is only available through the catalog, the
+markdown instruction must call `execute_sentry_tool` with
 `name: "get_agent_conversation_details"` and the target arguments; only use the
 catalog tool name directly when it is exposed through `tools/list`. Emit either
-action only when its direct tool surface is available. The markdown `Response
-Notes` or `Agent Conversations` section must mirror the same callable action and
-arguments for clients that do not read `structuredContent`. Follow the shared
+instruction only when its direct tool surface is available. Follow the shared
 suggested action contract in
 [Tool Responses](../contributing/tool-responses.md#suggested-actions).
 

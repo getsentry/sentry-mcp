@@ -14,10 +14,7 @@ import {
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import type { Skill } from "../../skills";
-import {
-  getStructuredContent,
-  getTextContent,
-} from "../../test-utils/structured-content";
+import { getTextContent } from "../../test-utils/structured-content";
 import getIssueDetails from "./get-issue-details.js";
 
 const baseContext = {
@@ -396,7 +393,7 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    const text = getTextContent(result);
+    const text = typeof result === "string" ? result : getTextContent(result);
     expect(text).toContain(
       "- Agent conversation found in this trace: `conv-123`. Matching span: `span-123`.",
     );
@@ -404,30 +401,8 @@ describe("get_issue_details", () => {
       '- Use the Sentry tool `execute_sentry_tool(name=\'get_agent_conversation_details\', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})` to fetch the full transcript.',
     );
     expect(
-      getStructuredContent<{
-        suggestedActions: Array<{
-          type: string;
-          toolName: string;
-          arguments: Record<string, unknown>;
-          reason: string;
-        }>;
-      }>(result),
-    ).toEqual({
-      suggestedActions: [
-        {
-          type: "tool_call",
-          toolName: "execute_sentry_tool",
-          arguments: {
-            name: "get_agent_conversation_details",
-            arguments: {
-              organizationSlug: "sentry-mcp-evals",
-              conversationId: "conv-123",
-            },
-          },
-          reason: "Fetch the full transcript for this agent conversation.",
-        },
-      ],
-    });
+      (result as { structuredContent?: unknown }).structuredContent,
+    ).toBeUndefined();
     expect(text).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
 
@@ -2061,28 +2036,6 @@ describe("get_issue_details", () => {
       /Sentry Event ID \*\*[a-f0-9]{32}\*\*/,
       "Sentry Event ID **<SENTRY_EVENT_ID>**",
     );
-
-    expect(
-      getStructuredContent<{
-        suggestedActions: Array<{
-          toolName: string;
-          arguments: Record<string, unknown>;
-        }>;
-      }>(result),
-    ).toMatchObject({
-      suggestedActions: [
-        {
-          toolName: "execute_sentry_tool",
-          arguments: {
-            name: "get_agent_conversation_details",
-            arguments: {
-              organizationSlug: "sentry-mcp-evals",
-              conversationId: "conv-unsupported",
-            },
-          },
-        },
-      ],
-    });
 
     expect(normalizedResult).toMatchInlineSnapshot(`
       "# Issue FUTURE-TYPE-001 in **sentry-mcp-evals**
