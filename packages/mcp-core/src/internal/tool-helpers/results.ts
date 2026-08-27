@@ -20,9 +20,12 @@ export function structuredResult<T extends Record<string, unknown>>(
  * always includes that same markdown so structured-preferring clients do not lose
  * the primary answer when optional fields (for example suggestedActions) are present.
  */
-export function markdownResult<
-  TExtras extends Record<string, unknown> = Record<string, never>,
->({ markdown, ...extras }: { markdown: string } & TExtras): CallToolResult {
+export function markdownResult(
+  result: {
+    markdown: string;
+  } & Record<string, unknown>,
+): CallToolResult {
+  const { markdown, ...extras } = result;
   return {
     content: [{ type: "text", text: markdown }],
     structuredContent: {
