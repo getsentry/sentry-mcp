@@ -1,7 +1,7 @@
-import { traceMixedFixture } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
+import { mswServer, traceMixedFixture } from "@sentry/mcp-server-mocks";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
-import { mswServer } from "@sentry/mcp-server-mocks";
+import { getTextContent } from "../../test-utils/structured-content";
 import getSpanDetails from "./get-span-details.js";
 
 function httpGetRegional(
@@ -56,7 +56,7 @@ describe("get_span_details", () => {
       },
     );
 
-    expect(result).toMatchInlineSnapshot(`
+    expect(getTextContent(result)).toMatchInlineSnapshot(`
       "# Span \`aa8e7f3384ef4ff5\` in Trace \`b4d1aae7216b47ff8117cf4e09ce9d0b\` in **sentry-mcp-evals**
 
       ## Summary
