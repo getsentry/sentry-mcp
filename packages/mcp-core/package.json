@@ -1,6 +1,6 @@
 {
   "name": "@sentry/mcp-core",
-  "version": "0.38.0",
+  "version": "0.39.0",
   "type": "module",
   "private": true,
   "packageManager": "pnpm@11.8.0",
