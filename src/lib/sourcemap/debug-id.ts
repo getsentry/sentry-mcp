@@ -21,6 +21,7 @@
 
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
+import { UUID_DASH_RE } from "../hex-id.js";
 import { logger } from "../logger.js";
 import {
   type DecodedInlineMap,
@@ -34,6 +35,29 @@ const DEBUGID_COMMENT_PREFIX = "//# debugId=";
 
 /** Regex to extract an existing debug ID from a JS file. @internal */
 export const EXISTING_DEBUGID_RE = /\/\/# debugId=([0-9a-fA-F-]{36})/;
+
+/**
+ * Read a pre-existing debug ID off a parsed sourcemap.
+ *
+ * `debug_id` wins over `debugId` when both are present. A value that is not a
+ * well-formed UUID is treated as absent so the caller falls through to minting.
+ *
+ * @param map - A parsed sourcemap object (any shape; fields are probed)
+ * @returns The debug ID, or `undefined` when the map carries none
+ * @internal
+ */
+export function readSourcemapDebugId(map: unknown): string | undefined {
+  if (typeof map !== "object" || map === null) {
+    return;
+  }
+  const { debug_id: snake, debugId: camel } = map as SourcemapJson;
+  for (const candidate of [snake, camel]) {
+    if (typeof candidate === "string" && UUID_DASH_RE.test(candidate)) {
+      return candidate;
+    }
+  }
+  return;
+}
 
 /**
  * Generate a deterministic debug ID (UUID v4 format) from content.
@@ -118,7 +142,9 @@ export function prependDebugIdSnippet(
  * registered in source code (`constants.ts`) instead of via the IIFE.
  *
  * The operation is **idempotent** — files that already contain a
- * `//# debugId=` comment are returned unchanged.
+ * `//# debugId=` comment are returned unchanged. A debug ID already present
+ * on the sourcemap is likewise adopted as-is, leaving both files untouched
+ * (see {@link readSourcemapDebugId}).
  *
  * @param jsPath - Path to the JavaScript file
  * @param mapPath - Path to the companion `.map` file
@@ -140,6 +166,19 @@ export async function injectDebugId(
   const existingMatch = jsContent.match(EXISTING_DEBUGID_RE);
   if (existingMatch?.[1]) {
     return { debugId: existingMatch[1], wasInjected: false };
+  }
+
+  const map = JSON.parse(mapContent) as SourcemapJson;
+
+  // The JS carries no comment, but the map may already have been stamped by a
+  // bundler plugin that intentionally left the bundle alone. Adopt that ID and
+  // touch neither file: the bundle already registers it via the plugin's own
+  // `_sentryDebugIds` writer (a second snippet under a different stack key
+  // would make the runtime mapping ambiguous), and the map's `mappings` line
+  // up with the un-offset bundle.
+  const mapDebugId = readSourcemapDebugId(map);
+  if (mapDebugId) {
+    return { debugId: mapDebugId, wasInjected: false };
   }
 
   // Derive the debug ID from the minified JS content combined with the
@@ -168,7 +207,6 @@ export async function injectDebugId(
   newJs += `\n${DEBUGID_COMMENT_PREFIX}${debugId}\n`;
 
   // --- Mutate sourcemap ---
-  const map = JSON.parse(mapContent) as SourcemapJson;
   mutateSourcemap(map, debugId, { offsetMappings: !skipSnippet });
 
   // Write both files concurrently
@@ -244,7 +282,8 @@ const INLINE_DIRECTIVE_RE =
  * place**, so the file stays self-contained. Only the **last** inline
  * directive is rewritten.
  *
- * Idempotent — files already carrying a `//# debugId=` comment are unchanged.
+ * Idempotent — files already carrying a `//# debugId=` comment are unchanged,
+ * as are files whose decoded inline map already carries a debug ID.
  *
  * @param jsPath - Path to the JavaScript file
  * @param decoded - The decoded inline sourcemap and its re-encode metadata
@@ -277,6 +316,18 @@ export async function injectInlineDebugId(
   if (existingMatch?.[1]) {
     return {
       debugId: existingMatch[1],
+      wasInjected: false,
+      injectedMapContent: Buffer.from(decoded.json),
+    };
+  }
+
+  // Same rule as the external path: a debug ID already stamped on the map by a
+  // bundler plugin is adopted verbatim, leaving the JS (and its embedded map)
+  // untouched. Upload the map exactly as decoded.
+  const mapDebugId = readSourcemapDebugId(decoded.map);
+  if (mapDebugId) {
+    return {
+      debugId: mapDebugId,
       wasInjected: false,
       injectedMapContent: Buffer.from(decoded.json),
     };

@@ -426,3 +426,159 @@ describe("injectDirectory — debug ID uniqueness (regression #3350)", () => {
     expect(ids["a.js"]).toBe(ids["b.js"]);
   });
 });
+
+/**
+ * A debug ID already stamped on the sourcemap by a bundler plugin
+ * (`sourcemaps.disable: 'disable-upload'`) must be adopted, not replaced.
+ * Those builds deliberately leave the bundle without a `//# debugId=` comment
+ * so post-emit rewriting can't invalidate subresource-integrity hashes.
+ */
+describe("injectDirectory — pre-existing sourcemap debug ID", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "sentry-inject-mapid-"));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  /** A debug ID a bundler plugin would have minted at build time. */
+  const PLUGIN_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+
+  const BASE_MAP = {
+    version: 3,
+    sources: ["a.ts"],
+    names: [],
+    mappings: "AAAA",
+  };
+
+  /** Build a `data:` URL for a sourcemap object. */
+  function toDataUrl(map: unknown): string {
+    const b64 = Buffer.from(JSON.stringify(map)).toString("base64");
+    return `data:application/json;base64,${b64}`;
+  }
+
+  /**
+   * Write what the plugin emits: a bundle carrying its own `_sentryDebugIds`
+   * writer but no `//# debugId=` comment, plus a map holding the ID.
+   */
+  function writePluginPair(
+    name: string,
+    mapExtra: Record<string, unknown>
+  ): { jsPath: string; mapPath: string; js: string; map: string } {
+    const jsPath = join(dir, name);
+    const mapPath = `${jsPath}.map`;
+    const js = `;!function(){e._sentryDebugIdIdentifier="sentry-dbid-${PLUGIN_ID}"}();\nconsole.log(1)\n//# sourceMappingURL=${name}.map\n`;
+    const map = JSON.stringify({ ...BASE_MAP, ...mapExtra });
+    writeFileSync(jsPath, js);
+    writeFileSync(mapPath, map);
+    return { jsPath, mapPath, js, map };
+  }
+
+  test("adopts a `debug_id` from an external map without touching either file", async () => {
+    const pair = writePluginPair("bundle.js", { debug_id: PLUGIN_ID });
+
+    const results = await injectDirectory(dir);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.debugId).toBe(PLUGIN_ID);
+    expect(results[0]?.injected).toBe(false);
+    expect(readFileSync(pair.jsPath, "utf-8")).toBe(pair.js);
+    expect(readFileSync(pair.mapPath, "utf-8")).toBe(pair.map);
+  });
+
+  test("adopts the camelCase `debugId` spelling", async () => {
+    const pair = writePluginPair("bundle.js", { debugId: PLUGIN_ID });
+
+    const results = await injectDirectory(dir);
+
+    expect(results[0]?.debugId).toBe(PLUGIN_ID);
+    expect(results[0]?.injected).toBe(false);
+    expect(readFileSync(pair.jsPath, "utf-8")).toBe(pair.js);
+    expect(readFileSync(pair.mapPath, "utf-8")).toBe(pair.map);
+  });
+
+  test("prefers `debug_id` when both spellings disagree", async () => {
+    const other = "11111111-2222-3333-4444-555555555555";
+    writePluginPair("bundle.js", { debug_id: PLUGIN_ID, debugId: other });
+
+    const results = await injectDirectory(dir);
+
+    expect(results[0]?.debugId).toBe(PLUGIN_ID);
+  });
+
+  test("adopts a debug ID carried by an inline map", async () => {
+    const jsPath = join(dir, "inline.js");
+    const js = `console.log(1)\n//# sourceMappingURL=${toDataUrl({ ...BASE_MAP, debug_id: PLUGIN_ID })}\n`;
+    writeFileSync(jsPath, js);
+
+    const results = await injectDirectory(dir);
+
+    expect(results[0]?.debugId).toBe(PLUGIN_ID);
+    expect(results[0]?.injected).toBe(false);
+    expect(readFileSync(jsPath, "utf-8")).toBe(js);
+    // The map is uploaded exactly as decoded — no snippet, so no line offset.
+    const uploaded = JSON.parse(
+      (results[0]?.injectedMapContent ?? Buffer.alloc(0)).toString()
+    );
+    expect(uploaded.debug_id).toBe(PLUGIN_ID);
+    expect(uploaded.mappings).toBe(BASE_MAP.mappings);
+  });
+
+  test("a `//# debugId=` comment in the JS wins over a conflicting map field", async () => {
+    const jsPath = join(dir, "bundle.js");
+    const jsId = "99999999-8888-7777-6666-555555555555";
+    writeFileSync(
+      jsPath,
+      `console.log(1)\n//# sourceMappingURL=bundle.js.map\n//# debugId=${jsId}\n`
+    );
+    writeFileSync(
+      `${jsPath}.map`,
+      JSON.stringify({ ...BASE_MAP, debug_id: PLUGIN_ID })
+    );
+
+    const results = await injectDirectory(dir);
+
+    expect(results[0]?.debugId).toBe(jsId);
+    expect(results[0]?.injected).toBe(false);
+  });
+
+  test("falls through to minting when the map's debug ID is malformed", async () => {
+    const pair = writePluginPair("bundle.js", { debug_id: "not-a-uuid" });
+
+    const results = await injectDirectory(dir);
+
+    expect(results[0]?.injected).toBe(true);
+    expect(results[0]?.debugId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(results[0]?.debugId).not.toBe("not-a-uuid");
+    const js = readFileSync(pair.jsPath, "utf-8");
+    expect(js).toContain(`//# debugId=${results[0]?.debugId}`);
+    expect(JSON.parse(readFileSync(pair.mapPath, "utf-8")).debug_id).toBe(
+      results[0]?.debugId
+    );
+  });
+
+  test("--dry-run reports the adopted ID rather than a pending injection", async () => {
+    const pair = writePluginPair("bundle.js", { debug_id: PLUGIN_ID });
+
+    const results = await injectDirectory(dir, { dryRun: true });
+
+    expect(results[0]?.debugId).toBe(PLUGIN_ID);
+    expect(results[0]?.injected).toBe(false);
+    expect(readFileSync(pair.jsPath, "utf-8")).toBe(pair.js);
+    expect(readFileSync(pair.mapPath, "utf-8")).toBe(pair.map);
+  });
+
+  test("repeated runs stay a no-op", async () => {
+    const pair = writePluginPair("bundle.js", { debug_id: PLUGIN_ID });
+
+    await injectDirectory(dir);
+    const results = await injectDirectory(dir);
+
+    expect(results[0]?.debugId).toBe(PLUGIN_ID);
+    expect(readFileSync(pair.jsPath, "utf-8")).toBe(pair.js);
+    expect(readFileSync(pair.mapPath, "utf-8")).toBe(pair.map);
+  });
+});
