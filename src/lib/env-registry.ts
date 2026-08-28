@@ -253,7 +253,7 @@ export const ENV_VAR_REGISTRY: readonly EnvVarEntry[] = [
   {
     name: "DO_NOT_TRACK",
     description:
-      "Industry-standard opt-out for telemetry ([consoledonottrack.com](https://consoledonottrack.com/)). When set to `1`, the CLI disables all telemetry, equivalent to `SENTRY_CLI_NO_TELEMETRY=1`.",
+      "Industry-standard opt-out for telemetry. When set to `1`, the CLI disables all telemetry, equivalent to `SENTRY_CLI_NO_TELEMETRY=1`.",
     example: "1",
   },
   {
