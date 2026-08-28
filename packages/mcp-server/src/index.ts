@@ -20,25 +20,24 @@
  * ```
  */
 
-import {
-  getAgentProvider,
-  getResolvedProviderType,
-  setAgentProvider,
-  setProviderBaseUrls,
-} from "@sentry/mcp-core/internal/agents/provider-factory";
 import { buildServer } from "@sentry/mcp-core/server";
-import { SKILLS } from "@sentry/mcp-core/skills";
-import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
-import { LIB_VERSION } from "@sentry/mcp-core/version";
+import { startStdio } from "./transports/stdio";
 import * as Sentry from "@sentry/node";
+import { LIB_VERSION } from "@sentry/mcp-core/version";
+import { buildUsage } from "./cli/usage";
+import { printCliLine } from "./cli/output";
+import { parseArgv, parseEnv, merge } from "./cli/parse";
+import { finalize } from "./cli/resolve";
 import { resolveAccessToken } from "./auth/resolve-token";
 import { authCommand } from "./cli/commands/auth";
-import { printCliLine } from "./cli/output";
-import { merge, parseArgv, parseEnv } from "./cli/parse";
-import { finalize } from "./cli/resolve";
-import { buildUsage } from "./cli/usage";
-import { createFatalHandler, ignoreBrokenStdioStreamErrors } from "./fatal";
-import { startStdio } from "./transports/stdio";
+import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
+import { SKILLS } from "@sentry/mcp-core/skills";
+import {
+  getAgentProvider,
+  setAgentProvider,
+  setProviderBaseUrls,
+  getResolvedProviderType,
+} from "@sentry/mcp-core/internal/agents/provider-factory";
 
 const packageName = "@sentry/mcp-server";
 const allSkills = Object.keys(SKILLS) as ReadonlyArray<
@@ -325,24 +324,41 @@ async function main() {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
 
-  // Dead clients can break all stdio pipes at once. Swallow EPIPE on the
-  // streams themselves, and keep fatal handlers re-entrancy-safe so a broken
-  // stderr cannot recurse forever (getsentry/sentry-mcp#1274).
-  ignoreBrokenStdioStreamErrors();
-  const onFatal = createFatalHandler({
-    timeoutMs: SENTRY_TIMEOUT,
-    captureException: (error) => {
+  // If the client dies and closes all pipes, console.error can throw EPIPE
+  // inside these handlers. Without a guard, that recurses forever and burns CPU.
+  // See getsentry/sentry-mcp#1274.
+  let exiting = false;
+  function exitAfterError(error: unknown, label: string) {
+    if (exiting) {
+      process.exit(1);
+      return;
+    }
+    exiting = true;
+
+    try {
+      console.error(label, error);
+    } catch {
+      // stderr may already be closed
+    }
+
+    try {
       Sentry.captureException(error);
-    },
-    flush: (timeoutMs) => Sentry.flush(timeoutMs),
-  });
+    } catch {
+      // reporting must not block exit
+    }
+
+    // Don't depend on flush finishing — exit even if it hangs or rejects.
+    const timer = setTimeout(() => process.exit(1), SENTRY_TIMEOUT);
+    timer.unref();
+    void Sentry.flush(SENTRY_TIMEOUT).finally(() => process.exit(1));
+  }
 
   process.on("uncaughtException", (error) => {
-    onFatal(error, "Uncaught exception:");
+    exitAfterError(error, "Uncaught exception:");
   });
 
   process.on("unhandledRejection", (reason) => {
-    onFatal(reason, "Unhandled rejection:");
+    exitAfterError(reason, "Unhandled rejection:");
   });
 
   const context = {
@@ -369,7 +385,7 @@ async function main() {
   });
 
   startStdio(server, context).catch((err) => {
-    onFatal(err, "Server error:");
+    exitAfterError(err, "Server error:");
   });
 }
 
