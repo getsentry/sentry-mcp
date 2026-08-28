@@ -324,19 +324,41 @@ async function main() {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
 
-  // Uncaught error handlers
-  process.on("uncaughtException", async (error) => {
-    console.error("Uncaught exception:", error);
-    Sentry.captureException(error);
-    await Sentry.flush(SENTRY_TIMEOUT);
-    process.exit(1);
+  // If the client dies and closes all pipes, console.error can throw EPIPE
+  // inside these handlers. Without a guard, that recurses forever and burns CPU.
+  // See getsentry/sentry-mcp#1274.
+  let exiting = false;
+  function exitAfterError(error: unknown, label: string) {
+    if (exiting) {
+      process.exit(1);
+      return;
+    }
+    exiting = true;
+
+    try {
+      console.error(label, error);
+    } catch {
+      // stderr may already be closed
+    }
+
+    try {
+      Sentry.captureException(error);
+    } catch {
+      // reporting must not block exit
+    }
+
+    // Don't depend on flush finishing — exit even if it hangs or rejects.
+    const timer = setTimeout(() => process.exit(1), SENTRY_TIMEOUT);
+    timer.unref();
+    void Sentry.flush(SENTRY_TIMEOUT).finally(() => process.exit(1));
+  }
+
+  process.on("uncaughtException", (error) => {
+    exitAfterError(error, "Uncaught exception:");
   });
 
-  process.on("unhandledRejection", async (reason) => {
-    console.error("Unhandled rejection:", reason);
-    Sentry.captureException(reason);
-    await Sentry.flush(SENTRY_TIMEOUT);
-    process.exit(1);
+  process.on("unhandledRejection", (reason) => {
+    exitAfterError(reason, "Unhandled rejection:");
   });
 
   const context = {
@@ -362,11 +384,8 @@ async function main() {
     experimentalMode: cli.experimental,
   });
 
-  startStdio(server, context).catch(async (err) => {
-    console.error("Server error:", err);
-    Sentry.captureException(err);
-    await Sentry.flush(SENTRY_TIMEOUT);
-    process.exit(1);
+  startStdio(server, context).catch((err) => {
+    exitAfterError(err, "Server error:");
   });
 }
 
