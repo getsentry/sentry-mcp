@@ -484,6 +484,14 @@ Two behavioral differences to be aware of:
   `--wait`, `--wait-for`, `--no-sourcemap-reference`, `--debug-id-reference`,
   `--bundle`, `--bundle-sourcemap`, `--strict`. `sourcemap inject` also drops
   `--release`. Run `sentry sourcemap upload --help` for the current set.
+- **`--debug-id-reference` is now automatic:** in v3 that flag let `sourcemaps
+  upload` take the debug ID from the linked sourcemap when it couldn't verify
+  one in the bundle itself, for example in binary bundles.
+  v4 does this by default. If a sourcemap already carries `debug_id`
+  — from a bundler plugin configured with `sourcemaps.disable:
+  'disable-upload'`, or copied across by a tool like React Native's
+  `copy-debugid.js` — `inject` and `upload` adopt that ID rather than generating a
+  new one.
 
 See [`sourcemap`](/commands/sourcemap/) for details.
 
