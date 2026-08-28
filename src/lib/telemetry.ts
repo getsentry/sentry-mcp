@@ -98,7 +98,7 @@ export function markSessionCrashed(): void {
 /** Env var that disables CLI telemetry when set to `"1"`. */
 export const TELEMETRY_ENV_VAR = "SENTRY_CLI_NO_TELEMETRY";
 
-/** Industry-standard env var for opting out of telemetry (consoledonottrack.com). */
+/** Industry-standard env var for opting out of telemetry. */
 export const DO_NOT_TRACK_ENV_VAR = "DO_NOT_TRACK";
 
 /** Result of resolving the effective telemetry state */
@@ -120,7 +120,7 @@ export type TelemetryEffective = {
  *
  * Priority (highest to lowest):
  * 1. `SENTRY_CLI_NO_TELEMETRY=1` — explicit CLI env var opt-out
- * 2. `DO_NOT_TRACK=1` — industry standard (consoledonottrack.com)
+ * 2. `DO_NOT_TRACK=1` — industry-standard opt-out
  * 3. SQLite persistent preference — `sentry cli defaults telemetry on/off`
  * 4. Default: enabled
  *
@@ -168,7 +168,7 @@ export function isTelemetryEnabled(): boolean {
  *
  * Telemetry can be disabled via:
  * - `SENTRY_CLI_NO_TELEMETRY=1` environment variable
- * - `DO_NOT_TRACK=1` environment variable (consoledonottrack.com)
+ * - `DO_NOT_TRACK=1` environment variable
  * - `sentry cli defaults telemetry off` (persistent preference)
  *
  * @param callback - The CLI execution function to wrap, receives the span for naming
