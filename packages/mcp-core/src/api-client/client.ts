@@ -3348,7 +3348,7 @@ export class SentryApiService {
       apiPath`/organizations/${organizationSlug}/events/validate/` +
         `?${queryParams.toString()}`,
       undefined,
-      { ...opts, allowStatuses: [400] },
+      opts,
     );
     const body = await this.parseJsonResponse(response);
     return EventsValidationResponseSchema.parse(body);
