@@ -13,8 +13,10 @@ import { type DecodedImage, encodeImageToSixel } from "../sixel-image.js";
 import {
   buildCategoricalChartModel,
   buildChartModel,
+  buildHeatmapModel,
   hexToRgb,
   rasterizeChart,
+  rasterizeHeatmap,
   seriesColor,
 } from "./chart-core.js";
 import {
@@ -244,6 +246,39 @@ function drawFrame(
   });
 }
 
+/** Early-out for empty data or heatmap (which has its own rasterizer). */
+function tryRenderSpecialChart(
+  image: ReturnType<typeof createPixelCanvas>,
+  options: Parameters<typeof drawChartContent>[1]
+): boolean {
+  if (options.data.series.length === 0) {
+    drawPixelText(image, "(NO DATA)", {
+      x: options.x,
+      y: options.y,
+      cellWidth: options.cellWidth,
+      cellHeight: options.cellHeight,
+      maxColumns: Math.max(1, Math.floor(options.width / options.cellWidth)),
+      color: FRAME_COLOR,
+    });
+    return true;
+  }
+  if (!options.categorical) {
+    const hm = buildHeatmapModel(options.data);
+    if (hm) {
+      const chart = rasterizeHeatmap(hm, {
+        width: options.width,
+        height: options.height,
+        backgroundTransparent: true,
+      });
+      if (chart) {
+        blitPixelImage(image, chart, options.x, options.y);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /** Draw chart bars, axes, and a series legend into a widget's content region. */
 function drawChartContent(
   image: ReturnType<typeof createPixelCanvas>,
@@ -258,21 +293,15 @@ function drawChartContent(
     cellHeight: number;
   }
 ): void {
+  if (tryRenderSpecialChart(image, options)) {
+    return;
+  }
   const model = options.categorical
     ? buildCategoricalChartModel(options.data)
     : buildChartModel(options.data);
   if (!model) {
-    drawPixelText(image, "(NO DATA)", {
-      x: options.x,
-      y: options.y,
-      cellWidth: options.cellWidth,
-      cellHeight: options.cellHeight,
-      maxColumns: Math.max(1, Math.floor(options.width / options.cellWidth)),
-      color: FRAME_COLOR,
-    });
     return;
   }
-
   const contentRows = Math.max(
     1,
     Math.floor(options.height / options.cellHeight)
