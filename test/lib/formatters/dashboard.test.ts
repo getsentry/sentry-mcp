@@ -605,6 +605,59 @@ describe("formatDashboardWithData", () => {
       expect(output).toContain("(no data)");
     });
 
+    test("renders heatmap as one row per series with a legend", () => {
+      const data = makeDashboardData({
+        widgets: [
+          makeWidget({
+            title: "Errors by Browser",
+            displayType: "heatmap",
+            layout: { x: 0, y: 0, w: 3, h: 3 },
+            data: makeTimeseriesData({
+              series: [
+                {
+                  label: "Chrome",
+                  values: [
+                    { timestamp: 1_700_000_000, value: 0 },
+                    { timestamp: 1_700_000_060, value: 50 },
+                    { timestamp: 1_700_000_120, value: 100 },
+                  ],
+                },
+                {
+                  label: "Firefox",
+                  values: [
+                    { timestamp: 1_700_000_000, value: 5 },
+                    { timestamp: 1_700_000_060, value: 10 },
+                    { timestamp: 1_700_000_120, value: 20 },
+                  ],
+                },
+              ],
+            }),
+          }),
+        ],
+      });
+      const output = formatDashboardWithData(data);
+      expect(output).toContain("Errors by Browser");
+      // Category labels appear as row headers
+      expect(output).toContain("Chrome");
+      expect(output).toContain("Firefox");
+      // Intensity legend is present
+      expect(output).toContain("low");
+      expect(output).toContain("high");
+    });
+
+    test("shows no data for empty series in heatmap", () => {
+      const data = makeDashboardData({
+        widgets: [
+          makeWidget({
+            displayType: "heatmap",
+            data: makeTimeseriesData({ series: [] }),
+          }),
+        ],
+      });
+      const output = formatDashboardWithData(data);
+      expect(output).toContain("(no data)");
+    });
+
     test("bar chart fills full widget width (no trailing gap)", () => {
       // Create enough data points that bars should fill the chart area.
       // With a tall widget (h=3), the renderer uses bar mode (not sparkline).

@@ -1527,6 +1527,138 @@ function renderPlaceholderContent(message: string): string[] {
   return [isPlainOutput() ? `(${message})` : muted(`(${message})`)];
 }
 
+// ---------------------------------------------------------------------------
+// Heatmap renderer
+// ---------------------------------------------------------------------------
+
+/**
+ * Intensity ramp for heatmap cells.
+ *
+ * Index 0 is empty (zero value); 1-4 map increasing intensity to shade
+ * blocks in plain mode and to a blue→red heat gradient in color mode.
+ */
+const HEATMAP_SHADES = [" ", "░", "▒", "▓", "█"] as const;
+const HEATMAP_COLORS = [
+  "#79B8FF", // low  — cyan/blue
+  "#FDB81B", // yellow
+  "#FF9838", // orange
+  "#fe4144", // high — red
+] as const;
+
+/** Map a normalized intensity (0-1) to a ramp bucket index (0-4). */
+function heatmapBucket(normalized: number): number {
+  if (normalized <= 0) {
+    return 0;
+  }
+  return Math.min(4, Math.max(1, Math.ceil(normalized * 4)));
+}
+
+/** Render a single heatmap cell for a normalized intensity. */
+function heatmapCell(normalized: number, plain: boolean): string {
+  const bucket = heatmapBucket(normalized);
+  if (plain) {
+    return HEATMAP_SHADES[bucket] ?? " ";
+  }
+  if (bucket === 0) {
+    return " ";
+  }
+  const color = HEATMAP_COLORS[bucket - 1] ?? COLORS.magenta;
+  return chalk.hex(color)("█");
+}
+
+/**
+ * Render heatmap content: one row per series (category), columns over time.
+ *
+ * Cell intensity encodes the value relative to the global maximum across all
+ * cells, so hot spots stand out. Falls back to a "no data" line when there
+ * are no series or values.
+ */
+function renderHeatmapContent(
+  data: TimeseriesResult,
+  opts: { innerWidth: number; contentHeight: number }
+): string[] {
+  const { innerWidth, contentHeight } = opts;
+  if (data.series.length === 0) {
+    return [noDataLine()];
+  }
+
+  const plain = isPlainOutput();
+
+  // Reserve rows for the bottom time axis (2 lines) and a legend (1 line).
+  const axisLines = 3;
+  const maxRows = Math.max(1, contentHeight - axisLines);
+  const series = data.series.slice(0, maxRows);
+
+  const maxLabelLen = Math.min(
+    20,
+    Math.max(4, ...series.map((s) => s.label.length))
+  );
+  const gutterW = maxLabelLen + 1; // label + space
+  const chartWidth = Math.max(1, innerWidth - gutterW);
+
+  // Determine the actual number of time buckets from the longest series.
+  const maxLen = Math.max(0, ...series.map((s) => s.values.length));
+  const bucketCount = Math.min(chartWidth, maxLen || chartWidth);
+
+  // Downsample every series to that bucket count; pad shorter series so every
+  // row has exactly `bucketCount` cells (downsample returns early for short input).
+  const rows = series.map((s) => {
+    const ds = downsample(
+      s.values.map((v) => v.value),
+      bucketCount
+    );
+    return ds.length < bucketCount
+      ? [...ds, ...new Array(bucketCount - ds.length).fill(0)]
+      : ds;
+  });
+  const globalMax = Math.max(1, ...rows.flat());
+
+  const lines: string[] = [];
+  for (let i = 0; i < series.length; i += 1) {
+    const s = series[i];
+    const values = rows[i] ?? [];
+    if (!s) {
+      continue;
+    }
+    const label =
+      s.label.length > maxLabelLen
+        ? `${s.label.slice(0, maxLabelLen - 1)}…`
+        : s.label.padEnd(maxLabelLen);
+    const cells = values.map((v) => heatmapCell(v / globalMax, plain)).join("");
+    const labelStr = plain ? label : chalk.hex(COLORS.cyan)(label);
+    lines.push(`${labelStr} ${cells}`);
+  }
+
+  // Bottom time axis, aligned to the chart area.
+  // Find the longest series so its timestamps match the bucketCount.
+  const longest = series.reduce(
+    (a, b) => (b.values.length > a.values.length ? b : a),
+    series[0] ?? { values: [] }
+  );
+  const axisTs = longest.values.map((v) => v.timestamp);
+  if (axisTs.length > 0) {
+    const dsTs = downsampleTimestamps(axisTs, bucketCount);
+    lines.push(
+      ...buildTimeAxis({
+        timestamps: dsTs,
+        chartWidth: bucketCount,
+        gutterWidth: gutterW,
+      })
+    );
+  }
+
+  // Intensity legend: low → high.
+  const gutter = " ".repeat(gutterW);
+  if (plain) {
+    lines.push(`${gutter}low ${HEATMAP_SHADES.slice(1).join("")} high`);
+  } else {
+    const ramp = HEATMAP_COLORS.map((c) => chalk.hex(c)("█")).join("");
+    lines.push(`${gutter}${muted("low")} ${ramp} ${muted("high")}`);
+  }
+
+  return lines;
+}
+
 /**
  * Dispatch to the appropriate content renderer based on data type.
  *
@@ -1545,6 +1677,9 @@ function renderContentLines(opts: {
 
   switch (data.type) {
     case "timeseries": {
+      if (widget.displayType === "heatmap") {
+        return renderHeatmapContent(data, { innerWidth, contentHeight });
+      }
       if (widget.displayType === "categorical_bar") {
         return renderVerticalBarsContent(data, { innerWidth, contentHeight });
       }
