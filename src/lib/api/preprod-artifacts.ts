@@ -37,9 +37,9 @@ import {
   AssembleResponseSchema,
   type ChunkServerOptions,
   getChunkUploadOptions,
-  hashBuffer,
+  hashChunks,
   pickUploadEncoding,
-  uploadMissingBufferChunks,
+  uploadMissingChunks,
 } from "./chunk-upload.js";
 import {
   apiRequestToRegion,
@@ -195,8 +195,8 @@ export type BuildUploadOptions = {
   org: string;
   /** Project slug. */
   project: string;
-  /** Normalized wrapper-ZIP bytes to upload. */
-  content: Buffer;
+  /** Path to the normalized wrapper-ZIP on disk to upload. */
+  contentPath: string;
   /** Optional build metadata folded into the assemble body. */
   metadata: BuildUploadMetadata;
   /** Pre-fetched chunk upload options (fetched if omitted). */
@@ -248,12 +248,12 @@ function buildAssembleBody(
 export async function uploadBuild(
   options: BuildUploadOptions
 ): Promise<string> {
-  const { org, project, content, metadata } = options;
+  const { org, project, contentPath, metadata } = options;
   const serverOptions =
     options.serverOptions ?? (await getChunkUploadOptions(org));
   const encoding = pickUploadEncoding(serverOptions.compression);
-  const { chunks, overallChecksum } = hashBuffer(
-    content,
+  const { chunks, overallChecksum } = await hashChunks(
+    contentPath,
     serverOptions.chunkSize
   );
   const regionUrl = await resolveOrgRegion(org);
@@ -297,10 +297,10 @@ export async function uploadBuild(
 
     const missing = new Set(data.missingChunks ?? []);
     if (missing.size > 0) {
-      await uploadMissingBufferChunks({
+      await uploadMissingChunks({
         chunks,
         missingChecksums: missing,
-        content,
+        tmpZipPath: contentPath,
         serverOptions,
         encoding,
         regionUrl,
