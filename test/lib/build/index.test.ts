@@ -8,6 +8,7 @@
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -18,6 +19,7 @@ import { strToU8, unzipSync, zipSync } from "fflate";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   detectBuildFormat,
+  detectBuildFormatFromFile,
   extractIpaAppName,
   normalizeBuildDirectory,
   normalizeBuildFile,
@@ -25,6 +27,47 @@ import {
   parsePluginFromPipeline,
   validateXcarchiveDirectory,
 } from "../../../src/lib/build/index.js";
+
+/** Temp dirs created by tests; cleaned up via {@link cleanupTmp}. */
+const tmpDirs: string[] = [];
+
+/** Create a tracked temp directory that {@link cleanupTmp} will remove. */
+function makeTmpDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tmpDirs.push(dir);
+  return dir;
+}
+
+/** Remove every tracked temp directory. */
+function cleanupTmp(): void {
+  while (tmpDirs.length > 0) {
+    const d = tmpDirs.pop();
+    if (d) {
+      rmSync(d, { recursive: true, force: true });
+    }
+  }
+}
+
+/** Write bytes to a fresh temp file and return its path. */
+function writeTmpFile(name: string, data: Uint8Array): string {
+  const dir = makeTmpDir("build-fixture-");
+  const path = join(dir, name);
+  writeFileSync(path, Buffer.from(data));
+  return path;
+}
+
+/**
+ * Run a normalizer that writes a wrapper ZIP to disk and return the bytes.
+ * The output path lives in a tracked temp dir.
+ */
+async function normalizeToBuffer(
+  run: (outPath: string) => Promise<void>
+): Promise<Buffer> {
+  const dir = makeTmpDir("build-out-");
+  const outPath = join(dir, "normalized.zip");
+  await run(outPath);
+  return readFileSync(outPath);
+}
 
 function fakeApk(): Uint8Array {
   return zipSync({ "AndroidManifest.xml": strToU8("binary-xml") });
@@ -93,9 +136,14 @@ describe("parsePluginFromPipeline", () => {
 });
 
 describe("normalizeBuildFile", () => {
-  test("wraps the build under its basename plus a metadata file", () => {
+  afterEach(cleanupTmp);
+
+  test("wraps the build under its basename plus a metadata file", async () => {
     const apk = fakeApk();
-    const zip = normalizeBuildFile("/some/dir/app-release.apk", apk, null);
+    const src = writeTmpFile("app-release.apk", apk);
+    const zip = await normalizeToBuffer((out) =>
+      normalizeBuildFile(src, out, null)
+    );
 
     const entries = unzipSync(zip);
     expect(Object.keys(entries).sort()).toEqual([
@@ -108,28 +156,36 @@ describe("normalizeBuildFile", () => {
     expect(metadata).toContain("sentry-cli-version:");
   });
 
-  test("records a recognized plugin in the metadata file", () => {
-    const zip = normalizeBuildFile("/x/app.aab", fakeAab(), {
-      name: "sentry-gradle-plugin",
-      version: "4.12.0",
-    });
+  test("records a recognized plugin in the metadata file", async () => {
+    const src = writeTmpFile("app.aab", fakeAab());
+    const zip = await normalizeToBuffer((out) =>
+      normalizeBuildFile(src, out, {
+        name: "sentry-gradle-plugin",
+        version: "4.12.0",
+      })
+    );
     const metadata = new TextDecoder().decode(
       unzipSync(zip)[".sentry-cli-metadata.txt"]
     );
     expect(metadata).toContain("sentry-gradle-plugin: 4.12.0");
   });
 
-  test("is deterministic (identical input → identical bytes)", () => {
-    const apk = fakeApk();
-    const a = normalizeBuildFile("/x/app.apk", apk, null);
-    const b = normalizeBuildFile("/x/app.apk", apk, null);
-    expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true);
+  test("is deterministic (identical input → identical bytes)", async () => {
+    const src = writeTmpFile("app.apk", fakeApk());
+    const a = await normalizeToBuffer((out) =>
+      normalizeBuildFile(src, out, null)
+    );
+    const b = await normalizeToBuffer((out) =>
+      normalizeBuildFile(src, out, null)
+    );
+    expect(a.equals(b)).toBe(true);
   });
 });
 
 describe("normalizeBuildDirectory", () => {
   const dirs: string[] = [];
   afterEach(() => {
+    cleanupTmp();
     while (dirs.length > 0) {
       const d = dirs.pop();
       if (d) {
@@ -154,7 +210,9 @@ describe("normalizeBuildDirectory", () => {
   }
 
   test("zips files under the directory basename plus a root metadata file", async () => {
-    const zip = await normalizeBuildDirectory(fakeXcarchive(), null);
+    const zip = await normalizeToBuffer((out) =>
+      normalizeBuildDirectory(fakeXcarchive(), out, null)
+    );
     const entries = unzipSync(zip);
     expect(Object.keys(entries).sort()).toEqual([
       ".sentry-cli-metadata.txt",
@@ -166,8 +224,12 @@ describe("normalizeBuildDirectory", () => {
 
   test("is deterministic (identical tree → identical bytes)", async () => {
     const xc = fakeXcarchive();
-    const a = await normalizeBuildDirectory(xc, null);
-    const b = await normalizeBuildDirectory(xc, null);
+    const a = await normalizeToBuffer((out) =>
+      normalizeBuildDirectory(xc, out, null)
+    );
+    const b = await normalizeToBuffer((out) =>
+      normalizeBuildDirectory(xc, out, null)
+    );
     expect(a.equals(b)).toBe(true);
   });
 
@@ -182,7 +244,9 @@ describe("normalizeBuildDirectory", () => {
       writeFileSync(join(xc, "real.txt"), "REAL");
       symlinkSync("real.txt", join(xc, "link.txt"));
 
-      const entries = unzipSync(await normalizeBuildDirectory(xc, null));
+      const entries = unzipSync(
+        await normalizeToBuffer((out) => normalizeBuildDirectory(xc, out, null))
+      );
       // The symlink entry stores its target path — proof it was NOT followed
       // (following would store "REAL", the target's file content).
       expect(new TextDecoder().decode(entries["App.xcarchive/link.txt"])).toBe(
@@ -275,6 +339,8 @@ describe("extractIpaAppName", () => {
 });
 
 describe("normalizeIpa", () => {
+  afterEach(cleanupTmp);
+
   function fakeIpaBytes(): Uint8Array {
     return zipSync({
       "Payload/MyApp.app/Info.plist": strToU8("<app/>"),
@@ -283,8 +349,14 @@ describe("normalizeIpa", () => {
     });
   }
 
-  test("remaps Payload into an XCArchive layout with a generated Info.plist", () => {
-    const zip = normalizeIpa(fakeIpaBytes(), null);
+  /** Write IPA bytes to a temp file and normalize it, returning the wrapper. */
+  async function normalizeIpaBytes(ipa: Uint8Array): Promise<Buffer> {
+    const src = writeTmpFile("app.ipa", ipa);
+    return normalizeToBuffer((out) => normalizeIpa(src, out, null));
+  }
+
+  test("remaps Payload into an XCArchive layout with a generated Info.plist", async () => {
+    const zip = await normalizeIpaBytes(fakeIpaBytes());
     const entries = unzipSync(zip);
     expect(Object.keys(entries).sort()).toEqual([
       ".sentry-cli-metadata.txt",
@@ -303,12 +375,15 @@ describe("normalizeIpa", () => {
     ).toEqual(strToU8("carbytes"));
   });
 
-  test("remaps nested framework entries under the app", () => {
-    const ipa = zipSync({
-      "Payload/MyApp.app/Info.plist": strToU8("<app/>"),
-      "Payload/MyApp.app/Frameworks/X.framework/X": strToU8("fw"),
-    });
-    const entries = unzipSync(normalizeIpa(ipa, null));
+  test("remaps nested framework entries under the app", async () => {
+    const entries = unzipSync(
+      await normalizeIpaBytes(
+        zipSync({
+          "Payload/MyApp.app/Info.plist": strToU8("<app/>"),
+          "Payload/MyApp.app/Frameworks/X.framework/X": strToU8("fw"),
+        })
+      )
+    );
     expect(
       entries[
         "archive.xcarchive/Products/Applications/MyApp.app/Frameworks/X.framework/X"
@@ -316,15 +391,20 @@ describe("normalizeIpa", () => {
     ).toEqual(strToU8("fw"));
   });
 
-  test("includes only the identified app's entries", () => {
-    const ipa = zipSync({
-      "Payload/MyApp.app/Info.plist": strToU8("<app/>"),
-      "Payload/MyApp.app/MyApp": strToU8("bin"),
-      // A stray second .app (no Info.plist so extractIpaAppName still sees one)
-      // must not be bundled.
-      "Payload/Stray.app/junk": strToU8("junk"),
-    });
-    const names = Object.keys(unzipSync(normalizeIpa(ipa, null)));
+  test("includes only the identified app's entries", async () => {
+    const names = Object.keys(
+      unzipSync(
+        await normalizeIpaBytes(
+          zipSync({
+            "Payload/MyApp.app/Info.plist": strToU8("<app/>"),
+            "Payload/MyApp.app/MyApp": strToU8("bin"),
+            // A stray second .app (no Info.plist so extractIpaAppName still
+            // sees one) must not be bundled.
+            "Payload/Stray.app/junk": strToU8("junk"),
+          })
+        )
+      )
+    );
     expect(names.some((n) => n.includes("Stray"))).toBe(false);
     expect(
       names.includes(
@@ -333,23 +413,60 @@ describe("normalizeIpa", () => {
     ).toBe(true);
   });
 
-  test("skips path-traversal entries", () => {
-    const ipa = zipSync({
-      "Payload/MyApp.app/Info.plist": strToU8("<app/>"),
-      "Payload/MyApp.app/../../evil": strToU8("x"),
-    });
-    const names = Object.keys(unzipSync(normalizeIpa(ipa, null)));
+  test("skips path-traversal entries", async () => {
+    const names = Object.keys(
+      unzipSync(
+        await normalizeIpaBytes(
+          zipSync({
+            "Payload/MyApp.app/Info.plist": strToU8("<app/>"),
+            "Payload/MyApp.app/../../evil": strToU8("x"),
+          })
+        )
+      )
+    );
     expect(names.some((n) => n.includes("evil"))).toBe(false);
   });
 
-  test("is deterministic (identical IPA → identical bytes)", () => {
-    const ipa = fakeIpaBytes();
-    expect(normalizeIpa(ipa, null).equals(normalizeIpa(ipa, null))).toBe(true);
+  test("is deterministic (identical IPA → identical bytes)", async () => {
+    const src = writeTmpFile("app.ipa", fakeIpaBytes());
+    const a = await normalizeToBuffer((out) => normalizeIpa(src, out, null));
+    const b = await normalizeToBuffer((out) => normalizeIpa(src, out, null));
+    expect(a.equals(b)).toBe(true);
   });
 
-  test("throws when the IPA has no single .app", () => {
-    expect(() => normalizeIpa(zipSync({ "readme.txt": strToU8("x") }), null)).toThrow(
-      "exactly one"
-    );
+  test("throws when the IPA has no single .app", async () => {
+    const src = writeTmpFile("bad.ipa", zipSync({ "readme.txt": strToU8("x") }));
+    await expect(
+      normalizeToBuffer((out) => normalizeIpa(src, out, null))
+    ).rejects.toThrow("exactly one");
+  });
+});
+
+describe("detectBuildFormatFromFile", () => {
+  afterEach(cleanupTmp);
+
+  test("detects an APK from a file on disk", async () => {
+    const src = writeTmpFile("app.apk", fakeApk());
+    expect(await detectBuildFormatFromFile(src)).toBe("apk");
+  });
+
+  test("detects an AAB from a file on disk", async () => {
+    const src = writeTmpFile("app.aab", fakeAab());
+    expect(await detectBuildFormatFromFile(src)).toBe("aab");
+  });
+
+  test("detects an IPA from a file on disk", async () => {
+    const src = writeTmpFile("app.ipa", fakeIpa());
+    expect(await detectBuildFormatFromFile(src)).toBe("ipa");
+  });
+
+  test("returns null for a ZIP without build markers", async () => {
+    const src = writeTmpFile("x.zip", zipSync({ "readme.txt": strToU8("hi") }));
+    expect(await detectBuildFormatFromFile(src)).toBe(null);
+  });
+
+  test("returns null for a non-ZIP file", async () => {
+    const src = writeTmpFile("x.bin", strToU8("not a zip"));
+    expect(await detectBuildFormatFromFile(src)).toBe(null);
   });
 });

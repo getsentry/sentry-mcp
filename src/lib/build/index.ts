@@ -23,13 +23,29 @@
  * intentionally skipped (see `normalizeBuildDirectory`).
  */
 
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { lstat, readdir, readFile, readlink } from "node:fs/promises";
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readdirSync,
+  statSync,
+  writeSync,
+} from "node:fs";
+import { lstat, mkdtemp, open, readdir, readlink, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { strToU8, unzipSync, type Zippable, zipSync } from "fflate";
+import {
+  strToU8,
+  Unzip,
+  type UnzipFile,
+  UnzipInflate,
+  UnzipPassThrough,
+  unzipSync,
+} from "fflate";
 import { CLI_VERSION } from "../constants.js";
 import { ValidationError } from "../errors.js";
 import { logger } from "../logger.js";
+import { DeterministicZipWriter } from "./zip-writer.js";
 
 const log = logger.withTag("build.normalize");
 
@@ -38,13 +54,6 @@ export type BuildFormat = "apk" | "aab" | "ipa" | "xcarchive";
 
 /** ZIP local-file-header magic bytes (`PK\x03\x04`). */
 const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04];
-
-/**
- * Fixed modification time for normalized ZIP entries. A constant timestamp
- * (the ZIP epoch, 1980-01-01) keeps the wrapper byte-deterministic so identical
- * builds produce identical chunks.
- */
-const FIXED_MTIME = new Date("1980-01-01T00:00:00Z");
 
 /** Name of the metadata file embedded in every normalized build ZIP. */
 const METADATA_FILENAME = ".sentry-cli-metadata.txt";
@@ -71,6 +80,28 @@ function listZipEntryNames(content: Uint8Array): string[] {
   return names;
 }
 
+/** Classify a build format from a ZIP's entry names (order-independent). */
+function classifyBuildFormat(names: string[]): BuildFormat | null {
+  const entries = new Set(names);
+  // AAB is more specific than APK (an AAB also nests an AndroidManifest under
+  // base/), so check it first.
+  if (
+    entries.has("BundleConfig.pb") &&
+    entries.has("base/manifest/AndroidManifest.xml")
+  ) {
+    return "aab";
+  }
+  if (entries.has("AndroidManifest.xml")) {
+    return "apk";
+  }
+  // IPA: a Payload/<name>.app/Info.plist entry (recognized so the caller can
+  // emit an "iOS not yet supported" message rather than "unrecognized").
+  if (names.some((name) => /^Payload\/[^/]+\.app\/Info\.plist$/.test(name))) {
+    return "ipa";
+  }
+  return null;
+}
+
 /**
  * Detect the mobile build format from a file's bytes.
  *
@@ -93,24 +124,62 @@ export function detectBuildFormat(content: Uint8Array): BuildFormat | null {
     return null;
   }
 
-  const entries = new Set(names);
-  // AAB is more specific than APK (an AAB also nests an AndroidManifest under
-  // base/), so check it first.
-  if (
-    entries.has("BundleConfig.pb") &&
-    entries.has("base/manifest/AndroidManifest.xml")
-  ) {
-    return "aab";
+  return classifyBuildFormat(names);
+}
+
+/**
+ * Detect the mobile build format by streaming a file from disk.
+ *
+ * Reads the ZIP's entry names via a streaming unzip (local headers only — entry
+ * data is never decompressed or buffered), so large APK/AAB/IPA files are
+ * classified without loading them into memory. Returns `null` for a non-ZIP or
+ * an unrecognized ZIP.
+ *
+ * @param filePath - Path to the build file.
+ */
+export async function detectBuildFormatFromFile(
+  filePath: string
+): Promise<BuildFormat | null> {
+  const src = await open(filePath, "r");
+  try {
+    // Cheap magic check first: a non-ZIP would otherwise make Unzip throw.
+    const magic = Buffer.alloc(ZIP_MAGIC.length);
+    const { bytesRead } = await src.read(magic, 0, magic.length, 0);
+    if (bytesRead < ZIP_MAGIC.length || !hasZipMagic(magic)) {
+      return null;
+    }
+
+    const names: string[] = [];
+    const unzip = new Unzip();
+    unzip.register(UnzipInflate);
+    unzip.register(UnzipPassThrough);
+    // Record each entry name but never call `file.start()`, so fflate skips the
+    // entry's data entirely (no decompression, no buffering).
+    unzip.onfile = (file: UnzipFile) => {
+      names.push(file.name);
+    };
+
+    const buf = Buffer.allocUnsafe(1 << 20);
+    const size = (await src.stat()).size;
+    let position = 0;
+    while (position < size) {
+      const read = await src.read(buf, 0, buf.length, position);
+      if (read.bytesRead === 0) {
+        break;
+      }
+      position += read.bytesRead;
+      unzip.push(
+        Uint8Array.prototype.slice.call(buf, 0, read.bytesRead),
+        position >= size
+      );
+    }
+    return classifyBuildFormat(names);
+  } catch (err) {
+    log.debug("Failed to read ZIP entries while detecting build format", err);
+    return null;
+  } finally {
+    await src.close();
   }
-  if (entries.has("AndroidManifest.xml")) {
-    return "apk";
-  }
-  // IPA: a Payload/<name>.app/Info.plist entry (recognized so the caller can
-  // emit an "iOS not yet supported" message rather than "unrecognized").
-  if (names.some((name) => /^Payload\/[^/]+\.app\/Info\.plist$/.test(name))) {
-    return "ipa";
-  }
-  return null;
 }
 
 /** A Sentry build plugin parsed from `SENTRY_PIPELINE`. */
@@ -157,32 +226,32 @@ function buildMetadataFile(plugin: PipelinePlugin | null): string {
 }
 
 /**
- * Wrap a build file into a deterministic normalized ZIP for upload.
+ * Wrap a build file into a deterministic normalized ZIP written to `outPath`.
  *
  * The ZIP stores the build under its basename plus `.sentry-cli-metadata.txt`,
  * using STORE (no compression) and a fixed mtime so identical inputs produce
- * identical bytes.
+ * identical bytes. The build file is streamed from disk into the wrapper, so
+ * neither the build nor the wrapper is held in memory in full.
  *
  * @param filePath - Path to the build file (its basename becomes the ZIP entry).
- * @param content - The raw build file bytes.
+ * @param outPath - Destination path for the normalized wrapper ZIP.
  * @param plugin - Optional plugin identity for the metadata file.
- * @returns The normalized ZIP bytes.
  */
-export function normalizeBuildFile(
+export async function normalizeBuildFile(
   filePath: string,
-  content: Uint8Array,
+  outPath: string,
   plugin: PipelinePlugin | null
-): Buffer {
-  const entryOptions = { level: 0 as const, mtime: FIXED_MTIME };
-  const zipped = zipSync({
-    [basename(filePath)]: [content, entryOptions],
-    [METADATA_FILENAME]: [strToU8(buildMetadataFile(plugin)), entryOptions],
-  });
-  return Buffer.from(zipped);
+): Promise<void> {
+  const zip = await DeterministicZipWriter.create(outPath);
+  try {
+    await zip.addFile(basename(filePath), filePath);
+    await zip.addData(METADATA_FILENAME, strToU8(buildMetadataFile(plugin)));
+    await zip.finalize();
+  } catch (err) {
+    await zip.close();
+    throw err;
+  }
 }
-
-/** Deterministic STORE + fixed-mtime options for a normalized ZIP entry. */
-const ENTRY_OPTIONS = { level: 0 as const, mtime: FIXED_MTIME };
 
 /** `os` = 3 (Unix) — required for `attrs` to carry Unix mode bits in a ZIP. */
 const ZIP_OS_UNIX = 3;
@@ -250,12 +319,23 @@ export function validateXcarchiveDirectory(dirPath: string): void {
   }
 }
 
-/** A collected archive entry: its relative path, bytes, and ZIP attrs. */
-type ArchiveEntry = { relPath: string; content: Uint8Array; attrs: number };
+/**
+ * A collected archive entry. Files carry a `sourcePath` (streamed from disk);
+ * symlinks carry inline `linkTarget` bytes (never followed). `attrs` holds the
+ * Unix mode in the upper 16 bits.
+ */
+type ArchiveEntry = {
+  relPath: string;
+  attrs: number;
+} & ({ sourcePath: string } | { linkTarget: Uint8Array });
 
 /**
  * Recursively collect an XCArchive's entries, preserving symlinks and Unix
  * permissions (via ZIP external attributes) exactly as the legacy CLI does.
+ *
+ * File contents are NOT read here — only the source path is recorded, so the
+ * bytes can later be streamed straight into the wrapper ZIP without buffering
+ * the whole tree in memory.
  *
  * A custom walk (rather than the shared file walker) is used because fidelity
  * matters here: symlinks are stored as symlink entries (their target string as
@@ -275,14 +355,14 @@ async function collectArchiveEntries(root: string): Promise<ArchiveEntry[]> {
 
       // Check symlink first: a symlink to a directory must be stored as a link,
       // not descended into (matching Rust's WalkDir with follow_links = false).
-      let content: Uint8Array;
+      let payload: { sourcePath: string } | { linkTarget: Uint8Array };
       if (dirent.isSymbolicLink()) {
-        content = strToU8(await readlink(full));
+        payload = { linkTarget: strToU8(await readlink(full)) };
       } else if (dirent.isDirectory()) {
         await walk(full, relPath);
         continue;
       } else if (dirent.isFile()) {
-        content = await readFile(full);
+        payload = { sourcePath: full };
       } else {
         // Skip sockets, FIFOs, and other special files.
         continue;
@@ -292,7 +372,7 @@ async function collectArchiveEntries(root: string): Promise<ArchiveEntry[]> {
       // bits of the ZIP external attributes so symlinks and exec bits survive.
       const { mode } = await lstat(full);
       const attrs = ((mode & 0xff_ff) << 16) >>> 0;
-      entries.push({ relPath, content, attrs });
+      entries.push({ relPath, attrs, ...payload });
     }
   };
 
@@ -302,7 +382,8 @@ async function collectArchiveEntries(root: string): Promise<ArchiveEntry[]> {
 }
 
 /**
- * Wrap an XCArchive directory into a deterministic normalized ZIP for upload.
+ * Wrap an XCArchive directory into a deterministic normalized ZIP written to
+ * `outPath`.
  *
  * Every file under `dirPath` is stored under `<dir-basename>/<relative-path>`
  * (STORE, fixed mtime, sorted for byte-stability) alongside a root
@@ -310,37 +391,43 @@ async function collectArchiveEntries(root: string): Promise<ArchiveEntry[]> {
  * Symlinks and Unix permissions are preserved (see {@link collectArchiveEntries});
  * validate the directory first with {@link validateXcarchiveDirectory}.
  *
+ * File bytes are streamed from disk one entry at a time, so peak memory does not
+ * scale with the archive size (a large XCArchive with dSYMs no longer risks
+ * Node's ~2 GiB Buffer cap).
+ *
  * Documented gap: `Assets.car` asset catalogs are not parsed into per-asset
  * images (that required native macOS frameworks), so no `ParsedAssets/` tree is
  * added — the raw `.car` is uploaded as-is.
  *
- * The whole directory is read into memory; a very large XCArchive (e.g. with
- * dSYMs) could exceed Node's ~2 GiB Buffer cap — streaming is a follow-up.
- *
  * @param dirPath - Path to the XCArchive directory.
+ * @param outPath - Destination path for the normalized wrapper ZIP.
  * @param plugin - Optional plugin identity for the metadata file.
- * @returns The normalized ZIP bytes.
  */
 export async function normalizeBuildDirectory(
   dirPath: string,
+  outPath: string,
   plugin: PipelinePlugin | null
-): Promise<Buffer> {
+): Promise<void> {
   const root = resolve(dirPath);
   const dirName = basename(root);
 
-  const entries: Zippable = {};
-  for (const entry of await collectArchiveEntries(root)) {
-    entries[`${dirName}/${entry.relPath}`] = [
-      entry.content,
-      { level: 0, mtime: FIXED_MTIME, os: ZIP_OS_UNIX, attrs: entry.attrs },
-    ];
+  const zip = await DeterministicZipWriter.create(outPath);
+  try {
+    for (const entry of await collectArchiveEntries(root)) {
+      const name = `${dirName}/${entry.relPath}`;
+      const options = { os: ZIP_OS_UNIX, attrs: entry.attrs };
+      if ("sourcePath" in entry) {
+        await zip.addFile(name, entry.sourcePath, options);
+      } else {
+        await zip.addData(name, entry.linkTarget, options);
+      }
+    }
+    await zip.addData(METADATA_FILENAME, strToU8(buildMetadataFile(plugin)));
+    await zip.finalize();
+  } catch (err) {
+    await zip.close();
+    throw err;
   }
-  entries[METADATA_FILENAME] = [
-    strToU8(buildMetadataFile(plugin)),
-    ENTRY_OPTIONS,
-  ];
-
-  return Buffer.from(zipSync(entries));
 }
 
 /** Regex matching an IPA's single `Payload/<name>.app/Info.plist` entry. */
@@ -383,67 +470,156 @@ function xcarchiveInfoPlist(appName: string): string {
 </plist>`;
 }
 
+/** A `Payload/…` file entry extracted from an IPA and staged on disk. */
+type StagedIpaEntry = { name: string; stagePath: string };
+
 /**
- * Convert an IPA into a deterministic normalized XCArchive ZIP for upload.
+ * Stream an IPA ZIP from disk, staging every `Payload/…` file entry to a temp
+ * file under `stageDir` without holding decompressed bytes in memory.
  *
- * The IPA (a ZIP of `Payload/<app>.app/…`) is remapped in-memory into an
- * XCArchive layout — `archive.xcarchive/Products/Applications/<app>.app/…` plus
- * a generated `archive.xcarchive/Info.plist` — and stored (STORE, fixed mtime)
+ * Only file entries (not directory markers) whose name begins with `Payload/`
+ * are staged; other top-level entries (e.g. `iTunesMetadata.plist`) are dropped,
+ * matching the previous in-memory filter. Returns the staged entries in the
+ * order they appeared in the archive (the caller sorts for determinism).
+ */
+async function stageIpaPayload(
+  ipaPath: string,
+  stageDir: string
+): Promise<StagedIpaEntry[]> {
+  const staged: StagedIpaEntry[] = [];
+  let index = 0;
+
+  const unzip = new Unzip();
+  unzip.register(UnzipInflate);
+  unzip.register(UnzipPassThrough);
+  unzip.onfile = (file: UnzipFile) => {
+    const wanted = !file.name.endsWith("/") && file.name.startsWith("Payload/");
+    if (!wanted) {
+      // Still drain the entry so fflate advances past its data.
+      file.ondata = () => {
+        // Discard.
+      };
+      file.start();
+      return;
+    }
+    const stagePath = join(stageDir, `e${index++}`);
+    const fd = openSync(stagePath, "w");
+    file.ondata = (err, chunk, final) => {
+      if (err) {
+        closeSync(fd);
+        throw err;
+      }
+      if (chunk.length > 0) {
+        writeSync(fd, chunk);
+      }
+      if (final) {
+        closeSync(fd);
+        staged.push({ name: file.name, stagePath });
+      }
+    };
+    file.start();
+  };
+
+  const src = await open(ipaPath, "r");
+  try {
+    const buf = Buffer.allocUnsafe(1 << 20);
+    const size = (await src.stat()).size;
+    let position = 0;
+    while (position < size) {
+      const { bytesRead } = await src.read(buf, 0, buf.length, position);
+      if (bytesRead === 0) {
+        break;
+      }
+      position += bytesRead;
+      unzip.push(
+        Uint8Array.prototype.slice.call(buf, 0, bytesRead),
+        position >= size
+      );
+    }
+  } finally {
+    await src.close();
+  }
+  return staged;
+}
+
+/**
+ * Convert an IPA into a deterministic normalized XCArchive ZIP written to
+ * `outPath`.
+ *
+ * The IPA (a ZIP of `Payload/<app>.app/…`) is remapped into an XCArchive
+ * layout — `archive.xcarchive/Products/Applications/<app>.app/…` plus a
+ * generated `archive.xcarchive/Info.plist` — and stored (STORE, fixed mtime)
  * alongside a root `.sentry-cli-metadata.txt`. Mirrors the legacy CLI's
  * `ipa_to_xcarchive` + `normalize_directory`.
  *
- * @param content - The raw IPA bytes.
+ * The IPA is stream-unzipped to temp files and stream-wrapped, so neither the
+ * IPA nor the wrapper is held in memory in full.
+ *
+ * @param ipaPath - Path to the IPA file.
+ * @param outPath - Destination path for the normalized wrapper ZIP.
  * @param plugin - Optional plugin identity for the metadata file.
- * @returns The normalized ZIP bytes.
  * @throws {Error} If the IPA does not contain exactly one `.app`.
  */
-export function normalizeIpa(
-  content: Uint8Array,
+export async function normalizeIpa(
+  ipaPath: string,
+  outPath: string,
   plugin: PipelinePlugin | null
-): Buffer {
-  const ipaEntries = unzipSync(content);
-  const appName = extractIpaAppName(Object.keys(ipaEntries));
+): Promise<void> {
+  const stageDir = await mkdtemp(join(tmpdir(), "sentry-ipa-"));
+  try {
+    const staged = await stageIpaPayload(ipaPath, stageDir);
+    const appName = extractIpaAppName(staged.map((e) => e.name));
 
-  const archiveDir = "archive.xcarchive";
-  // Only the identified app's entries are included (an IPA should contain
-  // exactly one `.app`); a stray second bundle is ignored so it can't skew size
-  // analysis.
-  const appPrefix = `Payload/${appName}.app/`;
+    const archiveDir = "archive.xcarchive";
+    // Only the identified app's entries are included (an IPA should contain
+    // exactly one `.app`); a stray second bundle is ignored so it can't skew
+    // size analysis.
+    const appPrefix = `Payload/${appName}.app/`;
 
-  // Collect (path, bytes) then sort so the output depends only on contents, not
-  // on the IPA's central-directory order — keeping bytes deterministic for
-  // chunk dedup across re-uploads (as normalizeBuildDirectory does).
-  const archiveEntries: Array<[string, Uint8Array]> = [];
-  for (const [name, bytes] of Object.entries(ipaEntries)) {
-    // Directory entries (trailing "/") carry no data; skip them.
-    if (name.endsWith("/") || !name.startsWith(appPrefix)) {
-      continue;
+    // Remap into archive paths — a staged file for each app entry plus the
+    // generated Info.plist — then sort so the output depends only on contents,
+    // not on the IPA's central-directory order, keeping bytes deterministic for
+    // chunk dedup across re-uploads.
+    type ArchiveItem = { name: string; stagePath?: string; data?: Uint8Array };
+    const items: ArchiveItem[] = [
+      {
+        name: `${archiveDir}/Info.plist`,
+        data: strToU8(xcarchiveInfoPlist(appName)),
+      },
+    ];
+    for (const entry of staged) {
+      if (!entry.name.startsWith(appPrefix)) {
+        continue;
+      }
+      const stripped = entry.name.slice("Payload/".length);
+      // Skip path-traversal entries (a `..` segment) defensively, matching the
+      // legacy CLI's `enclosed_name()` guard.
+      if (stripped.split("/").includes("..")) {
+        continue;
+      }
+      items.push({
+        name: `${archiveDir}/Products/Applications/${stripped}`,
+        stagePath: entry.stagePath,
+      });
     }
-    const stripped = name.slice("Payload/".length);
-    // Skip path-traversal entries (a `..` segment) defensively, matching the
-    // legacy CLI's `enclosed_name()` guard.
-    if (stripped.split("/").includes("..")) {
-      continue;
+    items.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+    const zip = await DeterministicZipWriter.create(outPath);
+    try {
+      for (const item of items) {
+        if (item.stagePath !== undefined) {
+          await zip.addFile(item.name, item.stagePath);
+        } else if (item.data !== undefined) {
+          await zip.addData(item.name, item.data);
+        }
+      }
+      await zip.addData(METADATA_FILENAME, strToU8(buildMetadataFile(plugin)));
+      await zip.finalize();
+    } catch (err) {
+      await zip.close();
+      throw err;
     }
-    archiveEntries.push([
-      `${archiveDir}/Products/Applications/${stripped}`,
-      bytes,
-    ]);
+  } finally {
+    await rm(stageDir, { recursive: true, force: true });
   }
-  archiveEntries.push([
-    `${archiveDir}/Info.plist`,
-    strToU8(xcarchiveInfoPlist(appName)),
-  ]);
-  archiveEntries.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-
-  const entries: Zippable = {};
-  for (const [key, bytes] of archiveEntries) {
-    entries[key] = [bytes, ENTRY_OPTIONS];
-  }
-  entries[METADATA_FILENAME] = [
-    strToU8(buildMetadataFile(plugin)),
-    ENTRY_OPTIONS,
-  ];
-
-  return Buffer.from(zipSync(entries));
 }
