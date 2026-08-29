@@ -1,9 +1,10 @@
 /**
  * Dashboard sixel integration tests.
  *
- * Stubs `canRenderSixel` and `terminalPixelWidth` so the dashboard formatter
- * takes the sixel rendering path deterministically, then verifies that the
- * output contains one sixel DCS sequence for the complete dashboard grid.
+ * Stubs `selectGraphicsFormat`, `graphicsCellSize`, and `terminalPixelWidth` so
+ * the dashboard formatter takes the graphics rendering path deterministically,
+ * then verifies that the output contains one sixel DCS sequence (or kitty APC
+ * sequence) for the complete dashboard grid.
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -73,10 +74,12 @@ describe("dashboard sixel integration", () => {
     savedColumns = process.stdout.columns;
     process.env.SENTRY_PLAIN_OUTPUT = "0";
     process.stdout.columns = 40;
-    vi.spyOn(sixelModule, "canRenderSixel").mockReturnValue(true);
-    vi.spyOn(sixelModule, "canRenderKitty").mockReturnValue(false);
+    vi.spyOn(sixelModule, "selectGraphicsFormat").mockReturnValue("sixel");
+    vi.spyOn(sixelModule, "graphicsCellSize").mockReturnValue({
+      cellWidth: 8,
+      cellHeight: 12,
+    });
     vi.spyOn(sixelModule, "terminalPixelWidth").mockReturnValue(320);
-    vi.spyOn(sixelModule, "terminalPixelHeight").mockReturnValue(12);
   });
 
   afterEach(() => {
@@ -108,7 +111,7 @@ describe("dashboard sixel integration", () => {
   });
 
   test("prefers kitty encoding when the terminal supports it", () => {
-    vi.spyOn(sixelModule, "canRenderKitty").mockReturnValue(true);
+    vi.mocked(sixelModule.selectGraphicsFormat).mockReturnValue("kitty");
     const data = makeDashboardData({
       widgets: [
         makeWidget({
@@ -273,8 +276,9 @@ describe("dashboard sixel integration", () => {
     expect(output).toContain('"1;1;32;72');
   });
 
-  test("falls back to the complete character dashboard without cell geometry", () => {
-    vi.mocked(sixelModule.terminalPixelHeight).mockReturnValue(undefined);
+  test("falls back to the complete character dashboard without a graphics format", () => {
+    vi.mocked(sixelModule.selectGraphicsFormat).mockReturnValue(undefined);
+    vi.mocked(sixelModule.graphicsCellSize).mockReturnValue(undefined);
     const output = formatDashboardWithData(
       makeDashboardData({
         widgets: [
@@ -287,6 +291,34 @@ describe("dashboard sixel integration", () => {
     );
 
     expect(output).not.toContain(`${ESC}P`);
+    expect(output).not.toContain(`${ESC}_G`);
     expect(output).toContain("Fallback Widget");
+  });
+
+  test("renders graphics on a kitty terminal that never reports cell geometry", () => {
+    // Regression for #1506: kitty terminals frequently answer the graphics
+    // query but never send `CSI 16 t`, so terminalPixelWidth is undefined.
+    // graphicsCellSize supplies default cell dimensions so the dashboard still
+    // renders as kitty graphics instead of dropping to ASCII.
+    vi.mocked(sixelModule.selectGraphicsFormat).mockReturnValue("kitty");
+    vi.mocked(sixelModule.terminalPixelWidth).mockReturnValue(undefined);
+    vi.mocked(sixelModule.graphicsCellSize).mockReturnValue({
+      cellWidth: 10,
+      cellHeight: 20,
+    });
+    const output = formatDashboardWithData(
+      makeDashboardData({
+        widgets: [
+          makeWidget({
+            title: "Kitty No Geometry",
+            layout: { x: 0, y: 0, w: 6, h: 1 },
+          }),
+        ],
+      })
+    );
+
+    expect(output).toContain(`${ESC}_G`);
+    expect(output).not.toContain(`${ESC}P`);
+    expect(output).not.toContain("Kitty No Geometry");
   });
 });

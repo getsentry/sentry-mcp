@@ -21,9 +21,8 @@ import type {
 } from "../../types/dashboard.js";
 import { encodeImageToKitty } from "../kitty-image.js";
 import {
-  canRenderKitty,
-  canRenderSixel,
-  terminalPixelHeight,
+  graphicsCellSize,
+  selectGraphicsFormat,
   terminalPixelWidth,
 } from "../sixel.js";
 import { SERIES_PALETTE } from "./chart-core.js";
@@ -1870,24 +1869,32 @@ export function formatDashboardWithData(data: DashboardViewData): string {
 }
 
 /**
- * Render the complete dashboard as one graphics canvas (kitty when available,
- * otherwise sixel) when graphics are enabled and the terminal exposes both cell
- * dimensions. Never partially replaces the framebuffer: unavailable geometry
- * always returns the complete established character rendering.
+ * Render the complete dashboard as one graphics canvas, selecting the most
+ * capable terminal format available (kitty over sixel over ASCII). When the
+ * terminal advertises graphics but doesn't report its cell geometry — common
+ * for kitty terminals, which frequently answer the graphics query but never
+ * send `CSI 16 t` — default cell dimensions are used so the dashboard still
+ * renders as graphics rather than silently dropping to ASCII. Never partially
+ * replaces the framebuffer: when no graphics format is available it returns
+ * `undefined` so the caller falls back to the complete character rendering.
  */
 function renderCompleteDashboardAsSixel(
   data: DashboardViewData,
   termWidth: number | undefined
 ): string | undefined {
-  const canKitty = canRenderKitty();
-  if (!termWidth || isPlainOutput() || !(canKitty || canRenderSixel())) {
+  const format = selectGraphicsFormat();
+  if (!termWidth || isPlainOutput() || !format) {
     return;
   }
-  const pixelWidth = terminalPixelWidth(termWidth);
-  const cellHeight = terminalPixelHeight(1);
-  if (!(pixelWidth && cellHeight)) {
+  const cell = graphicsCellSize();
+  if (!cell) {
     return;
   }
+  // Preserve the terminal's reported pixel width when known; otherwise derive it
+  // from the (possibly defaulted) cell width so the canvas still matches the
+  // column count exactly.
+  const pixelWidth =
+    terminalPixelWidth(termWidth) ?? termWidth * cell.cellWidth;
   const cellWidth = Math.floor(pixelWidth / termWidth);
   if (cellWidth < 1) {
     return;
@@ -1895,7 +1902,7 @@ function renderCompleteDashboardAsSixel(
   return renderDashboardAsSixel(data, {
     pixelWidth,
     cellWidth,
-    cellHeight,
+    cellHeight: cell.cellHeight,
     renderTextContent(widget, innerWidth, contentHeight) {
       return renderContentLines({
         widget,
@@ -1903,9 +1910,10 @@ function renderCompleteDashboardAsSixel(
         contentHeight,
       });
     },
-    encodeImage: canKitty
-      ? (image) => encodeImageToKitty(image, image.width, true)
-      : undefined,
+    encodeImage:
+      format === "kitty"
+        ? (image) => encodeImageToKitty(image, image.width, true)
+        : undefined,
   });
 }
 
