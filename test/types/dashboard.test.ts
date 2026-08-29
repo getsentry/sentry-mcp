@@ -93,6 +93,7 @@ describe("DISPLAY_TYPES", () => {
       "top_n",
       "details",
       "categorical_bar",
+      "heatmap",
       "wheel",
       "rage_and_dead_clicks",
       "server_tree",

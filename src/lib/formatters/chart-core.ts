@@ -74,6 +74,19 @@ export type ChartSeries = {
   values: number[];
 };
 
+/** Heatmap grid model: categories (rows) × time buckets (columns). */
+export type HeatmapModel = {
+  kind: "heatmap";
+  /** Row labels (category/series names). */
+  labels: string[];
+  /** 2-D grid: rows[category][bucket] intensity value. */
+  rows: number[][];
+  /** Global maximum across the entire grid (for normalization). */
+  maxVal: number;
+  /** Number of time buckets (columns). */
+  buckets: number;
+};
+
 /**
  * Resolution-independent chart description.
  *
@@ -150,6 +163,29 @@ export function buildCategoricalChartModel(
     maxVal,
     stacked: false,
   };
+}
+
+/** Build a heatmap grid model from grouped timeseries data. */
+export function buildHeatmapModel(
+  data: TimeseriesResult
+): HeatmapModel | undefined {
+  if (data.series.length === 0) {
+    return;
+  }
+  const labels = data.series.map((s) => s.label);
+  const buckets = Math.max(0, ...data.series.map((s) => s.values.length));
+  if (buckets === 0) {
+    return;
+  }
+  const rows = data.series.map((s) => {
+    const vals = s.values.map((v) => v.value);
+    // pad shorter rows so every row has exactly `buckets` columns
+    return vals.length < buckets
+      ? [...vals, ...new Array(buckets - vals.length).fill(0)]
+      : vals;
+  });
+  const maxVal = Math.max(1, ...rows.flat());
+  return { kind: "heatmap", labels, rows, maxVal, buckets };
 }
 
 /** Sum each bucket across every series. */
@@ -342,4 +378,57 @@ function drawCategoricalBars(
       color: hexToRgb(seriesColor(series.label, index)),
     });
   }
+}
+
+/**
+ * Blue→red gradient for the 5 heatmap intensity buckets (matches the ASCII
+ * color ramp). Index 0 is the empty/zero cell.
+ */
+const HEATMAP_EMPTY_COLOR: [number, number, number] = [60, 60, 80];
+const HEATMAP_CELL_COLORS: [number, number, number][] = [
+  HEATMAP_EMPTY_COLOR,
+  [80, 120, 200],
+  [120, 180, 120],
+  [220, 160, 60],
+  [220, 60, 60],
+];
+
+/** Rasterize a heatmap grid into a pixel canvas (one colored cell per bucket). */
+export function rasterizeHeatmap(
+  model: HeatmapModel,
+  opts: RasterizeOpts
+): DecodedImage | undefined {
+  if (model.buckets === 0 || model.rows.length === 0) {
+    return;
+  }
+  const width = Math.max(16, Math.floor(opts.width));
+  const height = Math.max(8, Math.floor(opts.height));
+  const transparent = opts.backgroundTransparent ?? true;
+  const img = createPixelCanvas({
+    width,
+    height,
+    background: transparent ? undefined : BACKGROUND_RGB,
+  });
+
+  const rows = model.rows.length;
+  const cols = model.buckets;
+  const cellW = Math.max(1, Math.floor(width / cols));
+  const cellH = Math.max(1, Math.floor(height / rows));
+
+  for (let r = 0; r < rows; r += 1) {
+    const rowVals = model.rows[r] ?? [];
+    for (let c = 0; c < cols; c += 1) {
+      const norm = (rowVals[c] ?? 0) / model.maxVal;
+      // reuse the same 5-bucket intensity mapping as the ASCII renderer
+      const bucket = Math.min(4, Math.floor(norm * 5));
+      drawPixelRect(img, {
+        x: c * cellW,
+        y: r * cellH,
+        width: cellW,
+        height: cellH,
+        color: HEATMAP_CELL_COLORS[bucket] ?? HEATMAP_EMPTY_COLOR,
+      });
+    }
+  }
+  return img;
 }

@@ -72,6 +72,7 @@ export const DISPLAY_TYPES = [
   "top_n",
   "details",
   "categorical_bar",
+  "heatmap",
   "wheel",
   "rage_and_dead_clicks",
   "server_tree",
@@ -1041,6 +1042,7 @@ export const TIMESERIES_DISPLAY_TYPES = new Set([
   "stacked_area",
   "bar",
   "categorical_bar",
+  "heatmap",
 ]);
 
 /** Display types that use tabular data (events endpoint) */
