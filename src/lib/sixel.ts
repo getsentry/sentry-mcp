@@ -41,6 +41,67 @@ export type SixelCaps = {
 /** Shared "no graphics" result. */
 const UNSUPPORTED: SixelCaps = { supported: false };
 
+/**
+ * Fallback character-cell width in pixels, used when a graphics-capable
+ * terminal doesn't report its cell size (`CSI 16 t`). Many kitty terminals
+ * answer the graphics query but never report cell geometry; without a fallback
+ * they would silently drop to ASCII rendering. 10×20 is a typical monospace
+ * cell and keeps the rasterized dashboard reasonably proportioned.
+ */
+export const DEFAULT_CELL_WIDTH = 10;
+
+/** Fallback character-cell height in pixels. See {@link DEFAULT_CELL_WIDTH}. */
+export const DEFAULT_CELL_HEIGHT = 20;
+
+/**
+ * The terminal graphics protocol to use for inline images, ordered most capable
+ * to least: kitty (direct RGBA, per-pixel alpha) is preferred over sixel
+ * (palette-quantized). ASCII is the implicit fallback when neither is present.
+ */
+export type GraphicsFormat = "kitty" | "sixel";
+
+/**
+ * Pick the best available terminal graphics format, or `undefined` when the
+ * terminal can only render ASCII. Kitty and sixel are usually mutually
+ * exclusive, but when a terminal advertises both, kitty wins because it
+ * transmits full RGBA without palette quantization.
+ */
+export function selectGraphicsFormat(): GraphicsFormat | undefined {
+  if (canRenderKitty()) {
+    return "kitty";
+  }
+  if (canRenderSixel()) {
+    return "sixel";
+  }
+  return;
+}
+
+/**
+ * The character-cell dimensions in device pixels for the current terminal, or
+ * `undefined` when no graphics format is available. Uses the terminal's
+ * reported cell size when known and falls back to {@link DEFAULT_CELL_WIDTH} /
+ * {@link DEFAULT_CELL_HEIGHT} otherwise, so a graphics-capable terminal that
+ * never reports its geometry still renders graphics instead of ASCII.
+ */
+export function graphicsCellSize():
+  | { cellWidth: number; cellHeight: number }
+  | undefined {
+  if (!selectGraphicsFormat()) {
+    return;
+  }
+  const caps = detectSixelCaps();
+  return {
+    cellWidth:
+      caps.cellWidth && caps.cellWidth > 0
+        ? caps.cellWidth
+        : DEFAULT_CELL_WIDTH,
+    cellHeight:
+      caps.cellHeight && caps.cellHeight > 0
+        ? caps.cellHeight
+        : DEFAULT_CELL_HEIGHT,
+  };
+}
+
 /** Primary DA reply: `ESC [ ? <p;p;...> c` — attribute list; `4` == sixel. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: parsing terminal escapes
 const DA1_RE = /\x1b\[\?([0-9;]*)c/;
