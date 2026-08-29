@@ -20,7 +20,11 @@ import type {
   WidgetDataResult,
 } from "../../types/dashboard.js";
 import { encodeImageToKitty } from "../kitty-image.js";
+import { logger } from "../logger.js";
 import {
+  detectSixelCaps,
+  type GraphicsFormat,
+  type GraphicsRendererPreference,
   graphicsCellSize,
   selectGraphicsFormat,
   terminalPixelWidth,
@@ -46,6 +50,8 @@ export type DashboardViewData = {
   url: string;
   dateCreated?: string;
   environment?: string[];
+  /** Renderer selected by --renderer; omitted for API/JSON output. */
+  rendererPreference?: GraphicsRendererPreference;
   widgets: DashboardViewWidget[];
 };
 
@@ -1992,9 +1998,10 @@ export function formatDashboardWithData(data: DashboardViewData): string {
   const lines: string[] = [];
   lines.push(...renderHeader(data, termWidth));
 
-  const sixel = renderCompleteDashboardAsSixel(data, getSixelTermWidth());
-  if (sixel) {
-    lines.push(sixel);
+  const graphics = renderCompleteDashboardAsGraphics(data, getSixelTermWidth());
+  logDashboardGraphicsRenderer(graphics);
+  if (graphics.output) {
+    lines.push(graphics.output);
   } else {
     lines.push(...renderGrid(data.widgets, termWidth));
   }
@@ -2010,20 +2017,79 @@ export function formatDashboardWithData(data: DashboardViewData): string {
  * for kitty terminals, which frequently answer the graphics query but never
  * send `CSI 16 t` — default cell dimensions are used so the dashboard still
  * renders as graphics rather than silently dropping to ASCII. Never partially
- * replaces the framebuffer: when no graphics format is available it returns
- * `undefined` so the caller falls back to the complete character rendering.
+ * replaces the framebuffer: when no graphics format is available it records
+ * the fallback reason so the caller can render the complete character view and
+ * emit a useful debug log.
  */
-function renderCompleteDashboardAsSixel(
+type DashboardGraphicsRender = {
+  renderer: GraphicsFormat | "ascii";
+  rendererPreference: GraphicsRendererPreference;
+  output?: string;
+  reason?: string;
+  termWidth?: number;
+  cell?: { cellWidth: number; cellHeight: number };
+  pixelWidth?: number;
+};
+
+/** Log the terminal graphics decision without including dashboard data. */
+function logDashboardGraphicsRenderer(render: DashboardGraphicsRender): void {
+  const caps = detectSixelCaps();
+  const details = [
+    `requested=${render.rendererPreference}`,
+    `capabilities: kitty=${caps.kitty === true ? "yes" : "no"}, sixel=${caps.supported ? "yes" : "no"}`,
+    `terminal: stdout TTY=${process.stdout.isTTY ? "yes" : "no"}, stdin TTY=${process.stdin.isTTY ? "yes" : "no"}`,
+    `plain output=${isPlainOutput() ? "yes" : "no"}`,
+    `columns=${render.termWidth ?? "unavailable"}`,
+  ];
+  if (render.cell) {
+    details.push(`cell=${render.cell.cellWidth}x${render.cell.cellHeight}`);
+  }
+  if (render.pixelWidth) {
+    details.push(`pixel width=${render.pixelWidth}`);
+  }
+  const reason = render.reason ? ` (reason: ${render.reason})` : "";
+  logger.debug(
+    `Dashboard graphics renderer: ${render.renderer}${reason}; ${details.join("; ")}`
+  );
+}
+
+function renderCompleteDashboardAsGraphics(
   data: DashboardViewData,
   termWidth: number | undefined
-): string | undefined {
-  const format = selectGraphicsFormat();
-  if (!termWidth || isPlainOutput() || !format) {
-    return;
+): DashboardGraphicsRender {
+  const rendererPreference = data.rendererPreference ?? "auto";
+  const format = selectGraphicsFormat(rendererPreference);
+  if (!termWidth) {
+    return {
+      renderer: "ascii",
+      rendererPreference,
+      reason: "terminal width unavailable",
+    };
   }
-  const cell = graphicsCellSize();
+  if (isPlainOutput()) {
+    return {
+      renderer: "ascii",
+      rendererPreference,
+      reason: "plain output requested",
+      termWidth,
+    };
+  }
+  if (!format) {
+    return {
+      renderer: "ascii",
+      rendererPreference,
+      reason: "no compatible graphics protocol detected",
+      termWidth,
+    };
+  }
+  const cell = graphicsCellSize(rendererPreference);
   if (!cell) {
-    return;
+    return {
+      renderer: "ascii",
+      rendererPreference,
+      reason: "graphics cell size unavailable",
+      termWidth,
+    };
   }
   // Preserve the terminal's reported pixel width when known; otherwise derive it
   // from the (possibly defaulted) cell width so the canvas still matches the
@@ -2032,9 +2098,16 @@ function renderCompleteDashboardAsSixel(
     terminalPixelWidth(termWidth) ?? termWidth * cell.cellWidth;
   const cellWidth = Math.floor(pixelWidth / termWidth);
   if (cellWidth < 1) {
-    return;
+    return {
+      renderer: "ascii",
+      rendererPreference,
+      reason: "calculated graphics cell width is invalid",
+      termWidth,
+      cell,
+      pixelWidth,
+    };
   }
-  return renderDashboardAsSixel(data, {
+  const graphics = renderDashboardAsSixel(data, {
     pixelWidth,
     cellWidth,
     cellHeight: cell.cellHeight,
@@ -2050,6 +2123,24 @@ function renderCompleteDashboardAsSixel(
         ? (image) => encodeImageToKitty(image, image.width, true)
         : undefined,
   });
+  if (!("output" in graphics)) {
+    return {
+      renderer: "ascii",
+      rendererPreference,
+      reason: graphics.reason,
+      termWidth,
+      cell,
+      pixelWidth,
+    };
+  }
+  return {
+    renderer: format,
+    rendererPreference,
+    output: graphics.output,
+    termWidth,
+    cell,
+    pixelWidth,
+  };
 }
 
 // ---------------------------------------------------------------------------

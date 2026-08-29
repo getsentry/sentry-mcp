@@ -22,6 +22,7 @@ import { logger } from "../../lib/logger.js";
 import { withProgress } from "../../lib/polling.js";
 import { resolveOrgRegion } from "../../lib/region.js";
 import { buildDashboardUrl } from "../../lib/sentry-urls.js";
+import type { GraphicsRendererPreference } from "../../lib/sixel.js";
 import {
   formatTimeRangeFlag,
   PERIOD_BRIEF,
@@ -52,6 +53,7 @@ type ViewFlags = {
   readonly fresh: boolean;
   readonly refresh?: number;
   readonly period?: TimeRange;
+  readonly renderer: GraphicsRendererPreference;
   readonly json: boolean;
   readonly fields?: string[];
 };
@@ -107,7 +109,11 @@ function buildViewData(
   },
   widgetResults: Map<number, WidgetDataResult>,
   widgets: DashboardWidget[],
-  opts: { period: string; url: string }
+  opts: {
+    period: string;
+    rendererPreference: GraphicsRendererPreference;
+    url: string;
+  }
 ): DashboardViewData {
   return {
     id: dashboard.id,
@@ -117,6 +123,7 @@ function buildViewData(
     url: opts.url,
     dateCreated: dashboard.dateCreated,
     environment: dashboard.environment,
+    rendererPreference: opts.rendererPreference,
     widgets: widgets.map((w, i) => ({
       title: w.title,
       displayType: w.displayType,
@@ -166,12 +173,14 @@ export const viewCommand = buildCommand({
       "  sentry dashboard view my-org/my-project 12345\n" +
       "  sentry dashboard view 12345 --json\n" +
       "  sentry dashboard view 12345 --period 7d\n" +
+      "  sentry dashboard view 12345 --renderer sixel\n" +
       "  sentry dashboard view 12345 -r\n" +
       "  sentry dashboard view 12345 -r 30\n" +
       "  sentry dashboard view 12345 --web",
   },
   output: {
     human: createDashboardViewRenderer,
+    jsonExclude: ["rendererPreference"],
   },
   parameters: {
     positional: {
@@ -201,6 +210,13 @@ export const viewCommand = buildCommand({
         parse: parsePeriod,
         brief: PERIOD_BRIEF,
         optional: true,
+      },
+      renderer: {
+        kind: "enum",
+        values: ["auto", "kitty", "sixel"],
+        brief:
+          "Graphics renderer (defaults to auto; falls back to auto when unavailable)",
+        default: "auto",
       },
     },
     aliases: {
@@ -285,6 +301,7 @@ export const viewCommand = buildCommand({
           // Build output data before clearing so clear→render is instantaneous
           const viewData = buildViewData(dashboard, widgetData, widgets, {
             period: formatTimeRangeFlag(timeRange),
+            rendererPreference: flags.renderer,
             url,
           });
 
@@ -316,6 +333,7 @@ export const viewCommand = buildCommand({
     yield new CommandOutput(
       buildViewData(dashboard, widgetData, widgets, {
         period: formatTimeRangeFlag(timeRange),
+        rendererPreference: flags.renderer,
         url,
       })
     );
