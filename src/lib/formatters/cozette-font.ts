@@ -34,12 +34,95 @@ const FIRST_ASCII_CODE_POINT = 32;
 const LAST_ASCII_CODE_POINT = 126;
 const FULL_BLOCK_CODE_POINT = 0x25_88;
 const BLACK_SQUARE_CODE_POINT = 0x25_a0;
+const UPPER_HALF_BLOCK_CODE_POINT = 0x25_80;
+const LOWER_HALF_BLOCK_CODE_POINT = 0x25_84;
+const HORIZONTAL_RULE_CODE_POINT = 0x25_00;
+const VERTICAL_RULE_CODE_POINT = 0x25_02;
+const LOWER_LEFT_CORNER_CODE_POINT = 0x25_14;
+const RIGHT_TEE_CODE_POINT = 0x25_24;
+const DOWN_TEE_CODE_POINT = 0x25_2c;
+const ELLIPSIS_CODE_POINT = 0x20_26;
+const LIGHT_SHADE_CODE_POINT = 0x25_91;
+const MEDIUM_SHADE_CODE_POINT = 0x25_92;
+const DARK_SHADE_CODE_POINT = 0x25_93;
+const LOWER_ONE_EIGHTH_BLOCK_CODE_POINT = 0x25_81;
+const LOWER_TWO_EIGHTHS_BLOCK_CODE_POINT = 0x25_82;
+const LOWER_THREE_EIGHTHS_BLOCK_CODE_POINT = 0x25_83;
+const LOWER_FIVE_EIGHTHS_BLOCK_CODE_POINT = 0x25_85;
+const LOWER_SIX_EIGHTHS_BLOCK_CODE_POINT = 0x25_86;
+const LOWER_SEVEN_EIGHTHS_BLOCK_CODE_POINT = 0x25_87;
 const FULL_BLOCK_INDEX = LAST_ASCII_CODE_POINT - FIRST_ASCII_CODE_POINT + 1;
 const BLACK_SQUARE_INDEX = FULL_BLOCK_INDEX + 1;
+const QUESTION_MARK_INDEX = 0x3f - FIRST_ASCII_CODE_POINT;
 
-/** Visible fallback for a Unicode glyph outside the embedded Cozette subset. */
-const UNKNOWN_GLYPH = new Uint8Array([
-  63, 33, 45, 45, 45, 45, 45, 45, 45, 45, 33, 63, 0,
+/** Dashboard's compact number and table renderers use these block glyphs. */
+const UPPER_HALF_BLOCK_GLYPH = new Uint8Array([
+  63, 63, 63, 63, 63, 63, 0, 0, 0, 0, 0, 0, 0,
+]);
+const LOWER_HALF_BLOCK_GLYPH = new Uint8Array([
+  0, 0, 0, 0, 0, 0, 63, 63, 63, 63, 63, 63, 63,
+]);
+const HORIZONTAL_RULE_GLYPH = new Uint8Array([
+  0, 0, 0, 0, 0, 0, 63, 0, 0, 0, 0, 0, 0,
+]);
+const VERTICAL_RULE_GLYPH = new Uint8Array([
+  8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+]);
+const LOWER_LEFT_CORNER_GLYPH = new Uint8Array([
+  32, 32, 32, 32, 32, 32, 63, 0, 0, 0, 0, 0, 0,
+]);
+const RIGHT_TEE_GLYPH = new Uint8Array([
+  1, 1, 1, 1, 1, 1, 63, 1, 1, 1, 1, 1, 1,
+]);
+const DOWN_TEE_GLYPH = new Uint8Array([0, 0, 0, 0, 0, 63, 8, 8, 8, 8, 8, 8, 8]);
+const ELLIPSIS_GLYPH = new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42, 0, 0]);
+const LIGHT_SHADE_GLYPH = new Uint8Array([
+  33, 0, 0, 33, 0, 0, 33, 0, 0, 33, 0, 0, 33,
+]);
+const MEDIUM_SHADE_GLYPH = new Uint8Array([
+  36, 9, 36, 9, 36, 9, 36, 9, 36, 9, 36, 9, 36,
+]);
+const DARK_SHADE_GLYPH = new Uint8Array([
+  45, 54, 45, 54, 45, 54, 45, 54, 45, 54, 45, 54, 45,
+]);
+const LOWER_ONE_EIGHTH_BLOCK_GLYPH = new Uint8Array([
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63, 63,
+]);
+const LOWER_TWO_EIGHTHS_BLOCK_GLYPH = new Uint8Array([
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63, 63, 63,
+]);
+const LOWER_THREE_EIGHTHS_BLOCK_GLYPH = new Uint8Array([
+  0, 0, 0, 0, 0, 0, 0, 0, 63, 63, 63, 63, 63,
+]);
+const LOWER_FIVE_EIGHTHS_BLOCK_GLYPH = new Uint8Array([
+  0, 0, 0, 0, 0, 63, 63, 63, 63, 63, 63, 63, 63,
+]);
+const LOWER_SIX_EIGHTHS_BLOCK_GLYPH = new Uint8Array([
+  0, 0, 0, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63,
+]);
+const LOWER_SEVEN_EIGHTHS_BLOCK_GLYPH = new Uint8Array([
+  0, 0, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63,
+]);
+
+/** Raster glyphs needed by the dashboard's box, sparkline, and text output. */
+const DASHBOARD_GLYPHS = new Map<number, Uint8Array>([
+  [UPPER_HALF_BLOCK_CODE_POINT, UPPER_HALF_BLOCK_GLYPH],
+  [LOWER_HALF_BLOCK_CODE_POINT, LOWER_HALF_BLOCK_GLYPH],
+  [HORIZONTAL_RULE_CODE_POINT, HORIZONTAL_RULE_GLYPH],
+  [VERTICAL_RULE_CODE_POINT, VERTICAL_RULE_GLYPH],
+  [LOWER_LEFT_CORNER_CODE_POINT, LOWER_LEFT_CORNER_GLYPH],
+  [RIGHT_TEE_CODE_POINT, RIGHT_TEE_GLYPH],
+  [DOWN_TEE_CODE_POINT, DOWN_TEE_GLYPH],
+  [ELLIPSIS_CODE_POINT, ELLIPSIS_GLYPH],
+  [LIGHT_SHADE_CODE_POINT, LIGHT_SHADE_GLYPH],
+  [MEDIUM_SHADE_CODE_POINT, MEDIUM_SHADE_GLYPH],
+  [DARK_SHADE_CODE_POINT, DARK_SHADE_GLYPH],
+  [LOWER_ONE_EIGHTH_BLOCK_CODE_POINT, LOWER_ONE_EIGHTH_BLOCK_GLYPH],
+  [LOWER_TWO_EIGHTHS_BLOCK_CODE_POINT, LOWER_TWO_EIGHTHS_BLOCK_GLYPH],
+  [LOWER_THREE_EIGHTHS_BLOCK_CODE_POINT, LOWER_THREE_EIGHTHS_BLOCK_GLYPH],
+  [LOWER_FIVE_EIGHTHS_BLOCK_CODE_POINT, LOWER_FIVE_EIGHTHS_BLOCK_GLYPH],
+  [LOWER_SIX_EIGHTHS_BLOCK_CODE_POINT, LOWER_SIX_EIGHTHS_BLOCK_GLYPH],
+  [LOWER_SEVEN_EIGHTHS_BLOCK_CODE_POINT, LOWER_SEVEN_EIGHTHS_BLOCK_GLYPH],
 ]);
 
 /**
@@ -58,12 +141,28 @@ const GLYPH_ROWS = Uint8Array.from(
 /** Look up a Cozette glyph by character without parsing or rasterizing a font. */
 export function getCozetteGlyph(character: string): Uint8Array {
   const codePoint = character.codePointAt(0);
-  const index = getGlyphIndex(codePoint);
-  if (index === undefined) {
-    return UNKNOWN_GLYPH;
+  const dashboardGlyph = getDashboardGlyph(codePoint);
+  if (dashboardGlyph) {
+    return dashboardGlyph;
   }
-  const start = index * COZETTE_CELL_HEIGHT;
+  const index = getGlyphIndex(codePoint);
+  const start = (index ?? QUESTION_MARK_INDEX) * COZETTE_CELL_HEIGHT;
   return GLYPH_ROWS.subarray(start, start + COZETTE_CELL_HEIGHT);
+}
+
+/** Whether the embedded font can represent a character without substitution. */
+export function hasCozetteGlyph(character: string): boolean {
+  const codePoint = character.codePointAt(0);
+  return (
+    getDashboardGlyph(codePoint) !== undefined ||
+    getGlyphIndex(codePoint) !== undefined
+  );
+}
+
+function getDashboardGlyph(
+  codePoint: number | undefined
+): Uint8Array | undefined {
+  return codePoint === undefined ? undefined : DASHBOARD_GLYPHS.get(codePoint);
 }
 
 function getGlyphIndex(codePoint: number | undefined): number | undefined {

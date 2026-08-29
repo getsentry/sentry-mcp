@@ -43,6 +43,7 @@ View a dashboard
 - `-f, --fresh - Bypass cache, re-detect projects, and fetch fresh data`
 - `-r, --refresh <value> - Auto-refresh interval in seconds (default: 60, min: 10)`
 - `-t, --period <value> - Time range: "7d", "2026-07-01..2026-08-01", ">=2026-07-01"`
+- `--renderer <value> - Graphics renderer (defaults to auto; falls back to auto when unavailable) - (default: "auto")`
 
 **Examples:**
 

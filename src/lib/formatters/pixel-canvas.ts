@@ -3,8 +3,8 @@
  *
  * Charts and dashboards use this module to draw into the RGBA buffers consumed
  * by the sixel encoder. The text renderer is deliberately limited to a compact
- * terminal-sized bitmap font: unsupported glyphs remain visible as a fallback
- * box instead of silently disappearing from a dashboard image.
+ * terminal-sized bitmap font. Common punctuation and diacritics are normalized
+ * before drawing so they remain legible even outside the embedded font subset.
  */
 
 import type { DecodedImage } from "../sixel-image.js";
@@ -12,7 +12,26 @@ import {
   COZETTE_CELL_HEIGHT,
   COZETTE_CELL_WIDTH,
   getCozetteGlyph,
+  hasCozetteGlyph,
 } from "./cozette-font.js";
+
+/** Unicode punctuation that has a clear one- or two-cell ASCII equivalent. */
+const BITMAP_TEXT_FALLBACKS = new Map<string, string>([
+  ["–", "-"],
+  ["—", "-"],
+  ["−", "-"],
+  ["“", '"'],
+  ["”", '"'],
+  ["‘", "'"],
+  ["’", "'"],
+  ["•", "*"],
+  ["→", "->"],
+  ["←", "<-"],
+  ["↔", "<->"],
+  [" ", " "],
+]);
+
+const COMBINING_MARK_RE = /\p{Mark}/gu;
 
 /** An RGB color tuple with one 0-255 value per channel. */
 export type Rgb = [number, number, number];
@@ -162,10 +181,13 @@ export function drawPixelText(
   const cellHeight = Math.max(1, Math.floor(options.cellHeight));
 
   let column = 0;
-  for (const rawChar of text) {
-    if (column >= options.maxColumns) {
+  const characters = normalizeBitmapText(text)[Symbol.iterator]();
+  while (column < options.maxColumns) {
+    const character = characters.next();
+    if (character.done) {
       break;
     }
+    const rawChar = character.value;
     drawCozetteGlyph(image, getCozetteGlyph(rawChar), {
       x: options.x + column * cellWidth,
       y: options.y,
@@ -174,6 +196,32 @@ export function drawPixelText(
       color: options.color,
     });
     column += 1;
+  }
+}
+
+/** Convert common Unicode text into glyphs that the embedded font can draw. */
+function* normalizeBitmapText(text: string): Iterable<string> {
+  for (const character of text) {
+    if (hasCozetteGlyph(character)) {
+      yield character;
+      continue;
+    }
+    const fallback = BITMAP_TEXT_FALLBACKS.get(character);
+    if (fallback) {
+      yield* fallback;
+      continue;
+    }
+    const decomposed = character
+      .normalize("NFKD")
+      .replace(COMBINING_MARK_RE, "");
+    if (
+      decomposed.length > 0 &&
+      [...decomposed].every((candidate) => hasCozetteGlyph(candidate))
+    ) {
+      yield* decomposed;
+      continue;
+    }
+    yield "?";
   }
 }
 
