@@ -27,6 +27,7 @@ import {
   parseSixelCaps,
   readReply,
   selectGraphicsFormat,
+  selectGraphicsFormatFromAvailability,
   sixelBanner,
   sixelFits,
   terminalPixelWidth,
@@ -151,6 +152,15 @@ describe("selectGraphicsFormat", () => {
     // available and the caller falls back to ASCII.
     __resetSixelCache();
     expect(selectGraphicsFormat()).toBeUndefined();
+  });
+
+  test("falls back to the automatic renderer when the requested one is unavailable", () => {
+    expect(
+      selectGraphicsFormatFromAvailability("sixel", {
+        kitty: true,
+        sixel: false,
+      })
+    ).toBe("kitty");
   });
 });
 

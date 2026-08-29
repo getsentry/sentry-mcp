@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { getCozetteGlyph } from "../../../src/lib/formatters/cozette-font.js";
 import {
   createPixelCanvas,
@@ -35,6 +35,71 @@ describe("drawPixelText", () => {
 
   test("packs Cozette rows with bit five as the leftmost pixel", () => {
     expect(getCozetteGlyph("A")[2]).toBe(0b00_1110);
+  });
+
+  test("includes the half-block and rule glyphs used by dashboard content", () => {
+    expect([...getCozetteGlyph("▀")]).toEqual([
+      63, 63, 63, 63, 63, 63, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+    expect([...getCozetteGlyph("▄")]).toEqual([
+      0, 0, 0, 0, 0, 0, 63, 63, 63, 63, 63, 63, 63,
+    ]);
+    expect([...getCozetteGlyph("─")]).toEqual([
+      0, 0, 0, 0, 0, 0, 63, 0, 0, 0, 0, 0, 0,
+    ]);
+  });
+
+  test("uses a question mark for unsupported text glyphs", () => {
+    expect([...getCozetteGlyph("\u6f22")]).toEqual([...getCozetteGlyph("?")]);
+  });
+
+  test("includes the dashboard axis, sparkline, and ellipsis glyphs", () => {
+    const questionMark = [...getCozetteGlyph("?")];
+    for (const character of [
+      "│",
+      "└",
+      "┤",
+      "┬",
+      "…",
+      "▁",
+      "▂",
+      "▃",
+      "▄",
+      "▅",
+      "▆",
+      "▇",
+      "░",
+      "▓",
+    ]) {
+      expect([...getCozetteGlyph(character)]).not.toEqual(questionMark);
+    }
+  });
+
+  test("renders accented labels and typographic punctuation legibly", () => {
+    const rendered = renderText("Café — 50…");
+    const expected = renderText("Cafe - 50…");
+
+    expect(rendered.data).toEqual(expected.data);
+  });
+
+  test("does not normalize text outside its visible width", () => {
+    const normalize = vi.spyOn(String.prototype, "normalize");
+    const image = createPixelCanvas({ width: 6, height: 13 });
+
+    try {
+      drawPixelText(image, `A${"é".repeat(100)}`, {
+        x: 0,
+        y: 0,
+        cellWidth: 6,
+        cellHeight: 13,
+        maxColumns: 1,
+        color: [255, 255, 255],
+      });
+
+      expect(normalize).not.toHaveBeenCalled();
+    } finally {
+      normalize.mockRestore();
+    }
   });
 
   test("fills non-integer terminal cells with proportional bitmap scaling", () => {
@@ -93,3 +158,16 @@ describe("drawPixelText", () => {
     }
   });
 });
+
+function renderText(text: string) {
+  const image = createPixelCanvas({ width: 120, height: 13 });
+  drawPixelText(image, text, {
+    x: 0,
+    y: 0,
+    cellWidth: 6,
+    cellHeight: 13,
+    maxColumns: 20,
+    color: [255, 255, 255],
+  });
+  return image;
+}

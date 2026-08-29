@@ -61,19 +61,45 @@ export const DEFAULT_CELL_HEIGHT = 20;
 export type GraphicsFormat = "kitty" | "sixel";
 
 /**
+ * The graphics renderer requested by a dashboard invocation. A requested
+ * protocol is preferred when available; otherwise selection falls back to the
+ * normal automatic order (kitty, then sixel, then ASCII).
+ */
+export type GraphicsRendererPreference = "auto" | GraphicsFormat;
+
+/** Select a graphics renderer from the protocols currently available. */
+export function selectGraphicsFormatFromAvailability(
+  preference: GraphicsRendererPreference,
+  available: { kitty: boolean; sixel: boolean }
+): GraphicsFormat | undefined {
+  if (preference === "kitty" && available.kitty) {
+    return "kitty";
+  }
+  if (preference === "sixel" && available.sixel) {
+    return "sixel";
+  }
+  if (available.kitty) {
+    return "kitty";
+  }
+  if (available.sixel) {
+    return "sixel";
+  }
+  return;
+}
+
+/**
  * Pick the best available terminal graphics format, or `undefined` when the
  * terminal can only render ASCII. Kitty and sixel are usually mutually
  * exclusive, but when a terminal advertises both, kitty wins because it
  * transmits full RGBA without palette quantization.
  */
-export function selectGraphicsFormat(): GraphicsFormat | undefined {
-  if (canRenderKitty()) {
-    return "kitty";
-  }
-  if (canRenderSixel()) {
-    return "sixel";
-  }
-  return;
+export function selectGraphicsFormat(
+  preference: GraphicsRendererPreference = "auto"
+): GraphicsFormat | undefined {
+  return selectGraphicsFormatFromAvailability(preference, {
+    kitty: canRenderKitty(),
+    sixel: canRenderSixel(),
+  });
 }
 
 /**
@@ -83,10 +109,10 @@ export function selectGraphicsFormat(): GraphicsFormat | undefined {
  * {@link DEFAULT_CELL_HEIGHT} otherwise, so a graphics-capable terminal that
  * never reports its geometry still renders graphics instead of ASCII.
  */
-export function graphicsCellSize():
-  | { cellWidth: number; cellHeight: number }
-  | undefined {
-  if (!selectGraphicsFormat()) {
+export function graphicsCellSize(
+  preference: GraphicsRendererPreference = "auto"
+): { cellWidth: number; cellHeight: number } | undefined {
+  if (!selectGraphicsFormat(preference)) {
     return;
   }
   const caps = detectSixelCaps();
