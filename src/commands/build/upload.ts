@@ -9,14 +9,16 @@
  * git/VCS metadata collection is added in a follow-up. Sentry SaaS only.
  */
 
-import { readFile, stat } from "node:fs/promises";
+import { mkdtemp, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { SentryContext } from "../../context.js";
 import {
   type BuildUploadMetadata,
   uploadBuild,
 } from "../../lib/api/preprod-artifacts.js";
 import {
-  detectBuildFormat,
+  detectBuildFormatFromFile,
   normalizeBuildDirectory,
   normalizeBuildFile,
   normalizeIpa,
@@ -115,36 +117,41 @@ async function uploadOne(
 
   const plugin = parsePluginFromPipeline(ctx.env.SENTRY_PIPELINE);
 
-  // An XCArchive is a directory; validate its structure, then zip it. The
-  // validation refuses arbitrary directories so a stray `sentry build upload ./`
-  // can't sweep up source, .git/, or secrets.
-  if (info.isDirectory()) {
-    validateXcarchiveDirectory(path);
-    const normalized = await normalizeBuildDirectory(path, plugin);
-    return await uploadBuild({ org, project, content: normalized, metadata });
+  // Normalize into a wrapper ZIP on disk (streamed, so peak memory does not
+  // scale with the build size), then upload it via the file-based chunk path.
+  const workDir = await mkdtemp(join(tmpdir(), "sentry-build-"));
+  const outPath = join(workDir, "normalized.zip");
+  try {
+    // An XCArchive is a directory; validate its structure, then zip it. The
+    // validation refuses arbitrary directories so a stray
+    // `sentry build upload ./` can't sweep up source, .git/, or secrets.
+    if (info.isDirectory()) {
+      validateXcarchiveDirectory(path);
+      await normalizeBuildDirectory(path, outPath, plugin);
+    } else {
+      // detectBuildFormatFromFile only classifies files (apk/aab/ipa);
+      // XCArchive is a directory, handled above.
+      const format = await detectBuildFormatFromFile(path);
+      if (format === "ipa") {
+        await normalizeIpa(path, outPath, plugin);
+      } else if (format === "apk" || format === "aab") {
+        await normalizeBuildFile(path, outPath, plugin);
+      } else {
+        throw new ValidationError(
+          `Unsupported build format (expected APK, AAB, IPA, or XCArchive): ${path}`,
+          "path"
+        );
+      }
+    }
+    return await uploadBuild({
+      org,
+      project,
+      contentPath: outPath,
+      metadata,
+    });
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
   }
-
-  // NOTE: the build is read fully into memory (and normalized into a second
-  // buffer). Fine for typical mobile builds, but files above Node's ~2 GiB
-  // Buffer cap will throw. A follow-up can stream normalization to a temp file
-  // and use the file-based chunk path; the legacy CLI memory-maps instead.
-  const content = await readFile(path);
-  // detectBuildFormat only classifies files (apk/aab/ipa); XCArchive is a
-  // directory, handled above.
-  const format = detectBuildFormat(content);
-
-  let normalized: Buffer;
-  if (format === "ipa") {
-    normalized = normalizeIpa(content, plugin);
-  } else if (format === "apk" || format === "aab") {
-    normalized = normalizeBuildFile(path, content, plugin);
-  } else {
-    throw new ValidationError(
-      `Unsupported build format (expected APK, AAB, IPA, or XCArchive): ${path}`,
-      "path"
-    );
-  }
-  return await uploadBuild({ org, project, content: normalized, metadata });
 }
 
 export const uploadCommand = buildCommand({

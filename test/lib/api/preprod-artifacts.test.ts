@@ -7,7 +7,7 @@
  * same-origin-only auth attachment can be verified without a network.
  */
 
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { safeParse } from "valibot";
@@ -19,13 +19,13 @@ const {
   apiRequestToRegionMock,
   apiRequestToRegionNoContentMock,
   getAuthTokenMock,
-  uploadMissingBufferChunksMock,
+  uploadMissingChunksMock,
 } = vi.hoisted(() => ({
   customFetchMock: vi.fn(),
   apiRequestToRegionMock: vi.fn(),
   apiRequestToRegionNoContentMock: vi.fn(() => Promise.resolve()),
   getAuthTokenMock: vi.fn<() => string | undefined>(() => "secret-token"),
-  uploadMissingBufferChunksMock: vi.fn(() => Promise.resolve()),
+  uploadMissingChunksMock: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("../../../src/lib/region.js", () => ({
@@ -57,7 +57,7 @@ vi.mock("../../../src/lib/api/chunk-upload.js", async (importOriginal) => {
       concurrency: 8,
       compression: ["gzip"],
     })),
-    uploadMissingBufferChunks: uploadMissingBufferChunksMock,
+    uploadMissingChunks: uploadMissingChunksMock,
   };
 });
 
@@ -206,11 +206,19 @@ describe("downloadBuildArtifact", () => {
 });
 
 describe("uploadBuild", () => {
-  const content = Buffer.from("normalized-build-zip-bytes");
+  let contentPath: string;
+  let buildTmpDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     apiRequestToRegionMock.mockReset();
-    uploadMissingBufferChunksMock.mockClear();
+    uploadMissingChunksMock.mockClear();
+    buildTmpDir = await mkdtemp(join(tmpdir(), "preprod-build-"));
+    contentPath = join(buildTmpDir, "normalized.zip");
+    await writeFile(contentPath, Buffer.from("normalized-build-zip-bytes"));
+  });
+
+  afterEach(async () => {
+    await rm(buildTmpDir, { recursive: true, force: true });
   });
 
   test("returns the artifactUrl and folds metadata into the assemble body", async () => {
@@ -222,7 +230,7 @@ describe("uploadBuild", () => {
     const url = await uploadBuild({
       org: "my-org",
       project: "my-project",
-      content,
+      contentPath,
       metadata: {
         buildConfiguration: "Release",
         releaseNotes: "notes",
@@ -242,36 +250,32 @@ describe("uploadBuild", () => {
     expect(body.release_notes).toBe("notes");
     expect(body.install_groups).toEqual(["qa", "beta"]);
     // No missing chunks on the first (and only) response.
-    expect(uploadMissingBufferChunksMock).not.toHaveBeenCalled();
+    expect(uploadMissingChunksMock).not.toHaveBeenCalled();
   });
 
   test("uploads missing chunks then returns the artifactUrl", async () => {
-    vi.useFakeTimers();
-    try {
-      apiRequestToRegionMock
-        .mockResolvedValueOnce({
-          data: { state: "created", missingChunks: ["deadbeef"] },
-          headers: new Headers(),
-        })
-        .mockResolvedValueOnce({
-          data: { state: "ok", artifactUrl: "https://sentry.io/artifact/2" },
-          headers: new Headers(),
-        });
+    // Real timers: uploadBuild now hashes the wrapper via async file I/O before
+    // the first assemble POST, which does not interleave cleanly with fake
+    // timers. The single real inter-poll sleep (~1s) is tolerable.
+    apiRequestToRegionMock
+      .mockResolvedValueOnce({
+        data: { state: "created", missingChunks: ["deadbeef"] },
+        headers: new Headers(),
+      })
+      .mockResolvedValueOnce({
+        data: { state: "ok", artifactUrl: "https://sentry.io/artifact/2" },
+        headers: new Headers(),
+      });
 
-      const promise = uploadBuild({
+    await expect(
+      uploadBuild({
         org: "my-org",
         project: "my-project",
-        content,
+        contentPath,
         metadata: {},
-      });
-      // Advance past the inter-poll sleep so the second assemble POST runs.
-      await vi.advanceTimersByTimeAsync(1000);
-
-      await expect(promise).resolves.toBe("https://sentry.io/artifact/2");
-      expect(uploadMissingBufferChunksMock).toHaveBeenCalledTimes(1);
-    } finally {
-      vi.useRealTimers();
-    }
+      })
+    ).resolves.toBe("https://sentry.io/artifact/2");
+    expect(uploadMissingChunksMock).toHaveBeenCalledTimes(1);
   });
 
   test("flattens vcs fields into the top level of the assemble body", async () => {
@@ -283,7 +287,7 @@ describe("uploadBuild", () => {
     await uploadBuild({
       org: "my-org",
       project: "my-project",
-      content,
+      contentPath,
       metadata: { vcs: { head_sha: "abc", provider: "github", pr_number: 3 } },
     });
 
@@ -307,7 +311,7 @@ describe("uploadBuild", () => {
     await uploadBuild({
       org: "my-org",
       project: "my-project",
-      content,
+      contentPath,
       metadata: {},
     });
 
@@ -328,7 +332,7 @@ describe("uploadBuild", () => {
       uploadBuild({
         org: "my-org",
         project: "my-project",
-        content,
+        contentPath,
         metadata: {},
       })
     ).rejects.toThrow(ApiError);
@@ -344,7 +348,7 @@ describe("uploadBuild", () => {
       uploadBuild({
         org: "my-org",
         project: "my-project",
-        content,
+        contentPath,
         metadata: {},
       })
     ).rejects.toThrow(/no artifact URL/i);
