@@ -55,6 +55,7 @@ import { snapshotsRoute } from "./commands/snapshots/index.js";
 import { sourcemapRoute } from "./commands/sourcemap/index.js";
 import { spanRoute } from "./commands/span/index.js";
 import { listCommand as spanListCommand } from "./commands/span/list.js";
+import { statusRoute } from "./commands/status/index.js";
 import { teamRoute } from "./commands/team/index.js";
 import { listCommand as teamListCommand } from "./commands/team/list.js";
 import { traceRoute } from "./commands/trace/index.js";
@@ -140,6 +141,7 @@ export const routes = buildRouteMap({
     sourcemap: sourcemapRoute,
     sourcemaps: sourcemapRoute,
     span: spanRoute,
+    status: statusRoute,
     trace: traceRoute,
     trial: trialRoute,
     init: initCommand,
