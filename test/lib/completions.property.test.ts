@@ -195,6 +195,7 @@ describe("proposeCompletions: Stricli integration", () => {
     "docs",
     "trace",
     "span",
+    "status",
     "log",
     "local",
     "monitor",

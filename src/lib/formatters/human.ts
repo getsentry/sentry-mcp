@@ -2581,3 +2581,88 @@ export function formatDefaultsResult(data: DefaultsResult): string {
       return "";
   }
 }
+
+// Sentry Service Status Formatting
+
+/** Structured service status data shape (re-imported from the API module) */
+type SentryStatus = import("../api/status-page.js").SentryStatus;
+type StatusComponent = import("../api/status-page.js").StatusComponent;
+
+/** Color tag for the overall status indicator. */
+const STATUS_INDICATOR_TAGS: Record<string, Parameters<typeof colorTag>[0]> = {
+  none: "green",
+  minor: "yellow",
+  major: "red",
+  critical: "red",
+  maintenance: "blue",
+};
+
+/** Color tag for a component's operational status. */
+const COMPONENT_STATUS_TAGS: Record<string, Parameters<typeof colorTag>[0]> = {
+  operational: "green",
+  degraded_performance: "yellow",
+  partial_outage: "yellow",
+  major_outage: "red",
+  under_maintenance: "blue",
+};
+
+/** Human-readable label for a component's operational status. */
+const COMPONENT_STATUS_LABELS: Record<string, string> = {
+  operational: "Operational",
+  degraded_performance: "Degraded Performance",
+  partial_outage: "Partial Outage",
+  major_outage: "Major Outage",
+  under_maintenance: "Under Maintenance",
+};
+
+/** Render one component row: a colored dot, its name, and status label. */
+function formatComponentLine(component: StatusComponent): string {
+  const tag = COMPONENT_STATUS_TAGS[component.status] ?? "yellow";
+  const label =
+    COMPONENT_STATUS_LABELS[component.status] ?? capitalize(component.status);
+  return `${colorTag(tag, "●")} ${escapeMarkdownInline(component.name)} — ${label}`;
+}
+
+/**
+ * Format Sentry service status as rendered markdown: an overall header, any
+ * active incidents, and the per-component breakdown.
+ */
+export function formatSentryStatus(data: SentryStatus): string {
+  const lines: string[] = [];
+
+  const indicatorTag = STATUS_INDICATOR_TAGS[data.indicator] ?? "yellow";
+  const icon = data.indicator === "none" ? "✓" : "●";
+  lines.push(
+    `## ${colorTag(indicatorTag, icon)} ${escapeMarkdownInline(data.description)}`
+  );
+  lines.push("");
+
+  if (data.incidents.length > 0) {
+    lines.push("### Active Incidents");
+    lines.push("");
+    for (const incident of data.incidents) {
+      lines.push(
+        `- **${escapeMarkdownInline(incident.name)}** (${escapeMarkdownInline(incident.impact)} impact, ${escapeMarkdownInline(incident.status)})`
+      );
+      lines.push(`  ${safeCodeSpan(incident.shortlink)}`);
+    }
+    lines.push("");
+  }
+
+  if (data.components.length > 0) {
+    // Only surface components that aren't fully operational to keep the output
+    // focused during an outage; fall back to the full list when all is well.
+    const impacted = data.components.filter((c) => c.status !== "operational");
+    const shown = impacted.length > 0 ? impacted : data.components;
+    lines.push("### Components");
+    lines.push("");
+    for (const component of shown) {
+      lines.push(formatComponentLine(component));
+    }
+    lines.push("");
+  }
+
+  lines.push(`See ${safeCodeSpan(data.url)} for full details.`);
+
+  return renderMarkdown(lines.join("\n"));
+}

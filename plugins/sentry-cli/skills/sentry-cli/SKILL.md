@@ -617,6 +617,14 @@ List and view spans in projects or traces
 
 → Full flags and examples: `references/span.md`
 
+### Status
+
+Check Sentry service status
+
+- `sentry status show` — Show Sentry service status
+
+→ Full flags and examples: `references/status.md`
+
 ### Trace
 
 View distributed traces
