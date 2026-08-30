@@ -79,6 +79,7 @@ cli/
 │   │   ├── snapshots/   # diff, download, upload
 │   │   ├── sourcemap/   # inject, resolve, upload
 │   │   ├── span/        # list, view
+│   │   ├── status/      # show
 │   │   ├── team/        # list
 │   │   ├── trace/       # list, logs, view
 │   │   ├── trial/       # list, start
