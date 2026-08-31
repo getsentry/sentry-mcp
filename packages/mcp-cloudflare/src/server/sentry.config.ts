@@ -10,7 +10,6 @@ export default function getSentryConfig(env: Env): CloudflareOptions {
   return {
     dsn: env.SENTRY_DSN,
     tracesSampleRate: 1,
-    sendDefaultPii: true,
     beforeSend: sentryBeforeSend,
     initialScope: {
       tags: {
@@ -22,8 +21,6 @@ export default function getSentryConfig(env: Env): CloudflareOptions {
     environment:
       env.SENTRY_ENVIRONMENT ??
       (process.env.NODE_ENV !== "production" ? "development" : "production"),
-    enableLogs: true,
-    enableMetrics: true,
     integrations: [Sentry.zodErrorsIntegration(), Sentry.vercelAIIntegration()],
   };
 }
