@@ -4,7 +4,6 @@ import { resolveAttribution } from "./utils";
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
-  sendDefaultPii: true,
   tracesSampleRate: 1,
   beforeSend: sentryBeforeSend,
   // First-party only. Cloudflare Web Analytics injects beacon.min.js outside our

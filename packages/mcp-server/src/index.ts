@@ -278,7 +278,6 @@ async function main() {
 
   Sentry.init({
     dsn: cfg.sentryDsn,
-    sendDefaultPii: true,
     tracesSampleRate: 1,
     beforeSend: sentryBeforeSend,
     initialScope: {
