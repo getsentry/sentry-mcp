@@ -90,7 +90,6 @@ import {
   UptimeCheckListSchema,
   UptimeMonitorListSchema,
   UptimeMonitorSchema,
-  UserRegionsSchema,
   UserReportListSchema,
   UserSchema,
 } from "./schema";
@@ -1604,13 +1603,11 @@ export class SentryApiService {
   /**
    * Lists all organizations accessible to the authenticated user.
    *
-   * Automatically handles multi-region queries by fetching from all
-   * available regions and combining results.
+   * Queries the `/organizations/` endpoint on the root host.
    *
    * @param params Query parameters
    * @param params.query Search query to filter organizations by name/slug
    * @param params.limit Maximum number of organizations to return (defaults to 25)
-   * @param opts Request options
    * @returns Array of organizations across all accessible regions
    *
    * @example
@@ -1622,10 +1619,10 @@ export class SentryApiService {
    * });
    * ```
    */
-  async listOrganizations(
-    params?: { query?: string; limit?: number },
-    opts?: RequestOptions,
-  ): Promise<OrganizationList> {
+  async listOrganizations(params?: {
+    query?: string;
+    limit?: number;
+  }): Promise<OrganizationList> {
     const limit = params?.limit ?? 25;
 
     // Build query parameters
@@ -1637,50 +1634,14 @@ export class SentryApiService {
     const queryString = queryParams.toString();
     const path = `/organizations/?${queryString}`;
 
-    // For self-hosted instances, the regions endpoint doesn't exist
-    if (!this.isSaas()) {
-      const body = await this.requestJSON(path, undefined, opts);
-      return OrganizationListSchema.parse(body);
+    let host = undefined;
+    // For SaaS, always use the main sentry.io host, not regional hosts
+    if (this.isSaas()) {
+      host = "sentry.io";
     }
 
-    // For SaaS, try to use regions endpoint first
-    try {
-      // TODO: Sentry is currently not returning all orgs without hitting region endpoints
-      // The regions endpoint only exists on the main API server, not on regional endpoints
-      const regionsBody = await this.requestJSON(
-        "/users/me/regions/",
-        undefined,
-        {}, // Don't pass opts to ensure we use the main host
-      );
-      const regionData = UserRegionsSchema.parse(regionsBody);
-
-      const allOrganizations = (
-        await Promise.all(
-          regionData.regions.map(async (region) =>
-            this.requestJSON(path, undefined, {
-              ...opts,
-              host: new URL(region.url).host,
-            }),
-          ),
-        )
-      )
-        .map((data) => OrganizationListSchema.parse(data))
-        .reduce((acc, curr) => acc.concat(curr), []);
-
-      // Apply the limit after combining results from all regions
-      return allOrganizations.slice(0, limit);
-    } catch (error) {
-      // If regions endpoint fails (e.g., older self-hosted versions identifying as sentry.io),
-      // fall back to direct organizations endpoint
-      if (error instanceof ApiNotFoundError) {
-        // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
-        const body = await this.requestJSON(path, undefined, opts);
-        return OrganizationListSchema.parse(body);
-      }
-
-      // Re-throw other errors
-      throw error;
-    }
+    const body = await this.requestJSON(path, undefined, { host });
+    return OrganizationListSchema.parse(body);
   }
 
   /**
@@ -3723,7 +3684,8 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Event> {
     const body = await this.requestJSON(
-      apiPath`/organizations/${organizationSlug}/issues/${issueId}/events/${eventId}/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/events/${eventId}/` +
+        `?llmFormat=markdown`,
       undefined,
       opts,
     );
@@ -4762,7 +4724,8 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<AutofixRunState> {
     const body = await this.requestJSON(
-      apiPath`/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/autofix/` +
+        `?llmFormat=markdown`,
       undefined,
       opts,
     );
@@ -4919,7 +4882,7 @@ export class SentryApiService {
       }
 
       const response = await this.request(
-        apiPath`/organizations/${organizationSlug}/ai-conversations/${conversationId}/` +
+        apiPath`/organizations/${organizationSlug}/agents/conversations/${conversationId}/` +
           `?${queryParams.toString()}`,
         undefined,
         opts,
@@ -5001,7 +4964,7 @@ export class SentryApiService {
     }
 
     const response = await this.request(
-      apiPath`/organizations/${organizationSlug}/ai-conversations/` +
+      apiPath`/organizations/${organizationSlug}/agents/conversations/` +
         `?${queryParams.toString()}`,
       undefined,
       opts,

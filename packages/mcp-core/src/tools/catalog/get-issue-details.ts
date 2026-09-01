@@ -13,10 +13,7 @@ import type {
 } from "../../api-client/types";
 import { UserInputError } from "../../errors";
 import type { CodeLocation } from "../../internal/code-location";
-import {
-  type AIConversationReference,
-  addAIConversationSuggestedActions,
-} from "../../internal/tool-helpers/ai-conversation-actions";
+import type { AIConversationReference } from "../../internal/tool-helpers/ai-conversation-actions";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { enhanceNotFoundError } from "../../internal/tool-helpers/enhance-error";
@@ -167,29 +164,23 @@ export default defineTool({
           apiService,
           organizationSlug: orgSlug,
           issue,
+          seerEnabled: isSeerGranted(context),
         }),
       ]);
 
-      return addAIConversationSuggestedActions({
-        markdown: formatIssueOutput({
-          organizationSlug: orgSlug,
-          issue,
-          event,
-          apiService,
-          autofixState,
-          performanceTrace,
-          externalIssues,
-          relatedReplayIds,
-          replayLookupFailed,
-          aiConversations,
-          codeLocation,
-          experimentalMode: context.experimentalMode,
-          availableToolNames: context.availableToolNames,
-          directToolNames: context.directToolNames,
-        }),
+      return formatIssueOutput({
         organizationSlug: orgSlug,
+        issue,
+        event,
+        apiService,
+        autofixState,
+        performanceTrace,
+        externalIssues,
+        relatedReplayIds,
+        replayLookupFailed,
         aiConversations,
-        experimentalMode: context.experimentalMode ?? false,
+        codeLocation,
+        experimentalMode: context.experimentalMode,
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
       });
@@ -260,29 +251,23 @@ export default defineTool({
         apiService,
         organizationSlug: orgSlug,
         issue,
+        seerEnabled: isSeerGranted(context),
       }),
     ]);
 
-    return addAIConversationSuggestedActions({
-      markdown: formatIssueOutput({
-        organizationSlug: orgSlug,
-        issue,
-        event,
-        apiService,
-        autofixState,
-        performanceTrace,
-        externalIssues,
-        relatedReplayIds,
-        replayLookupFailed,
-        aiConversations,
-        codeLocation,
-        experimentalMode: context.experimentalMode,
-        availableToolNames: context.availableToolNames,
-        directToolNames: context.directToolNames,
-      }),
+    return formatIssueOutput({
       organizationSlug: orgSlug,
+      issue,
+      event,
+      apiService,
+      autofixState,
+      performanceTrace,
+      externalIssues,
+      relatedReplayIds,
+      replayLookupFailed,
       aiConversations,
-      experimentalMode: context.experimentalMode ?? false,
+      codeLocation,
+      experimentalMode: context.experimentalMode,
       availableToolNames: context.availableToolNames,
       directToolNames: context.directToolNames,
     });
@@ -328,17 +313,20 @@ async function fetchEventEnrichment({
 
 /**
  * Fetches supplementary data for an issue in parallel: Seer analysis and external links.
- * Both calls are non-blocking -- failures are silently caught so they never
- * prevent the primary issue details from being returned.
+ * All calls are non-blocking -- failures are silently caught so they never
+ * prevent the primary issue details from being returned. Seer analysis is
+ * skipped entirely when the `seer` skill is not granted.
  */
 async function fetchIssueEnrichmentData({
   apiService,
   organizationSlug,
   issue,
+  seerEnabled,
 }: {
   apiService: SentryApiService;
   organizationSlug: string;
   issue: Issue;
+  seerEnabled: boolean;
 }): Promise<{
   autofixState: AutofixRunState | undefined;
   externalIssues: ExternalIssueList | undefined;
@@ -347,9 +335,12 @@ async function fetchIssueEnrichmentData({
 }> {
   const issueId = String(issue.id);
   const [autofixState, externalIssues, relatedReplayIds] = await Promise.all([
-    apiService
-      .getAutofixState({ organizationSlug, issueId: issue.shortId })
-      .catch(() => undefined),
+    maybeFetchAutofixState({
+      apiService,
+      organizationSlug,
+      issue,
+      seerEnabled,
+    }),
     apiService
       .getIssueExternalLinks({ organizationSlug, issueId: issue.shortId })
       .catch(() => undefined),
@@ -373,6 +364,39 @@ async function fetchIssueEnrichmentData({
     relatedReplayIds: relatedReplayIds.ok ? relatedReplayIds.ids : undefined,
     replayLookupFailed: !relatedReplayIds.ok,
   };
+}
+
+/**
+ * Whether Seer output can be used at all in this session.
+ *
+ * A session started with `--disable-skills=seer` (or `--skills` that omits it)
+ * drops Seer output on the floor, so requesting it is pure overhead -- and on
+ * deployments without Seer the autofix endpoint answers 500, making it a
+ * guaranteed-failing request on every issue lookup. An unknown granted set
+ * keeps the previous behaviour and fetches.
+ */
+function isSeerGranted(context: ServerContext): boolean {
+  return context.grantedSkills ? context.grantedSkills.has("seer") : true;
+}
+
+async function maybeFetchAutofixState({
+  apiService,
+  organizationSlug,
+  issue,
+  seerEnabled,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  issue: Issue;
+  seerEnabled: boolean;
+}): Promise<AutofixRunState | undefined> {
+  if (!seerEnabled) {
+    return undefined;
+  }
+
+  return apiService
+    .getAutofixState({ organizationSlug, issueId: issue.shortId })
+    .catch(() => undefined);
 }
 
 async function maybeFetchPerformanceTrace({

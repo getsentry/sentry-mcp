@@ -1,24 +1,23 @@
 import { setTag } from "@sentry/core";
-import { defineTool } from "../../internal/tool-helpers/define";
-import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import { hasAgentProvider } from "../../internal/agents/provider-factory";
-import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
-import {
-  addAIConversationSuggestedActions,
-  formatAIConversationActionInstructions,
-  type AIConversationReference,
-} from "../../internal/tool-helpers/ai-conversation-actions";
-import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/resolve-region-url";
 import type { SentryApiService, Trace, TraceSpan } from "../../api-client";
 import { UserInputError } from "../../errors";
-import type { ServerContext } from "../../types";
-import { formatSemanticSpanDisplay } from "../support/traces/semantic-display.js";
+import { hasAgentProvider } from "../../internal/agents/provider-factory";
+import {
+  type AIConversationReference,
+  formatAIConversationActionInstructions,
+} from "../../internal/tool-helpers/ai-conversation-actions";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/resolve-region-url";
+import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
   ParamSpanId,
   ParamTraceId,
 } from "../../schema";
+import type { ServerContext } from "../../types";
+import { formatSemanticSpanDisplay } from "../support/traces/semantic-display.js";
 
 // Constants for span filtering and tree rendering
 const MAX_TRACE_FETCH_LIMIT = 1000;
@@ -191,14 +190,7 @@ export default defineTool({
       directToolNames: context.directToolNames,
       aiConversations,
     });
-    return addAIConversationSuggestedActions({
-      markdown,
-      organizationSlug: params.organizationSlug,
-      aiConversations,
-      experimentalMode: context.experimentalMode ?? false,
-      availableToolNames: context.availableToolNames,
-      directToolNames: context.directToolNames,
-    });
+    return markdown;
   },
 });
 
@@ -1213,7 +1205,7 @@ function formatAIConversationSection({
     directToolNames,
   });
 
-  const lines = ["## AI Conversations", ""];
+  const lines = ["## Agent Conversations", ""];
   if (aiConversations.length === 1) {
     const [conversation] = aiConversations;
     lines.push(`**Conversation ID**: \`${conversation.conversationId}\``);

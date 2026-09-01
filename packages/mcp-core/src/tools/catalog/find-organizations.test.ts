@@ -11,12 +11,7 @@ import findOrganizations from "./find-organizations.js";
 
 function mockOrganizations(organizations: unknown[]) {
   mswServer.use(
-    http.get("https://sentry.io/api/0/users/me/regions/", () =>
-      HttpResponse.json({
-        regions: [{ name: "us", url: "https://us.sentry.io" }],
-      }),
-    ),
-    http.get("https://us.sentry.io/api/0/organizations/", ({ request }) => {
+    http.get("https://sentry.io/api/0/organizations/", ({ request }) => {
       expect(new URL(request.url).searchParams.get("per_page")).toBe("26");
       return HttpResponse.json(organizations);
     }),

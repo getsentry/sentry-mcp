@@ -48,11 +48,33 @@ import getSentryResource from "./get-sentry-resource";
 import getSnapshot from "./get-snapshot";
 import getSnapshotImage from "./get-snapshot-image";
 import getLatestBaseSnapshot from "./get-latest-base-snapshot";
-import getAIConversationDetails from "./get-ai-conversation-details";
-import searchAIConversations from "./search-ai-conversations";
+import getAgentConversationDetails from "./get-agent-conversation-details";
+import searchAgentConversations from "./search-agent-conversations";
 import addIssueNote from "./add-issue-note";
 import onboardingStatusUpdate from "./onboarding-status-update";
 import type { ToolConfig } from "../types";
+
+const legacyGetAIConversationDetails = {
+  ...getAgentConversationDetails,
+  name: "get_ai_conversation_details",
+  includeInSkillDefinitions: false,
+  description: [
+    "Deprecated alias for get_agent_conversation_details.",
+    "",
+    "Use get_agent_conversation_details for new integrations. This alias is kept for backward compatibility.",
+  ].join("\n"),
+} satisfies ToolConfig<any>;
+
+const legacySearchAIConversations = {
+  ...searchAgentConversations,
+  name: "search_ai_conversations",
+  includeInSkillDefinitions: false,
+  description: [
+    "Deprecated alias for search_agent_conversations.",
+    "",
+    "Use search_agent_conversations for new integrations. This alias is kept for backward compatibility.",
+  ].join("\n"),
+} satisfies ToolConfig<any>;
 
 /**
  * Catalog of ordinary Sentry MCP operations.
@@ -114,8 +136,10 @@ const catalogTools = {
   get_snapshot: getSnapshot,
   get_snapshot_image: getSnapshotImage,
   get_latest_base_snapshot: getLatestBaseSnapshot,
-  get_ai_conversation_details: getAIConversationDetails,
-  search_ai_conversations: searchAIConversations,
+  get_agent_conversation_details: getAgentConversationDetails,
+  get_ai_conversation_details: legacyGetAIConversationDetails,
+  search_agent_conversations: searchAgentConversations,
+  search_ai_conversations: legacySearchAIConversations,
   add_issue_note: addIssueNote,
   onboarding_status_update: onboardingStatusUpdate,
 } as const satisfies Record<string, ToolConfig<any>>;

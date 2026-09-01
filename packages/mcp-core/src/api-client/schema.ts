@@ -57,15 +57,6 @@ export const UserSchema = z
   })
   .passthrough();
 
-export const UserRegionsSchema = z.object({
-  regions: z.array(
-    z.object({
-      name: z.string(),
-      url: z.string().url(),
-    }),
-  ),
-});
-
 /**
  * Schema for Sentry organization API responses.
  *
@@ -1238,6 +1229,8 @@ const BaseEventSchema = z.object({
   _meta: z.unknown().optional(),
   // dateReceived is when the server received the event (may not be present in all contexts)
   dateReceived: z.string().datetime().nullish(),
+  // shared-formatter output, present when the event endpoint is called with ?llmFormat
+  formatted: z.object({ format: z.string(), content: z.string() }).optional(),
 });
 
 export const ErrorEventSchema = BaseEventSchema.omit({
@@ -1472,6 +1465,8 @@ export const AutofixRunStateSchema = z.object({
     })
     .passthrough()
     .nullable(),
+  // shared-formatter output, present when the autofix endpoint is called with ?llmFormat
+  formatted: z.object({ format: z.string(), content: z.string() }).optional(),
 });
 
 export const EventAttachmentSchema = z.object({
@@ -1481,7 +1476,8 @@ export const EventAttachmentSchema = z.object({
   size: z.number(),
   mimetype: z.string(),
   dateCreated: z.string().datetime(),
-  sha1: z.string(),
+  // Objectstore-backed attachments do not store a usable SHA1 (checksum is
+  // unavailable), so we neither require nor surface it from this endpoint.
   headers: z.record(z.string(), z.string()).optional(),
 });
 
@@ -2240,11 +2236,43 @@ export const AgenticOnboardingStageStatusUpdateSchema = z.enum([
   "failed",
 ]);
 
-export const AgenticOnboardingStageStateSchema = z.object({
-  stage: AgenticOnboardingStageSchema,
+const AgenticOnboardingCreateProjectExtraSchema = z
+  .object({
+    projectSlugs: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+const AgenticOnboardingVerificationErrorExtraSchema = z
+  .object({
+    issueIds: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+const AgenticOnboardingStageWithoutExtraSchema =
+  AgenticOnboardingStageSchema.exclude([
+    "create_project",
+    "receive_verification_error",
+  ]);
+
+const AgenticOnboardingStageStateBaseSchema = z.object({
   status: AgenticOnboardingStageStatusSchema.nullable(),
   eventNote: z.string().nullable(),
 });
+
+export const AgenticOnboardingStageStateSchema = z.discriminatedUnion("stage", [
+  AgenticOnboardingStageStateBaseSchema.extend({
+    stage: z.literal("create_project"),
+    extra: AgenticOnboardingCreateProjectExtraSchema.nullable(),
+  }),
+  AgenticOnboardingStageStateBaseSchema.extend({
+    stage: z.literal("receive_verification_error"),
+    extra: AgenticOnboardingVerificationErrorExtraSchema.nullable(),
+  }),
+  AgenticOnboardingStageStateBaseSchema.extend({
+    stage: AgenticOnboardingStageWithoutExtraSchema,
+    extra: z.null(),
+  }),
+]);
 
 export const AgenticOnboardingRunStatusSchema = z.enum([
   "active",
@@ -2258,16 +2286,35 @@ export const AgenticOnboardingRunStatusUpdateSchema = z.enum([
   "failed",
 ]);
 
-export const AgenticOnboardingStatusUpdateSchema = z.object({
+export const AgenticOnboardingRunTokenSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9]{10}$/);
+
+const AgenticOnboardingStatusUpdateBaseSchema = z.object({
   schemaVersion: z.literal(1),
-  runToken: z.string().regex(/^[A-Za-z0-9]{10}$/),
-  stage: AgenticOnboardingStageSchema,
+  runToken: AgenticOnboardingRunTokenSchema,
   status: AgenticOnboardingStageStatusUpdateSchema,
   runStatus: AgenticOnboardingRunStatusUpdateSchema.optional(),
   eventNote: z.string().trim().min(1).max(256).optional(),
-  projectSlugs: z.array(z.string().trim().min(1)).min(1).max(100).optional(),
-  issueIds: z.array(z.string().trim().min(1)).min(1).max(100).optional(),
 });
+
+export const AgenticOnboardingStatusUpdateSchema = z.discriminatedUnion(
+  "stage",
+  [
+    AgenticOnboardingStatusUpdateBaseSchema.extend({
+      stage: z.literal("create_project"),
+      extra: AgenticOnboardingCreateProjectExtraSchema.optional(),
+    }),
+    AgenticOnboardingStatusUpdateBaseSchema.extend({
+      stage: z.literal("receive_verification_error"),
+      extra: AgenticOnboardingVerificationErrorExtraSchema.optional(),
+    }),
+    AgenticOnboardingStatusUpdateBaseSchema.extend({
+      stage: AgenticOnboardingStageWithoutExtraSchema,
+      extra: z.never().optional(),
+    }),
+  ],
+);
 
 export const AgenticOnboardingRunSchema = z.object({
   schemaVersion: z.literal(1),
@@ -2280,13 +2327,5 @@ export const AgenticOnboardingRunSchema = z.object({
   expiresAt: z.string(),
   continueUpdates: z.boolean(),
   runStatus: AgenticOnboardingRunStatusSchema,
-  projectSlugs: z
-    .array(z.string())
-    .nullable()
-    .transform((projectSlugs) => projectSlugs ?? []),
-  issueIds: z
-    .array(z.string())
-    .nullable()
-    .transform((issueIds) => issueIds ?? []),
   stages: z.array(AgenticOnboardingStageStateSchema),
 });

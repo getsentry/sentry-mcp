@@ -1,4 +1,5 @@
 import {
+  AgentExecutionError,
   UserInputError,
   ConfigurationError,
   LLMProviderError,
@@ -34,6 +35,16 @@ export function isConfigurationError(
  */
 export function isLLMProviderError(error: unknown): error is LLMProviderError {
   return error instanceof LLMProviderError;
+}
+
+/**
+ * Type guard for unexpected embedded-agent failures that already created a
+ * Sentry issue at the agent boundary.
+ */
+export function isAgentExecutionError(
+  error: unknown,
+): error is AgentExecutionError {
+  return error instanceof AgentExecutionError;
 }
 
 /**
@@ -88,6 +99,8 @@ export function isExpectedToolError(error: unknown): boolean {
     isUserInputError(error) ||
     isConfigurationError(error) ||
     isLLMProviderError(error) ||
+    // Already reported once in callEmbeddedAgent; do not record again on the span.
+    isAgentExecutionError(error) ||
     isApiClientError(error) ||
     isApiAuthenticationErrorDeep(error)
   ) {
@@ -203,6 +216,20 @@ export async function formatErrorForUser(
       ],
       options,
     );
+  }
+
+  // Unexpected agent failure already filed a Sentry issue in callEmbeddedAgent.
+  // Return a graceful tool error without creating a second issue.
+  if (isAgentExecutionError(error)) {
+    const parts = [
+      "**AI Processing Error**",
+      "The AI agent failed to complete this request.",
+      "The service operator has been notified. Please try again, or rephrase your request.",
+    ];
+    if (error.eventId) {
+      parts.push(`**Event ID**: ${error.eventId}`);
+    }
+    return parts.join("\n\n");
   }
 
   // Handle AI SDK APICallError / RetryError that weren't converted to

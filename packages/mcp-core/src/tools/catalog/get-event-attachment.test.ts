@@ -36,7 +36,6 @@ describe("get_event_attachment", () => {
       **Size:** 1024 bytes
       **MIME Type:** image/png
       **Created:** 2025-04-08T21:15:04.000Z
-      **SHA1:** abc123def456
 
       To download this attachment with the attachmentId provided:
       Use the Sentry tool \`get_event_attachment\`
@@ -87,7 +86,6 @@ describe("get_event_attachment", () => {
       **Size:** 1024 bytes
       **MIME Type:** image/png
       **Created:** 2025-04-08T21:15:04.000Z
-      **SHA1:** abc123def456
 
       **Download URL:** https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/7ca573c0f4814912aaa9bdc77d1a7d51/attachments/123/?download=1
 

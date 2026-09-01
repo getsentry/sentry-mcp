@@ -13,10 +13,8 @@ import {
 } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
-import {
-  getStructuredContent,
-  getTextContent,
-} from "../../test-utils/structured-content";
+import type { Skill } from "../../skills";
+import { getTextContent } from "../../test-utils/structured-content";
 import getIssueDetails from "./get-issue-details.js";
 
 const baseContext = {
@@ -332,7 +330,241 @@ describe("get_issue_details", () => {
     expect(result).not.toContain("**Culprit**: null");
   });
 
-  it("surfaces AI conversation IDs found by bounded span lookup", async () => {
+  it.each([
+    {
+      type: "error/default",
+      issueId: "CLOUDFLARE-MCP-41",
+      issue: undefined,
+      event: createDefaultEvent,
+      marker: "SHARED-FORMATTER-MARKER",
+      replacedRenderer: undefined,
+    },
+    {
+      type: "generic",
+      issueId: "MCP-SERVER-EQE",
+      issue: createRegressedIssue,
+      event: createGenericEvent,
+      marker: "GENERIC-FORMATTER-MARKER",
+      replacedRenderer: "### Performance Regression Details",
+    },
+    {
+      type: "csp",
+      issueId: "BLOG-CSP-4XC",
+      issue: createCspIssue,
+      event: createCspEvent,
+      marker: "CSP-FORMATTER-MARKER",
+      replacedRenderer: "### CSP Violation",
+    },
+  ])(
+    "uses formatted.content for $type events",
+    async ({ issueId, issue, event, marker, replacedRenderer }) => {
+      const base = `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/${issueId}`;
+      if (issue) {
+        mswServer.use(
+          http.get(`${base}/`, () => HttpResponse.json(issue()), {
+            once: true,
+          }),
+        );
+      }
+      mswServer.use(
+        http.get(
+          `${base}/events/latest/`,
+          () =>
+            HttpResponse.json({
+              ...event(),
+              formatted: {
+                format: "markdown",
+                content: `## Body\n\n${marker}`,
+              },
+            }),
+          { once: true },
+        ),
+      );
+
+      const result = await getIssueDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId,
+          eventId: undefined,
+          issueUrl: undefined,
+          regionUrl: null,
+        },
+        baseContext,
+      );
+
+      // the body is rendered from the shared formatter's content
+      expect(result).toContain(marker);
+      // ...replacing MCP's type-specific renderer
+      if (replacedRenderer) {
+        expect(result).not.toContain(replacedRenderer);
+      }
+    },
+  );
+
+  it("ignores formatted.content for non-error events (transaction)", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/",
+        () => HttpResponse.json(createPerformanceIssue()),
+        { once: true },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createPerformanceEvent(),
+            formatted: {
+              format: "markdown",
+              content: "TRANSACTION-SHOULD-IGNORE-THIS",
+            },
+          }),
+        { once: true },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/abcdef1234567890abcdef1234567890/",
+        () => HttpResponse.json(createTraceResponseFixture()),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "PERF-N1-001",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    // transaction events still route through formatEventOutput, so formatted is unused
+    expect(result).toContain("Issue PERF-N1-001"); // sanity: real output was produced
+    expect(result).not.toContain("TRANSACTION-SHOULD-IGNORE-THIS");
+  });
+
+  it("keeps the replay note when error events use formatted.content", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            contexts: {
+              replay: {
+                type: "default",
+                replay_id: "1234567890abcdef1234567890abcdef",
+              },
+            },
+            formatted: {
+              format: "markdown",
+              content: "## Title\n\nBODY-FROM-FORMATTER",
+            },
+          }),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(result).toContain("BODY-FROM-FORMATTER"); // body from the shared formatter
+    expect(result).toContain("## Session Replay"); // replay note preserved (was inside formatEventOutput)
+  });
+
+  it("embeds the shared formatter's analysis in the Seer section when present", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        () =>
+          HttpResponse.json({
+            autofix: { run_id: 7, status: "completed", blocks: [] },
+            formatted: {
+              format: "markdown",
+              content: "## Root Cause\n\nEMBEDDED-SEER-MARKER",
+            },
+          }),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(result).toContain("## Seer Analysis");
+    expect(result).toContain("EMBEDDED-SEER-MARKER");
+    // LLM-generated content is wrapped in the untrusted-data boundary
+    expect(result).toContain('<seer_analysis run_id="7" step="analysis">');
+  });
+
+  it.each([
+    {
+      label: "in progress",
+      status: "processing",
+      expected: "**Status:** Processing",
+    },
+    {
+      label: "failed",
+      status: "error",
+      expected: "**Status:** Analysis failed.",
+    },
+    {
+      label: "awaiting input",
+      status: "awaiting_user_input",
+      expected: "**Status:** Analysis paused - additional information needed.",
+    },
+  ])(
+    "still reports Seer run status ($label) alongside formatted content",
+    async ({ status, expected }) => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+          () =>
+            HttpResponse.json({
+              autofix: { run_id: 7, status, blocks: [] },
+              formatted: {
+                format: "markdown",
+                content: "## Root Cause\n\nEMBEDDED-SEER-MARKER",
+              },
+            }),
+          { once: true },
+        ),
+      );
+
+      const result = await getIssueDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          eventId: undefined,
+          issueUrl: undefined,
+          regionUrl: null,
+        },
+        baseContext,
+      );
+
+      // the formatted body must not hide that the run needs attention
+      expect(result).toContain("EMBEDDED-SEER-MARKER");
+      expect(result).toContain(expected);
+    },
+  );
+
+  it("surfaces agent conversation IDs found by bounded span lookup", async () => {
     const traceId = "11112222333344445555666677778888";
     const event = createDefaultEvent({
       contexts: {
@@ -395,38 +627,16 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    const text = getTextContent(result);
+    const text = typeof result === "string" ? result : getTextContent(result);
     expect(text).toContain(
-      "- AI conversation found in this trace: `conv-123`. Matching span: `span-123`.",
+      "- Agent conversation found in this trace: `conv-123`. Matching span: `span-123`.",
     );
     expect(text).toContain(
-      '- Use the Sentry tool `execute_sentry_tool(name=\'get_ai_conversation_details\', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})` to fetch the full transcript.',
+      '- Use the Sentry tool `execute_sentry_tool(name=\'get_agent_conversation_details\', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})` to fetch the full transcript.',
     );
     expect(
-      getStructuredContent<{
-        suggestedActions: Array<{
-          type: string;
-          toolName: string;
-          arguments: Record<string, unknown>;
-          reason: string;
-        }>;
-      }>(result),
-    ).toEqual({
-      suggestedActions: [
-        {
-          type: "tool_call",
-          toolName: "execute_sentry_tool",
-          arguments: {
-            name: "get_ai_conversation_details",
-            arguments: {
-              organizationSlug: "sentry-mcp-evals",
-              conversationId: "conv-123",
-            },
-          },
-          reason: "Fetch the full transcript for this AI conversation.",
-        },
-      ],
-    });
+      (result as { structuredContent?: unknown }).structuredContent,
+    ).toBeUndefined();
     expect(text).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
 
@@ -476,8 +686,8 @@ describe("get_issue_details", () => {
 
       - Commit message issue reference: \`Fixes CLOUDFLARE-MCP-41\` automatically closes the issue when the commit is merged.
       - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
-      - AI conversation found in this trace: \`conv-123\`. Matching span: \`span-123\`.
-      - Use the Sentry tool \`execute_sentry_tool(name='get_ai_conversation_details', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})\` to fetch the full transcript.
+      - Agent conversation found in this trace: \`conv-123\`. Matching span: \`span-123\`.
+      - Use the Sentry tool \`execute_sentry_tool(name='get_agent_conversation_details', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})\` to fetch the full transcript.
       - Issue event search: Use the Sentry tool \`search_issue_events\`
       - Full distributed trace and span tree: Use the Sentry tool \`get_sentry_resource\`
       - Related span search: Use the Sentry tool \`search_events\`
@@ -486,7 +696,7 @@ describe("get_issue_details", () => {
     `);
   });
 
-  it("omits AI conversation guidance when bounded span lookup finds no match", async () => {
+  it("omits agent conversation guidance when bounded span lookup finds no match", async () => {
     const traceId = "99992222333344445555666677778888";
     const event = createDefaultEvent({
       contexts: {
@@ -522,8 +732,8 @@ describe("get_issue_details", () => {
       baseContext,
     );
 
-    expect(result).not.toContain("AI conversation found");
-    expect(result).not.toContain("get_ai_conversation_details");
+    expect(result).not.toContain("Agent conversation found");
+    expect(result).not.toContain("get_agent_conversation_details");
   });
 
   it("does not query spans for an invalid event trace ID", async () => {
@@ -1400,6 +1610,65 @@ describe("get_issue_details", () => {
     // expect(result).toContain("## Seer AI Analysis");
   });
 
+  it("skips the autofix request when the seer skill is not granted", async () => {
+    let autofixRequested = false;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        () => {
+          autofixRequested = true;
+          return HttpResponse.json({ autofix: null });
+        },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      {
+        ...baseContext,
+        grantedSkills: new Set<Skill>(["inspect"]),
+      },
+    );
+
+    expect(autofixRequested).toBe(false);
+    expect(result).toContain("# Issue CLOUDFLARE-MCP-41");
+  });
+
+  it("requests autofix state when the seer skill is granted", async () => {
+    let autofixRequested = false;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        () => {
+          autofixRequested = true;
+          return HttpResponse.json({ autofix: null });
+        },
+      ),
+    );
+
+    await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      {
+        ...baseContext,
+        grantedSkills: new Set<Skill>(["inspect", "seer"]),
+      },
+    );
+
+    expect(autofixRequested).toBe(true);
+  });
+
   it.skip("includes Seer analysis when in progress - processing state", async () => {
     const inProgressFixture = {
       autofix: {
@@ -2062,28 +2331,6 @@ describe("get_issue_details", () => {
       "Sentry Event ID **<SENTRY_EVENT_ID>**",
     );
 
-    expect(
-      getStructuredContent<{
-        suggestedActions: Array<{
-          toolName: string;
-          arguments: Record<string, unknown>;
-        }>;
-      }>(result),
-    ).toMatchObject({
-      suggestedActions: [
-        {
-          toolName: "execute_sentry_tool",
-          arguments: {
-            name: "get_ai_conversation_details",
-            arguments: {
-              organizationSlug: "sentry-mcp-evals",
-              conversationId: "conv-unsupported",
-            },
-          },
-        },
-      ],
-    });
-
     expect(normalizedResult).toMatchInlineSnapshot(`
       "# Issue FUTURE-TYPE-001 in **sentry-mcp-evals**
 
@@ -2110,8 +2357,8 @@ describe("get_issue_details", () => {
 
       ## Response Notes
 
-      - AI conversation found in this trace: \`conv-unsupported\`. Matching span: \`span-unsupported\`.
-      - Use the Sentry tool \`execute_sentry_tool(name='get_ai_conversation_details', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-unsupported"})\` to fetch the full transcript.
+      - Agent conversation found in this trace: \`conv-unsupported\`. Matching span: \`span-unsupported\`.
+      - Use the Sentry tool \`execute_sentry_tool(name='get_agent_conversation_details', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-unsupported"})\` to fetch the full transcript.
       "
     `);
 
