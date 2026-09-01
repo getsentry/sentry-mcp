@@ -20,6 +20,7 @@ overrides:
   "@modelcontextprotocol/sdk": 1.30.0
   fast-xml-parser: 5.7.2
   seroval: ^1.5.4
+  sharp: ^0.35.4
   undici: ^7.24.4
 
 catalog:
