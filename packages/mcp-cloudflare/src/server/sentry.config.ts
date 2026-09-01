@@ -21,7 +21,7 @@ export default function getSentryConfig(env: Env): CloudflareOptions {
     environment:
       env.SENTRY_ENVIRONMENT ??
       (process.env.NODE_ENV !== "production" ? "development" : "production"),
-    integrations: [Sentry.zodErrorsIntegration(), Sentry.vercelAIIntegration()],
+    integrations: [Sentry.zodErrorsIntegration()],
   };
 }
 
