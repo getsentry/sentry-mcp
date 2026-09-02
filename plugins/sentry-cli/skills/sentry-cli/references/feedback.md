@@ -19,7 +19,7 @@ List and search User Feedback
 - `--status <value> - Mailbox: unresolved, resolved, spam, or all - (default: "unresolved")`
 - `-n, --limit <value> - Number of feedback items (1-1000) - (default: "25")`
 - `-q, --query <value> - Search query (Sentry issue search syntax)`
-- `-t, --period <value> - Time range: "7d", "2026-07-01..2026-08-01", ">=2026-07-01" - (default: "14d")`
+- `-t, --period <value> - Time range: "7d", "2026-08-01..2026-09-01", ">=2026-08-01" - (default: "14d")`
 - `-f, --fresh - Bypass cache, re-detect projects, and fetch fresh data`
 - `-c, --cursor <value> - Navigate pages: "next", "prev", "first" (or raw cursor string)`
 

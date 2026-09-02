@@ -19,7 +19,7 @@ List recent traces in a project
 - `-n, --limit <value> - Number of traces (1-1000) - (default: "25")`
 - `-q, --query <value> - Search query (Sentry search syntax)`
 - `-s, --sort <value> - Sort by: date, duration - (default: "date")`
-- `-t, --period <value> - Time range: "7d", "2026-07-01..2026-08-01", ">=2026-07-01" - (default: "7d")`
+- `-t, --period <value> - Time range: "7d", "2026-08-01..2026-09-01", ">=2026-08-01" - (default: "7d")`
 - `-f, --fresh - Bypass cache, re-detect projects, and fetch fresh data`
 - `-c, --cursor <value> - Navigate pages: "next", "prev", "first" (or raw cursor string)`
 
@@ -91,7 +91,7 @@ View logs associated with a trace
 
 **Flags:**
 - `-w, --web - Open trace in browser`
-- `-t, --period <value> - Time range: "7d", "2026-07-01..2026-08-01", ">=2026-07-01" - (default: "14d")`
+- `-t, --period <value> - Time range: "7d", "2026-08-01..2026-09-01", ">=2026-08-01" - (default: "14d")`
 - `-n, --limit <value> - Number of log entries (<=1000) - (default: "100")`
 - `-q, --query <value> - Filter query (e.g., "severity:error", "project:backend", "project:[a,b]")`
 - `-s, --sort <value> - Sort order: "newest" (default) or "oldest" - (default: "newest")`
