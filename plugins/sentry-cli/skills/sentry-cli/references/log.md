@@ -19,7 +19,7 @@ List logs from a project
 - `-n, --limit <value> - Number of log entries (1-1000) - (default: "100")`
 - `-q, --query <value> - Filter query (e.g., "severity:error", "project:backend", "project:[a,b]")`
 - `-f, --follow <value> - Stream logs (optionally specify poll interval in seconds)`
-- `-t, --period <value> - Time range: "7d", "2026-07-01..2026-08-01", ">=2026-07-01"`
+- `-t, --period <value> - Time range: "7d", "2026-08-01..2026-09-01", ">=2026-08-01"`
 - `-s, --sort <value> - Sort order: "newest" (default) or "oldest" - (default: "newest")`
 - `--fresh - Bypass cache, re-detect projects, and fetch fresh data`
 
