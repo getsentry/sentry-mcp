@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
-import { getCozetteGlyph } from "../../../src/lib/formatters/cozette-font.js";
 import {
   createPixelCanvas,
   drawPixelText,
 } from "../../../src/lib/formatters/pixel-canvas.js";
+import { getSpleenGlyph } from "../../../src/lib/formatters/spleen-font.js";
 
 function opaquePixelCount(image: { data: Uint8Array }): number {
   let count = 0;
@@ -16,45 +16,38 @@ function opaquePixelCount(image: { data: Uint8Array }): number {
 }
 
 describe("drawPixelText", () => {
-  test("uses Cozette's native 6x13 raster at terminal cell size", () => {
-    const image = createPixelCanvas({ width: 6, height: 13 });
+  test("uses Spleen's native 8x16 raster at terminal cell size", () => {
+    const image = createPixelCanvas({ width: 8, height: 16 });
 
     drawPixelText(image, "A", {
       x: 0,
       y: 0,
-      cellWidth: 6,
-      cellHeight: 13,
+      cellWidth: 8,
+      cellHeight: 16,
       maxColumns: 1,
       color: [255, 255, 255],
     });
 
-    expect(opaquePixelCount(image)).toBe(20);
+    expect(opaquePixelCount(image)).toBe(44);
     expect(image.data[(2 * image.width + 2) * 4 + 3]).toBe(255);
     expect(image.data[(0 * image.width + 1) * 4 + 3]).toBe(0);
   });
 
-  test("packs Cozette rows with bit five as the leftmost pixel", () => {
-    expect(getCozetteGlyph("A")[2]).toBe(0b00_1110);
-  });
-
-  test("includes the half-block and rule glyphs used by dashboard content", () => {
-    expect([...getCozetteGlyph("▀")]).toEqual([
-      63, 63, 63, 63, 63, 63, 0, 0, 0, 0, 0, 0, 0,
+  test("keeps Spleen's native box and block glyphs for dashboard content", () => {
+    expect([...getSpleenGlyph("▀")]).toEqual([
+      255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0,
     ]);
-    expect([...getCozetteGlyph("▄")]).toEqual([
-      0, 0, 0, 0, 0, 0, 63, 63, 63, 63, 63, 63, 63,
-    ]);
-    expect([...getCozetteGlyph("─")]).toEqual([
-      0, 0, 0, 0, 0, 0, 63, 0, 0, 0, 0, 0, 0,
+    expect([...getSpleenGlyph("─")]).toEqual([
+      0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0,
     ]);
   });
 
   test("uses a question mark for unsupported text glyphs", () => {
-    expect([...getCozetteGlyph("\u6f22")]).toEqual([...getCozetteGlyph("?")]);
+    expect([...getSpleenGlyph("\u6f22")]).toEqual([...getSpleenGlyph("?")]);
   });
 
   test("includes the dashboard axis, sparkline, and ellipsis glyphs", () => {
-    const questionMark = [...getCozetteGlyph("?")];
+    const questionMark = [...getSpleenGlyph("?")];
     for (const character of [
       "│",
       "└",
@@ -70,8 +63,9 @@ describe("drawPixelText", () => {
       "▇",
       "░",
       "▓",
+      "■",
     ]) {
-      expect([...getCozetteGlyph(character)]).not.toEqual(questionMark);
+      expect([...getSpleenGlyph(character)]).not.toEqual(questionMark);
     }
   });
 
@@ -84,14 +78,14 @@ describe("drawPixelText", () => {
 
   test("does not normalize text outside its visible width", () => {
     const normalize = vi.spyOn(String.prototype, "normalize");
-    const image = createPixelCanvas({ width: 6, height: 13 });
+    const image = createPixelCanvas({ width: 8, height: 16 });
 
     try {
       drawPixelText(image, `A${"é".repeat(100)}`, {
         x: 0,
         y: 0,
-        cellWidth: 6,
-        cellHeight: 13,
+        cellWidth: 8,
+        cellHeight: 16,
         maxColumns: 1,
         color: [255, 255, 255],
       });
@@ -130,7 +124,7 @@ describe("drawPixelText", () => {
       color: [255, 255, 255],
     });
 
-    expect(opaquePixelCount(image)).toBe(20 * 4);
+    expect(opaquePixelCount(image)).toBe(106);
   });
 
   test("never draws outside an undersized terminal cell", () => {
@@ -160,12 +154,12 @@ describe("drawPixelText", () => {
 });
 
 function renderText(text: string) {
-  const image = createPixelCanvas({ width: 120, height: 13 });
+  const image = createPixelCanvas({ width: 160, height: 16 });
   drawPixelText(image, text, {
     x: 0,
     y: 0,
-    cellWidth: 6,
-    cellHeight: 13,
+    cellWidth: 8,
+    cellHeight: 16,
     maxColumns: 20,
     color: [255, 255, 255],
   });

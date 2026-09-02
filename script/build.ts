@@ -344,6 +344,18 @@ async function compileAllTargets(
   copyFileSync(DIF_WASM_SRC, DIF_WASM);
   assetArgs.push("--assets", DIF_WASM);
 
+  // Embed the Spleen dashboard glyph subset. The asset key matches the path
+  // requested through node:sea in src/lib/formatters/spleen-font.ts.
+  const SPLEEN_FONT_SRC = "src/lib/formatters/assets/spleen-8x16.bin";
+  if (!existsSync(SPLEEN_FONT_SRC)) {
+    throw new Error(
+      `Missing Spleen dashboard font asset at ${SPLEEN_FONT_SRC}`
+    );
+  }
+  const SPLEEN_FONT = `${BUILD_DIR}/spleen-8x16.bin`;
+  copyFileSync(SPLEEN_FONT_SRC, SPLEEN_FONT);
+  assetArgs.push("--assets", SPLEEN_FONT);
+
   console.log(
     `  Step 2: Compiling ${platforms.length} target(s) (Node SEA via fossilize)...`
   );

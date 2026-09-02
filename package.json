@@ -32,6 +32,7 @@
     "dist/index.d.mts",
     "dist/ink-app.js",
     "dist/node-sqlite3-wasm.wasm",
+    "dist/assets/spleen-8x16.bin",
     "dist/vendor/symbolic_bg.wasm",
     "LICENSE.md",
     "THIRD_PARTY_LICENSES.md",
