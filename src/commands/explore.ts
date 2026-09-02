@@ -440,10 +440,23 @@ function validateMetricsFields(fieldList: string[]): void {
 /**
  * Datasets whose Events endpoint accepts a `sort` param. A deterministic sort
  * is what makes offset-based cursor pagination stable — without it, multi-page
- * grouped aggregate queries overlap and skip rows (#1519). `metrics` and `logs`
- * reject `sort` with a 400, so they stay unsorted.
+ * grouped aggregate queries overlap and skip rows (#1519). `metrics`
+ * (`tracemetrics`) and `logs` reject `sort` with a 400, so they stay unsorted.
+ *
+ * This is a hand-curated contract, not a machine-readable capability lookup,
+ * because no canonical source for it exists today (#1523):
+ *   - The OpenAPI spec (`@sentry/api` `listOrganizationEvents`) models `sort`
+ *     as a flat query param whose only documented constraint is "must be in
+ *     the `field` list" — it does not encode which datasets accept it.
+ *   - There is no dataset-capability introspection endpoint in the spec.
+ *   - The spec's `dataset` enum is
+ *     `errors | logs | profile_functions | spans | tracemetrics |
+ *     uptime_results`; `discover` is a legacy virtual dataset that is not a
+ *     valid `--dataset` value here (see {@link DATASET_ALIASES}), so it is
+ *     intentionally omitted.
+ * Revisit if Sentry ever publishes a per-dataset capability contract.
  */
-const SORTABLE_DATASETS = new Set(["spans", "errors", "discover"]);
+const SORTABLE_DATASETS = new Set(["spans", "errors"]);
 
 /**
  * Dataset-specific configuration resolved before the main query loop.
