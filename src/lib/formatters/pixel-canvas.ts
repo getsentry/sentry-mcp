@@ -9,11 +9,11 @@
 
 import type { DecodedImage } from "../sixel-image.js";
 import {
-  COZETTE_CELL_HEIGHT,
-  COZETTE_CELL_WIDTH,
-  getCozetteGlyph,
-  hasCozetteGlyph,
-} from "./cozette-font.js";
+  getSpleenGlyph,
+  hasSpleenGlyph,
+  SPLEEN_CELL_HEIGHT,
+  SPLEEN_CELL_WIDTH,
+} from "./spleen-font.js";
 
 /** Unicode punctuation that has a clear one- or two-cell ASCII equivalent. */
 const BITMAP_TEXT_FALLBACKS = new Map<string, string>([
@@ -171,7 +171,7 @@ function copyOpaquePixel(
   destination.data[targetOffset + 3] = source.data[sourceOffset + 3] ?? 255;
 }
 
-/** Draw a Cozette text line, scaled and clipped to its terminal cells. */
+/** Draw a Spleen text line, scaled and clipped to its terminal cells. */
 export function drawPixelText(
   image: DecodedImage,
   text: string,
@@ -188,7 +188,7 @@ export function drawPixelText(
       break;
     }
     const rawChar = character.value;
-    drawCozetteGlyph(image, getCozetteGlyph(rawChar), {
+    drawSpleenGlyph(image, getSpleenGlyph(rawChar), {
       x: options.x + column * cellWidth,
       y: options.y,
       cellWidth,
@@ -202,7 +202,7 @@ export function drawPixelText(
 /** Convert common Unicode text into glyphs that the embedded font can draw. */
 function* normalizeBitmapText(text: string): Iterable<string> {
   for (const character of text) {
-    if (hasCozetteGlyph(character)) {
+    if (hasSpleenGlyph(character)) {
       yield character;
       continue;
     }
@@ -216,7 +216,7 @@ function* normalizeBitmapText(text: string): Iterable<string> {
       .replace(COMBINING_MARK_RE, "");
     if (
       decomposed.length > 0 &&
-      [...decomposed].every((candidate) => hasCozetteGlyph(candidate))
+      [...decomposed].every((candidate) => hasSpleenGlyph(candidate))
     ) {
       yield* decomposed;
       continue;
@@ -225,7 +225,7 @@ function* normalizeBitmapText(text: string): Iterable<string> {
   }
 }
 
-type CozetteGlyphOptions = {
+type SpleenGlyphOptions = {
   x: number;
   y: number;
   cellWidth: number;
@@ -233,48 +233,48 @@ type CozetteGlyphOptions = {
   color: Rgb;
 };
 
-function drawCozetteGlyph(
+function drawSpleenGlyph(
   image: DecodedImage,
   glyph: Uint8Array,
-  options: CozetteGlyphOptions
+  options: SpleenGlyphOptions
 ): void {
-  for (let row = 0; row < COZETTE_CELL_HEIGHT; row += 1) {
+  for (let row = 0; row < SPLEEN_CELL_HEIGHT; row += 1) {
     const pattern = glyph[row] ?? 0;
-    for (let column = 0; column < COZETTE_CELL_WIDTH; column += 1) {
-      if (!isCozettePixelSet(pattern, column)) {
+    for (let column = 0; column < SPLEEN_CELL_WIDTH; column += 1) {
+      if (!isSpleenPixelSet(pattern, column)) {
         continue;
       }
-      drawCozettePixel(image, { ...options, row, column });
+      drawSpleenPixel(image, { ...options, row, column });
     }
   }
 }
 
-function isCozettePixelSet(pattern: number, column: number): boolean {
-  const divisor = 2 ** (COZETTE_CELL_WIDTH - 1 - column);
+function isSpleenPixelSet(pattern: number, column: number): boolean {
+  const divisor = 2 ** (SPLEEN_CELL_WIDTH - 1 - column);
   return Math.floor(pattern / divisor) % 2 === 1;
 }
 
-type CozettePixelOptions = CozetteGlyphOptions & {
+type SpleenPixelOptions = SpleenGlyphOptions & {
   row: number;
   column: number;
 };
 
-function drawCozettePixel(
+function drawSpleenPixel(
   image: DecodedImage,
-  options: CozettePixelOptions
+  options: SpleenPixelOptions
 ): void {
   const x =
     options.x +
-    scaleCoordinate(options.column, options.cellWidth, COZETTE_CELL_WIDTH);
+    scaleCoordinate(options.column, options.cellWidth, SPLEEN_CELL_WIDTH);
   const y =
     options.y +
-    scaleCoordinate(options.row, options.cellHeight, COZETTE_CELL_HEIGHT);
+    scaleCoordinate(options.row, options.cellHeight, SPLEEN_CELL_HEIGHT);
   const right =
     options.x +
-    scaleCoordinate(options.column + 1, options.cellWidth, COZETTE_CELL_WIDTH);
+    scaleCoordinate(options.column + 1, options.cellWidth, SPLEEN_CELL_WIDTH);
   const bottom =
     options.y +
-    scaleCoordinate(options.row + 1, options.cellHeight, COZETTE_CELL_HEIGHT);
+    scaleCoordinate(options.row + 1, options.cellHeight, SPLEEN_CELL_HEIGHT);
   drawPixelRect(image, {
     x,
     y,
@@ -284,7 +284,7 @@ function drawCozettePixel(
   });
 }
 
-/** Scale a Cozette bitmap coordinate to its terminal-cell boundary. */
+/** Scale a Spleen bitmap coordinate to its terminal-cell boundary. */
 function scaleCoordinate(
   coordinate: number,
   cellSize: number,
