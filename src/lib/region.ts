@@ -85,7 +85,7 @@ async function resolveOrgRegionUncached(orgSlug: string): Promise<string> {
       throw response.error;
     }
 
-    const regionUrl = response.data?.links?.regionUrl ?? baseUrl;
+    const regionUrl = response.data?.links?.regionUrl || baseUrl;
 
     // Cache for future use. setOrgRegion also extends the in-process
     // trust class so the subsequent request to this region passes the
