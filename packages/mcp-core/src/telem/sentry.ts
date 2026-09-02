@@ -98,6 +98,14 @@ export function sentryBeforeSend(event: any, hint: any): any {
   // (e.g., "Country, region, or territory not supported", temperature issues).
   // Without custom fingerprinting, they all get grouped into a single issue.
   const firstException = event?.exception?.values?.[0];
+
+  // Drop client-side JsonRpcError_-32603 validation errors — these are caused
+  // by malformed client requests (e.g. missing `params`) and are not actionable
+  // server errors.
+  if (firstException?.type?.startsWith("JsonRpcError_-32603")) {
+    return null;
+  }
+
   if (firstException?.type === "AI_APICallError" && firstException.value) {
     event.fingerprint = ["AI_APICallError", firstException.value];
   }
