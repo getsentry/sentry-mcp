@@ -3839,18 +3839,32 @@ export class SentryApiService {
       projectSlug,
       eventId,
       attachmentId,
+      maxInlineBytes,
     }: {
       organizationSlug: string;
       projectSlug: string;
       eventId: string;
       attachmentId: string;
+      /**
+       * When set, attachments larger than this (by metadata `size`) are not
+       * downloaded; the method returns `bytes: null` so the caller can hand back
+       * a download reference instead.
+       */
+      maxInlineBytes?: number;
     },
     opts?: RequestOptions,
   ): Promise<{
     attachment: EventAttachment;
+    /** Authenticated API download URL (requires credentials). */
     downloadUrl: string;
+    /**
+     * Presigned URL that downloads the file directly without credentials, or
+     * `null` when unavailable. Only set on the skipped-download path.
+     */
+    directDownloadUrl: string | null;
     filename: string;
-    blob: Blob;
+    /** Raw file bytes, or `null` when the download was skipped. */
+    bytes: Uint8Array | null;
     contentType: string;
   }> {
     // Get the attachment metadata first
@@ -3869,12 +3883,31 @@ export class SentryApiService {
       );
     }
 
-    // Download the actual file content
-    const downloadUrl =
+    const downloadPath =
       apiPath`/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/${attachmentId}/` +
       `?download=1`;
+
+    // Skip the download for oversized attachments — buffering and base64
+    // encoding them can exhaust the worker's memory. Decide from the metadata
+    // size so we never issue the request.
+    if (maxInlineBytes !== undefined && attachment.size > maxInlineBytes) {
+      const directDownloadUrl = await this.resolveDirectDownloadUrl(
+        downloadPath,
+        opts,
+      );
+      return {
+        attachment,
+        downloadUrl: `${this.apiPrefix}${downloadPath}`,
+        directDownloadUrl,
+        filename: attachment.name,
+        bytes: null,
+        contentType: attachment.mimetype || "application/octet-stream",
+      };
+    }
+
+    // Download the actual file content
     const downloadResponse = await this.request(
-      downloadUrl,
+      downloadPath,
       { method: "GET" },
       opts,
     );
@@ -3887,13 +3920,45 @@ export class SentryApiService {
       attachment.mimetype ||
       "application/octet-stream";
 
+    // Read the body once as bytes; arrayBuffer() avoids the extra copy that
+    // blob() + blob.arrayBuffer() would hold at the same time.
+    const bytes = new Uint8Array(await downloadResponse.arrayBuffer());
+
     return {
       attachment,
       downloadUrl: downloadResponse.url,
+      directDownloadUrl: null,
       filename: attachment.name,
-      blob: await downloadResponse.blob(),
+      bytes,
       contentType,
     };
+  }
+
+  /**
+   * Probe the download endpoint for a presigned URL without buffering the file.
+   *
+   * Objectstore attachments redirect to a presigned URL (returned here); legacy
+   * ones stream a 200 with no redirect, so there is no direct URL. The body is
+   * discarded either way — we only need the URL.
+   */
+  private async resolveDirectDownloadUrl(
+    downloadPath: string,
+    opts?: RequestOptions,
+  ): Promise<string | null> {
+    try {
+      const response = await this.request(
+        downloadPath,
+        { method: "GET" },
+        opts,
+      );
+      const directUrl = response.redirected ? response.url : null;
+      // Don't await cancel(): we already have the URL, and awaiting it can
+      // stall on some runtimes.
+      void response.body?.cancel().catch(() => {});
+      return directUrl;
+    } catch {
+      return null;
+    }
   }
 
   async getReplayDetails(

@@ -4,7 +4,7 @@ import type {
   TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
 import { setTag } from "@sentry/core";
-import { blobToBase64 } from "../../internal/blob-utils";
+import { bytesToBase64 } from "../../internal/blob-utils";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
@@ -16,6 +16,76 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import type { ServerContext } from "../../types";
+
+/**
+ * Max attachment size returned inline over the MCP transport. Larger payloads
+ * can exhaust the worker's memory while base64-encoding, so above this we return
+ * download instructions instead of the bytes.
+ */
+const MAX_INLINE_ATTACHMENT_BYTES = 30 * 1024 * 1024;
+
+function formatMegabytes(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Render the response for an attachment too large to inline: a presigned direct
+ * link when available, otherwise authenticated-download instructions.
+ */
+function formatOversizedAttachment(
+  params: {
+    organizationSlug: string;
+    projectSlug: string;
+    eventId: string;
+    attachmentId: string;
+  },
+  attachment: {
+    downloadUrl: string;
+    directDownloadUrl: string | null;
+    filename: string;
+    contentType: string;
+    attachment: { type: string; size: number; dateCreated: string };
+  },
+): string {
+  const sizeBytes = attachment.attachment.size;
+  const downloadApiPath = `projects/${params.organizationSlug}/${params.projectSlug}/events/${params.eventId}/attachments/${params.attachmentId}/?download=1`;
+  // Use the validated attachment ID (not the uploader-controlled filename) as the
+  // output name so the command examples can't carry shell metacharacters.
+  const outputName = `attachment-${params.attachmentId}`;
+
+  let output = "# Event Attachment — Too Large to Return Inline\n\n";
+  output += `**Event ID:** ${params.eventId}\n`;
+  output += `**Attachment ID:** ${params.attachmentId}\n`;
+  output += `**Filename:** ${attachment.filename}\n`;
+  output += `**Type:** ${attachment.attachment.type}\n`;
+  output += `**Size:** ${sizeBytes} bytes (${formatMegabytes(sizeBytes)})\n`;
+  output += `**MIME Type:** ${attachment.contentType}\n`;
+  output += `**Created:** ${attachment.attachment.dateCreated}\n\n`;
+  output += `This attachment (${formatMegabytes(sizeBytes)}) exceeds the ${formatMegabytes(
+    MAX_INLINE_ATTACHMENT_BYTES,
+  )} inline limit for MCP responses, so its contents were not downloaded.\n\n`;
+  output += "## How to download it\n\n";
+
+  if (attachment.directDownloadUrl) {
+    output +=
+      "**Direct download** (a presigned link — no authentication needed; it expires shortly, so fetch it promptly):\n\n";
+    output += `${attachment.directDownloadUrl}\n\n`;
+    output +=
+      "If the link has expired, re-run this tool to get a fresh one, or use the authenticated API endpoint below.\n\n";
+    output +=
+      "**Authenticated Sentry API endpoint** (requires Sentry credentials):\n";
+    output += `- Sentry CLI: \`sentry api ${downloadApiPath} > ${outputName}\`\n`;
+    output += `- Or an \`Authorization: Bearer <token>\` request to: ${attachment.downloadUrl}\n`;
+  } else {
+    output +=
+      "The download URL is an authenticated Sentry API endpoint — it is not a public link and requires your Sentry credentials (a bare fetch returns HTTP 401).\n\n";
+    output += "- **Sentry CLI** (handles auth automatically):\n";
+    output += `  \`sentry api ${downloadApiPath} > ${outputName}\`\n`;
+    output += `- **Any HTTP client** with an \`Authorization: Bearer <token>\` header against: ${attachment.downloadUrl}\n`;
+    output += "- **Sentry UI:** open the event and use the Attachments tab.\n";
+  }
+  return output;
+}
 
 export default defineTool({
   name: "get_event_attachment",
@@ -76,7 +146,21 @@ export default defineTool({
         projectSlug: params.projectSlug,
         eventId: params.eventId,
         attachmentId: params.attachmentId,
+        maxInlineBytes: MAX_INLINE_ATTACHMENT_BYTES,
       });
+
+      // Too large to inline — return download instructions instead of the bytes.
+      if (attachment.bytes === null) {
+        return formatOversizedAttachment(
+          {
+            organizationSlug: params.organizationSlug,
+            projectSlug: params.projectSlug,
+            eventId: params.eventId,
+            attachmentId: params.attachmentId,
+          },
+          attachment,
+        );
+      }
 
       const contentParts: (TextContent | ImageContent | EmbeddedResource)[] =
         [];
@@ -86,10 +170,12 @@ export default defineTool({
       // even when the file is an image — and Step 2 is the authoritative signal.
       const effectiveMimeType = attachment.contentType;
       const isBinary = !effectiveMimeType.startsWith("text/");
+      // A zero-byte body for a non-empty file means a failed/truncated download.
+      const isEmpty = attachment.bytes.length === 0;
 
-      if (isBinary) {
+      if (isBinary && !isEmpty) {
         const isImage = effectiveMimeType.startsWith("image/");
-        const base64 = await blobToBase64(attachment.blob);
+        const base64 = bytesToBase64(attachment.bytes);
         if (isImage) {
           const image: ImageContent = {
             type: "image",
@@ -120,13 +206,19 @@ export default defineTool({
       output += `**Created:** ${attachment.attachment.dateCreated}\n\n`;
       output += `**Download URL:** ${attachment.downloadUrl}\n\n`;
 
-      if (isBinary) {
+      if (isEmpty) {
+        output += `## Empty Content\n\n`;
+        if (attachment.attachment.size > 0) {
+          output += `The download returned no data even though the attachment metadata reports ${attachment.attachment.size} bytes. This usually indicates a failed or truncated download; try again, or download it directly from the URL above (requires Sentry authentication).\n`;
+        } else {
+          output += `This attachment is empty (0 bytes).\n`;
+        }
+      } else if (isBinary) {
         output += `## Binary Content\n\n`;
         output += `The attachment is included as a resource and accessible through your client.\n`;
       } else {
-        // If it's a text file and we have blob content, decode and display it instead
-        // of embedding it as an image or resource
-        const textContent = await attachment.blob.text();
+        // Text file: inline the decoded content.
+        const textContent = new TextDecoder().decode(attachment.bytes);
         output += `## File Content\n\n`;
         output += `\`\`\`\n${textContent}\n\`\`\`\n\n`;
       }

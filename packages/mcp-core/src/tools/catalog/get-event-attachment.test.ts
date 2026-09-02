@@ -132,6 +132,125 @@ describe("get_event_attachment", () => {
     });
   });
 
+  it("decodes and inlines a text/plain (.log) attachment", async () => {
+    const result = await getEventAttachment.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        eventId: "e49541c747cb4d8aa3efb70ca5aba245",
+        attachmentId: "789",
+        regionUrl: null,
+      },
+      {
+        constraints: { organizationSlug: null, projectSlug: null },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    // Text files are inlined as a single text block — no image/resource part.
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ type: "text" });
+    const text = (result[0] as { text: string }).text;
+    expect(text).toContain("**MIME Type:** text/plain");
+    expect(text).toContain("## File Content");
+    expect(text).toContain("INFO app started");
+    expect(text).toContain("ERROR db connection failed");
+  });
+
+  it("returns a presigned direct-download URL for an oversized objectstore attachment", async () => {
+    const result = await getEventAttachment.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        eventId: "f49541c747cb4d8aa3efb70ca5aba246",
+        attachmentId: "999",
+        regionUrl: null,
+      },
+      {
+        constraints: { organizationSlug: null, projectSlug: null },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    // Oversized objectstore: no bytes downloaded; a guidance string leading with
+    // the presigned direct link (no auth) is returned.
+    expect(typeof result).toBe("string");
+    const text = result as string;
+    expect(text).toContain("Too Large to Return Inline");
+    expect(text).toContain("50.0 MB");
+    expect(text).toContain("30.0 MB");
+    expect(text).toContain("Direct download");
+    expect(text).toContain("no authentication needed");
+    expect(text).toContain(
+      "https://objectstore.example.test/attachments/999/blob?sig=test-signature",
+    );
+    // The authenticated API endpoint is still offered as a fallback.
+    expect(text).toContain(
+      "sentry api projects/sentry-mcp-evals/cloudflare-mcp/events/f49541c747cb4d8aa3efb70ca5aba246/attachments/999/?download=1",
+    );
+  });
+
+  it("falls back to authenticated-download instructions for an oversized legacy attachment", async () => {
+    const result = await getEventAttachment.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        eventId: "h49541c747cb4d8aa3efb70ca5aba248",
+        attachmentId: "222",
+        regionUrl: null,
+      },
+      {
+        constraints: { organizationSlug: null, projectSlug: null },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    // Oversized legacy (no presigned URL): auth-required guidance only.
+    expect(typeof result).toBe("string");
+    const text = result as string;
+    expect(text).toContain("Too Large to Return Inline");
+    expect(text).toContain("40.0 MB");
+    expect(text).toContain("requires your Sentry credentials");
+    expect(text).not.toContain("objectstore.example.test");
+
+    // The uploader-controlled filename must not be interpolated into the shell
+    // command — the redirect target uses the validated attachment ID instead.
+    expect(text).toContain(
+      "sentry api projects/sentry-mcp-evals/cloudflare-mcp/events/h49541c747cb4d8aa3efb70ca5aba248/attachments/222/?download=1 > attachment-222",
+    );
+    expect(text).not.toContain("?download=1 > pwn");
+  });
+
+  it("flags an empty download body when metadata reports a non-empty file", async () => {
+    const result = await getEventAttachment.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        eventId: "g49541c747cb4d8aa3efb70ca5aba247",
+        attachmentId: "111",
+        regionUrl: null,
+      },
+      {
+        constraints: { organizationSlug: null, projectSlug: null },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    // Zero-byte body: no binary/image part is emitted; the text flags the gap.
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ type: "text" });
+    const text = (result[0] as { text: string }).text;
+    expect(text).toContain("## Empty Content");
+    expect(text).toContain("returned no data");
+    expect(text).toContain("1024 bytes");
+  });
+
   it("throws error for malformed regionUrl", async () => {
     await expect(
       getEventAttachment.handler(
