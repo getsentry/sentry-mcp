@@ -27,7 +27,9 @@ export type ExploreQueryOptions = {
   query?: string;
   /**
    * Sort field. Prefix with `-` for descending.
-   * Only supported on the `spans` dataset — other datasets reject it with 400.
+   * Supported on the `spans`, `errors`, and `discover` datasets; `metrics` and
+   * `logs` reject it with 400. A stable sort is required for correct
+   * offset-based cursor pagination on grouped aggregate queries (#1519).
    */
   sort?: string;
   /** Maximum number of rows to return */

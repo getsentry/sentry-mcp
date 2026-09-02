@@ -441,17 +441,17 @@ describe("sentry explore", () => {
   });
 
   describe("sort handling", () => {
-    test("auto-sorts by first aggregate descending for non-spans", async () => {
+    test("auto-sorts errors by first aggregate descending", async () => {
       resolveTargetSpy.mockResolvedValue({ org: "test-org" });
       const { context } = createContext();
 
       await func.call(context, DEFAULT_FLAGS, "test-org/");
 
-      // Default fields are ["title", "count()"], so sort should be omitted
-      // for non-spans datasets (errors is the default)
+      // Default fields are ["title", "count()"]; the errors dataset accepts
+      // sort and needs a stable order for correct cursor pagination (#1519).
       expect(queryEventsSpy).toHaveBeenCalledWith(
         "test-org",
-        expect.objectContaining({ sort: undefined })
+        expect.objectContaining({ sort: "-count()" })
       );
     });
 
@@ -471,19 +471,44 @@ describe("sentry explore", () => {
       );
     });
 
-    test("omits sort for non-spans dataset even when auto-detected", async () => {
+    test("omits sort for metrics dataset even when auto-detected", async () => {
       resolveTargetSpy.mockResolvedValue({ org: "test-org" });
       const { context } = createContext();
 
       await func.call(
         context,
-        { ...DEFAULT_FLAGS, dataset: "errors" },
+        {
+          ...DEFAULT_FLAGS,
+          dataset: "tracemetrics",
+          field: ["sum(value,llm.token_usage,distribution,none)"],
+        },
+        "test-org/"
+      );
+
+      // metrics/logs reject sort with 400, so it stays unset.
+      expect(queryEventsSpy).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({ sort: undefined })
+      );
+    });
+
+    test("applies auto-derived sort on errors for grouped aggregates", async () => {
+      resolveTargetSpy.mockResolvedValue({ org: "test-org" });
+      const { context } = createContext();
+
+      await func.call(
+        context,
+        {
+          ...DEFAULT_FLAGS,
+          dataset: "errors",
+          field: ["task.name", "failure.node", "count()"],
+        },
         "test-org/"
       );
 
       expect(queryEventsSpy).toHaveBeenCalledWith(
         "test-org",
-        expect.objectContaining({ sort: undefined })
+        expect.objectContaining({ sort: "-count()", dataset: "errors" })
       );
     });
 

@@ -438,6 +438,14 @@ function validateMetricsFields(fieldList: string[]): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * Datasets whose Events endpoint accepts a `sort` param. A deterministic sort
+ * is what makes offset-based cursor pagination stable — without it, multi-page
+ * grouped aggregate queries overlap and skip rows (#1519). `metrics` and `logs`
+ * reject `sort` with a 400, so they stay unsorted.
+ */
+const SORTABLE_DATASETS = new Set(["spans", "errors", "discover"]);
+
+/**
  * Dataset-specific configuration resolved before the main query loop.
  *
  * Centralizes all replay vs. non-replay branching so the main `func` body
@@ -545,13 +553,20 @@ function resolveDatasetConfig(params: {
   const firstAgg = findFirstAggregate(fieldList);
   const rawSort = flags.sort ?? (firstAgg ? `-${firstAgg}` : undefined);
   let sort: string | undefined;
-  if (dataset === "spans") {
+  if (SORTABLE_DATASETS.has(dataset)) {
+    // A deterministic sort is required for correct cursor pagination: the
+    // events cursor is offset-based, so without a stable total order the
+    // separate page requests overlap and skip rows, producing duplicate and
+    // missing dimension tuples across the merged result (#1519). Defaulting
+    // to `-<firstAggregate>` gives grouped aggregate queries a stable order.
     sort = rawSort;
   } else {
-    // Warn only when user explicitly passed --sort on a non-spans dataset
+    // Warn only when the user explicitly passed --sort on a dataset that
+    // rejects it (metrics/logs). An auto-derived sort is silently dropped.
     if (rawSort && flags.sort) {
+      const displayDataset = API_TO_USER_DATASET.get(dataset) ?? dataset;
       log.warn(
-        `--sort is only supported on the spans dataset. Ignoring sort for ${dataset}.`
+        `--sort is not supported on the ${displayDataset} dataset. Ignoring sort.`
       );
     }
     sort = undefined;
