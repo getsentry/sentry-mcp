@@ -398,6 +398,16 @@ await copyFile(
 );
 console.log("  -> dist/vendor/symbolic_bg.wasm (DIF parser)");
 
+// Ship the Spleen glyph subset next to the npm bundle. The formatter resolves
+// it via new URL("./assets/spleen-8x16.bin", import.meta.url), relative to
+// dist/index.cjs (see src/lib/formatters/spleen-font.ts).
+await mkdir("./dist/assets", { recursive: true });
+await copyFile(
+  "./src/lib/formatters/assets/spleen-8x16.bin",
+  "./dist/assets/spleen-8x16.bin"
+);
+console.log("  -> dist/assets/spleen-8x16.bin (dashboard font)");
+
 // Ship the WASM SQLite driver's .wasm next to the bundle. The driver JS
 // (node-sqlite3-wasm) is inlined into dist/index.cjs by esbuild, and its
 // Emscripten glue locates the .wasm via `__dirname + "/node-sqlite3-wasm.wasm"`.

@@ -22,6 +22,7 @@ import {
   SourceBundleWriter,
 } from "@sentry/symbolic";
 import { logger } from "../logger.js";
+import { getSeaRawAsset } from "../sea-assets.js";
 
 const log = logger.withTag("dif");
 const _require = createRequire(import.meta.url);
@@ -71,22 +72,6 @@ export type DifArchiveInfo = {
 
 let initialized = false;
 
-/** Returns the SEA API when running inside a Node SEA binary, else null. */
-function isSeaBinary(): { getRawAsset: (key: string) => ArrayBuffer } | null {
-  try {
-    const sea = _require("node:sea") as {
-      isSea?: () => boolean;
-      getRawAsset?: (key: string) => ArrayBuffer;
-    };
-    if (sea.isSea?.() && sea.getRawAsset) {
-      return { getRawAsset: sea.getRawAsset };
-    }
-  } catch (err) {
-    log.debug("node:sea unavailable; treating as non-SEA runtime", err);
-  }
-  return null;
-}
-
 /**
  * Load the WASM bytes for the current runtime mode.
  *
@@ -95,9 +80,9 @@ function isSeaBinary(): { getRawAsset: (key: string) => ArrayBuffer } | null {
  * time. In dev it is resolved from the installed `@sentry/symbolic` package.
  */
 function loadWasmBytes(): Uint8Array {
-  const sea = isSeaBinary();
-  if (sea) {
-    return new Uint8Array(sea.getRawAsset(DIF_WASM_ASSET_KEY));
+  const seaAsset = getSeaRawAsset(DIF_WASM_ASSET_KEY);
+  if (seaAsset) {
+    return seaAsset;
   }
   const sibling = new URL("./vendor/symbolic_bg.wasm", import.meta.url);
   if (existsSync(sibling)) {
