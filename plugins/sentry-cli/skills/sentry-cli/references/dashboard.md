@@ -44,6 +44,7 @@ View a dashboard
 - `-r, --refresh <value> - Auto-refresh interval in seconds (default: 60, min: 10)`
 - `-t, --period <value> - Time range: "7d", "2026-08-01..2026-09-01", ">=2026-08-01"`
 - `--renderer <value> - Graphics renderer (defaults to auto; falls back to auto when unavailable) - (default: "auto")`
+- `--no-graphics-cap - Use the terminal-native graphics width (may fall back to ASCII for very large dashboards)`
 
 **Examples:**
 

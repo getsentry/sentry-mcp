@@ -16,6 +16,8 @@ import {
 import { logger } from "../../../src/lib/logger.js";
 // biome-ignore lint/performance/noNamespaceImport: needed for vi.spyOn mocking
 import * as sixelModule from "../../../src/lib/sixel.js";
+// biome-ignore lint/performance/noNamespaceImport: needed for vi.spyOn mocking
+import * as sixelImageModule from "../../../src/lib/sixel-image.js";
 import type { TimeseriesResult } from "../../../src/types/dashboard.js";
 
 const ESC = "\x1b";
@@ -414,6 +416,7 @@ describe("dashboard sixel integration", () => {
 
     const output = formatDashboardWithData(
       makeDashboardData({
+        graphicsCap: false,
         widgets: [makeWidget({ layout: { x: 0, y: 12, w: 6, h: 1 } })],
       })
     );
@@ -422,6 +425,37 @@ describe("dashboard sixel integration", () => {
     expect(debugSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         "reason: canvas 3416x2496 (8.53M pixels) exceeds the 8M pixel limit"
+      )
+    );
+    expect(debugSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "native pixel width=3416; effective pixel width=3416; graphics cap=not applied"
+      )
+    );
+  });
+
+  test("caps a high-DPI canvas instead of falling back to ASCII", () => {
+    process.stdout.columns = 244;
+    vi.mocked(sixelModule.terminalPixelWidth).mockReturnValue(3416);
+    vi.mocked(sixelModule.graphicsCellSize).mockReturnValue({
+      cellWidth: 14,
+      cellHeight: 32,
+    });
+    vi.spyOn(sixelImageModule, "encodeImageToSixel").mockImplementation(
+      (image) => `${ESC}P${image.width}x${image.height}${ESC}\\`
+    );
+    const debugSpy = vi.spyOn(logger, "debug");
+
+    const output = formatDashboardWithData(
+      makeDashboardData({
+        widgets: [makeWidget({ layout: { x: 0, y: 12, w: 6, h: 1 } })],
+      })
+    );
+
+    expect(output).toContain(`${ESC}P2548x2496${ESC}\\`);
+    expect(debugSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "native pixel width=3416; effective pixel width=2548; graphics cap=applied"
       )
     );
   });
