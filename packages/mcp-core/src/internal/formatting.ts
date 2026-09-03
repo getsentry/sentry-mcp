@@ -181,6 +181,24 @@ export function formatFrameHeader(
 }
 
 /**
+ * Whether the shared formatter covers this event type, and so whether its body should be used
+ * instead of the local rendering.
+ *
+ * "default" is an error event without exception data, "generic" a performance regression or
+ * metric issue, "csp" a Content Security Policy violation. Anything else (a transaction, most
+ * notably) keeps the local path, which renders things the shared body does not carry such as
+ * the fetched performance trace.
+ */
+export function usesSharedFormatterBody(event: { type?: unknown }): boolean {
+  return (
+    event.type === "error" ||
+    event.type === "default" ||
+    event.type === "generic" ||
+    event.type === "csp"
+  );
+}
+
+/**
  * Formats a Sentry event into a structured markdown output.
  * Includes error messages, stack traces, request info, and contextual data.
  *
@@ -2118,14 +2136,7 @@ export function formatIssueOutput({
 
   output += `**Event ID**: ${event.id}\n`;
   output += `**Type**: ${event.type}\n`;
-  // "default" type represents error events without exception data
-  // "generic" type represents performance regressions and metric-based issues
-  // "csp" type represents Content Security Policy violations
-  const isSharedFormatterType =
-    event.type === "error" ||
-    event.type === "default" ||
-    event.type === "generic" ||
-    event.type === "csp";
+  const isSharedFormatterType = usesSharedFormatterBody(event);
   if (isSharedFormatterType) {
     const typedEvent = event as
       | z.infer<typeof ErrorEventSchema>

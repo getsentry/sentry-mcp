@@ -19,7 +19,10 @@ import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { enhanceNotFoundError } from "../../internal/tool-helpers/enhance-error";
 import { structuredResult } from "../../internal/tool-helpers/results";
-import { getSeerActionabilityLabel } from "../../internal/formatting";
+import {
+  getSeerActionabilityLabel,
+  usesSharedFormatterBody,
+} from "../../internal/formatting";
 import {
   getAutofixArtifactSummaries,
   getStatusDisplayName,
@@ -99,6 +102,11 @@ export type GetIssueDetailsPayload = z.infer<
  * carry the whole answer, and without the body it would not.
  */
 function parseFormattedBody(event: Event): Record<string, unknown> | undefined {
+  // the same event-type gate the markdown path applies: a transaction still needs the local
+  // rendering, which carries the fetched performance trace that the shared body does not
+  if (!usesSharedFormatterBody(event)) {
+    return undefined;
+  }
   const content = event.formatted?.content;
   if (!content) {
     return undefined;

@@ -2405,4 +2405,25 @@ describe("structuredContent", () => {
     expect(result).not.toHaveProperty("structuredContent");
     expect(result).toContain("CLOUDFLARE-MCP-41");
   });
+
+  it("keeps transactions on the local path so the performance trace survives", async () => {
+    // the shared body carries no performance trace; that is fetched separately and only
+    // rendered for transactions, so a transaction must not take the structured path
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            type: "transaction",
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(result).toContain("CLOUDFLARE-MCP-41");
+  });
 });
