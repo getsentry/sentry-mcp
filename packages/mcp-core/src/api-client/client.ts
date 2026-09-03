@@ -298,7 +298,7 @@ type UpdateClientKeyRequest = {
   browserSdkVersion?: string;
   dynamicSdkLoaderOptions?: ClientKeyDynamicSdkLoaderOptions;
 };
-export type TraceItemAttributeType = "string" | "number" | "boolean";
+export type TraceItemAttributeType = "string" | "number" | "boolean" | "array";
 export type TraceItemAttributeSourceType = "sentry" | "user";
 
 export type TraceItemAttributeSource = {
@@ -354,7 +354,7 @@ export type EventsValidationResult = {
   orderby: EventsAttributeValidationResult[];
 };
 
-const TraceItemAttributeTypeSchema = z.enum(["string", "number", "boolean"]);
+const TraceItemAttributeTypeSchema = z.enum(["string", "number", "boolean", "array"]);
 const TraceItemAttributeSourceSchema = z.object({
   source_type: z.enum(["sentry", "user"]),
   is_transformed_alias: z.boolean().optional(),
