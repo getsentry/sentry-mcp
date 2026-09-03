@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigurationError } from "../errors";
 import { SentryApiService } from "./client";
+import { ApiServerError } from "./errors";
 
 describe("getIssueUrl", () => {
   it("should work with sentry.io", () => {
@@ -729,6 +730,144 @@ describe("network error handling", () => {
     await expect(apiService.getAuthenticatedUser()).rejects.toThrow(
       ConfigurationError,
     );
+  });
+});
+
+describe("transient 5xx retry", () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  // A transient gateway failure like the ones Sentry's edge returns
+  // ("upstream connect error ... reset before headers"), reported as 503.
+  const serviceUnavailable = () =>
+    new Response(
+      "upstream connect error or disconnect/reset before headers. reset reason: connection termination",
+      { status: 503, statusText: "Service Unavailable" },
+    );
+
+  const internalError = () =>
+    new Response(JSON.stringify({ detail: "Internal Error" }), {
+      status: 500,
+      statusText: "Internal Server Error",
+      headers: { "Content-Type": "application/json" },
+    });
+
+  const authOk = () =>
+    new Response(
+      JSON.stringify({ id: "1", name: "Test User", email: "test@example.com" }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.useRealTimers();
+  });
+
+  it("retries a transient gateway error on a GET and succeeds", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(serviceUnavailable())
+      .mockResolvedValueOnce(serviceUnavailable())
+      .mockResolvedValueOnce(authOk());
+    globalThis.fetch = fetchMock;
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const promise = apiService.getAuthenticatedUser();
+    await vi.runAllTimersAsync();
+    const user = await promise;
+
+    expect(user.id).toBe("1");
+    // Initial attempt + 2 retries, succeeding on the last one.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("gives up after exhausting the retry budget on a persistent gateway error", async () => {
+    // A fresh Response per attempt — a Response body can only be read once.
+    const fetchMock = vi.fn().mockImplementation(() => serviceUnavailable());
+    globalThis.fetch = fetchMock;
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const promise = apiService.getAuthenticatedUser();
+    // Attach a catch synchronously so the rejection is never unhandled while
+    // fake timers advance through the backoff waits.
+    promise.catch(() => {});
+    await vi.runAllTimersAsync();
+
+    await expect(promise).rejects.toBeInstanceOf(ApiServerError);
+    // Initial attempt + 2 retries, all failing.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry a non-gateway 500", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(internalError());
+    globalThis.fetch = fetchMock;
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await expect(apiService.getAuthenticatedUser()).rejects.toBeInstanceOf(
+      ApiServerError,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a non-idempotent (POST) request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(serviceUnavailable());
+    globalThis.fetch = fetchMock;
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const promise = apiService.createTeam({
+      organizationSlug: "my-org",
+      name: "My Team",
+    });
+    promise.catch(() => {});
+    await vi.runAllTimersAsync();
+
+    await expect(promise).rejects.toBeInstanceOf(ApiServerError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a 5xx that the caller opted into via allowStatuses", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(serviceUnavailable());
+    globalThis.fetch = fetchMock;
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    // getEventAttachment passes allowStatuses so the caller can inspect the raw
+    // response; such requests must be returned as-is, never retried.
+    const response = await (
+      apiService as unknown as {
+        request: (
+          path: string,
+          options?: RequestInit,
+          requestOptions?: { host?: string; allowStatuses?: number[] },
+        ) => Promise<Response>;
+      }
+    ).request("/auth/", undefined, { allowStatuses: [503] });
+
+    expect(response.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

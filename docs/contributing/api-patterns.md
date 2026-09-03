@@ -223,6 +223,21 @@ try {
 
 See error patterns in [common-patterns.md](common-patterns.md#error-handling).
 
+### Automatic Retries
+
+`SentryApiService.request()` transparently retries transient upstream gateway
+failures (`502`/`503`/`504`) using exponential backoff. Retries are:
+
+- **GET-only** — non-idempotent methods (`POST`/`PUT`/`DELETE`) are never
+  retried, so an automatic retry can never replay a mutation.
+- **Gateway-only** — gated on `ApiServerError.isGatewayError()`. Persistent
+  `500`s, `4xx` client errors, and network/configuration errors fail fast.
+- **Bypassed by `allowStatuses`** — a status the caller opts into is returned
+  as-is from `requestOnce`, never retried.
+
+Callers and tools need no changes: a retried request either resolves normally or
+throws the same `ApiServerError` it would have thrown without retries.
+
 ## Best Practices
 
 1. **Always use context helper** when in tools/prompts

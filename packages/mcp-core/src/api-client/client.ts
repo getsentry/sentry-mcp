@@ -30,9 +30,15 @@ import {
   isSentryHost,
   type TraceMetricIdentifier,
 } from "../utils/url-utils";
+import { retryWithBackoff } from "../internal/fetch-utils";
 import { USER_AGENT } from "../version";
 import { apiPath } from "./api-path";
-import { ApiNotFoundError, ApiValidationError, createApiError } from "./errors";
+import {
+  ApiNotFoundError,
+  ApiServerError,
+  ApiValidationError,
+  createApiError,
+} from "./errors";
 import {
   AgenticOnboardingRunSchema,
   AIConversationDetailsResponseSchema,
@@ -255,6 +261,18 @@ type RequestOptions = {
   host?: string;
   allowStatuses?: number[];
 };
+
+/**
+ * Automatic retry policy for transient upstream gateway failures (502/503/504).
+ *
+ * Sentry's edge intermittently returns short-lived gateway errors (e.g.
+ * "upstream connect error or disconnect/reset before headers") that clear on a
+ * retry. We retry only idempotent GET requests so an automatic retry can never
+ * replay a mutation, and keep the budget small so a still-failing tool call
+ * resolves quickly under the Cloudflare Workers request lifetime.
+ */
+const RETRYABLE_REQUEST_MAX_RETRIES = 2;
+const RETRYABLE_REQUEST_INITIAL_DELAY_MS = 250;
 
 /**
  * Default cap for returning attachment bytes inline over the MCP transport.
@@ -680,6 +698,42 @@ export class SentryApiService {
   }
 
   /**
+   * Makes an authenticated request to the Sentry API, transparently retrying
+   * transient upstream gateway failures (502/503/504).
+   *
+   * Retries are limited to idempotent GET requests so an automatic retry can
+   * never replay a mutation, and are gated on `ApiServerError.isGatewayError()`
+   * so persistent 500s, 4xx client errors, and network/configuration errors
+   * fail fast without waiting. Callers that opt a 5xx into `allowStatuses`
+   * receive the raw response from `requestOnce` and are never retried.
+   *
+   * @param path API endpoint path (without /api/0 prefix)
+   * @param options Fetch options
+   * @param requestOptions Additional request configuration
+   * @returns Promise resolving to Response object
+   * @throws {ApiError} Enhanced API errors with user-friendly messages
+   * @throws {Error} Network or parsing errors
+   */
+  private async request(
+    path: string,
+    options: RequestInit = {},
+    requestOptions: { host?: string; allowStatuses?: number[] } = {},
+  ): Promise<Response> {
+    const method = (options.method ?? "GET").toUpperCase();
+    const isIdempotent = method === "GET";
+
+    return retryWithBackoff(
+      () => this.requestOnce(path, options, requestOptions),
+      {
+        maxRetries: isIdempotent ? RETRYABLE_REQUEST_MAX_RETRIES : 0,
+        initialDelay: RETRYABLE_REQUEST_INITIAL_DELAY_MS,
+        shouldRetry: (error) =>
+          error instanceof ApiServerError && error.isGatewayError(),
+      },
+    );
+  }
+
+  /**
    * Internal method for making authenticated requests to Sentry API.
    *
    * Handles:
@@ -695,7 +749,7 @@ export class SentryApiService {
    * @throws {ApiError} Enhanced API errors with user-friendly messages
    * @throws {Error} Network or parsing errors
    */
-  private async request(
+  private async requestOnce(
     path: string,
     options: RequestInit = {},
     { host, allowStatuses }: { host?: string; allowStatuses?: number[] } = {},
