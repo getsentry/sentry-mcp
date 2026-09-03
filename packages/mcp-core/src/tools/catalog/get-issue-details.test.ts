@@ -2426,4 +2426,44 @@ describe("structuredContent", () => {
     expect(result).not.toHaveProperty("structuredContent");
     expect(result).toContain("CLOUDFLARE-MCP-41");
   });
+
+  it("keeps the attached replay, which lives on the event not the related list", async () => {
+    // an issue whose only replay is attached would otherwise report no replays at all
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            contexts: {
+              replay: {
+                type: "default",
+                replay_id: "1234567890abcdef1234567890abcdef",
+              },
+            },
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(payload.replays?.attached).toBe("1234567890abcdef1234567890abcdef");
+    // and the attached id is not repeated in the related list
+    expect(payload.replays?.related).not.toContain(
+      "1234567890abcdef1234567890abcdef",
+    );
+  });
+
+  it("reports no replays when there are none", async () => {
+    mockLatestEventWithFormatted({ format: "json", content: FORMATTER_JSON });
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(payload.replays).toBeNull();
+  });
 });

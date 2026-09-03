@@ -2449,7 +2449,7 @@ function formatIssueReplayOutput({
   return `${lines.join("\n")}\n\n`;
 }
 
-function getReplayIdFromEvent(event: Event): string | null {
+export function getReplayIdFromEvent(event: Event): string | null {
   const replayContext = event.contexts?.replay as
     | Record<string, unknown>
     | undefined;
@@ -2464,7 +2464,7 @@ function getReplayIdFromEvent(event: Event): string | null {
   return normalizeReplayId(replayContextId ?? replayTagId);
 }
 
-function dedupeReplayIds(replayIds: string[]): string[] {
+export function dedupeReplayIds(replayIds: string[]): string[] {
   const normalizedReplayIds: string[] = [];
   const seenReplayIds = new Set<string>();
 

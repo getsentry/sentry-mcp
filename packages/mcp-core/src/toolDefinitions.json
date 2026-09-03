@@ -3639,13 +3639,30 @@
             }
           ]
         },
-        "replayIds": {
+        "replays": {
           "anyOf": [
             {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
+              "type": "object",
+              "properties": {
+                "attached": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "related": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": ["related"],
+              "additionalProperties": false
             },
             {
               "type": "null"

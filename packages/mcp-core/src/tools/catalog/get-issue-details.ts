@@ -20,6 +20,8 @@ import { defineTool } from "../../internal/tool-helpers/define";
 import { enhanceNotFoundError } from "../../internal/tool-helpers/enhance-error";
 import { structuredResult } from "../../internal/tool-helpers/results";
 import {
+  dedupeReplayIds,
+  getReplayIdFromEvent,
   getSeerActionabilityLabel,
   usesSharedFormatterBody,
 } from "../../internal/formatting";
@@ -87,7 +89,12 @@ export const getIssueDetailsOutputSchema = z.object({
     })
     .nullish(),
   codeLocation: z.unknown().nullish(),
-  replayIds: z.array(z.string()).nullish(),
+  replays: z
+    .object({
+      attached: z.string().nullish(),
+      related: z.array(z.string()),
+    })
+    .nullish(),
   externalIssues: z.unknown().nullish(),
   aiConversations: z.unknown().nullish(),
 });
@@ -119,6 +126,25 @@ function parseFormattedBody(event: Event): Record<string, unknown> | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The attached replay plus the related ones, derived the way the markdown output derives them.
+ * The attached id lives on the event rather than in the related list, so passing that list
+ * through alone loses the replay for an issue whose only one is attached.
+ */
+function buildReplays(
+  event: Event,
+  relatedReplayIds?: string[],
+): GetIssueDetailsPayload["replays"] {
+  const attached = getReplayIdFromEvent(event);
+  const related = dedupeReplayIds(relatedReplayIds ?? []).filter(
+    (replayId) => replayId !== attached,
+  );
+  if (!attached && related.length === 0) {
+    return null;
+  }
+  return { attached, related };
 }
 
 function buildIssueDetailsPayload({
@@ -187,7 +213,7 @@ function buildIssueDetailsPayload({
         }
       : null,
     codeLocation: codeLocation ?? null,
-    replayIds: relatedReplayIds ?? null,
+    replays: buildReplays(event, relatedReplayIds),
     externalIssues: externalIssues ?? null,
     aiConversations: aiConversations?.length ? aiConversations : null,
   };
