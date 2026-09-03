@@ -1622,6 +1622,116 @@ export const restHandlers = buildHandlers([
       });
     },
   },
+  // A text/plain (.log) attachment (the shape reported in #1267).
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/e49541c747cb4d8aa3efb70ca5aba245/attachments/",
+    fetch: () =>
+      HttpResponse.json([
+        {
+          id: "789",
+          name: "application.log",
+          type: "event.attachment",
+          size: 44,
+          mimetype: "text/plain",
+          dateCreated: "2025-04-08T21:15:04.000Z",
+          headers: { "Content-Type": "text/plain" },
+        },
+      ]),
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/e49541c747cb4d8aa3efb70ca5aba245/attachments/789/",
+    fetch: () =>
+      new HttpResponse(
+        new Blob(["INFO app started\nERROR db connection failed\n"], {
+          type: "text/plain",
+        }),
+        { headers: { "Content-Type": "text/plain" } },
+      ),
+  },
+  // Oversized objectstore attachment: the download 302-redirects to a presigned
+  // URL (mocked below).
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/f49541c747cb4d8aa3efb70ca5aba246/attachments/",
+    fetch: () =>
+      HttpResponse.json([
+        {
+          id: "999",
+          name: "core.dmp",
+          type: "event.attachment",
+          size: 50 * 1024 * 1024,
+          mimetype: "application/octet-stream",
+          dateCreated: "2025-04-08T21:15:04.000Z",
+          headers: { "Content-Type": "application/octet-stream" },
+        },
+      ]),
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/f49541c747cb4d8aa3efb70ca5aba246/attachments/999/",
+    fetch: () =>
+      HttpResponse.redirect(
+        "https://objectstore.example.test/attachments/999/blob?sig=test-signature",
+        302,
+      ),
+  },
+  // Oversized legacy attachment: the download streams a 200 with no redirect, so
+  // there is no presigned URL.
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/h49541c747cb4d8aa3efb70ca5aba248/attachments/",
+    fetch: () =>
+      HttpResponse.json([
+        {
+          id: "222",
+          // Hostile, uploader-controlled name: must never reach a shell command.
+          name: "pwn; rm -rf ~ #.dmp",
+          type: "event.attachment",
+          size: 40 * 1024 * 1024,
+          mimetype: "application/octet-stream",
+          dateCreated: "2025-04-08T21:15:04.000Z",
+          headers: { "Content-Type": "application/octet-stream" },
+        },
+      ]),
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/h49541c747cb4d8aa3efb70ca5aba248/attachments/222/",
+    fetch: () =>
+      new HttpResponse(
+        new Blob(["legacy bytes"], { type: "application/octet-stream" }),
+        {
+          headers: { "Content-Type": "application/octet-stream" },
+        },
+      ),
+  },
+  // Metadata reports a non-empty file but the download returns zero bytes.
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/g49541c747cb4d8aa3efb70ca5aba247/attachments/",
+    fetch: () =>
+      HttpResponse.json([
+        {
+          id: "111",
+          name: "screenshot.png",
+          type: "event.attachment",
+          size: 1024,
+          mimetype: "image/png",
+          dateCreated: "2025-04-08T21:15:04.000Z",
+          headers: { "Content-Type": "image/png" },
+        },
+      ]),
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/g49541c747cb4d8aa3efb70ca5aba247/attachments/111/",
+    fetch: () =>
+      new HttpResponse(new Blob([], { type: "image/png" }), {
+        headers: { "Content-Type": "image/png" },
+      }),
+  },
   {
     method: "get",
     path: "/api/0/organizations/:organizationSlug/repos/",
@@ -1663,6 +1773,10 @@ export const restHandlers = buildHandlers([
 
 // Add handlers for mcp.sentry.dev and localhost
 export const searchHandlers = [
+  // Presigned target for the oversized-attachment redirect (999).
+  http.get("https://objectstore.example.test/attachments/999/blob", () =>
+    HttpResponse.text("presigned blob bytes"),
+  ),
   http.post("https://mcp.sentry.dev/api/search", async ({ request }) => {
     const body = (await request.json()) as any;
 
