@@ -29,7 +29,7 @@
   "src/lib/delta-upgrade.ts": 1,
   "src/lib/detect-agent.ts": 2,
   "src/lib/dev-script.ts": 2,
-  "src/lib/dif/find.ts": 3,
+  "src/lib/dif/find.ts": 0,
   "src/lib/docs-context.ts": 4,
   "src/lib/docs-service.ts": 1,
   "src/lib/dsn/detector.ts": 1,
