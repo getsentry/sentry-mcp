@@ -80,7 +80,7 @@
   "src/lib/trace-target.ts": 1,
   "src/lib/upgrade.ts": 3,
   "src/lib/utils.ts": 1,
-  "src/lib/version-check.ts": 1,
+  "src/lib/version-check.ts": 0,
   "src/lib/which.ts": 1,
   "src/lib/wrangler.ts": 1
 }

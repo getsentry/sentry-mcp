@@ -25,6 +25,7 @@ import { getEnv } from "./env.js";
 import { isUserError } from "./errors.js";
 import { cyan, muted } from "./formatters/colors.js";
 import { GLOBAL_FLAGS } from "./global-flags.js";
+import { logger } from "./logger.js";
 import { cleanupPatchCache } from "./patch-cache.js";
 import { fetchLatestFromGitHub, fetchLatestNightlyVersion } from "./upgrade.js";
 
@@ -237,15 +238,15 @@ async function maybePrefetchPatches(
     } else {
       await prefetchStablePatches(latestVersion, signal);
     }
-  } catch {
-    // Pre-fetch is best-effort — don't report errors
+  } catch (error) {
+    logger.debug("Delta patch pre-fetch failed (best-effort)", error);
   }
 
   // Opportunistic cleanup of stale cached patches
   try {
     await cleanupPatchCache();
-  } catch {
-    /* ignore */
+  } catch (error) {
+    logger.debug("Patch cache cleanup failed (best-effort)", error);
   }
 }
 
