@@ -2543,4 +2543,82 @@ describe("structuredContent", () => {
     expect(payload.event).toHaveProperty("id");
     expect(payload.event).toHaveProperty("type");
   });
+
+  it("does not label an error's exception message as a query pattern", async () => {
+    // metadata.value is a query pattern for a performance issue and the exception message for
+    // an error, so reading it unconditionally puts error text under the wrong name
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () =>
+          HttpResponse.json({
+            ...createPerformanceIssue({
+              shortId: "CLOUDFLARE-MCP-41",
+              metadata: {
+                title: "metadata title",
+                value: "Tried to cancel a non-cancellable request",
+                location: "index.js",
+              },
+            }),
+            // same metadata, but not a performance issue
+            issueType: "error",
+            issueCategory: "error",
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(payload.issue.queryPattern).toBeNull();
+    expect(payload.issue.location).toBeNull();
+    // and the top level title wins for an error, not the metadata one
+    expect(payload.issue.title).not.toBe("metadata title");
+  });
+
+  it("uses the metadata fields for a performance issue", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () =>
+          HttpResponse.json({
+            ...createPerformanceIssue({
+              shortId: "CLOUDFLARE-MCP-41",
+              issueType: "performance_n_plus_one_db_queries",
+              issueCategory: "performance",
+              metadata: {
+                title: "N+1 Query",
+                value: "SELECT * FROM users WHERE id = ?",
+                location: "/api/checkout",
+              },
+            }),
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(payload.issue.title).toBe("N+1 Query");
+    expect(payload.issue.queryPattern).toBe("SELECT * FROM users WHERE id = ?");
+    expect(payload.issue.location).toBe("/api/checkout");
+  });
 });

@@ -22,6 +22,7 @@ import { structuredResult } from "../../internal/tool-helpers/results";
 import {
   dedupeReplayIds,
   getReplayIdFromEvent,
+  isPerformanceIssueType,
   getSeerActionabilityLabel,
   usesSharedFormatterBody,
 } from "../../internal/formatting";
@@ -218,11 +219,13 @@ function buildIssueDetailsPayload({
   // the run's own artifacts, not the whole state: an AutofixRunState carries every step and
   // would dwarf the rest of the payload
   const summaries = autofix ? getAutofixArtifactSummaries(autofix) : undefined;
+  const isPerf = isPerformanceIssueType(issue) && !!issue.metadata;
 
   return {
     issue: {
       shortId: issue.shortId,
-      title: issue.title,
+      // a performance issue's metadata carries the better title, as the markdown path prefers
+      title: (isPerf ? issue.metadata?.title : null) || issue.title,
       culprit: issue.culprit,
       firstSeen: issue.firstSeen,
       lastSeen: issue.lastSeen,
@@ -243,8 +246,10 @@ function buildIssueDetailsPayload({
       platform: issue.platform,
       project: issue.project?.name,
       url: apiService.getIssueUrl(organizationSlug, issue.shortId),
-      location: issue.metadata?.location,
-      queryPattern: issue.metadata?.value,
+      // metadata.value is a query pattern only for a performance issue; on an error it is the
+      // exception message, so reading it unconditionally would misname the error text
+      location: isPerf ? issue.metadata?.location : null,
+      queryPattern: isPerf ? issue.metadata?.value : null,
     },
     event: {
       id: event.id,

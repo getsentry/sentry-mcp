@@ -189,6 +189,24 @@ export function formatFrameHeader(
  * notably) keeps the local path, which renders things the shared body does not carry such as
  * the fetched performance trace.
  */
+/**
+ * Whether to read the issue's metadata instead of its top level fields. Performance issues can
+ * have various categories such as 'db_query', but the issueType starts with 'performance_'.
+ *
+ * It matters which side of this an issue falls on: metadata.value is a query pattern for a
+ * performance issue and the exception message for an error, so reading it unconditionally
+ * misnames the error text.
+ */
+export function isPerformanceIssueType(issue: {
+  issueType?: string | null;
+  issueCategory?: string | null;
+}): boolean {
+  return (
+    issue.issueType?.startsWith("performance_") === true ||
+    issue.issueCategory === "performance"
+  );
+}
+
 export function usesSharedFormatterBody(event: { type?: unknown }): boolean {
   return (
     event.type === "error" ||
@@ -2004,11 +2022,7 @@ export function formatIssueOutput({
 }) {
   let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
 
-  // Check if this is a performance issue based on issueCategory or issueType
-  // Performance issues can have various categories like 'db_query' but issueType starts with 'performance_'
-  const isPerformanceIssue =
-    issue.issueType?.startsWith("performance_") ||
-    issue.issueCategory === "performance";
+  const isPerformanceIssue = isPerformanceIssueType(issue);
 
   if (isPerformanceIssue && issue.metadata) {
     // For performance issues, use metadata for better context
