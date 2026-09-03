@@ -52,7 +52,10 @@ const TRACE_ID_PATTERN = /^[0-9a-fA-F]{32}$/;
 /**
  * The issue payload as `structuredContent`.
  *
- * `event.body` is deliberately an open record: it is whatever Sentry's shared formatter emits
+ * Every field is mapped explicitly rather than spread from an api response, so a passthrough
+ * upstream schema cannot leak backend-only fields into the public interface.
+ *
+ * `event.body` is the one open record: it is whatever Sentry's shared formatter emits
  * for `?llmFormat=json`, and its sections are decided there. Enumerating them here would make
  * this schema a second declaration of that contract, needing a bump every time a section is
  * added on the Sentry side.
@@ -88,15 +91,39 @@ export const getIssueDetailsOutputSchema = z.object({
       solution: z.string().nullish(),
     })
     .nullish(),
-  codeLocation: z.unknown().nullish(),
+  codeLocation: z
+    .object({
+      repository: z.string().nullish(),
+      path: z.string().nullish(),
+      line: z.number().nullish(),
+      url: z.string(),
+    })
+    .nullish(),
   replays: z
     .object({
       attached: z.string().nullish(),
       related: z.array(z.string()),
     })
     .nullish(),
-  externalIssues: z.unknown().nullish(),
-  aiConversations: z.unknown().nullish(),
+  externalIssues: z
+    .array(
+      z.object({
+        id: z.string(),
+        issueId: z.string(),
+        serviceType: z.string(),
+        displayName: z.string(),
+        webUrl: z.string(),
+      }),
+    )
+    .nullish(),
+  aiConversations: z
+    .array(
+      z.object({
+        conversationId: z.string(),
+        spanId: z.string().nullish(),
+      }),
+    )
+    .nullish(),
 });
 
 export type GetIssueDetailsPayload = z.infer<
@@ -212,10 +239,32 @@ function buildIssueDetailsPayload({
           solution: summaries?.solution,
         }
       : null,
-    codeLocation: codeLocation ?? null,
+    codeLocation: codeLocation
+      ? {
+          repository: codeLocation.repository,
+          path: codeLocation.path,
+          line: codeLocation.line,
+          url: codeLocation.url,
+        }
+      : null,
     replays: buildReplays(event, relatedReplayIds),
-    externalIssues: externalIssues ?? null,
-    aiConversations: aiConversations?.length ? aiConversations : null,
+    // mapped field by field, not handed through: several upstream schemas are passthrough, and
+    // structuredContent is a product contract rather than a view of the api response
+    externalIssues: externalIssues?.length
+      ? externalIssues.map((issue) => ({
+          id: String(issue.id),
+          issueId: String(issue.issueId),
+          serviceType: issue.serviceType,
+          displayName: issue.displayName,
+          webUrl: issue.webUrl,
+        }))
+      : null,
+    aiConversations: aiConversations?.length
+      ? aiConversations.map((conversation) => ({
+          conversationId: conversation.conversationId,
+          spanId: conversation.spanId,
+        }))
+      : null,
   };
 }
 
@@ -270,7 +319,10 @@ export default defineTool({
     eventId: ParamEventId.optional(),
     issueUrl: ParamIssueUrl.optional(),
   },
-  outputSchema: getIssueDetailsOutputSchema,
+  // outputSchema is deliberately not declared yet. tools/list would export it immediately,
+  // while an org that is not on sentry's formatter rollout still gets a markdown result with
+  // no structuredContent -- advertising a schema that some success paths cannot satisfy. Wire
+  // it up once the rollout guarantees a json body on every event.
   annotations: {
     readOnlyHint: true,
     destructiveHint: false,

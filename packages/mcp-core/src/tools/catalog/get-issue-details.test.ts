@@ -2376,7 +2376,7 @@ describe("structuredContent", () => {
     expect(typeof payload.event.body).toBe("object");
   });
 
-  it("matches the declared outputSchema", async () => {
+  it("produces a payload that satisfies the schema", async () => {
     mockLatestEventWithFormatted({ format: "json", content: FORMATTER_JSON });
 
     const result = await getIssueDetails.handler(params, baseContext);
@@ -2465,5 +2465,41 @@ describe("structuredContent", () => {
       .structuredContent;
 
     expect(payload.replays).toBeNull();
+  });
+
+  it("maps external issues field by field so upstream extras cannot leak", async () => {
+    // structuredContent is a product contract, not a view of the api response: several
+    // upstream schemas are passthrough, so anything not mapped must not appear
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/external-issues/",
+        () =>
+          HttpResponse.json([
+            {
+              id: 42,
+              issueId: 7,
+              serviceType: "github",
+              displayName: "getsentry/sentry#1",
+              webUrl: "https://github.com/getsentry/sentry/issues/1",
+              internalOnlyToken: "must-not-leak",
+            },
+          ]),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(JSON.stringify(payload)).not.toContain("internalOnlyToken");
+    expect(JSON.stringify(payload)).not.toContain("must-not-leak");
   });
 });
