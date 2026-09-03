@@ -256,6 +256,14 @@ type RequestOptions = {
   allowStatuses?: number[];
 };
 
+/**
+ * Default cap for returning attachment bytes inline over the MCP transport.
+ * A 30 MB attachment takes ~80 MB in memory once base64-encoded and serialized,
+ * which fits the Cloudflare Worker's 128 MB isolate with room for the rest of the
+ * request; above it, getEventAttachment returns a reference instead of the bytes.
+ */
+export const DEFAULT_MAX_INLINE_ATTACHMENT_BYTES = 30 * 1024 * 1024;
+
 export type TraceItemType = "spans" | "logs" | "tracemetrics";
 
 type ClientKeyRateLimit = {
@@ -3839,16 +3847,16 @@ export class SentryApiService {
       projectSlug,
       eventId,
       attachmentId,
-      maxInlineBytes,
+      maxInlineBytes = DEFAULT_MAX_INLINE_ATTACHMENT_BYTES,
     }: {
       organizationSlug: string;
       projectSlug: string;
       eventId: string;
       attachmentId: string;
       /**
-       * When set, attachments larger than this (by metadata `size`) are not
-       * downloaded; the method returns `bytes: null` so the caller can hand back
-       * a download reference instead.
+       * Attachments larger than this (by metadata `size`) skip download —
+       * `getEventAttachment` returns `bytes: null`. Defaults to
+       * {@link DEFAULT_MAX_INLINE_ATTACHMENT_BYTES}.
        */
       maxInlineBytes?: number;
     },
@@ -3890,7 +3898,7 @@ export class SentryApiService {
     // Skip the download for oversized attachments — buffering and base64
     // encoding them can exhaust the worker's memory. Decide from the metadata
     // size so we never issue the request.
-    if (maxInlineBytes !== undefined && attachment.size > maxInlineBytes) {
+    if (attachment.size > maxInlineBytes) {
       const directDownloadUrl = await this.resolveDirectDownloadUrl(
         downloadPath,
         opts,

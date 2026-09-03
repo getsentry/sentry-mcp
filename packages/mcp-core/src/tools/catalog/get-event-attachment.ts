@@ -4,6 +4,7 @@ import type {
   TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
 import { setTag } from "@sentry/core";
+import { DEFAULT_MAX_INLINE_ATTACHMENT_BYTES } from "../../api-client";
 import { bytesToBase64 } from "../../internal/blob-utils";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
@@ -16,13 +17,6 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import type { ServerContext } from "../../types";
-
-/**
- * Max attachment size returned inline over the MCP transport. Larger payloads
- * can exhaust the worker's memory while base64-encoding, so above this we return
- * download instructions instead of the bytes.
- */
-const MAX_INLINE_ATTACHMENT_BYTES = 30 * 1024 * 1024;
 
 function formatMegabytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -62,7 +56,7 @@ function formatOversizedAttachment(
   output += `**MIME Type:** ${attachment.contentType}\n`;
   output += `**Created:** ${attachment.attachment.dateCreated}\n\n`;
   output += `This attachment (${formatMegabytes(sizeBytes)}) exceeds the ${formatMegabytes(
-    MAX_INLINE_ATTACHMENT_BYTES,
+    DEFAULT_MAX_INLINE_ATTACHMENT_BYTES,
   )} inline limit for MCP responses, so its contents were not downloaded.\n\n`;
   output += "## How to download it\n\n";
 
@@ -146,7 +140,6 @@ export default defineTool({
         projectSlug: params.projectSlug,
         eventId: params.eventId,
         attachmentId: params.attachmentId,
-        maxInlineBytes: MAX_INLINE_ATTACHMENT_BYTES,
       });
 
       // Too large to inline — return download instructions instead of the bytes.
