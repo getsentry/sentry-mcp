@@ -52,6 +52,8 @@ export type DashboardViewData = {
   environment?: string[];
   /** Renderer selected by --renderer; omitted for API/JSON output. */
   rendererPreference?: GraphicsRendererPreference;
+  /** Whether the default high-DPI graphics width cap should apply. */
+  graphicsCap?: boolean;
   widgets: DashboardViewWidget[];
 };
 
@@ -82,6 +84,9 @@ const MIN_TERM_WIDTH = 80;
 
 /** Fallback terminal width when stdout is not a TTY */
 const DEFAULT_TERM_WIDTH = 100;
+
+/** Default graphics canvas cap for high-DPI terminals. */
+const MAX_GRAPHICS_WIDTH = 2560;
 
 /**
  * Get the effective terminal width.
@@ -2028,7 +2033,9 @@ type DashboardGraphicsRender = {
   reason?: string;
   termWidth?: number;
   cell?: { cellWidth: number; cellHeight: number };
+  nativePixelWidth?: number;
   pixelWidth?: number;
+  graphicsCapApplied?: boolean;
 };
 
 /** Log the terminal graphics decision without including dashboard data. */
@@ -2044,9 +2051,15 @@ function logDashboardGraphicsRenderer(render: DashboardGraphicsRender): void {
   if (render.cell) {
     details.push(`cell=${render.cell.cellWidth}x${render.cell.cellHeight}`);
   }
-  if (render.pixelWidth) {
-    details.push(`pixel width=${render.pixelWidth}`);
+  if (render.nativePixelWidth) {
+    details.push(`native pixel width=${render.nativePixelWidth}`);
   }
+  if (render.pixelWidth) {
+    details.push(`effective pixel width=${render.pixelWidth}`);
+  }
+  details.push(
+    `graphics cap=${render.graphicsCapApplied ? "applied" : "not applied"}`
+  );
   const reason = render.reason ? ` (reason: ${render.reason})` : "";
   logger.debug(
     `Dashboard graphics renderer: ${render.renderer}${reason}; ${details.join("; ")}`
@@ -2094,9 +2107,9 @@ function renderCompleteDashboardAsGraphics(
   // Preserve the terminal's reported pixel width when known; otherwise derive it
   // from the (possibly defaulted) cell width so the canvas still matches the
   // column count exactly.
-  const pixelWidth =
+  const nativePixelWidth =
     terminalPixelWidth(termWidth) ?? termWidth * cell.cellWidth;
-  const cellWidth = Math.floor(pixelWidth / termWidth);
+  const cellWidth = Math.floor(nativePixelWidth / termWidth);
   if (cellWidth < 1) {
     return {
       renderer: "ascii",
@@ -2104,9 +2117,28 @@ function renderCompleteDashboardAsGraphics(
       reason: "calculated graphics cell width is invalid",
       termWidth,
       cell,
-      pixelWidth,
+      nativePixelWidth,
     };
   }
+  const graphicsCap = data.graphicsCap !== false;
+  const graphicsCapApplied =
+    graphicsCap && nativePixelWidth > MAX_GRAPHICS_WIDTH;
+  const graphicsColumns = graphicsCapApplied
+    ? Math.min(termWidth, Math.floor(MAX_GRAPHICS_WIDTH / cellWidth))
+    : termWidth;
+  if (graphicsColumns < 1) {
+    return {
+      renderer: "ascii",
+      rendererPreference,
+      reason: "graphics cap is smaller than one terminal cell",
+      termWidth,
+      cell,
+      nativePixelWidth,
+    };
+  }
+  const pixelWidth = graphicsCapApplied
+    ? graphicsColumns * cellWidth
+    : nativePixelWidth;
   const graphics = renderDashboardAsSixel(data, {
     pixelWidth,
     cellWidth,
@@ -2130,7 +2162,9 @@ function renderCompleteDashboardAsGraphics(
       reason: graphics.reason,
       termWidth,
       cell,
+      nativePixelWidth,
       pixelWidth,
+      graphicsCapApplied,
     };
   }
   return {
@@ -2139,7 +2173,9 @@ function renderCompleteDashboardAsGraphics(
     output: graphics.output,
     termWidth,
     cell,
+    nativePixelWidth,
     pixelWidth,
+    graphicsCapApplied,
   };
 }
 
