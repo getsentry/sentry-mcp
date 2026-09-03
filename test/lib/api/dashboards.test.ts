@@ -5,16 +5,62 @@
  * from src/lib/api/dashboards.ts.
  */
 
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   computeOptimalInterval,
   periodToSeconds,
   queryAllWidgets,
+  restoreDashboardRevision,
 } from "../../../src/lib/api/dashboards.js";
 import type {
   DashboardDetail,
   DashboardWidget,
 } from "../../../src/types/dashboard.js";
+
+const { apiRequestToRegionMock, resolveOrgRegionMock } = vi.hoisted(() => ({
+  apiRequestToRegionMock: vi.fn(),
+  resolveOrgRegionMock: vi.fn(),
+}));
+
+vi.mock("../../../src/lib/region.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../src/lib/region.js")>();
+  return { ...actual, resolveOrgRegion: resolveOrgRegionMock };
+});
+
+vi.mock("../../../src/lib/api/infrastructure.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../src/lib/api/infrastructure.js")
+    >();
+  return { ...actual, apiRequestToRegion: apiRequestToRegionMock };
+});
+
+// ---------------------------------------------------------------------------
+// restoreDashboardRevision
+// ---------------------------------------------------------------------------
+
+describe("restoreDashboardRevision", () => {
+  test("posts to the revision restore endpoint", async () => {
+    const dashboard = {
+      id: "123",
+      title: "Restored Dashboard",
+      widgets: [],
+    } as DashboardDetail;
+    resolveOrgRegionMock.mockResolvedValue("https://us.sentry.io");
+    apiRequestToRegionMock.mockResolvedValue({ data: dashboard });
+
+    await expect(
+      restoreDashboardRevision("test-org", "123", "42")
+    ).resolves.toBe(dashboard);
+
+    expect(apiRequestToRegionMock).toHaveBeenCalledWith(
+      "https://us.sentry.io",
+      "/organizations/test-org/dashboards/123/revisions/42/restore/",
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+});
 
 // ---------------------------------------------------------------------------
 // periodToSeconds
