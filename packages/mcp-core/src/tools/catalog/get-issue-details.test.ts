@@ -15,7 +15,9 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import type { Skill } from "../../skills";
 import { getTextContent } from "../../test-utils/structured-content";
-import getIssueDetails from "./get-issue-details.js";
+import getIssueDetails, {
+  getIssueDetailsOutputSchema,
+} from "./get-issue-details.js";
 
 const baseContext = {
   constraints: {
@@ -2327,5 +2329,80 @@ describe("get_issue_details", () => {
     ).rejects.toThrow(
       'Issue is outside the active project constraint. Expected project "frontend".',
     );
+  });
+});
+
+describe("structuredContent", () => {
+  const FORMATTER_JSON = JSON.stringify({
+    title: { text: "Error: Tried to cancel a non-cancellable request" },
+    exception: { handled: "No", code: "at Object.fetch (index.js:1)" },
+    tags: { environment: "production" },
+  });
+
+  function mockLatestEventWithFormatted(formatted: unknown) {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () => HttpResponse.json({ ...createDefaultEvent(), formatted }),
+      ),
+    );
+  }
+
+  const params = {
+    organizationSlug: "sentry-mcp-evals",
+    issueId: "CLOUDFLARE-MCP-41",
+    eventId: undefined,
+    issueUrl: undefined,
+    regionUrl: null,
+  };
+
+  it("returns a structured payload when the formatter sends json", async () => {
+    mockLatestEventWithFormatted({ format: "json", content: FORMATTER_JSON });
+
+    const result = await getIssueDetails.handler(params, baseContext);
+
+    expect(result).toHaveProperty("structuredContent");
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    // the issue level fields the markdown used to assemble
+    expect(payload.issue.shortId).toBe("CLOUDFLARE-MCP-41");
+    expect(payload.issue.url).toContain("CLOUDFLARE-MCP-41");
+    expect(typeof payload.issue.occurrences).toBe("number");
+    expect(typeof payload.issue.usersImpacted).toBe("number");
+
+    // the event body is the formatter's json, embedded as an object rather than a string
+    expect(payload.event.body).toEqual(JSON.parse(FORMATTER_JSON));
+    expect(typeof payload.event.body).toBe("object");
+  });
+
+  it("matches the declared outputSchema", async () => {
+    mockLatestEventWithFormatted({ format: "json", content: FORMATTER_JSON });
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: unknown })
+      .structuredContent;
+
+    // a tool that advertises a schema has to return something that satisfies it
+    expect(() => getIssueDetailsOutputSchema.parse(payload)).not.toThrow();
+  });
+
+  it("falls back to markdown when the org is not on the rollout", async () => {
+    mockLatestEventWithFormatted(undefined);
+
+    const result = await getIssueDetails.handler(params, baseContext);
+
+    // a structured result has to carry the whole answer; without the body it would not
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(result).toContain("CLOUDFLARE-MCP-41");
+  });
+
+  it("falls back to markdown when the body is not parseable json", async () => {
+    mockLatestEventWithFormatted({ format: "json", content: "## not json" });
+
+    const result = await getIssueDetails.handler(params, baseContext);
+
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(result).toContain("CLOUDFLARE-MCP-41");
   });
 });

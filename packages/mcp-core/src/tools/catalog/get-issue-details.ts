@@ -1,4 +1,5 @@
 import { setTag } from "@sentry/core";
+import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
 import { ApiNotFoundError } from "../../api-client";
 import type {
@@ -17,6 +18,12 @@ import type { AIConversationReference } from "../../internal/tool-helpers/ai-con
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { enhanceNotFoundError } from "../../internal/tool-helpers/enhance-error";
+import { structuredResult } from "../../internal/tool-helpers/results";
+import { getSeerActionabilityLabel } from "../../internal/formatting";
+import {
+  getAutofixArtifactSummaries,
+  getStatusDisplayName,
+} from "../../internal/tool-helpers/seer";
 import {
   assertIssueWithinProjectConstraint,
   formatIssueOutput,
@@ -36,6 +43,147 @@ import { resolveCodeLocation } from "../support/code-location";
 const MAX_AI_CONVERSATION_MATCHES = 3;
 const AI_CONVERSATION_LOOKUP_WINDOW_MS = 24 * 60 * 60 * 1000;
 const TRACE_ID_PATTERN = /^[0-9a-fA-F]{32}$/;
+
+/**
+ * The issue payload as `structuredContent`.
+ *
+ * `event.body` is deliberately an open record: it is whatever Sentry's shared formatter emits
+ * for `?llmFormat=json`, and its sections are decided there. Enumerating them here would make
+ * this schema a second declaration of that contract, needing a bump every time a section is
+ * added on the Sentry side.
+ */
+export const getIssueDetailsOutputSchema = z.object({
+  issue: z.object({
+    shortId: z.string(),
+    title: z.string(),
+    culprit: z.string().nullish(),
+    firstSeen: z.string().nullish(),
+    lastSeen: z.string().nullish(),
+    occurrences: z.number().nullish(),
+    usersImpacted: z.number().nullish(),
+    status: z.string().nullish(),
+    substatus: z.string().nullish(),
+    assignedTo: z.string().nullish(),
+    issueType: z.string().nullish(),
+    issueCategory: z.string().nullish(),
+    seerActionability: z.string().nullish(),
+    platform: z.string().nullish(),
+    project: z.string().nullish(),
+    url: z.string(),
+  }),
+  event: z.object({
+    id: z.string(),
+    type: z.string().nullish(),
+    body: z.record(z.string(), z.unknown()),
+  }),
+  seer: z
+    .object({
+      status: z.string().nullish(),
+      rootCause: z.string().nullish(),
+      solution: z.string().nullish(),
+    })
+    .nullish(),
+  codeLocation: z.unknown().nullish(),
+  replayIds: z.array(z.string()).nullish(),
+  externalIssues: z.unknown().nullish(),
+  aiConversations: z.unknown().nullish(),
+});
+
+export type GetIssueDetailsPayload = z.infer<
+  typeof getIssueDetailsOutputSchema
+>;
+
+/**
+ * Parses the shared formatter's json body. Returns undefined when the caller's org is not on
+ * the rollout yet, which is the signal to keep returning markdown: a structured result has to
+ * carry the whole answer, and without the body it would not.
+ */
+function parseFormattedBody(event: Event): Record<string, unknown> | undefined {
+  const content = event.formatted?.content;
+  if (!content) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(content);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function buildIssueDetailsPayload({
+  organizationSlug,
+  issue,
+  event,
+  body,
+  apiService,
+  autofixState,
+  externalIssues,
+  relatedReplayIds,
+  aiConversations,
+  codeLocation,
+}: {
+  organizationSlug: string;
+  issue: Issue;
+  event: Event;
+  body: Record<string, unknown>;
+  apiService: SentryApiService;
+  autofixState?: AutofixRunState;
+  externalIssues?: ExternalIssueList;
+  relatedReplayIds?: string[];
+  aiConversations?: AIConversationReference[];
+  codeLocation?: CodeLocation;
+}): GetIssueDetailsPayload {
+  const autofix = autofixState?.autofix;
+  // the run's own artifacts, not the whole state: an AutofixRunState carries every step and
+  // would dwarf the rest of the payload
+  const summaries = autofix ? getAutofixArtifactSummaries(autofix) : undefined;
+
+  return {
+    issue: {
+      shortId: issue.shortId,
+      title: issue.title,
+      culprit: issue.culprit,
+      firstSeen: issue.firstSeen,
+      lastSeen: issue.lastSeen,
+      occurrences: issue.count == null ? null : Number(issue.count),
+      usersImpacted: issue.userCount == null ? null : Number(issue.userCount),
+      status: issue.status,
+      substatus: issue.substatus,
+      assignedTo:
+        typeof issue.assignedTo === "string"
+          ? issue.assignedTo
+          : issue.assignedTo?.name,
+      issueType: issue.issueType,
+      issueCategory: issue.issueCategory,
+      seerActionability:
+        issue.seerFixabilityScore == null
+          ? null
+          : getSeerActionabilityLabel(issue.seerFixabilityScore),
+      platform: issue.platform,
+      project: issue.project?.name,
+      url: apiService.getIssueUrl(organizationSlug, issue.shortId),
+    },
+    event: {
+      id: event.id,
+      type: typeof event.type === "string" ? event.type : null,
+      body,
+    },
+    seer: autofix
+      ? {
+          status: getStatusDisplayName(autofix.status),
+          rootCause: summaries?.rootCause,
+          solution: summaries?.solution,
+        }
+      : null,
+    codeLocation: codeLocation ?? null,
+    replayIds: relatedReplayIds ?? null,
+    externalIssues: externalIssues ?? null,
+    aiConversations: aiConversations?.length ? aiConversations : null,
+  };
+}
 
 export default defineTool({
   name: "get_issue_details",
@@ -88,6 +236,7 @@ export default defineTool({
     eventId: ParamEventId.optional(),
     issueUrl: ParamIssueUrl.optional(),
   },
+  outputSchema: getIssueDetailsOutputSchema,
   annotations: {
     readOnlyHint: true,
     destructiveHint: false,
@@ -121,7 +270,7 @@ export default defineTool({
           query: eventId,
         });
         if (!found) {
-          return `# Event Not Found\n\nNo issue found for Event ID: ${eventId}`;
+          throw new UserInputError(`No issue found for Event ID: ${eventId}`);
         }
         issue = found;
       }
@@ -168,6 +317,26 @@ export default defineTool({
         }),
       ]);
 
+      const body = parseFormattedBody(event);
+      if (body) {
+        return structuredResult(
+          buildIssueDetailsPayload({
+            organizationSlug: orgSlug,
+            issue,
+            event,
+            body,
+            apiService,
+            autofixState,
+            externalIssues,
+            relatedReplayIds,
+            aiConversations,
+            codeLocation,
+          }),
+        );
+      }
+
+      // no shared-formatter body for this org yet: keep returning markdown rather than a
+      // structured result that is missing the event itself
       return formatIssueOutput({
         organizationSlug: orgSlug,
         issue,
@@ -254,6 +423,26 @@ export default defineTool({
       }),
     ]);
 
+    const body = parseFormattedBody(event);
+    if (body) {
+      return structuredResult(
+        buildIssueDetailsPayload({
+          organizationSlug: orgSlug,
+          issue,
+          event,
+          body,
+          apiService,
+          autofixState,
+          externalIssues,
+          relatedReplayIds,
+          aiConversations,
+          codeLocation,
+        }),
+      );
+    }
+
+    // no shared-formatter body for this org yet: keep returning markdown rather than a
+    // structured result that is missing the event itself
     return formatIssueOutput({
       organizationSlug: orgSlug,
       issue,

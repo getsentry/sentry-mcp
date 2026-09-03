@@ -2140,7 +2140,13 @@ export function formatIssueOutput({
     output += `**Message**:\n${event.message}\n`;
   }
   output += "\n";
-  if (isSharedFormatterType && event.formatted?.content) {
+  // only a markdown body belongs in this output; a json body is for structuredContent, and
+  // pasting it here would put a serialized object in the middle of the prose
+  if (
+    isSharedFormatterType &&
+    event.formatted?.format === "markdown" &&
+    event.formatted.content
+  ) {
     // the shared formatter body doesn't include the replay note — add it here to match formatEventOutput
     output += formatIssueReplayOutput({
       apiService,
