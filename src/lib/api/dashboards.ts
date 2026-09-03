@@ -227,7 +227,7 @@ export async function restoreDashboardRevision(
   const encodedRevisionId = encodeURIComponent(revisionId);
   const { data } = await apiRequestToRegion<DashboardDetail>(
     regionUrl,
-    `/organizations/${orgSlug}/dashboards/${dashboardId}/revisions/${encodedRevisionId}/`,
+    `/organizations/${orgSlug}/dashboards/${dashboardId}/revisions/${encodedRevisionId}/restore/`,
     { method: "POST", schema: DashboardDetailSchema }
   );
   return data;
