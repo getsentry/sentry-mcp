@@ -2502,4 +2502,45 @@ describe("structuredContent", () => {
     expect(JSON.stringify(payload)).not.toContain("internalOnlyToken");
     expect(JSON.stringify(payload)).not.toContain("must-not-leak");
   });
+
+  it("carries every field the markdown output surfaces", async () => {
+    // greg's bar for this migration is "roughly the same content": anything the markdown
+    // renders and the payload drops is a regression for every MCP user
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            dateCreated: "2026-09-03T12:00:00.000Z",
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    // the issue header markdown builds before the event body
+    for (const field of [
+      "shortId",
+      "title",
+      "culprit",
+      "firstSeen",
+      "lastSeen",
+      "occurrences",
+      "usersImpacted",
+      "status",
+      "platform",
+      "project",
+      "url",
+    ]) {
+      expect(payload.issue).toHaveProperty(field);
+    }
+    // and the event identity markdown prints alongside it
+    expect(payload.event.occurredAt).toBe("2026-09-03T12:00:00.000Z");
+    expect(payload.event).toHaveProperty("id");
+    expect(payload.event).toHaveProperty("type");
+  });
 });

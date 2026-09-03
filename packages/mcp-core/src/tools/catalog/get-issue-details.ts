@@ -78,10 +78,14 @@ export const getIssueDetailsOutputSchema = z.object({
     platform: z.string().nullish(),
     project: z.string().nullish(),
     url: z.string(),
+    // metadata fields the markdown surfaces for specific issue types
+    location: z.string().nullish(),
+    queryPattern: z.string().nullish(),
   }),
   event: z.object({
     id: z.string(),
     type: z.string().nullish(),
+    occurredAt: z.string().nullish(),
     body: z.record(z.string(), z.unknown()),
   }),
   seer: z
@@ -160,6 +164,19 @@ function parseFormattedBody(event: Event): Record<string, unknown> | undefined {
  * The attached id lives on the event rather than in the related list, so passing that list
  * through alone loses the replay for an issue whose only one is attached.
  */
+/**
+ * ``dateCreated`` sits on the shared-formatter event types rather than the base union, and
+ * the markdown path normalizes it to ISO. Read it the same way and tolerate a bad value.
+ */
+function eventOccurredAt(event: Event): string | null {
+  const raw = "dateCreated" in event ? event.dateCreated : null;
+  if (typeof raw !== "string") {
+    return null;
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
 function buildReplays(
   event: Event,
   relatedReplayIds?: string[],
@@ -226,10 +243,13 @@ function buildIssueDetailsPayload({
       platform: issue.platform,
       project: issue.project?.name,
       url: apiService.getIssueUrl(organizationSlug, issue.shortId),
+      location: issue.metadata?.location,
+      queryPattern: issue.metadata?.value,
     },
     event: {
       id: event.id,
       type: typeof event.type === "string" ? event.type : null,
+      occurredAt: eventOccurredAt(event),
       body,
     },
     seer: autofix
