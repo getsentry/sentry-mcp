@@ -64,7 +64,7 @@
   "src/lib/resolve-team.ts": 1,
   "src/lib/response-cache.ts": 7,
   "src/lib/scan/worker-pool.ts": 1,
-  "src/lib/scope-recovery.ts": 1,
+  "src/lib/scope-recovery.ts": 0,
   "src/lib/sdk-invoke.ts": 2,
   "src/lib/search-query.ts": 1,
   "src/lib/sentry-client.ts": 1,

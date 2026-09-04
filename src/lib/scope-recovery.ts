@@ -5,6 +5,7 @@ import { type AuthSource, getAuthConfig } from "./db/auth.js";
 import { ApiError, AuthError } from "./errors.js";
 import type { LoginResult } from "./interactive-login.js";
 import { interactivePromptsAllowed } from "./interactive-prompts.js";
+import { logger } from "./logger.js";
 import { OAUTH_SCOPES } from "./oauth.js";
 
 type InteractiveLogin = () => Promise<LoginResult | null>;
@@ -79,7 +80,8 @@ function hasActiveOAuthGrant(
 ): boolean {
   try {
     return runtime.getAuthSource() === "oauth";
-  } catch {
+  } catch (error) {
+    logger.debug("Failed to read auth source for OAuth grant check", error);
     return false;
   }
 }
