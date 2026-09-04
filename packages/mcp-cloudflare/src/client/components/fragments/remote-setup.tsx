@@ -56,10 +56,7 @@ export function RemoteSetupTabs({
 }: RemoteSetupTabsProps) {
   return (
     <InstallTabs selectedTab={selectedIde} onTabChange={onIdeChange}>
-      <Tab id="amp" title="Amp">
-        <AmpInstructions transport="cloud" />
-      </Tab>
-
+      {/* Keep the primary IDEs first, then alphabetize within each group. */}
       <Tab id="claude-code" title="Claude Code">
         <ClaudeCodeInstructions transport="cloud" />
       </Tab>
@@ -70,6 +67,10 @@ export function RemoteSetupTabs({
 
       <Tab id="cursor" title="Cursor">
         <CursorInstructions transport="cloud" />
+      </Tab>
+
+      <Tab id="amp" title="Amp">
+        <AmpInstructions transport="cloud" />
       </Tab>
 
       <Tab id="fx" title="fx">

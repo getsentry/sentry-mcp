@@ -203,10 +203,7 @@ export function StdioSetupTabs({
 }: StdioSetupTabsProps) {
   return (
     <InstallTabs selectedTab={selectedIde} onTabChange={onIdeChange}>
-      <Tab id="amp" title="Amp">
-        <AmpInstructions transport="stdio" />
-      </Tab>
-
+      {/* Keep the primary IDEs first, then alphabetize within each group. */}
       <Tab id="claude-code" title="Claude Code">
         <ClaudeCodeInstructions transport="stdio" />
       </Tab>
@@ -217,6 +214,10 @@ export function StdioSetupTabs({
 
       <Tab id="cursor" title="Cursor">
         <CursorInstructions transport="stdio" />
+      </Tab>
+
+      <Tab id="amp" title="Amp">
+        <AmpInstructions transport="stdio" />
       </Tab>
 
       <Tab id="fx" title="fx">
