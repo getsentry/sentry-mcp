@@ -986,6 +986,13 @@ export async function runWizard(initialOptions: WizardOptions): Promise<void> {
 
   const { directory, yes, dryRun, features, forceLegacyUi } = initialOptions;
 
+  // Tag the whole run's telemetry with dry-run mode. Dry runs plan changes but
+  // apply and install nothing, so post-apply verification (both this CLI's
+  // `verify-setup` runtime check and the server's `verify-changes` step) sees an
+  // unmodified project and reports expected "issues". This tag lets that
+  // expected noise be filtered out (`wizard.dry_run:false` isolates real runs).
+  setTag("wizard.dry_run", dryRun === true);
+
   // Construct the UI once for the entire run; tear down on every exit
   // path via `await using`. The factory picks `InkUI` for interactive
   // runs and `LoggingUI` for CI / `--yes` / `--no-tui`.
