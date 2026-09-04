@@ -7,7 +7,6 @@ import { ValidationError } from "../../lib/errors.js";
 const ISSUE_MATCH_MODES = new Set(["all", "any"]);
 const METRIC_DATASET_VALUES = new Set([
   "errors",
-  "transactions",
   "sessions",
   "events",
   "spans",
@@ -18,10 +17,10 @@ const METRIC_DATASET_VALUES = new Set([
  * Maps user-provided dataset aliases to canonical metric alert dataset values.
  *
  * Only aliases that resolve to a value already accepted by the metric alert API
- * are listed here: the singular forms (`error` → `errors`) and the dashboard
- * terminology for the error/transaction datasets (`error-events` → `errors`,
- * `transaction-like` → `transactions`). This lets users copying from dashboard
- * docs avoid a validation error without changing which dataset is sent.
+ * are listed here: the singular forms (`error` → `errors`, `span` → `spans`)
+ * and the dashboard terminology for the error dataset (`error-events` →
+ * `errors`). This lets users copying from dashboard docs avoid a validation
+ * error without changing which dataset is sent.
  *
  * Names that denote a *distinct* dataset in the metric alert path — e.g.
  * `tracemetrics`, `metricsenhanced`, `eap`, `events_analytics_platform` — are
@@ -29,17 +28,30 @@ const METRIC_DATASET_VALUES = new Set([
  * silently send the wrong dataset in the create/edit payload (the CLI's
  * canonical `metrics` is session/crash-rate, not trace metrics), with no
  * validation error to catch it.
+ *
+ * The deprecated `transaction`/`transactions` datasets are handled separately
+ * by {@link resolveMetricDataset} — they route to `spans` with an added
+ * `is_transaction:true` filter rather than a plain rename, so they are not
+ * listed here.
  */
 const METRIC_DATASET_ALIASES: Record<string, string> = {
   // Singular forms
   error: "errors",
-  transaction: "transactions",
   session: "sessions",
   metric: "metrics",
-  // Dashboard terminology for the error/transaction datasets
+  span: "spans",
+  // Dashboard terminology for the error dataset
   "error-events": "errors",
-  "transaction-like": "transactions",
 };
+
+/** Deprecated dataset names that now route to `spans` with `is_transaction:true`. */
+const TRANSACTION_DATASET_NAMES = new Set(["transaction", "transactions"]);
+
+/** Query filter appended when migrating a `transaction(s)` request to `spans`. */
+const IS_TRANSACTION_FILTER = "is_transaction:true";
+
+/** Splits a query string on runs of whitespace. */
+const QUERY_TOKEN_SEPARATOR = /\s+/;
 const METRIC_TIME_WINDOWS = new Set([
   1, 5, 10, 15, 30, 60, 120, 240, 360, 720, 1440,
 ]);
@@ -203,13 +215,64 @@ export function normalizeProjectList(
  * Normalise a user-provided `--dataset` value to the canonical metric alert
  * dataset name accepted by the Sentry API.
  *
- * Resolves known aliases (e.g. `error-events` → `errors`, `transaction` →
- * `transactions`) so that values copied from dashboard docs or using singular
- * forms work without manual translation.
+ * Resolves known aliases (e.g. `error-events` → `errors`) so that values copied
+ * from dashboard docs or using singular forms work without manual
+ * translation.
  */
 export function normalizeMetricDataset(dataset: string): string {
   const lower = dataset.trim().toLowerCase();
   return METRIC_DATASET_ALIASES[lower] ?? lower;
+}
+
+/**
+ * Result of resolving a `--dataset` value, accounting for the deprecated
+ * `transaction(s)` datasets that now route to `spans`.
+ */
+export type ResolvedMetricDataset = {
+  /** Canonical dataset to send to the API. */
+  readonly dataset: string;
+  /** Query with `is_transaction:true` appended when routed off `transaction(s)`. */
+  readonly query: string;
+  /** A gentle one-line nudge to show the user, or `undefined` when none applies. */
+  readonly notice?: string;
+};
+
+/**
+ * Append the `is_transaction:true` filter to a query, unless it is already
+ * present. Keeps existing filters intact and avoids duplicate tokens.
+ */
+function appendIsTransactionFilter(query: string): string {
+  const trimmed = query.trim();
+  const tokens = trimmed.length > 0 ? trimmed.split(QUERY_TOKEN_SEPARATOR) : [];
+  if (tokens.includes(IS_TRANSACTION_FILTER)) {
+    return trimmed;
+  }
+  return [...tokens, IS_TRANSACTION_FILTER].join(" ");
+}
+
+/**
+ * Resolve a user-provided `--dataset` (and its accompanying `--query`) to the
+ * dataset/query actually sent to the API.
+ *
+ * The `transactions` dataset was removed from alerts; the same use cases are
+ * served by `spans` filtered to transaction-like spans. Rather than hard-fail a
+ * `transaction(s)` request, route it to `spans` and add `is_transaction:true`
+ * to the query so existing muscle memory keeps working, returning a `notice`
+ * that nudges the user toward the canonical form.
+ */
+export function resolveMetricDataset(
+  dataset: string,
+  query: string
+): ResolvedMetricDataset {
+  const lower = dataset.trim().toLowerCase();
+  if (TRANSACTION_DATASET_NAMES.has(lower)) {
+    return {
+      dataset: "spans",
+      query: appendIsTransactionFilter(query),
+      notice: `The '${lower}' dataset is no longer supported for alerts. Routing to the 'spans' dataset with '${IS_TRANSACTION_FILTER}' added to the query. Use --dataset spans directly to silence this notice.`,
+    };
+  }
+  return { dataset: normalizeMetricDataset(dataset), query };
 }
 
 /** Validate that `dataset` is one of the allowed Sentry metric alert dataset values. */

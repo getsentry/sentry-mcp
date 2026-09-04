@@ -130,8 +130,8 @@ function metricDetector(overrides: Record<string, unknown>) {
     dateCreated: "2026-01-01T00:00:00Z",
     dataSources: [
       {
-        aggregate: "p95(transaction.duration)",
-        dataset: "transactions",
+        aggregate: "p95(span.duration)",
+        dataset: "spans",
         query: "environment:prod",
         // Detectors expose the window in seconds; 300s == 5m.
         timeWindow: 300,
@@ -159,8 +159,8 @@ describe("listMetricAlertsPaginated", () => {
       id: "9",
       name: "P95 latency",
       status: 0,
-      aggregate: "p95(transaction.duration)",
-      dataset: "transactions",
+      aggregate: "p95(span.duration)",
+      dataset: "spans",
       query: "environment:prod",
       // 300s from the detector payload is normalized to 5 minutes.
       timeWindow: 5,
@@ -221,8 +221,8 @@ describe("getMetricAlertRule", () => {
               queryObj: {
                 snubaQuery: {
                   aggregate: "p75(measurements.lcp)",
-                  dataset: "transactions",
-                  query: "transaction.op:pageload",
+                  dataset: "spans",
+                  query: "span.op:pageload",
                   timeWindow: 600,
                 },
               },
@@ -234,8 +234,8 @@ describe("getMetricAlertRule", () => {
 
     const rule = await getMetricAlertRule("test-org", "9");
     expect(rule.aggregate).toBe("p75(measurements.lcp)");
-    expect(rule.dataset).toBe("transactions");
-    expect(rule.query).toBe("transaction.op:pageload");
+    expect(rule.dataset).toBe("spans");
+    expect(rule.query).toBe("span.op:pageload");
     expect(rule.timeWindow).toBe(10);
   });
 
@@ -393,8 +393,8 @@ describe("createMetricAlertRule", () => {
         type: "metric_issue",
         dataSources: [
           {
-            aggregate: "p95(transaction.duration)",
-            dataset: "transactions",
+            aggregate: "p95(span.duration)",
+            dataset: "spans",
             query: "environment:prod",
             queryType: 1,
             eventTypes: ["trace_item_span"],
@@ -418,8 +418,8 @@ describe("createMetricAlertRule", () => {
     const created = await createMetricAlertRule("test-org", {
       name: "P95 latency",
       query: "environment:prod",
-      aggregate: "p95(transaction.duration)",
-      dataset: "transactions",
+      aggregate: "p95(span.duration)",
+      dataset: "spans",
       timeWindow: 5,
       environment: "prod",
       triggers: [{ alertThreshold: 500, actions: [{ id: "notify" }] }],
@@ -480,8 +480,8 @@ describe("getMetricAlertRuleDocument", () => {
     expect(doc).toMatchObject({
       id: "9",
       name: "Baseline",
-      aggregate: "p95(transaction.duration)",
-      dataset: "transactions",
+      aggregate: "p95(span.duration)",
+      dataset: "spans",
       timeWindow: 5,
     });
   });
@@ -506,8 +506,8 @@ describe("putMetricAlertRule", () => {
     const updated = await putMetricAlertRule("test-org", "9", {
       name: "Renamed",
       query: "environment:prod",
-      aggregate: "p95(transaction.duration)",
-      dataset: "transactions",
+      aggregate: "p95(span.duration)",
+      dataset: "spans",
       timeWindow: 5,
       status: 1,
       triggers: [{ alertThreshold: 500, actions: [{ id: "notify" }] }],
