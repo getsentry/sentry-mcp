@@ -17,6 +17,7 @@ import {
 import { createExecuteTool } from "./tools/special/execute-tool";
 import type { ToolConfig } from "./tools/types";
 import type { ServerContext } from "./types";
+import { LIB_VERSION } from "./version";
 
 // Mock the Sentry core module
 vi.mock("@sentry/core", () => ({
@@ -1139,6 +1140,43 @@ describe("buildServer", () => {
       }>(result);
 
       expect(payload.results.map((tool) => tool.name)).toContain("whoami");
+    });
+
+    it("discovers and executes Sentry MCP server information from the catalog", async () => {
+      const searchServer = buildServer({
+        context: baseContext,
+      });
+
+      const toolNames = getRegisteredToolNames(searchServer);
+      expect(toolNames).not.toContain("get_sentry_mcp_info");
+
+      const searchResult = await callRegisteredTool(
+        searchServer,
+        "search_sentry_tools",
+        {
+          query: "server version",
+          limit: 8,
+        },
+      );
+      const searchPayload = getStructuredContent<{
+        results: Array<{ name: string }>;
+      }>(searchResult);
+      expect(searchPayload.results[0]?.name).toBe("get_sentry_mcp_info");
+
+      const executeServer = buildServer({
+        context: baseContext,
+      });
+      const executeResult = await callRegisteredTool(
+        executeServer,
+        "execute_sentry_tool",
+        {
+          name: "get_sentry_mcp_info",
+          arguments: {},
+        },
+      );
+      expect(getStructuredContent(executeResult)).toEqual({
+        version: LIB_VERSION,
+      });
     });
 
     it("search_sentry_tools omits unavailable non-inspect tools", async () => {

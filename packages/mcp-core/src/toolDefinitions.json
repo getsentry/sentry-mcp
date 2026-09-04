@@ -4004,6 +4004,25 @@
     "surface": "catalog"
   },
   {
+    "name": "get_sentry_mcp_info",
+    "description": "Get information about the running Sentry MCP server.\n\nUse this tool when you need to:\n- Check the Sentry MCP server version\n- Verify compatibility with a Skill or integration",
+    "inputSchema": {},
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "The Sentry MCP server version."
+        }
+      },
+      "required": ["version"],
+      "additionalProperties": false
+    },
+    "requiredScopes": [],
+    "skills": ["inspect", "seer", "docs", "triage", "project-management"],
+    "surface": "catalog"
+  },
+  {
     "name": "get_sentry_resource",
     "description": "Fetch a Sentry resource by URL, or by resourceType plus resourceId.\nPass a Sentry URL directly when possible; the resource type is auto-detected.\n\nSupports issues, events, traces, spans, agent conversations, replays, monitors, preprod snapshots, and snapshot images.\nTrace lookups return a condensed overview by default.\n\nAgent Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID, or pass a Sentry conversation URL, to fetch the transcript/details. To discover or list conversations, use search_agent_conversations. Conversations are NOT issues — do not use search_issues for conversation queries.\n\nFor preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):\n- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)\n- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use the Sentry tool `get_snapshot_image` for full-resolution image bytes.\n\nResource IDs:\n- monitor: <monitorSlug>\n- snapshot: <snapshotId>\n\n<examples>\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')\n</examples>",
     "inputSchema": {
