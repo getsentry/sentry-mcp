@@ -154,8 +154,8 @@ Create a metric alert rule
 **Flags:**
 - `--name <value> - Rule name`
 - `--query <value> - Metric query filter string`
-- `--aggregate <value> - Aggregate expression (for example count(), p95(transaction.duration))`
-- `--dataset <value> - Dataset: errors (error-events), transactions (transaction-like), sessions, events, spans, metrics`
+- `--aggregate <value> - Aggregate expression (for example count(), p95(span.duration))`
+- `--dataset <value> - Dataset: errors (error-events), sessions, events, spans, metrics (transaction(s) routes to spans)`
 - `--time-window <value> - Evaluation window in minutes`
 - `-t, --trigger <value>... - Trigger object JSON (repeatable, or pass one JSON array)`
 - `-p, --project <value>... - Project slug filter (repeatable or comma-separated)`
@@ -170,8 +170,8 @@ Create a metric alert rule
 sentry alert metrics create my-org \
   --name "P95 Latency" \
   --query "environment:prod" \
-  --aggregate "p95(transaction.duration)" \
-  --dataset transactions \
+  --aggregate "p95(span.duration)" \
+  --dataset spans \
   --time-window 5 \
   --trigger '{"alertThreshold":500,"actions":[{"id":"sentry.mail.actions.NotifyEmailAction","targetType":"Team","targetIdentifier":1}]}'
 ```
@@ -201,7 +201,7 @@ Edit a metric alert rule
 - `--status <value> - active or disabled`
 - `--query <value> - Metric query filter`
 - `--aggregate <value> - Aggregate expression`
-- `--dataset <value> - Dataset: errors (error-events), transactions (transaction-like), sessions, events, spans, metrics`
+- `--dataset <value> - Dataset: errors (error-events), sessions, events, spans, metrics (transaction(s) routes to spans)`
 - `--time-window <value> - Evaluation window in minutes`
 - `-t, --trigger <value>... - Trigger object JSON (repeatable, or pass one JSON array)`
 - `-p, --project <value>... - Project slug filter (repeatable or comma-separated)`

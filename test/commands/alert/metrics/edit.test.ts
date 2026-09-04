@@ -98,7 +98,7 @@ describe("alert metrics edit", () => {
       status: 1,
       query: "event.type:error environment:prod",
       aggregate: "count()",
-      dataset: "transactions",
+      dataset: "spans",
       timeWindow: 15,
       triggers: [{ alertThreshold: 200, actions: [{ id: "notify" }] }],
     });
@@ -114,7 +114,7 @@ describe("alert metrics edit", () => {
         status: "disabled",
         query: "event.type:error environment:prod",
         aggregate: "count()",
-        dataset: "transactions",
+        dataset: "spans",
         "time-window": 15,
         trigger: ['{"alertThreshold":200,"actions":[{"id":"notify"}]}'],
         json: true,
@@ -128,7 +128,7 @@ describe("alert metrics edit", () => {
       status: 1,
       query: "event.type:error environment:prod",
       aggregate: "count()",
-      dataset: "transactions",
+      dataset: "spans",
       timeWindow: 15,
       triggers: [{ alertThreshold: 200, actions: [{ id: "notify" }] }],
     });
@@ -230,6 +230,58 @@ describe("alert metrics edit", () => {
       "test-org",
       "9",
       expect.objectContaining({ query: "" })
+    );
+  });
+
+  test("routes --dataset transactions to spans with is_transaction:true and a tip", async () => {
+    const context = createContext();
+    resolveSpy.mockResolvedValue({ org: "test-org" });
+    getRuleSpy.mockResolvedValue(sampleRule);
+    getDocSpy.mockResolvedValue({
+      id: "9",
+      name: "Metric Rule",
+      status: 0,
+      query: "environment:prod",
+      aggregate: "count()",
+      dataset: "errors",
+      timeWindow: 5,
+      triggers: [{ alertThreshold: 100, actions: [{ id: "notify" }] }],
+    });
+    putSpy.mockResolvedValue({
+      id: "9",
+      name: "Metric Rule",
+      status: 0,
+      query: "environment:prod is_transaction:true",
+      aggregate: "count()",
+      dataset: "spans",
+      timeWindow: 5,
+      triggers: [{ alertThreshold: 100, actions: [{ id: "notify" }] }],
+    });
+    const func = (await editCommand.loader()) as unknown as (
+      this: unknown,
+      flags: EditFlags,
+      arg: string
+    ) => Promise<void>;
+
+    await func.call(
+      context,
+      {
+        dataset: "transactions",
+        json: true,
+      },
+      "test-org/9"
+    );
+
+    expect(putSpy).toHaveBeenCalledWith(
+      "test-org",
+      "9",
+      expect.objectContaining({
+        dataset: "spans",
+        query: "environment:prod is_transaction:true",
+      })
+    );
+    expect(context.stderr.write).toHaveBeenCalledWith(
+      expect.stringContaining("is_transaction:true")
     );
   });
 });
