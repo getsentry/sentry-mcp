@@ -36,7 +36,12 @@
       "!codemods",
       // custom-ca.ts blows past Biome's type-analysis limit when pulled into
       // the module graph (internal Biome bug); force-ignore even via a test.
-      "!!src/lib/custom-ca.ts"
+      "!!src/lib/custom-ca.ts",
+      // output.ts hits the same 200k type-analysis limit once valibot's
+      // GenericSchema graph is pulled in — the same internal Biome bug, surfacing
+      // non-deterministically (main passes by a hair; unrelated PRs trip it,
+      // e.g. #1499, #1501). Force-ignore until Biome raises/fixes the limit.
+      "!!src/lib/formatters/output.ts"
     ]
   },
   "javascript": {},
