@@ -4,27 +4,20 @@ Agent skills for using the Sentry CLI, following the [Agent Skills](https://gith
 
 ## Installation
 
-### Claude Code (from GitHub)
+### Automatic (recommended)
+
+When you install the CLI via the install script, Homebrew, or a package manager,
+`sentry cli setup` automatically installs skills into detected agent directories
+(`~/.claude`, `~/.agents`). Skills are also refreshed on `sentry cli upgrade`.
+
+### dotagents
+
+[dotagents](https://github.com/getsentry/dotagents) installs the skill from
+the well-known source:
 
 ```bash
-# Add the marketplace
-claude plugin marketplace add getsentry/cli
-
-# Install the plugin
-claude plugin install sentry/cli
+npx @sentry/dotagents add https://cli.sentry.dev sentry-cli
 ```
-
-### Claude Code (from local clone)
-
-```bash
-# Add the marketplace from local clone
-claude plugin marketplace add /path/to/sentry/cli
-
-# Install the plugin
-claude plugin install sentry/cli
-```
-
-After installation, restart Claude Code. The skills will be automatically invoked when relevant to your task.
 
 ### Cursor
 
@@ -32,7 +25,7 @@ Skills are automatically available in `.cursor/skills/` for Cursor users.
 
 ### Other Agents
 
-Copy the `plugins/sentry-cli/skills/` directory to your agent's skills location, or reference the SKILL.md files directly according to your agent's documentation.
+Copy the `plugins/sentry-cli/skills/` directory to your agent's skills location, or reference the SKILL.md files directly according to your agent's documentation. Any agent that reads skills from `~/.agents` will pick up automatically installed skills.
 
 ## Available Skills
 
