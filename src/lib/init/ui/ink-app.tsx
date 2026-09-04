@@ -735,6 +735,7 @@ function CompletionScreen({
         case "issues":
           if (primaryUrl) {
             actions.openUrl(primaryUrl);
+            actions.track("open-sentry");
             setNote("Opened Sentry in your browser.");
           }
           break;
@@ -742,9 +743,11 @@ function CompletionScreen({
           if (agentCommand) {
             if (agentQueued) {
               store.dequeuePostExitAction(agentCommand);
+              actions.track("agent-plugin-unqueued");
               setNote("");
             } else {
               store.queuePostExitAction(agentCommand);
+              actions.track("agent-plugin-queued");
               setNote(`Queued — ${agentCommand} runs when you finish.`);
             }
           }
@@ -773,6 +776,7 @@ function CompletionScreen({
                 !key.ctrl && (input === "o" || input === "O"),
               run: () => {
                 actions.openUrl(primaryUrl);
+                actions.track("open-sentry");
                 setNote("Opened Sentry in your browser.");
               },
             },
