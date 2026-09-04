@@ -8,7 +8,6 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { showCommand } from "../../../src/commands/status/show.js";
-import { ApiError } from "../../../src/lib/errors.js";
 
 type ShowFlags = {
   readonly json: boolean;
@@ -133,12 +132,15 @@ describe("showCommand.func", () => {
     expect(parsed.incidents[0].name).toBe("sentry.io is not available");
   });
 
-  test("throws ApiError on a non-ok response", async () => {
+  test("falls back to a self-hosted health probe when summary.json is unavailable", async () => {
+    // Both the summary probe and the health fallback return non-2xx, so the
+    // command degrades to a synthetic "major" status rather than throwing.
     mockFetch({}, false, 503);
-    const { context } = createContext();
+    const { context, getOutput } = createContext();
 
-    await expect(func.call(context, humanFlags)).rejects.toBeInstanceOf(
-      ApiError
-    );
+    await func.call(context, humanFlags);
+
+    const out = getOutput();
+    expect(out).toContain("●");
   });
 });
