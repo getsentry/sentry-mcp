@@ -29,6 +29,7 @@ import type { SentryRepository } from "../../types/index.js";
 
 /** Fetch the git origin URL without throwing when it's missing. */
 function getGitOriginUrl(cwd: string): string | undefined {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return execFileSync("git", ["remote", "get-url", "origin"], {
       cwd,

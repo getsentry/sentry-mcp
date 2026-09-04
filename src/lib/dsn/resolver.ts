@@ -158,10 +158,12 @@ type AccessibleProject = {
 export async function getAccessibleProjects(): Promise<AccessibleProject[]> {
   const results: AccessibleProject[] = [];
 
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const orgs = await listOrganizations();
 
     for (const org of orgs) {
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         const projects = await listProjects(org.slug);
 

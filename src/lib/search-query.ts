@@ -348,6 +348,7 @@ export function sanitizeQuery(query: string | undefined): string | undefined {
   const normalized = normalizeQuery(query);
 
   let nodes: SearchNode[];
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     nodes = parse(normalized);
   } catch {

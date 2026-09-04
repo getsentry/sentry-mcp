@@ -55,6 +55,7 @@ export async function openBrowser(url: string): Promise<boolean> {
     return false;
   }
 
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const proc = spawn(command, args, {
       stdio: ["ignore", "ignore", "ignore"],

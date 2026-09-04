@@ -36,6 +36,7 @@ function seedTrustedRegionOriginsIfNeeded(): void {
     return;
   }
   trustedRegionOriginsSeeded = true;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const db = getDatabase();
     const rows = db

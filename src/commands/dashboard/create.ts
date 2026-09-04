@@ -69,6 +69,7 @@ async function enrichTargetProjectIds(
       if (t.projectId !== undefined) {
         return t.projectId;
       }
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         const info = await getProject(t.org, t.project);
         return toNumericId(info.id);

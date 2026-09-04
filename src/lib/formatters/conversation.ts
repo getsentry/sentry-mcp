@@ -189,6 +189,7 @@ function getOperationType(span: AgentConversationSpan): string | undefined {
 }
 
 function parseJson(value: string): unknown {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return JSON.parse(value);
   } catch {

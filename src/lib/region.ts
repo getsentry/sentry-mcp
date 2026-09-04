@@ -178,6 +178,7 @@ export async function resolveEffectiveOrg(orgSlug: string): Promise<string> {
     // Normal slug: try a single resolveOrgRegion() call (1 API request)
     // instead of the heavy listOrganizationsUncached() fan-out (1+N requests).
     // If it succeeds, the slug is valid and the region is now cached.
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       await resolveOrgRegion(orgSlug);
       return orgSlug;
@@ -190,6 +191,7 @@ export async function resolveEffectiveOrg(orgSlug: string): Promise<string> {
 
   // DSN numeric ID: refresh the full org list to populate ID → slug mapping.
   // listOrganizationsUncached() populates org_regions with slug, region, org_id, and name.
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const { listOrganizationsUncached } = await import("./api-client.js");
     await listOrganizationsUncached();

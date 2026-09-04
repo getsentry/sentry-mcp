@@ -240,6 +240,7 @@ import inkAppPath from "./ink-app.tsx" with { type: "file" };
  * broken in Bun-compiled binaries (see module docstring).
  */
 function openFreshTtyForInk(): ReadStream | null {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const fd = openSync("/dev/tty", "r");
     return new ReadStream(fd);
@@ -276,6 +277,7 @@ export async function createInkUI(
 
   // Check if running inside a Node SEA binary
   let isSea = false;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     // biome-ignore lint/suspicious/noExplicitAny: node:sea types not yet in @types/node
     const sea = _require("node:sea") as any;
@@ -310,6 +312,7 @@ export async function createInkUI(
 
   // Clean up SEA temp file — module is cached in memory after import()
   if (seaTmpDir) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       const { rmSync } = await import("node:fs");
       rmSync(seaTmpDir, { recursive: true, force: true });
@@ -530,6 +533,7 @@ export class InkUI implements WizardUI {
       actions: {
         openUrl: (url) => {
           // Best-effort; openBrowser never throws, catch keeps it non-blocking.
+          // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
           openBrowser(url).catch(() => {
             // ignore
           });
@@ -927,11 +931,13 @@ export class InkUI implements WizardUI {
     // Detach the cancel callback from the store so a stale Ctrl+C
     // routed through the App after teardown can't re-enter.
     this.store.setRequestCancel(undefined);
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       this.instance.clear();
     } catch {
       // best-effort
     }
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       this.instance.unmount();
     } catch {
@@ -950,6 +956,7 @@ export class InkUI implements WizardUI {
     // left untouched so its compact summary flows into scrollback as before.
     const hasPostExitActions =
       this.store.getSnapshot().postExitActions.length > 0;
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       process.stdout.write(
         hasPostExitActions ? "\x1b[?1049l\x1b[2J\x1b[H" : "\x1b[?1049l"
@@ -958,11 +965,13 @@ export class InkUI implements WizardUI {
       // best-effort — stdout may already be destroyed
     }
     if (this.freshStdin) {
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         this.freshStdin.setRawMode(false);
       } catch {
         // stream already torn down
       }
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         this.freshStdin.pause();
         this.freshStdin.destroy();

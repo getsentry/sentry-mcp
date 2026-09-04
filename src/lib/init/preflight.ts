@@ -212,6 +212,7 @@ async function resolveDetectedProject(
   }
 
   let detectedProject: { orgSlug: string; projectSlug: string } | null = null;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     detectedProject = await detectExistingProject(initial.directory);
   } catch {
@@ -408,6 +409,7 @@ function canBypassMemberCreationRestriction(access: unknown): boolean {
 
 async function assertOrgScopedCreationCanProceed(org: string): Promise<void> {
   let organization: Awaited<ReturnType<typeof getOrganization>>;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     organization = await getOrganization(org);
   } catch {
@@ -591,6 +593,7 @@ async function detectExistingProject(
     return null;
   }
 
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const { resolveDsnByPublicKey } = await import("../resolve-target.js");
     const resolved = await resolveDsnByPublicKey(dsn);

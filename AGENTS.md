@@ -526,7 +526,7 @@ CliError (base, exitCode=1)
 - Pass `alternatives: []` when defaults are irrelevant (e.g., for missing Trace ID, Event ID)
 - Use `" and "` in `resource` for plural grammar: `"Trace ID and span ID"` → "are required"
 
-**CI enforcement:** `pnpm run check:errors` scans for `ContextError` with multiline commands, `CliError` with ad-hoc "Try:" strings, and silent `catch` blocks (ratchet baseline — new ones fail CI).
+**CI enforcement:** `pnpm run check:errors` scans for `ContextError` with multiline commands and `CliError` with ad-hoc "Try:" strings. Silent `catch` blocks are enforced separately by the `no-silent-catch` Biome plugin (see below).
 
 ```typescript
 // Usage examples
@@ -570,14 +570,18 @@ catch (error) {
 
 Use `logger.withTag("command-name")` for tagged logging in command files.
 
-**CI enforcement:** `pnpm run check:errors` includes a silent-catch scan that flags
-`catch` blocks which are empty, comment-only, or return-only without surfacing the
-error. It is enforced with a **ratchet baseline** (`script/silent-catch-baseline.json`)
-recording the per-file count of the pre-existing backlog: a *new* silent catch (a file
-exceeding its baseline, or one not in the baseline) fails CI, and removing silent
-catches without lowering the baseline also fails — so the backlog can only shrink.
-When you fix or intentionally add a silent catch, refresh the baseline with
-`pnpm run check:errors -- --update` and commit it.
+**CI enforcement:** the `no-silent-catch` Biome plugin
+(`lint-rules/no-silent-catch.grit`, registered in `biome.jsonc`) flags `catch`
+blocks — statement and `.catch()` form — that are empty, comment-only, or
+return-only without surfacing the error. The pre-existing backlog is
+grandfathered in place with inline
+`// biome-ignore lint/plugin: <reason>` comments. Because `pnpm run lint` runs
+with `--error-on-warnings`, an *orphaned* suppression (left behind when a
+grandfathered catch is fixed) fails as `suppressions/unused` — so the backlog
+can only shrink, the same ratchet the old JSON baseline provided, with no
+separate script or baseline file to maintain. Fix a grandfathered catch by
+adding logging/re-throwing and deleting its `biome-ignore` line; only add a new
+suppression for a genuinely intentional silent catch, with a real reason.
 
 ### Auto-Recovery for Wrong Entity Types
 

@@ -372,6 +372,7 @@ export function parseSentryUrl(input: string): ParsedSentryUrl | null {
   }
 
   let url: URL;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     url = new URL(input);
   } catch {

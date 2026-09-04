@@ -89,6 +89,7 @@ export async function openProjectFile(
     }
     return { handle, stat };
   } catch (error) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     await handle?.close().catch(() => {
       // Preserve the primary open error when cleanup fails.
     });
@@ -99,6 +100,7 @@ export async function openProjectFile(
 export async function closeProjectFile(
   handle: fs.promises.FileHandle
 ): Promise<void> {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   await handle.close().catch(() => {
     // Descriptor cleanup must not replace the primary read classification.
   });

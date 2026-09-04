@@ -244,6 +244,7 @@ export function getWorkerPool(): WorkerPool {
         }
         pw.inflight = 0;
         unrefWorker(pw.worker);
+        // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
         try {
           pw.worker.terminate();
         } catch {
