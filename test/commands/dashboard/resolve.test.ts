@@ -785,21 +785,14 @@ describe("normalizeDataset", () => {
   test("lowercases canonical values (pass-through)", () => {
     expect(normalizeDataset("spans")).toBe("spans");
     expect(normalizeDataset("error-events")).toBe("error-events");
-    expect(normalizeDataset("transaction-like")).toBe("transaction-like");
     expect(normalizeDataset("tracemetrics")).toBe("tracemetrics");
     expect(normalizeDataset("logs")).toBe("logs");
     expect(normalizeDataset("issue")).toBe("issue");
-    expect(normalizeDataset("discover")).toBe("discover");
   });
 
   test("resolves error/errors aliases", () => {
     expect(normalizeDataset("errors")).toBe("error-events");
     expect(normalizeDataset("error")).toBe("error-events");
-  });
-
-  test("resolves transaction/transactions aliases", () => {
-    expect(normalizeDataset("transactions")).toBe("transaction-like");
-    expect(normalizeDataset("transaction")).toBe("transaction-like");
   });
 
   test("resolves metrics and metricsEnhanced aliases", () => {

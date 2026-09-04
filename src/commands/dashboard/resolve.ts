@@ -808,18 +808,15 @@ export async function enrichDashboardError(
 /**
  * User-facing dataset synonyms resolved to the canonical Sentry widget type.
  *
- * The Sentry API/UI and docs surface names like `errors` and `transactions`
- * but widget types use `error-events` and `transaction-like`. The CLI accepts
- * both forms so users copying from docs or using API-dataset terminology
- * don't have to translate.
+ * The Sentry API/UI and docs surface names like `errors` but widget types
+ * use `error-events`. The CLI accepts both forms so users copying from
+ * docs or using API-dataset terminology don't have to translate.
  *
  * Keys are lowercase; matching is case-insensitive via {@link normalizeDataset}.
  */
 const DATASET_ALIASES: Record<string, string> = {
   error: "error-events",
   errors: "error-events",
-  transaction: "transaction-like",
-  transactions: "transaction-like",
   log: "logs",
   // `metrics` and `metricsEnhanced` both alias to the canonical `tracemetrics`.
   // `metricsEnhanced` is a legacy API synonym and may appear in older docs.
@@ -839,7 +836,7 @@ const DATASET_ALIASES: Record<string, string> = {
  * Must be called once, up-front, and the result threaded through every
  * downstream consumer (aggregate validator, warnings, PUT body). Leaving
  * an un-normalized value in `flags.dataset` causes dataset-specific
- * aggregate validation (e.g. `failure_rate` for `error-events`) to see
+ * aggregate validation (e.g. `count_if` for `error-events`) to see
  * the alias instead of the canonical name and reject valid inputs.
  */
 export function normalizeDataset(dataset?: string): string | undefined {
