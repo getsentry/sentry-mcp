@@ -54,7 +54,8 @@ type SilenceReason =
   | "output_error"
   | "auth_expected"
   | "api_user_error"
-  | "network_error";
+  | "network_error"
+  | "process_exit";
 
 /**
  * Classify whether an error should be silenced.
@@ -93,6 +94,16 @@ export function classifySilenced(error: unknown): SilenceReason | null {
   }
   if (error instanceof ApiError && error.status > 400 && error.status < 500) {
     return "api_user_error";
+  }
+  // A child process launched by `sentry local run` or `sentry monitor run`
+  // that exits with a non-zero code throws `CliError("Process exited with
+  // code N")`. These are expected user-script failures, not CLI bugs — no
+  // actionable signal comes from capturing them (CLI-20G).
+  if (
+    error instanceof CliError &&
+    error.message.startsWith("Process exited with code")
+  ) {
+    return "process_exit";
   }
   // A 400 (Bad Request) signals a malformed request the CLI built — a code
   // defect — so it is always captured. A user's unparseable `--query` is NOT a
