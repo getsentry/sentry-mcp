@@ -53,8 +53,8 @@ sentry alert issues delete my-org/my-project/12345 --dry-run
 sentry alert metrics create my-org \
   --name "P95 Latency" \
   --query "environment:prod" \
-  --aggregate "p95(transaction.duration)" \
-  --dataset transactions \
+  --aggregate "p95(span.duration)" \
+  --dataset spans \
   --time-window 5 \
   --trigger '{"alertThreshold":500,"actions":[{"id":"sentry.mail.actions.NotifyEmailAction","targetType":"Team","targetIdentifier":1}]}'
 ```
