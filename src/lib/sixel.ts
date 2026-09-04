@@ -266,6 +266,7 @@ function probe(): SixelCaps {
   }
   let savedStty: string | undefined;
   let fd: number | undefined;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     fd = openSync("/dev/tty", "r+");
     savedStty = execSync("stty -g < /dev/tty", { encoding: "utf8" }).trim();
@@ -280,6 +281,7 @@ function probe(): SixelCaps {
     return UNSUPPORTED;
   } finally {
     if (savedStty) {
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         execSync(`stty ${savedStty} < /dev/tty`);
       } catch {
@@ -287,6 +289,7 @@ function probe(): SixelCaps {
       }
     }
     if (fd !== undefined) {
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         closeSync(fd);
       } catch {

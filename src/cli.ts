@@ -50,6 +50,7 @@ async function preloadProjectContext(cwd: string): Promise<void> {
   // Apply persistent URL default (lower priority than env vars and .sentryclirc).
   const env = getEnv();
   if (!(env.SENTRY_HOST?.trim() || env.SENTRY_URL?.trim())) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       const { getDefaultUrl } = await import("./lib/db/defaults.js");
       const url = getDefaultUrl();
@@ -501,6 +502,7 @@ export async function runCli(cliArgs: string[]): Promise<void> {
           return;
         }
         // Best-effort: telemetry must never crash the CLI
+        // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
         try {
           await reportUnknownCommand(argv);
         } catch {

@@ -389,6 +389,7 @@ function writeLockOwner(dbPath: string): void {
 
 /** Read the recorded owner PID, or null if absent/unreadable. */
 function readLockOwner(dbPath: string): number | null {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const pid = Number.parseInt(
       readFileSync(lockOwnerPath(dbPath), "utf8"),

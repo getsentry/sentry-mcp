@@ -208,6 +208,7 @@ async function applyHeadersOption(
 
 /** Flush Sentry telemetry (no beforeExit handler in library mode). */
 async function flushTelemetry(): Promise<void> {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const Sentry = await import("@sentry/node-core/light");
     const client = Sentry.getClient();
@@ -285,6 +286,7 @@ export function parseOutput<T>(
   if (!stdoutStr.trim()) {
     return undefined as T;
   }
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return JSON.parse(stdoutStr) as T;
   } catch {

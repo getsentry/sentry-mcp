@@ -178,6 +178,7 @@ function resolveCreateContent(
 }
 
 function prettyPrintJson(content: string): string {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return `${JSON.stringify(JSON.parse(content), null, 2)}\n`;
   } catch {
@@ -246,6 +247,7 @@ async function prepareFileChange(
 
   let canonicalPath: string;
   let pathIdentity: string | undefined;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     canonicalPath = await resolveCanonicalDestination(absolutePath);
     if (!isCanonicalChild(rootRealPath, canonicalPath)) {
@@ -327,6 +329,7 @@ async function prepareDelete(
   preparedPath: PreparedPath,
   change: Extract<FileChange, { action: "delete" }>
 ): Promise<PrepareFileChangesResult> {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const expected = await readDeleteSnapshot(preparedPath.absolutePath);
     if (!expected) {
@@ -515,6 +518,7 @@ export async function prepareFileChanges(
     return { changes: prepared, ok: true };
   }
   let rootRealPath: string;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     rootRealPath = await resolveCanonicalRoot(cwd);
   } catch {

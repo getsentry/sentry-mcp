@@ -30,6 +30,7 @@ export type SourceMapReport = {
 
 /** Whether this process is a Node Single Executable Application. */
 export function isSea(): boolean {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const req = createRequire(import.meta.url);
     const sea = req("node:sea") as { isSea?: () => boolean };
@@ -53,6 +54,7 @@ function loadReport(path: string): SourceMapReport {
   if (!existsSync(path)) {
     return {};
   }
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return JSON.parse(readFileSync(path, "utf-8")) as SourceMapReport;
   } catch {

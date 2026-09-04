@@ -267,6 +267,7 @@ export function attachSentryReporter(): void {
     return;
   }
 
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     // Dynamic import to avoid pulling in Sentry at module load time.
     // The reporter is exported from @sentry/node-core/light (via @sentry/node → @sentry/core).

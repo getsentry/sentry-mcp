@@ -148,6 +148,7 @@ async function readCommonConfigFile(
   filePath: string
 ): Promise<CommonConfigRead> {
   let opened: OpenedProjectFile | undefined;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const result = await openProjectFile(directory, filePath);
     if ("error" in result) {

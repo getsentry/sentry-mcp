@@ -106,6 +106,7 @@ export const whoamiCommand = buildCommand({
 
     // Keep cached user info up to date. Non-fatal: display must succeed even
     // if the DB write fails (read-only filesystem, corrupted database, etc.).
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       setUserInfo({
         userId: user.id,

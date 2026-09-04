@@ -13,6 +13,7 @@ export async function fileExistsBatch(
 ): Promise<ToolResult> {
   const results = await Promise.all(
     payload.params.paths.map(async (filePath) => {
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         const absPath = safePath(payload.cwd, filePath);
         await fs.promises.access(absPath);

@@ -7,15 +7,16 @@ language js
 // covers syntactically empty `catch {}`; this also covers comment-only and
 // return-only bodies.
 //
-// This replaces the hand-rolled detector in script/check-error-patterns.ts.
-// The pre-existing backlog is grandfathered with inline
-// `// biome-ignore lint/plugin: <reason>` comments. Removing a grandfathered
-// catch orphans its suppression, which Biome reports as `suppressions/unused`;
-// the lint step runs with `--error-on-warnings`, so the backlog can only shrink
-// (the same ratchet the old baseline JSON provided).
+// This replaces the hand-rolled silent-catch detector and the
+// script/silent-catch-baseline.json ratchet (see #1531). The pre-existing
+// backlog is grandfathered with inline `// biome-ignore lint/plugin: <reason>`
+// comments. Removing a grandfathered catch orphans its suppression, which Biome
+// reports as `suppressions/unused`; `pnpm run lint` runs with
+// `--error-on-warnings`, so the backlog can only shrink (the same ratchet the
+// old baseline JSON provided).
 //
-// Registered via an override scoped to `src/**` in biome.jsonc (the old script
-// only scanned `src/**/*.ts`).
+// Registered via an override scoped to `src/**/*.ts` in biome.jsonc (matching
+// the old script's scan scope).
 or {
   `try { $t } catch { }`,
   `try { $t } catch { return; }`,

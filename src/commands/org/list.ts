@@ -47,6 +47,7 @@ type OrgListEntry = SentryOrganization & { region?: string };
  * @example "https://east-1.us.sentry.io" -> "EAST-1.US"
  */
 function getRegionDisplayName(regionUrl: string): string {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const url = new URL(regionUrl);
     const { hostname } = url;

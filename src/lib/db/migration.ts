@@ -44,6 +44,7 @@ function oldConfigExists(): boolean {
 
 function readOldConfig(): OldConfig | null {
   const configPath = join(getConfigDir(), OLD_CONFIG_FILENAME);
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const { readFileSync } = _require("node:fs");
     const content = readFileSync(configPath, "utf-8");

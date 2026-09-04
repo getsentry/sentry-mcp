@@ -136,6 +136,7 @@ export function computeTelemetryEffective(): TelemetryEffective {
     return { enabled: false, source: `env:${DO_NOT_TRACK_ENV_VAR}` };
   }
 
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const pref = getTelemetryPreference();
     if (pref !== undefined) {
@@ -189,6 +190,7 @@ export async function withTelemetry<T>(
 
   // Flush deferred completion telemetry (queued during __complete fast-path).
   // Best-effort: never block CLI execution for telemetry emission.
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const { drainCompletionTelemetry } = await import(
       "./db/completion-telemetry.js"
@@ -287,6 +289,7 @@ export function createBeforeExitHandler(
     // Flush pending events before exit. Convert PromiseLike to Promise
     // for proper error handling. The async work causes beforeExit to
     // re-fire when complete, which the isFlushing guard handles.
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     Promise.resolve(client.flush(3000)).catch(() => {
       // Ignore flush errors — telemetry should never block CLI exit
     });
@@ -434,6 +437,7 @@ const LIBRARY_EXCLUDED_INTEGRATIONS = new Set([
  * Checked once at module load so the integration filter is a simple boolean.
  */
 const hasGetSystemErrorMap = (() => {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     // Dynamic require to avoid bundler issues — the check only matters at runtime
     const util = _require("node:util") as Record<string, unknown>;
@@ -1143,6 +1147,7 @@ const noop = (): void => {};
 
 /** Resolves the database path, falling back to a default if the import fails. */
 function resolveDbPath(): string {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const { getDbPath } = _require("./db/index.js") as {
       getDbPath: () => string;
@@ -1215,6 +1220,7 @@ function isOwnedByRoot(filePath: string): boolean {
   if (process.platform === "win32") {
     return false;
   }
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return statSync(filePath).uid === 0;
   } catch {
@@ -1249,6 +1255,7 @@ function tryRepairReadonly(): boolean {
     return false;
   }
 
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     // Repair config directory (needs rwx for WAL/SHM creation)
     chmodSync(configDir, 0o700);

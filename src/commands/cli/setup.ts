@@ -111,6 +111,7 @@ async function handleInstall(
 
   // Clean up temp binary (Posix only — the inode stays alive for the running process)
   if (process.platform !== "win32") {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       unlinkSync(execPath);
     } catch {

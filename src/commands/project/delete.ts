@@ -70,6 +70,7 @@ async function buildPermissionError(
   // org listing has already been fetched during this session.
   let orgRole = getCachedOrgRole(orgSlug);
   if (!orgRole) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       const org = await getOrganization(orgSlug);
       orgRole = (org as Record<string, unknown>).orgRole as string | undefined;

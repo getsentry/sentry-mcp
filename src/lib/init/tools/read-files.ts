@@ -102,6 +102,7 @@ async function readSingleFileV2(
   } catch (error) {
     return { error: readErrorCode(error), status: "error" };
   } finally {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     await opened?.handle.close().catch(() => {
       // Preserve the primary read result when descriptor cleanup fails.
     });
@@ -324,6 +325,7 @@ function isTextChunk(
   ) {
     return false;
   }
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     decoder.decode(buffer, { stream: hasMoreBytes });
     return true;

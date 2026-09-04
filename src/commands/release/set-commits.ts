@@ -108,6 +108,7 @@ const REPO_CACHE_TTL_MS = 60 * 60 * 1000;
 
 /** Check if we've cached that this org has no repo integration */
 function hasNoRepoIntegration(orgSlug: string): boolean {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const db = getDatabase();
     const key = `repos_configured.${orgSlug}`;
@@ -127,6 +128,7 @@ function hasNoRepoIntegration(orgSlug: string): boolean {
 
 /** Cache that this org has no repo integration */
 function cacheNoRepoIntegration(orgSlug: string): void {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const db = getDatabase();
     const key = `repos_configured.${orgSlug}`;
@@ -141,6 +143,7 @@ function cacheNoRepoIntegration(orgSlug: string): void {
 
 /** Clear the negative cache (e.g., when auto succeeds) */
 function clearRepoIntegrationCache(orgSlug: string): void {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const db = getDatabase();
     const key = `repos_configured.${orgSlug}`;

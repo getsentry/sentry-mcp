@@ -116,6 +116,7 @@ async function sendCheckInSafely(
     const send = sendEnvelopeRequest(dsn, body);
     // Prevent unhandled rejection if the timeout wins the race but the
     // fetch later rejects (Node 15+ terminates on unhandled rejections).
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     send.catch(() => {
       // Intentionally empty — prevents unhandled rejection if timeout wins.
     });
