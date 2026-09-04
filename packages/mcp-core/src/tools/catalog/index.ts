@@ -1,4 +1,5 @@
 import whoami from "./whoami";
+import getSentryMcpInfo from "./get-sentry-mcp-info";
 import findOrganizations from "./find-organizations";
 import findTeams from "./find-teams";
 import findProjects from "./find-projects";
@@ -128,6 +129,7 @@ const catalogTools = {
   search_issue_events: searchIssueEvents,
   get_profile: getProfile,
   get_profile_details: getProfileDetails,
+  get_sentry_mcp_info: getSentryMcpInfo,
   get_sentry_resource: getSentryResource,
   get_snapshot: getSnapshot,
   get_snapshot_image: getSnapshotImage,
