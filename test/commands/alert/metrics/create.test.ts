@@ -321,4 +321,48 @@ describe("alert metrics create", () => {
       projects: ["backend"],
     });
   });
+
+  test("routes --dataset transactions to spans with is_transaction:true and a tip", async () => {
+    const context = createContext();
+    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    createSpy.mockResolvedValue({
+      id: "77",
+      name: "Metric Rule",
+      status: 0,
+    });
+    const func = (await createCommand.loader()) as unknown as (
+      this: unknown,
+      flags: CreateFlags,
+      arg: string
+    ) => Promise<void>;
+
+    await func.call(
+      context,
+      {
+        name: "Metric Rule",
+        query: "environment:prod",
+        aggregate: "p95(span.duration)",
+        dataset: "transactions",
+        "time-window": 5,
+        trigger: ['{"alertThreshold":100,"actions":[{"id":"notify"}]}'],
+        project: ["backend"],
+        "dry-run": false,
+        json: true,
+      },
+      "test-org"
+    );
+
+    expect(createSpy).toHaveBeenCalledWith("test-org", {
+      name: "Metric Rule",
+      query: "environment:prod is_transaction:true",
+      aggregate: "p95(span.duration)",
+      dataset: "spans",
+      timeWindow: 5,
+      triggers: [{ alertThreshold: 100, actions: [{ id: "notify" }] }],
+      projects: ["backend"],
+    });
+    expect(context.stderr.write).toHaveBeenCalledWith(
+      expect.stringContaining("is_transaction:true")
+    );
+  });
 });
