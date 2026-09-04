@@ -13,10 +13,10 @@ import {
   type DashboardWidget,
   DashboardWidgetInputSchema,
   DEFAULT_WIDGET_TYPE,
-  DISCOVER_AGGREGATE_FUNCTIONS,
   DISPLAY_TYPES,
-  DiscoverAggregateFunctionSchema,
   type DisplayType,
+  ERROR_AGGREGATE_FUNCTIONS,
+  ErrorAggregateFunctionSchema,
   EventsStatsDataPointSchema,
   EventsStatsSeriesSchema,
   EventsTableResponseSchema,
@@ -53,10 +53,8 @@ describe("WIDGET_TYPES", () => {
 
   test("contains all expected dataset types", () => {
     const expected: WidgetType[] = [
-      "discover",
       "issue",
       "error-events",
-      "transaction-like",
       "spans",
       "logs",
       "tracemetrics",
@@ -107,7 +105,7 @@ describe("DISPLAY_TYPES", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SPAN_AGGREGATE_FUNCTIONS / DISCOVER_AGGREGATE_FUNCTIONS
+// SPAN_AGGREGATE_FUNCTIONS / ERROR_AGGREGATE_FUNCTIONS
 // ---------------------------------------------------------------------------
 
 describe("SPAN_AGGREGATE_FUNCTIONS", () => {
@@ -146,34 +144,36 @@ describe("SPAN_AGGREGATE_FUNCTIONS", () => {
   });
 });
 
-describe("DISCOVER_AGGREGATE_FUNCTIONS", () => {
+describe("ERROR_AGGREGATE_FUNCTIONS", () => {
   test("is a superset of span functions", () => {
     for (const fn of SPAN_AGGREGATE_FUNCTIONS) {
-      expect(DISCOVER_AGGREGATE_FUNCTIONS).toContain(fn);
+      expect(ERROR_AGGREGATE_FUNCTIONS).toContain(fn);
     }
   });
 
-  test("contains discover-specific functions", () => {
+  test("contains error-event-specific functions", () => {
     const extras = [
-      "failure_count",
-      "failure_rate",
-      "apdex",
-      "user_misery",
       "count_if",
+      "count_at_least",
       "last_seen",
+      "latest_event",
+      "var",
+      "stddev",
+      "cov",
+      "corr",
     ];
     for (const fn of extras) {
-      expect(DISCOVER_AGGREGATE_FUNCTIONS).toContain(fn);
+      expect(ERROR_AGGREGATE_FUNCTIONS).toContain(fn);
     }
   });
 
-  test("valibot schema validates discover functions", () => {
-    expect(safeParse(DiscoverAggregateFunctionSchema, "apdex").success).toBe(
+  test("valibot schema validates error-event functions", () => {
+    expect(safeParse(ErrorAggregateFunctionSchema, "count_if").success).toBe(
       true
     );
-    expect(
-      safeParse(DiscoverAggregateFunctionSchema, "failure_rate").success
-    ).toBe(true);
+    expect(safeParse(ErrorAggregateFunctionSchema, "last_seen").success).toBe(
+      true
+    );
   });
 });
 
@@ -949,9 +949,7 @@ describe("EventsTableResponseSchema", () => {
 describe("mapWidgetTypeToDataset", () => {
   test("maps known widget types", () => {
     expect(mapWidgetTypeToDataset("spans")).toBe("spans");
-    expect(mapWidgetTypeToDataset("discover")).toBe("discover");
     expect(mapWidgetTypeToDataset("error-events")).toBe("errors");
-    expect(mapWidgetTypeToDataset("transaction-like")).toBe("transactions");
     expect(mapWidgetTypeToDataset("logs")).toBe("logs");
     expect(mapWidgetTypeToDataset("tracemetrics")).toBe("tracemetrics");
   });
@@ -959,6 +957,8 @@ describe("mapWidgetTypeToDataset", () => {
   test("returns null for unsupported widget types", () => {
     expect(mapWidgetTypeToDataset("issue")).toBeNull();
     expect(mapWidgetTypeToDataset("preprod-app-size")).toBeNull();
+    expect(mapWidgetTypeToDataset("discover")).toBeNull();
+    expect(mapWidgetTypeToDataset("transaction-like")).toBeNull();
   });
 
   test("returns null for undefined", () => {

@@ -29,21 +29,15 @@ export const widgetRoute = buildRouteMap({
       "                                Example: p50(value,completion.duration_ms,distribution,none)\n" +
       "                                Supported displays: line, area, bar, big_number,\n" +
       "                                categorical_bar\n" +
-      "  discover                      Legacy discover queries (adds failure_rate,\n" +
-      "                                apdex, etc.)\n" +
       "  issue                         Issue-based queries\n" +
       "  error-events — errors, error  Error event queries\n" +
-      "  transaction-like — transactions, transaction\n" +
-      "                                Transaction-based queries\n" +
       "  logs — log                    Log queries\n\n" +
-      "Dataset values are case-insensitive; Sentry UI/API names like 'errors'\n" +
-      "and 'transactions' are accepted in addition to the canonical forms.\n\n" +
+      "Dataset values are case-insensitive; the Sentry UI/API name 'errors'\n" +
+      "is accepted in addition to the canonical form.\n\n" +
       "Aggregates (spans): count, count_unique, sum, avg, percentile, p50, p75,\n" +
       "  p90, p95, p99, p100, eps, epm, any, min, max\n" +
-      "Aggregates (discover adds): failure_count, failure_rate, apdex,\n" +
-      "  count_miserable, user_misery, count_web_vitals, count_if, count_at_least,\n" +
-      "  last_seen, latest_event, var, stddev, cov, corr, performance_score,\n" +
-      "  opportunity_score, count_scores\n" +
+      "Aggregates (error-events adds): count_if, count_at_least, last_seen,\n" +
+      "  latest_event, var, stddev, cov, corr\n" +
       "Aliases: spm → epm, sps → eps, tpm → epm, tps → eps\n\n" +
       "tracemetrics query format:\n" +
       "  aggregation(value,metric_name,metric_type,unit)\n" +
