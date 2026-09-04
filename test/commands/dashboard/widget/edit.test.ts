@@ -287,11 +287,7 @@ describe("dashboard widget edit", () => {
     const { context } = createMockContext();
     const func = await editCommand.loader();
     // Should not throw — "text" is untracked, no dataset constraint applies
-    await func.call(
-      context,
-      { json: false, index: 0, dataset: "discover" },
-      "123"
-    );
+    await func.call(context, { json: false, index: 0, dataset: "logs" }, "123");
     expect(updateDashboardSpy).toHaveBeenCalled();
   });
 
@@ -415,23 +411,23 @@ describe("dashboard widget edit", () => {
     const { context } = createMockContext();
     const func = await editCommand.loader();
 
-    // "failure_rate" is valid for discover but not spans.
-    // Here we change the existing spans widget to discover dataset while
-    // also setting a discover-only aggregate. This should succeed.
+    // "last_seen" is valid for error-events but not spans.
+    // Here we change the existing spans widget to error-events dataset while
+    // also setting a last_seen aggregate. This should succeed.
     await func.call(
       context,
       {
         json: false,
         index: 0,
-        dataset: "discover",
-        query: ["failure_rate"],
+        dataset: "error-events",
+        query: ["last_seen"],
       },
       "123"
     );
 
     const body = updateDashboardSpy.mock.calls[0]?.[2];
-    expect(body.widgets[0].widgetType).toBe("discover");
-    expect(body.widgets[0].queries[0].aggregates).toEqual(["failure_rate()"]);
+    expect(body.widgets[0].widgetType).toBe("error-events");
+    expect(body.widgets[0].queries[0].aggregates).toEqual(["last_seen()"]);
   });
 
   test("resolves --dataset alias 'errors' to 'error-events' in PUT body", async () => {
@@ -448,9 +444,9 @@ describe("dashboard widget edit", () => {
   });
 
   test("dataset alias is resolved BEFORE dataset-aware aggregate validation", async () => {
-    // Regression test for the "aliases resolve too late" bug: failure_rate
+    // Regression test for the "aliases resolve too late" bug: last_seen
     // is valid for error-events, so passing --dataset errors --query
-    // failure_rate must succeed. If the alias is not applied before
+    // last_seen must succeed. If the alias is not applied before
     // validateAggregateNames runs, "errors" falls through the canonical
     // branch and "Unknown aggregate function" is thrown.
     const { context } = createMockContext();
@@ -461,27 +457,23 @@ describe("dashboard widget edit", () => {
         json: false,
         index: 0,
         dataset: "errors",
-        query: ["failure_rate"],
+        query: ["last_seen"],
       },
       "123"
     );
 
     const body = updateDashboardSpy.mock.calls[0]?.[2];
     expect(body.widgets[0].widgetType).toBe("error-events");
-    expect(body.widgets[0].queries[0].aggregates).toEqual(["failure_rate()"]);
+    expect(body.widgets[0].queries[0].aggregates).toEqual(["last_seen()"]);
   });
 
   test("case-insensitive --dataset values are accepted", async () => {
     const { context } = createMockContext();
     const func = await editCommand.loader();
-    await func.call(
-      context,
-      { json: false, index: 0, dataset: "TRANSACTIONS" },
-      "123"
-    );
+    await func.call(context, { json: false, index: 0, dataset: "LOGS" }, "123");
 
     const body = updateDashboardSpy.mock.calls[0]?.[2];
-    expect(body.widgets[0].widgetType).toBe("transaction-like");
+    expect(body.widgets[0].widgetType).toBe("logs");
   });
 
   test("auto-defaults --limit to 5 when adding --group-by without --limit", async () => {

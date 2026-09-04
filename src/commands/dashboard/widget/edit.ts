@@ -246,7 +246,7 @@ export const editCommand = buildCommand({
         kind: "parsed",
         parse: String,
         brief:
-          "Widget dataset (default: spans). Accepts canonical names and API synonyms: spans, error-events/errors, transaction-like/transactions, tracemetrics/metrics, logs, issue, discover",
+          "Widget dataset (default: spans). Accepts canonical names and API synonyms: spans, error-events/errors, tracemetrics/metrics, logs, issue",
         optional: true,
       },
       query: {
@@ -335,7 +335,7 @@ export const editCommand = buildCommand({
     // Replace flags.dataset with the canonical value so every downstream
     // consumer — validateEnumsAndAggregates, validateAggregateNames, and the
     // PUT body — sees the normalized name. Without this, dataset-aware
-    // aggregate validation (e.g. failure_rate for error-events) would fail
+    // aggregate validation (e.g. count_if for error-events) would fail
     // when the user passes --dataset errors.
     const normalizedDataset = normalizeDataset(flags.dataset);
     const normalizedFlags: EditFlags =
