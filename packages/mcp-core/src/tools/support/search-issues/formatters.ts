@@ -121,7 +121,6 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
       output += `- **Category**: ${issue.issueCategory}\n`;
     }
     output += `- **Users**: ${issue.userCount || 0}\n`;
-    output += `- **Events**: ${issue.count || 0}\n`;
 
     if (issue.assignedTo) {
       const assignee = issue.assignedTo;

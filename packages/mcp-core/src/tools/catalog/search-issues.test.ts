@@ -136,7 +136,6 @@ describe("search_issues", () => {
 
       - **Status**: unresolved
       - **Users**: 50
-      - **Events**: 100
       - **First seen**: 2025-01-15
       - **Last seen**: 2025-01-15
       - **Culprit**: \`test.function\`
