@@ -53,7 +53,7 @@ import { ReadStream } from "node:tty";
 
 const _require = createRequire(import.meta.url);
 
-import { setTag } from "@sentry/node-core/light";
+import { addBreadcrumb, setTag } from "@sentry/node-core/light";
 import { FULL_BANNER_LINES } from "../../banner.js";
 import { openBrowser } from "../../browser.js";
 import { CLI_VERSION } from "../../constants.js";
@@ -538,6 +538,29 @@ export class InkUI implements WizardUI {
             // ignore
           });
         },
+        track: (event) => {
+          // Land completion-screen interactions on the run's `cli.command`
+          // transaction so we can see, per run, whether the user opened Sentry
+          // and/or chose to install the agent plugin. Tags are sticky: once a
+          // user has clicked "install", un-toggling leaves the click recorded.
+          switch (event) {
+            case "open-sentry":
+              setTag("wizard.completion.opened_sentry", "true");
+              break;
+            case "agent-plugin-queued":
+              setTag("wizard.completion.agent_plugin_clicked", "true");
+              break;
+            case "agent-plugin-unqueued":
+              break;
+            default:
+              break;
+          }
+          addBreadcrumb({
+            category: "wizard.completion",
+            message: event,
+            level: "info",
+          });
+        },
       },
     });
   }
@@ -884,6 +907,12 @@ export class InkUI implements WizardUI {
    */
   private async runPostExitActions(): Promise<void> {
     const actions = this.store.getSnapshot().postExitActions;
+    if (actions.length > 0) {
+      // The agent-plugin installer is the only thing the completion screen
+      // queues, so a non-empty list here means the user finished with it queued
+      // and we're about to actually run it — the strongest "installed" signal.
+      setTag("wizard.completion.agent_plugin_installed", "true");
+    }
     for (const command of actions) {
       process.stdout.write(`\n$ ${command}\n`);
       await runInheritedCommand(command);
