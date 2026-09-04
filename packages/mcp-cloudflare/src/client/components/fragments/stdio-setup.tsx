@@ -203,24 +203,24 @@ export function StdioSetupTabs({
 }: StdioSetupTabsProps) {
   return (
     <InstallTabs selectedTab={selectedIde} onTabChange={onIdeChange}>
+      <Tab id="amp" title="Amp">
+        <AmpInstructions transport="stdio" />
+      </Tab>
+
       <Tab id="claude-code" title="Claude Code">
         <ClaudeCodeInstructions transport="stdio" />
-      </Tab>
-
-      <Tab id="cursor" title="Cursor">
-        <CursorInstructions transport="stdio" />
-      </Tab>
-
-      <Tab id="vscode" title="VSCode">
-        <VSCodeInstructions transport="stdio" />
       </Tab>
 
       <Tab id="codex-cli" title="Codex">
         <CodexCLIInstructions transport="stdio" />
       </Tab>
 
-      <Tab id="amp" title="Amp">
-        <AmpInstructions transport="stdio" />
+      <Tab id="cursor" title="Cursor">
+        <CursorInstructions transport="stdio" />
+      </Tab>
+
+      <Tab id="fx" title="fx">
+        <FxInstructions transport="stdio" />
       </Tab>
 
       <Tab id="gemini" title="Gemini CLI">
@@ -231,12 +231,12 @@ export function StdioSetupTabs({
         <OpenCodeInstructions transport="stdio" />
       </Tab>
 
-      <Tab id="warp" title="Warp">
-        <WarpInstructions transport="stdio" />
+      <Tab id="vscode" title="VSCode">
+        <VSCodeInstructions transport="stdio" />
       </Tab>
 
-      <Tab id="fx" title="fx">
-        <FxInstructions transport="stdio" />
+      <Tab id="warp" title="Warp">
+        <WarpInstructions transport="stdio" />
       </Tab>
 
       <Tab id="zed" title="Zed">

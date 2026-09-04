@@ -302,14 +302,14 @@ export default function InstallTabs({
 }
 
 const iconsByID: Record<string, React.ReactNode> = {
-  cursor: <CursorIcon />,
+  amp: <AmpIcon />,
   "claude-code": <ClaudeIcon />,
   "codex-cli": <CodexIcon />,
+  cursor: <CursorIcon />,
   fx: <FxIcon />,
+  gemini: <GeminiIcon />,
+  opencode: <OpenCodeIcon />,
   vscode: <VSCodeIcon />,
   warp: <WarpIcon />,
   zed: <ZedIcon />,
-  gemini: <GeminiIcon />,
-  opencode: <OpenCodeIcon />,
-  amp: <AmpIcon />,
 };
