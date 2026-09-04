@@ -11,7 +11,9 @@
  */
 
 import { customFetch } from "../custom-ca.js";
-import { ApiError } from "../errors.js";
+import { logger } from "../logger.js";
+
+const log = logger.withTag("status-page");
 
 /** Default Sentry status page base URL. */
 export const SENTRY_STATUS_PAGE_URL = "https://status.sentry.io";
@@ -82,59 +84,68 @@ type SummaryResponse = {
 };
 
 /**
- * Fetch the current Sentry service status from a Statuspage summary endpoint.
+ * Fetch the current Sentry service status.
+ *
+ * Rather than guessing from the host name whether a URL is a Statuspage
+ * instance, we probe the target directly: request `/api/v2/summary.json` and,
+ * if it comes back as a valid Statuspage summary, use it. Any clear
+ * non-Statuspage response (non-2xx, non-JSON, or a body missing the summary
+ * shape) or a network error falls back to the self-hosted `/_health/?full=1`
+ * probe. This makes the command reliable for arbitrary self-hosted or regional
+ * deployments without domain-name inference.
  *
  * @param baseUrl - Status page base URL (defaults to status.sentry.io). Pass a
  *   custom URL to point at a self-hosted or regional Statuspage instance.
  */
-export function fetchSentryStatus(
+export async function fetchSentryStatus(
   baseUrl: string = SENTRY_STATUS_PAGE_URL
 ): Promise<SentryStatus> {
   const normalized = baseUrl.replace(TRAILING_SLASHES, "");
 
-  // Statuspage hosts (statuspage.io) use the /api/v2/summary.json flow.
-  // All other hosts (self-hosted) are probed via the generic /_health/ endpoint.
-  let parsedUrl: URL | undefined;
-  try {
-    parsedUrl = new URL(normalized);
-  } catch {
-    parsedUrl = undefined;
-  }
-  const host = parsedUrl?.hostname.toLowerCase() ?? "";
-  // Sentry's public status page (status.sentry.io) is a Statuspage instance,
-  // as are any *.statuspage.io hosts and common CNAMEs containing "status"
-  // (status.example.com, statuspage.acme.com, …). Everything else falls back
-  // to the lightweight self-hosted /_health/ probe.
-  const isStatuspageHost =
-    host === "status.sentry.io" ||
-    host.endsWith(".statuspage.io") ||
-    host.includes("status");
-
-  return isStatuspageHost
-    ? fetchStatuspageSummary(normalized)
-    : probeSelfHostedHealth(normalized);
+  const summary = await tryFetchStatuspageSummary(normalized);
+  return summary ?? probeSelfHostedHealth(normalized);
 }
 
-/** Fetch and shape a Statuspage `/api/v2/summary.json` response. */
-async function fetchStatuspageSummary(
+/**
+ * Probe `<baseUrl>/api/v2/summary.json` and shape it into a {@link SentryStatus}.
+ *
+ * Returns `undefined` when the target does not look like a Statuspage instance
+ * — a non-2xx response, a body that isn't JSON, or JSON that lacks the summary
+ * shape — so the caller can fall back to the self-hosted health probe. Never
+ * throws.
+ */
+async function tryFetchStatuspageSummary(
   normalized: string
-): Promise<SentryStatus> {
+): Promise<SentryStatus | undefined> {
   const endpoint = `${normalized}/api/v2/summary.json`;
 
-  const response = await customFetch(endpoint, {
-    signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      "Failed to fetch Sentry status",
-      response.status,
-      await response.text(),
-      endpoint
-    );
+  let response: Response;
+  try {
+    response = await customFetch(endpoint, {
+      signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    log.debug(`Statuspage summary fetch failed for ${endpoint}`, err);
+    return;
   }
 
-  const summary = (await response.json()) as SummaryResponse;
+  if (!response.ok) {
+    return;
+  }
+
+  let summary: SummaryResponse;
+  try {
+    summary = (await response.json()) as SummaryResponse;
+  } catch (err) {
+    log.debug(`Statuspage summary parse failed for ${endpoint}`, err);
+    return;
+  }
+
+  // A genuine Statuspage summary always carries a `status` object with an
+  // `indicator`. Anything else is some other JSON endpoint, not Statuspage.
+  if (!summary || typeof summary.status?.indicator !== "string") {
+    return;
+  }
 
   const components: StatusComponent[] = (summary.components ?? [])
     // Group headers carry no operational status of their own.
