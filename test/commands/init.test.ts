@@ -183,16 +183,12 @@ describe("init command func", () => {
       const ctx = makeContext();
       await func.call(ctx, {
         ...DEFAULT_FLAGS,
-        features: [
-          "errors,tracing,replay,sourcemaps,attachments,agent-tracing,mcp-observability",
-        ],
+        features: ["errors,tracing,replay,agent-tracing,mcp-observability"],
       });
       expect(capturedArgs?.features).toEqual([
         "errorMonitoring",
         "performanceMonitoring",
         "sessionReplay",
-        "sourceMaps",
-        "attachments",
         "aiMonitoring",
         "mcpObservability",
       ]);
@@ -203,15 +199,13 @@ describe("init command func", () => {
       await func.call(ctx, {
         ...DEFAULT_FLAGS,
         features: [
-          "errorMonitoring,performanceMonitoring,sessionReplay,sourceMaps,attachments,aiMonitoring,mcpObservability",
+          "errorMonitoring,performanceMonitoring,sessionReplay,aiMonitoring,mcpObservability",
         ],
       });
       expect(capturedArgs?.features).toEqual([
         "errorMonitoring",
         "performanceMonitoring",
         "sessionReplay",
-        "sourceMaps",
-        "attachments",
         "aiMonitoring",
         "mcpObservability",
       ]);
@@ -225,7 +219,7 @@ describe("init command func", () => {
       });
       await expect(promise).rejects.toThrow(ValidationError);
       await expect(promise).rejects.toThrow(
-        "Supported features: errors, tracing, logs, replay, metrics, profiling, sourcemaps, crons, attachments, agent-tracing, mcp-observability"
+        "Supported features: errors, tracing, logs, replay, profiling, crons, agent-tracing, mcp-observability"
       );
       expect(runWizardSpy).not.toHaveBeenCalled();
       expect(findProjectsSpy).not.toHaveBeenCalled();
@@ -236,6 +230,23 @@ describe("init command func", () => {
       "user-feedback",
       "userFeedback",
     ])("rejects %s because init cannot configure User Feedback placement", async (feature) => {
+      const ctx = makeContext();
+      const promise = func.call(ctx, {
+        ...DEFAULT_FLAGS,
+        features: [feature],
+      });
+      await expect(promise).rejects.toThrow(ValidationError);
+      await expect(promise).rejects.toThrow(
+        `Unknown init feature "${feature}"`
+      );
+      expect(runWizardSpy).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      "metrics",
+      "sourcemaps",
+      "attachments",
+    ])("rejects %s because init does not yet automate its setup", async (feature) => {
       const ctx = makeContext();
       const promise = func.call(ctx, {
         ...DEFAULT_FLAGS,
