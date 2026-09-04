@@ -220,13 +220,30 @@ export type WizardCompletion = {
 };
 
 /**
+ * A completion-screen interaction worth recording on the run's telemetry.
+ * `open-sentry` covers both the "View my first event" / "Open my Issues feed"
+ * menu item and the `o` shortcut; the agent-plugin events track the install
+ * toggle (a queued click is the "did they choose to install the plugin" signal).
+ */
+export type CompletionActionEvent =
+  | "open-sentry"
+  | "agent-plugin-queued"
+  | "agent-plugin-unqueued";
+
+/**
  * Side-effectful actions the completion screen invokes. Provided by `InkUI`
  * (which lives in the main bundle) so the pre-bundled Ink sidecar never has to
- * import Node built-ins (browser launch) itself.
+ * import Node built-ins (browser launch) or the Sentry SDK itself.
  */
 export type CompletionActions = {
   /** Open a URL in the user's browser. Best-effort, non-blocking. */
   openUrl: (url: string) => void;
+  /**
+   * Record a completion-screen interaction on the run's telemetry. Bound by
+   * `InkUI` so the Ink sidecar never imports Sentry; the tags land on the
+   * active `cli.command` transaction like the rest of the `wizard.*` tags.
+   */
+  track: (event: CompletionActionEvent) => void;
 };
 
 /**

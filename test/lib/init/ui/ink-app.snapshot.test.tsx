@@ -1329,6 +1329,9 @@ describe("completion screen", () => {
           openUrl: () => {
             // no-op in tests
           },
+          track: () => {
+            // no-op in tests
+          },
         },
       },
     });
