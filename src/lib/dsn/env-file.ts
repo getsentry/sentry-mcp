@@ -210,6 +210,7 @@ export async function detectFromMonorepoEnvFiles(
     // surfaces when iterating. Wrap the full open+iterate in one try/catch.
     // No explicit handle.close() needed: for-await-of auto-closes the Dir
     // handle when the loop exits (including early return or break).
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       for await (const entry of await opendir(rootDir)) {
         // Skip hidden dirs (.git, .cache) and non-directories. Accept

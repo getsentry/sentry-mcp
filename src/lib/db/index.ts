@@ -85,15 +85,18 @@ function ensureConfigDir(): void {
 
 function setDbPermissions(): void {
   const dbPath = getDbPath();
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     chmodSync(dbPath, 0o600);
     // WAL mode creates -wal and -shm files that may contain sensitive data
     // Chmod them too if they exist (they may not exist on first run)
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       chmodSync(`${dbPath}-wal`, 0o600);
     } catch {
       // File may not exist yet
     }
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       chmodSync(`${dbPath}-shm`, 0o600);
     } catch {

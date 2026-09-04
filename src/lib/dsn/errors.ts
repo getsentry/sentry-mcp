@@ -65,6 +65,7 @@ export async function formatNoDsnError(
 
   // Try to fetch and show accessible projects
   if (showProjects) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       const projects = await getAccessibleProjects();
 

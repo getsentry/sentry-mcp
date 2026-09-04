@@ -69,6 +69,7 @@ export function isSaaS(): boolean {
  * @returns true if the hostname is sentry.io or a subdomain of sentry.io
  */
 export function isSentrySaasUrl(url: string): boolean {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const parsed = new URL(url);
     return (
@@ -99,6 +100,7 @@ export function isSentrySaasUrl(url: string): boolean {
  * @returns true only if the URL is a strictly-SaaS origin
  */
 export function isSaaSTrustOrigin(url: string): boolean {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const parsed = new URL(url);
     return (
@@ -129,6 +131,7 @@ export function normalizeOrigin(
   } else {
     raw = input.url;
   }
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return new URL(raw).origin;
   } catch {
@@ -241,6 +244,7 @@ export function parseOrgProjectFromSettingsUrl(url: string): {
   orgSlug?: string;
   projectSlug?: string;
 } {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const parsed = new URL(url);
     const segments = parsed.pathname.split("/").filter(Boolean);

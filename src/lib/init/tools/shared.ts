@@ -17,6 +17,7 @@ export function safePath(cwd: string, relative: string): string {
   }
 
   let realCwd: string;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     realCwd = fs.realpathSync(normalizedCwd);
   } catch {
@@ -58,6 +59,7 @@ export function validateToolSandbox(
   payload: Pick<ToolPayload, "cwd">,
   directory: string
 ): { cwd: string } | ToolResult {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const realDirectory = fs.realpathSync(path.resolve(directory));
     const realCwd = fs.realpathSync(path.resolve(payload.cwd));

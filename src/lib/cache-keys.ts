@@ -104,6 +104,7 @@ export function computeInvalidationPrefixes(
   apiBaseUrl: string
 ): string[] {
   let parsed: URL;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     parsed = new URL(fullUrl);
   } catch {

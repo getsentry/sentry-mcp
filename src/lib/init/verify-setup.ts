@@ -386,6 +386,7 @@ export async function verifySetup(
   const envelopeReceived = new Promise<void>((r) => {
     subscriptionId = buffer.subscribe((container) => {
       if (firstEventId === undefined) {
+        // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
         try {
           const parsed = container.getParsedEnvelope();
           const header = parsed?.envelope?.[0] as

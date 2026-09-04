@@ -35,6 +35,7 @@ async function postDocs<T>(
   if (!response.ok) {
     let detail = text;
     let parsed: { code?: unknown; error?: unknown } | undefined;
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       parsed = JSON.parse(text) as { code?: unknown; error?: unknown };
     } catch {

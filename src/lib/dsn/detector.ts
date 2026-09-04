@@ -204,6 +204,7 @@ export async function detectAllDsns(cwd: string): Promise<DsnDetectionResult> {
   // Get project root directory mtime for quick invalidation
   // when files are added/removed at root level
   let rootDirMtime = 0;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const stats = await stat(projectRoot);
     rootDirMtime = Math.floor(stats.mtimeMs);
@@ -284,6 +285,7 @@ async function verifyFileDsnCache(
 
   const filePath = join(cwd, cached.sourcePath);
 
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     // Guard: skip non-regular files (FIFOs, sockets, etc.) that would block.
     // 1Password streams secrets via symlinked named pipes; Bun.file().text()

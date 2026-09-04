@@ -96,6 +96,7 @@ function errorMessage(err: unknown): string {
 
 /** Assert a path is an existing directory. */
 function assertDirectory(path: string, label: string): void {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     if (statSync(path).isDirectory()) {
       return;

@@ -106,6 +106,7 @@ export function makeByteProgress(
 
   const emit = (): void => {
     // Cosmetic only — a formatting or callback failure must never propagate.
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       setMessage?.(render());
     } catch {

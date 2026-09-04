@@ -290,6 +290,7 @@ export async function getProcessInfoFromOS(
   pid: number
 ): Promise<ProcessInfo | undefined> {
   // Linux: /proc is an in-memory filesystem — fast even though async
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const status = await readFile(`/proc/${pid}/status`, "utf-8");
     const nameMatch = status.match(PROC_STATUS_NAME_RE);
@@ -303,6 +304,7 @@ export async function getProcessInfoFromOS(
 
   // macOS / other Unix: use ps(1) asynchronously
   if (process.platform !== "win32") {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       const result = await execFileUnreffed(
         "ps",

@@ -63,6 +63,7 @@ export function parseSntrysClaim(
   }
 
   let parsed: unknown;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     parsed = JSON.parse(Buffer.from(payloadEncoded, "base64").toString("utf8"));
   } catch {

@@ -370,6 +370,7 @@ async function hasWranglerConfig(
   }
 
   for (const filename of WRANGLER_CONFIG_FILES) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       await access(join(cwd, filename));
       return true;

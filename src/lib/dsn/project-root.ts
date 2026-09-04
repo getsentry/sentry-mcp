@@ -196,6 +196,7 @@ const statLimit = pLimit(STAT_CONCURRENCY);
  * Check if a path exists (file or directory) using stat.
  */
 async function pathExists(filePath: string): Promise<boolean> {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     await stat(filePath);
     return true;
@@ -238,6 +239,7 @@ async function anyGlobMatches(
   // surfaces when iterating. Wrap the full open+iterate in one try/catch.
   // No explicit handle.close() needed: for-await-of auto-closes the Dir
   // handle when the loop exits (including early return or break).
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     // Pre-compile matchers outside the loop to avoid recompiling per entry.
     const matchers = patterns.map((p) => picomatch(p, { dot: true }));
@@ -391,6 +393,7 @@ function checkEnvForDsn(dir: string): Promise<DetectedDsn | null> {
  * Returns home directory if it exists, otherwise filesystem root.
  */
 export function getStopBoundary(): string {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return homedir();
   } catch {

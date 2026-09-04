@@ -198,6 +198,7 @@ async function addToShellConfig(
   );
 
   if (!exists) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       await writeFile(configFile, `# sentry\n${command}\n`, "utf-8");
       return {
@@ -227,6 +228,7 @@ async function addToShellConfig(
     };
   }
 
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const newContent = content.endsWith("\n")
       ? `${content}\n# sentry\n${command}\n`

@@ -530,6 +530,7 @@ export function refreshAccessToken(
 
     if (!response.ok) {
       let errorDetail = "Token refresh failed";
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         const errorData = await response.json();
         const errorResult = safeParse(TokenErrorResponseSchema, errorData);

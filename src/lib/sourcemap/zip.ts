@@ -149,6 +149,7 @@ export class ZipWriter {
    * Safe to call multiple times — subsequent calls are no-ops.
    */
   async close(): Promise<void> {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     await this.fh.close().catch(() => {
       // Already closed — ignore
     });

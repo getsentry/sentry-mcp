@@ -60,6 +60,7 @@ type WalkState = {
 };
 
 async function readDirEntries(dir: string): Promise<fs.Dirent[] | undefined> {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return await fs.promises.readdir(dir, { withFileTypes: true });
   } catch {
@@ -94,6 +95,7 @@ function toDirEntry(
   const relNative = abs.slice(state.cwdPrefixLen);
 
   if (entry.isSymbolicLink()) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       safePath(state.cwd, relNative);
     } catch {
@@ -121,6 +123,7 @@ function toDirEntry(
 
 /** Return a regular file's byte size without opening or reading its contents. */
 function fileSize(abs: string): { size?: number } {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const stat = fs.lstatSync(abs);
     return stat.isFile() ? { size: stat.size } : {};

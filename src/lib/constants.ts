@@ -140,6 +140,7 @@ export const SENTRY_CLI_DSN =
  * mechanism directly.
  */
 if (typeof __SENTRY_DEBUG_ID__ !== "undefined") {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     // biome-ignore lint/suspicious/useErrorMessage: stack trace capture only
     const stack = new Error().stack;

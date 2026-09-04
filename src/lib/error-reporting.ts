@@ -115,6 +115,7 @@ function recordSilencedError(error: unknown, reason: SilenceReason): void {
     attributes.auth_reason = error.reason;
   }
 
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     Sentry.metrics.distribution("cli.error.silenced", 1, { attributes });
   } catch {
@@ -124,6 +125,7 @@ function recordSilencedError(error: unknown, reason: SilenceReason): void {
   // Structured log for user API errors — `detail` is often the most actionable
   // field and is searchable in Sentry Logs.
   if (reason === "api_user_error" && error instanceof ApiError) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       Sentry.logger.info("cli.api_error_silenced", {
         status: error.status,

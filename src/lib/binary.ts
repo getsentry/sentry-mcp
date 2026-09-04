@@ -326,6 +326,7 @@ export function replaceBinarySync(tempPath: string, installPath: string): void {
       renameSync(installPath, oldPath);
     } catch {
       // Current binary might not exist (fresh install) or .old already exists
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         unlinkSync(oldPath);
         renameSync(installPath, oldPath);
@@ -353,6 +354,7 @@ export function replaceBinarySync(tempPath: string, installPath: string): void {
  */
 export function cleanupOldBinary(oldPath: string): void {
   // Fire-and-forget: don't await, just let cleanup run in background
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   unlink(oldPath).catch(() => {
     // Intentionally ignore errors — file may not exist
   });
@@ -452,6 +454,7 @@ function handleExistingLock(lockPath: string): void {
  * @param lockPath - Path to the lock file
  */
 export function releaseLock(lockPath: string): void {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     unlinkSync(lockPath);
   } catch {

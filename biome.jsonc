@@ -59,6 +59,16 @@
   },
   "overrides": [
     {
+      // Silent-catch enforcement is scoped to production code under src/**.
+      // The grandfathered backlog is pinned with inline `// biome-ignore
+      // lint/plugin` comments; `pnpm run lint` runs with `--error-on-warnings`
+      // so an orphaned suppression fails as `suppressions/unused`, keeping the
+      // backlog shrink-only. Replaces the old script/silent-catch-baseline.json
+      // ratchet (see #1531).
+      "includes": ["src/**/*.ts"],
+      "plugins": ["./lint-rules/no-silent-catch.grit"]
+    },
+    {
       // The React-hook lint rules infer "this is a hook" from the
       // `use*` naming convention. We have a couple of test helpers
       // (`useTestConfigDir`, `useEnvSandbox`) that share the prefix

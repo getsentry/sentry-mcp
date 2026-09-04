@@ -441,6 +441,7 @@ export async function getCachedResponse(
   }
 
   let key: string;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     key = buildCacheKey(method, url);
   } catch {
@@ -486,6 +487,7 @@ export async function getCachedResponse(
         // Best-effort cleanup of the broken entry.
         span.setAttribute("cache.hit", false);
         recordCacheHit("http", false);
+        // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
         unlink(cacheFilePath(key)).catch(() => {
           // Ignored — fire-and-forget
         });
@@ -506,6 +508,7 @@ export async function getCachedResponse(
 async function readCacheEntry(key: string): Promise<CacheEntry | undefined> {
   const filePath = cacheFilePath(key);
   let raw: string;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     raw = await readFile(filePath, "utf-8");
   } catch {
@@ -517,6 +520,7 @@ async function readCacheEntry(key: string): Promise<CacheEntry | undefined> {
     return JSON.parse(raw) as CacheEntry;
   } catch {
     // Corrupted cache file — delete it
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     await unlink(filePath).catch(() => {
       // Best-effort cleanup of corrupted file
     });
@@ -555,6 +559,7 @@ export async function storeCachedResponse(
   }
 
   let key: string;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     key = buildCacheKey(method, url);
   } catch {
@@ -562,6 +567,7 @@ export async function storeCachedResponse(
     return;
   }
 
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     await withCacheSpan(
       url,
@@ -676,6 +682,7 @@ async function writeResponseToCache(req: WriteRequest): Promise<number> {
 
   // Probabilistic cleanup to avoid unbounded cache growth
   if (Math.random() < CLEANUP_PROBABILITY) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     cleanupCache().catch(() => {
       // Non-fatal: cleanup failure doesn't affect cache correctness
     });
@@ -698,6 +705,7 @@ async function writeResponseToCache(req: WriteRequest): Promise<number> {
 export async function invalidateCachedResponsesMatching(
   prefix: string
 ): Promise<void> {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const cacheDir = getCacheDir();
     const files = await readdir(cacheDir);
@@ -710,6 +718,7 @@ export async function invalidateCachedResponsesMatching(
 
     await cacheIO.map(jsonFiles, async (file) => {
       const filePath = join(cacheDir, file);
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         const raw = await readFile(filePath, "utf-8");
         const entry = JSON.parse(raw) as CacheEntry;
@@ -717,6 +726,7 @@ export async function invalidateCachedResponsesMatching(
           entry.identity === currentIdentity &&
           entry.url?.startsWith(prefix)
         ) {
+          // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
           await unlink(filePath).catch(() => {
             /* another process may have deleted it */
           });
@@ -735,6 +745,7 @@ export async function invalidateCachedResponsesMatching(
  * Called on `auth logout` and `auth login` since cached data is tied to the user.
  */
 export async function clearResponseCache(): Promise<void> {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     await rm(getCacheDir(), { recursive: true, force: true });
   } catch {
@@ -816,6 +827,7 @@ async function deleteStaleTempFiles(
     try {
       const stats = await stat(filePath);
       if (stats.mtimeMs < cutoff) {
+        // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
         await unlink(filePath).catch(() => {
           // Already gone — another sweep or the owning process removed it.
         });
@@ -889,6 +901,7 @@ async function deleteExpiredEntries(
 ): Promise<void> {
   const expired = entries.filter((e) => e.expired);
   await cacheIO.map(expired, (entry) =>
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     unlink(join(cacheDir, entry.file)).catch(() => {
       // Best-effort: file may have been deleted by another process
     })
@@ -908,6 +921,7 @@ async function evictExcessEntries(
   remaining.sort((a, b) => a.createdAt - b.createdAt);
   const toEvict = remaining.slice(0, remaining.length - MAX_CACHE_ENTRIES);
   await cacheIO.map(toEvict, (entry) =>
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     unlink(join(cacheDir, entry.file)).catch(() => {
       // Best-effort eviction
     })

@@ -279,6 +279,7 @@ export async function uploadSourcemaps(options: UploadOptions): Promise<void> {
     });
   } finally {
     // Always clean up the temp file
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     await unlink(tmpZipPath).catch(() => {
       // Best-effort cleanup — OS temp directory will eventually purge it
     });

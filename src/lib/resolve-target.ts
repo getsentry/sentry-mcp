@@ -319,6 +319,7 @@ async function normalizeNumericOrg(orgId: string): Promise<string> {
   // Slow path: fetch org list to populate numeric ID → slug mapping.
   // resolveEffectiveOrg doesn't handle bare numeric IDs (only o-prefixed),
   // so we do a targeted refresh via listOrganizationsUncached().
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const { listOrganizationsUncached } = await import("./api-client.js");
     await listOrganizationsUncached();
@@ -537,6 +538,7 @@ async function inferFromDirectoryName(cwd: string): Promise<ResolvedTargets> {
 
   // Search for matching projects using word-boundary matching
   let matches: Awaited<ReturnType<typeof findProjectsByPattern>>;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     matches = await findProjectsByPattern(dirName);
   } catch {
@@ -652,6 +654,7 @@ async function findSimilarProjects(
   org: string,
   slug: string
 ): Promise<string[]> {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const projects = await listProjects(org);
     const slugs = projects.map((p) => p.slug);
@@ -683,6 +686,7 @@ async function findSimilarProjectsAcrossOrgs(
    *  when the slug convention differs (e.g. underscores vs dashes). */
   displayName?: string
 ): Promise<{ slug: string; orgSlug: string }[]> {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const concurrency = pLimit(5);
     const orgProjects = await Promise.all(
@@ -1361,6 +1365,7 @@ export async function resolveOrgAndProject(
       }
 
       // 5. DSN auto-detection
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         const dsnResult = await resolveFromDsn(cwd);
         if (dsnResult) {
@@ -1701,6 +1706,7 @@ export async function resolveOrg(
   }
 
   // 5. DSN auto-detection
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const result = await resolveOrgFromDsn(cwd);
     if (result) {

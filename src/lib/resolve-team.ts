@@ -41,6 +41,7 @@ import { getSentryBaseUrl } from "./sentry-urls.js";
  * @returns Formatted org list like "Your organizations:\n\n  acme-corp\n  other-org"
  */
 async function fetchOrgListHint(fallbackHint: string): Promise<string> {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const orgs = await listOrganizations();
     if (orgs.length > 0) {

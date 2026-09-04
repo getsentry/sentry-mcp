@@ -576,6 +576,7 @@ export function repairSchema(db: Database): RepairResult {
   repairWrongPrimaryKeys(db, result);
 
   if (result.fixed.length > 0) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       db.query("UPDATE schema_version SET version = ?").run(
         CURRENT_SCHEMA_VERSION
@@ -678,6 +679,7 @@ export function tryRepairAndRetry<T>(
 
   isRepairing = true;
   let repairSucceeded = false;
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     // Dynamic imports to avoid circular dependencies with db/index.js
     const { getRawDatabase } = _require("./index.js") as {

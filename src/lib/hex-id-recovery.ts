@@ -682,6 +682,7 @@ function recordRecoveryOutcome(
   input: string,
   result: RecoveryResult
 ): void {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     addBreadcrumb({
       category: "hex_id_recovery",

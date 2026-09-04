@@ -105,6 +105,7 @@ export async function detectDocsContextFromReader(
   let sentryConfigured = false;
 
   for (const manifest of DOCS_CONTEXT_MANIFESTS) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       const contents = await reader.readManifest(manifest);
       if (contents === undefined) {
@@ -119,6 +120,7 @@ export async function detectDocsContextFromReader(
   }
 
   for (const config of DOCS_CONTEXT_CONFIGS) {
+    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       sentryConfigured ||= await reader.hasConfig(config);
     } catch {
@@ -137,6 +139,7 @@ export async function detectDocsContextFromReader(
 export function detectDocsContext(cwd: string): Promise<DocsProjectContext> {
   return detectDocsContextFromReader({
     async readManifest(name) {
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         return await readFile(join(cwd, name), "utf8");
       } catch {
@@ -144,6 +147,7 @@ export function detectDocsContext(cwd: string): Promise<DocsProjectContext> {
       }
     },
     async hasConfig(name) {
+      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         await access(join(cwd, name));
         return true;

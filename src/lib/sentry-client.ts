@@ -372,6 +372,7 @@ function extractFullUrl(input: Request | string | URL): string {
 /** Extract the URL pathname for span naming */
 function extractUrlPath(input: Request | string | URL): string {
   const raw = extractFullUrl(input);
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return new URL(raw).pathname;
   } catch {

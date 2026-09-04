@@ -143,6 +143,7 @@ export function normalizeEndpoint(endpoint: string): string {
  * @internal Exported for testing
  */
 export function parseFieldValue(value: string): unknown {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return JSON.parse(value);
   } catch {
@@ -670,6 +671,7 @@ export function parseHeaders(headers: string[]): Record<string, string> {
 export function parseDataBody(
   data: string
 ): Record<string, unknown> | unknown[] | string {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return JSON.parse(data) as Record<string, unknown> | unknown[];
   } catch {
@@ -761,6 +763,7 @@ function tryParseJsonField(
     return;
   }
 
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return JSON.parse(field) as Record<string, unknown> | unknown[];
   } catch {
@@ -848,6 +851,7 @@ export async function buildBodyFromInput(
   }
 
   // Try to parse as JSON for the API client
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     return JSON.parse(content) as Record<string, unknown>;
   } catch {

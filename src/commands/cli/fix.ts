@@ -252,6 +252,7 @@ async function checkOwnership(
  * separate argument — the shell never interpolates it, preventing injection.
  */
 function resolveUid(username: string): number | null {
+  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const result = execFileSync("id", ["-u", "--", username], {
       encoding: "utf-8",
