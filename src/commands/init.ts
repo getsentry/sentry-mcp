@@ -42,6 +42,12 @@ const FEATURE_DELIMITER = /[,+ ]+/;
 const NON_INTERACTIVE_USAGE_HINT =
   "sentry init --yes --features errors,tracing,replay [target] [directory]";
 
+// Only features backed by a Sentry SDK selector product are accepted here.
+// Non-selector products (source maps, metrics, attachments) are intentionally
+// not exposed via --features yet: their setup isn't fully automated — e.g.
+// source-map upload needs an auth token this wizard does not provision — so
+// accepting them would leave a half-configured integration. Re-add an alias
+// (and its SUPPORTED_FEATURE_NAMES entry) once that flow is complete.
 const FEATURE_ALIASES = {
   errors: "errorMonitoring",
   errorMonitoring: "errorMonitoring",
@@ -50,12 +56,8 @@ const FEATURE_ALIASES = {
   logs: "logs",
   replay: "sessionReplay",
   sessionReplay: "sessionReplay",
-  metrics: "metrics",
   profiling: "profiling",
-  sourcemaps: "sourceMaps",
-  sourceMaps: "sourceMaps",
   crons: "crons",
-  attachments: "attachments",
   aiMonitoring: "aiMonitoring",
   "agent-tracing": "aiMonitoring",
   agentTracing: "aiMonitoring",
@@ -68,11 +70,8 @@ const SUPPORTED_FEATURE_NAMES = [
   "tracing",
   "logs",
   "replay",
-  "metrics",
   "profiling",
-  "sourcemaps",
   "crons",
-  "attachments",
   "agent-tracing",
   "mcp-observability",
 ] as const;
@@ -339,7 +338,7 @@ export const initCommand = buildCommand<
         kind: "parsed",
         parse: String,
         brief:
-          "Features to enable: errors,tracing,logs,replay,metrics,profiling,sourcemaps,crons,attachments,agent-tracing,mcp-observability",
+          "Features to enable: errors,tracing,logs,replay,profiling,crons,agent-tracing,mcp-observability",
         variadic: true,
         optional: true,
       },
