@@ -56,24 +56,24 @@ export function RemoteSetupTabs({
 }: RemoteSetupTabsProps) {
   return (
     <InstallTabs selectedTab={selectedIde} onTabChange={onIdeChange}>
+      <Tab id="amp" title="Amp">
+        <AmpInstructions transport="cloud" />
+      </Tab>
+
       <Tab id="claude-code" title="Claude Code">
         <ClaudeCodeInstructions transport="cloud" />
-      </Tab>
-
-      <Tab id="cursor" title="Cursor">
-        <CursorInstructions transport="cloud" />
-      </Tab>
-
-      <Tab id="vscode" title="VSCode">
-        <VSCodeInstructions transport="cloud" />
       </Tab>
 
       <Tab id="codex-cli" title="Codex">
         <CodexCLIInstructions transport="cloud" />
       </Tab>
 
-      <Tab id="amp" title="Amp">
-        <AmpInstructions transport="cloud" />
+      <Tab id="cursor" title="Cursor">
+        <CursorInstructions transport="cloud" />
+      </Tab>
+
+      <Tab id="fx" title="fx">
+        <FxInstructions transport="cloud" />
       </Tab>
 
       <Tab id="gemini" title="Gemini CLI">
@@ -84,12 +84,12 @@ export function RemoteSetupTabs({
         <OpenCodeInstructions transport="cloud" />
       </Tab>
 
-      <Tab id="warp" title="Warp">
-        <WarpInstructions transport="cloud" />
+      <Tab id="vscode" title="VSCode">
+        <VSCodeInstructions transport="cloud" />
       </Tab>
 
-      <Tab id="fx" title="fx">
-        <FxInstructions transport="cloud" />
+      <Tab id="warp" title="Warp">
+        <WarpInstructions transport="cloud" />
       </Tab>
 
       <Tab id="zed" title="Zed">
