@@ -1,19 +1,19 @@
 "use client";
 
-import * as React from "react";
-import { Prose } from "../ui/prose";
-import { cn } from "@/client/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { GeminiIcon } from "../ui/icons/gemini";
-import { ZedIcon } from "../ui/icons/zed";
-import { WarpIcon } from "../ui/icons/warp";
-import { VSCodeIcon } from "../ui/icons/vscode";
-import { WindsurfIcon } from "../ui/icons/windsurf";
-import { CodexIcon } from "../ui/icons/codex";
-import { ClaudeIcon } from "../ui/icons/claude";
-import { CursorIcon } from "../ui/icons/cursor";
-import { OpenCodeIcon } from "../ui/icons/opencode";
+import * as React from "react";
+import { cn } from "@/client/lib/utils";
 import { AmpIcon } from "../ui/icons/amp";
+import { ClaudeIcon } from "../ui/icons/claude";
+import { CodexIcon } from "../ui/icons/codex";
+import { CursorIcon } from "../ui/icons/cursor";
+import { FxIcon } from "../ui/icons/fx";
+import { GeminiIcon } from "../ui/icons/gemini";
+import { OpenCodeIcon } from "../ui/icons/opencode";
+import { VSCodeIcon } from "../ui/icons/vscode";
+import { WarpIcon } from "../ui/icons/warp";
+import { ZedIcon } from "../ui/icons/zed";
+import { Prose } from "../ui/prose";
 
 export type TabProps = {
   id: string;
@@ -305,7 +305,7 @@ const iconsByID: Record<string, React.ReactNode> = {
   cursor: <CursorIcon />,
   "claude-code": <ClaudeIcon />,
   "codex-cli": <CodexIcon />,
-  windsurf: <WindsurfIcon />,
+  fx: <FxIcon />,
   vscode: <VSCodeIcon />,
   warp: <WarpIcon />,
   zed: <ZedIcon />,
