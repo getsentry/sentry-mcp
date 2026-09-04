@@ -34,6 +34,27 @@ The `--version` flag takes precedence over `SENTRY_VERSION` if both are set.
 The chosen channel is persisted so that `sentry cli upgrade` automatically
 tracks the same channel on future updates.
 
+### Installer Flags
+
+The install script accepts additional flags to customize behavior:
+
+```bash
+# Skip shell config modifications (~/.zshrc, ~/.bashrc, etc.)
+curl https://cli.sentry.dev/install -fsS | bash -s -- --no-modify-path
+
+# Skip shell completion installation
+curl https://cli.sentry.dev/install -fsS | bash -s -- --no-completions
+
+# Skip AI agent skill installation
+curl https://cli.sentry.dev/install -fsS | bash -s -- --no-agent-skills
+```
+
+You can also set `SENTRY_INSTALL_DIR` to override the binary installation directory:
+
+```bash
+SENTRY_INSTALL_DIR=~/.local/bin curl https://cli.sentry.dev/install -fsS | bash
+```
+
 ### Supported Platforms
 
 {/* GENERATED:START platform-support */}

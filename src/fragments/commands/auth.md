@@ -69,6 +69,12 @@ sentry auth logout
 
 ```bash
 sentry auth refresh
+
+# Refresh with read-only scopes
+sentry auth refresh --read-only
+
+# Refresh with specific scopes
+sentry auth refresh --scope project:read --scope org:read
 ```
 
 ### Print stored token
