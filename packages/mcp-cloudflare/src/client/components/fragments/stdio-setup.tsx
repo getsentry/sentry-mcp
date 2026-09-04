@@ -1,8 +1,8 @@
-import CodeSnippet from "../ui/code-snippet";
 import skillDefinitions from "@sentry/mcp-core/skillDefinitions";
 import { NPM_PACKAGE_NAME, SCOPES } from "../../../constants";
-import { Prose } from "../ui/prose";
 import { Link } from "../ui/base";
+import CodeSnippet from "../ui/code-snippet";
+import { Prose } from "../ui/prose";
 import InstallTabs, { Tab } from "./install-tabs";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
@@ -180,16 +180,16 @@ export default function StdioSetup() {
   );
 }
 
+import { AmpInstructions } from "./instructions/amp";
 // Import IDE instruction components
 import { ClaudeCodeInstructions } from "./instructions/claude-code";
-import { CursorInstructions } from "./instructions/cursor";
-import { VSCodeInstructions } from "./instructions/vscode";
 import { CodexCLIInstructions } from "./instructions/codex-cli";
-import { AmpInstructions } from "./instructions/amp";
+import { CursorInstructions } from "./instructions/cursor";
+import { FxInstructions } from "./instructions/fx";
 import { GeminiInstructions } from "./instructions/gemini";
 import { OpenCodeInstructions } from "./instructions/opencode";
+import { VSCodeInstructions } from "./instructions/vscode";
 import { WarpInstructions } from "./instructions/warp";
-import { WindsurfInstructions } from "./instructions/windsurf";
 import { ZedInstructions } from "./instructions/zed";
 
 interface StdioSetupTabsProps {
@@ -235,8 +235,8 @@ export function StdioSetupTabs({
         <WarpInstructions transport="stdio" />
       </Tab>
 
-      <Tab id="windsurf" title="Windsurf">
-        <WindsurfInstructions transport="stdio" />
+      <Tab id="fx" title="fx">
+        <FxInstructions transport="stdio" />
       </Tab>
 
       <Tab id="zed" title="Zed">
