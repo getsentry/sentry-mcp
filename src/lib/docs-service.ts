@@ -48,6 +48,12 @@ async function postDocs<T>(
         EXIT.API
       );
     }
+    if (parsed?.code === "DOCS_MODEL_UNAVAILABLE") {
+      throw new CliError(
+        "Sentry Docs AI is temporarily unavailable in this region. Please try again later.",
+        EXIT.API
+      );
+    }
     if (typeof parsed?.error === "string") {
       detail = parsed.error;
     }
