@@ -17,6 +17,32 @@ import { queryDocs } from "../../src/lib/docs-service.js";
 import { EXIT, isUserError } from "../../src/lib/errors.js";
 
 describe("queryDocs", () => {
+  test("explains when Docs AI is unavailable in the service region", async () => {
+    refreshToken.mockResolvedValue({ token: "test-token" });
+    customFetch.mockResolvedValue({
+      ok: false,
+      status: 502,
+      text: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          code: "DOCS_MODEL_UNAVAILABLE",
+          error: "Sentry Docs AI is temporarily unavailable in this region.",
+        })
+      ),
+    });
+
+    await expect(
+      queryDocs("How do I configure tracing?", {
+        frameworks: [],
+        languages: [],
+        sentryConfigured: false,
+      })
+    ).rejects.toMatchObject({
+      exitCode: EXIT.API,
+      message:
+        "Sentry Docs AI is temporarily unavailable in this region. Please try again later.",
+    });
+  });
+
   test("explains when the service cannot verify a cited answer", async () => {
     refreshToken.mockResolvedValue({ token: "test-token" });
     customFetch.mockResolvedValue({
