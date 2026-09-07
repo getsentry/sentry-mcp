@@ -68,7 +68,9 @@ vi.mock("node:child_process", async (importOriginal) => {
 });
 
 vi.mock("@sentry/node-core/light", () => ({
+  addBreadcrumb: vi.fn(),
   captureException: vi.fn(),
+  setTag: vi.fn(),
 }));
 
 import { verifySetup } from "../../../src/lib/init/verify-setup.js";
