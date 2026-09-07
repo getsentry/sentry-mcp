@@ -14,7 +14,11 @@
 
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
-import { captureException } from "@sentry/node-core/light";
+import {
+  addBreadcrumb,
+  captureException,
+  setTag,
+} from "@sentry/node-core/light";
 import { createSpotlightBuffer } from "@spotlightjs/spotlight/sdk";
 import { BUFFER_SIZE, shutdownServer } from "../../commands/local/run.js";
 import { buildApp, tryListen } from "../../commands/local/server.js";
@@ -320,6 +324,21 @@ async function cleanupProcessTree(child: ChildProcess): Promise<void> {
   }
 }
 
+type VerificationSkipReason = "no_dev_command" | "server_bind" | "spawn_failed";
+
+/**
+ * Expected verification skips are not failures. Emitting them with
+ * `captureException` produced ERROR events on healthy completed runs.
+ */
+function recordVerificationSkipped(reason: VerificationSkipReason): void {
+  addBreadcrumb({
+    category: "wizard.verify",
+    level: "info",
+    message: `skipped:${reason}`,
+  });
+  setTag("wizard.verify", "skipped");
+}
+
 /**
  * Outcome of {@link verifySetup}, surfaced to the completion screen so it can
  * celebrate a received event (and deep-link it) instead of only telling the
@@ -352,12 +371,7 @@ export async function verifySetup(
   const detected = await detectDevCommand(cwd);
   if (!detected) {
     ui.log.info("Skipping verification — could not detect a dev command");
-    captureException(new Error("init verification skipped"), {
-      tags: {
-        "wizard.platform": String(result.result?.platform ?? "unknown"),
-        "wizard.verify": "no_dev_command",
-      },
-    });
+    recordVerificationSkipped("no_dev_command");
     return { verified: false, kind: "skipped" };
   }
 
@@ -375,6 +389,7 @@ export async function verifySetup(
   } catch (error) {
     logger.debug("Failed to start verification server", error);
     ui.log.warn("Skipping verification — could not start local server.");
+    recordVerificationSkipped("server_bind");
     return { verified: false, kind: "skipped" };
   }
 
@@ -419,6 +434,7 @@ export async function verifySetup(
     logger.debug("Failed to spawn verification child", error);
     await shutdownServer(server);
     ui.log.warn("Skipping verification — could not start the dev command.");
+    recordVerificationSkipped("spawn_failed");
     return { verified: false, kind: "skipped" };
   }
 
@@ -558,6 +574,7 @@ function reportOutcome(outcome: VerifyOutcome, ctx: ReportContext): void {
   if (outcome.kind === "spawn_error") {
     logger.debug("Failed to spawn verification child", outcome.error);
     ui.log.warn("Skipping verification — could not start the dev command.");
+    recordVerificationSkipped("spawn_failed");
     return;
   }
 
