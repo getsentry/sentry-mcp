@@ -133,8 +133,9 @@ sentry auth
 You'll be given a URL and a code to enter. Once you authorize the application
 in your browser, the CLI stores the OAuth credentials. When the server provides
 a refresh token, the CLI refreshes the access token automatically. Persist the
-Sentry CLI configuration directory (`~/.sentry/` by default, overridable with
-`SENTRY_CONFIG_DIR`) across runs to keep automatic refresh working.
+Sentry CLI configuration directory (`$XDG_CONFIG_HOME/sentry/`, defaulting to
+`~/.config/sentry/`, overridable with `SENTRY_CONFIG_DIR`) across runs to keep
+automatic refresh working.
 
 ### API Token
 
@@ -177,7 +178,7 @@ See the [Self-Hosted](../self-hosted/) guide for full setup details.
 
 ## Configuration
 
-Credentials are stored in a SQLite database at `~/.sentry/` with restricted file permissions (mode 600) for security. See [Configuration](../configuration/) for environment variables and customization options.
+Credentials are stored in a SQLite database under `$XDG_CONFIG_HOME/sentry/` (defaulting to `~/.config/sentry/`) with restricted file permissions (mode 600) for security. See [Configuration](../configuration/) for environment variables and customization options.
 
 ## Next Steps
 

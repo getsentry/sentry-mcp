@@ -103,7 +103,7 @@ The `sentry api` command also uses `--verbose` to show full HTTP request/respons
 
 ## Credential Storage
 
-We store credentials and caches in a SQLite database (`cli.db`) inside the config directory (`~/.sentry/` by default, overridable via `SENTRY_CONFIG_DIR`). The database file and its WAL side-files are created with restricted permissions (mode 600) so that only the current user can read them. The database also caches:
+We store credentials and caches in a SQLite database (`cli.db`) inside the config directory. The location follows the [XDG Base Directory specification](https://specifications.freedesktop.org/basedir/latest/): by default the CLI uses `$XDG_CONFIG_HOME/sentry` (i.e. `~/.config/sentry/` when `XDG_CONFIG_HOME` is unset), and you can override it with `SENTRY_CONFIG_DIR`. For backward compatibility, if a legacy `~/.sentry/` directory already exists it continues to be used. The database file and its WAL side-files are created with restricted permissions (mode 600) so that only the current user can read them. The database also caches:
 
 - Organization and project defaults
 - DSN resolution results
@@ -111,3 +111,16 @@ We store credentials and caches in a SQLite database (`cli.db`) inside the confi
 - Project aliases (for monorepo support)
 
 See [Credential Storage](./commands/auth/#credential-storage) in the auth command docs for more details.
+
+## Binary Install Location
+
+When installed via the install script, the CLI binary is placed in an XDG-aligned directory. `sentry cli setup` resolves the location in this order:
+
+1. `SENTRY_INSTALL_DIR` — explicit override
+2. `$XDG_BIN_HOME` — used when set to an absolute path, per the XDG spec
+3. `~/.local/bin` or `~/bin` — when either already exists and is on your `PATH`
+4. `~/.local/bin` — default fallback
+
+Older installs placed the binary in `~/.sentry/bin`. Running `sentry cli setup` moves an existing `~/.sentry/bin` binary into the resolved install directory (updating your `PATH` and recorded install metadata to match) and migrates any legacy `~/.sentry` config data (`cli.db`, `config.json`) into the XDG config directory. Both migrations are skipped when a binary or config already exists at the target.
+
+`sentry upgrade` runs `setup` on the new binary, so it migrates too — but conservatively, because upgrade never edits your `PATH`. A legacy `~/.sentry/bin` binary is relocated to the XDG install directory **only when that directory is already on your `PATH`**, so the moved binary stays discoverable. If the XDG directory isn't on `PATH`, upgrade leaves the binary in place (a mislocated binary that vanished from `PATH` would break the command); run `sentry cli setup` explicitly to relocate it and update `PATH`. Legacy config data is migrated on upgrade regardless.
