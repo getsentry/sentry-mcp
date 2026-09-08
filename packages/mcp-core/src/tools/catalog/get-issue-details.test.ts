@@ -2625,7 +2625,7 @@ describe("structuredContent", () => {
   it("caps related replays and reports the full count", async () => {
     // a real issue came back with 51 of these
     const many = Array.from({ length: 51 }, (_, i) =>
-      `${i}`.padStart(32, "abcdef0123456789"),
+      i.toString(16).padStart(32, "0"),
     );
     mswServer.use(
       http.get(
@@ -2636,9 +2636,17 @@ describe("structuredContent", () => {
             formatted: { format: "json", content: FORMATTER_JSON },
           }),
       ),
+      // related ids come from replay-count, keyed by the issue's numeric id. The default
+      // handler returns {}, which is what made an earlier version of this test vacuous.
+      // Echo back whichever id was asked for, so this does not depend on which issue fixture
+      // a preceding test left registered.
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/replays/",
-        () => HttpResponse.json(many.map((id) => ({ id }))),
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/replay-count/",
+        ({ request }) => {
+          const query = new URL(request.url).searchParams.get("query") ?? "";
+          const issueId = query.match(/issue\.id:\[(\d+)\]/)?.[1];
+          return HttpResponse.json(issueId ? { [issueId]: many } : {});
+        },
       ),
     );
 
@@ -2646,11 +2654,9 @@ describe("structuredContent", () => {
     const payload = (result as { structuredContent: Record<string, any> })
       .structuredContent;
 
-    if (payload.replays) {
-      expect(payload.replays.related.length).toBeLessThanOrEqual(5);
-      expect(payload.replays.relatedCount).toBeGreaterThanOrEqual(
-        payload.replays.related.length,
-      );
-    }
+    // unconditional: a guarded assertion here is how the cap went unchecked before
+    expect(payload.replays).not.toBeNull();
+    expect(payload.replays.relatedCount).toBe(51);
+    expect(payload.replays.related).toHaveLength(5);
   });
 });
