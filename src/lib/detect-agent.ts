@@ -18,6 +18,7 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 
 import { getEnv } from "./env.js";
+import { logger } from "./logger.js";
 
 /** Structured agent identity returned by detection functions. */
 export type AgentInfo = {
@@ -286,11 +287,12 @@ export async function detectAgentFromProcessTree(): Promise<
  * falls back to `ps(1)` (macOS and other Unix systems).
  * Windows is unsupported — returns `undefined`.
  */
+const log = logger.withTag("detect-agent");
+
 export async function getProcessInfoFromOS(
   pid: number
 ): Promise<ProcessInfo | undefined> {
   // Linux: /proc is an in-memory filesystem — fast even though async
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const status = await readFile(`/proc/${pid}/status`, "utf-8");
     const nameMatch = status.match(PROC_STATUS_NAME_RE);
@@ -298,13 +300,12 @@ export async function getProcessInfoFromOS(
     if (nameMatch?.[1] && ppidMatch?.[1]) {
       return { name: nameMatch[1].trim(), ppid: Number(ppidMatch[1]) };
     }
-  } catch {
-    // Not Linux or process is gone — fall through to ps
+  } catch (error) {
+    log.debug(`Could not read /proc/${pid}/status`, error);
   }
 
   // macOS / other Unix: use ps(1) asynchronously
   if (process.platform !== "win32") {
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       const result = await execFileUnreffed(
         "ps",
@@ -315,8 +316,8 @@ export async function getProcessInfoFromOS(
       if (match?.[1] && match?.[2]) {
         return { name: basename(match[2].trim()), ppid: Number(match[1]) };
       }
-    } catch {
-      // Process gone, ps not available, or timeout
+    } catch (error) {
+      log.debug(`Could not query ps for pid ${pid}`, error);
     }
   }
 }
