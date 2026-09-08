@@ -2621,4 +2621,37 @@ describe("structuredContent", () => {
     expect(payload.issue.queryPattern).toBe("SELECT * FROM users WHERE id = ?");
     expect(payload.issue.location).toBe("/api/checkout");
   });
+
+  it("caps related replays and reports the full count", async () => {
+    // a real issue came back with 51 of these. the markdown output shows a count plus the
+    // first few, so the payload should not be the one place every id lands
+    const many = Array.from({ length: 51 }, (_, i) =>
+      `${i}`.padStart(32, "abcdef0123456789"),
+    );
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/replays/",
+        () => HttpResponse.json(many.map((id) => ({ id }))),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    if (payload.replays) {
+      expect(payload.replays.related.length).toBeLessThanOrEqual(5);
+      expect(payload.replays.relatedCount).toBeGreaterThanOrEqual(
+        payload.replays.related.length,
+      );
+    }
+  });
 });
