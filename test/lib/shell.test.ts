@@ -17,6 +17,7 @@ import {
   findExistingConfigFile,
   getConfigCandidates,
   isBashAvailable,
+  isInPath,
 } from "../../src/lib/shell.js";
 import { whichSync } from "../../src/lib/which.js";
 
@@ -356,6 +357,34 @@ describe("shell utilities", () => {
 
       expect(result).toBe(false);
     });
+  });
+});
+
+describe("isInPath", () => {
+  const sep = process.platform === "win32" ? ";" : ":";
+
+  test("returns true for an exact match", () => {
+    expect(isInPath("/usr/local/bin", `/usr/bin${sep}/usr/local/bin`)).toBe(
+      true
+    );
+  });
+
+  test("returns false when the directory is absent", () => {
+    expect(isInPath("/opt/bin", `/usr/bin${sep}/usr/local/bin`)).toBe(false);
+  });
+
+  test("returns false for undefined or empty PATH", () => {
+    expect(isInPath("/usr/bin", undefined)).toBe(false);
+    expect(isInPath("/usr/bin", "")).toBe(false);
+  });
+
+  test("case sensitivity follows the platform", () => {
+    const result = isInPath("/Users/User/.local/bin", "/users/user/.local/bin");
+    if (process.platform === "win32" || process.platform === "darwin") {
+      expect(result).toBe(true);
+    } else {
+      expect(result).toBe(false);
+    }
   });
 });
 

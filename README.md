@@ -78,7 +78,7 @@ Run `sentry --help` to see all available commands, or browse the [command refere
 
 ## Configuration
 
-Credentials are stored in `~/.sentry/` with restricted permissions (mode 600).
+Credentials are stored in `$XDG_CONFIG_HOME/sentry/` (defaulting to `~/.config/sentry/`) with restricted permissions (mode 600). A pre-existing legacy `~/.sentry/` directory is still honored, and the location can be overridden with `SENTRY_CONFIG_DIR`.
 
 ## Library Usage
 
