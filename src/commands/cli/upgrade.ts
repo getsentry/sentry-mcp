@@ -16,13 +16,15 @@
 
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import type { SentryContext } from "../../context.js";
 import {
   determineInstallDir,
   isDowngrade,
+  LEGACY_INSTALL_SUBDIR,
   releaseLock,
+  samePath,
 } from "../../lib/binary.js";
 import { buildCommand } from "../../lib/command.js";
 import { CLI_VERSION } from "../../lib/constants.js";
@@ -42,6 +44,7 @@ import {
   type ChangelogSummary,
   fetchChangelog,
 } from "../../lib/release-notes.js";
+import { isInPath } from "../../lib/shell.js";
 import {
   detectInstallationMethod,
   executeUpgrade,
@@ -565,6 +568,41 @@ function resolveUpdatedCliPath(
 }
 
 /**
+ * Decide which directory a curl upgrade should install into.
+ *
+ * Normally the binary stays where it currently lives — pinning the install
+ * dir keeps an in-place update from relocating a binary that is already on
+ * the user's `PATH` (upgrade runs setup with `--no-modify-path`, so it can't
+ * add a new directory to `PATH`).
+ *
+ * The one exception is a legacy `~/.sentry/bin` install: those should move to
+ * the XDG-aligned location so users actually migrate off `~/.sentry`. We only
+ * relocate when the XDG target directory is *already* on `PATH`, so the moved
+ * binary stays discoverable without any `PATH` edit. When it isn't, we keep
+ * the binary in place and leave relocation to an explicit `sentry cli setup`.
+ */
+export function resolveUpgradeInstallDir(
+  currentInstallDir: string,
+  pathEnv: string | undefined
+): string {
+  const legacyBinDir = join(homedir(), LEGACY_INSTALL_SUBDIR);
+  if (!samePath(currentInstallDir, legacyBinDir)) {
+    return currentInstallDir;
+  }
+
+  // determineInstallDir with the legacy pin removed yields the XDG target.
+  const { SENTRY_INSTALL_DIR: _pinned, ...envWithoutPin } = process.env;
+  const xdgInstallDir = determineInstallDir(homedir(), envWithoutPin);
+  if (
+    !samePath(xdgInstallDir, legacyBinDir) &&
+    isInPath(xdgInstallDir, pathEnv)
+  ) {
+    return xdgInstallDir;
+  }
+  return currentInstallDir;
+}
+
+/**
  * Execute the standard upgrade path: download via curl or package manager,
  * then run setup on the new binary.
  */
@@ -615,17 +653,22 @@ async function executeStandardUpgrade(opts: {
   if (downloadResult) {
     // Curl: new binary is at temp path, setup --install will place it.
     // Pin the install directory via SENTRY_INSTALL_DIR so the child's
-    // determineInstallDir() doesn't relocate to a different directory.
+    // determineInstallDir() doesn't relocate to a directory that isn't on
+    // PATH. A legacy ~/.sentry/bin install is relocated to the XDG dir when
+    // that dir is already on PATH (see resolveUpgradeInstallDir); setup's
+    // legacy-binary migration then moves the old binary and removes it before
+    // --install writes the new one.
     // Release the download lock after the child exits — if the child used
     // the same lock path (ppid takeover), this is a harmless no-op.
     const currentInstallDir = dirname(getCurlInstallPaths().installPath);
+    const installDir = resolveUpgradeInstallDir(currentInstallDir, pathEnv);
     try {
       await runSetupOnNewBinary({
         binaryPath: downloadResult.tempBinaryPath,
         method,
         channel,
         install: true,
-        installDir: currentInstallDir,
+        installDir,
         ensureAuthScopes: !json,
         noAgentSkills,
       });

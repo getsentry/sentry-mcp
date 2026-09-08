@@ -4,8 +4,9 @@
  * Integration tests for SQLite-based config storage.
  */
 
-import { writeFileSync } from "node:fs";
-import { access } from "node:fs/promises";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { access, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
@@ -26,6 +27,7 @@ import {
   CONFIG_DIR_ENV_VAR,
   closeDatabase,
   getDbPath,
+  resolveConfigDir,
 } from "../../src/lib/db/index.js";
 import {
   clearProjectAliases,
@@ -558,6 +560,62 @@ describe("getDbPath", () => {
     const path = getDbPath();
     expect(path).toContain("cli.db");
     expect(path).toContain(getConfigDir());
+  });
+});
+
+describe("resolveConfigDir", () => {
+  let home: string;
+
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), "resolve-config-home-"));
+  });
+
+  afterEach(async () => {
+    await rm(home, { recursive: true, force: true });
+  });
+
+  test("prefers the SENTRY_CONFIG_DIR override over everything", () => {
+    const override = join(home, "custom-config");
+    mkdirSync(join(home, ".sentry"));
+    expect(
+      resolveConfigDir(
+        {
+          [CONFIG_DIR_ENV_VAR]: override,
+          XDG_CONFIG_HOME: join(home, "xdg"),
+        },
+        home
+      )
+    ).toBe(override);
+  });
+
+  test("uses the legacy ~/.sentry directory when it already exists", () => {
+    const legacy = join(home, ".sentry");
+    mkdirSync(legacy);
+    writeFileSync(join(legacy, "cli.db"), ""); // simulate a prior config install
+    expect(resolveConfigDir({}, home)).toBe(legacy);
+  });
+
+  test("ignores a bare ~/.sentry/bin (installer artifact) and falls back to XDG", () => {
+    const legacy = join(home, ".sentry");
+    mkdirSync(join(legacy, "bin"), { recursive: true });
+    expect(resolveConfigDir({}, home)).toBe(join(home, ".config", "sentry"));
+  });
+
+  test("uses XDG_CONFIG_HOME/sentry when set to an absolute path", () => {
+    const xdg = join(home, "xdg-config");
+    expect(resolveConfigDir({ XDG_CONFIG_HOME: xdg }, home)).toBe(
+      join(xdg, "sentry")
+    );
+  });
+
+  test("falls back to ~/.config/sentry when XDG_CONFIG_HOME is unset", () => {
+    expect(resolveConfigDir({}, home)).toBe(join(home, ".config", "sentry"));
+  });
+
+  test("ignores a non-absolute XDG_CONFIG_HOME per the XDG spec", () => {
+    expect(resolveConfigDir({ XDG_CONFIG_HOME: "relative/path" }, home)).toBe(
+      join(home, ".config", "sentry")
+    );
   });
 });
 

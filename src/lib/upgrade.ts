@@ -19,11 +19,12 @@ import {
 } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join, sep } from "node:path";
+import { dirname, isAbsolute, join, sep } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import {
   acquireLock,
   cleanupOldBinary,
+  determineInstallDir,
   fetchWithUpgradeError,
   GITHUB_RELEASES_URL,
   getBinaryDownloadUrl,
@@ -89,18 +90,34 @@ export const VERSION_PREFIX_REGEX = /^v/;
 // Curl Binary Helpers
 
 /**
- * Known directories where the curl installer may place the binary.
- * Resolved at runtime against the user's home directory.
- * Used for legacy detection (when no install info is stored).
- * Trailing separator ensures startsWith matches a directory boundary
- * (e.g. ~/.local/bin/ won't match ~/.local/binaries/).
- *
- * Computed lazily (not at module load) to avoid TDZ issues from circular
- * imports — `KNOWN_CURL_DIRS` must be fully initialized before access.
+ * Build the list of known curl install directories the binary may live in,
+ * each with a trailing separator so `startsWith` matches a directory boundary
+ * (e.g. `~/.local/bin/` won't match `~/.local/binaries/`). Pure — takes home
+ * and env — so it can be unit-tested; `getKnownCurlPaths` memoizes the result.
+ */
+export function buildKnownCurlPaths(
+  homeDir: string,
+  env: NodeJS.ProcessEnv
+): string[] {
+  const paths = KNOWN_CURL_DIRS.map((dir) => join(homeDir, dir) + sep);
+  // Honor an absolute XDG_BIN_HOME, matching determineInstallDir's precedence.
+  const xdgBinHome = env.XDG_BIN_HOME;
+  if (xdgBinHome && isAbsolute(xdgBinHome)) {
+    // join(dir, ".") strips any trailing separator so we don't emit a double
+    // separator (e.g. `/custom/bin//`) that would break the startsWith checks.
+    paths.push(join(xdgBinHome, ".") + sep);
+  }
+  return paths;
+}
+
+/**
+ * Memoized known curl paths. Computed lazily (not at module load) to avoid TDZ
+ * issues from circular imports — `KNOWN_CURL_DIRS` must be fully initialized
+ * before access.
  */
 let _knownCurlPaths: string[] | undefined;
 function getKnownCurlPaths(): string[] {
-  _knownCurlPaths ??= KNOWN_CURL_DIRS.map((dir) => join(homedir(), dir) + sep);
+  _knownCurlPaths ??= buildKnownCurlPaths(homedir(), process.env);
   return _knownCurlPaths;
 }
 
@@ -111,7 +128,7 @@ function getKnownCurlPaths(): string[] {
  * 1. Stored install path from DB (if method is curl AND its directory still
  *    exists — a stale path whose directory was purged is skipped)
  * 2. process.execPath if it's in a known curl install location
- * 3. Default to ~/.sentry/bin/sentry (fallback for fresh installs)
+ * 3. Default to the XDG-aware install dir (fallback for fresh installs)
  *
  * @returns Object with install, temp, old, and lock file paths
  */
@@ -128,7 +145,7 @@ export function getCurlInstallPaths(): {
   // `ENOENT ... open '.../sentry.lock'` (reported in #discuss-cli).
   //
   // existsSync also returns false on EACCES / a transiently-unmounted parent,
-  // in which case we fall through to execPath / the ~/.sentry/bin fallback
+  // in which case we fall through to execPath / the default-install fallback
   // rather than erroring. That tradeoff is acceptable: the running binary's
   // own directory (execPath) is by definition accessible, so a genuine install
   // is still found; only an unreadable *stored hint* is ignored.
@@ -149,7 +166,10 @@ export function getCurlInstallPaths(): {
   }
 
   // Fallback to default path (for fresh installs or non-curl runs like tests)
-  const defaultPath = join(homedir(), ".sentry", "bin", getBinaryFilename());
+  const defaultPath = join(
+    determineInstallDir(homedir(), process.env),
+    getBinaryFilename()
+  );
   return getBinaryPaths(defaultPath);
 }
 

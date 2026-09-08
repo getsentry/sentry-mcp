@@ -19,7 +19,7 @@ import {
 } from "node:fs";
 import { access, readFile, unlink, writeFile } from "node:fs/promises";
 import { homedir, platform } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { gzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -129,6 +129,7 @@ import { UpgradeError } from "../../src/lib/errors.js";
 import { isProcessRunning } from "../../src/lib/process-utils.js";
 
 const {
+  buildKnownCurlPaths,
   detectInstallationMethod,
   detectPackageManagerFromPath,
   downloadBinaryToTemp,
@@ -983,6 +984,40 @@ describe("getBinaryDownloadUrl", () => {
     // Should include architecture
     const arch = process.arch === "arm64" ? "arm64" : "x64";
     expect(url).toContain(arch);
+  });
+});
+
+describe("buildKnownCurlPaths", () => {
+  test("appends a trailing separator to each known dir", () => {
+    const paths = buildKnownCurlPaths("/home/user", {});
+    expect(paths).toContain(join("/home/user", ".local", "bin") + sep);
+    expect(paths).toContain(join("/home/user", ".sentry", "bin") + sep);
+    expect(paths.every((p) => p.endsWith(sep))).toBe(true);
+  });
+
+  test("includes an absolute XDG_BIN_HOME", () => {
+    const xdgBin = join(homedir(), "custom", "bin");
+    const paths = buildKnownCurlPaths("/home/user", { XDG_BIN_HOME: xdgBin });
+    expect(paths).toContain(xdgBin + sep);
+  });
+
+  test("normalizes a trailing slash on XDG_BIN_HOME (no double separator)", () => {
+    const xdgBin = join(homedir(), "custom", "bin");
+    const paths = buildKnownCurlPaths("/home/user", {
+      // Trailing separator on the configured dir must be normalized away.
+      XDG_BIN_HOME: xdgBin + sep,
+    });
+    // Must end with a single sep, never a double sep which would break
+    // process.execPath.startsWith() directory-boundary checks.
+    expect(paths).toContain(xdgBin + sep);
+    expect(paths.some((p) => p.includes(sep + sep))).toBe(false);
+  });
+
+  test("ignores a non-absolute XDG_BIN_HOME", () => {
+    const paths = buildKnownCurlPaths("/home/user", {
+      XDG_BIN_HOME: join("relative", "bin"),
+    });
+    expect(paths.some((p) => p.includes(`relative${sep}bin`))).toBe(false);
   });
 });
 
