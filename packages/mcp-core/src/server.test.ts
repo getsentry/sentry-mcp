@@ -2,7 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import { type Span, setUser, startSpan } from "@sentry/core";
-import { mswServer } from "@sentry/mcp-server-mocks";
+import { createDefaultEvent, mswServer } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -1347,6 +1347,59 @@ describe("buildServer", () => {
       expect(getTextContent(result)).toContain(
         "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
       );
+    });
+
+    it.each(["get_sentry_resource", "get_issue_details"])(
+      "dispatches package selection through %s",
+      async (toolName) => {
+        const eventId = "7ca573c0f4814912aaa9bdc77d1a7d51";
+        mswServer.use(
+          http.get(
+            `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/${eventId}/`,
+            () =>
+              HttpResponse.json({
+                ...createDefaultEvent({ id: eventId, contexts: {} }),
+                packages: { example: "1.2.3", unrelated: "9.9.9" },
+                formatted: { format: "markdown", content: "Synthetic event" },
+              }),
+          ),
+        );
+        const server = buildServer({
+          context: {
+            ...baseContext,
+            constraints: {
+              organizationSlug: "sentry-mcp-evals",
+              projectSlug: "CLOUDFLARE-MCP",
+            },
+          },
+        });
+        const result = await callRegisteredTool(server, "execute_sentry_tool", {
+          name: toolName,
+          arguments: {
+            ...(toolName === "get_sentry_resource"
+              ? { resourceType: "event", resourceId: eventId }
+              : { eventId }),
+            packageNames: ["example"],
+          },
+        });
+        expect(getTextContent(result)).toContain("example: 1.2.3");
+        expect(result.isError).not.toBe(true);
+        expect(getTextContent(result)).not.toContain("unrelated");
+      },
+    );
+
+    it("rejects excessive package selection at the MCP boundary", async () => {
+      const result = await callRegisteredTool(
+        buildServer({ context: baseContext }),
+        "get_sentry_resource",
+        {
+          resourceType: "event",
+          resourceId: "7ca573c0f4814912aaa9bdc77d1a7d51",
+          organizationSlug: "sentry-mcp-evals",
+          packageNames: Array.from({ length: 11 }, (_, i) => `package${i}`),
+        },
+      );
+      expect(result.isError).toBe(true);
     });
 
     it("execute_sentry_tool dispatches to catalog-only event stacktrace", async () => {

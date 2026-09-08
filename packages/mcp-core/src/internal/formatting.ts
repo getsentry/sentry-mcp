@@ -1948,6 +1948,36 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
   return `${parts.join("\n")}\n\n`;
 }
 
+function formatEventPackages(event: Event, packageNames: string[]): string {
+  let output = "\n### Selected Package Versions\n\n";
+  const packages = event.packages;
+  if (!packages || Object.keys(packages).length === 0) {
+    return `${output}Package metadata is unavailable for this event.\n\n`;
+  }
+
+  for (const name of new Set(packageNames)) {
+    const version = Object.hasOwn(packages, name) ? packages[name] : undefined;
+    const value =
+      version === undefined
+        ? "Not listed in this event's package metadata"
+        : !version?.trim()
+          ? "Version not recorded"
+          : version.length > 256
+            ? `${version.slice(0, 256)}… (truncated)`
+            : version;
+    output += `- ${formatPackageText(name)}: ${formatPackageText(value)}\n`;
+  }
+  return `${output}\n`;
+}
+
+function formatPackageText(value: string): string {
+  return value
+    .replace(/[\r\n\t]/g, " ")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/([\\`*_\[\]|>])/g, "\\$1");
+}
+
 /**
  * Formats a Sentry issue with its latest event into comprehensive markdown output.
  * Includes issue metadata, event details, and usage instructions.
@@ -1956,6 +1986,7 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
  * @returns Formatted markdown string with complete issue information
  */
 export function formatIssueOutput({
+  packageNames,
   organizationSlug,
   issue,
   event,
@@ -1970,6 +2001,7 @@ export function formatIssueOutput({
   availableToolNames,
   directToolNames,
 }: {
+  packageNames?: string[];
   organizationSlug: string;
   issue: Issue;
   event: Event;
@@ -2112,6 +2144,10 @@ export function formatIssueOutput({
       });
     }
 
+    if (packageNames?.length) {
+      output += formatEventPackages(event, packageNames);
+    }
+
     // For unsupported event types, return early without trying to render event details
     return output;
   }
@@ -2167,6 +2203,10 @@ export function formatIssueOutput({
         directToolNames,
       },
     });
+  }
+
+  if (packageNames?.length) {
+    output += formatEventPackages(event, packageNames);
   }
 
   // Add Seer context if available

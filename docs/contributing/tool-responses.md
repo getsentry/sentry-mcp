@@ -115,6 +115,26 @@ When changing Sentry API endpoint usage, validate the upstream behavior in
 should model what Sentry returns, but tool responses should model what users
 need.
 
+## Selected Event Package Versions
+
+Use `get_sentry_resource` with `resourceType: "event"` (or an event URL) and
+`packageNames: ["example-package", "@example/client"]` to inspect dependency
+versions recorded with that event. The catalog tool `get_issue_details` accepts
+the same selection with an explicit `eventId`.
+
+- Selection is optional: omitting it preserves the ordinary response.
+- Accept 1–10 exact, case-sensitive names, each up to 256 characters. Duplicate
+  names produce one entry; package names are not normalized across ecosystems.
+- Append selected versions after either Sentry-supplied Markdown or local event
+  formatting, using the existing response's `packages` map without extra API calls.
+- Missing, null, and empty maps mean metadata is unavailable. In a populated map,
+  distinguish a name not listed from a null or blank version. Neither proves a
+  dependency was absent from the application.
+- Truncate versions after 256 characters with an explicit marker and escape
+  Markdown in package data. Do not render unrelated packages.
+- Package selection requires an exact event; issue/latest-event and other resource
+  lookups reject it.
+
 ## Structured Content
 
 MCP tools may expose `structuredContent` alongside generated text `content`.

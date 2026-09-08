@@ -27,6 +27,7 @@ import {
   ParamIssueShortId,
   ParamIssueUrl,
   ParamOrganizationSlug,
+  ParamPackageNames,
   ParamRegionUrl,
 } from "../../schema";
 import { logError } from "../../telem/logging";
@@ -48,6 +49,7 @@ export default defineTool({
     "- Provide a specific issue ID (e.g., 'CLOUDFLARE-MCP-41', 'PROJECT-123')",
     "- Ask to 'explain [ISSUE-ID]', 'tell me about [ISSUE-ID]'",
     "- Want details/stacktrace/analysis for a known issue",
+    "- Need installed package versions for an exact event (pass eventId and packageNames)",
     "- Provide a Sentry issue URL",
     "",
     "DO NOT USE for:",
@@ -87,6 +89,7 @@ export default defineTool({
     issueId: ParamIssueShortId.optional(),
     eventId: ParamEventId.optional(),
     issueUrl: ParamIssueUrl.optional(),
+    packageNames: ParamPackageNames.optional(),
   },
   annotations: {
     readOnlyHint: true,
@@ -94,6 +97,9 @@ export default defineTool({
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
+    if (params.packageNames && !params.eventId) {
+      throw new UserInputError("`packageNames` requires an explicit `eventId`.");
+    }
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
     });
@@ -169,6 +175,7 @@ export default defineTool({
       ]);
 
       return formatIssueOutput({
+        packageNames: params.packageNames,
         organizationSlug: orgSlug,
         issue,
         event,

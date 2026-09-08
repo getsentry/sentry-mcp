@@ -13,6 +13,7 @@ import {
 } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import type { Skill } from "../../skills";
 import { getTextContent } from "../../test-utils/structured-content";
 import getIssueDetails from "./get-issue-details.js";
@@ -2327,5 +2328,223 @@ describe("get_issue_details", () => {
     ).rejects.toThrow(
       'Issue is outside the active project constraint. Expected project "frontend".',
     );
+  });
+});
+
+describe("selected event package versions", () => {
+  const eventId = "7ca573c0f4814912aaa9bdc77d1a7d51";
+  const params = {
+    organizationSlug: "sentry-mcp-evals",
+    issueId: "CLOUDFLARE-MCP-41",
+    eventId,
+    regionUrl: null,
+    packageNames: ["example", "@example/client", "missing"],
+  };
+
+  function mockPackages(packages: unknown, suppliedFormatting = true) {
+    mswServer.use(
+      http.get(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/${eventId}/`,
+        ({ request }) => {
+          expect(new URL(request.url).searchParams.get("llmFormat")).toBe(
+            "markdown",
+          );
+          return HttpResponse.json({
+            ...createDefaultEvent({ id: eventId, contexts: {} }),
+            packages,
+            formatted: suppliedFormatting
+              ? {
+                  format: "markdown",
+                  content: "### Message\n\nSynthetic event",
+                }
+              : undefined,
+          });
+        },
+      ),
+    );
+  }
+
+  it("adds only selected versions to supplied Markdown", async () => {
+    mockPackages({
+      example: "1.2.3",
+      "@example/client": "2.0.0",
+      unrelated: "9.9.9",
+    });
+    const result = await getIssueDetails.handler(params, baseContext);
+    expect(result).not.toContain("unrelated");
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
+
+      **Description**: Error: Tool list_organizations is already registered
+      **Culprit**: Object.fetch(index)
+      **First Seen**: 2025-04-03T22:51:19.403Z
+      **Last Seen**: 2025-04-12T11:34:11.000Z
+      **Occurrences**: 25
+      **Users Impacted**: 1
+      **Status**: unresolved
+      **Substatus**: ongoing
+      **Assigned To**: Jane Developer (User)
+      **Issue Type**: error
+      **Issue Category**: error
+      **Platform**: javascript
+      **Project**: CLOUDFLARE-MCP
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
+
+      ## Event Details
+
+      **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
+      **Type**: default
+      **Occurred At**: 2025-10-02T12:00:00.000Z
+      **Message**:
+      Something went wrong
+
+      ### Message
+
+      Synthetic event
+
+      ### Selected Package Versions
+
+      - example: 1.2.3
+      - @example/client: 2.0.0
+      - missing: Not listed in this event's package metadata
+
+      ## Response Notes
+
+      - Commit message issue reference: \`Fixes CLOUDFLARE-MCP-41\` automatically closes the issue when the commit is merged.
+      - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
+      - Issue event search: Use the Sentry tool \`search_issue_events\`
+      "
+    `);
+  });
+
+  it("adds selected versions with the local fallback formatter", async () => {
+    mockPackages({ example: "1.2.3", unrelated: "9.9.9" }, false);
+    const result = await getIssueDetails.handler(params, baseContext);
+    expect(result).toContain("### Selected Package Versions");
+    expect(result).toContain("example: 1.2.3");
+    expect(result).not.toContain("unrelated");
+  });
+
+  it.each([undefined, null, {}])(
+    "reports unavailable metadata for %j",
+    async (packages) => {
+      mockPackages(packages);
+      const result = await getIssueDetails.handler(params, baseContext);
+      expect(result).toContain(
+        "Package metadata is unavailable for this event.",
+      );
+      expect(result).not.toContain("Not listed");
+    },
+  );
+
+  it("distinguishes absent names and unrecorded versions", async () => {
+    mockPackages({ example: null, "@example/client": "" });
+    const result = await getIssueDetails.handler(params, baseContext);
+    expect(result).toContain("example: Version not recorded");
+    expect(result).toContain("@example/client: Version not recorded");
+    expect(result).toContain(
+      "missing: Not listed in this event's package metadata",
+    );
+  });
+
+  it("matches exact names, deduplicates selections, and ignores inherited properties", async () => {
+    mockPackages({ example: "1" });
+    const result = await getIssueDetails.handler(
+      {
+        ...params,
+        packageNames: ["example", "example", "Example", "constructor"],
+      },
+      baseContext,
+    );
+    expect(String(result).match(/- example: 1/g)).toHaveLength(1);
+    expect(result).toContain("Example: Not listed");
+    expect(result).toContain("constructor: Not listed");
+  });
+
+  it("caps versions and keeps package data inside list entries", async () => {
+    mockPackages({
+      example: "v".repeat(300),
+      "<script>\n# heading": "`value`\n# heading",
+    });
+    const result = await getIssueDetails.handler(
+      { ...params, packageNames: ["example", "<script>\n# heading"] },
+      baseContext,
+    );
+    expect(result).toContain("v".repeat(256));
+    expect(result).not.toContain("v".repeat(257));
+    expect(result).toContain("truncated");
+    expect(result).not.toContain("<script>");
+    expect(result).not.toContain("\n# heading");
+  });
+
+  it.each([true, false])(
+    "preserves ordinary output when selection is omitted (supplied=%s)",
+    async (supplied) => {
+      mockPackages({ example: "1.2.3" }, supplied);
+      const withMetadata = await getIssueDetails.handler(
+        { ...params, packageNames: undefined },
+        baseContext,
+      );
+      mockPackages(undefined, supplied);
+      const withoutMetadata = await getIssueDetails.handler(
+        { ...params, packageNames: undefined },
+        baseContext,
+      );
+      expect(withMetadata).toEqual(withoutMetadata);
+      expect(withMetadata).not.toContain("Selected Package Versions");
+    },
+  );
+
+  it.each(
+    [
+      [],
+      Array.from({ length: 11 }, (_, i) => `package${i}`),
+      [""],
+      ["x".repeat(257)],
+    ].map((packageNames) => ({ packageNames })),
+  )("rejects out-of-bounds selection %j", ({ packageNames }) => {
+    expect(
+      z
+        .object(getIssueDetails.inputSchema)
+        .safeParse({ ...params, packageNames }).success,
+    ).toBe(false);
+  });
+
+  it("accepts the maximum bounded selection", async () => {
+    const packageNames = Array.from(
+      { length: 10 },
+      (_, i) => `${i}${"x".repeat(255)}`,
+    );
+    mockPackages(
+      Object.fromEntries(packageNames.map((name) => [name, "v".repeat(256)])),
+    );
+    const input = z
+      .object(getIssueDetails.inputSchema)
+      .parse({ ...params, packageNames });
+    const result = await getIssueDetails.handler(input, baseContext);
+    expect(String(result).match(/: v{256}/g)).toHaveLength(10);
+    expect(result).not.toContain("truncated");
+  });
+
+  it("retains selected packages even for an unsupported event type", async () => {
+    mswServer.use(
+      http.get(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/${eventId}/`,
+        () =>
+          HttpResponse.json({
+            ...createUnknownEvent({ id: eventId, contexts: {} }),
+            packages: { example: "1.2.3" },
+          }),
+      ),
+    );
+    const result = await getIssueDetails.handler(params, baseContext);
+    expect(result).toContain("Unsupported event type");
+    expect(result).toContain("example: 1.2.3");
+  });
+
+  it("requires an exact event", async () => {
+    await expect(
+      getIssueDetails.handler({ ...params, eventId: undefined }, baseContext),
+    ).rejects.toThrow("requires an explicit `eventId`");
   });
 });
