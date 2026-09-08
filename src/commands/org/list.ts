@@ -18,6 +18,7 @@ import {
   FRESH_ALIASES,
   FRESH_FLAG,
 } from "../../lib/list-command.js";
+import { logger } from "../../lib/logger.js";
 import { withProgress } from "../../lib/polling.js";
 import type { SentryOrganization, Writer } from "../../types/index.js";
 
@@ -46,8 +47,9 @@ type OrgListEntry = SentryOrganization & { region?: string };
  * @example "https://de.sentry.io" -> "EU"
  * @example "https://east-1.us.sentry.io" -> "EAST-1.US"
  */
+const log = logger.withTag("org.list");
+
 function getRegionDisplayName(regionUrl: string): string {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const url = new URL(regionUrl);
     const { hostname } = url;
@@ -69,7 +71,8 @@ function getRegionDisplayName(regionUrl: string): string {
       sentry: "US", // sentry.io defaults to US
     };
     return regionMap[regionPart] ?? regionPart.toUpperCase();
-  } catch {
+  } catch (error) {
+    log.debug(`Failed to parse region URL "${regionUrl}"`, error);
     return "?";
   }
 }
