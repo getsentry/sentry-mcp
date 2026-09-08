@@ -18,6 +18,7 @@ import {
 import { OutputError } from "../../lib/errors.js";
 import { formatFixResult } from "../../lib/formatters/human.js";
 import { CommandOutput } from "../../lib/formatters/output.js";
+import { logger } from "../../lib/logger.js";
 import { getRealUsername } from "../../lib/utils.js";
 
 type FixFlags = {
@@ -251,8 +252,9 @@ async function checkOwnership(
  * Uses `execFileSync` (not `execSync`) so the username is passed as a
  * separate argument — the shell never interpolates it, preventing injection.
  */
+const log = logger.withTag("cli.fix");
+
 function resolveUid(username: string): number | null {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const result = execFileSync("id", ["-u", "--", username], {
       encoding: "utf-8",
@@ -260,7 +262,8 @@ function resolveUid(username: string): number | null {
     });
     const uid = Number(result.trim());
     return Number.isNaN(uid) ? null : uid;
-  } catch {
+  } catch (error) {
+    log.debug(`Failed to resolve UID for user "${username}"`, error);
     return null;
   }
 }
