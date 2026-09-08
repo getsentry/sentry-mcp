@@ -26,7 +26,11 @@ import { TEST_TMP_DIR } from "../../constants.js";
  * delegates to the real `spawn`, so commands like `printenv`/`true` run for
  * real and exit codes propagate normally.
  */
-const spawnCapture: { args?: readonly string[]; env?: NodeJS.ProcessEnv } = {};
+const spawnCapture: {
+  args?: readonly string[];
+  env?: NodeJS.ProcessEnv;
+  stdio?: Parameters<typeof import("node:child_process").spawn>[2]["stdio"];
+} = {};
 
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
@@ -39,6 +43,9 @@ vi.mock("node:child_process", async (importOriginal) => {
     ) => {
       spawnCapture.args = args;
       spawnCapture.env = (options as { env?: NodeJS.ProcessEnv })?.env;
+      spawnCapture.stdio = (
+        options as { stdio?: typeof spawnCapture.stdio }
+      )?.stdio;
       return actual.spawn(cmd, args as string[], options);
     },
   };
@@ -46,7 +53,15 @@ vi.mock("node:child_process", async (importOriginal) => {
 
 type RunFunc = (
   this: unknown,
-  flags: { port: number; host: string; verify: boolean; timeout: number },
+  flags: {
+    port: number;
+    host: string;
+    verify: boolean;
+    timeout: number;
+    format?: "human" | "json";
+    attributes?: boolean;
+    filter?: ("error" | "transaction" | "log" | "ai")[];
+  },
   ...args: string[]
 ) => Promise<void>;
 
@@ -76,6 +91,7 @@ describe("sentry local run", () => {
   beforeEach(() => {
     spawnCapture.args = undefined;
     spawnCapture.env = undefined;
+    spawnCapture.stdio = undefined;
   });
 
   test("throws ValidationError when no command and no auto-detect", async () => {
@@ -351,6 +367,87 @@ describe("sentry local run", () => {
     expect(output).toContain("Hello from the server!");
     // A healthy attach must not emit the give-up warning.
     expect(output).not.toContain("Could not attach to the event stream");
+  });
+
+  test("writes normalized NDJSON to stdout when following an existing server", async () => {
+    // A one-command agent workflow uses `local run --format json`, including
+    // when another process already owns the local receiver.
+    const buffer = createSpotlightBuffer(10);
+    const { server, port } = await tryListen(buildApp(buffer), 0, "127.0.0.1");
+    const savedFetch = globalThis.fetch;
+    const realFetch = (globalThis as { __originalFetch?: typeof fetch })
+      .__originalFetch;
+    if (realFetch) {
+      globalThis.fetch = realFetch;
+    }
+
+    const stdoutWrites: string[] = [];
+    const stdoutSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        stdoutWrites.push(chunk.toString());
+        return true;
+      });
+
+    try {
+      await fetch(`http://127.0.0.1:${port}/stream`, {
+        method: "POST",
+        headers: { "Content-Type": SENTRY_CONTENT_TYPE },
+        body: '{"sdk":{"name":"sentry.javascript.node"}}\n{"type":"session"}\n{"timestamp":"2026-09-07T00:00:00Z"}\n{"type":"event","event_id":"event-123"}\n{"event_id":"event-123","timestamp":1750000000,"message":"JSON tail failure"}',
+      });
+
+      const func = (await runCommand.loader()) as unknown as RunFunc;
+      await func.call(
+        makeContext(),
+        {
+          port,
+          host: "127.0.0.1",
+          verify: false,
+          timeout: 0,
+          format: "json",
+          attributes: false,
+          filter: ["error"],
+        },
+        "sleep",
+        "1"
+      );
+    } finally {
+      stdoutSpy.mockRestore();
+      globalThis.fetch = savedFetch;
+      await shutdownServer(server);
+    }
+
+    const records = stdoutWrites
+      .join("")
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(records).toEqual([
+      expect.objectContaining({
+        schema_version: 1,
+        event_id: "event-123",
+        message: "JSON tail failure",
+      }),
+    ]);
+  });
+
+  test("routes child output away from the NDJSON channel", async () => {
+    const func = (await runCommand.loader()) as unknown as RunFunc;
+    await func.call(
+      makeContext(),
+      {
+        port: 0,
+        host: "127.0.0.1",
+        verify: false,
+        timeout: 0,
+        format: "json",
+        attributes: false,
+      },
+      "true"
+    );
+
+    expect(spawnCapture.stdio).toEqual(["inherit", "pipe", "pipe"]);
   });
 
   test("warns when the existing server's stream cannot be attached", async () => {

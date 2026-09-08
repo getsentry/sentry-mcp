@@ -36,7 +36,7 @@ import {
   isItemIncluded,
   SENTRY_CONTENT_TYPE,
 } from "../../lib/formatters/local.js";
-import { logger, printLine } from "../../lib/logger.js";
+import { logger, printJsonLine, printLine } from "../../lib/logger.js";
 
 /** Default port for the local dev server. */
 export const DEFAULT_PORT = 8969;
@@ -66,7 +66,7 @@ const MAX_BODY_BYTES = 10 * 1024 * 1024;
  * Parse and validate a `--format` value.
  * Accepts: human, json.
  */
-function parseFormat(value: string): FormatValue {
+export function parseFormat(value: string): FormatValue {
   const lower = value.toLowerCase();
   if (!FORMAT_VALUES.includes(lower as FormatValue)) {
     throw new ValidationError(
@@ -81,7 +81,7 @@ function parseFormat(value: string): FormatValue {
  * Parse and validate a `--filter` value.
  * Accepts the canonical names: error, transaction, logger.
  */
-function parseFilter(value: string): FilterValue {
+export function parseFilter(value: string): FilterValue {
   const lower = value.toLowerCase();
   if (!FILTER_VALUES.includes(lower as FilterValue)) {
     throw new ValidationError(
@@ -694,13 +694,22 @@ function processSSEEvent(
             showAttributes
           );
       for (const line of lines) {
-        printLine(line);
+        printLocalEventLine(line, useJson);
       }
     }
   } catch (err) {
     logger.debug(
       `Failed to parse SSE event: ${err instanceof Error ? err.message : String(err)}`
     );
+  }
+}
+
+/** Route human event tails to stderr and JSON observations to stdout. */
+function printLocalEventLine(line: string, useJson: boolean): void {
+  if (useJson) {
+    printJsonLine(line);
+  } else {
+    printLine(line);
   }
 }
 
@@ -745,7 +754,7 @@ export const serverCommand = buildCommand({
       format: {
         kind: "parsed",
         parse: parseFormat,
-        brief: "Output format: human (default) or json (NDJSON)",
+        brief: "Output format: human (default) or json (NDJSON on stdout)",
         default: "human",
       },
       attributes: {
@@ -814,7 +823,7 @@ export const serverCommand = buildCommand({
             activeFilters,
             flags.attributes
           )) {
-            printLine(line);
+            printLocalEventLine(line, useJson);
           }
         } catch (err) {
           logger.debug(

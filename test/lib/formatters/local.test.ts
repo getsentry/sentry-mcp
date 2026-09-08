@@ -772,6 +772,37 @@ describe("formatItemJson", () => {
     expect(parsed.source).toBe("server");
   });
 
+  test("adds the versioned observation schema to JSON records", () => {
+    const lines = formatItemJson(
+      "error",
+      { timestamp: 1_700_000_000, message: "boom" },
+      serverHeader
+    );
+
+    expect(JSON.parse(lines[0]).schema_version).toBe(1);
+  });
+
+  test("preserves event and envelope identities for agent correlation", () => {
+    const lines = formatItemJson(
+      "error",
+      {
+        event_id: "event-123",
+        timestamp: 1_700_000_000,
+        message: "boom",
+      },
+      {
+        ...serverHeader,
+        // Spotlight stores its internal envelope identity as a UUID object.
+        __spotlight_envelope_id: { toString: () => "envelope-123" },
+      }
+    );
+
+    expect(JSON.parse(lines[0])).toMatchObject({
+      event_id: "event-123",
+      envelope_id: "envelope-123",
+    });
+  });
+
   test("formats error without stack frame", () => {
     const event = {
       timestamp: 1_700_000_000,
@@ -918,6 +949,39 @@ describe("formatItemJson", () => {
     expect(lines).toHaveLength(1);
     const parsed = JSON.parse(lines[0]);
     expect(parsed.type).toBe("attachment");
+  });
+
+  test("strips terminal controls from every JSON observation field", () => {
+    const lines = formatItemJson(
+      "attachment\u202e",
+      { timestamp: "2026-09-08\u009b", event_id: "event\u202e-123" },
+      serverHeader
+    );
+    const parsed = JSON.parse(lines[0]);
+
+    expect(parsed).toMatchObject({
+      type: "attachment",
+      timestamp: "2026-09-08",
+      event_id: "event-123",
+    });
+
+    const logLines = formatItemJson(
+      "log",
+      {
+        items: [
+          {
+            body: "safe",
+            attributes: {
+              nested: { value: { child: "unsafe\u202evalue" } },
+            },
+          },
+        ],
+      },
+      serverHeader
+    );
+    expect(JSON.parse(logLines[0]).attributes).toEqual({
+      nested: { child: "unsafevalue" },
+    });
   });
 
   test("detects browser source in JSON", () => {

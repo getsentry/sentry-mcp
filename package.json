@@ -93,6 +93,7 @@
     "@mastra/client-js": "^1.38.0",
     "@sentry/api": "^0.256.0",
     "@sentry/core": "10.63.0",
+    "@sentry/node": "10.65.0",
     "@sentry/node-core": "10.63.0",
     "@sentry/sqlish": "^1.0.1",
     "@sentry/symbolic": "13.7.0",
