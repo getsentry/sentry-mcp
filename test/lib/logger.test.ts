@@ -241,6 +241,33 @@ describe("printLine", () => {
   });
 });
 
+describe("printJsonLine", () => {
+  test("writes an NDJSON record only to stdout", async () => {
+    const loggerModule = (await import(
+      "../../src/lib/logger.js"
+    )) as typeof import("../../src/lib/logger.js") & {
+      printJsonLine?: (line: string) => void;
+    };
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    try {
+      expect(loggerModule.printJsonLine).toBeTypeOf("function");
+      loggerModule.printJsonLine?.('{"schema_version":1,"type":"error"}');
+      expect(stdout).toHaveBeenCalledWith(
+        '{"schema_version":1,"type":"error"}\n'
+      );
+      expect(stderr).not.toHaveBeenCalled();
+    } finally {
+      stdout.mockRestore();
+      stderr.mockRestore();
+    }
+  });
+});
+
 describe("attachSentryReporter", () => {
   test("can be called without error", () => {
     // attachSentryReporter is idempotent and safe to call even when
