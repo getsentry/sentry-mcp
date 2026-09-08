@@ -113,6 +113,16 @@ Use `--format json` (or `-F json`) for machine-readable NDJSON output, one JSON 
 sentry local --format json
 ```
 
+`local run` supports the same JSON, attribute, and filter options while it
+starts your app and injects the receiver URL. For an agent-friendly stream
+without SDK housekeeping envelopes, use:
+
+```bash
+sentry local run --format json \
+  --filter error --filter transaction --filter log --filter ai \
+  -- npm run dev
+```
+
 ```json
 {"type":"transaction","timestamp":1700000001,"op":"gen_ai","label":"chat anthropic/claude-4-sonnet","duration_ms":1200,"span_count":5,"source":"server"}
 {"type":"error","timestamp":1700000002,"error_type":"RateLimitError","message":"API quota exceeded","source":"server"}
@@ -120,3 +130,43 @@ sentry local --format json
 ```
 
 This is useful for AI coding agents and automation tools that need to consume Sentry events programmatically.
+
+In JSON mode, event records are versioned NDJSON on standard output. Startup,
+connection, and shutdown messages stay on standard error, so an agent can pipe
+the evidence stream without parsing terminal status text. Records include
+`schema_version`, `trace_id`, and, when supplied by the SDK, `event_id` and
+`envelope_id` for exact correlation. In `local run --format json`, the wrapped
+app's standard output is also forwarded to standard error, leaving standard
+output exclusively for NDJSON observations.
+
+## Agent-debugging fixture
+
+The repository includes a small Hono server that produces a normal database
+request, an agent/MCP trace, and an intentional failure. It sends only to the
+local server unless you explicitly set `SENTRY_DSN`.
+
+In one terminal, start the local receiver:
+
+```bash
+sentry local serve --format json --attributes
+```
+
+In another, run the fixture with Spotlight pointed at that receiver:
+
+```bash
+SENTRY_SPOTLIGHT=http://localhost:8969/stream \
+  pnpm --filter sentry exec tsx test/fixtures/local-agent-server.ts
+```
+
+Then exercise each telemetry shape:
+
+```bash
+curl http://127.0.0.1:3030/api/users/42
+curl -X POST http://127.0.0.1:3030/api/agent/run \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Where is the rate limit configured?"}'
+curl -i http://127.0.0.1:3030/api/broken
+```
+
+The final request intentionally returns HTTP 500. The fixture is for local
+experimentation only; do not run it with production credentials.
