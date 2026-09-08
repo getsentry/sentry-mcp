@@ -53,11 +53,15 @@ const AI_CONVERSATION_LOOKUP_WINDOW_MS = 24 * 60 * 60 * 1000;
 const TRACE_ID_PATTERN = /^[0-9a-fA-F]{32}$/;
 
 /**
- * The issue payload as `structuredContent`. Fields are mapped explicitly, never spread from an
- * api response, so a passthrough upstream schema cannot leak backend-only fields.
+ * The issue payload as `structuredContent`.
  *
- * `event.body` is the one open record: Sentry's shared formatter decides its sections, so
- * enumerating them here would be a second declaration of that contract.
+ * Every field is mapped explicitly rather than spread from an api response, so a passthrough
+ * upstream schema cannot leak backend-only fields into the public interface.
+ *
+ * `event.body` is the one open record: it is whatever Sentry's shared formatter emits
+ * for `?llmFormat=json`, and its sections are decided there. Enumerating them here would make
+ * this schema a second declaration of that contract, needing a bump every time a section is
+ * added on the Sentry side.
  */
 export const getIssueDetailsOutputSchema = z.object({
   issue: z.object({
@@ -106,7 +110,7 @@ export const getIssueDetailsOutputSchema = z.object({
     .object({
       attached: z.string().nullish(),
       related: z.array(z.string()),
-      // `related` is capped, so carry the total
+      // the full count, since `related` is capped
       relatedCount: z.number(),
     })
     .nullish(),
@@ -136,12 +140,13 @@ export type GetIssueDetailsPayload = z.infer<
 >;
 
 /**
- * The shared formatter's json body, or undefined when the org is not on the rollout yet, which
- * is the signal to keep returning markdown.
+ * Parses the shared formatter's json body. Returns undefined when the caller's org is not on
+ * the rollout yet, which is the signal to keep returning markdown: a structured result has to
+ * carry the whole answer, and without the body it would not.
  */
 function parseFormattedBody(event: Event): Record<string, unknown> | undefined {
-  // same gate the markdown path applies: a transaction needs the local rendering, which
-  // carries the performance trace the shared body does not
+  // the same event-type gate the markdown path applies: a transaction still needs the local
+  // rendering, which carries the fetched performance trace that the shared body does not
   if (!usesSharedFormatterBody(event)) {
     return undefined;
   }
@@ -188,7 +193,8 @@ function buildReplays(
   if (!attached && related.length === 0) {
     return null;
   }
-  // markdown shows a count plus the first few, not every id
+  // an issue can carry dozens of these; the markdown output shows a count plus the first few
+  // rather than every id, and the payload should not be the one place they all land
   return {
     attached,
     related: related.slice(0, MAX_RELATED_REPLAYS),
@@ -220,14 +226,15 @@ function buildIssueDetailsPayload({
   codeLocation?: CodeLocation;
 }): GetIssueDetailsPayload {
   const autofix = autofixState?.autofix;
-  // artifacts only: a whole AutofixRunState would dwarf the rest of the payload
+  // the run's own artifacts, not the whole state: an AutofixRunState carries every step and
+  // would dwarf the rest of the payload
   const summaries = autofix ? getAutofixArtifactSummaries(autofix) : undefined;
   const isPerf = isPerformanceIssueType(issue) && !!issue.metadata;
 
   return {
     issue: {
       shortId: issue.shortId,
-      // markdown prefers the metadata title for a performance issue
+      // a performance issue's metadata carries the better title, as the markdown path prefers
       title: (isPerf ? issue.metadata?.title : null) || issue.title,
       culprit: issue.culprit,
       firstSeen: issue.firstSeen,
@@ -249,8 +256,8 @@ function buildIssueDetailsPayload({
       platform: issue.platform,
       project: issue.project?.name,
       url: apiService.getIssueUrl(organizationSlug, issue.shortId),
-      // metadata.value is a query pattern for a performance issue, the exception message for
-      // an error, so reading it unconditionally misnames the error text
+      // metadata.value is a query pattern only for a performance issue; on an error it is the
+      // exception message, so reading it unconditionally would misname the error text
       location: isPerf ? issue.metadata?.location : null,
       queryPattern: isPerf ? issue.metadata?.value : null,
     },
@@ -276,7 +283,8 @@ function buildIssueDetailsPayload({
         }
       : null,
     replays: buildReplays(event, relatedReplayIds),
-    // field by field, not handed through: several upstream schemas are passthrough
+    // mapped field by field, not handed through: several upstream schemas are passthrough, and
+    // structuredContent is a product contract rather than a view of the api response
     externalIssues: externalIssues?.length
       ? externalIssues.map((issue) => ({
           id: String(issue.id),
@@ -346,8 +354,10 @@ export default defineTool({
     eventId: ParamEventId.optional(),
     issueUrl: ParamIssueUrl.optional(),
   },
-  // no outputSchema yet: tools/list would export it immediately, while an org off the rollout
-  // still gets markdown with no structuredContent. Declare it once every event carries json.
+  // outputSchema is deliberately not declared yet. tools/list would export it immediately,
+  // while an org that is not on sentry's formatter rollout still gets a markdown result with
+  // no structuredContent -- advertising a schema that some success paths cannot satisfy. Wire
+  // it up once the rollout guarantees a json body on every event.
   annotations: {
     readOnlyHint: true,
     destructiveHint: false,

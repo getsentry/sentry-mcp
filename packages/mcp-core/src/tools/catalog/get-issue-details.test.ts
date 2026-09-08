@@ -2623,7 +2623,8 @@ describe("structuredContent", () => {
   });
 
   it("caps related replays and reports the full count", async () => {
-    // a real issue came back with 51 of these
+    // a real issue came back with 51 of these. the markdown output shows a count plus the
+    // first few, so the payload should not be the one place every id lands
     const many = Array.from({ length: 51 }, (_, i) =>
       i.toString(16).padStart(32, "0"),
     );
