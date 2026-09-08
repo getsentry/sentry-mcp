@@ -193,8 +193,7 @@ function buildReplays(
   if (!attached && related.length === 0) {
     return null;
   }
-  // an issue can carry dozens of these; the markdown output shows a count plus the first few
-  // rather than every id, and the payload should not be the one place they all land
+  // markdown shows a count plus the first few, not every id
   return {
     attached,
     related: related.slice(0, MAX_RELATED_REPLAYS),
