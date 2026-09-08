@@ -3673,7 +3673,7 @@ export class SentryApiService {
   ): Promise<Event> {
     const body = await this.requestJSON(
       apiPath`/organizations/${organizationSlug}/issues/${issueId}/events/${eventId}/` +
-        `?llmFormat=markdown`,
+        `?llmFormat=json`,
       undefined,
       opts,
     );
