@@ -20,6 +20,7 @@ import {
 } from "../../utils/events-datasets";
 import { extractConversationIdFromSearchQuery } from "../../utils/url-utils";
 import {
+  fetchEnvironmentNames,
   searchEventsAgent,
   type searchEventsAgentOutputSchema,
 } from "../support/search-events/agent";
@@ -169,6 +170,53 @@ function appendSearchFilter(query: string, filter?: string): string {
     return trimmedQuery;
   }
   return [trimmedQuery, filter].filter(Boolean).join(" ");
+}
+
+/**
+ * Collect the environment names a search actually filters on — from both the
+ * separate `environment` field and any `environment:` token in the query string.
+ * Sentry only validates the former against real environments, so a bad value in
+ * the query (e.g. a typo) otherwise slips through and silently returns nothing.
+ */
+export function collectRequestedEnvironments(
+  environment: string | string[] | null | undefined,
+  query: string,
+): string[] {
+  const values: string[] = [];
+  if (typeof environment === "string") {
+    values.push(environment);
+  } else if (Array.isArray(environment)) {
+    values.push(...environment);
+  }
+  const tokenPattern = /\benvironment:(\[[^\]]*\]|"[^"]*"|\S+)/gi;
+  for (const match of query.matchAll(tokenPattern)) {
+    const raw = match[1];
+    const inner = raw.startsWith("[") ? raw.slice(1, -1) : raw;
+    for (const part of inner.split(",")) {
+      const cleaned = part.trim().replace(/^"|"$/g, "");
+      if (cleaned) {
+        values.push(cleaned);
+      }
+    }
+  }
+  return values;
+}
+
+/**
+ * Note listing the org's real environments when a search references one that
+ * doesn't exist, so the caller can retry with a valid name. We don't guess a
+ * match — the calling agent maps from the list.
+ */
+export function formatUnknownEnvironmentNote(
+  unknown: string[],
+  available: string[],
+): string {
+  const uniqueUnknown = [...new Set(unknown)].map((name) => `\`${name}\``);
+  const shown = available.slice(0, 50).map((name) => `\`${name}\``);
+  const more =
+    available.length > shown.length ? ` (${available.length} total)` : "";
+  const label = uniqueUnknown.length === 1 ? "environment" : "environments";
+  return `> ⚠️ Requested ${label} not found in this organization: ${uniqueUnknown.join(", ")}. Available environments: ${shown.join(", ")}${more}. Re-run filtering by one of these, or omit the environment to search all.`;
 }
 
 function applyEnvironmentToEventsQuery(
@@ -462,7 +510,23 @@ export default defineTool({
     const canRunWithoutAgent =
       shouldTrustStructuredTraceSearch && hasExplicitFields && hasExplicitSort;
 
-    if (hasAgentProvider() && !canRunWithoutAgent) {
+    // Fetch the org's real environments once: used to ground the agent prompt
+    // (below) and to flag any requested environment that doesn't exist. Skipped
+    // when the agent won't run and no environment was requested.
+    const willRunAgent = hasAgentProvider() && !canRunWithoutAgent;
+    const environmentNames =
+      willRunAgent || params.environment != null
+        ? await fetchEnvironmentNames({
+            apiService,
+            organizationSlug,
+            projectId,
+          })
+        : [];
+    const knownEnvironments = new Set(
+      environmentNames.map((name) => name.toLowerCase()),
+    );
+
+    if (willRunAgent) {
       const parsed = await withProviderFallback<SearchEventsAgentResult>({
         operation: "search_events.rewrite",
         fallback: () => ({
@@ -491,6 +555,7 @@ export default defineTool({
               organizationSlug,
               apiService,
               projectId,
+              environmentNames,
             })
           ).result,
       });
@@ -555,6 +620,22 @@ export default defineTool({
           : (params.fields ?? defaultFieldsForDataset(dataset));
     }
 
+    // Flag any requested environment that doesn't exist (checking both the
+    // separate field and `environment:` tokens in the query) so the caller can
+    // retry with a valid name instead of silently getting zero results.
+    const unknownEnvironments =
+      knownEnvironments.size > 0
+        ? collectRequestedEnvironments(environment, sentryQuery).filter(
+            (name) => !knownEnvironments.has(name.toLowerCase()),
+          )
+        : [];
+    const environmentNote =
+      unknownEnvironments.length > 0
+        ? formatUnknownEnvironmentNote(unknownEnvironments, environmentNames)
+        : "";
+    const withEnvironmentNote = (text: string): string =>
+      environmentNote ? `${environmentNote}\n\n${text}` : text;
+
     if (dataset === "replays") {
       const replaySort = sortParam || DEFAULT_REPLAY_SORT;
       if (!isValidReplaySort(replaySort)) {
@@ -599,7 +680,7 @@ export default defineTool({
         replays.length,
       );
 
-      return formatReplayResults({
+      const replayOutput = formatReplayResults({
         replays,
         inputQuery: params.query || sentryQuery || "recent replays",
         includeExplanation: params.includeExplanation,
@@ -622,6 +703,7 @@ export default defineTool({
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
       });
+      return withEnvironmentNote(replayOutput);
     }
 
     // Sentry rejects the request if the sort column isn't in the selected
@@ -766,15 +848,15 @@ export default defineTool({
 
     switch (dataset) {
       case "errors":
-        return formatErrorResults(formatParams);
+        return withEnvironmentNote(formatErrorResults(formatParams));
       case "logs":
-        return formatLogResults(formatParams);
+        return withEnvironmentNote(formatLogResults(formatParams));
       case "spans":
-        return formatSpanResults(formatParams);
+        return withEnvironmentNote(formatSpanResults(formatParams));
       case "profiles":
-        return formatProfileResults(formatParams);
+        return withEnvironmentNote(formatProfileResults(formatParams));
       default:
-        return formatTraceMetricsResults(formatParams);
+        return withEnvironmentNote(formatTraceMetricsResults(formatParams));
     }
   },
 });

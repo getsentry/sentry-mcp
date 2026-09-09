@@ -84,6 +84,12 @@ export interface SearchEventsAgentOptions {
   organizationSlug: string;
   apiService: SentryApiService;
   projectId?: string;
+  /**
+   * The org's real environment names, used to ground the prompt. When omitted
+   * the agent fetches them itself; the search_events tool passes a pre-fetched
+   * list so the same call is reused for post-agent validation.
+   */
+  environmentNames?: string[];
 }
 
 // Above this many environments we stop inlining the full list into the prompt
@@ -118,11 +124,13 @@ export function buildSystemPromptWithEnvironments(
 
 /**
  * Best-effort fetch of the org's environment names (scoped to the project when
- * known). Failures are non-fatal — the agent still runs, just without grounding.
+ * known). Failures are non-fatal — callers still run, just without grounding.
  */
-async function fetchEnvironmentNames(
-  options: SearchEventsAgentOptions,
-): Promise<string[]> {
+export async function fetchEnvironmentNames(options: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  projectId?: string;
+}): Promise<string[]> {
   try {
     const environments = await options.apiService.listEnvironments({
       organizationSlug: options.organizationSlug,
@@ -172,8 +180,10 @@ export async function searchEventsAgent(
   const whoamiTool = createWhoamiTool({ apiService: options.apiService });
 
   // Ground the agent in the org's real environments so it stops inventing
-  // invalid `environment` values (the top cause of no-output failures).
-  const environmentNames = await fetchEnvironmentNames(options);
+  // invalid `environment` values (the top cause of no-output failures). The
+  // tool passes a pre-fetched list; fall back to fetching for standalone callers.
+  const environmentNames =
+    options.environmentNames ?? (await fetchEnvironmentNames(options));
 
   // Use callEmbeddedAgent to translate the query with tool call capture
   return await callEmbeddedAgent<
