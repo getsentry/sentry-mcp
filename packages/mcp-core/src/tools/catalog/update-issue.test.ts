@@ -96,6 +96,44 @@ describe("update_issue", () => {
     `);
   });
 
+  it("unassigns an issue", async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    const currentIssue = createIssue();
+    const updatedIssue = createIssue({ assignedTo: null });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        async ({ request }) => {
+          requestBody = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(updatedIssue);
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: undefined,
+        assignedTo: null,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(requestBody).toEqual({ assignedTo: "" });
+    expect(result).toContain(
+      "**Assigned To**: Jane Developer → **Unassigned**",
+    );
+    expect(result).toContain("**Assigned To**: Unassigned");
+  });
+
   it("skips status updates when the requested status is already set", async () => {
     let putCalled = false;
     const currentIssue = createIssue({
