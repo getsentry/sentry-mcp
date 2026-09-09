@@ -19,6 +19,7 @@ import { SENTRY_AUTH_URL } from "../constants";
 import {
   createAuthorizationErrorRedirect,
   createResourceValidationError,
+  getAuthorizationServerIssuer,
   getUpstreamAuthorizeUrl,
   validateResourceParameter,
 } from "../helpers";
@@ -127,7 +128,7 @@ export default new Hono<{ Bindings: Env }>()
             err.code,
             errorMessage,
             err.state,
-            err.issuer,
+            err.issuer ?? getAuthorizationServerIssuer(c.req.url),
           );
         }
 

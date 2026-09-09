@@ -205,6 +205,9 @@ describe("oauth authorize routes", () => {
         "Requested scope is not supported",
       );
       expect(location.searchParams.get("state")).toBe("orig");
+      // No issuer on the error itself; falls back to the request origin so
+      // the redirect still carries RFC 9207 `iss`.
+      expect(location.searchParams.get("iss")).toBe("http://localhost");
     });
 
     it("rejects redirect URIs with a userinfo component", async () => {
