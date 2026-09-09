@@ -1,29 +1,33 @@
-import { Hono } from "hono";
+import {
+  AuthorizationError,
+  type AuthRequest,
+} from "@cloudflare/workers-oauth-provider";
 import * as Sentry from "@sentry/cloudflare";
-import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
+import { logWarn } from "@sentry/mcp-core/telem/logging";
+import { Hono } from "hono";
+import { SCOPES } from "../../../constants";
 import {
   getRememberedSkillsForClient,
-  renderApprovalDialog,
   parseRedirectApproval,
+  renderApprovalDialog,
 } from "../../lib/approval-dialog";
+import { resolveClientFamilyFromName } from "../../lib/client-family";
 import { redirectUriHasUserInfo } from "../../lib/html-utils";
 import { isRegisteredRedirectUri } from "../../lib/redirect-uri";
-import { resolveClientFamilyFromName } from "../../lib/client-family";
+import type { Env } from "../../types";
+import { SENTRY_AUTH_URL } from "../constants";
+import {
+  createAuthorizationErrorRedirect,
+  createResourceValidationError,
+  getUpstreamAuthorizeUrl,
+  validateResourceParameter,
+} from "../helpers";
+import { parseResourceMcpConstraints } from "../resource-scope";
+import { type OAuthState, signState } from "../state";
 import {
   CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
   getClientRegistrationMethodTelemetry,
 } from "../telemetry";
-import type { Env } from "../../types";
-import { SENTRY_AUTH_URL } from "../constants";
-import {
-  getUpstreamAuthorizeUrl,
-  validateResourceParameter,
-  createResourceValidationError,
-} from "../helpers";
-import { SCOPES } from "../../../constants";
-import { signState, type OAuthState } from "../state";
-import { logWarn } from "@sentry/mcp-core/telem/logging";
-import { parseResourceMcpConstraints } from "../resource-scope";
 
 /**
  * Extended AuthRequest that includes skills and resource parameter
@@ -73,35 +77,61 @@ export default new Hono<{ Bindings: Env }>()
     try {
       oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
     } catch (err) {
-      // Log invalid redirect URI errors without sending them to Sentry
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      if (errorMessage.includes("Invalid redirect URI")) {
-        // parseAuthRequest threw before producing a request, so read the
-        // attempted values directly from the query string.
-        const authUrl = new URL(c.req.url);
-        const attemptedClientId = authUrl.searchParams.get("client_id");
-        const attemptedRedirectUri = authUrl.searchParams.get("redirect_uri");
-        let registeredUris: string[] | undefined;
-        let clientName: string | undefined;
-        if (attemptedClientId) {
-          try {
-            const client =
-              await c.env.OAUTH_PROVIDER.lookupClient(attemptedClientId);
-            registeredUris = client?.redirectUris;
-            clientName = client?.clientName;
-          } catch {}
+      // workers-oauth-provider >= 0.10.0 throws AuthorizationError for
+      // expected authorization-request validation failures (missing
+      // client_id, invalid redirect URI, etc). These are user-correctable
+      // and must be rendered locally when no redirectUri is attached, so
+      // don't forward them to Sentry.
+      if (err instanceof AuthorizationError) {
+        const errorMessage = err.description;
+        if (errorMessage.includes("Invalid redirect URI")) {
+          // parseAuthRequest threw before producing a request, so read the
+          // attempted values directly from the query string.
+          const authUrl = new URL(c.req.url);
+          const attemptedClientId = authUrl.searchParams.get("client_id");
+          const attemptedRedirectUri = authUrl.searchParams.get("redirect_uri");
+          let registeredUris: string[] | undefined;
+          let clientName: string | undefined;
+          if (attemptedClientId) {
+            try {
+              const client =
+                await c.env.OAUTH_PROVIDER.lookupClient(attemptedClientId);
+              registeredUris = client?.redirectUris;
+              clientName = client?.clientName;
+            } catch {}
+          }
+          logWarn(`OAuth authorization failed: ${errorMessage}`, {
+            loggerScope: ["cloudflare", "oauth", "authorize"],
+            extra: {
+              error: errorMessage,
+              clientId: attemptedClientId,
+              redirectUri: attemptedRedirectUri,
+              registeredUris,
+              clientName,
+            },
+          });
+          return c.text("Invalid redirect URI", 400);
         }
-        logWarn(`OAuth authorization failed: ${errorMessage}`, {
+
+        logWarn(`OAuth authorization request rejected: ${errorMessage}`, {
           loggerScope: ["cloudflare", "oauth", "authorize"],
-          extra: {
-            error: errorMessage,
-            clientId: attemptedClientId,
-            redirectUri: attemptedRedirectUri,
-            registeredUris,
-            clientName,
-          },
+          extra: { code: err.code, error: errorMessage },
         });
-        return c.text("Invalid redirect URI", 400);
+
+        // Once redirect URI validation has succeeded, the provider attaches
+        // the validated redirectUri so the error can be safely relayed to
+        // the client instead of rendered locally.
+        if (err.redirectUri) {
+          return createAuthorizationErrorRedirect(
+            err.redirectUri,
+            err.code,
+            errorMessage,
+            err.state,
+            err.issuer,
+          );
+        }
+
+        return c.text(errorMessage, 400);
       }
       // Re-throw other errors to be captured by Sentry
       throw err;
