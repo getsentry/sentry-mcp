@@ -125,6 +125,10 @@ sentry log list --query "severity:error"
 # SDK sends to both.
 sentry local run -- npm run dev          # or: python manage.py runserver, etc.
 
+# From a CLI source checkout, run the Local UI in a second terminal, then open it.
+pnpm --filter local dev
+sentry local run --open -- npm run dev
+
 # Watch only AI/agent (gen_ai, mcp) spans while iterating on an agent.
 sentry local -f ai
 
