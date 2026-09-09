@@ -703,6 +703,10 @@ async function tryEventFallbacks(
   // Track whether the search completed so we can skip the org in cross-org
   // only when we got a definitive "not found" (not a transient failure).
   let sameOrgSearched = false;
+  // Track rate-limit separately: a 429 means the org is reachable but throttled.
+  // Retrying it immediately in the cross-org fallback would just hit the same
+  // limit again, producing consecutive identical HTTP requests (CLI-2Y1).
+  let orgRateLimited = false;
   try {
     const resolved = await resolveEventInOrg(org, eventId);
     sameOrgSearched = true;
@@ -717,15 +721,20 @@ async function tryEventFallbacks(
     if (sameOrgError instanceof AuthError) {
       throw sameOrgError;
     }
-    // Transient failure — don't mark org as searched so cross-org retries it
+    if (sameOrgError instanceof ApiError && sameOrgError.status === 429) {
+      // Rate-limited — exclude the org from cross-org search; an immediate
+      // retry against the same endpoint would hit the same limit.
+      orgRateLimited = true;
+    }
+    logger.debug("Same-org event lookup failed", sameOrgError);
   }
 
   // Cross-org fallback: the event may exist in a different organization.
-  // Only exclude the org if the same-org search completed successfully
-  // (returned null). If it threw a transient error, let cross-org retry it.
+  // Exclude the org when the same-org search completed (returned null) OR
+  // when it was rate-limited — either way, re-querying it immediately is futile.
   try {
     const crossOrg = await findEventAcrossOrgs(eventId, {
-      excludeOrgs: sameOrgSearched ? [org] : undefined,
+      excludeOrgs: sameOrgSearched || orgRateLimited ? [org] : undefined,
     });
     if (crossOrg) {
       // Use project-scoped phrasing when found in same org (different project)
