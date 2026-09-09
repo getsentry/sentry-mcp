@@ -44,6 +44,11 @@ import {
   parsePort,
   tryListen,
 } from "./server.js";
+import {
+  formatLocalServerUrl,
+  openLocalUiIfRequested,
+  validateOpenHost,
+} from "./ui.js";
 
 type RunFlags = {
   readonly port: number;
@@ -53,6 +58,7 @@ type RunFlags = {
   readonly filter?: readonly FilterValue[];
   readonly format: FormatValue;
   readonly attributes: boolean;
+  readonly open: boolean;
 };
 
 /** Buffer size for the auto-started background server. */
@@ -197,7 +203,7 @@ async function startBackgroundServer({
   const buffer = createSpotlightBuffer(BUFFER_SIZE);
   const app = buildApp(buffer);
   const { server, port: boundPort } = await tryListen(app, port, host);
-  const url = `http://${host}:${boundPort}`;
+  const url = formatLocalServerUrl(host, boundPort);
 
   const subscriptionId = buffer.subscribe((container) => {
     try {
@@ -242,7 +248,7 @@ async function openEventTail({
   useJson,
   showAttributes,
 }: EventTailOptions): Promise<EventTail> {
-  const url = `http://${host}:${port}`;
+  const url = formatLocalServerUrl(host, port);
 
   if (await isServerRunning(url)) {
     logger.info(`Connected to existing server at ${bold(url)}`);
@@ -349,7 +355,8 @@ export const runCommand = buildCommand({
       "SENTRY_SPOTLIGHT (server-side SDKs read this automatically), the\n" +
       "framework-prefixed client variants (NEXT_PUBLIC_, VITE_, etc.), and\n" +
       "SENTRY_TRACES_SAMPLE_RATE=1. Use --format json to stream versioned\n" +
-      "NDJSON observations to stdout for agents.\n\n" +
+      "NDJSON observations to stdout for agents. Use --open to launch the\n" +
+      "Sentry Local UI.\n\n" +
       "Example:\n" +
       "  sentry local run -- npm run dev\n" +
       "  sentry local run -- python manage.py runserver",
@@ -407,6 +414,11 @@ export const runCommand = buildCommand({
         brief: "Include selected event attributes in output",
         default: false,
       },
+      open: {
+        kind: "boolean",
+        brief: "Open Sentry Local UI in the browser",
+        default: false,
+      },
     },
     aliases: {
       p: "port",
@@ -419,6 +431,11 @@ export const runCommand = buildCommand({
   },
   auth: false,
   async *func(this: SentryContext, flags: RunFlags, ...rawArgs: string[]) {
+    if (flags.open && flags.verify) {
+      throw new ValidationError("--open cannot be used with --verify.", "open");
+    }
+    validateOpenHost(flags.open, flags.host);
+
     const stripped = rawArgs[0] === "--" ? rawArgs.slice(1) : rawArgs;
     const { args, commandSource } = await resolveArgs(stripped, this.cwd);
 
@@ -427,7 +444,7 @@ export const runCommand = buildCommand({
       return;
     }
 
-    let url = `http://${flags.host}:${flags.port}`;
+    let url = formatLocalServerUrl(flags.host, flags.port);
 
     const useJson = flags.format === "json";
     const activeFilters = new Set(flags.filter);
@@ -439,6 +456,8 @@ export const runCommand = buildCommand({
       showAttributes: flags.attributes,
     });
     url = tail.url;
+
+    await openLocalUiIfRequested(flags.open, url);
 
     const spotlightUrl = `${url}/stream`;
     const wrangler = await injectWranglerSpotlightBinding(
@@ -575,7 +594,7 @@ async function* runWithVerify(
     flags.port,
     flags.host
   );
-  const url = `http://${flags.host}:${boundPort}`;
+  const url = formatLocalServerUrl(flags.host, boundPort);
   logger.info(`Verify server listening on ${bold(url)}`);
 
   const spotlightUrl = `${url}/stream`;
