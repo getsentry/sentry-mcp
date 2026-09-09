@@ -98,6 +98,15 @@ export function sentryBeforeSend(event: any, hint: any): any {
   // (e.g., "Country, region, or territory not supported", temperature issues).
   // Without custom fingerprinting, they all get grouped into a single issue.
   const firstException = event?.exception?.values?.[0];
+
+  // Drop expected user-input and configuration errors — these are not bugs.
+  if (
+    firstException?.type === "UserInputError" ||
+    firstException?.type === "ConfigurationError"
+  ) {
+    return null;
+  }
+
   if (firstException?.type === "AI_APICallError" && firstException.value) {
     event.fingerprint = ["AI_APICallError", firstException.value];
   }
