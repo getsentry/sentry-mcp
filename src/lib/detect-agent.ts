@@ -4,7 +4,8 @@
  *
  * Detection uses two strategies:
  * 1. **Environment variables** (sync) — agents inject these into child
- *    processes. Adapted from Vercel's @vercel/detect-agent (Apache-2.0).
+ *    processes. Selected rules adapted from Vercel's detect-agent v1.2.0
+ *    (Apache-2.0): https://github.com/vercel/detect-agent/tree/3ab1df1
  * 2. **Process tree walking** (async) — scan parent/grandparent process
  *    names for known agent executables. Runs as a non-blocking background
  *    task so it never delays CLI startup.
@@ -37,6 +38,12 @@ export type AgentInfo = {
 export const AGENT_ALIASES = new Map<string, string>([
   ["claude-code", "claude"],
   ["claudecode", "claude"],
+  ["claude_code", "claude"],
+  ["codex_cli", "codex"],
+  ["gemini_cli", "gemini"],
+  ["open_code", "opencode"],
+  ["cursor-cli", "cursor"],
+  ["augment-cli", "augment"],
 ]);
 
 /** Truthy boolean-ish values — signal "an agent is present" but don't name it. */
@@ -120,25 +127,40 @@ export const ENV_VAR_AGENTS = new Map<string, string>([
   // Cursor
   ["CURSOR_TRACE_ID", "cursor"],
   ["CURSOR_AGENT", "cursor"],
+  // Kimi Code plugin hooks — KIMI_CODE_HOME can be set outside a session
+  ["KIMI_PLUGIN_ROOT", "kimi"],
+  // Grok plugin hooks must win over Claude compatibility markers
+  ["GROK_PLUGIN_ROOT", "grok"],
+  ["GROK_PLUGIN_DATA", "grok"],
   // Gemini CLI
   ["GEMINI_CLI", "gemini"],
+  // Cline
+  ["CLINE_ACTIVE", "cline"],
   // OpenAI Codex
   ["CODEX_SANDBOX", "codex"],
   ["CODEX_CI", "codex"],
   ["CODEX_THREAD_ID", "codex"],
+  ["CODEX_SANDBOX_NETWORK_DISABLED", "codex"],
   // Antigravity
   ["ANTIGRAVITY_AGENT", "antigravity"],
+  ["ANTIGRAVITY_CLI_ALIAS", "antigravity"],
   // Augment
   ["AUGMENT_AGENT", "augment"],
   // OpenCode
   ["OPENCODE_CLIENT", "opencode"],
+  ["OPENCODE", "opencode"],
+  // Junie
+  ["JUNIE_DATA", "junie"],
+  ["JUNIE_SHIM_PATH", "junie"],
+  // OpenClaw
+  ["OPENCLAW_SHELL", "openclaw"],
   // Replit — REPL_ID intentionally excluded because it's set in ALL Replit
   // workspaces, not just when the AI agent is driving the CLI
   // GitHub Copilot — COPILOT_GITHUB_TOKEN intentionally excluded because
   // users may export it persistently for auth, causing false positives
   ["COPILOT_MODEL", "github-copilot"],
   ["COPILOT_ALLOW_ALL", "github-copilot"],
-  // Goose
+  // Goose — GOOSE_PROVIDER can be persistent configuration in a human shell
   ["GOOSE_TERMINAL", "goose"],
   // Amp
   ["AMP_THREAD_ID", "amp"],
@@ -203,7 +225,7 @@ export function setProcessInfoProvider(provider: ProcessInfoProvider): void {
  *
  * Priority:
  * 1. `AI_AGENT` env var — explicit override, any agent can self-identify
- * 2. Agent-specific env vars from {@link ENV_VAR_AGENTS}
+ * 2. Cursor's exact agent-exec role, then env vars from {@link ENV_VAR_AGENTS}
  * 3. Claude Code with Cowork variant (conditional, can't be in the map)
  * 4. `AGENT` env var — generic fallback set by Goose, Amp, and others
  *
@@ -223,6 +245,12 @@ export function detectAgent(): AgentInfo | undefined {
     if (normalized) {
       return normalized;
     }
+  }
+
+  // The role marker also exists outside agent execution; only this value
+  // identifies an agent. Check before the map to retain Cursor's priority.
+  if (env.CURSOR_EXTENSION_HOST_ROLE === "agent-exec") {
+    return normalizeAgent("cursor");
   }
 
   // 2. Table-driven env var check (Map iteration preserves insertion order).

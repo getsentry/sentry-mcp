@@ -36,7 +36,13 @@ describe("detectAgent", () => {
   // ── AI_AGENT override ──────────────────────────────────────────────
 
   test("AI_AGENT takes highest priority", () => {
-    withEnv({ AI_AGENT: "custom-agent", CLAUDE_CODE: "1", CI: "true" });
+    withEnv({
+      AI_AGENT: "custom-agent",
+      CURSOR_EXTENSION_HOST_ROLE: "agent-exec",
+      GROK_PLUGIN_DATA: "/tmp/grok",
+      CLAUDE_CODE: "1",
+      CI: "true",
+    });
     expect(detectAgent()).toEqual(named("custom-agent"));
   });
 
@@ -94,6 +100,38 @@ describe("detectAgent", () => {
     expect(detectAgent()).toEqual(named("claude"));
   });
 
+  test.each([
+    ["CLINE_ACTIVE", "cline"],
+    ["OPENCLAW_SHELL", "openclaw"],
+    ["KIMI_PLUGIN_ROOT", "kimi"],
+    ["GROK_PLUGIN_ROOT", "grok"],
+    ["GROK_PLUGIN_DATA", "grok"],
+    ["JUNIE_DATA", "junie"],
+    ["JUNIE_SHIM_PATH", "junie"],
+    ["CODEX_SANDBOX_NETWORK_DISABLED", "codex"],
+    ["ANTIGRAVITY_CLI_ALIAS", "antigravity"],
+    ["OPENCODE", "opencode"],
+  ])("%s detects %s before the AGENT fallback", (envVar, agent) => {
+    withEnv({ [envVar]: "1", AGENT: "other-agent" });
+    expect(detectAgent()).toEqual(named(agent));
+  });
+
+  test("empty agent-specific signals are ignored", () => {
+    withEnv({
+      CLINE_ACTIVE: "",
+      OPENCLAW_SHELL: "",
+      KIMI_PLUGIN_ROOT: "",
+      GROK_PLUGIN_ROOT: "",
+      GROK_PLUGIN_DATA: "",
+      JUNIE_DATA: "",
+      JUNIE_SHIM_PATH: "",
+      CODEX_SANDBOX_NETWORK_DISABLED: "",
+      ANTIGRAVITY_CLI_ALIAS: "",
+      OPENCODE: "",
+    });
+    expect(detectAgent()).toBeUndefined();
+  });
+
   // ── Cursor ─────────────────────────────────────────────────────────
 
   test("CURSOR_TRACE_ID → cursor", () => {
@@ -109,6 +147,37 @@ describe("detectAgent", () => {
   test("CURSOR_TRACE_ID takes priority over CURSOR_AGENT", () => {
     withEnv({ CURSOR_TRACE_ID: "abc", CURSOR_AGENT: "1" });
     expect(detectAgent()).toEqual(named("cursor"));
+  });
+
+  test("CURSOR_EXTENSION_HOST_ROLE=agent-exec → cursor", () => {
+    withEnv({ CURSOR_EXTENSION_HOST_ROLE: "agent-exec" });
+    expect(detectAgent()).toEqual(named("cursor"));
+  });
+
+  test("Cursor agent-exec takes priority over other agent markers", () => {
+    withEnv({
+      CURSOR_EXTENSION_HOST_ROLE: "agent-exec",
+      GEMINI_CLI: "1",
+      GROK_PLUGIN_ROOT: "/tmp/grok",
+      CLAUDE_CODE: "1",
+      AGENT: "other-agent",
+    });
+    expect(detectAgent()).toEqual(named("cursor"));
+  });
+
+  test.each([
+    "",
+    "terminal",
+    "agent-exec-helper",
+    "AGENT-EXEC",
+  ])("CURSOR_EXTENSION_HOST_ROLE=%j does not trigger detection", (role) => {
+    withEnv({ CURSOR_EXTENSION_HOST_ROLE: role });
+    expect(detectAgent()).toBeUndefined();
+  });
+
+  test("a different Cursor role falls through to other agent markers", () => {
+    withEnv({ CURSOR_EXTENSION_HOST_ROLE: "terminal", CLINE_ACTIVE: "1" });
+    expect(detectAgent()).toEqual(named("cline"));
   });
 
   // ── Gemini ─────────────────────────────────────────────────────────
@@ -183,6 +252,20 @@ describe("detectAgent", () => {
     expect(detectAgent()).toBeUndefined();
   });
 
+  test.each([
+    ["GROK_PLUGIN_ROOT", "CLAUDE_CODE", ""],
+    ["GROK_PLUGIN_DATA", "CLAUDECODE", ""],
+    ["GROK_PLUGIN_ROOT", "CLAUDECODE", "1"],
+    ["GROK_PLUGIN_DATA", "CLAUDE_CODE", "1"],
+  ])("%s takes priority over %s with CLAUDE_CODE_IS_COWORK=%j", (grokVar, claudeVar, cowork) => {
+    withEnv({
+      [grokVar]: "/tmp/grok",
+      [claudeVar]: "1",
+      CLAUDE_CODE_IS_COWORK: cowork,
+    });
+    expect(detectAgent()).toEqual(named("grok"));
+  });
+
   // ── Excluded env vars (false positive risks) ──────────────────────
 
   test("REPL_ID alone does not trigger detection (platform env, not agent signal)", () => {
@@ -192,6 +275,14 @@ describe("detectAgent", () => {
 
   test("COPILOT_GITHUB_TOKEN alone does not trigger detection (false positive risk)", () => {
     withEnv({ COPILOT_GITHUB_TOKEN: "ghu_xxx" });
+    expect(detectAgent()).toBeUndefined();
+  });
+
+  test.each([
+    ["GOOSE_PROVIDER", "openai"],
+    ["KIMI_CODE_HOME", "/tmp/kimi"],
+  ])("%s configuration alone does not trigger detection", (envVar, value) => {
+    withEnv({ [envVar]: value });
     expect(detectAgent()).toBeUndefined();
   });
 
@@ -256,6 +347,20 @@ describe("detectAgent", () => {
   test("AGENT compound value is normalized", () => {
     withEnv({ AGENT: "my-agent/1.0.0" });
     expect(detectAgent()).toEqual({ name: "my-agent", version: "1.0.0" });
+  });
+
+  test.each([
+    ["claude_code", "claude"],
+    ["codex_cli", "codex"],
+    ["gemini_cli", "gemini"],
+    ["open_code", "opencode"],
+    ["cursor-cli", "cursor"],
+    ["augment-cli", "augment"],
+  ])("%s identifies %s through AI_AGENT and AGENT", (alias, name) => {
+    for (const envVar of ["AI_AGENT", "AGENT"]) {
+      withEnv({ [envVar]: `${alias}/1.2.3/agent` });
+      expect(detectAgent()).toEqual({ name, version: "1.2.3", role: "agent" });
+    }
   });
 
   // ── No agent ───────────────────────────────────────────────────────

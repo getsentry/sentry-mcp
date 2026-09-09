@@ -641,6 +641,7 @@ describe("runWizard", () => {
       "AGENT",
       "CLAUDECODE",
       "CLAUDE_CODE",
+      "CURSOR_EXTENSION_HOST_ROLE",
       ...ENV_VAR_AGENTS.keys(),
     ]);
     const cleanEnv = Object.fromEntries(
