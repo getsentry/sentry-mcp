@@ -7,17 +7,75 @@
 
 import { createSpotlightBuffer } from "@spotlightjs/spotlight/sdk";
 import { Hono } from "hono";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   buildApp,
   feedSSELine,
   isServerRunning,
   parsePort,
   SERVER_IDENTIFIER,
+  serverCommand,
   tryListen,
 } from "../../../src/commands/local/server.js";
+import { openBrowser } from "../../../src/lib/browser.js";
 import { ValidationError } from "../../../src/lib/errors.js";
 import { SENTRY_CONTENT_TYPE } from "../../../src/lib/formatters/local.js";
+
+vi.mock("../../../src/lib/browser.js", () => ({
+  openBrowser: vi.fn().mockResolvedValue(true),
+}));
+
+type ServeFunc = (
+  this: object,
+  flags: {
+    port: number;
+    host: string;
+    quiet: boolean;
+    filter: ("error" | "transaction" | "log" | "ai")[];
+    format: "human" | "json";
+    attributes: boolean;
+    open: boolean;
+  }
+) => Promise<void>;
+
+function interceptShutdownSignal() {
+  let handler: (() => void) | undefined;
+  const originalOn = process.on.bind(process);
+  const originalOnce = process.once.bind(process);
+  const onSpy = vi.spyOn(process, "on").mockImplementation(((
+    event: string,
+    listener: () => void
+  ) => {
+    if (event === "SIGINT") {
+      handler = listener;
+      return process;
+    }
+    return originalOn(event, listener);
+  }) as typeof process.on);
+  const onceSpy = vi.spyOn(process, "once").mockImplementation(((
+    event: string,
+    listener: () => void
+  ) => {
+    if (event === "SIGINT") {
+      handler = listener;
+      return process;
+    }
+    return originalOnce(event, listener);
+  }) as typeof process.once);
+
+  return {
+    trigger() {
+      if (!handler) {
+        throw new Error("Expected a SIGINT handler");
+      }
+      handler();
+    },
+    restore() {
+      onSpy.mockRestore();
+      onceSpy.mockRestore();
+    },
+  };
+}
 
 describe("parsePort", () => {
   test("parses valid port numbers", () => {
@@ -40,6 +98,73 @@ describe("parsePort", () => {
 
   test("throws on non-numeric", () => {
     expect(() => parsePort("abc")).toThrow();
+  });
+});
+
+describe("sentry local serve --open", () => {
+  const flags = {
+    host: "127.0.0.1",
+    quiet: true,
+    filter: [],
+    format: "human" as const,
+    attributes: false,
+    open: true,
+  };
+
+  test("opens the UI after starting an owned receiver", async () => {
+    const signal = interceptShutdownSignal();
+    const openBrowserMock = vi.mocked(openBrowser);
+    openBrowserMock.mockClear();
+    const func = (await serverCommand.loader()) as unknown as ServeFunc;
+
+    try {
+      const command = func.call({}, { ...flags, port: 0 });
+      await vi.waitFor(() => expect(openBrowserMock).toHaveBeenCalledTimes(1));
+      signal.trigger();
+      await command;
+    } finally {
+      signal.restore();
+    }
+
+    expect(openBrowserMock).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^http:\/\/localhost:5173\/#stream=http%3A%2F%2F127\.0\.0\.1%3A\d+%2Fstream$/
+      )
+    );
+  });
+
+  test("opens the UI when attaching to an existing receiver", async () => {
+    const signal = interceptShutdownSignal();
+    const openBrowserMock = vi.mocked(openBrowser);
+    openBrowserMock.mockClear();
+    const savedFetch = globalThis.fetch;
+    const realFetch = (globalThis as { __originalFetch?: typeof fetch })
+      .__originalFetch;
+    if (!realFetch) {
+      throw new Error("Expected the test preload to retain the native fetch");
+    }
+    globalThis.fetch = realFetch;
+    const { server, port } = await tryListen(
+      buildApp(createSpotlightBuffer(10)),
+      0,
+      "127.0.0.1"
+    );
+    const func = (await serverCommand.loader()) as unknown as ServeFunc;
+
+    try {
+      const command = func.call({}, { ...flags, port });
+      await vi.waitFor(() => expect(openBrowserMock).toHaveBeenCalledTimes(1));
+      signal.trigger();
+      await command;
+    } finally {
+      signal.restore();
+      globalThis.fetch = savedFetch;
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+
+    expect(openBrowserMock).toHaveBeenCalledWith(
+      `http://localhost:5173/#stream=http%3A%2F%2F127.0.0.1%3A${port}%2Fstream`
+    );
   });
 });
 
@@ -255,6 +380,71 @@ describe("buildApp", () => {
     expect(res.headers.get("access-control-allow-origin")).toBe(
       "http://localhost:3000"
     );
+  });
+
+  test("CORS allows the hosted local UI to read the event stream", async () => {
+    const buffer = createSpotlightBuffer(10);
+    const app = buildApp(buffer);
+
+    const res = await app.request("/stream", {
+      headers: { Origin: "https://local.sentry.dev" },
+    });
+    expect(res.headers.get("access-control-allow-origin")).toBe(
+      "https://local.sentry.dev"
+    );
+    if (res.body) {
+      await res.body.cancel();
+    }
+  });
+
+  test("CORS permits the SSE resume header from the hosted local UI", async () => {
+    const buffer = createSpotlightBuffer(10);
+    const app = buildApp(buffer);
+
+    const res = await app.request("/stream", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://local.sentry.dev",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "Last-Event-ID",
+        "Access-Control-Request-Private-Network": "true",
+      },
+    });
+    expect(res.headers.get("access-control-allow-headers")).toContain(
+      "Last-Event-ID"
+    );
+    expect(res.headers.get("access-control-allow-private-network")).toBe(
+      "true"
+    );
+    expect(res.headers.get("vary")).toContain(
+      "Access-Control-Request-Private-Network"
+    );
+  });
+
+  test("rejects hosted-origin writes to the local receiver", async () => {
+    const buffer = createSpotlightBuffer(10);
+    const app = buildApp(buffer);
+
+    const res = await app.request("/stream", {
+      method: "POST",
+      headers: {
+        Origin: "https://local.sentry.dev",
+        "Content-Type": SENTRY_CONTENT_TYPE,
+      },
+      body: '{"type":"event"}\n{}',
+    });
+    expect(res.status).toBe(403);
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  test("CORS blocks lookalike hosted UI origins", async () => {
+    const buffer = createSpotlightBuffer(10);
+    const app = buildApp(buffer);
+
+    const res = await app.request("/health", {
+      headers: { Origin: "https://not-local.sentry.dev" },
+    });
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
   });
 
   test("CORS blocks non-localhost origins", async () => {

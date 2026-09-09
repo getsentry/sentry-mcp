@@ -16,6 +16,7 @@ import {
   shutdownServer,
 } from "../../../src/commands/local/run.js";
 import { buildApp, tryListen } from "../../../src/commands/local/server.js";
+import { openBrowser } from "../../../src/lib/browser.js";
 import { CliError, ValidationError } from "../../../src/lib/errors.js";
 import { SENTRY_CONTENT_TYPE } from "../../../src/lib/formatters/local.js";
 import { TEST_TMP_DIR } from "../../constants.js";
@@ -51,6 +52,10 @@ vi.mock("node:child_process", async (importOriginal) => {
   };
 });
 
+vi.mock("../../../src/lib/browser.js", () => ({
+  openBrowser: vi.fn().mockResolvedValue(true),
+}));
+
 type RunFunc = (
   this: unknown,
   flags: {
@@ -61,6 +66,7 @@ type RunFunc = (
     format?: "human" | "json";
     attributes?: boolean;
     filter?: ("error" | "transaction" | "log" | "ai")[];
+    open?: boolean;
   },
   ...args: string[]
 ) => Promise<void>;
@@ -159,6 +165,73 @@ describe("sentry local run", () => {
       "echo",
       "ok"
     );
+  });
+
+  test("opens the development UI with the bound receiver stream", async () => {
+    const openBrowserMock = vi.mocked(openBrowser);
+    openBrowserMock.mockClear();
+    const func = (await runCommand.loader()) as unknown as RunFunc;
+
+    await func.call(
+      makeContext(),
+      {
+        port: 0,
+        host: "127.0.0.1",
+        verify: false,
+        timeout: 0,
+        open: true,
+      },
+      "true"
+    );
+
+    expect(openBrowserMock).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^http:\/\/localhost:5173\/#stream=http%3A%2F%2F127\.0\.0\.1%3A\d+%2Fstream$/
+      )
+    );
+  });
+
+  test("rejects --open with --verify before starting a receiver", async () => {
+    const func = (await runCommand.loader()) as unknown as RunFunc;
+
+    await expect(
+      func.call(
+        makeContext(),
+        {
+          port: 0,
+          host: "localhost",
+          verify: true,
+          timeout: 0,
+          open: true,
+        },
+        "true"
+      )
+    ).rejects.toMatchObject({
+      field: "open",
+      message: "--open cannot be used with --verify.",
+    });
+  });
+
+  test("rejects a non-loopback --open host before starting a receiver", async () => {
+    const func = (await runCommand.loader()) as unknown as RunFunc;
+
+    await expect(
+      func.call(
+        makeContext(),
+        {
+          port: 0,
+          host: "0.0.0.0",
+          verify: false,
+          timeout: 0,
+          open: true,
+        },
+        "true"
+      )
+    ).rejects.toMatchObject({
+      field: "host",
+      message:
+        "--open requires a loopback --host (localhost, 127.0.0.1, or ::1).",
+    });
   });
 
   test("injects SENTRY_SPOTLIGHT as a Wrangler Worker binding", async () => {
