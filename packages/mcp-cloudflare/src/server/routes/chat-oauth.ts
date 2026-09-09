@@ -20,6 +20,35 @@ function generateState(): string {
   );
 }
 
+function base64UrlEncode(bytes: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(bytes)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+/**
+ * Generates an RFC 7636 PKCE (S256) pair.
+ *
+ * workers-oauth-provider >= 0.9.0 requires public clients
+ * (`tokenEndpointAuthMethod: "none"`) to use PKCE, and this chat client
+ * registers as public (no client secret).
+ */
+async function generatePkcePair(): Promise<{
+  codeVerifier: string;
+  codeChallenge: string;
+}> {
+  const codeVerifier = base64UrlEncode(
+    crypto.getRandomValues(new Uint8Array(32)).buffer,
+  );
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(codeVerifier),
+  );
+
+  return { codeVerifier, codeChallenge: base64UrlEncode(digest) };
+}
+
 // Check if we're in development environment
 function isDevelopmentEnvironment(url: string): boolean {
   const parsedUrl = new URL(url);
@@ -157,6 +186,7 @@ async function exchangeCodeForToken(
   code: string,
   redirectUri: string,
   clientId: string,
+  codeVerifier: string,
 ): Promise<TokenResponse> {
   const mcpHost = new URL(redirectUri).origin;
   const tokenUrl = `${mcpHost}/oauth/token`;
@@ -166,6 +196,7 @@ async function exchangeCodeForToken(
     client_id: clientId,
     code: code,
     redirect_uri: redirectUri,
+    code_verifier: codeVerifier,
   });
 
   const response = await fetch(tokenUrl, {
@@ -200,13 +231,22 @@ export default new Hono<{
   .get("/authorize", async (c) => {
     try {
       const state = generateState();
+      const { codeVerifier, codeChallenge } = await generatePkcePair();
       const redirectUri = new URL("/api/auth/callback", c.req.url).href;
 
-      // Store state in a secure cookie for CSRF protection
+      // Store state and PKCE verifier in secure cookies for CSRF protection
+      // and to redeem at the token endpoint (workers-oauth-provider >= 0.9.0
+      // requires PKCE for this public client).
       setCookie(
         c,
         "chat_oauth_state",
         state,
+        getSecureCookieOptions(c.req.url, 600),
+      );
+      setCookie(
+        c,
+        "chat_oauth_code_verifier",
+        codeVerifier,
         getSecureCookieOptions(c.req.url, 600),
       );
 
@@ -221,6 +261,8 @@ export default new Hono<{
       authUrl.searchParams.set("response_type", "code");
       authUrl.searchParams.set("scope", Object.keys(SCOPES).join(" "));
       authUrl.searchParams.set("state", state);
+      authUrl.searchParams.set("code_challenge", codeChallenge);
+      authUrl.searchParams.set("code_challenge_method", "S256");
 
       return c.redirect(authUrl.toString());
     } catch (error) {
@@ -237,10 +279,16 @@ export default new Hono<{
     const state = c.req.query("state");
 
     const storedState = getCookie(c, "chat_oauth_state");
+    const codeVerifier = getCookie(c, "chat_oauth_code_verifier");
 
     // Validate state parameter to prevent CSRF attacks
     if (!state || !storedState || state !== storedState) {
       deleteCookie(c, "chat_oauth_state", getSecureCookieOptions(c.req.url));
+      deleteCookie(
+        c,
+        "chat_oauth_code_verifier",
+        getSecureCookieOptions(c.req.url),
+      );
       logIssue("Invalid state parameter received", {
         contexts: {
           oauth: {
@@ -274,6 +322,11 @@ export default new Hono<{
 
     // Clear the state cookie with same options as when it was set
     deleteCookie(c, "chat_oauth_state", getSecureCookieOptions(c.req.url));
+    deleteCookie(
+      c,
+      "chat_oauth_code_verifier",
+      getSecureCookieOptions(c.req.url),
+    );
 
     if (!code) {
       logIssue("No authorization code received");
@@ -300,6 +353,31 @@ export default new Hono<{
       );
     }
 
+    if (!codeVerifier) {
+      logIssue("No PKCE code verifier found for chat OAuth callback");
+      return c.html(
+        createErrorPage(
+          "Authentication Failed",
+          "Missing PKCE verifier. Please try again.",
+          {
+            bodyScript: `
+              // Write error to localStorage
+              try {
+                localStorage.setItem('oauth_result', JSON.stringify({
+                  type: 'SENTRY_AUTH_ERROR',
+                  timestamp: Date.now(),
+                  error: 'Missing PKCE verifier'
+                }));
+              } catch (e) {}
+              
+              setTimeout(() => { window.close(); }, 3000);
+            `,
+          },
+        ),
+        400,
+      );
+    }
+
     try {
       const redirectUri = new URL("/api/auth/callback", c.req.url).href;
 
@@ -312,6 +390,7 @@ export default new Hono<{
         code,
         redirectUri,
         clientId,
+        codeVerifier,
       );
 
       // Store complete auth data in secure cookie

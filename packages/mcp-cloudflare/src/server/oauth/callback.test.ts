@@ -3,12 +3,13 @@ import { getOAuthApi } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SCOPES } from "../../constants";
+import { PKCE_CODE_CHALLENGE, PKCE_CODE_VERIFIER } from "../../test-utils/pkce";
 import app from "../app";
 import handler from "../index";
 import mcpHandler from "../lib/mcp-handler";
 import type { Env } from "../types";
 import oauthRoute from "./index";
-import { signState, type OAuthState } from "./state";
+import { type OAuthState, signState } from "./state";
 
 const { exchangeCodeForAccessToken, logError, logIssue, logWarn } = vi.hoisted(
   () => ({
@@ -94,8 +95,11 @@ async function createSignedCallbackState(
     req: {
       clientId,
       redirectUri: REDIRECT_URI,
+      responseType: "code",
       scope: ["org:read"],
       skills,
+      codeChallenge: PKCE_CODE_CHALLENGE,
+      codeChallengeMethod: "S256",
       ...(resource ? { resource } : {}),
     },
     iat: now,
@@ -117,6 +121,7 @@ async function approveClient(
         oauthReqInfo: {
           clientId,
           redirectUri: REDIRECT_URI,
+          responseType: "code",
           scope: ["org:read"],
           ...(resource ? { resource } : {}),
         },
@@ -186,6 +191,7 @@ function createTokenExchangeRequest(clientId: string, code: string) {
       client_id: clientId,
       code,
       redirect_uri: REDIRECT_URI,
+      code_verifier: PKCE_CODE_VERIFIER,
     }).toString(),
   });
 }
@@ -277,6 +283,7 @@ describe("oauth callback routes", () => {
             oauthReqInfo: {
               clientId: client.clientId,
               redirectUri: loopbackRedirectUri,
+              responseType: "code",
               scope: ["org:read"],
             },
           },
@@ -304,8 +311,11 @@ describe("oauth callback routes", () => {
           req: {
             clientId: client.clientId,
             redirectUri: loopbackRedirectUri,
+            responseType: "code",
             scope: ["org:read"],
             skills: ["inspect"],
+            codeChallenge: PKCE_CODE_CHALLENGE,
+            codeChallengeMethod: "S256",
           },
           iat: now,
           exp: now + 10 * 60 * 1000,
