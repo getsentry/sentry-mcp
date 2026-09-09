@@ -1370,6 +1370,29 @@ describe("fetchEventWithContext", () => {
     });
   });
 
+  test("cross-org excludes org when same-org search was rate-limited (429)", async () => {
+    vi.spyOn(apiClient, "getEvent").mockRejectedValue(
+      new ApiError("Not found", 404)
+    );
+    // Same-org search hit a rate limit — retrying it immediately is futile (CLI-2Y1)
+    vi.spyOn(apiClient, "resolveEventInOrg").mockRejectedValue(
+      new ApiError("Too Many Requests", 429)
+    );
+    const findSpy = vi
+      .spyOn(apiClient, "findEventAcrossOrgs")
+      .mockResolvedValue(null);
+
+    await expect(
+      fetchEventWithContext(null, "my-org", "my-project", "abc123")
+    ).rejects.toThrow(ResolutionError);
+
+    // org must be excluded — re-querying a rate-limited endpoint immediately
+    // produces consecutive identical HTTP requests (the Consecutive HTTP issue).
+    expect(findSpy).toHaveBeenCalledWith("abc123", {
+      excludeOrgs: ["my-org"],
+    });
+  });
+
   test("swallows non-auth cross-org errors and throws ResolutionError", async () => {
     vi.spyOn(apiClient, "getEvent").mockRejectedValue(
       new ApiError("Not found", 404)
