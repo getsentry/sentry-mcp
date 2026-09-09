@@ -22,6 +22,7 @@ Start the local dev server and tail events
 - `-f, --filter <value>... - Only show items of this type (repeatable: error, transaction, log, ai)`
 - `-F, --format <value> - Output format: human (default) or json (NDJSON on stdout) - (default: "human")`
 - `-a, --attributes - Show a grouped attribute table (user vs SDK) under each transaction`
+- `--open - Open Sentry Local UI in the browser`
 
 ### `sentry local run <command...>`
 
@@ -35,6 +36,7 @@ Run a command with the local dev server enabled
 - `-t, --timeout <value> - Kill the child after N seconds (0 = no timeout; defaults to 30 s in --verify mode) - (default: "0")`
 - `-F, --format <value> - Output format: human (default) or json (NDJSON on stdout) - (default: "human")`
 - `-a, --attributes - Include selected event attributes in output`
+- `--open - Open Sentry Local UI in the browser`
 
 **Examples:**
 
