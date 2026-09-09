@@ -42,13 +42,13 @@ import type { z } from "zod";
 import type {
   AgenticOnboardingRunSchema,
   AgenticOnboardingStatusUpdateSchema,
-  AssignedToSchema,
-  AIConversationSummaryListSchema,
-  AIConversationSummarySchema,
   AIConversationDetailsResponseSchema,
   AIConversationSpanListSchema,
   AIConversationSpanSchema,
+  AIConversationSummaryListSchema,
+  AIConversationSummarySchema,
   AIConversationUserSchema,
+  AssignedToSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
   ClientKeyListSchema,
@@ -82,18 +82,16 @@ import type {
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
+  MetricAlertRuleListSchema,
+  MetricAlertRuleSchema,
   MonitorCheckInListSchema,
   MonitorCheckInSchema,
   MonitorListSchema,
   MonitorSchema,
-  MonitorStatsSchema,
   MonitorStatSchema,
-  UptimeCheckListSchema,
-  UptimeCheckSchema,
-  UptimeMonitorListSchema,
-  UptimeMonitorSchema,
-  MetricAlertRuleListSchema,
-  MetricAlertRuleSchema,
+  MonitorStatsSchema,
+  OrganizationEnvironmentListSchema,
+  OrganizationEnvironmentSchema,
   OrganizationListSchema,
   OrganizationSchema,
   ProfileChunkResponseSchema,
@@ -123,8 +121,12 @@ import type {
   TransactionProfileSampleSchema,
   TransactionProfileSchema,
   UnknownEventSchema,
-  UserSchema,
+  UptimeCheckListSchema,
+  UptimeCheckSchema,
+  UptimeMonitorListSchema,
+  UptimeMonitorSchema,
   UserReportListSchema,
+  UserSchema,
 } from "./schema";
 
 export type AgenticOnboardingRun = z.infer<typeof AgenticOnboardingRunSchema>;
@@ -202,6 +204,12 @@ export type MonitorStats = z.infer<typeof MonitorStatsSchema>;
 export type UptimeMonitorList = z.infer<typeof UptimeMonitorListSchema>;
 export type UptimeCheckList = z.infer<typeof UptimeCheckListSchema>;
 export type EventAttachmentList = z.infer<typeof EventAttachmentListSchema>;
+export type OrganizationEnvironment = z.infer<
+  typeof OrganizationEnvironmentSchema
+>;
+export type OrganizationEnvironmentList = z.infer<
+  typeof OrganizationEnvironmentListSchema
+>;
 export type TagList = z.infer<typeof TagListSchema>;
 export type ClientKeyList = z.infer<typeof ClientKeyListSchema>;
 

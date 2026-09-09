@@ -27,11 +27,11 @@ export const searchEventsAgentOutputSchema = z
       .describe("Array of field names to return in results."),
     sort: z.string().describe("Sort parameter for results."),
     environment: z
-      .union([z.string(), z.array(z.string()).min(1)])
+      .union([z.string().min(1), z.array(z.string().min(1)).min(1)])
       .nullable()
       .default(null)
       .describe(
-        "Separate environment filter for datasets like replays that do not support environment in the query string. Use a string for one environment or an array when multiple environments are requested.",
+        "Separate environment filter for datasets like replays that do not support environment in the query string. Set only to a real environment the user named (see the 'Available environments' list); omit otherwise. Never use wildcards, placeholders, or example values.",
       ),
     timeRange: z
       .union([
@@ -86,6 +86,56 @@ export interface SearchEventsAgentOptions {
   projectId?: string;
 }
 
+// Above this many environments we stop inlining the full list into the prompt
+// (token cost) and rely on the guidance text alone; validation still checks the
+// value against the real list.
+const MAX_INLINE_ENVIRONMENTS = 100;
+
+/**
+ * Append the organization's real environment names to the system prompt.
+ *
+ * Without this the model invents `environment` values (`":null"`, `".*"`,
+ * `["production","staging","development"]`, `" "` …) that Sentry's validation
+ * rejects, burning the step budget and producing no output — the single biggest
+ * source of search_events failures. Grounding it in the real names lets it pick
+ * a valid one or omit the field.
+ */
+export function buildSystemPromptWithEnvironments(
+  base: string,
+  environmentNames: string[],
+): string {
+  if (environmentNames.length === 0) {
+    return base;
+  }
+  const rule =
+    'When the user names an environment, set the `environment` field to a matching value from this list EXACTLY; otherwise OMIT the field. Never use wildcards, placeholders, "null", "*", empty strings, or example values.';
+  if (environmentNames.length <= MAX_INLINE_ENVIRONMENTS) {
+    const list = environmentNames.map((name) => `"${name}"`).join(", ");
+    return `${base}\n\n## Available environments\nThe only valid \`environment\` values for this organization are: ${list}.\n${rule}`;
+  }
+  return `${base}\n\n## Environments\nThis organization has ${environmentNames.length} environments. ${rule}`;
+}
+
+/**
+ * Best-effort fetch of the org's environment names (scoped to the project when
+ * known). Failures are non-fatal — the agent still runs, just without grounding.
+ */
+async function fetchEnvironmentNames(
+  options: SearchEventsAgentOptions,
+): Promise<string[]> {
+  try {
+    const environments = await options.apiService.listEnvironments({
+      organizationSlug: options.organizationSlug,
+      projectId: options.projectId,
+    });
+    return environments
+      .map((environment) => environment.name)
+      .filter((name) => name.length > 0);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Search events agent - single entry point for translating natural language queries to Sentry search syntax
  * This returns both the translated query result AND the tool calls made by the agent
@@ -121,12 +171,16 @@ export async function searchEventsAgent(
   });
   const whoamiTool = createWhoamiTool({ apiService: options.apiService });
 
+  // Ground the agent in the org's real environments so it stops inventing
+  // invalid `environment` values (the top cause of no-output failures).
+  const environmentNames = await fetchEnvironmentNames(options);
+
   // Use callEmbeddedAgent to translate the query with tool call capture
   return await callEmbeddedAgent<
     z.output<typeof searchEventsAgentOutputSchema>,
     typeof searchEventsAgentOutputSchema
   >({
-    system: systemPrompt,
+    system: buildSystemPromptWithEnvironments(systemPrompt, environmentNames),
     prompt: options.query,
     tools: {
       datasetAttributes: datasetAttributesTool,
