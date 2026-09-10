@@ -1,6 +1,9 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../../api-client";
-import { callEmbeddedAgent } from "../../../internal/agents/callEmbeddedAgent";
+import {
+  callEmbeddedAgent,
+  type ToolCall,
+} from "../../../internal/agents/callEmbeddedAgent";
 import { createDatasetFieldsTool } from "../../../internal/agents/tools/dataset-fields";
 import { createOtelLookupTool } from "../../../internal/agents/tools/otel-semantics";
 import { createWhoamiTool } from "../../../internal/agents/tools/whoami";
@@ -100,11 +103,10 @@ const MAX_INLINE_ENVIRONMENTS = 100;
 /**
  * Append the organization's real environment names to the system prompt.
  *
- * Without this the model invents `environment` values (`":null"`, `".*"`,
- * `["production","staging","development"]`, `" "` …) that Sentry's validation
- * rejects, burning the step budget and producing no output — the single biggest
- * source of search_events failures. Grounding it in the real names lets it pick
- * a valid one or omit the field.
+ * Without this the model invents `environment` values (e.g. `":null"`, `".*"`)
+ * that Sentry rejects, burning the step budget and producing no output — the top
+ * source of search_events failures. Grounding it lets the model pick a real one
+ * or omit the field.
  */
 export function buildSystemPromptWithEnvironments(
   base: string,
@@ -152,7 +154,7 @@ export async function searchEventsAgent(
   options: SearchEventsAgentOptions,
 ): Promise<{
   result: z.output<typeof searchEventsAgentOutputSchema>;
-  toolCalls: any[];
+  toolCalls: ToolCall[];
 }> {
   // Provider check happens in callEmbeddedAgent via getAgentProvider()
   // Create tools pre-bound with the provided API service and organization

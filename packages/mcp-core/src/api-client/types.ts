@@ -91,7 +91,6 @@ import type {
   MonitorStatSchema,
   MonitorStatsSchema,
   OrganizationEnvironmentListSchema,
-  OrganizationEnvironmentSchema,
   OrganizationListSchema,
   OrganizationSchema,
   ProfileChunkResponseSchema,
@@ -204,9 +203,6 @@ export type MonitorStats = z.infer<typeof MonitorStatsSchema>;
 export type UptimeMonitorList = z.infer<typeof UptimeMonitorListSchema>;
 export type UptimeCheckList = z.infer<typeof UptimeCheckListSchema>;
 export type EventAttachmentList = z.infer<typeof EventAttachmentListSchema>;
-export type OrganizationEnvironment = z.infer<
-  typeof OrganizationEnvironmentSchema
->;
 export type OrganizationEnvironmentList = z.infer<
   typeof OrganizationEnvironmentListSchema
 >;
