@@ -1,6 +1,9 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../../api-client";
-import { callEmbeddedAgent } from "../../../internal/agents/callEmbeddedAgent";
+import {
+  callEmbeddedAgent,
+  type ToolCall,
+} from "../../../internal/agents/callEmbeddedAgent";
 import { createDatasetFieldsTool } from "../../../internal/agents/tools/dataset-fields";
 import { createOtelLookupTool } from "../../../internal/agents/tools/otel-semantics";
 import { createWhoamiTool } from "../../../internal/agents/tools/whoami";
@@ -27,11 +30,11 @@ export const searchEventsAgentOutputSchema = z
       .describe("Array of field names to return in results."),
     sort: z.string().describe("Sort parameter for results."),
     environment: z
-      .union([z.string(), z.array(z.string()).min(1)])
+      .union([z.string().min(1), z.array(z.string().min(1)).min(1)])
       .nullable()
       .default(null)
       .describe(
-        "Separate environment filter for datasets like replays that do not support environment in the query string. Use a string for one environment or an array when multiple environments are requested.",
+        "Separate environment filter for datasets like replays that do not support environment in the query string. Set only to a real environment the user named (see the 'Available environments' list); omit otherwise. Never use wildcards, placeholders, or example values.",
       ),
     timeRange: z
       .union([
@@ -84,6 +87,63 @@ export interface SearchEventsAgentOptions {
   organizationSlug: string;
   apiService: SentryApiService;
   projectId?: string;
+  /**
+   * The org's real environment names, used to ground the prompt. When omitted
+   * the agent fetches them itself; the search_events tool passes a pre-fetched
+   * list so the same call is reused for post-agent validation.
+   */
+  environmentNames?: string[];
+}
+
+// Above this many environments we stop inlining the full list into the prompt
+// (token cost) and rely on the guidance text alone; validation still checks the
+// value against the real list.
+const MAX_INLINE_ENVIRONMENTS = 100;
+
+/**
+ * Append the organization's real environment names to the system prompt.
+ *
+ * Without this the model invents `environment` values (e.g. `":null"`, `".*"`)
+ * that Sentry rejects, burning the step budget and producing no output — the top
+ * source of search_events failures. Grounding it lets the model pick a real one
+ * or omit the field.
+ */
+export function buildSystemPromptWithEnvironments(
+  base: string,
+  environmentNames: string[],
+): string {
+  if (environmentNames.length === 0) {
+    return base;
+  }
+  const rule =
+    'When the user names an environment, set the `environment` field to a matching value from this list EXACTLY; otherwise OMIT the field. Never use wildcards, placeholders, "null", "*", empty strings, or example values.';
+  if (environmentNames.length <= MAX_INLINE_ENVIRONMENTS) {
+    const list = environmentNames.map((name) => `"${name}"`).join(", ");
+    return `${base}\n\n## Available environments\nThe only valid \`environment\` values for this organization are: ${list}.\n${rule}`;
+  }
+  return `${base}\n\n## Environments\nThis organization has ${environmentNames.length} environments. ${rule}`;
+}
+
+/**
+ * Best-effort fetch of the org's environment names (scoped to the project when
+ * known). Failures are non-fatal — callers still run, just without grounding.
+ */
+export async function fetchEnvironmentNames(options: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  projectId?: string;
+}): Promise<string[]> {
+  try {
+    const environments = await options.apiService.listEnvironments({
+      organizationSlug: options.organizationSlug,
+      projectId: options.projectId,
+    });
+    return environments
+      .map((environment) => environment.name)
+      .filter((name) => name.length > 0);
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -94,7 +154,7 @@ export async function searchEventsAgent(
   options: SearchEventsAgentOptions,
 ): Promise<{
   result: z.output<typeof searchEventsAgentOutputSchema>;
-  toolCalls: any[];
+  toolCalls: ToolCall[];
 }> {
   // Provider check happens in callEmbeddedAgent via getAgentProvider()
   // Create tools pre-bound with the provided API service and organization
@@ -121,12 +181,18 @@ export async function searchEventsAgent(
   });
   const whoamiTool = createWhoamiTool({ apiService: options.apiService });
 
+  // Ground the agent in the org's real environments so it stops inventing
+  // invalid `environment` values (the top cause of no-output failures). The
+  // tool passes a pre-fetched list; fall back to fetching for standalone callers.
+  const environmentNames =
+    options.environmentNames ?? (await fetchEnvironmentNames(options));
+
   // Use callEmbeddedAgent to translate the query with tool call capture
   return await callEmbeddedAgent<
     z.output<typeof searchEventsAgentOutputSchema>,
     typeof searchEventsAgentOutputSchema
   >({
-    system: systemPrompt,
+    system: buildSystemPromptWithEnvironments(systemPrompt, environmentNames),
     prompt: options.query,
     tools: {
       datasetAttributes: datasetAttributesTool,

@@ -15,7 +15,7 @@ import {
   LLMProviderError,
   UserInputError,
 } from "../../errors";
-import { logIssue } from "../../telem/logging";
+import { logIssue, logWarn } from "../../telem/logging";
 import { getAgentProvider } from "./provider-factory";
 
 vi.mock("../../telem/logging", () => ({
@@ -243,7 +243,8 @@ describe("callEmbeddedAgent", () => {
 
   it("throws LLMProviderError for provider budget/quota failures", async () => {
     const budgetError = new APICallError({
-      message: "Workspace monthly budget of $15000.00 exceeded. Contact your org admin.",
+      message:
+        "Workspace monthly budget of $15000.00 exceeded. Contact your org admin.",
       url: "https://openrouter.ai/api/v1/chat/completions",
       requestBodyValues: {},
       statusCode: 402,
@@ -370,13 +371,15 @@ describe("callEmbeddedAgent", () => {
     );
   });
 
-  it("converts NoOutputGeneratedError into AgentExecutionError after filing a Sentry issue", async () => {
+  it("treats NoOutputGeneratedError as a recoverable UserInputError without filing a Sentry issue", async () => {
     const noOutputError = new NoOutputGeneratedError({
       message: "No output generated.",
     });
 
     mockGenerateText.mockRejectedValue(noOutputError);
 
+    // Recoverable model limitation (usually repeated tool/validation failures),
+    // not a system fault — surface as user input and log a warning, not an issue.
     await expect(
       callEmbeddedAgent({
         system: "You are a test agent",
@@ -384,35 +387,16 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toBeInstanceOf(AgentExecutionError);
+    ).rejects.toBeInstanceOf(UserInputError);
 
-    await expect(
-      callEmbeddedAgent({
-        system: "You are a test agent",
-        prompt: "Test prompt",
-        tools: {},
-        schema: testSchema,
-      }),
-    ).rejects.toMatchObject({
-      message: expect.stringContaining("No output generated."),
-      eventId: "mock-event-id",
-      cause: noOutputError,
-    });
-
-    expect(logIssue).toHaveBeenCalledWith(
-      noOutputError,
-      expect.objectContaining({
-        loggerScope: ["agents", "embedded"],
-        contexts: {
-          embeddedAgent: expect.objectContaining({
-            isNoOutputGenerated: true,
-          }),
-        },
-      }),
+    expect(logIssue).not.toHaveBeenCalled();
+    expect(logWarn).toHaveBeenCalledWith(
+      "Embedded agent produced no output",
+      expect.objectContaining({ loggerScope: ["agents", "embedded"] }),
     );
   });
 
-  it("treats missing experimental_output as NoOutputGeneratedError", async () => {
+  it("treats missing experimental_output as a recoverable UserInputError", async () => {
     mockGenerateText.mockResolvedValue({
       experimental_output: undefined,
     } as never);
@@ -424,17 +408,9 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toBeInstanceOf(AgentExecutionError);
+    ).rejects.toBeInstanceOf(UserInputError);
 
-    expect(logIssue).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: "AI_NoOutputGeneratedError",
-        message: "No output generated.",
-      }),
-      expect.objectContaining({
-        loggerScope: ["agents", "embedded"],
-      }),
-    );
+    expect(logIssue).not.toHaveBeenCalled();
   });
 
   it("rethrows ConfigurationError from getProviderOptions without filing an issue", async () => {

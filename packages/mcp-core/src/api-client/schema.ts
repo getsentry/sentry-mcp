@@ -1349,6 +1349,17 @@ export const EventAttachmentSchema = z.object({
 
 export const EventAttachmentListSchema = z.array(EventAttachmentSchema);
 
+// GET /organizations/{org}/environments/ — visible environments (the endpoint
+// excludes the empty-name "No Environment" and hidden environments by default).
+export const OrganizationEnvironmentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+
+export const OrganizationEnvironmentListSchema = z.array(
+  OrganizationEnvironmentSchema,
+);
+
 /**
  * Schema for individual tag values within an issue's tag distribution.
  *
