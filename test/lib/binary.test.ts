@@ -25,14 +25,19 @@ import {
   getBinaryDownloadUrl,
   getBinaryFilename,
   getBinaryPaths,
+  getGitHubReleaseByTagUrl,
   getLegacyInstallDirs,
   getPlatformBinaryName,
   installBinary,
   isDowngrade,
   isMusl,
+  parseUpgradeJson,
   releaseLock,
   replaceBinarySync,
+  resolveUpgradeSource,
   samePath,
+  UPGRADE_SOURCES,
+  UpgradeSourceNotFoundError,
 } from "../../src/lib/binary.js";
 import { UpgradeError } from "../../src/lib/errors.js";
 
@@ -40,9 +45,9 @@ describe("getBinaryDownloadUrl", () => {
   test("builds correct URL for current platform", () => {
     const url = getBinaryDownloadUrl("1.0.0");
 
-    expect(url).toContain("/1.0.0/");
+    expect(url).toContain("/cli@1.0.0/");
     expect(url).toStartWith(
-      "https://github.com/getsentry/cli/releases/download/"
+      "https://github.com/getsentry/toolkit/releases/download/"
     );
     expect(url).toContain("sentry-");
 
@@ -58,6 +63,128 @@ describe("getBinaryDownloadUrl", () => {
     } else {
       expect(url).not.toEndWith(".exe");
     }
+  });
+});
+
+describe("UPGRADE_SOURCES", () => {
+  test("checks Toolkit before the legacy CLI repository", () => {
+    expect(UPGRADE_SOURCES).toEqual([
+      {
+        githubRepo: "getsentry/toolkit",
+        ghcrRepo: "getsentry/toolkit",
+        tagPrefix: "cli@",
+      },
+      {
+        githubRepo: "getsentry/cli",
+        ghcrRepo: "getsentry/cli",
+        tagPrefix: "",
+      },
+    ]);
+  });
+});
+
+describe("resolveUpgradeSource", () => {
+  test("uses the first source when it exists", async () => {
+    const requests: string[] = [];
+
+    const resolved = await resolveUpgradeSource({
+      getProbeUrl: (source) => getGitHubReleaseByTagUrl("0.45.0", source),
+      fetch: async (url) => {
+        requests.push(String(url));
+        return new Response(JSON.stringify({ tag_name: "cli@0.45.0" }), {
+          status: 200,
+        });
+      },
+    });
+
+    expect(resolved).toEqual({
+      source: UPGRADE_SOURCES[0],
+      response: expect.any(Response),
+    });
+    expect(requests).toEqual([
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.45.0",
+    ]);
+  });
+
+  test("falls back to the legacy source only on HTTP 404", async () => {
+    const requests: string[] = [];
+
+    const resolved = await resolveUpgradeSource({
+      getProbeUrl: (source) => getGitHubReleaseByTagUrl("0.45.0", source),
+      fetch: async (url) => {
+        requests.push(String(url));
+        return new Response(
+          requests.length === 1
+            ? "Not Found"
+            : JSON.stringify({ tag_name: "0.45.0" }),
+          { status: requests.length === 1 ? 404 : 200 }
+        );
+      },
+    });
+
+    expect(resolved.source).toBe(UPGRADE_SOURCES[1]);
+    expect(requests).toEqual([
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.45.0",
+      "https://api.github.com/repos/getsentry/cli/releases/tags/0.45.0",
+    ]);
+  });
+
+  test.each([
+    401, 403, 429, 500,
+  ])("does not fall back on HTTP %i", async (status) => {
+    const requests: string[] = [];
+
+    await expect(
+      resolveUpgradeSource({
+        getProbeUrl: (source) => getGitHubReleaseByTagUrl("0.45.0", source),
+        fetch: async (url) => {
+          requests.push(String(url));
+          return new Response("failure", { status });
+        },
+      })
+    ).rejects.toThrow(`HTTP ${status}`);
+
+    expect(requests).toEqual([
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.45.0",
+    ]);
+  });
+
+  test("does not fall back on a network failure", async () => {
+    const requests: string[] = [];
+
+    await expect(
+      resolveUpgradeSource({
+        getProbeUrl: (source) => getGitHubReleaseByTagUrl("0.45.0", source),
+        fetch: async (url) => {
+          requests.push(String(url));
+          throw new TypeError("fetch failed");
+        },
+      })
+    ).rejects.toThrow("Failed to connect to GitHub: fetch failed");
+
+    expect(requests).toEqual([
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.45.0",
+    ]);
+  });
+
+  test("fails after every source returns 404", async () => {
+    const requests: string[] = [];
+
+    const error = await resolveUpgradeSource({
+      getProbeUrl: (source) => getGitHubReleaseByTagUrl("0.45.0", source),
+      fetch: async (url) => {
+        requests.push(String(url));
+        return new Response("Not Found", { status: 404 });
+      },
+    }).catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(UpgradeSourceNotFoundError);
+    expect(error).toMatchObject({ name: "UpgradeSourceNotFoundError" });
+
+    expect(requests).toEqual([
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.45.0",
+      "https://api.github.com/repos/getsentry/cli/releases/tags/0.45.0",
+    ]);
   });
 });
 
@@ -328,6 +455,21 @@ describe("fetchWithUpgradeError", () => {
     }
   });
 
+  test("preserves an arbitrary external abort reason", async () => {
+    const controller = new AbortController();
+    const reason = { kind: "cancelled" };
+    const request = resolveUpgradeSource({
+      getProbeUrl: () => "https://example.com",
+      signal: controller.signal,
+      fetch: async () => {
+        controller.abort(reason);
+        throw reason;
+      },
+    });
+
+    await expect(request).rejects.toBe(reason);
+  });
+
   test("wraps network errors as UpgradeError", async () => {
     globalThis.fetch = (async () => {
       throw new Error("ECONNREFUSED");
@@ -356,6 +498,48 @@ describe("fetchWithUpgradeError", () => {
       expect(error).toBeInstanceOf(UpgradeError);
       expect((error as UpgradeError).message).toContain("ECONNRESET");
     }
+  });
+});
+
+describe("parseUpgradeJson", () => {
+  test("preserves cancellation during body consumption", async () => {
+    const controller = new AbortController();
+    const reason = { kind: "cancelled" };
+    const response = Response.json({});
+    response.json = async () => {
+      controller.abort(reason);
+      throw new DOMException("aborted", "AbortError");
+    };
+
+    await expect(
+      parseUpgradeJson(response, controller.signal, "invalid metadata")
+    ).rejects.toBe(reason);
+  });
+
+  test("classifies body termination as transport failure", async () => {
+    const response = Response.json({});
+    response.json = async () => {
+      throw new TypeError("terminated");
+    };
+
+    await expect(
+      parseUpgradeJson(response, undefined, "invalid metadata")
+    ).rejects.toMatchObject({
+      name: "UpgradeTransportError",
+      reason: "network_error",
+    });
+  });
+
+  test("classifies completed malformed JSON as metadata failure", async () => {
+    const response = new Response("not json");
+
+    await expect(
+      parseUpgradeJson(response, undefined, "invalid metadata")
+    ).rejects.toMatchObject({
+      name: "UpgradeError",
+      reason: "network_error",
+      message: "invalid metadata",
+    });
   });
 });
 

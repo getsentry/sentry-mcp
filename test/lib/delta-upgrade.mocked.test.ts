@@ -99,10 +99,10 @@ describe("resolveStableDelta", () => {
     // Set up fetch mocks — releases API + patch download
     // Since applyPatch will fail (we don't have a real TRDIFF10 matching this binary),
     // we expect resolveStableDelta to throw, but the chain resolution should succeed
-    const patchUrl = `https://github.com/getsentry/cli/releases/download/0.14.0/${BINARY_NAME}.patch`;
+    const patchUrl = `https://github.com/getsentry/toolkit/releases/download/cli@0.14.0/${BINARY_NAME}.patch`;
     const releases = [
       {
-        tag_name: "0.14.0",
+        tag_name: "cli@0.14.0",
         assets: [
           {
             name: BINARY_NAME,
@@ -123,7 +123,7 @@ describe("resolveStableDelta", () => {
         ],
       },
       {
-        tag_name: "0.13.0",
+        tag_name: "cli@0.13.0",
         assets: [
           {
             name: BINARY_NAME,
@@ -352,7 +352,7 @@ describe("attemptDeltaUpgrade", () => {
     const patchUrl = "https://example.com/patch";
     const releases = [
       {
-        tag_name: "0.14.0",
+        tag_name: "cli@0.14.0",
         assets: [
           {
             name: BINARY_NAME,
@@ -373,7 +373,7 @@ describe("attemptDeltaUpgrade", () => {
         ],
       },
       {
-        tag_name: "0.13.0",
+        tag_name: "cli@0.13.0",
         assets: [
           {
             name: BINARY_NAME,
@@ -434,7 +434,7 @@ describe("attemptDeltaUpgrade", () => {
     const patchUrl = "https://example.com/small.patch";
     const releases = [
       {
-        tag_name: "0.14.0",
+        tag_name: "cli@0.14.0",
         assets: [
           {
             name: BINARY_NAME,
@@ -455,7 +455,7 @@ describe("attemptDeltaUpgrade", () => {
         ],
       },
       {
-        tag_name: "0.13.0",
+        tag_name: "cli@0.13.0",
         assets: [
           {
             name: BINARY_NAME,

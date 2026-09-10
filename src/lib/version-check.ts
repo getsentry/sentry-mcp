@@ -10,6 +10,7 @@
 // biome-ignore lint/performance/noNamespaceImport: Sentry SDK recommends namespace import
 import * as Sentry from "@sentry/node-core/light";
 import { compare as semverCompare } from "semver";
+import type { UpgradeSource } from "./binary.js";
 import { CLI_VERSION } from "./constants.js";
 import { getReleaseChannel } from "./db/release-channel.js";
 import {
@@ -27,7 +28,10 @@ import { cyan, muted } from "./formatters/colors.js";
 import { GLOBAL_FLAGS } from "./global-flags.js";
 import { logger } from "./logger.js";
 import { cleanupPatchCache } from "./patch-cache.js";
-import { fetchLatestFromGitHub, fetchLatestNightlyVersion } from "./upgrade.js";
+import {
+  fetchLatestFromGitHubWithSource,
+  fetchLatestNightlyVersionWithSource,
+} from "./upgrade.js";
 
 /** Target check interval: ~24 hours */
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -227,16 +231,17 @@ export function abortPendingVersionCheck(): void {
 async function maybePrefetchPatches(
   channel: "stable" | "nightly",
   latestVersion: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  source: UpgradeSource
 ): Promise<void> {
   if (semverCompare(latestVersion, CLI_VERSION) !== 1) {
     return;
   }
   try {
     if (channel === "nightly") {
-      await prefetchNightlyPatches(latestVersion, signal);
+      await prefetchNightlyPatches(latestVersion, signal, source);
     } else {
-      await prefetchStablePatches(latestVersion, signal);
+      await prefetchStablePatches(latestVersion, signal, source);
     }
   } catch (error) {
     logger.debug("Delta patch pre-fetch failed (best-effort)", error);
@@ -281,14 +286,14 @@ function checkForUpdateInBackgroundImpl(): void {
     async (span) => {
       try {
         // Use GHCR for nightly channel; GitHub Releases for stable.
-        const latestVersion =
+        const { version: latestVersion, source } =
           channel === "nightly"
-            ? await fetchLatestNightlyVersion(signal)
-            : await fetchLatestFromGitHub(signal);
+            ? await fetchLatestNightlyVersionWithSource(signal)
+            : await fetchLatestFromGitHubWithSource(signal);
         setVersionCheckInfo(latestVersion);
 
         // Pre-fetch delta patches so `sentry cli upgrade` can apply them offline
-        await maybePrefetchPatches(channel, latestVersion, signal);
+        await maybePrefetchPatches(channel, latestVersion, signal, source);
 
         span.setStatus({ code: 1 }); // OK
       } catch (error) {

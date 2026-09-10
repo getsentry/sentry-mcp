@@ -23,7 +23,11 @@ import {
   customFetch,
   isTlsCertError,
 } from "./custom-ca.js";
-import { stringifyUnknown, UpgradeError } from "./errors.js";
+import {
+  stringifyUnknown,
+  UpgradeError,
+  UpgradeTransportError,
+} from "./errors.js";
 import { logger } from "./logger.js";
 import { isProcessRunning } from "./process-utils.js";
 /** Known directories where the curl installer may place the binary */
@@ -101,6 +105,33 @@ export type InstallationMethod =
   | "bun"
   | "yarn"
   | "unknown";
+
+/** A repository pair that hosts CLI stable releases and nightly OCI images. */
+export type UpgradeSource = {
+  /** GitHub `owner/repository` containing CLI release assets. */
+  readonly githubRepo: string;
+  /** GHCR `owner/package` containing CLI nightly images and delta patches. */
+  readonly ghcrRepo: string;
+  /** Prefix attached to CLI release tags in this repository. */
+  readonly tagPrefix: string;
+};
+
+/** Ordered CLI release sources. The resolver falls through only on HTTP 404. */
+export const UPGRADE_SOURCES = [
+  {
+    githubRepo: "getsentry/toolkit",
+    ghcrRepo: "getsentry/toolkit",
+    tagPrefix: "cli@",
+  },
+  {
+    githubRepo: "getsentry/cli",
+    ghcrRepo: "getsentry/cli",
+    tagPrefix: "",
+  },
+] as const satisfies readonly [UpgradeSource, ...UpgradeSource[]];
+
+/** The first source used by direct helper calls that do not resolve a source. */
+export const PRIMARY_UPGRADE_SOURCE = UPGRADE_SOURCES[0];
 
 /** Valid methods that can be specified via --method flag */
 const VALID_METHODS: InstallationMethod[] = [
@@ -204,13 +235,130 @@ export function getPlatformBinaryName(): string {
  * @param version - Version to download (without 'v' prefix)
  * @returns Download URL for the binary
  */
-export function getBinaryDownloadUrl(version: string): string {
-  return `https://github.com/getsentry/cli/releases/download/${version}/${getPlatformBinaryName()}`;
+export function getBinaryDownloadUrl(
+  version: string,
+  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
+): string {
+  const tag = `${source.tagPrefix}${version}`;
+  return `https://github.com/${source.githubRepo}/releases/download/${tag}/${getPlatformBinaryName()}`;
 }
 
-/** GitHub API base URL for releases */
-export const GITHUB_RELEASES_URL =
-  "https://api.github.com/repos/getsentry/cli/releases";
+/** Build the GitHub API base URL for a release source. */
+export function getGitHubReleasesUrl(
+  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
+): string {
+  return `https://api.github.com/repos/${source.githubRepo}/releases`;
+}
+
+/** Build the GitHub API URL for one source-specific release tag. */
+export function getGitHubReleaseByTagUrl(
+  version: string,
+  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
+): string {
+  const tag = `${source.tagPrefix}${version}`;
+  return `${getGitHubReleasesUrl(source)}/tags/${encodeURIComponent(tag)}`;
+}
+
+/** Build the GitHub API URL used to discover a source's latest CLI release. */
+export function getGitHubLatestReleaseUrl(
+  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
+): string {
+  return source.tagPrefix
+    ? `${getGitHubReleasesUrl(source)}?per_page=100`
+    : `${getGitHubReleasesUrl(source)}/latest`;
+}
+
+/** Build the GitHub API URL used to verify that a source repository exists. */
+export function getGitHubRepositoryUrl(
+  source: UpgradeSource = PRIMARY_UPGRADE_SOURCE
+): string {
+  return `https://api.github.com/repos/${source.githubRepo}`;
+}
+
+/** GitHub API base URL for the primary release source. */
+export const GITHUB_RELEASES_URL = getGitHubReleasesUrl();
+
+/** Result of selecting one source for an upgrade operation. */
+export type ResolvedUpgradeSource = {
+  /** The selected release source. */
+  readonly source: UpgradeSource;
+  /** The successful response from the source probe. */
+  readonly response: Response;
+};
+
+/** All configured upgrade sources returned an HTTP 404 response. */
+export class UpgradeSourceNotFoundError extends UpgradeError {
+  constructor() {
+    super(
+      "network_error",
+      "No CLI upgrade source was found: every source returned HTTP 404"
+    );
+    this.name = "UpgradeSourceNotFoundError";
+  }
+}
+
+/** Configuration for selecting the first available upgrade source. */
+export type ResolveUpgradeSourceOptions = {
+  /** Build the source-specific URL whose response proves source availability. */
+  readonly getProbeUrl: (source: UpgradeSource) => string;
+  /** Fetch implementation used for the probe. Defaults to the CLI CA-aware fetch. */
+  readonly fetch?: typeof fetch;
+  /** Optional cancellation signal shared by every source probe. */
+  readonly signal?: AbortSignal;
+  /** Ordered sources to probe. Defaults to all configured upgrade sources. */
+  readonly sources?: readonly UpgradeSource[];
+};
+
+async function fetchUpgradeProbe(
+  source: UpgradeSource,
+  options: ResolveUpgradeSourceOptions
+): Promise<Response> {
+  try {
+    return await (options.fetch ?? customFetch)(options.getProbeUrl(source), {
+      headers: getGitHubHeaders(),
+      signal: options.signal,
+    });
+  } catch (error) {
+    if (options.signal?.aborted) {
+      throw options.signal.reason;
+    }
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
+    if (error instanceof Error && isTlsCertError(error)) {
+      throw new UpgradeTransportError(buildTlsErrorDetail(error));
+    }
+    throw new UpgradeTransportError(
+      `Failed to connect to GitHub: ${stringifyUnknown(error)}`
+    );
+  }
+}
+
+/**
+ * Select the first available upgrade source.
+ *
+ * The caller receives the successful probe response so it never repeats the
+ * request. Only HTTP 404 advances to the next source. Every other HTTP or
+ * network failure aborts immediately.
+ */
+export async function resolveUpgradeSource(
+  options: ResolveUpgradeSourceOptions
+): Promise<ResolvedUpgradeSource> {
+  for (const source of options.sources ?? UPGRADE_SOURCES) {
+    const response = await fetchUpgradeProbe(source, options);
+    if (response.ok) {
+      return { source, response };
+    }
+    if (response.status !== 404) {
+      throw new UpgradeError(
+        "network_error",
+        `Failed to fetch from GitHub: HTTP ${response.status}`
+      );
+    }
+  }
+
+  throw new UpgradeSourceNotFoundError();
+}
 
 /**
  * Detect whether a version string identifies a nightly build.
@@ -228,7 +376,7 @@ export function isNightlyVersion(version: string): boolean {
 /**
  * Compare two version strings and return their ordering.
  *
- * Uses `Bun.semver.order` which handles both stable (`X.Y.Z`) and
+ * Uses `semver.compare` which handles both stable (`X.Y.Z`) and
  * nightly (`X.Y.Z-dev.<unix-seconds>`) versions correctly — the numeric
  * pre-release identifier is compared numerically per SemVer spec.
  *
@@ -353,17 +501,40 @@ export async function fetchWithUpgradeError(
   try {
     return await customFetch(url, init);
   } catch (error) {
+    if (init.signal?.aborted) {
+      throw init.signal.reason;
+    }
     // Re-throw AbortError as-is so callers can handle it specifically
     if (error instanceof Error && error.name === "AbortError") {
       throw error;
     }
     if (error instanceof Error && isTlsCertError(error)) {
-      throw new UpgradeError("network_error", buildTlsErrorDetail(error));
+      throw new UpgradeTransportError(buildTlsErrorDetail(error));
     }
     const msg = stringifyUnknown(error);
-    throw new UpgradeError(
-      "network_error",
+    throw new UpgradeTransportError(
       `Failed to connect to ${serviceName}: ${msg}`
+    );
+  }
+}
+
+/** Parse an upgrade response while preserving cancellation and transport failures. */
+export async function parseUpgradeJson(
+  response: Response,
+  signal: AbortSignal | undefined,
+  invalidMessage: string
+): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch (error) {
+    if (signal?.aborted) {
+      throw signal.reason;
+    }
+    if (error instanceof SyntaxError) {
+      throw new UpgradeError("network_error", invalidMessage);
+    }
+    throw new UpgradeTransportError(
+      `${invalidMessage}: ${stringifyUnknown(error)}`
     );
   }
 }

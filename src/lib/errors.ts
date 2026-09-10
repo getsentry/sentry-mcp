@@ -618,6 +618,14 @@ export class UpgradeError extends CliError {
   }
 }
 
+/** Upgrade failure caused by transport rather than an HTTP or metadata error. */
+export class UpgradeTransportError extends UpgradeError {
+  constructor(message: string) {
+    super("network_error", message);
+    this.name = "UpgradeTransportError";
+  }
+}
+
 // Seer Errors
 
 export type SeerErrorReason = "not_enabled" | "no_budget" | "ai_disabled";

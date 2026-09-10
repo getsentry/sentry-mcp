@@ -124,7 +124,7 @@ describe("upgradeCommand.func", () => {
 
   test("shows installation info with specified method", async () => {
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ tag_name: "v0.0.0-dev" }), {
+      new Response(JSON.stringify([{ tag_name: "cli@1.0.0" }]), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       })) as typeof fetch;
@@ -135,18 +135,18 @@ describe("upgradeCommand.func", () => {
 
     // Use method flag to bypass detection (curl uses GitHub).
     // Pass json: true so the output config renders structured JSON to stdout.
-    await func.call(context, { check: false, method: "curl", json: true });
+    await func.call(context, { check: true, method: "curl", json: true });
 
     // Final result is rendered as JSON to stdout by the output system
     const data = JSON.parse(getStdout()) as UpgradeResult;
-    expect(data.action).toBe("up-to-date");
+    expect(data.action).toBe("checked");
     expect(data.method).toBe("curl");
   });
 
   test("check mode shows update available", async () => {
-    // curl uses GitHub API which returns { tag_name: "vX.X.X" }
+    // Curl uses the Toolkit GitHub release list with product-prefixed tags.
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ tag_name: "v99.0.0" }), {
+      new Response(JSON.stringify([{ tag_name: "cli@99.0.0" }]), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       })) as typeof fetch;
@@ -164,11 +164,15 @@ describe("upgradeCommand.func", () => {
   });
 
   test("check mode with version shows versioned command", async () => {
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ tag_name: "v99.0.0" }), {
+    globalThis.fetch = (async (url) => {
+      const response = String(url).includes("/releases/tags/cli%402.0.0")
+        ? { tag_name: "cli@2.0.0" }
+        : [{ tag_name: "cli@99.0.0" }];
+      return new Response(JSON.stringify(response), {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      })) as typeof fetch;
+      });
+    }) as typeof fetch;
 
     const func = await upgradeCommand.loader();
     const { context, getStdout, restore } = createMockContext();
@@ -187,9 +191,9 @@ describe("upgradeCommand.func", () => {
     );
   });
 
-  test("check mode shows already on target when versions match", async () => {
+  test("check mode compares the current version with a stable target", async () => {
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ tag_name: "v0.0.0-dev" }), {
+      new Response(JSON.stringify([{ tag_name: "cli@1.0.0" }]), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       })) as typeof fetch;
@@ -202,25 +206,14 @@ describe("upgradeCommand.func", () => {
 
     const data = JSON.parse(getStdout()) as UpgradeResult;
     expect(data.action).toBe("checked");
-    expect(data.currentVersion).toBe(data.targetVersion);
-    // No warnings when already on target
-    expect(data.warnings).toBeUndefined();
+    expect(data.currentVersion).toBe("0.0.0-dev");
+    expect(data.targetVersion).toBe("1.0.0");
   });
 
   test("throws UpgradeError when specified version does not exist", async () => {
-    // First call: fetch latest (returns 99.0.0)
-    // Second call: check if version exists (returns 404)
     let callCount = 0;
     globalThis.fetch = (async () => {
       callCount += 1;
-      if (callCount === 1) {
-        // Latest version check
-        return new Response(JSON.stringify({ tag_name: "v99.0.0" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      // Version exists check - return 404
       return new Response("Not Found", { status: 404 });
     }) as typeof fetch;
 
@@ -232,5 +225,6 @@ describe("upgradeCommand.func", () => {
     await expect(
       func.call(context, { check: false, method: "curl" }, "999.0.0")
     ).rejects.toThrow("Version 999.0.0 not found");
+    expect(callCount).toBe(2);
   });
 });
