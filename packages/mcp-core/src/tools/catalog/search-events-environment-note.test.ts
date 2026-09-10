@@ -26,6 +26,11 @@ describe("collectRequestedEnvironments", () => {
     expect(
       collectRequestedEnvironments(null, "environment:[prod,dev]"),
     ).toEqual(["prod", "dev"]);
+    // IN-list with spaces after commas (official syntax) — tokenizer splits it,
+    // so it must be rejoined rather than parsed as garbage.
+    expect(
+      collectRequestedEnvironments(null, "environment:[prod, dev] level:error"),
+    ).toEqual(["prod", "dev"]);
     expect(collectRequestedEnvironments(null, 'environment:"qa eu"')).toEqual([
       "qa eu",
     ]);

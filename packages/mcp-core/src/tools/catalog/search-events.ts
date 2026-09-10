@@ -191,14 +191,24 @@ export function collectRequestedEnvironments(
   // Tokenize (quote/escape-aware) and only take tokens that ARE an `environment:`
   // filter, so dotted keys like `deployment.environment:` and `environment:`
   // inside quoted text (e.g. a message value) aren't mistaken for a filter.
-  for (const token of tokenizeSearchQuery(query)) {
-    const match = /^environment:(.*)$/is.exec(token);
+  const tokens = tokenizeSearchQuery(query);
+  for (let i = 0; i < tokens.length; i++) {
+    const match = /^environment:(.*)$/is.exec(tokens[i]);
     if (!match) {
       continue;
     }
-    const raw = match[1];
+    let value = match[1];
+    // An IN-list (`environment:[a, b]`) can be split across tokens on its
+    // internal spaces; rejoin following tokens until the list is closed.
+    while (
+      value.startsWith("[") &&
+      !value.includes("]") &&
+      i + 1 < tokens.length
+    ) {
+      value += ` ${tokens[++i]}`;
+    }
     const inner =
-      raw.startsWith("[") && raw.endsWith("]") ? raw.slice(1, -1) : raw;
+      value.startsWith("[") && value.endsWith("]") ? value.slice(1, -1) : value;
     for (const part of inner.split(",")) {
       const cleaned = part.trim().replace(/^["']|["']$/g, "");
       if (cleaned) {
