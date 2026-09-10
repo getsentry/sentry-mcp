@@ -188,12 +188,19 @@ export function collectRequestedEnvironments(
   } else if (Array.isArray(environment)) {
     values.push(...environment);
   }
-  const tokenPattern = /\benvironment:(\[[^\]]*\]|"[^"]*"|\S+)/gi;
-  for (const match of query.matchAll(tokenPattern)) {
+  // Tokenize (quote/escape-aware) and only take tokens that ARE an `environment:`
+  // filter, so dotted keys like `deployment.environment:` and `environment:`
+  // inside quoted text (e.g. a message value) aren't mistaken for a filter.
+  for (const token of tokenizeSearchQuery(query)) {
+    const match = /^environment:(.*)$/is.exec(token);
+    if (!match) {
+      continue;
+    }
     const raw = match[1];
-    const inner = raw.startsWith("[") ? raw.slice(1, -1) : raw;
+    const inner =
+      raw.startsWith("[") && raw.endsWith("]") ? raw.slice(1, -1) : raw;
     for (const part of inner.split(",")) {
-      const cleaned = part.trim().replace(/^"|"$/g, "");
+      const cleaned = part.trim().replace(/^["']|["']$/g, "");
       if (cleaned) {
         values.push(cleaned);
       }
@@ -512,10 +519,14 @@ export default defineTool({
 
     // Fetch the org's real environments once: used to ground the agent prompt
     // (below) and to flag any requested environment that doesn't exist. Skipped
-    // when the agent won't run and no environment was requested.
+    // only when nothing references an environment — including a structured query
+    // that skips the agent but puts `environment:` in the query string.
     const willRunAgent = hasAgentProvider() && !canRunWithoutAgent;
+    const inputReferencesEnvironment =
+      params.environment != null ||
+      collectRequestedEnvironments(null, params.query ?? "").length > 0;
     const environmentNames =
-      willRunAgent || params.environment != null
+      willRunAgent || inputReferencesEnvironment
         ? await fetchEnvironmentNames({
             apiService,
             organizationSlug,

@@ -36,6 +36,24 @@ describe("collectRequestedEnvironments", () => {
       collectRequestedEnvironments("production", "environment:qa"),
     ).toEqual(["production", "qa"]);
   });
+
+  it("ignores dotted keys and quoted text that aren't real environment filters", () => {
+    // `deployment.environment` is a different (OTel) field, not the env filter.
+    expect(
+      collectRequestedEnvironments(null, "deployment.environment:prod"),
+    ).toEqual([]);
+    // `environment:` inside a quoted value (e.g. a message) is not a filter.
+    expect(
+      collectRequestedEnvironments(null, 'message:"environment:foo"'),
+    ).toEqual([]);
+    // A real environment filter alongside those is still collected.
+    expect(
+      collectRequestedEnvironments(
+        null,
+        'deployment.environment:prod environment:qa message:"environment:bar"',
+      ),
+    ).toEqual(["qa"]);
+  });
 });
 
 describe("formatUnknownEnvironmentNote", () => {
