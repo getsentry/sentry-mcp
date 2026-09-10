@@ -4109,7 +4109,7 @@ export class SentryApiService {
       organizationSlug: string;
       issueId: string;
       status?: string;
-      assignedTo?: string;
+      assignedTo?: string | null;
       substatus?: string;
       ignoreDuration?: number;
       ignoreCount?: number;
@@ -4130,7 +4130,7 @@ export class SentryApiService {
       ignoreUserWindow?: number;
     } = {};
     if (status !== undefined) updateData.status = status;
-    if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
+    if (assignedTo !== undefined) updateData.assignedTo = assignedTo ?? "";
     if (substatus !== undefined) updateData.substatus = substatus;
     if (ignoreDuration !== undefined)
       updateData.ignoreDuration = ignoreDuration;
