@@ -6,6 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { UPGRADE_SOURCES } from "../../src/lib/binary.js";
 import { UpgradeError } from "../../src/lib/errors.js";
 import {
   downloadLayerBlob,
@@ -15,6 +16,7 @@ import {
   findLayerByFilename,
   GHCR_REPO,
   GHCR_TAG,
+  GhcrManifestHttpError,
   getAnonymousToken,
   getNightlyVersion,
   listTags,
@@ -37,13 +39,13 @@ function makeManifest(overrides: Partial<OciManifest> = {}): OciManifest {
     schemaVersion: 2,
     mediaType: "application/vnd.oci.image.manifest.v1+json",
     config: {
-      digest: "sha256:config",
+      digest: `sha256:${"0".repeat(64)}`,
       mediaType: "application/vnd.oci.empty.v1+json",
       size: 2,
     },
     layers: [
       {
-        digest: "sha256:abc123",
+        digest: `sha256:${"a".repeat(64)}`,
         mediaType: "application/octet-stream",
         size: 1000,
         annotations: {
@@ -51,7 +53,7 @@ function makeManifest(overrides: Partial<OciManifest> = {}): OciManifest {
         },
       },
       {
-        digest: "sha256:def456",
+        digest: `sha256:${"d".repeat(64)}`,
         mediaType: "application/octet-stream",
         size: 1200,
         annotations: {
@@ -91,6 +93,19 @@ describe("getAnonymousToken", () => {
     expect(token).toBe("test-token-abc");
   });
 
+  test("uses the selected source's GHCR repository", async () => {
+    mockFetch(async (url) => {
+      expect(String(url)).toContain("scope=repository:getsentry/toolkit:pull");
+      return new Response(JSON.stringify({ token: "toolkit-token" }), {
+        status: 200,
+      });
+    });
+
+    await expect(getAnonymousToken(UPGRADE_SOURCES[0])).resolves.toBe(
+      "toolkit-token"
+    );
+  });
+
   test("throws UpgradeError on HTTP error", async () => {
     mockFetch(async () => new Response("Unauthorized", { status: 401 }));
 
@@ -111,6 +126,42 @@ describe("getAnonymousToken", () => {
     );
   });
 
+  test("propagates caller cancellation without retrying", async () => {
+    const controller = new AbortController();
+    let requests = 0;
+    mockFetch(async (_url, init) => {
+      requests += 1;
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("aborted", "AbortError")),
+          { once: true }
+        );
+      });
+    });
+
+    const request = getAnonymousToken(undefined, controller.signal);
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    expect(requests).toBe(1);
+  });
+
+  test("preserves a primitive caller cancellation reason without retrying", async () => {
+    const controller = new AbortController();
+    let requests = 0;
+    mockFetch(async () => {
+      requests += 1;
+      controller.abort("cancelled");
+      throw controller.signal.reason;
+    });
+
+    await expect(getAnonymousToken(undefined, controller.signal)).rejects.toBe(
+      "cancelled"
+    );
+    expect(requests).toBe(1);
+  });
+
   test("throws UpgradeError when response has no token field", async () => {
     mockFetch(
       async () =>
@@ -123,6 +174,39 @@ describe("getAnonymousToken", () => {
     await expect(getAnonymousToken()).rejects.toThrow(UpgradeError);
     await expect(getAnonymousToken()).rejects.toThrow(
       "GHCR token exchange returned no token"
+    );
+  });
+
+  test("rejects a non-string token", async () => {
+    mockFetch(async () => Response.json({ token: {} }));
+
+    await expect(getAnonymousToken()).rejects.toThrow(
+      "GHCR token exchange returned no token"
+    );
+  });
+
+  test.each([" ", "\ttoken"])("rejects malformed token %j", async (token) => {
+    mockFetch(async () => Response.json({ token }));
+
+    await expect(getAnonymousToken()).rejects.toThrow(
+      "GHCR token exchange returned no token"
+    );
+  });
+
+  test("preserves cancellation during token body consumption", async () => {
+    const controller = new AbortController();
+    const reason = { kind: "cancelled" };
+    mockFetch(async () => {
+      const response = Response.json({ token: "unused" });
+      response.json = async () => {
+        controller.abort(reason);
+        throw new DOMException("aborted", "AbortError");
+      };
+      return response;
+    });
+
+    await expect(getAnonymousToken(undefined, controller.signal)).rejects.toBe(
+      reason
     );
   });
 });
@@ -151,6 +235,18 @@ describe("fetchNightlyManifest", () => {
     expect(capturedHeaders.accept).toBe(
       "application/vnd.oci.image.manifest.v1+json"
     );
+  });
+
+  test("uses the selected source's GHCR repository", async () => {
+    const manifest = makeManifest();
+    mockFetch(async (url) => {
+      expect(String(url)).toContain("/v2/getsentry/toolkit/manifests/nightly");
+      return new Response(JSON.stringify(manifest), { status: 200 });
+    });
+
+    await expect(
+      fetchNightlyManifest("token", undefined, UPGRADE_SOURCES[0])
+    ).resolves.toEqual(manifest);
   });
 
   test("throws UpgradeError on HTTP error", async () => {
@@ -192,19 +288,31 @@ describe("getNightlyVersion", () => {
     const manifest = makeManifest({ annotations: undefined });
     expect(() => getNightlyVersion(manifest)).toThrow(UpgradeError);
   });
+
+  test.each([
+    "not-semver",
+    "1.2.3",
+    "1.2.3-dev.foo",
+  ])("rejects invalid nightly version annotation %s", (version) => {
+    const manifest = makeManifest({ annotations: { version } });
+
+    expect(() => getNightlyVersion(manifest)).toThrow(
+      "Nightly manifest has invalid version annotation"
+    );
+  });
 });
 
 describe("findLayerByFilename", () => {
   test("finds layer by filename annotation", () => {
     const manifest = makeManifest();
     const layer = findLayerByFilename(manifest, "sentry-linux-x64.gz");
-    expect(layer.digest).toBe("sha256:abc123");
+    expect(layer.digest).toBe(`sha256:${"a".repeat(64)}`);
   });
 
   test("finds darwin layer", () => {
     const manifest = makeManifest();
     const layer = findLayerByFilename(manifest, "sentry-darwin-arm64.gz");
-    expect(layer.digest).toBe("sha256:def456");
+    expect(layer.digest).toBe(`sha256:${"d".repeat(64)}`);
   });
 
   test("throws UpgradeError when filename not found", () => {
@@ -362,11 +470,102 @@ describe("downloadNightlyBlob", () => {
       "Failed to download from blob storage: fetch failed"
     );
   });
+
+  test("preserves external cancellation during the GHCR blob request", async () => {
+    const controller = new AbortController();
+    let requestCount = 0;
+    mockFetch(async () => {
+      requestCount += 1;
+      controller.abort();
+      throw new DOMException("aborted", "AbortError");
+    });
+
+    await expect(
+      downloadNightlyBlob("token", "sha256:abc", controller.signal)
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(requestCount).toBe(1);
+  });
+
+  test("preserves an arbitrary external cancellation reason", async () => {
+    const controller = new AbortController();
+    const reason = new Error("cancelled");
+    let requestCount = 0;
+    mockFetch(async () => {
+      requestCount += 1;
+      controller.abort(reason);
+      throw new TypeError("invalid_argument");
+    });
+
+    await expect(
+      downloadNightlyBlob("token", "sha256:abc", controller.signal)
+    ).rejects.toBe(reason);
+    expect(requestCount).toBe(1);
+  });
+
+  test("preserves external cancellation during the redirect request", async () => {
+    const controller = new AbortController();
+    const reason = { kind: "cancelled" };
+    const headers: Headers[] = [];
+    mockFetch(async (_url, init) => {
+      headers.push(new Headers(init?.headers));
+      if (headers.length === 1) {
+        return Response.redirect("https://blob.storage.azure.com/file", 307);
+      }
+      controller.abort(reason);
+      throw new TypeError("invalid_argument");
+    });
+
+    await expect(
+      downloadNightlyBlob("token", "sha256:abc", controller.signal)
+    ).rejects.toBe(reason);
+    expect(headers).toHaveLength(2);
+    expect(headers[1]?.has("authorization")).toBe(false);
+  });
 });
 
 // fetchManifest (generic tag variant)
 
 describe("fetchManifest", () => {
+  test.each([
+    null,
+    [],
+    {},
+    { schemaVersion: 2 },
+    { schemaVersion: 2, layers: {} },
+    { schemaVersion: 2, layers: [], annotations: ["value"] },
+    {
+      schemaVersion: 2,
+      layers: [
+        {
+          digest: `sha256:${"a".repeat(64)}`,
+          mediaType: "application/octet-stream",
+          size: 1,
+          annotations: ["value"],
+        },
+      ],
+    },
+  ])("rejects invalid OCI manifest %#", async (manifest) => {
+    mockFetch(async () => Response.json(manifest));
+
+    await expect(fetchManifest("token", "nightly")).rejects.toThrow(
+      'Manifest for tag "nightly" returned invalid metadata'
+    );
+  });
+
+  test("classifies manifest body termination as transport failure", async () => {
+    mockFetch(async () => {
+      const response = Response.json(makeManifest());
+      response.json = async () => {
+        throw new TypeError("terminated");
+      };
+      return response;
+    });
+
+    await expect(fetchManifest("token", "nightly")).rejects.toMatchObject({
+      name: "UpgradeTransportError",
+      reason: "network_error",
+    });
+  });
   test("fetches manifest for an arbitrary tag", async () => {
     const manifest = makeManifest();
 
@@ -387,12 +586,15 @@ describe("fetchManifest", () => {
   test("throws UpgradeError on HTTP 404", async () => {
     mockFetch(async () => new Response("Not Found", { status: 404 }));
 
-    await expect(fetchManifest("token", "patch-0.13.0")).rejects.toThrow(
-      UpgradeError
+    const error = await fetchManifest("token", "patch-0.13.0").catch(
+      (reason: unknown) => reason
     );
-    await expect(fetchManifest("token", "patch-0.13.0")).rejects.toThrow(
-      'Failed to fetch manifest for tag "patch-0.13.0": HTTP 404'
-    );
+    expect(error).toBeInstanceOf(GhcrManifestHttpError);
+    expect(error).toMatchObject({
+      name: "GhcrManifestHttpError",
+      status: 404,
+      message: 'Failed to fetch manifest for tag "patch-0.13.0": HTTP 404',
+    });
   });
 
   test("throws UpgradeError on network failure", async () => {
@@ -412,6 +614,19 @@ describe("fetchManifest", () => {
 // listTags
 
 describe("listTags", () => {
+  test("rejects a repeated pagination cursor", async () => {
+    const tags = Array.from({ length: 100 }, (_, index) => `tag-${index}`);
+    let requests = 0;
+    mockFetch(async () => {
+      requests += 1;
+      return Response.json({ tags });
+    });
+
+    await expect(listTags("token")).rejects.toThrow(
+      "GHCR tag pagination returned a repeated cursor"
+    );
+    expect(requests).toBe(2);
+  });
   test("returns all tags when no prefix filter", async () => {
     mockFetch(async (url) => {
       expect(String(url)).toContain(`/v2/${GHCR_REPO}/tags/list`);

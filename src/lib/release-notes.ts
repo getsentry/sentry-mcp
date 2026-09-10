@@ -15,11 +15,18 @@
 import { marked, type Token, type Tokens } from "marked";
 import {
   compareVersions,
-  GITHUB_RELEASES_URL,
   getGitHubHeaders,
+  getGitHubReleasesUrl,
+  PRIMARY_UPGRADE_SOURCE,
+  type UpgradeSource,
 } from "./binary.js";
 import { customFetch } from "./custom-ca.js";
-import type { GitHubRelease } from "./delta-upgrade.js";
+import {
+  type GitHubRelease,
+  isNormalizedForSource,
+  type NormalizedGitHubReleases,
+  normalizeStableReleases,
+} from "./delta-upgrade.js";
 import { logger } from "./logger.js";
 
 const log = logger.withTag("release-notes");
@@ -413,27 +420,34 @@ function mergeSectionsByCategory(releases: GitHubRelease[]): ChangeSection[] {
   return merged;
 }
 
-/**
- * Build a changelog summary from a list of GitHub releases.
- *
- * Filters releases within the version range (exclusive `fromVersion`,
- * inclusive `toVersion`), extracts and merges sections by category, and
- * optionally truncates to fit terminal constraints.
- *
- * @param releases - GitHub releases (newest first)
- * @param fromVersion - Current version (exclusive lower bound)
- * @param toVersion - Target version (inclusive upper bound)
- * @param maxItems - Maximum total list items across all sections
- * @returns Changelog summary, or null if no relevant changes found
- */
-export function buildChangelogSummary(
+/** Options for source-aware changelog summary construction. */
+type ChangelogBuildOptions = {
+  /** Maximum total list items across all sections, or unlimited when omitted. */
+  maxItems?: number;
+  /** Selected release source whose tag prefix filters the release list. */
+  source?: UpgradeSource;
+};
+
+function normalizeChangelogReleases(
+  releases: GitHubRelease[],
+  source: UpgradeSource
+): GitHubRelease[] {
+  if (isNormalizedForSource(releases, source)) {
+    return releases;
+  }
+  return [];
+}
+
+/** Build a changelog summary while filtering source-specific release tags. */
+function buildChangelogSummaryForSource(
   releases: GitHubRelease[],
   fromVersion: string,
   toVersion: string,
-  maxItems?: number
+  options: ChangelogBuildOptions
 ): ChangelogSummary | null {
-  const inRange = releases.filter((r) => {
-    const version = r.tag_name.replace(VERSION_PREFIX_RE, "");
+  const { maxItems } = options;
+  const inRange = releases.filter((release) => {
+    const version = release.tag_name.replace(VERSION_PREFIX_RE, "");
     return (
       compareVersions(version, fromVersion) === 1 &&
       compareVersions(version, toVersion) <= 0
@@ -451,6 +465,26 @@ export function buildChangelogSummary(
     toVersion,
     maxItems
   );
+}
+
+/**
+ * Build a changelog summary from releases with legacy unprefixed tags.
+ *
+ * @param releases - GitHub releases (newest first)
+ * @param fromVersion - Current version (exclusive lower bound)
+ * @param toVersion - Target version (inclusive upper bound)
+ * @param maxItems - Maximum total list items across all sections
+ * @returns Changelog summary, or null if no relevant changes were found
+ */
+export function buildChangelogSummary(
+  releases: GitHubRelease[],
+  fromVersion: string,
+  toVersion: string,
+  maxItems?: number
+): ChangelogSummary | null {
+  return buildChangelogSummaryForSource(releases, fromVersion, toVersion, {
+    maxItems,
+  });
 }
 
 // ────────────────────────── Nightly Commit Parsing ─────────────────────────
@@ -557,11 +591,13 @@ const CHANGELOG_MAX_RELEASES = 30;
  *
  * @returns Array of releases (newest first), or empty array on failure
  */
-async function fetchReleasesForChangelog(): Promise<GitHubRelease[]> {
+async function fetchReleasesForChangelog(
+  source: UpgradeSource
+): Promise<GitHubRelease[]> {
   let response: Response;
   try {
     response = await customFetch(
-      `${GITHUB_RELEASES_URL}?per_page=${CHANGELOG_MAX_RELEASES}`,
+      `${getGitHubReleasesUrl(source)}?per_page=${CHANGELOG_MAX_RELEASES}`,
       { headers: getGitHubHeaders() }
     );
   } catch (error) {
@@ -582,7 +618,7 @@ async function fetchReleasesForChangelog(): Promise<GitHubRelease[]> {
     log.debug("GitHub releases response is not an array", typeof data);
     return [];
   }
-  return data as GitHubRelease[];
+  return normalizeStableReleases(data as GitHubRelease[], source);
 }
 
 /**
@@ -593,23 +629,24 @@ async function fetchReleasesForChangelog(): Promise<GitHubRelease[]> {
  * back to fetching with a higher per_page than the delta-upgrade path
  * to cover larger version jumps.
  *
- * @param fromVersion - Current version
- * @param toVersion - Target version
- * @param maxItems - Maximum list items to include
- * @param prefetchedReleases - Optional releases already fetched by the caller
+ * @param options - Version range, selected source, limit, and optional releases
  * @returns Changelog summary, or null on failure
  */
 async function fetchStableChangelog(
-  fromVersion: string,
-  toVersion: string,
-  maxItems?: number,
-  prefetchedReleases?: GitHubRelease[]
+  options: FetchChangelogOptions & { source: UpgradeSource }
 ): Promise<ChangelogSummary | null> {
-  const releases = prefetchedReleases ?? (await fetchReleasesForChangelog());
+  const { fromVersion, toVersion, maxItems, prefetchedReleases, source } =
+    options;
+  const releases = prefetchedReleases
+    ? normalizeChangelogReleases(prefetchedReleases, source)
+    : await fetchReleasesForChangelog(source);
   if (releases.length === 0) {
     return null;
   }
-  return buildChangelogSummary(releases, fromVersion, toVersion, maxItems);
+  return buildChangelogSummaryForSource(releases, fromVersion, toVersion, {
+    maxItems,
+    source,
+  });
 }
 
 /**
@@ -636,12 +673,14 @@ function buildNightlyChangelogSummary(
  *
  * @param fromVersion - Current nightly version
  * @param toVersion - Target nightly version
+ * @param source - Release source selected during version discovery
  * @param maxItems - Maximum list items to include
  * @returns Changelog summary, or null on failure or invalid versions
  */
 async function fetchNightlyChangelog(
   fromVersion: string,
   toVersion: string,
+  source: UpgradeSource,
   maxItems?: number
 ): Promise<ChangelogSummary | null> {
   const fromTs = extractNightlyTimestamp(fromVersion);
@@ -659,7 +698,7 @@ async function fetchNightlyChangelog(
   const sinceDate = new Date((fromTs + 1) * 1000).toISOString();
   const untilDate = new Date((toTs + 1) * 1000).toISOString();
 
-  const url = `https://api.github.com/repos/getsentry/cli/commits?sha=main&since=${sinceDate}&until=${untilDate}&per_page=100`;
+  const url = `https://api.github.com/repos/${source.githubRepo}/commits?sha=main&since=${sinceDate}&until=${untilDate}&per_page=100`;
 
   let response: Response;
   try {
@@ -704,7 +743,9 @@ export type FetchChangelogOptions = {
   /** Maximum list items to include */
   maxItems?: number;
   /** Pre-fetched releases to avoid redundant API call (stable channel only) */
-  prefetchedReleases?: GitHubRelease[];
+  prefetchedReleases?: NormalizedGitHubReleases;
+  /** Release source selected during version discovery; defaults to the primary source */
+  source?: UpgradeSource;
 };
 
 /**
@@ -721,17 +762,30 @@ export async function fetchChangelog(
   opts: FetchChangelogOptions
 ): Promise<ChangelogSummary | null> {
   try {
-    const { channel, fromVersion, toVersion, maxItems, prefetchedReleases } =
-      opts;
-    if (channel === "nightly") {
-      return await fetchNightlyChangelog(fromVersion, toVersion, maxItems);
-    }
-    return await fetchStableChangelog(
+    const {
+      channel,
       fromVersion,
       toVersion,
       maxItems,
-      prefetchedReleases
-    );
+      prefetchedReleases,
+      source = PRIMARY_UPGRADE_SOURCE,
+    } = opts;
+    if (channel === "nightly") {
+      return await fetchNightlyChangelog(
+        fromVersion,
+        toVersion,
+        source,
+        maxItems
+      );
+    }
+    return await fetchStableChangelog({
+      channel,
+      fromVersion,
+      toVersion,
+      maxItems,
+      prefetchedReleases,
+      source,
+    });
   } catch (error) {
     log.debug("Changelog fetch failed:", error);
     return null;

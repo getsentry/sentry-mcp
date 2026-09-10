@@ -11,8 +11,11 @@ import { existsSync, unlinkSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { getPlatformBinaryName } from "../../src/lib/binary.js";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import {
+  getPlatformBinaryName,
+  UPGRADE_SOURCES,
+} from "../../src/lib/binary.js";
 import {
   applyPatchChain,
   attemptDeltaUpgrade,
@@ -38,6 +41,12 @@ import {
   validateChainStep,
 } from "../../src/lib/delta-upgrade.js";
 import type { OciManifest } from "../../src/lib/ghcr.js";
+import { useTestConfigDir } from "../helpers.js";
+
+const LEGACY_UPGRADE_SOURCE = UPGRADE_SOURCES[1];
+if (!LEGACY_UPGRADE_SOURCE) {
+  throw new Error("Legacy upgrade source is not configured");
+}
 
 // ---------------------------------------------------------------------------
 // Test helpers (file-scoped)
@@ -819,13 +828,14 @@ afterEach(() => {
 describe("fetchRecentReleases", () => {
   test("returns releases from GitHub API", async () => {
     const releases: GitHubRelease[] = [
-      makeRelease("0.14.0", [makeAsset({ name: "sentry-linux-x64" })]),
-      makeRelease("0.13.0", [makeAsset({ name: "sentry-linux-x64" })]),
+      makeRelease("cli@0.14.0", [makeAsset({ name: "sentry-linux-x64" })]),
+      makeRelease("cli@0.13.0", [makeAsset({ name: "sentry-linux-x64" })]),
+      makeRelease("mcp@9.0.0", [makeAsset({ name: "sentry-linux-x64" })]),
     ];
 
     mockFetch(async (url) => {
       expect(String(url)).toContain(
-        "api.github.com/repos/getsentry/cli/releases"
+        "api.github.com/repos/getsentry/toolkit/releases"
       );
       expect(String(url)).toContain("per_page=");
       return new Response(JSON.stringify(releases), { status: 200 });
@@ -834,6 +844,39 @@ describe("fetchRecentReleases", () => {
     const result = await fetchRecentReleases();
     expect(result).toHaveLength(2);
     expect(result[0]?.tag_name).toBe("0.14.0");
+  });
+
+  test.each([
+    ["Toolkit", undefined, "cli@0.14.0-dev.1", "cli@0.14.0"],
+    ["legacy", LEGACY_UPGRADE_SOURCE, "0.14.0-dev.1", "0.14.0"],
+  ])("excludes semantic prereleases from the %s stable source", async (_name, source, prereleaseTag, stableTag) => {
+    mockFetch(
+      async () =>
+        new Response(
+          JSON.stringify([
+            { ...makeRelease(prereleaseTag, []), prerelease: false },
+            makeRelease(stableTag, []),
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const result = await fetchRecentReleases(undefined, source);
+    expect(result.map((release) => release.tag_name)).toEqual(["0.14.0"]);
+  });
+
+  test("uses the selected legacy GitHub repository", async () => {
+    const urls: string[] = [];
+    mockFetch(async (url) => {
+      urls.push(String(url));
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+
+    await fetchRecentReleases(undefined, LEGACY_UPGRADE_SOURCE);
+
+    expect(urls).toEqual([
+      "https://api.github.com/repos/getsentry/cli/releases?per_page=12",
+    ]);
   });
 
   test("returns empty array on HTTP error", async () => {
@@ -921,13 +964,14 @@ describe("resolveStableChain", () => {
     });
   }
 
-  test("resolves single-hop chain with mocked fetch", async () => {
+  test("resolves prefixed Toolkit CLI releases and ignores other products", async () => {
     const binaryName = getPlatformBinaryName();
     const patchBytes = new Uint8Array([10, 20, 30]);
-    const patchUrl = `https://github.com/getsentry/cli/releases/download/0.14.0/${binaryName}.patch`;
+    const patchUrl = `https://github.com/getsentry/toolkit/releases/download/cli@0.14.0/${binaryName}.patch`;
 
     const releases: GitHubRelease[] = [
-      makeRelease("0.14.0", [
+      makeRelease("mcp@9.0.0", [makeAsset({ name: binaryName })]),
+      makeRelease("cli@0.14.0", [
         makeAsset({
           name: binaryName,
           digest: `sha256:${versionHex("0.14.0")}`,
@@ -939,7 +983,7 @@ describe("resolveStableChain", () => {
         }),
         makeAsset({ name: `${binaryName}.gz`, size: 100_000 }),
       ]),
-      makeRelease("0.13.0", [makeAsset({ name: binaryName })]),
+      makeRelease("cli@0.13.0", [makeAsset({ name: binaryName })]),
     ];
 
     setupStableMocks(releases, new Map([[patchUrl, patchBytes]]));
@@ -954,6 +998,22 @@ describe("resolveStableChain", () => {
     ]);
   });
 
+  test("keeps stable resolution on the selected legacy source", async () => {
+    const urls: string[] = [];
+    mockFetch(async (url) => {
+      urls.push(String(url));
+      return new Response("Not Found", { status: 404 });
+    });
+
+    await expect(
+      resolveStableChain("0.13.0", "0.14.0", undefined, LEGACY_UPGRADE_SOURCE)
+    ).resolves.toBeNull();
+    expect(urls).toEqual([
+      "https://api.github.com/repos/getsentry/cli/releases?per_page=12",
+    ]);
+    expect(urls.every((url) => !url.includes("getsentry/toolkit"))).toBe(true);
+  });
+
   test("resolves multi-hop chain with parallel downloads", async () => {
     const binaryName = getPlatformBinaryName();
     const patchA = new Uint8Array([1, 2]);
@@ -962,7 +1022,7 @@ describe("resolveStableChain", () => {
     const urlB = "https://example.com/0.15.0.patch";
 
     const releases: GitHubRelease[] = [
-      makeRelease("0.15.0", [
+      makeRelease("cli@0.15.0", [
         makeAsset({
           name: binaryName,
           digest: `sha256:${versionHex("0.15.0")}`,
@@ -974,7 +1034,7 @@ describe("resolveStableChain", () => {
         }),
         makeAsset({ name: `${binaryName}.gz`, size: 100_000 }),
       ]),
-      makeRelease("0.14.0", [
+      makeRelease("cli@0.14.0", [
         makeAsset({
           name: binaryName,
           digest: `sha256:${versionHex("0.14.0")}`,
@@ -986,7 +1046,7 @@ describe("resolveStableChain", () => {
         }),
         makeAsset({ name: `${binaryName}.gz`, size: 100_000 }),
       ]),
-      makeRelease("0.13.0", [makeAsset({ name: binaryName })]),
+      makeRelease("cli@0.13.0", [makeAsset({ name: binaryName })]),
     ];
 
     setupStableMocks(
@@ -1011,7 +1071,7 @@ describe("resolveStableChain", () => {
 
   test("returns null when target not in releases", async () => {
     const releases: GitHubRelease[] = [
-      makeRelease("0.13.0", [makeAsset({ name: "sentry-linux-x64" })]),
+      makeRelease("cli@0.13.0", [makeAsset({ name: "sentry-linux-x64" })]),
     ];
     setupStableMocks(releases, new Map());
 
@@ -1029,7 +1089,7 @@ describe("resolveStableChain", () => {
   test("returns null when a patch download fails", async () => {
     const binaryName = getPlatformBinaryName();
     const releases: GitHubRelease[] = [
-      makeRelease("0.14.0", [
+      makeRelease("cli@0.14.0", [
         makeAsset({
           name: binaryName,
           digest: `sha256:${versionHex("0.14.0")}`,
@@ -1041,7 +1101,7 @@ describe("resolveStableChain", () => {
         }),
         makeAsset({ name: `${binaryName}.gz`, size: 100_000 }),
       ]),
-      makeRelease("0.13.0", [makeAsset({ name: binaryName })]),
+      makeRelease("cli@0.13.0", [makeAsset({ name: binaryName })]),
     ];
 
     // Only mock releases API, no patch data available
@@ -1057,7 +1117,7 @@ describe("resolveStableChain", () => {
     const versions = Array.from({ length: 15 }, (_, i) => `0.${i + 1}.0`);
     versions.reverse(); // newest first
     const releases = versions.map((v) =>
-      makeRelease(v, [
+      makeRelease(`cli@${v}`, [
         makeAsset({ name: binaryName, digest: `sha256:${versionHex(v)}` }),
         makeAsset({
           name: `${binaryName}.patch`,
@@ -1179,6 +1239,26 @@ describe("resolveNightlyChain", () => {
     expect(chain?.steps).toEqual([
       { fromVersion: "0.0.0-dev.100", toVersion: "0.0.0-dev.101" },
     ]);
+  });
+
+  test("keeps nightly resolution on the selected legacy source", async () => {
+    const urls: string[] = [];
+    mockFetch(async (url) => {
+      urls.push(String(url));
+      return new Response(JSON.stringify({ tags: [] }), { status: 200 });
+    });
+
+    await expect(
+      resolveNightlyChain({
+        token: "test-token",
+        currentVersion: "0.0.0-dev.100",
+        targetVersion: "0.0.0-dev.101",
+        fullGzSize: 100_000,
+        source: LEGACY_UPGRADE_SOURCE,
+      })
+    ).resolves.toBeNull();
+    expect(urls).toEqual(["https://ghcr.io/v2/getsentry/cli/tags/list?n=100"]);
+    expect(urls.every((url) => !url.includes("getsentry/toolkit"))).toBe(true);
   });
 
   test("returns null when no matching patches in graph", async () => {
@@ -1842,5 +1922,113 @@ describe("prefetchStablePatches", () => {
     });
 
     await prefetchStablePatches("0.14.0");
+  });
+});
+
+async function importDeltaUpgradeWithVersion(version: string) {
+  vi.resetModules();
+  vi.doMock("../../src/lib/constants.js", async (importOriginal) => {
+    const actual =
+      await importOriginal<typeof import("../../src/lib/constants.js")>();
+    return { ...actual, CLI_VERSION: version };
+  });
+  return import("../../src/lib/delta-upgrade.js");
+}
+
+function restoreDeltaUpgradeModule(): void {
+  vi.doUnmock("../../src/lib/constants.js");
+  vi.resetModules();
+}
+
+describe("selected source affinity", () => {
+  useTestConfigDir("delta-source-affinity-");
+  afterEach(restoreDeltaUpgradeModule);
+
+  test("attemptDeltaUpgrade keeps stable requests on the legacy source", async () => {
+    const urls: string[] = [];
+    mockFetch(async (url) => {
+      urls.push(String(url));
+      return new Response("Not Found", { status: 404 });
+    });
+    const versionedDelta = await importDeltaUpgradeWithVersion("0.13.0");
+
+    await expect(
+      versionedDelta.attemptDeltaUpgrade(
+        "0.14.0",
+        "/tmp/fake-old",
+        "/tmp/fake-out",
+        false,
+        undefined,
+        LEGACY_UPGRADE_SOURCE
+      )
+    ).resolves.toBeNull();
+    expect(urls).toEqual([
+      "https://api.github.com/repos/getsentry/cli/releases?per_page=12",
+    ]);
+    expect(urls.every((url) => !url.includes("getsentry/toolkit"))).toBe(true);
+  });
+
+  test("attemptDeltaUpgrade keeps nightly requests on the legacy source", async () => {
+    const urls: string[] = [];
+    mockFetch(async (url) => {
+      urls.push(String(url));
+      return new Response("Unauthorized", { status: 401 });
+    });
+    const versionedDelta =
+      await importDeltaUpgradeWithVersion("0.14.0-dev.100");
+
+    await expect(
+      versionedDelta.attemptDeltaUpgrade(
+        "0.14.0-dev.101",
+        "/tmp/fake-old",
+        "/tmp/fake-out",
+        false,
+        undefined,
+        LEGACY_UPGRADE_SOURCE
+      )
+    ).resolves.toBeNull();
+    expect(urls).toEqual([
+      "https://ghcr.io/token?scope=repository:getsentry/cli:pull",
+    ]);
+    expect(urls.every((url) => !url.includes("getsentry/toolkit"))).toBe(true);
+  });
+
+  test("prefetchStablePatches keeps requests on the legacy source", async () => {
+    const urls: string[] = [];
+    mockFetch(async (url) => {
+      urls.push(String(url));
+      return new Response("Not Found", { status: 404 });
+    });
+    const versionedDelta = await importDeltaUpgradeWithVersion("0.13.0");
+
+    await versionedDelta.prefetchStablePatches(
+      "0.14.0",
+      undefined,
+      LEGACY_UPGRADE_SOURCE
+    );
+    expect(urls).toEqual([
+      "https://api.github.com/repos/getsentry/cli/releases?per_page=12",
+    ]);
+    expect(urls.every((url) => !url.includes("getsentry/toolkit"))).toBe(true);
+  });
+
+  test("prefetchNightlyPatches keeps requests on the legacy source", async () => {
+    const urls: string[] = [];
+    mockFetch(async (url) => {
+      urls.push(String(url));
+      return new Response("Unauthorized", { status: 401 });
+    });
+    const versionedDelta =
+      await importDeltaUpgradeWithVersion("0.14.0-dev.100");
+
+    await versionedDelta.prefetchNightlyPatches(
+      "0.14.0-dev.101",
+      undefined,
+      LEGACY_UPGRADE_SOURCE
+    );
+    expect(urls).toEqual([
+      "https://ghcr.io/token?scope=repository:getsentry/cli:pull",
+    ]);
+    expect(urls.every((url) => !url.includes("getsentry/toolkit"))).toBe(true);
   });
 });
