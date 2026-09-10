@@ -9,16 +9,22 @@
  */
 
 import { marked } from "marked";
-import { describe, expect, test } from "vitest";
-import type { GitHubRelease } from "../../src/lib/delta-upgrade.js";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { UPGRADE_SOURCES } from "../../src/lib/binary.js";
+import {
+  fetchRecentReleases,
+  type GitHubRelease,
+} from "../../src/lib/delta-upgrade.js";
 import {
   buildChangelogSummary,
   type ChangeCategory,
   countListItems,
   extractNightlyTimestamp,
   extractSections,
+  fetchChangelog,
   parseCommitMessages,
 } from "../../src/lib/release-notes.js";
+import { mockFetch } from "../helpers.js";
 
 // ─────────────────────────── Fixtures ──────────────────────────────────────
 
@@ -291,5 +297,216 @@ describe("countListItems", () => {
 
   test("returns 0 for empty token array", () => {
     expect(countListItems([])).toBe(0);
+  });
+});
+
+describe("fetchChangelog source affinity", () => {
+  const toolkitSource = UPGRADE_SOURCES[0]!;
+  const legacySource = UPGRADE_SOURCES[1]!;
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  test("fetches stable releases only from the explicitly selected Toolkit source", async () => {
+    const requestedUrls: string[] = [];
+    globalThis.fetch = mockFetch(async (input) => {
+      requestedUrls.push(String(input));
+      return new Response(
+        JSON.stringify([
+          makeRelease(
+            "mcp@99.0.0",
+            "### New Features ✨\n\n- Unrelated Toolkit package release"
+          ),
+          makeRelease(
+            "0.21.0",
+            "### Bug Fixes 🐛\n\n- Unprefixed Toolkit release"
+          ),
+          makeRelease(
+            "cli@0.21.0",
+            "### Bug Fixes 🐛\n\n- Keep release stages source-affine"
+          ),
+        ]),
+        { status: 200 }
+      );
+    });
+
+    const changelog = await fetchChangelog({
+      channel: "stable",
+      fromVersion: "0.20.0",
+      toVersion: "0.21.0",
+      source: toolkitSource,
+    });
+
+    expect(changelog?.totalItems).toBe(1);
+    expect(changelog?.sections[0]?.markdown).not.toContain(
+      "Unrelated Toolkit package release"
+    );
+    expect(changelog?.sections[0]?.markdown).not.toContain(
+      "Unprefixed Toolkit release"
+    );
+    expect(requestedUrls).toEqual([
+      "https://api.github.com/repos/getsentry/toolkit/releases?per_page=30",
+    ]);
+    expect(requestedUrls.some((url) => url.includes("getsentry/cli"))).toBe(
+      false
+    );
+  });
+
+  test("builds a Toolkit changelog from normalized prefetched releases", async () => {
+    globalThis.fetch = mockFetch(
+      async () =>
+        new Response(
+          JSON.stringify([
+            makeRelease(
+              "cli@0.21.0",
+              "### Bug Fixes 🐛\n\n- Reuse prefetched releases"
+            ),
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const releases = await fetchRecentReleases(undefined, toolkitSource);
+    const changelog = await fetchChangelog({
+      channel: "stable",
+      fromVersion: "0.20.0",
+      toVersion: "0.21.0",
+      source: { ...toolkitSource },
+      prefetchedReleases: releases,
+    });
+
+    expect(changelog?.totalItems).toBe(1);
+    expect(changelog?.sections[0]?.markdown).toContain(
+      "Reuse prefetched releases"
+    );
+  });
+
+  test("rejects normalized releases from another source", async () => {
+    const releases = await fetchRecentReleases(undefined, toolkitSource);
+    const changelog = await fetchChangelog({
+      channel: "stable",
+      fromVersion: "0.20.0",
+      toVersion: "0.21.0",
+      source: UPGRADE_SOURCES[1],
+      prefetchedReleases: releases,
+    });
+
+    expect(changelog).toBeNull();
+  });
+
+  test("rejects raw prefetched Toolkit releases without fetching", async () => {
+    const requestedUrls: string[] = [];
+    globalThis.fetch = mockFetch(async (input) => {
+      requestedUrls.push(String(input));
+      return new Response("Unexpected", { status: 500 });
+    });
+
+    const changelog = await fetchChangelog({
+      channel: "stable",
+      fromVersion: "0.20.0",
+      toVersion: "0.21.0",
+      source: toolkitSource,
+      prefetchedReleases: [
+        makeRelease("mcp@0.21.0", "- Unrelated MCP release"),
+        makeRelease(
+          "cli@0.21.0",
+          "### Bug Fixes 🐛\n\n- Raw prefetched release"
+        ),
+      ] as never,
+    });
+
+    expect(changelog).toBeNull();
+    expect(requestedUrls).toEqual([]);
+  });
+
+  test("rejects unprefixed raw prefetched releases for Toolkit", async () => {
+    const changelog = await fetchChangelog({
+      channel: "stable",
+      fromVersion: "0.20.0",
+      toVersion: "0.21.0",
+      source: toolkitSource,
+      prefetchedReleases: [
+        makeRelease("0.21.0", "### Bug Fixes 🐛\n\n- Legacy release"),
+      ] as never,
+    });
+
+    expect(changelog).toBeNull();
+  });
+
+  test("excludes semantic prereleases from stable changelogs", async () => {
+    const changelog = await fetchChangelog({
+      channel: "stable",
+      fromVersion: "0.20.0",
+      toVersion: "0.21.0",
+      source: toolkitSource,
+      prefetchedReleases: [
+        makeRelease("cli@0.21.0-dev.1", "- Development release"),
+        makeRelease("cli@0.21.0", "### Bug Fixes 🐛\n\n- Stable release"),
+      ] as never,
+    });
+
+    expect(changelog).toBeNull();
+  });
+
+  test("fetches stable releases only from the explicitly selected legacy source", async () => {
+    const requestedUrls: string[] = [];
+    globalThis.fetch = mockFetch(async (input) => {
+      requestedUrls.push(String(input));
+      return new Response(
+        JSON.stringify([
+          makeRelease(
+            "0.21.0",
+            "### Bug Fixes 🐛\n\n- Keep the legacy bridge working"
+          ),
+        ]),
+        { status: 200 }
+      );
+    });
+
+    const changelog = await fetchChangelog({
+      channel: "stable",
+      fromVersion: "0.20.0",
+      toVersion: "0.21.0",
+      source: legacySource,
+    });
+
+    expect(changelog?.totalItems).toBe(1);
+    expect(requestedUrls).toEqual([
+      "https://api.github.com/repos/getsentry/cli/releases?per_page=30",
+    ]);
+  });
+
+  test("fetches nightly commits only from the explicitly selected Toolkit source", async () => {
+    const requestedUrls: string[] = [];
+    globalThis.fetch = mockFetch(async (input) => {
+      requestedUrls.push(String(input));
+      return new Response(
+        JSON.stringify([
+          { commit: { message: "fix: keep nightly stages affine" } },
+        ]),
+        { status: 200 }
+      );
+    });
+
+    const changelog = await fetchChangelog({
+      channel: "nightly",
+      fromVersion: "0.21.0-dev.100",
+      toVersion: "0.21.0-dev.200",
+      source: toolkitSource,
+    });
+
+    expect(changelog?.totalItems).toBe(1);
+    expect(requestedUrls).toEqual([
+      "https://api.github.com/repos/getsentry/toolkit/commits?sha=main&since=1970-01-01T00:01:41.000Z&until=1970-01-01T00:03:21.000Z&per_page=100",
+    ]);
+    expect(requestedUrls.some((url) => url.includes("getsentry/cli"))).toBe(
+      false
+    );
   });
 });
