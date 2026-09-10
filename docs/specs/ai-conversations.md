@@ -220,7 +220,7 @@ Each result should include:
 - AI call count.
 - Tool call count and tool error count.
 - Tool names.
-- Total tokens and total cost.
+- Total tokens and a display-formatted USD total cost. Use `—` for zero, `<$0.01` for positive sub-cent costs, and compact currency formatting otherwise.
 - Trace count and a small sample of trace IDs.
 
 Search and detail structured outputs use Unix millisecond timestamps for
