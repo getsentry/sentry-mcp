@@ -29,6 +29,7 @@ import type {
   TraceSpan,
 } from "../api-client/types";
 import { logIssue } from "../telem/logging";
+import { selectEventPackages } from "./event-packages";
 import {
   type CodeLocation,
   findMostRelevantInAppFrame,
@@ -178,6 +179,42 @@ export function formatFrameHeader(
       return `    at ${func} (${location}${line}${col})`;
     }
   }
+}
+
+/**
+ * Whether the shared formatter covers this event type, and so whether its body should be used
+ * instead of the local rendering.
+ *
+ * "default" is an error event without exception data, "generic" a performance regression or
+ * metric issue, "csp" a Content Security Policy violation. Anything else (a transaction, most
+ * notably) keeps the local path, which renders things the shared body does not carry such as
+ * the fetched performance trace.
+ */
+/**
+ * Whether to read the issue's metadata instead of its top level fields. Performance issues can
+ * have various categories such as 'db_query', but the issueType starts with 'performance_'.
+ *
+ * It matters which side of this an issue falls on: metadata.value is a query pattern for a
+ * performance issue and the exception message for an error, so reading it unconditionally
+ * misnames the error text.
+ */
+export function isPerformanceIssueType(issue: {
+  issueType?: string | null;
+  issueCategory?: string | null;
+}): boolean {
+  return (
+    issue.issueType?.startsWith("performance_") === true ||
+    issue.issueCategory === "performance"
+  );
+}
+
+export function usesSharedFormatterBody(event: { type?: unknown }): boolean {
+  return (
+    event.type === "error" ||
+    event.type === "default" ||
+    event.type === "generic" ||
+    event.type === "csp"
+  );
 }
 
 /**
@@ -1949,23 +1986,25 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
 }
 
 function formatEventPackages(event: Event, packageNames: string[]): string {
+  const selection = selectEventPackages(event.packages, packageNames);
+  if (!selection) {
+    return "";
+  }
   let output = "\n### Selected Package Versions\n\n";
-  const packages = event.packages;
-  if (!packages || Object.keys(packages).length === 0) {
+  if (!selection.metadataAvailable) {
     return `${output}Package metadata is unavailable for this event.\n\n`;
   }
 
-  for (const name of new Set(packageNames)) {
-    const version = Object.hasOwn(packages, name) ? packages[name] : undefined;
+  for (const entry of selection.packages) {
     const value =
-      version === undefined
-        ? "Not listed in this event's package metadata"
-        : !version?.trim()
-          ? "Version not recorded"
-          : version.length > 256
-            ? `${version.slice(0, 256)}… (truncated)`
-            : version;
-    output += `- ${formatPackageText(name)}: ${formatPackageText(value)}\n`;
+      entry.status === "recorded"
+        ? entry.truncated
+          ? `${entry.version}… (truncated)`
+          : entry.version
+        : entry.status === "not_listed"
+          ? "Not listed in this event's package metadata"
+          : "Version not recorded";
+    output += `- ${formatPackageText(entry.name)}: ${formatPackageText(value)}\n`;
   }
   return `${output}\n`;
 }
@@ -2018,11 +2057,7 @@ export function formatIssueOutput({
 }) {
   let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
 
-  // Check if this is a performance issue based on issueCategory or issueType
-  // Performance issues can have various categories like 'db_query' but issueType starts with 'performance_'
-  const isPerformanceIssue =
-    issue.issueType?.startsWith("performance_") ||
-    issue.issueCategory === "performance";
+  const isPerformanceIssue = isPerformanceIssueType(issue);
 
   if (isPerformanceIssue && issue.metadata) {
     // For performance issues, use metadata for better context
@@ -2154,14 +2189,7 @@ export function formatIssueOutput({
 
   output += `**Event ID**: ${event.id}\n`;
   output += `**Type**: ${event.type}\n`;
-  // "default" type represents error events without exception data
-  // "generic" type represents performance regressions and metric-based issues
-  // "csp" type represents Content Security Policy violations
-  const isSharedFormatterType =
-    event.type === "error" ||
-    event.type === "default" ||
-    event.type === "generic" ||
-    event.type === "csp";
+  const isSharedFormatterType = usesSharedFormatterBody(event);
   if (isSharedFormatterType) {
     const typedEvent = event as
       | z.infer<typeof ErrorEventSchema>
@@ -2176,7 +2204,13 @@ export function formatIssueOutput({
     output += `**Message**:\n${event.message}\n`;
   }
   output += "\n";
-  if (isSharedFormatterType && event.formatted?.content) {
+  // only a markdown body belongs in this output; a json body is for structuredContent, and
+  // pasting it here would put a serialized object in the middle of the prose
+  if (
+    isSharedFormatterType &&
+    event.formatted?.format === "markdown" &&
+    event.formatted.content
+  ) {
     // the shared formatter body doesn't include the replay note — add it here to match formatEventOutput
     output += formatIssueReplayOutput({
       apiService,
@@ -2472,7 +2506,7 @@ function formatIssueReplayOutput({
   return `${lines.join("\n")}\n\n`;
 }
 
-function getReplayIdFromEvent(event: Event): string | null {
+export function getReplayIdFromEvent(event: Event): string | null {
   const replayContext = event.contexts?.replay as
     | Record<string, unknown>
     | undefined;
@@ -2487,7 +2521,7 @@ function getReplayIdFromEvent(event: Event): string | null {
   return normalizeReplayId(replayContextId ?? replayTagId);
 }
 
-function dedupeReplayIds(replayIds: string[]): string[] {
+export function dedupeReplayIds(replayIds: string[]): string[] {
   const normalizedReplayIds: string[] = [];
   const seenReplayIds = new Set<string>();
 

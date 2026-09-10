@@ -14,6 +14,7 @@ import {
   getStructuredContent,
   getTextContent,
 } from "./test-utils/structured-content";
+import type { GetIssueDetailsPayload } from "./tools/catalog/get-issue-details";
 import { createExecuteTool } from "./tools/special/execute-tool";
 import type { ToolConfig } from "./tools/types";
 import type { ServerContext } from "./types";
@@ -1360,7 +1361,10 @@ describe("buildServer", () => {
               HttpResponse.json({
                 ...createDefaultEvent({ id: eventId, contexts: {} }),
                 packages: { example: "1.2.3", unrelated: "9.9.9" },
-                formatted: { format: "markdown", content: "Synthetic event" },
+                formatted: {
+                  format: "json",
+                  content: JSON.stringify({ message: "Synthetic event" }),
+                },
               }),
           ),
         );
@@ -1382,7 +1386,19 @@ describe("buildServer", () => {
             packageNames: ["example"],
           },
         });
-        expect(getTextContent(result)).toContain("example: 1.2.3");
+        const payload = getStructuredContent<GetIssueDetailsPayload>(result);
+        expect(payload.event.packageVersions).toEqual({
+          metadataAvailable: true,
+          packages: [
+            {
+              name: "example",
+              status: "recorded",
+              version: "1.2.3",
+              truncated: false,
+            },
+          ],
+        });
+        expect(getTextContent(result)).toBe(JSON.stringify(payload, null, 2));
         expect(result.isError).not.toBe(true);
         expect(getTextContent(result)).not.toContain("unrelated");
       },

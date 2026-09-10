@@ -12,11 +12,16 @@ import {
   mswServer,
 } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import type { Skill } from "../../skills";
-import { getTextContent } from "../../test-utils/structured-content";
-import getIssueDetails from "./get-issue-details.js";
+import {
+  getTextContent,
+  getStructuredContent,
+} from "../../test-utils/structured-content";
+import getIssueDetails, {
+  getIssueDetailsOutputSchema,
+} from "./get-issue-details.js";
 
 const baseContext = {
   constraints: {
@@ -2331,7 +2336,300 @@ describe("get_issue_details", () => {
   });
 });
 
+describe("structuredContent", () => {
+  const FORMATTER_JSON = JSON.stringify({
+    title: { text: "Error: Tried to cancel a non-cancellable request" },
+    exception: { handled: "No", code: "at Object.fetch (index.js:1)" },
+    tags: { environment: "production" },
+  });
+
+  function mockLatestEventWithFormatted(formatted: unknown) {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () => HttpResponse.json({ ...createDefaultEvent(), formatted }),
+      ),
+    );
+  }
+
+  const params = {
+    organizationSlug: "sentry-mcp-evals",
+    issueId: "CLOUDFLARE-MCP-41",
+    eventId: undefined,
+    issueUrl: undefined,
+    regionUrl: null,
+  };
+
+  it("returns a structured payload when the formatter sends json", async () => {
+    mockLatestEventWithFormatted({ format: "json", content: FORMATTER_JSON });
+
+    const result = await getIssueDetails.handler(params, baseContext);
+
+    expect(result).toHaveProperty("structuredContent");
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    // the issue level fields the markdown used to assemble
+    expect(payload.issue.shortId).toBe("CLOUDFLARE-MCP-41");
+    expect(payload.issue.url).toContain("CLOUDFLARE-MCP-41");
+    expect(typeof payload.issue.occurrences).toBe("number");
+    expect(typeof payload.issue.usersImpacted).toBe("number");
+
+    // the event body is the formatter's json, embedded as an object rather than a string
+    expect(payload.event.body).toEqual(JSON.parse(FORMATTER_JSON));
+    expect(typeof payload.event.body).toBe("object");
+  });
+
+  it("produces a payload that satisfies the schema", async () => {
+    mockLatestEventWithFormatted({ format: "json", content: FORMATTER_JSON });
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: unknown })
+      .structuredContent;
+
+    // a tool that advertises a schema has to return something that satisfies it
+    expect(() => getIssueDetailsOutputSchema.parse(payload)).not.toThrow();
+  });
+
+  it("falls back to markdown when the org is not on the rollout", async () => {
+    mockLatestEventWithFormatted(undefined);
+
+    const result = await getIssueDetails.handler(params, baseContext);
+
+    // a structured result has to carry the whole answer; without the body it would not
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(result).toContain("CLOUDFLARE-MCP-41");
+  });
+
+  it("falls back to markdown when the body is not parseable json", async () => {
+    mockLatestEventWithFormatted({ format: "json", content: "## not json" });
+
+    const result = await getIssueDetails.handler(params, baseContext);
+
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(result).toContain("CLOUDFLARE-MCP-41");
+  });
+
+  it("keeps transactions on the local path so the performance trace survives", async () => {
+    // the shared body carries no performance trace; that is fetched separately and only
+    // rendered for transactions, so a transaction must not take the structured path
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            type: "transaction",
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(result).toContain("CLOUDFLARE-MCP-41");
+  });
+
+  it("keeps the attached replay, which lives on the event not the related list", async () => {
+    // an issue whose only replay is attached would otherwise report no replays at all
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            contexts: {
+              replay: {
+                type: "default",
+                replay_id: "1234567890abcdef1234567890abcdef",
+              },
+            },
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(payload.replays?.attached).toBe("1234567890abcdef1234567890abcdef");
+    // and the attached id is not repeated in the related list
+    expect(payload.replays?.related).not.toContain(
+      "1234567890abcdef1234567890abcdef",
+    );
+  });
+
+  it("reports no replays when there are none", async () => {
+    mockLatestEventWithFormatted({ format: "json", content: FORMATTER_JSON });
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(payload.replays).toBeNull();
+  });
+
+  it("maps external issues field by field so upstream extras cannot leak", async () => {
+    // structuredContent is a product contract, not a view of the api response: several
+    // upstream schemas are passthrough, so anything not mapped must not appear
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/external-issues/",
+        () =>
+          HttpResponse.json([
+            {
+              id: 42,
+              issueId: 7,
+              serviceType: "github",
+              displayName: "getsentry/sentry#1",
+              webUrl: "https://github.com/getsentry/sentry/issues/1",
+              internalOnlyToken: "must-not-leak",
+            },
+          ]),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(JSON.stringify(payload)).not.toContain("internalOnlyToken");
+    expect(JSON.stringify(payload)).not.toContain("must-not-leak");
+  });
+
+  it("carries every field the markdown output surfaces", async () => {
+    // greg's bar for this migration is "roughly the same content": anything the markdown
+    // renders and the payload drops is a regression for every MCP user
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            dateCreated: "2026-09-03T12:00:00.000Z",
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    // the issue header markdown builds before the event body
+    for (const field of [
+      "shortId",
+      "title",
+      "culprit",
+      "firstSeen",
+      "lastSeen",
+      "occurrences",
+      "usersImpacted",
+      "status",
+      "platform",
+      "project",
+      "url",
+    ]) {
+      expect(payload.issue).toHaveProperty(field);
+    }
+    // and the event identity markdown prints alongside it
+    expect(payload.event.occurredAt).toBe("2026-09-03T12:00:00.000Z");
+    expect(payload.event).toHaveProperty("id");
+    expect(payload.event).toHaveProperty("type");
+  });
+
+  it("does not label an error's exception message as a query pattern", async () => {
+    // metadata.value is a query pattern for a performance issue and the exception message for
+    // an error, so reading it unconditionally puts error text under the wrong name
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () =>
+          HttpResponse.json({
+            ...createPerformanceIssue({
+              shortId: "CLOUDFLARE-MCP-41",
+              metadata: {
+                title: "metadata title",
+                value: "Tried to cancel a non-cancellable request",
+                location: "index.js",
+              },
+            }),
+            // same metadata, but not a performance issue
+            issueType: "error",
+            issueCategory: "error",
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(payload.issue.queryPattern).toBeNull();
+    expect(payload.issue.location).toBeNull();
+    // and the top level title wins for an error, not the metadata one
+    expect(payload.issue.title).not.toBe("metadata title");
+  });
+
+  it("uses the metadata fields for a performance issue", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () =>
+          HttpResponse.json({
+            ...createPerformanceIssue({
+              shortId: "CLOUDFLARE-MCP-41",
+              issueType: "performance_n_plus_one_db_queries",
+              issueCategory: "performance",
+              metadata: {
+                title: "N+1 Query",
+                value: "SELECT * FROM users WHERE id = ?",
+                location: "/api/checkout",
+              },
+            }),
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(payload.issue.title).toBe("N+1 Query");
+    expect(payload.issue.queryPattern).toBe("SELECT * FROM users WHERE id = ?");
+    expect(payload.issue.location).toBe("/api/checkout");
+  });
+});
+
 describe("selected event package versions", () => {
+  beforeEach(() => mswServer.resetHandlers());
+  afterEach(() => mswServer.resetHandlers());
   const eventId = "7ca573c0f4814912aaa9bdc77d1a7d51";
   const params = {
     organizationSlug: "sentry-mcp-evals",
@@ -2341,28 +2639,240 @@ describe("selected event package versions", () => {
     packageNames: ["example", "@example/client", "missing"],
   };
 
-  function mockPackages(packages: unknown, suppliedFormatting = true) {
+  function mockPackages(
+    packages: unknown,
+    suppliedFormatting: boolean | "json" = true,
+  ) {
     mswServer.use(
       http.get(
         `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/${eventId}/`,
         ({ request }) => {
           expect(new URL(request.url).searchParams.get("llmFormat")).toBe(
-            "markdown",
+            "json",
           );
           return HttpResponse.json({
             ...createDefaultEvent({ id: eventId, contexts: {} }),
             packages,
-            formatted: suppliedFormatting
-              ? {
-                  format: "markdown",
-                  content: "### Message\n\nSynthetic event",
-                }
-              : undefined,
+            formatted:
+              suppliedFormatting === "json"
+                ? {
+                    format: "json",
+                    content: JSON.stringify({ message: "Synthetic event" }),
+                  }
+                : suppliedFormatting
+                  ? {
+                      format: "markdown",
+                      content: "### Message\n\nSynthetic event",
+                    }
+                  : undefined,
           });
         },
       ),
     );
   }
+
+  it("retains only selected packages in structured event output", async () => {
+    mockPackages(
+      { example: "1.2.3", "@example/client": "2.0.0", unrelated: "9.9.9" },
+      "json",
+    );
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = getIssueDetailsOutputSchema.parse(
+      getStructuredContent(result),
+    );
+    expect(payload.event).toHaveProperty("packageVersions", {
+      metadataAvailable: true,
+      packages: [
+        {
+          name: "example",
+          status: "recorded",
+          version: "1.2.3",
+          truncated: false,
+        },
+        {
+          name: "@example/client",
+          status: "recorded",
+          version: "2.0.0",
+          truncated: false,
+        },
+        {
+          name: "missing",
+          status: "not_listed",
+          version: null,
+          truncated: false,
+        },
+      ],
+    });
+    expect(JSON.stringify(result)).not.toContain("unrelated");
+    expect(payload.event.body).toEqual({ message: "Synthetic event" });
+    expect(payload).toMatchInlineSnapshot(`
+      {
+        "aiConversations": null,
+        "codeLocation": null,
+        "event": {
+          "body": {
+            "message": "Synthetic event",
+          },
+          "id": "7ca573c0f4814912aaa9bdc77d1a7d51",
+          "occurredAt": "2025-10-02T12:00:00.000Z",
+          "packageVersions": {
+            "metadataAvailable": true,
+            "packages": [
+              {
+                "name": "example",
+                "status": "recorded",
+                "truncated": false,
+                "version": "1.2.3",
+              },
+              {
+                "name": "@example/client",
+                "status": "recorded",
+                "truncated": false,
+                "version": "2.0.0",
+              },
+              {
+                "name": "missing",
+                "status": "not_listed",
+                "truncated": false,
+                "version": null,
+              },
+            ],
+          },
+          "type": "default",
+        },
+        "externalIssues": null,
+        "issue": {
+          "assignedTo": "Jane Developer",
+          "culprit": "Object.fetch(index)",
+          "firstSeen": "2025-04-03T22:51:19.403000Z",
+          "issueCategory": "error",
+          "issueType": "error",
+          "lastSeen": "2025-04-12T11:34:11Z",
+          "location": null,
+          "occurrences": 25,
+          "platform": "javascript",
+          "project": "CLOUDFLARE-MCP",
+          "queryPattern": null,
+          "seerActionability": null,
+          "shortId": "CLOUDFLARE-MCP-41",
+          "status": "unresolved",
+          "substatus": "ongoing",
+          "title": "Error: Tool list_organizations is already registered",
+          "url": "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41",
+          "usersImpacted": 1,
+        },
+        "replays": null,
+        "seer": null,
+      }
+    `);
+  });
+
+  it.each([undefined, null, {}])(
+    "reports unavailable structured metadata for %j",
+    async (packages) => {
+      mockPackages(packages, "json");
+      const payload = getIssueDetailsOutputSchema.parse(
+        getStructuredContent(
+          await getIssueDetails.handler(params, baseContext),
+        ),
+      );
+      expect(payload.event.packageVersions).toEqual({
+        metadataAvailable: false,
+        packages: [],
+      });
+    },
+  );
+
+  it("preserves package states, exact names, bounds, and raw strings in structured output", async () => {
+    const specialName = "<example>\n*client*";
+    const specialVersion = "<version>\n`1.0`";
+    mockPackages(
+      {
+        example: null,
+        blank: " ",
+        long: "v".repeat(300),
+        [specialName]: specialVersion,
+      },
+      "json",
+    );
+    const result = await getIssueDetails.handler(
+      {
+        ...params,
+        packageNames: [
+          "example",
+          "blank",
+          "Example",
+          "constructor",
+          "long",
+          specialName,
+          "long",
+        ],
+      },
+      baseContext,
+    );
+    const payload = getIssueDetailsOutputSchema.parse(
+      getStructuredContent(result),
+    );
+    expect(payload.event.packageVersions).toEqual({
+      metadataAvailable: true,
+      packages: [
+        {
+          name: "example",
+          status: "version_not_recorded",
+          version: null,
+          truncated: false,
+        },
+        {
+          name: "blank",
+          status: "version_not_recorded",
+          version: null,
+          truncated: false,
+        },
+        {
+          name: "Example",
+          status: "not_listed",
+          version: null,
+          truncated: false,
+        },
+        {
+          name: "constructor",
+          status: "not_listed",
+          version: null,
+          truncated: false,
+        },
+        {
+          name: "long",
+          status: "recorded",
+          version: "v".repeat(256),
+          truncated: true,
+        },
+        {
+          name: specialName,
+          status: "recorded",
+          version: specialVersion,
+          truncated: false,
+        },
+      ],
+    });
+  });
+
+  it("preserves structured output when package selection is omitted", async () => {
+    mockPackages({ example: "1.2.3" }, "json");
+    const withMetadata = await getIssueDetails.handler(
+      { ...params, packageNames: undefined },
+      baseContext,
+    );
+    mockPackages(undefined, "json");
+    const withoutMetadata = await getIssueDetails.handler(
+      { ...params, packageNames: undefined },
+      baseContext,
+    );
+    expect(withMetadata).toEqual(withoutMetadata);
+    const payload = getIssueDetailsOutputSchema.parse(
+      getStructuredContent(withMetadata),
+    );
+    expect(payload.event).not.toHaveProperty("packageVersions");
+  });
 
   it("adds only selected versions to supplied Markdown", async () => {
     mockPackages({

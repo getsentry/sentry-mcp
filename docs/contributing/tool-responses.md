@@ -125,13 +125,19 @@ the same selection with an explicit `eventId`.
 - Selection is optional: omitting it preserves the ordinary response.
 - Accept 1–10 exact, case-sensitive names, each up to 256 characters. Duplicate
   names produce one entry; package names are not normalized across ecosystems.
-- Append selected versions after either Sentry-supplied Markdown or local event
-  formatting, using the existing response's `packages` map without extra API calls.
+- Use the existing response's `packages` map without extra API calls. With Sentry's
+  JSON formatter, include `event.packageVersions` in `structuredContent`: a
+  `metadataAvailable` flag and selected `packages` entries with `name`, `status`,
+  `version`, and `truncated`. Status is `recorded`, `not_listed`, or
+  `version_not_recorded`; unavailable metadata has an empty selection. The server
+  generates equivalent JSON text. When returning Markdown, append the same
+  selection after Sentry-supplied or local event formatting.
 - Missing, null, and empty maps mean metadata is unavailable. In a populated map,
   distinguish a name not listed from a null or blank version. Neither proves a
   dependency was absent from the application.
 - Truncate versions after 256 characters with an explicit marker and escape
-  Markdown in package data. Do not render unrelated packages.
+  Markdown in package data when rendering Markdown; structured strings stay raw.
+  Do not render unrelated packages.
 - Package selection requires an exact event; issue/latest-event and other resource
   lookups reject it.
 
