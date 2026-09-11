@@ -11,6 +11,7 @@ import {
 import type { InitToolDefinition, ToolContext } from "./types.js";
 
 const WINDOWS_BATCH_SHIM_RE = /\.(?:cmd|bat)$/iu;
+const PNPM_MANAGE_VERSION_ARG = "--config.manage-package-manager-versions=true";
 
 type SpawnCommand = {
   executable: string;
@@ -129,22 +130,44 @@ async function runSingleCommand(
   stderr: string;
 }> {
   const executable = whichSync(command.executable) ?? command.executable;
+  const executableName = command.executable
+    .replaceAll("\\", "/")
+    .split("/")
+    .at(-1)
+    ?.replace(WINDOWS_BATCH_SHIM_RE, "")
+    .toLowerCase();
+  const args =
+    executableName === "pnpm" && !command.args.includes(PNPM_MANAGE_VERSION_ARG)
+      ? [PNPM_MANAGE_VERSION_ARG, ...command.args]
+      : command.args;
+  const spawnEnv =
+    executableName === "pnpm"
+      ? (() => {
+          const env = { ...process.env };
+          // `sentry init` is often launched through pnpm itself. Its inherited
+          // config must not override the target repository's packageManager.
+          for (const key of Object.keys(env)) {
+            if (
+              key.toLowerCase() === "npm_config_manage_package_manager_versions"
+            ) {
+              delete env[key];
+            }
+          }
+          return env;
+        })()
+      : undefined;
   const spawnCommand: SpawnCommand = isWindowsBatchShim(executable)
     ? {
         executable: process.env.ComSpec ?? "cmd.exe",
-        args: [
-          "/d",
-          "/s",
-          "/c",
-          buildWindowsBatchCommand(executable, command.args),
-        ],
+        args: ["/d", "/s", "/c", buildWindowsBatchCommand(executable, args)],
         windowsVerbatimArguments: true,
       }
-    : { executable, args: command.args };
+    : { executable, args };
 
   try {
     const child = spawn(spawnCommand.executable, spawnCommand.args, {
       cwd,
+      ...(spawnEnv ? { env: spawnEnv } : {}),
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
       ...(spawnCommand.windowsVerbatimArguments

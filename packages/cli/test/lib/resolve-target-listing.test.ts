@@ -185,6 +185,10 @@ describe("resolveOrgProjectTarget", () => {
 
   beforeEach(() => {
     findProjectsBySlugSpy = vi.spyOn(apiClient, "findProjectsBySlug");
+    // Earlier resolver tests can exercise the real same-module call graph and
+    // leave calls on the underlying mocked export. Each assertion in this
+    // block should observe only the current test.
+    findProjectsBySlugSpy.mockClear();
     resolveOrgAndProjectSpy = vi.spyOn(
       resolveTargetModule,
       "resolveOrgAndProject"

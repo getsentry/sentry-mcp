@@ -139,6 +139,7 @@ export function createMockUI(options: MockUIOptions = {}): {
   }
 
   const ui: WizardUI = {
+    supportsInteractivePrompts: true,
     banner: (art) => calls.push({ kind: "banner", art }),
     intro: (title) => calls.push({ kind: "intro", title }),
     summary: (summary) => calls.push({ kind: "summary", summary }),

@@ -19,6 +19,7 @@ import {
 } from "./clack-utils.js";
 import { REQUIRED_FEATURE } from "./constants.js";
 import type {
+  AppEntry,
   ConfirmPayload,
   InteractiveContext,
   InteractivePayload,
@@ -26,6 +27,10 @@ import type {
   SelectPayload,
 } from "./types.js";
 import type { PromptDetail, WizardUI } from "./ui/types.js";
+
+type InteractiveUiOptions = {
+  holdPresentationOnSelect?: boolean;
+};
 
 function prependRequiredFeature(features: string[]): string[] {
   if (features.includes(REQUIRED_FEATURE)) {
@@ -94,11 +99,12 @@ function buildFeatureReviewDetails(features: string[]): PromptDetail[] {
 export async function handleInteractive(
   payload: InteractivePayload,
   options: InteractiveContext,
-  ui: WizardUI
+  ui: WizardUI,
+  uiOptions: InteractiveUiOptions = {}
 ): Promise<Record<string, unknown>> {
   switch (payload.kind) {
     case "select":
-      return await handleSelect(payload, options, ui);
+      return await handleSelect(payload, options, ui, uiOptions);
     case "multi-select":
       return await handleMultiSelect(payload, options, ui);
     case "confirm":
@@ -111,28 +117,88 @@ export async function handleInteractive(
   }
 }
 
-type AppEntry = { name: string; path: string; framework?: string };
+const APP_ROLE_LABELS: Record<NonNullable<AppEntry["role"]>, string> = {
+  application: "Application",
+  documentation: "Documentation website",
+  example: "Reference application",
+  runtime: "Runtime package",
+};
+
+function canAutoSelectSentrySetup(app: AppEntry): boolean {
+  return app.sentrySetup === "auto-select";
+}
+
+function autoSelectTarget(
+  items: string[],
+  apps: AppEntry[],
+  yes: boolean
+): Record<string, unknown> | undefined {
+  if (!yes) {
+    return;
+  }
+  if (items.length === 1) {
+    const onlyApp = apps.find((app) => app.name === items[0]);
+    if (
+      onlyApp?.sentrySetup === "detected" &&
+      !canAutoSelectSentrySetup(onlyApp)
+    ) {
+      return;
+    }
+    return { selectedApp: items[0] };
+  }
+  const detectedTargets = apps.filter(canAutoSelectSentrySetup);
+  if (detectedTargets.length !== 1) {
+    return;
+  }
+  const selectedApp = detectedTargets[0]?.name;
+  if (!selectedApp) {
+    return;
+  }
+  return { selectedApp };
+}
 
 function formatAppList(apps: AppEntry[], items: string[]): string[] {
   // Name-based lookup keeps this correct even when payload.options and
   // payload.apps arrive with different lengths.
-  const nameWidth = Math.max(1, ...items.map((n) => n.length));
+  const labels = items.map(
+    (name) => apps.find((app) => app.name === name)?.label ?? name
+  );
+  const nameWidth = Math.max(1, ...labels.map((label) => label.length));
   return items.map((name) => {
     const meta = apps.find((a) => a.name === name);
-    const fw = meta?.framework ? ` (${meta.framework})` : "";
+    const label = meta?.label ?? name;
+    const hint = meta ? appHint(meta) : "";
+    const formattedHint = hint ? ` (${hint})` : "";
     const path = meta?.path ? `  ${meta.path}` : "";
-    return `  ${name.padEnd(nameWidth)}${fw}${path}`;
+    return `  ${label.padEnd(nameWidth)}${formattedHint}${path}`;
   });
+}
+
+function appHint(app: AppEntry): string {
+  const parts: string[] = [];
+  if (app.role) {
+    parts.push(APP_ROLE_LABELS[app.role]);
+  }
+  if (app.framework) {
+    parts.push(app.framework);
+  }
+  if (
+    app.sentrySetup &&
+    !parts.some((part) => part.toLowerCase().includes("sentry detected"))
+  ) {
+    parts.push("Sentry detected");
+  }
+  return parts.join(" · ");
 }
 
 function buildMultiAppMessage(apps: AppEntry[], items: string[]): string {
   const exampleApp = items[0] ?? "<app>";
   return [
-    `This monorepo has ${items.length} apps. Use --app to specify which one to initialize:`,
+    `This monorepo has ${items.length} targets. Use --app to specify which one to initialize:`,
     "",
     `  sentry init --yes --features <features> --app ${exampleApp}`,
     "",
-    "Available apps:",
+    "Available targets:",
     ...formatAppList(apps, items),
     "",
     "Or run without --yes to pick interactively:",
@@ -149,7 +215,7 @@ function buildAppNotFoundMessage(
   return [
     `App "${requested}" not found in this monorepo.`,
     "",
-    "Available apps:",
+    "Available targets:",
     ...formatAppList(apps, items),
     "",
     "Re-run with --app <name>, for example:",
@@ -160,7 +226,8 @@ function buildAppNotFoundMessage(
 async function handleSelect(
   payload: SelectPayload,
   options: InteractiveContext,
-  ui: WizardUI
+  ui: WizardUI,
+  uiOptions: InteractiveUiOptions
 ): Promise<Record<string, unknown>> {
   const apps = payload.apps ?? [];
   const items = payload.options ?? apps.map((a) => a.name);
@@ -172,21 +239,21 @@ async function handleSelect(
   }
 
   if (options.app && payload.apps && payload.apps.length > 0) {
-    const match = items.find(
-      (item) => item.toLowerCase() === options.app?.toLowerCase()
+    const match = apps.find(
+      (app) => app.name.toLowerCase() === options.app?.toLowerCase()
     );
     if (!match) {
       const message = buildAppNotFoundMessage(options.app, apps, items);
       ui.log.error(message);
       throw new WizardError(message, { rendered: true });
     }
-    ui.log.info(`Using app: ${match}`);
-    return { selectedApp: match };
+    ui.log.info(`Using app: ${match.label ?? match.name}`);
+    return { selectedApp: match.name };
   }
 
-  if (options.yes && items.length === 1) {
-    ui.log.info(`Auto-selected: ${items[0]}`);
-    return { selectedApp: items[0] };
+  const autoSelected = autoSelectTarget(items, apps, options.yes);
+  if (autoSelected) {
+    return autoSelected;
   }
 
   if (options.yes && payload.apps && payload.apps.length > 0) {
@@ -201,10 +268,13 @@ async function handleSelect(
       const app = apps.find((a) => a.name === item);
       return {
         value: item,
-        label: item,
-        ...(app?.framework ? { hint: app.framework } : {}),
+        label: app?.label ?? item,
+        ...(app && appHint(app) ? { hint: appHint(app) } : {}),
       };
     }),
+    ...(uiOptions.holdPresentationOnSelect
+      ? { holdPresentationOnResolve: true }
+      : {}),
   });
 
   return { selectedApp: abortIfCancelled(selected) };
@@ -220,18 +290,28 @@ async function handleMultiSelect(
       (feature) => !UNSUPPORTED_INIT_FEATURES.has(feature)
     )
   );
+  const detectedExisting = (payload.initialFeatures ?? []).filter((feature) =>
+    available.includes(feature)
+  );
 
   if (options.yes) {
-    ui.log.info(
-      `Auto-selected all features: ${available.map(featureLabel).join(", ")}`
+    const defaults = normalizeFeatureSelection(
+      available.filter(
+        (feature) =>
+          DEFAULT_FEATURES.has(feature) || detectedExisting.includes(feature)
+      )
     );
-    return { features: available };
+    ui.log.info(
+      `Auto-selected default features: ${defaults.map(featureLabel).join(", ")}`
+    );
+    return { features: defaults };
   }
 
   const sorted = sortFeatureOptions(available);
   setTag("wizard.features.offered", available.join(","));
-  let initialValues: string[] = sorted.filter((feature) =>
-    DEFAULT_FEATURES.has(feature)
+  let initialValues: string[] = sorted.filter(
+    (feature) =>
+      DEFAULT_FEATURES.has(feature) || detectedExisting.includes(feature)
   );
 
   while (true) {

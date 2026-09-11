@@ -27,7 +27,7 @@ import {
   setCachedProjectByDsnKey,
 } from "../db/project-cache.js";
 import { getCachedOrganizations } from "../db/regions.js";
-import { type AuthGuardSuccess, withAuthGuard } from "../errors.js";
+import { type AuthGuardSuccess, CliError, withAuthGuard } from "../errors.js";
 import { getApiBaseUrl } from "../sentry-client.js";
 import { buildProjectUrl } from "../sentry-urls.js";
 import { isAllDigits } from "../utils.js";
@@ -307,6 +307,11 @@ export async function createProjectWithAutoTeam(
     result,
     "Failed to create project"
   );
+  if (typeof data.team_slug !== "string" || data.team_slug.trim() === "") {
+    throw new CliError(
+      `Sentry created project '${data.slug}' but did not return its owning team.`
+    );
+  }
   const dsn = await tryGetPrimaryDsn(orgSlug, data.slug);
   const url = buildProjectUrl(orgSlug, data.slug);
 

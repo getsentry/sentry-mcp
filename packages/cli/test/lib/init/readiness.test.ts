@@ -56,7 +56,13 @@ function makeUI(): { ui: WizardUI; errors: string[]; warns: string[] } {
   return { ui, errors, warns };
 }
 
-const OK_RESPONSE = new Response(null, { status: 200 });
+const OK_RESPONSE = new Response(
+  JSON.stringify({
+    capabilities: ["improve-existing-setup"],
+    status: "ok",
+  }),
+  { status: 200 }
+);
 const ERR_RESPONSE = new Response(null, { status: 503 });
 
 let fetchSpy: ReturnType<typeof spyOn>;
@@ -73,7 +79,9 @@ describe("checkReadiness", () => {
   test("resolves without error when the setup service is reachable", async () => {
     fetchSpy.mockResolvedValue(OK_RESPONSE.clone());
     const { ui, errors, warns } = makeUI();
-    await expect(checkReadiness(ui)).resolves.toBeUndefined();
+    await expect(checkReadiness(ui)).resolves.toEqual({
+      improveExistingSetup: true,
+    });
     expect(errors).toHaveLength(0);
     expect(warns).toHaveLength(0);
   });
@@ -81,7 +89,9 @@ describe("checkReadiness", () => {
   test("resolves but logs a warning when the setup service is unreachable", async () => {
     fetchSpy.mockRejectedValue(new Error("network failure"));
     const { ui, errors, warns } = makeUI();
-    await expect(checkReadiness(ui)).resolves.toBeUndefined();
+    await expect(checkReadiness(ui)).resolves.toEqual({
+      improveExistingSetup: false,
+    });
     expect(errors).toHaveLength(0);
     expect(warns.length).toBeGreaterThanOrEqual(1);
   });
@@ -89,8 +99,21 @@ describe("checkReadiness", () => {
   test("resolves but logs a warning when the setup service returns non-ok status", async () => {
     fetchSpy.mockResolvedValue(ERR_RESPONSE.clone());
     const { ui, errors, warns } = makeUI();
-    await expect(checkReadiness(ui)).resolves.toBeUndefined();
+    await expect(checkReadiness(ui)).resolves.toEqual({
+      improveExistingSetup: false,
+    });
     expect(errors).toHaveLength(0);
     expect(warns.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test("treats a reachable older service as lacking improvement support", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response(JSON.stringify({ status: "ok" }), { status: 200 })
+    );
+    const { ui } = makeUI();
+
+    await expect(checkReadiness(ui)).resolves.toEqual({
+      improveExistingSetup: false,
+    });
   });
 });

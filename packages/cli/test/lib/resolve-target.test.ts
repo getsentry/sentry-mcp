@@ -6,6 +6,9 @@
  * the complexity of mocking module dependencies in Bun's test environment.
  */
 
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { array, constantFrom, assert as fcAssert, property } from "fast-check";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { parseOrgProjectArg } from "../../src/lib/arg-parsing.js";
@@ -346,6 +349,62 @@ describe("Environment variable resolution (SENTRY_ORG / SENTRY_PROJECT)", () => 
     process.env.SENTRY_ORG = "env-org";
     const result = await resolveOrgsForListing(undefined, "/tmp");
     expect(result.orgs).toContain("env-org");
+  });
+});
+
+describe("local codebase evidence resolution", () => {
+  useTestConfigDir("test-resolve-target-evidence-");
+
+  let originalFetch: typeof globalThis.fetch;
+  let projectDir: string;
+
+  beforeEach(async () => {
+    originalFetch = globalThis.fetch;
+    projectDir = await mkdtemp(path.join(tmpdir(), "resolve-target-evidence-"));
+    delete process.env.SENTRY_ORG;
+    delete process.env.SENTRY_PROJECT;
+    delete process.env.SENTRY_DSN;
+    await setAuthToken("test-token");
+  });
+
+  afterEach(async () => {
+    globalThis.fetch = originalFetch;
+    delete process.env.SENTRY_ORG;
+    delete process.env.SENTRY_PROJECT;
+    delete process.env.SENTRY_DSN;
+    await rm(projectDir, { force: true, recursive: true });
+  });
+
+  test("uses numeric DSN identity without a project discovery request", async () => {
+    await writeFile(
+      path.join(projectDir, ".env"),
+      "SENTRY_DSN=https://public@o1.ingest.sentry.io/42\n"
+    );
+    let requestCount = 0;
+    globalThis.fetch = mockFetch(async () => {
+      requestCount += 1;
+      return new Response(JSON.stringify({ detail: "Unexpected request" }), {
+        status: 500,
+      });
+    });
+
+    const result = await resolveAllTargets({
+      cwd: projectDir,
+      resolutionMode: "codebase",
+    });
+
+    expect(result.targets).toEqual([
+      expect.objectContaining({
+        org: "1",
+        project: "42",
+        projectId: 42,
+        detectedDsn: expect.objectContaining({
+          projectId: "42",
+          sourcePath: ".env",
+        }),
+      }),
+    ]);
+    expect(requestCount).toBe(0);
   });
 });
 

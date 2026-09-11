@@ -31,6 +31,7 @@ export type { CodeScanResult } from "./code-scanner.js";
 export { scanCodeForDsns, scanCodeForFirstDsn } from "./code-scanner.js";
 // Main Detection API
 export {
+  detectAllDsnOccurrences,
   detectAllDsns,
   detectDsn,
   getDsnSourceDescription,

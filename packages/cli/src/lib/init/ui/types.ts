@@ -96,6 +96,8 @@ export type SelectOption<T extends string> = {
   label: string;
   /** Optional secondary copy rendered beside the label; omitted by default. */
   hint?: string;
+  /** Supporting copy rendered as muted lines below the option label. */
+  description?: string;
 };
 
 /** Option in a multiselect prompt, optionally carrying supporting copy or a fixed selection. */
@@ -126,6 +128,8 @@ export type SelectOptions<T extends string> = {
   options: SelectOption<T>[];
   /** Initially highlighted value. Defaults to the first option. */
   initialValue?: T;
+  /** Keep the current frame visible until the next prompt is mounted. */
+  holdPresentationOnResolve?: boolean;
 };
 
 /** Args for `multiselect`. */
@@ -254,6 +258,9 @@ export type CompletionActions = {
  * the main screen buffer, and release any held TTY resources.
  */
 export type WizardUI = AsyncDisposable & {
+  /** Whether this implementation can render and resolve interactive prompts. */
+  readonly supportsInteractivePrompts?: boolean;
+
   // ── Lifecycle messages ────────────────────────────────────────────
 
   /**

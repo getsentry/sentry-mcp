@@ -14,6 +14,7 @@
 import { execFileSync } from "node:child_process";
 
 import { ValidationError, validationError } from "./errors.js";
+import { logger } from "./logger.js";
 
 /** `execFileSync` failure shape when git exits non-zero. */
 type ExecFileSyncError = Error & {
@@ -420,6 +421,18 @@ export function inferRepositoryName(
     }
   }
   return;
+}
+
+/**
+ * Return the absolute root of the current git worktree.
+ */
+export function inferRepositoryRoot(cwd?: string): string | undefined {
+  try {
+    return git(["rev-parse", "--show-toplevel"], cwd) || undefined;
+  } catch (error) {
+    logger.debug("Could not infer git repository root", error);
+    return;
+  }
 }
 
 /**

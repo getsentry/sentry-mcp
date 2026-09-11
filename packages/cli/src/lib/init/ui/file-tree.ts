@@ -200,9 +200,8 @@ function rowFor(
  * {@link buildFileTree} but tags leaves with `status` instead of
  * `action`.
  *
- * Insertion order is preserved (no sort) so newly-read files always
- * land at the bottom of their parent directory — gives the Ink
- * `FilesPanel`'s tail-window viewport a stable "tail -f" feel.
+ * Insertion order is preserved (no sort) so the Files panel presents the read
+ * chronology from the first analyzed path onward.
  */
 export function buildReadTree(files: ReadFile[]): FileTreeNode {
   const root: FileTreeNode = { name: "", children: [] };
@@ -233,7 +232,6 @@ export function buildReadTree(files: ReadFile[]): FileTreeNode {
     }
   }
 
-  // Deliberately no `sortRecursive(root)` — keep insertion order so
-  // sticky-bottom scrollbox tracking feels right.
+  // Deliberately no `sortRecursive(root)` — keep read chronology intact.
   return root;
 }

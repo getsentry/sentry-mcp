@@ -233,6 +233,26 @@ export async function detectAllDsns(cwd: string): Promise<DsnDetectionResult> {
 }
 
 /**
+ * Detect every DSN source location without collapsing identical URLs.
+ * Init uses these occurrences to map each instrumented workspace package.
+ */
+export async function detectAllDsnOccurrences(
+  cwd: string
+): Promise<DetectedDsn[]> {
+  const { projectRoot } = await findProjectRoot(cwd);
+  const [codeResult, envResult] = await Promise.all([
+    scanCodeForDsns(projectRoot),
+    detectFromAllEnvFiles(projectRoot),
+  ]);
+  const envDsn = detectFromEnv();
+  return [
+    ...(codeResult.occurrences ?? codeResult.dsns),
+    ...envResult.dsns,
+    ...(envDsn ? [envDsn] : []),
+  ];
+}
+
+/**
  * Check if a higher-priority code DSN exists.
  * Used to invalidate low-priority cached DSNs when code is added.
  */

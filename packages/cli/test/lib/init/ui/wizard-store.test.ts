@@ -13,7 +13,7 @@
  * dev/binary builds. This test file focuses on the pure data layer.
  */
 
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   CANONICAL_STEP_ORDER,
   CHECKLIST_VISIBLE_STEPS,
@@ -419,6 +419,24 @@ describe("WizardStore overlay lifecycle", () => {
     });
   });
 
+  test("a recovery overlay preserves a held presentation", () => {
+    const store = new WizardStore();
+    store.holdPresentation();
+
+    store.setOverlay({
+      kind: "health",
+      message: "Connection interrupted, retrying...",
+      retryCount: 1,
+    });
+
+    expect(store.getSnapshot().presentationHold).toBe(true);
+    expect(store.getSnapshot().overlay).toEqual({
+      kind: "health",
+      message: "Connection interrupted, retrying...",
+      retryCount: 1,
+    });
+  });
+
   test("clearOverlay nulls the overlay and notifies", () => {
     const store = new WizardStore();
     store.setOverlay({ kind: "health", message: "x", retryCount: 0 });
@@ -430,6 +448,25 @@ describe("WizardStore overlay lifecycle", () => {
     unsubscribe();
     expect(notifications).toBe(1);
     expect(store.getSnapshot().overlay).toBeNull();
+  });
+});
+
+describe("WizardStore presentation hold", () => {
+  test("the success screen releases a held prompt frame", () => {
+    const store = new WizardStore();
+    store.holdPresentation();
+
+    store.setOutro({
+      kind: "success",
+      dismiss: vi.fn(),
+      actions: {
+        openUrl: vi.fn(),
+        track: vi.fn(),
+      },
+    });
+
+    expect(store.getSnapshot().presentationHold).toBe(false);
+    expect(store.getSnapshot().outroState?.kind).toBe("success");
   });
 });
 

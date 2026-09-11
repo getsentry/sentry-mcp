@@ -1,4 +1,8 @@
-import { getProject, tryGetPrimaryDsn } from "../api-client.js";
+import {
+  getProject,
+  resolveOrgDisplayName,
+  tryGetPrimaryDsn,
+} from "../api-client.js";
 import { ApiError } from "../errors.js";
 import { buildProjectUrl } from "../sentry-urls.js";
 import type { ExistingProjectData } from "./types.js";
@@ -16,13 +20,23 @@ export async function tryGetExistingProjectData(
 ): Promise<ExistingProjectData | null> {
   try {
     const project = await getProject(orgSlug, projectSlug);
-    const dsn = await tryGetPrimaryDsn(orgSlug, project.slug);
+    // The shared DSN resolver intentionally keeps cold SaaS lookups fast by
+    // returning numeric IDs. Once init fetches the concrete project, switch to
+    // the canonical organization slug returned by Sentry for display, URLs,
+    // and every subsequent API call.
+    const canonicalOrgSlug = project.organization?.slug ?? orgSlug;
+    const dsn = await tryGetPrimaryDsn(canonicalOrgSlug, project.slug);
     return {
-      orgSlug,
+      orgSlug: canonicalOrgSlug,
+      orgDisplay: resolveOrgDisplayName(
+        canonicalOrgSlug,
+        project.organization?.name
+      ),
       projectSlug: project.slug,
+      projectDisplay: project.name,
       projectId: project.id,
-      dsn: dsn ?? "",
-      url: buildProjectUrl(orgSlug, project.slug),
+      url: buildProjectUrl(canonicalOrgSlug, project.slug),
+      ...(dsn ? { dsn } : {}),
       ...(project.platform ? { platform: project.platform } : {}),
     };
   } catch (error) {

@@ -1,3 +1,5 @@
+import type { ResolvedConcreteTeam } from "../resolve-team.js";
+
 export type DirEntry = {
   name: string;
   path: string;
@@ -9,9 +11,11 @@ export type DirEntry = {
 
 export type ExistingProjectData = {
   orgSlug: string;
+  orgDisplay?: string;
   projectSlug: string;
+  projectDisplay?: string;
   projectId: string;
-  dsn: string;
+  dsn?: string;
   url: string;
   platform?: string;
 };
@@ -46,22 +50,18 @@ export type ResolvedInitContext = {
   features?: string[];
   org: string;
   /**
-   * Resolved team slug for init operations.
-   * Omitted when init defers empty-org auto-creation until project creation.
+   * Explicit team requested with `--team`.
+   * Implicit team resolution is deferred until project creation so existing
+   * projects never require a team choice.
    */
-  team?: string;
-  /**
-   * True only when `team` was supplied via the `--team` CLI flag.
-   * False/absent when the team was auto-selected by preflight.
-   * Used by project creation tools to decide whether to suppress the
-   * org-scoped fallback on 403 (only suppress for explicitly named teams).
-   */
-  isExplicitTeam?: boolean;
+  team?: Omit<ResolvedConcreteTeam, "source"> & { source: "explicit" };
   project?: string;
   /** Pre-selected app name for monorepo runs. Passed through from `--app`. */
   app?: string;
   authToken?: string;
   existingProject?: ExistingProjectData;
+  /** Existing setup should be preserved, reviewed, and brought up to date. */
+  setupIntent?: "improve-existing";
 };
 
 export type InteractiveContext = Pick<
@@ -329,12 +329,28 @@ export type InteractivePayload =
   | MultiSelectPayload
   | ConfirmPayload;
 
+/** One stable target identity plus optional human-facing selector metadata. */
+export type AppEntry = {
+  /** Presentation-only target name; selection and `--app` use `name`. */
+  label?: string;
+  /** Stable identifier returned through workflow suspend/resume. */
+  name: string;
+  /** Absolute filesystem path to the target root. */
+  path: string;
+  /** Framework proven or inferred for the target, when available. */
+  framework?: string;
+  /** Product role used to explain the target in the selector. */
+  role?: "application" | "documentation" | "example" | "runtime";
+  /** Deterministic existing-setup status and unattended-selection safety. */
+  sentrySetup?: "detected" | "auto-select";
+};
+
 export type SelectPayload = {
   type: "interactive";
   kind: "select";
   prompt: string;
   options?: string[];
-  apps?: Array<{ name: string; path: string; framework?: string }>;
+  apps?: AppEntry[];
 };
 
 export type MultiSelectPayload = {
@@ -342,6 +358,7 @@ export type MultiSelectPayload = {
   kind: "multi-select";
   prompt: string;
   availableFeatures?: string[];
+  initialFeatures?: string[];
   options?: string[];
 };
 
@@ -358,6 +375,7 @@ export type WorkflowRunResult = {
   status: "suspended" | "success" | "failed";
   suspended?: string[][];
   activeStepsPath?: Record<string, unknown>;
+  suspendedPaths?: Record<string, unknown>;
   steps?: Record<
     string,
     {

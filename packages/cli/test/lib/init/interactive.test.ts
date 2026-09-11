@@ -13,7 +13,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { WizardError } from "../../../src/lib/errors.js";
 import { handleInteractive } from "../../../src/lib/init/interactive.js";
 import type { InteractiveContext } from "../../../src/lib/init/types.js";
-import { CANCELLED } from "../../../src/lib/init/ui/types.js";
+import {
+  CANCELLED,
+  type SelectOptions,
+} from "../../../src/lib/init/ui/types.js";
 import { createMockUI } from "./ui/mock-ui.js";
 
 function makeOptions(
@@ -58,9 +61,7 @@ describe("handleSelect", () => {
     );
 
     expect(result).toEqual({ selectedApp: "my-app" });
-    expect(
-      calls.some((c) => c.kind === "log.info" && c.message.includes("my-app"))
-    ).toBe(true);
+    expect(calls.filter((call) => call.kind.startsWith("log."))).toEqual([]);
   });
 
   test("throws WizardError with app list when --yes and multiple apps", async () => {
@@ -81,6 +82,80 @@ describe("handleSelect", () => {
       )
     ).rejects.toBeInstanceOf(WizardError);
     expect(calls.some((c) => c.kind === "log.error")).toBe(true);
+  });
+
+  test("auto-selects the single existing Sentry target with --yes", async () => {
+    const { ui, calls } = createMockUI();
+
+    const result = await handleInteractive(
+      {
+        type: "interactive",
+        prompt: "Choose target",
+        kind: "select",
+        apps: [
+          {
+            name: "junior",
+            path: "/repo/packages/junior",
+            framework: "Sentry detected",
+            sentrySetup: "auto-select",
+          },
+          { name: "docs", path: "/repo/packages/docs", framework: "Astro" },
+          { name: "example", path: "/repo/apps/example", framework: "Nitro" },
+        ],
+      },
+      makeOptions({ yes: true }),
+      ui
+    );
+
+    expect(result).toEqual({ selectedApp: "junior" });
+    expect(calls.filter((call) => call.kind.startsWith("log."))).toEqual([]);
+  });
+
+  test("does not trust an AI framework label as deterministic setup evidence", async () => {
+    const { ui } = createMockUI();
+
+    await expect(
+      handleInteractive(
+        {
+          type: "interactive",
+          prompt: "Choose target",
+          kind: "select",
+          apps: [
+            {
+              name: "hallucinated",
+              path: "/repo/apps/hallucinated",
+              framework: "Sentry detected by framework analysis",
+            },
+            { name: "docs", path: "/repo/apps/docs", framework: "Astro" },
+          ],
+        },
+        makeOptions({ yes: true }),
+        ui
+      )
+    ).rejects.toBeInstanceOf(WizardError);
+  });
+
+  test("does not auto-select a sole setup target when discovery was truncated", async () => {
+    const { ui } = createMockUI();
+
+    await expect(
+      handleInteractive(
+        {
+          type: "interactive",
+          prompt: "Choose target",
+          kind: "select",
+          apps: [
+            {
+              name: "api",
+              path: "/repo/apps/api",
+              sentrySetup: "detected",
+            },
+          ],
+        },
+        makeOptions({ yes: true }),
+        ui
+      )
+    ).rejects.toBeInstanceOf(WizardError);
   });
 
   test("falls through to ui.select when --yes and non-monorepo select", async () => {
@@ -150,6 +225,73 @@ describe("handleSelect", () => {
 
     expect(result).toEqual({ selectedApp: "vue" });
     expect(calls.some((c) => c.kind === "select")).toBe(true);
+  });
+
+  test("presents workspace labels, roles, frameworks, and Sentry status", async () => {
+    const { ui, respond } = createMockUI();
+    respond.select("docs");
+    let selection: SelectOptions<string> | undefined;
+    const select = ui.select.bind(ui);
+    ui.select = (options) => {
+      selection = options;
+      return select(options);
+    };
+
+    await handleInteractive(
+      {
+        type: "interactive",
+        prompt: "Select the target application or package:",
+        kind: "select",
+        apps: [
+          {
+            label: "Junior",
+            name: "junior",
+            path: "/repo/packages/junior",
+            role: "runtime",
+            sentrySetup: "auto-select",
+          },
+          {
+            framework: "Astro",
+            label: "Junior Docs",
+            name: "docs",
+            path: "/repo/packages/docs",
+            role: "documentation",
+          },
+          {
+            framework: "Nitro",
+            label: "Junior Example",
+            name: "example",
+            path: "/repo/apps/example",
+            role: "example",
+          },
+        ],
+      },
+      makeOptions(),
+      ui,
+      { holdPresentationOnSelect: true }
+    );
+
+    expect(selection).toEqual({
+      message: "Select the target application or package:",
+      holdPresentationOnResolve: true,
+      options: [
+        {
+          hint: "Runtime package · Sentry detected",
+          label: "Junior",
+          value: "junior",
+        },
+        {
+          hint: "Documentation website · Astro",
+          label: "Junior Docs",
+          value: "docs",
+        },
+        {
+          hint: "Reference application · Nitro",
+          label: "Junior Example",
+          value: "example",
+        },
+      ],
+    });
   });
 
   test("throws WizardCancelledError on user cancellation", async () => {
@@ -308,8 +450,8 @@ describe("handleMultiSelect", () => {
     );
   });
 
-  test("auto-selects all features with --yes", async () => {
-    const { ui } = createMockUI();
+  test("auto-selects only the safe defaults with --yes", async () => {
+    const { ui, calls } = createMockUI();
     const result = await handleInteractive(
       {
         type: "interactive",
@@ -319,6 +461,8 @@ describe("handleMultiSelect", () => {
           "errorMonitoring",
           "performanceMonitoring",
           "sessionReplay",
+          "logs",
+          "profiling",
           "userFeedback",
         ],
       },
@@ -328,9 +472,94 @@ describe("handleMultiSelect", () => {
 
     expect(result.features).toEqual([
       "errorMonitoring",
-      "performanceMonitoring",
+      "logs",
       "sessionReplay",
+      "performanceMonitoring",
     ]);
+    expect(result.features).not.toContain("profiling");
+    expect(calls.find((call) => call.kind === "log.info")?.message).toBe(
+      "Auto-selected default features: Error Monitoring, Logs, Session Replay, Tracing"
+    );
+  });
+
+  test("keeps profiling optional for the Junior runtime defaults", async () => {
+    const { ui } = createMockUI();
+    const result = await handleInteractive(
+      {
+        type: "interactive",
+        prompt: "Select features",
+        kind: "multi-select",
+        availableFeatures: [
+          "errorMonitoring",
+          "performanceMonitoring",
+          "profiling",
+          "logs",
+        ],
+      },
+      makeOptions({ yes: true }),
+      ui
+    );
+
+    expect(result.features).toEqual([
+      "errorMonitoring",
+      "logs",
+      "performanceMonitoring",
+    ]);
+  });
+
+  test("keeps detected existing features selected with --yes", async () => {
+    const { ui } = createMockUI();
+    const result = await handleInteractive(
+      {
+        availableFeatures: [
+          "errorMonitoring",
+          "performanceMonitoring",
+          "profiling",
+          "logs",
+        ],
+        initialFeatures: ["profiling"],
+        kind: "multi-select",
+        prompt: "Select features",
+        type: "interactive",
+      },
+      makeOptions({ yes: true }),
+      ui
+    );
+
+    expect(result.features).toContain("profiling");
+  });
+
+  test("preselects detected existing features in the interactive checklist", async () => {
+    const { calls, respond, ui } = createMockUI();
+    respond.multiselect(["profiling"]);
+    respond.select("continue");
+
+    await handleInteractive(
+      {
+        availableFeatures: [
+          "errorMonitoring",
+          "performanceMonitoring",
+          "profiling",
+          "logs",
+        ],
+        initialFeatures: ["profiling"],
+        kind: "multi-select",
+        prompt: "Select features",
+        type: "interactive",
+      },
+      makeOptions(),
+      ui
+    );
+
+    const prompt = calls.find((call) => call.kind === "multiselect");
+    expect(prompt?.initialValues).toEqual(
+      expect.arrayContaining([
+        "errorMonitoring",
+        "performanceMonitoring",
+        "logs",
+        "profiling",
+      ])
+    );
   });
 
   test("returns error monitoring when no features are provided", async () => {

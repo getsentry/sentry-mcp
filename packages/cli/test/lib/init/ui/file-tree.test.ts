@@ -6,7 +6,7 @@
  * Two builders share `flattenTree`:
  *   - `buildFileTree(changed)` — sorts directories first, then alpha
  *   - `buildReadTree(reads)`   — preserves insertion order so the
- *     OpenTUI scrollbox's sticky-bottom tracking feels right
+ *     Files panel can present read chronology from the top
  *
  * The tests below exercise the second builder explicitly since it's
  * new in this PR; the changed-files builder already has implicit
@@ -60,8 +60,7 @@ describe("buildReadTree", () => {
   test("preserves insertion order (no sort)", () => {
     // Sorting would put `aa.ts` before `bb.ts`. We deliberately
     // insert in reverse-alphabetical order to verify that the
-    // builder doesn't reorder — sticky-bottom scrollbox tracking
-    // depends on newly-added files always landing at the end.
+    // builder doesn't reorder, so the UI starts with the earliest reads.
     const tree = buildReadTree([
       { path: "src/zz.ts", status: "analyzed" },
       { path: "src/aa.ts", status: "analyzed" },

@@ -1949,7 +1949,7 @@ export type ProjectCreatedResult = {
   /** Team slug the project was assigned to */
   teamSlug: string;
   /** How the team was resolved */
-  teamSource: "explicit" | "auto-selected" | "auto-created";
+  teamSource: "explicit" | "selected" | "auto-selected" | "auto-created";
   /** The platform the user requested via CLI argument (used as fallback display) */
   requestedPlatform: string;
   /** Primary DSN, if fetched successfully */
@@ -1999,8 +1999,8 @@ export function formatProjectCreated(result: ProjectCreatedResult): string {
   if (result.teamSource === "auto-created") {
     lines.push(
       dry
-        ? `> **Note:** Would create team '${escapeMarkdownInline(result.teamSlug)}' (org has no teams).`
-        : `> **Note:** Created team '${escapeMarkdownInline(result.teamSlug)}' (org had no teams).`
+        ? `> **Note:** Would create team '${escapeMarkdownInline(result.teamSlug)}' for this project.`
+        : `> **Note:** Created team '${escapeMarkdownInline(result.teamSlug)}' for this project.`
     );
     lines.push("");
   } else if (result.teamSource === "auto-selected") {

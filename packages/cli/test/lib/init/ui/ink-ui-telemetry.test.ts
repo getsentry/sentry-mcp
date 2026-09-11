@@ -258,6 +258,61 @@ describe("InkUI prompt telemetry", () => {
     await ui[Symbol.asyncDispose]();
   });
 
+  test("holds a resolved workflow select until the next prompt is mounted", async () => {
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const { ui, store } = createUi();
+    const snapshots: Array<{
+      held: boolean;
+      layout: string;
+      prompt: string | null;
+    }> = [];
+    const unsubscribe = store.subscribe(() => {
+      const snapshot = store.getSnapshot();
+      snapshots.push({
+        held: snapshot.presentationHold,
+        layout: snapshot.layout,
+        prompt: snapshot.prompt?.kind ?? null,
+      });
+    });
+
+    const resultPromise = ui.select({
+      message: "Select target",
+      options: [{ label: "Junior", value: "junior" }],
+      holdPresentationOnResolve: true,
+    });
+    const prompt = store.getSnapshot().prompt;
+    expect(prompt?.kind).toBe("select");
+    if (prompt?.kind !== "select") {
+      throw new Error("Expected a select prompt");
+    }
+    prompt.resolve("junior");
+
+    await expect(resultPromise).resolves.toBe("junior");
+    expect(store.getSnapshot().presentationHold).toBe(true);
+    const nextPrompt = ui.select({
+      message: "What would you like to do with this Sentry setup?",
+      options: [{ label: "Improve Sentry", value: "improve" }],
+    });
+    expect(snapshots).toEqual([
+      { held: false, layout: "workflow", prompt: "select" },
+      { held: true, layout: "workflow", prompt: "select" },
+      { held: false, layout: "workflow", prompt: "select" },
+    ]);
+    const mountedPrompt = store.getSnapshot().prompt;
+    if (mountedPrompt?.kind !== "select") {
+      throw new Error("Expected the next select prompt");
+    }
+    mountedPrompt.resolve("improve");
+    await expect(nextPrompt).resolves.toBe("improve");
+    expect(
+      snapshots
+        .slice(0, 3)
+        .some(({ prompt: promptKind }) => promptKind === null)
+    ).toBe(false);
+    unsubscribe();
+    await ui[Symbol.asyncDispose]();
+  });
+
   test("attributes workflow prompts to the active step", async () => {
     const metricSpy = vi.spyOn(Sentry.metrics, "distribution");
     const startSpanSpy = vi.spyOn(Sentry, "startSpan");

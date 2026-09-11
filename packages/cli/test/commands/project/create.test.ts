@@ -11,7 +11,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { app } from "../../../src/app.js";
 import { createCommand } from "../../../src/commands/project/create.js";
 import type { SentryContext } from "../../../src/context.js";
-import type { CreatedProjectDetails } from "../../../src/lib/api-client.js";
+import {
+  type CreatedProjectDetails,
+  MEMBER_PROJECT_CREATION_DISABLED_DETAIL,
+} from "../../../src/lib/api-client.js";
 
 // Auto-mock at the definition site so internal calls (e.g. createProjectWithDsn
 // calling createProject within projects.js) are intercepted. All exports become
@@ -50,6 +53,8 @@ const sampleTeam: SentryTeam = {
   name: "Engineering",
   memberCount: 5,
   isMember: true,
+  teamRole: "admin",
+  access: ["team:admin"],
 };
 
 const sampleTeam2: SentryTeam = {
@@ -58,6 +63,8 @@ const sampleTeam2: SentryTeam = {
   name: "Mobile Team",
   memberCount: 3,
   isMember: true,
+  teamRole: "admin",
+  access: ["team:admin"],
 };
 
 const sampleProject: SentryProject = {
@@ -114,6 +121,7 @@ describe("project create", () => {
   const createTeamSpy = vi.mocked(teamsApi.createTeam);
   const tryGetPrimaryDsnSpy = vi.mocked(projectsApi.tryGetPrimaryDsn);
   const listOrgsSpy = vi.mocked(orgsApi.listOrganizations);
+  const getOrganizationSpy = vi.mocked(orgsApi.getOrganization);
   const resolveOrgSpy = vi.mocked(resolveTarget.resolveOrg);
 
   beforeEach(() => {
@@ -147,6 +155,13 @@ describe("project create", () => {
       { slug: "acme-corp", name: "Acme Corp" },
       { slug: "other-org", name: "Other Org" },
     ]);
+    getOrganizationSpy.mockResolvedValue({
+      id: "1",
+      slug: "acme-corp",
+      name: "Acme Corp",
+      access: ["project:admin", "team:admin"],
+      allowMemberProjectCreation: false,
+    });
   });
 
   afterEach(() => {
@@ -156,6 +171,7 @@ describe("project create", () => {
     createTeamSpy.mockReset();
     tryGetPrimaryDsnSpy.mockReset();
     listOrgsSpy.mockReset();
+    getOrganizationSpy.mockReset();
     resolveOrgSpy.mockReset();
   });
 
@@ -293,14 +309,19 @@ describe("project create", () => {
   });
 
   test("auto-selects team when user is member of exactly one among many", async () => {
-    const nonMemberTeam = { ...sampleTeam2, isMember: false };
+    const nonMemberTeam = {
+      ...sampleTeam2,
+      isMember: false,
+      teamRole: null,
+      access: ["team:read"],
+    };
     listTeamsSpy.mockResolvedValue([nonMemberTeam, sampleTeam]);
 
     const { context } = createMockContext();
     const func = await createCommand.loader();
     await func.call(context, { json: false }, "my-app:node");
 
-    // Should auto-select the one team the user is a member of
+    // Only teams with effective Team Admin access are eligible.
     expect(createProjectWithDsnSpy).toHaveBeenCalledWith(
       "acme-corp",
       "engineering",
@@ -311,60 +332,63 @@ describe("project create", () => {
     );
   });
 
-  test("errors when user is member of multiple teams without --team", async () => {
+  test("requires --team when several Team Admin teams are ambiguous non-interactively", async () => {
     listTeamsSpy.mockResolvedValue([sampleTeam, sampleTeam2]);
 
     const { context } = createMockContext();
     const func = await createCommand.loader();
-
-    const err = await func
+    const error = await func
       .call(context, { json: false }, "my-app:node")
-      .catch((e: Error) => e);
-    expect(err).toBeInstanceOf(ContextError);
-    expect(err.message).toContain("You belong to 2 teams");
-    expect(err.message).toContain("engineering");
-    expect(err.message).toContain("mobile");
+      .catch((cause) => cause);
 
+    expect(error).toBeInstanceOf(ContextError);
+    expect(error.message).toContain("Choose one explicitly with --team");
     expect(createProjectWithDsnSpy).not.toHaveBeenCalled();
   });
 
-  test("shows only member teams in error, not all org teams", async () => {
+  test("ignores teams without Team Admin access", async () => {
     const nonMemberTeam = {
       id: "3",
       slug: "infra",
       name: "Infrastructure",
       isMember: false,
+      access: ["team:read"],
     };
-    listTeamsSpy.mockResolvedValue([sampleTeam, sampleTeam2, nonMemberTeam]);
+    listTeamsSpy.mockResolvedValue([nonMemberTeam, sampleTeam2]);
 
     const { context } = createMockContext();
     const func = await createCommand.loader();
+    await func.call(context, { json: false }, "my-app:node");
 
-    const err = await func
-      .call(context, { json: false }, "my-app:node")
-      .catch((e: Error) => e);
-    expect(err).toBeInstanceOf(ContextError);
-    expect(err.message).toContain("engineering");
-    expect(err.message).toContain("mobile");
-    // Non-member team should NOT appear
-    expect(err.message).not.toContain("infra");
+    expect(createProjectWithDsnSpy).toHaveBeenCalledWith(
+      "acme-corp",
+      "mobile",
+      expect.objectContaining({ name: "my-app" })
+    );
   });
 
-  test("falls back to all teams when isMember is not available", async () => {
+  test("uses org-scoped creation for a member with no eligible team", async () => {
     const teamNoMembership1 = { id: "1", slug: "alpha", name: "Alpha" };
     const teamNoMembership2 = { id: "2", slug: "beta", name: "Beta" };
     listTeamsSpy.mockResolvedValue([teamNoMembership1, teamNoMembership2]);
+    getOrganizationSpy.mockResolvedValue({
+      id: "1",
+      slug: "acme-corp",
+      name: "Acme Corp",
+      access: ["project:read"],
+      allowMemberProjectCreation: true,
+    });
+    createProjectWithAutoTeamSpy.mockResolvedValue({
+      ...createdProjectDetails("my-app"),
+      team_slug: "team-user",
+    });
 
     const { context } = createMockContext();
     const func = await createCommand.loader();
+    await func.call(context, { json: false }, "my-app:node");
 
-    const err = await func
-      .call(context, { json: false }, "my-app:node")
-      .catch((e: Error) => e);
-    expect(err).toBeInstanceOf(ContextError);
-    expect(err.message).toContain("Multiple teams found");
-    expect(err.message).toContain("alpha");
-    expect(err.message).toContain("beta");
+    expect(createProjectWithDsnSpy).not.toHaveBeenCalled();
+    expect(createProjectWithAutoTeamSpy).toHaveBeenCalled();
   });
 
   test("auto-creates team when org has no teams", async () => {
@@ -391,7 +415,8 @@ describe("project create", () => {
 
     const output = stdoutWrite.mock.calls.map((c) => c[0]).join("");
     expect(output).toContain("Created team 'my-app'");
-    expect(output).toContain("org had no teams");
+    expect(output).toContain("for this project");
+    expect(output).not.toContain("org had no teams");
   });
 
   test("errors when org cannot be resolved", async () => {
@@ -466,6 +491,24 @@ describe("project create", () => {
     expect(err.message).toContain("permission");
     // Must NOT say "not found" — the team clearly exists
     expect(err.message).not.toContain("not found");
+  });
+
+  test("does not diagnose an org-scoped fallback 404 as a team failure", async () => {
+    createProjectWithDsnSpy.mockRejectedValueOnce(
+      new ApiError("Forbidden", 403, "No project:write access")
+    );
+    createProjectWithAutoTeamSpy.mockRejectedValueOnce(
+      new ApiError("Not found", 404, "Endpoint unavailable")
+    );
+
+    const { context } = createMockContext();
+    const func = await createCommand.loader();
+    const error = await func
+      .call(context, { json: false }, "my-app:node")
+      .catch((cause) => cause);
+
+    expect(error.message).toContain("Failed to create project");
+    expect(error.message).not.toContain("Team 'engineering'");
   });
 
   test("handles 404 from createProject with bad org — shows user's orgs", async () => {
@@ -546,6 +589,7 @@ describe("project create", () => {
     expect(err).toBeInstanceOf(CliError);
     expect(err.message).toContain("Invalid platform 'node'");
     expect(err.message).toContain("Common platforms:");
+    expect(createProjectWithDsnSpy).toHaveBeenCalledOnce();
   });
 
   test("wraps other API errors with context, preserving ApiError type", async () => {
@@ -655,11 +699,14 @@ describe("project create", () => {
     expect(err).toBeInstanceOf(CliError);
     expect(err.message).toContain("Invalid platform 'node'");
     expect(err.message).toContain("Common platforms:");
+    expect(createProjectWithDsnSpy).toHaveBeenCalledOnce();
+    expect(createProjectWithAutoTeamSpy).toHaveBeenCalledOnce();
   });
 
-  test("surfaces policy error when org has disabled member project creation", async () => {
-    // Both paths 403: team-based creation fails, and the fallback returns
-    // the org-level policy error ("disabled this feature").
+  test("reports the organization policy when the org fallback is restricted", async () => {
+    // The team route did not expose a precise reason. The organization route
+    // is authoritative for its own policy and must not be rewritten as a
+    // team:admin scope failure.
     createProjectWithDsnSpy.mockRejectedValue(
       new ApiError("Forbidden", 403, "You do not have permission")
     );
@@ -668,12 +715,18 @@ describe("project create", () => {
     const { context } = createMockContext();
     const func = await createCommand.loader();
 
-    const err = (await func
+    const err = await func
       .call(context, { json: false }, "my-app:node")
-      .catch((e: Error) => e)) as ApiError;
+      .catch((e: Error) => e);
     expect(err).toBeInstanceOf(ApiError);
-    expect(err.status).toBe(403);
-    expect(err.message).toContain("disabled project creation for members");
+    expect(err).toMatchObject({ status: 403 });
+    expect((err as ApiError).detail).toContain(
+      MEMBER_PROJECT_CREATION_DISABLED_DETAIL
+    );
+    expect(err.message).toContain(
+      "Your organization has disabled project creation for members"
+    );
+    expect((err as ApiError).detail).not.toContain("team:admin");
   });
 
   test("outputs JSON when --json flag is set", async () => {
@@ -686,6 +739,27 @@ describe("project create", () => {
     expect(parsed.project.slug).toBe("my-app");
     expect(parsed.dsn).toBe("https://abc@o123.ingest.us.sentry.io/999");
     expect(parsed.teamSlug).toBe("engineering");
+  });
+
+  test("never offers an interactive team picker for JSON output", async () => {
+    listTeamsSpy.mockResolvedValue([sampleTeam, sampleTeam2]);
+    const { context: baseContext } = createMockContext();
+    const ttyProcess = Object.create(process) as NodeJS.Process;
+    Object.defineProperty(ttyProcess, "stdout", {
+      value: { isTTY: true },
+    });
+    const ttyStdin = Object.create(process.stdin) as SentryContext["stdin"];
+    Object.defineProperty(ttyStdin, "isTTY", { value: true });
+    const context = {
+      ...baseContext,
+      process: ttyProcess,
+      stdin: ttyStdin,
+    } satisfies SentryContext;
+    const func = await createCommand.loader();
+
+    await expect(
+      func.call(context, { json: true }, "my-app:node")
+    ).rejects.toThrow("Choose one explicitly with --team");
   });
 
   test("handles DSN fetch failure gracefully", async () => {
@@ -940,6 +1014,7 @@ describe("project create", () => {
     );
 
     expect(createProjectWithDsnSpy).toHaveBeenCalledTimes(3);
+    expect(listTeamsSpy).toHaveBeenCalledOnce();
     for (const [name, platform] of [
       ["web", "javascript"],
       ["api", "python-django"],

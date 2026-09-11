@@ -1,9 +1,9 @@
 /**
  * Smoke-test the Ink App by mounting it with mocked stdin/stdout
- * inside `bun test`. Verifies the full-screen layout (tabbed
+ * inside Vitest. Verifies the full-screen layout (tabbed
  * content and keyboard hints) without needing a real TTY.
  *
- * Note: The first Ink render() in a bun test CI worker can hang
+ * Note: The first Ink render() in a CI worker can hang
  * indefinitely (Ink's internal reconciler keeps the event loop
  * alive in non-TTY). Tests that call renderApp() rely on a 500ms
  * timeout race to prevent blocking.
@@ -29,14 +29,15 @@ const LEARN_HEADER_RE = /How Sentry Works/;
 const TASKS_HEADER_RE = /Tasks\b/;
 const STATUS_TAB_RE = /Status/;
 const FILES_TAB_RE = /Files/;
-const FILES_HEADER_PINNED_RE = /Files analyzed\s+\d+\/\d+/;
-const FILES_HEADER_UNPINNED_RE = /Files analyzed\s+\u2191\s+\d+\/\d+/;
+const FILES_HEADER_AT_TOP_RE = /Files analyzed\s+\d+\/\d+/;
+const FILES_HEADER_SCROLLED_RE = /Files analyzed\s+\u2191\s+\d+\/\d+/;
 const KEYBOARD_HINT_RE = /switch tab/;
 const SPACE_TOGGLE_HINT_RE = /space\s+toggle/;
 const A_ALL_HINT_RE = /a\s+all/;
 const ENTER_CONTINUE_HINT_RE = /enter\s+continue/;
 const ESC_CANCEL_HINT_RE = /esc\s+cancel/;
 const COMPLETED_SELECTING_FEATURES_RE = /✔\s+Selecting features/;
+const DOTS_SPINNER_GLYPH_RE = /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/gu;
 const ANSI_ESCAPE_PREFIX = "\u001B[";
 const CURSOR_TO_LINE_START = "\u001B[G";
 // biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI escape sequences in captured Ink output
@@ -170,6 +171,23 @@ function hasForcedWhiteForeground(output: string): boolean {
     output.includes(`${ANSI_ESCAPE_PREFIX}97m`) ||
     output.includes(`${ANSI_ESCAPE_PREFIX}38;2;255;255;255m`)
   );
+}
+
+async function waitForLatestFrame(
+  output: CaptureStream,
+  expectedText: string
+): Promise<string> {
+  let frame = "";
+  await vi.waitFor(
+    () => {
+      frame = stripAnsi(output.latestFrame());
+      if (!frame.includes(expectedText)) {
+        throw new Error(`Waiting for Ink frame containing: ${expectedText}`);
+      }
+    },
+    { interval: 20, timeout: 2000 }
+  );
+  return frame;
 }
 
 function withoutFeedbackBanner(output: string): string {
@@ -374,6 +392,208 @@ describe("Ink App snapshot", () => {
       renderedOptions[0]?.hintColumn,
       renderedOptions[0]?.hintColumn,
     ]);
+  });
+
+  test("select option descriptions render as muted lines below their labels", async () => {
+    const store = new WizardStore({ bannerRows: [], layout: "intro" });
+    store.setPrompt({
+      kind: "select",
+      message: "What would you like to do with this Sentry setup?",
+      options: [
+        {
+          value: "improve",
+          label: "Improve your Sentry setup",
+          description:
+            "Add features like tracing or Replay, repair issues, or upgrade your current setup.",
+        },
+        {
+          value: "other",
+          label: "Use or create another Sentry project",
+          description: "Use another project or create a new one.",
+        },
+      ],
+      initialIndex: 0,
+      resolve: ignorePromptResolution,
+    });
+
+    const previousChalkLevel = chalk.level;
+    chalk.level = 3;
+    let rawFrame: string;
+    try {
+      rawFrame = (await renderApp(store, 80)).allOutput();
+    } finally {
+      chalk.level = previousChalkLevel;
+    }
+    const frame = stripAnsi(rawFrame);
+    const lines = frame.split(LINE_SPLIT_RE);
+    const improveLabelLine = lines.findIndex((line) =>
+      line.includes("Improve your Sentry setup")
+    );
+    const improveDescriptionFirstLine = lines.findIndex((line) =>
+      line.includes("Add features like tracing or Replay")
+    );
+    const improveDescriptionLastLine = lines.findIndex((line) =>
+      line.includes("setup.")
+    );
+    const otherLabelLine = lines.findIndex((line) =>
+      line.includes("Use or create another Sentry project")
+    );
+    const otherDescriptionLine = lines.findIndex((line) =>
+      line.includes("Use another project or create a new one.")
+    );
+
+    expect(frame).toContain("Add features like tracing or Replay");
+    expect(frame.replaceAll(/\s+/g, " ")).toContain(
+      "Add features like tracing or Replay, repair issues, or upgrade your current setup."
+    );
+    expect(frame).toContain("Use another project or create a new one.");
+    expect(rawFrame).toContain(
+      `${ANSI_ESCAPE_PREFIX}38;2;137;130;148mAdd features like tracing or Replay`
+    );
+    expect(improveDescriptionFirstLine).toBe(improveLabelLine + 1);
+    expect(improveDescriptionLastLine).toBe(improveDescriptionFirstLine + 1);
+    expect(otherLabelLine).toBe(improveDescriptionLastLine + 1);
+    expect(otherDescriptionLine).toBe(otherLabelLine + 1);
+  });
+
+  test("holds the target selector until the next setup prompt is ready", async () => {
+    const store = new WizardStore({ bannerRows: [] });
+    store.setPrompt({
+      kind: "select",
+      message: "Select the target application or package:",
+      options: [
+        { value: "junior", label: "Junior", hint: "Sentry detected" },
+        { value: "docs", label: "Junior Docs", hint: "Astro" },
+      ],
+      initialIndex: 0,
+      resolve: ignorePromptResolution,
+    });
+    const out = new CaptureStream(120, 40);
+    const stdin = makeStdin();
+    const instance = render(createElement(App, { store }), {
+      stdout: out as unknown as NodeJS.WriteStream,
+      stderr: out as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      patchConsole: false,
+      exitOnCtrlC: false,
+      // This test exercises live frame transitions. Ink otherwise switches to
+      // non-interactive mode in CI and emits only the final frame on unmount.
+      interactive: true,
+    });
+
+    try {
+      // Wait for the selector to be committed before freezing presentation.
+      // A fixed delay can race Ink's first render on slower CI workers, which
+      // would freeze an empty initial snapshot instead of the selector.
+      await waitForLatestFrame(
+        out,
+        "Select the target application or package:"
+      );
+      const transitionFrameIndex = out.frames.length;
+      store.holdPresentation();
+      store.appendLog("success", "Selecting target application");
+      store.startSpinner("Checking for your existing Sentry setup");
+      store.setStepStatus("check-existing-sentry", "in_progress");
+      store.appendLog("success", "Sentry setup analyzed");
+      await sleep(FRAME_SETTLE_MS * 3);
+
+      const heldFrame = await waitForLatestFrame(
+        out,
+        "Select the target application or package:"
+      );
+      const heldOutput = stripAnsi(
+        out.frames.slice(transitionFrameIndex).join("")
+      );
+      const heldSpinnerGlyphs = new Set(
+        heldOutput.match(DOTS_SPINNER_GLYPH_RE) ?? []
+      );
+      expect(heldFrame).toContain("Select the target application or package:");
+      expect(heldFrame).toContain("Junior");
+      expect(heldFrame).not.toContain("▸ Junior");
+      expect(heldSpinnerGlyphs.size).toBeGreaterThanOrEqual(2);
+      expect(heldFrame).not.toContain("Selecting target application");
+      expect(heldFrame).not.toContain(
+        "Checking for your existing Sentry setup"
+      );
+      expect(heldFrame).not.toContain("Sentry setup analyzed");
+
+      store.setOverlay({
+        kind: "health",
+        message: "Connection interrupted, retrying...",
+        retryCount: 1,
+      });
+      await sleep(FRAME_SETTLE_MS);
+      const recoveryFrame = await waitForLatestFrame(
+        out,
+        "Connection interrupted, retrying..."
+      );
+      expect(recoveryFrame).toContain(
+        "Select the target application or package:"
+      );
+      expect(recoveryFrame).toContain("Connection interrupted, retrying...");
+      expect(store.getSnapshot().presentationHold).toBe(true);
+      store.clearOverlay();
+
+      store.stopSpinner();
+      store.setPrompt({
+        kind: "select",
+        message:
+          "Sentry detected for project junior in organization Sentry. What would you like to do?",
+        options: [
+          { value: "improve", label: "Improve your Sentry setup" },
+          {
+            value: "other",
+            label: "Use or create another Sentry project",
+          },
+        ],
+        initialIndex: 0,
+        resolve: ignorePromptResolution,
+      });
+      await sleep(FRAME_SETTLE_MS);
+
+      const transitionOutput = stripAnsi(
+        out.frames.slice(transitionFrameIndex).join("")
+      );
+      const nextFrame = await waitForLatestFrame(
+        out,
+        "Sentry detected for project junior"
+      );
+      expect(transitionOutput).not.toContain("Selecting target application");
+      expect(transitionOutput).not.toContain(
+        "Checking for your existing Sentry setup"
+      );
+      expect(transitionOutput).not.toContain("Sentry setup analyzed");
+      expect(nextFrame).toContain("Sentry detected for project junior");
+      expect(nextFrame).toContain("in organization Sentry");
+      expect(nextFrame).toContain("What would you");
+      expect(nextFrame).toContain("like to do?");
+      expect(nextFrame).toContain("Tasks");
+      expect(nextFrame).not.toContain("Selecting target application");
+      expect(nextFrame).not.toContain(
+        "Checking for your existing Sentry setup"
+      );
+      expect(nextFrame).not.toContain("Sentry setup analyzed");
+    } finally {
+      instance.unmount();
+    }
+  });
+
+  test("dry-run auto-resolution renders only the user-facing scan status", async () => {
+    const store = new WizardStore({ bannerRows: [] });
+    store.appendLog("warn", "Dry-run mode: no files will be modified.");
+    store.setStepStatus("discover-context", "completed");
+    store.setStepStatus("detect-platform", "in_progress");
+    store.startSpinner("Scanning project files...");
+
+    const frame = stripAnsi((await renderApp(store, 120)).latestFrame());
+
+    expect(frame).toContain("Dry-run mode: no files will be modified.");
+    expect(frame).toContain("Scanning project files...");
+    expect(frame).not.toContain("Selecting target application");
+    expect(frame).not.toContain("Auto-selected existing Sentry setup");
+    expect(frame).not.toContain("Sentry setup analyzed");
+    expect(frame).not.toContain("Sentry detected");
+    expect(frame).not.toContain("Project junior in organization Sentry");
   });
 
   test("workflow screen hides logo and shows feedback banner", async () => {
@@ -1119,6 +1339,57 @@ describe("Ink App snapshot", () => {
     expect(scrolledFrame).toContain("Team 8");
   });
 
+  test("wrapped select descriptions account for every row when windowing", async () => {
+    const store = new WizardStore({ bannerRows: [] });
+    store.setPrompt({
+      kind: "select",
+      message: "Choose an action",
+      options: Array.from({ length: 8 }, (_value, index) => ({
+        value: `action-${index + 1}`,
+        label: `Action ${index + 1}`,
+        description: `Description ${index + 1} has enough supporting detail to wrap onto another line.`,
+      })),
+      initialIndex: 0,
+      resolve: ignorePromptResolution,
+    });
+
+    const rendered = await renderApp(store, 80, { rows: 16 });
+    const frame = stripFinalLineBreak(stripAnsi(rendered.latestFrame()));
+    const frameLines = frame.split(LINE_SPLIT_RE);
+    const descriptionTwoLine = frameLines.findIndex((line) =>
+      line.includes("Description 2 has enough supporting detail")
+    );
+    expect(frame).toContain("(1/8)");
+    expect(descriptionTwoLine).toBeGreaterThanOrEqual(0);
+    expect(frameLines[descriptionTwoLine + 1]).toContain(
+      "to wrap onto another line."
+    );
+    expect(frame).not.toContain("Action 3");
+    expect(frameLines.length).toBeLessThanOrEqual(16);
+
+    const scrolledFrame = stripFinalLineBreak(
+      stripAnsi(
+        (
+          await renderApp(store, 80, {
+            input: Array.from({ length: 7 }, () => DOWN_ARROW),
+            rows: 16,
+          })
+        ).latestFrame()
+      )
+    );
+    const scrolledLines = scrolledFrame.split(LINE_SPLIT_RE);
+    const descriptionEightLine = scrolledLines.findIndex((line) =>
+      line.includes("Description 8 has enough supporting detail")
+    );
+    expect(scrolledFrame).toContain("(8/8)");
+    expect(scrolledFrame).toContain("Action 8");
+    expect(descriptionEightLine).toBeGreaterThanOrEqual(0);
+    expect(scrolledLines[descriptionEightLine + 1]).toContain(
+      "to wrap onto another line."
+    );
+    expect(scrolledLines.length).toBeLessThanOrEqual(16);
+  });
+
   test("long multiselect prompts only render options that fit the terminal", async () => {
     const store = new WizardStore({ bannerRows: [] });
     store.appendLog(
@@ -1231,7 +1502,7 @@ describe("Ink App snapshot", () => {
         rows: 16,
       })
     ).allOutput();
-    expect(shortFrame).toMatch(FILES_HEADER_PINNED_RE);
+    expect(shortFrame).toMatch(FILES_HEADER_AT_TOP_RE);
     expect(shortFrame).not.toContain("scroll");
 
     const tallTree = new WizardStore({ bannerRows: [] });
@@ -1239,14 +1510,23 @@ describe("Ink App snapshot", () => {
     tallTree.recordFilesReading(readFiles);
     tallTree.markFilesAnalyzed(readFiles);
 
-    const tallFrame = (
-      await renderApp(tallTree, 120, {
-        input: [RIGHT_ARROW],
-        rows: 16,
-      })
-    ).allOutput();
-    expect(tallFrame).toMatch(FILES_HEADER_PINNED_RE);
+    const tallRendered = await renderApp(tallTree, 120, {
+      input: [RIGHT_ARROW],
+      rows: 16,
+    });
+    const tallFrame = stripAnsi(tallRendered.latestFrame());
+    expect(tallFrame).toMatch(FILES_HEADER_AT_TOP_RE);
     expect(tallFrame).toContain("scroll");
+    expect(tallFrame).toContain("file-01.ts");
+    expect(tallFrame).not.toContain("file-12.ts");
+
+    const scrolledRendered = await renderApp(tallTree, 120, {
+      input: [RIGHT_ARROW, ...Array.from({ length: 20 }, () => DOWN_ARROW)],
+      rows: 16,
+    });
+    const scrolledFrame = stripAnsi(scrolledRendered.latestFrame());
+    expect(scrolledFrame).toMatch(FILES_HEADER_SCROLLED_RE);
+    expect(scrolledFrame).toContain("file-12.ts");
   });
 
   test("Status screen shows logs and banner, not file tree", async () => {
@@ -1257,8 +1537,8 @@ describe("Ink App snapshot", () => {
 
     const frame = (await renderApp(store, 120)).allOutput();
     expect(frame).toContain("Checking project...");
-    expect(frame).not.toMatch(FILES_HEADER_PINNED_RE);
-    expect(frame).not.toMatch(FILES_HEADER_UNPINNED_RE);
+    expect(frame).not.toMatch(FILES_HEADER_AT_TOP_RE);
+    expect(frame).not.toMatch(FILES_HEADER_SCROLLED_RE);
   });
 
   test("SummaryPanel renders featureBlurbs as Here's what we set up section", async () => {

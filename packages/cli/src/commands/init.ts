@@ -246,17 +246,14 @@ async function resolveTarget(targetArg: string | undefined): Promise<{
       // the name for a new project to create.
       const { projects, orgs } = await findProjectsBySlug(parsed.projectSlug);
 
-      // Multiple matches — disambiguation error
+      // Multiple cross-org matches are not concrete until an organization is
+      // known. Preserve the requested name and let preflight resolve the org;
+      // within that org an exact match wins, otherwise this is a new project.
       if (projects.length > 1) {
-        const first = projects[0];
-        const orgList = projects
-          .map((p) => `  ${p.orgSlug}/${p.slug}`)
-          .join("\n");
-        throw new ValidationError(
-          `Project "${parsed.projectSlug}" exists in multiple organizations.\n\n` +
-            `Specify the organization:\n${orgList}\n\n` +
-            `Example: sentry init ${first?.orgSlug ?? "<org>"}/${parsed.projectSlug}`
+        log.info(
+          `Project "${parsed.projectSlug}" exists in multiple organizations — the selected organization will determine whether to use it or create it.`
         );
+        return { org: undefined, project: parsed.projectSlug };
       }
 
       // Exactly one match — use it (wizard handles existing-project flow)
@@ -301,6 +298,13 @@ export const initCommand = buildCommand<
       "Supports org/project syntax and a directory positional. Path-like\n" +
       "arguments (starting with . / ~) are treated as the directory;\n" +
       "everything else is treated as the target.\n\n" +
+      "Without an explicit project, an exact DSN, repository, or directory\n" +
+      "match is reused automatically. Otherwise creating a new project is the\n" +
+      "default; selecting from existing projects is a separate choice.\n\n" +
+      "For project creation, interactive runs let you create a new team or use\n" +
+      "a team where you are Team Admin. Non-interactive runs use one eligible\n" +
+      "team automatically; multiple eligible teams require --team. With no\n" +
+      "eligible team, Sentry creates one when your organization allows it.\n\n" +
       "Examples:\n" +
       "  sentry init\n" +
       "  sentry init acme/\n" +

@@ -10,15 +10,14 @@ import {
   listOrganizationTeams,
   listProjectTeams as sdkListProjectTeams,
 } from "@sentry/api";
-// biome-ignore lint/performance/noNamespaceImport: Sentry SDK recommends namespace import
-import * as Sentry from "@sentry/node-core/light";
 
 import type { SentryTeam } from "../../types/index.js";
 
-import { logger } from "../logger.js";
-
 import {
+  API_MAX_PER_PAGE,
+  autoPaginate,
   getOrgSdkConfig,
+  MAX_PAGINATION_PAGES,
   type PaginatedResponse,
   unwrapPaginatedResult,
   unwrapResult,
@@ -26,17 +25,25 @@ import {
 
 /**
  * List teams in an organization.
+ * Automatically paginates through all API pages to return the complete list.
  * Uses region-aware routing for multi-region support.
  */
 export async function listTeams(orgSlug: string): Promise<SentryTeam[]> {
   const config = await getOrgSdkConfig(orgSlug);
 
-  const result = await listOrganizationTeams({
-    ...config,
-    path: { organization_id_or_slug: orgSlug },
-  });
+  const { data: allResults } = await autoPaginate(async (cursor) => {
+    const result = await listOrganizationTeams({
+      ...config,
+      path: { organization_id_or_slug: orgSlug },
+      query: { cursor, per_page: API_MAX_PER_PAGE } as {
+        cursor?: string;
+        per_page?: number;
+      },
+    });
+    return unwrapPaginatedResult<SentryTeam[]>(result, "Failed to list teams");
+  }, MAX_PAGINATION_PAGES * API_MAX_PER_PAGE);
 
-  return unwrapResult<SentryTeam[]>(result, "Failed to list teams");
+  return allResults;
 }
 
 /**
@@ -91,12 +98,8 @@ export async function listProjectTeams(
 }
 
 /**
- * Create a new team in an organization and add the current user as a member.
- *
- * The Sentry API does not automatically add the creator to a new team,
- * so we follow up with an `addMemberToTeam("me")` call. The member-add
- * is best-effort — if it fails (e.g., permissions), the team is still
- * returned successfully.
+ * Create a new team in an organization. The Sentry backend adds the creator's
+ * membership as part of this request.
  *
  * @param orgSlug - The organization slug
  * @param slug - Team slug (also used as display name)
@@ -112,21 +115,7 @@ export async function createTeam(
     path: { organization_id_or_slug: orgSlug },
     body: { slug },
   });
-  const team = unwrapResult<SentryTeam>(result, "Failed to create team");
-
-  // Best-effort: add the current user to the team
-  try {
-    await addMemberToTeam(orgSlug, team.slug, "me");
-  } catch (error) {
-    Sentry.captureException(error, {
-      extra: { orgSlug, teamSlug: team.slug, context: "auto-add member" },
-    });
-    logger.warn(
-      `Team '${team.slug}' was created but you could not be added as a member.`
-    );
-  }
-
-  return team;
+  return unwrapResult<SentryTeam>(result, "Failed to create team");
 }
 
 /**

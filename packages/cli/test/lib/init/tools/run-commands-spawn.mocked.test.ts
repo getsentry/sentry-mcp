@@ -9,11 +9,17 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { RunCommandsPayload } from "../../../../src/lib/init/types.js";
 
 const originalComSpec = process.env.ComSpec;
+const originalUppercasePnpmVersionConfig =
+  process.env.NPM_CONFIG_MANAGE_PACKAGE_MANAGER_VERSIONS;
 const { spawnCalls } = vi.hoisted(() => ({
   spawnCalls: [] as Array<{
     command: string;
     args: string[];
-    options: { shell?: boolean; windowsVerbatimArguments?: boolean };
+    options: {
+      env?: NodeJS.ProcessEnv;
+      shell?: boolean;
+      windowsVerbatimArguments?: boolean;
+    };
   }>,
 }));
 
@@ -34,7 +40,11 @@ vi.mock("node:child_process", async () => {
     spawn: (
       command: string,
       args: string[],
-      options: { shell?: boolean; windowsVerbatimArguments?: boolean }
+      options: {
+        env?: NodeJS.ProcessEnv;
+        shell?: boolean;
+        windowsVerbatimArguments?: boolean;
+      }
     ) => {
       spawnCalls.push({ command, args, options });
       const child = new EventEmitter() as any;
@@ -74,6 +84,7 @@ function makePayload(command: string): RunCommandsPayload {
 beforeEach(() => {
   spawnCalls.splice(0);
   delete process.env.ComSpec;
+  process.env.NPM_CONFIG_MANAGE_PACKAGE_MANAGER_VERSIONS = "false";
 });
 
 afterEach(() => {
@@ -82,6 +93,12 @@ afterEach(() => {
     delete process.env.ComSpec;
   } else {
     process.env.ComSpec = originalComSpec;
+  }
+  if (originalUppercasePnpmVersionConfig === undefined) {
+    delete process.env.NPM_CONFIG_MANAGE_PACKAGE_MANAGER_VERSIONS;
+  } else {
+    process.env.NPM_CONFIG_MANAGE_PACKAGE_MANAGER_VERSIONS =
+      originalUppercasePnpmVersionConfig;
   }
 });
 
@@ -96,7 +113,12 @@ describe("runCommands spawn options", () => {
     expect(result.ok).toBe(true);
     expect(spawnCalls[0]).toMatchObject({
       command: "cmd.exe",
-      args: ["/d", "/s", "/c", '""C:\\Tools\\pnpm.CMD" "--version""'],
+      args: [
+        "/d",
+        "/s",
+        "/c",
+        '""C:\\Tools\\pnpm.CMD" "--config.manage-package-manager-versions=true" "--version""',
+      ],
       options: { shell: false, windowsVerbatimArguments: true },
     });
   });
@@ -116,7 +138,7 @@ describe("runCommands spawn options", () => {
         "/d",
         "/s",
         "/c",
-        '""C:\\Tools\\pnpm.CMD" "--filter" "./apps/web app" "add" "@sentry/nextjs@^8.0.0""',
+        '""C:\\Tools\\pnpm.CMD" "--config.manage-package-manager-versions=true" "--filter" "./apps/web app" "add" "@sentry/nextjs@^8.0.0""',
       ],
       options: { shell: false, windowsVerbatimArguments: true },
     });
@@ -136,7 +158,7 @@ describe("runCommands spawn options", () => {
         "/d",
         "/s",
         "/c",
-        '""C:\\Tools\\pnpm.CMD" "add" "C:\\some\\path\\\\""',
+        '""C:\\Tools\\pnpm.CMD" "--config.manage-package-manager-versions=true" "add" "C:\\some\\path\\\\""',
       ],
       options: { shell: false, windowsVerbatimArguments: true },
     });
@@ -153,6 +175,9 @@ describe("runCommands spawn options", () => {
     const commandLine = spawnCalls[0]?.args.at(-1) ?? "";
 
     expect(result.ok).toBe(true);
+    expect(commandLine).toContain(
+      '"--config.manage-package-manager-versions=true"'
+    );
     expect(commandLine).toContain('"value ""quoted"""');
     expect(commandLine).not.toContain('\\"');
     expect(spawnCalls[0]).toMatchObject({
@@ -194,6 +219,7 @@ describe("runCommands spawn options", () => {
       options: { shell: false },
     });
     expect(spawnCalls[0]?.options.windowsVerbatimArguments).toBeUndefined();
+    expect(spawnCalls[0]?.options.env).toBeUndefined();
   });
 
   test("keeps POSIX command execution shell-free", async () => {
@@ -206,9 +232,57 @@ describe("runCommands spawn options", () => {
     expect(result.ok).toBe(true);
     expect(spawnCalls[0]).toMatchObject({
       command: "/usr/local/bin/pnpm",
-      args: ["--version"],
+      args: ["--config.manage-package-manager-versions=true", "--version"],
       options: { shell: false },
     });
     expect(spawnCalls[0]?.options.windowsVerbatimArguments).toBeUndefined();
+    expect(
+      spawnCalls[0]?.options.env?.npm_config_manage_package_manager_versions
+    ).toBeUndefined();
+    expect(
+      spawnCalls[0]?.options.env?.NPM_CONFIG_MANAGE_PACKAGE_MANAGER_VERSIONS
+    ).toBeUndefined();
+  });
+
+  test.each([
+    [
+      "python3 -m pip install sentry-sdk",
+      "python3",
+      ["-m", "pip", "install", "sentry-sdk"],
+    ],
+    ["uv add sentry-sdk", "uv", ["add", "sentry-sdk"]],
+    ["cargo add sentry", "cargo", ["add", "sentry"]],
+  ])("does not rewrite non-pnpm package-manager commands: %s", async (command, executableName, expectedArgs) => {
+    setPlatform("darwin");
+
+    const result = await runCommands(makePayload(command), {
+      dryRun: false,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(spawnCalls[0]).toMatchObject({
+      command: `/usr/local/bin/${executableName}`,
+      args: expectedArgs,
+      options: { shell: false },
+    });
+    expect(spawnCalls[0]?.options.env).toBeUndefined();
+  });
+
+  test("does not duplicate an explicit pnpm version-management option", async () => {
+    setPlatform("darwin");
+
+    const result = await runCommands(
+      makePayload(
+        "pnpm --config.manage-package-manager-versions=true add @sentry/node"
+      ),
+      { dryRun: false }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(spawnCalls[0]?.args).toEqual([
+      "--config.manage-package-manager-versions=true",
+      "add",
+      "@sentry/node",
+    ]);
   });
 });

@@ -41,6 +41,11 @@ const {
   mockGetProject,
   mockFindProjectByDsnKey,
   mockFindProjectsByPattern,
+  mockFindProjectsBySlug,
+  mockInferRepositoryName,
+  mockInferRepositoryRoot,
+  mockLoadSentryCliRc,
+  mockGetGlobalPaths,
   mockListOrganizationsUncached,
   mockGetOrgByNumericId,
 } = vi.hoisted(() => ({
@@ -77,6 +82,15 @@ const {
   mockGetProject: vi.fn(() => Promise.resolve({ slug: "test", name: "Test" })),
   mockFindProjectByDsnKey: vi.fn(() => Promise.resolve(null)),
   mockFindProjectsByPattern: vi.fn(() => Promise.resolve([])),
+  mockFindProjectsBySlug: vi.fn(() =>
+    Promise.resolve({ projects: [], orgs: [] })
+  ),
+  mockInferRepositoryName: vi.fn(
+    () => undefined as { name: string; remote: string } | undefined
+  ),
+  mockInferRepositoryRoot: vi.fn(() => undefined as string | undefined),
+  mockLoadSentryCliRc: vi.fn(() => Promise.resolve({ sources: {} })),
+  mockGetGlobalPaths: vi.fn(() => new Set(["/global/.sentryclirc"])),
   mockListOrganizationsUncached: vi.fn(() => Promise.resolve([])),
   mockGetOrgByNumericId: vi.fn(
     () => undefined as { slug: string; regionUrl: string } | undefined
@@ -114,6 +128,17 @@ vi.mock("../../src/lib/db/dsn-cache.js", () => ({
   setCachedDsn: mockSetCachedDsn,
 }));
 
+vi.mock("../../src/lib/git.js", () => ({
+  inferRepositoryName: mockInferRepositoryName,
+  inferRepositoryRoot: mockInferRepositoryRoot,
+}));
+
+vi.mock("../../src/lib/sentryclirc.js", () => ({
+  CONFIG_FILENAME: ".sentryclirc",
+  getGlobalPaths: mockGetGlobalPaths,
+  loadSentryCliRc: mockLoadSentryCliRc,
+}));
+
 vi.mock("../../src/lib/db/regions.js", () => ({
   getOrgByNumericId: mockGetOrgByNumericId,
   getOrgRegion: vi.fn(() => {
@@ -145,7 +170,7 @@ vi.mock("../../src/lib/api-client.js", () => ({
   getProject: mockGetProject,
   findProjectByDsnKey: mockFindProjectByDsnKey,
   findProjectsByPattern: mockFindProjectsByPattern,
-  findProjectsBySlug: vi.fn(() => Promise.resolve({ projects: [], orgs: [] })),
+  findProjectsBySlug: mockFindProjectsBySlug,
   listOrganizations: vi.fn(() => Promise.resolve([])),
   listOrganizationsUncached: mockListOrganizationsUncached,
   listProjects: vi.fn(() => Promise.resolve([])),
@@ -179,6 +204,11 @@ function resetAllMocks() {
   mockGetProject.mockReset();
   mockFindProjectByDsnKey.mockReset();
   mockFindProjectsByPattern.mockReset();
+  mockFindProjectsBySlug.mockReset();
+  mockInferRepositoryName.mockReset();
+  mockInferRepositoryRoot.mockReset();
+  mockLoadSentryCliRc.mockReset();
+  mockGetGlobalPaths.mockReset();
   mockListOrganizationsUncached.mockReset();
   mockGetOrgByNumericId.mockReset();
 
@@ -203,6 +233,11 @@ function resetAllMocks() {
   mockGetCachedProjectByDsnKey.mockReturnValue(null);
   mockGetCachedDsn.mockReturnValue(null);
   mockFindProjectsByPattern.mockResolvedValue([]);
+  mockFindProjectsBySlug.mockResolvedValue({ projects: [], orgs: [] });
+  mockInferRepositoryName.mockReturnValue(undefined);
+  mockInferRepositoryRoot.mockReturnValue(undefined);
+  mockLoadSentryCliRc.mockResolvedValue({ sources: {} });
+  mockGetGlobalPaths.mockReturnValue(new Set(["/global/.sentryclirc"]));
   mockListOrganizationsUncached.mockResolvedValue([]);
   mockGetOrgByNumericId.mockReturnValue(undefined);
 }
@@ -629,6 +664,180 @@ describe("resolveOrgAndProject", () => {
     expect(result?.project).toBe("dsn-project");
   });
 
+  test("resolves an exact project slug from the git repository name", async () => {
+    mockInferRepositoryName.mockReturnValue({
+      name: "getsentry/junior",
+      remote: "origin",
+    });
+    mockFindProjectsBySlug.mockImplementation((slug: string) =>
+      Promise.resolve({
+        projects:
+          slug === "junior"
+            ? [
+                {
+                  id: "789",
+                  slug: "junior",
+                  name: "Junior",
+                  orgSlug: "sentry",
+                  organization: {
+                    id: "1",
+                    slug: "sentry",
+                    name: "Sentry",
+                  },
+                },
+              ]
+            : [],
+        orgs: [],
+      })
+    );
+
+    const result = await resolveOrgAndProject({ cwd: "/work/checkout" });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        org: "sentry",
+        project: "junior",
+        detectedFrom: 'git origin remote "getsentry/junior"',
+      })
+    );
+    expect(mockFindProjectsBySlug).toHaveBeenCalledWith("junior");
+    expect(mockFindProjectsByPattern).not.toHaveBeenCalled();
+  });
+
+  test("resolves an exact project slug from the working-directory name", async () => {
+    mockInferRepositoryRoot.mockReturnValue("/work/junior");
+    mockFindProjectRoot.mockResolvedValue({
+      projectRoot: "/work/junior",
+      detectedFrom: "package.json",
+    });
+    mockFindProjectsBySlug.mockResolvedValue({
+      projects: [
+        {
+          id: "789",
+          slug: "junior",
+          name: "Junior",
+          orgSlug: "sentry",
+          organization: { id: "1", slug: "sentry", name: "Sentry" },
+        },
+      ],
+      orgs: [],
+    });
+
+    const result = await resolveOrgAndProject({ cwd: "/work/junior" });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        org: "sentry",
+        project: "junior",
+        detectedFrom: 'working directory name "junior"',
+      })
+    );
+    expect(mockFindProjectsBySlug).toHaveBeenCalledWith("junior");
+    expect(mockFindProjectRoot).toHaveBeenCalledWith("/work/junior");
+    expect(mockFindProjectsByPattern).not.toHaveBeenCalled();
+  });
+
+  test("prefers the specific working directory over the repository root", async () => {
+    mockInferRepositoryRoot.mockReturnValue("/work/monorepo");
+    mockFindProjectRoot.mockResolvedValue({
+      projectRoot: "/work/monorepo/packages/frontend",
+      detectedFrom: "package.json",
+    });
+    mockInferRepositoryName.mockReturnValue({
+      name: "getsentry/monorepo",
+      remote: "origin",
+    });
+    mockFindProjectsBySlug.mockImplementation((slug: string) =>
+      Promise.resolve({
+        projects:
+          slug === "frontend"
+            ? [
+                {
+                  id: "789",
+                  slug: "frontend",
+                  name: "Frontend",
+                  orgSlug: "sentry",
+                },
+              ]
+            : [],
+        orgs: [],
+      })
+    );
+
+    const result = await resolveOrgAndProject({
+      cwd: "/work/monorepo/packages/frontend",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({ org: "sentry", project: "frontend" })
+    );
+    expect(mockInferRepositoryName).not.toHaveBeenCalled();
+  });
+
+  test("prefers the git remote over a conflicting checkout-root name", async () => {
+    mockInferRepositoryRoot.mockReturnValue("/work/checkout");
+    mockFindProjectRoot.mockResolvedValue({
+      projectRoot: "/work/checkout",
+      detectedFrom: "vcs",
+    });
+    mockInferRepositoryName.mockReturnValue({
+      name: "getsentry/junior",
+      remote: "origin",
+    });
+    mockFindProjectsBySlug.mockImplementation((slug: string) =>
+      Promise.resolve({
+        projects: [
+          {
+            id: slug === "junior" ? "789" : "790",
+            slug,
+            name: slug,
+            orgSlug: "sentry",
+          },
+        ],
+        orgs: [],
+      })
+    );
+
+    const result = await resolveOrgAndProject({ cwd: "/work/checkout" });
+
+    expect(result).toEqual(
+      expect.objectContaining({ org: "sentry", project: "junior" })
+    );
+  });
+
+  test("does not treat a common nested cwd as a monorepo app root", async () => {
+    mockInferRepositoryRoot.mockReturnValue("/work/junior");
+    mockFindProjectRoot.mockResolvedValue({
+      projectRoot: "/work/junior",
+      detectedFrom: "vcs",
+    });
+    mockInferRepositoryName.mockReturnValue({
+      name: "getsentry/junior",
+      remote: "origin",
+    });
+    mockFindProjectsBySlug.mockImplementation((slug: string) =>
+      Promise.resolve({
+        projects: [
+          {
+            id: slug === "junior" ? "789" : "790",
+            slug,
+            name: slug,
+            orgSlug: "sentry",
+          },
+        ],
+        orgs: [],
+      })
+    );
+
+    const result = await resolveOrgAndProject({
+      cwd: "/work/junior/src",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({ org: "sentry", project: "junior" })
+    );
+  });
+
   test("falls back to directory inference when DSN detection fails", async () => {
     mockGetDefaultOrganization.mockReturnValue(null);
     mockGetDefaultProject.mockReturnValue(null);
@@ -666,6 +875,39 @@ describe("resolveOrgAndProject", () => {
     mockFindProjectsByPattern.mockResolvedValue([]);
 
     const result = await resolveOrgAndProject({ cwd: "/home/user/ab" });
+
+    expect(result).toBeNull();
+  });
+
+  test("does not choose the first cross-org exact match", async () => {
+    mockInferRepositoryName.mockReturnValue({
+      name: "getsentry/junior",
+      remote: "origin",
+    });
+    mockFindProjectsBySlug.mockImplementation((slug: string) =>
+      Promise.resolve({
+        projects:
+          slug === "junior"
+            ? [
+                {
+                  id: "789",
+                  slug: "junior",
+                  name: "Junior",
+                  orgSlug: "sentry",
+                },
+                {
+                  id: "790",
+                  slug: "junior",
+                  name: "Junior",
+                  orgSlug: "personal",
+                },
+              ]
+            : [],
+        orgs: [],
+      })
+    );
+
+    const result = await resolveOrgAndProject({ cwd: "/work/checkout" });
 
     expect(result).toBeNull();
   });
@@ -707,6 +949,227 @@ describe("resolveAllTargets", () => {
     expect(result.targets).toHaveLength(1);
     expect(result.targets[0].org).toBe("default-org");
     expect(result.targets[0].project).toBe("default-project");
+  });
+
+  test("codebase mode ignores global config and account defaults in favor of a local DSN", async () => {
+    mockLoadSentryCliRc.mockResolvedValue({
+      org: "global-org",
+      project: "global-project",
+      sources: {
+        org: "/global/.sentryclirc",
+        project: "/global/.sentryclirc",
+      },
+    });
+    mockGetDefaultOrganization.mockReturnValue("default-org");
+    mockGetDefaultProject.mockReturnValue("default-project");
+    mockDetectAllDsns.mockResolvedValue({
+      primary: {
+        raw: "https://abc@o123.ingest.sentry.io/456",
+        protocol: "https",
+        publicKey: "abc",
+        host: "o123.ingest.sentry.io",
+        projectId: "456",
+        orgId: "123",
+        source: "env-file",
+      },
+      all: [
+        {
+          raw: "https://abc@o123.ingest.sentry.io/456",
+          protocol: "https",
+          publicKey: "abc",
+          host: "o123.ingest.sentry.io",
+          projectId: "456",
+          orgId: "123",
+          source: "env-file",
+        },
+      ],
+      hasMultiple: false,
+      fingerprint: "abc",
+    });
+    mockGetCachedProject.mockReturnValue({
+      orgSlug: "local-org",
+      orgName: "Local Org",
+      projectSlug: "local-project",
+      projectName: "Local Project",
+      projectId: "456",
+    });
+
+    const result = await resolveAllTargets({
+      cwd: "/work/checkout",
+      resolutionMode: "codebase",
+    });
+
+    expect(result.targets).toEqual([
+      expect.objectContaining({
+        org: "local-org",
+        project: "local-project",
+      }),
+    ]);
+    expect(mockGetDefaultOrganization).not.toHaveBeenCalled();
+    expect(mockGetDefaultProject).not.toHaveBeenCalled();
+  });
+
+  test("codebase mode accepts a project from a local sentryclirc", async () => {
+    mockLoadSentryCliRc.mockResolvedValue({
+      org: "local-org",
+      project: "local-project",
+      sources: {
+        org: "/global/.sentryclirc",
+        project: "/work/.sentryclirc",
+      },
+    });
+
+    const result = await resolveAllTargets({
+      cwd: "/work/checkout",
+      resolutionMode: "codebase",
+    });
+
+    expect(result.targets).toEqual([
+      expect.objectContaining({
+        org: "local-org",
+        project: "local-project",
+      }),
+    ]);
+    expect(mockDetectAllDsns).not.toHaveBeenCalled();
+  });
+
+  test("organization filter skips an incompatible local config and continues", async () => {
+    mockLoadSentryCliRc.mockResolvedValue({
+      org: "other-org",
+      project: "other-project",
+      sources: {
+        org: "/work/.sentryclirc",
+        project: "/work/.sentryclirc",
+      },
+    });
+    mockInferRepositoryRoot.mockReturnValue("/work/checkout");
+    mockInferRepositoryName.mockReturnValue({
+      name: "getsentry/junior",
+      remote: "origin",
+    });
+    mockFindProjectsBySlug.mockImplementation((slug: string) =>
+      Promise.resolve({
+        projects:
+          slug === "junior"
+            ? [
+                {
+                  id: "789",
+                  slug: "junior",
+                  name: "Junior",
+                  orgSlug: "acme",
+                },
+              ]
+            : [],
+        orgs: [],
+      })
+    );
+
+    const result = await resolveAllTargets({
+      cwd: "/work/checkout",
+      resolutionMode: "codebase",
+      organizationFilter: "acme",
+    });
+
+    expect(result.targets).toEqual([
+      expect.objectContaining({ org: "acme", project: "junior" }),
+    ]);
+  });
+
+  test("organization filter skips a fully resolved DSN from another org", async () => {
+    const dsn = {
+      raw: "https://abc@o123.ingest.sentry.io/456",
+      protocol: "https",
+      publicKey: "abc",
+      host: "o123.ingest.sentry.io",
+      projectId: "456",
+      orgId: "123",
+      source: "env-file" as const,
+    };
+    mockDetectAllDsns.mockResolvedValue({
+      primary: dsn,
+      all: [dsn],
+      hasMultiple: false,
+      fingerprint: "abc",
+    });
+    mockGetCachedProject.mockReturnValue({
+      orgSlug: "other-org",
+      orgName: "Other Org",
+      projectSlug: "other-project",
+      projectName: "Other Project",
+      projectId: "456",
+    });
+    mockInferRepositoryRoot.mockReturnValue("/work/checkout");
+    mockInferRepositoryName.mockReturnValue({
+      name: "getsentry/junior",
+      remote: "origin",
+    });
+    mockFindProjectsBySlug.mockImplementation((slug: string) =>
+      Promise.resolve({
+        projects:
+          slug === "junior"
+            ? [
+                {
+                  id: "789",
+                  slug: "junior",
+                  name: "Junior",
+                  orgSlug: "acme",
+                },
+              ]
+            : [],
+        orgs: [],
+      })
+    );
+
+    const result = await resolveAllTargets({
+      cwd: "/work/checkout",
+      resolutionMode: "codebase",
+      organizationFilter: "acme",
+    });
+
+    expect(result.targets).toEqual([
+      expect.objectContaining({ org: "acme", project: "junior" }),
+    ]);
+  });
+
+  test("organization filter validates a cold numeric DSN in the selected org", async () => {
+    const dsn = {
+      raw: "https://abc@o123.ingest.sentry.io/456",
+      protocol: "https",
+      publicKey: "abc",
+      host: "o123.ingest.sentry.io",
+      projectId: "456",
+      orgId: "123",
+      source: "env-file" as const,
+    };
+    mockDetectAllDsns.mockResolvedValue({
+      primary: dsn,
+      all: [dsn],
+      hasMultiple: false,
+      fingerprint: "abc",
+    });
+    mockGetProject.mockResolvedValue({
+      id: "456",
+      slug: "junior",
+      name: "Junior",
+      organization: { id: "123", slug: "acme", name: "Acme" },
+    });
+
+    const result = await resolveAllTargets({
+      cwd: "/work/checkout",
+      resolutionMode: "codebase",
+      organizationFilter: "acme",
+    });
+
+    expect(mockGetProject).toHaveBeenCalledWith("acme", "456");
+    expect(mockFindProjectByDsnKey).not.toHaveBeenCalled();
+    expect(result.targets).toEqual([
+      expect.objectContaining({
+        org: "acme",
+        project: "junior",
+        projectId: 456,
+        detectedDsn: dsn,
+      }),
+    ]);
   });
 
   test("resolves multiple DSNs in monorepo", async () => {
@@ -854,6 +1317,82 @@ describe("resolveAllTargets", () => {
     expect(result.targets).toHaveLength(1);
     expect(result.targets[0].org).toBe("inferred-org");
     expect(result.targets[0].project).toBe("my-app");
+    expect(result.targets[0].matchStrength).toBe("exact");
+  });
+
+  test("marks a non-exact project-root match as fuzzy", async () => {
+    mockFindProjectRoot.mockResolvedValue({
+      projectRoot: "/home/user/junior",
+      detectedFrom: "package.json",
+    });
+    mockFindProjectsByPattern.mockResolvedValue([
+      {
+        id: "789",
+        slug: "junior-api",
+        name: "Junior API",
+        orgSlug: "inferred-org",
+        organization: { id: "1", slug: "inferred-org", name: "Inferred Org" },
+      },
+    ]);
+
+    const result = await resolveAllTargets({ cwd: "/work/checkout" });
+
+    expect(result.targets).toEqual([
+      expect.objectContaining({
+        project: "junior-api",
+        matchStrength: "fuzzy",
+      }),
+    ]);
+  });
+
+  test("preserves ambiguous cross-org git repository matches", async () => {
+    mockInferRepositoryName.mockReturnValue({
+      name: "getsentry/junior",
+      remote: "upstream",
+    });
+    mockFindProjectsBySlug.mockImplementation((slug: string) =>
+      Promise.resolve({
+        projects:
+          slug === "junior"
+            ? [
+                {
+                  id: "789",
+                  slug: "junior",
+                  name: "Junior",
+                  orgSlug: "sentry",
+                  organization: {
+                    id: "1",
+                    slug: "sentry",
+                    name: "Sentry",
+                  },
+                },
+                {
+                  id: "790",
+                  slug: "junior",
+                  name: "Junior",
+                  orgSlug: "personal",
+                  organization: {
+                    id: "2",
+                    slug: "personal",
+                    name: "Personal",
+                  },
+                },
+              ]
+            : [],
+        orgs: [],
+      })
+    );
+
+    const result = await resolveAllTargets({ cwd: "/work/checkout" });
+
+    expect(
+      result.targets.map(({ org, project }) => ({ org, project }))
+    ).toEqual([
+      { org: "sentry", project: "junior" },
+      { org: "personal", project: "junior" },
+    ]);
+    expect(result.footer).toContain("2 projects matching git repository");
+    expect(mockFindProjectsByPattern).not.toHaveBeenCalled();
   });
 
   test("returns empty targets when a public-key DSN cannot be resolved", async () => {
@@ -1089,6 +1628,42 @@ describe("env var resolution: SENTRY_ORG + SENTRY_PROJECT", () => {
 
     expect(result.targets[0]?.org).toBe("env-org");
     expect(mockGetDefaultOrganization).not.toHaveBeenCalled();
+  });
+
+  test("resolveAllTargets: organization filter skips incompatible env target", async () => {
+    process.env.SENTRY_ORG = "other-org";
+    process.env.SENTRY_PROJECT = "other-project";
+    mockInferRepositoryRoot.mockReturnValue("/work/checkout");
+    mockInferRepositoryName.mockReturnValue({
+      name: "getsentry/junior",
+      remote: "origin",
+    });
+    mockFindProjectsBySlug.mockImplementation((slug: string) =>
+      Promise.resolve({
+        projects:
+          slug === "junior"
+            ? [
+                {
+                  id: "789",
+                  slug: "junior",
+                  name: "Junior",
+                  orgSlug: "acme",
+                },
+              ]
+            : [],
+        orgs: [],
+      })
+    );
+
+    const result = await resolveAllTargets({
+      cwd: "/work/checkout",
+      resolutionMode: "codebase",
+      organizationFilter: "acme",
+    });
+
+    expect(result.targets).toEqual([
+      expect.objectContaining({ org: "acme", project: "junior" }),
+    ]);
   });
 
   // --- resolveOrgsForListing ---

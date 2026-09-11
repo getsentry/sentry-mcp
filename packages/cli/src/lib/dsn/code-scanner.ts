@@ -45,6 +45,8 @@ const log = logger.withTag("dsn-scan");
  */
 export type CodeScanResult = {
   dsns: DetectedDsn[];
+  /** Every source occurrence, including the same DSN in different files. */
+  occurrences?: DetectedDsn[];
   /**
    * Map of source file paths (POSIX, relative to cwd) → mtime.
    * Only files containing at least one validated DSN. The cache
@@ -266,6 +268,7 @@ function scanDirectory(cwd: string): Promise<CodeScanResult> {
       const sourceMtimes: Record<string, number> = {};
       const dirMtimes: Record<string, number> = {};
       const seen = new Map<string, DetectedDsn>();
+      const occurrences: DetectedDsn[] = [];
       // Dedup set for mtime recording. `grepFiles` emits one match
       // per line, so a file with 3 DSN-containing lines would trigger
       // 3 redundant writes to `sourceMtimes` without this gate.
@@ -291,7 +294,12 @@ function scanDirectory(cwd: string): Promise<CodeScanResult> {
         });
 
         for (const match of matches) {
-          processMatch(match, { seen, sourceMtimes, filesSeenForMtime });
+          processMatch(match, {
+            seen,
+            occurrences,
+            sourceMtimes,
+            filesSeenForMtime,
+          });
         }
 
         span.setAttribute("dsn.files_collected", stats.filesRead);
@@ -300,7 +308,12 @@ function scanDirectory(cwd: string): Promise<CodeScanResult> {
           "dsn.dsns_found": seen.size,
         });
 
-        return { dsns: [...seen.values()], sourceMtimes, dirMtimes };
+        return {
+          dsns: [...seen.values()],
+          occurrences,
+          sourceMtimes,
+          dirMtimes,
+        };
       } catch (error) {
         if (error instanceof ConfigError) {
           throw error;
@@ -322,6 +335,7 @@ function scanDirectory(cwd: string): Promise<CodeScanResult> {
 
 type MatchProcessingContext = {
   seen: Map<string, DetectedDsn>;
+  occurrences: DetectedDsn[];
   sourceMtimes: Record<string, number>;
   filesSeenForMtime: Set<string>;
 };
@@ -355,6 +369,7 @@ function processMatch(
       continue;
     }
     fileHadValidDsn = true;
+    ctx.occurrences.push(detected);
     if (!ctx.seen.has(raw)) {
       ctx.seen.set(raw, detected);
     }

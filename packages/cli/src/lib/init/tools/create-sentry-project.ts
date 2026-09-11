@@ -2,22 +2,24 @@
  * Sentry project creation tool for the init wizard.
  *
  * Implements the `create-sentry-project` and `ensure-sentry-project` wizard
- * operations. Uses the team-scoped endpoint for explicit or Team Admin teams;
- * otherwise uses POST /organizations/{org}/projects/, the onboarding endpoint
- * that auto-creates a personal team for eligible members.
+ * operations. Resolves team capabilities only after the final project slug is
+ * known, using the same policy as `sentry project create`.
  */
 
 import { captureException } from "@sentry/node-core/light";
-import {
-  createProjectWithAutoTeam,
-  createProjectWithDsn,
-  MEMBER_PROJECT_CREATION_DISABLED_DETAIL,
-} from "../../api-client.js";
+import { MEMBER_PROJECT_CREATION_DISABLED_DETAIL } from "../../api-client.js";
 import { ApiError } from "../../errors.js";
-import { resolveOrCreateTeam } from "../../resolve-team.js";
+import {
+  createProjectWithTeamFallback,
+  ProjectCreationApiError,
+} from "../../project-creation.js";
+import {
+  type ResolvedConcreteTeam,
+  resolveOrCreateTeam,
+} from "../../resolve-team.js";
 import { captureOAuthScopeRecoveryGate } from "../../scope-recovery.js";
 import { slugify } from "../../utils.js";
-import { tryGetExistingProjectData } from "../existing-project.js";
+import { WizardCancelledError } from "../clack-utils.js";
 import { formatMemberProjectCreationDisabledError } from "../project-creation-errors.js";
 import type {
   CreateSentryProjectPayload,
@@ -25,7 +27,10 @@ import type {
   ToolResult,
 } from "../types.js";
 import { formatToolError } from "./shared.js";
-import type { InitToolDefinition, ToolContext } from "./types.js";
+import type {
+  InitToolDefinition,
+  ProjectCreationToolContext,
+} from "./types.js";
 
 type ProjectData = {
   projectSlug: string;
@@ -33,6 +38,27 @@ type ProjectData = {
   dsn: string;
   url: string;
 };
+
+function existingProjectResult(
+  context: Pick<ProjectCreationToolContext, "existingProject" | "setupIntent">
+): ToolResult | undefined {
+  if (!context.existingProject) {
+    return;
+  }
+  if (
+    !context.existingProject.dsn &&
+    context.setupIntent !== "improve-existing"
+  ) {
+    return {
+      ok: false,
+      error: `Could not obtain a DSN for existing project '${context.existingProject.orgSlug}/${context.existingProject.projectSlug}'. Check project-key access or choose a project whose keys you can read.`,
+    };
+  }
+  return {
+    ok: true,
+    data: { ...context.existingProject, ensuredVia: "existing" },
+  };
+}
 
 type ProjectCreationResponse = {
   project: {
@@ -52,163 +78,87 @@ function toProjectData(response: ProjectCreationResponse): ProjectData {
   };
 }
 
-/**
- * Resolve project creation using the frontend onboarding policy.
- *
- * @param opts.org - Organization slug
- * @param opts.name - Project display name
- * @param opts.platform - Platform identifier (null/undefined → omitted from request)
- * @param opts.team - Pre-resolved team slug (explicit or auto-selected by preflight).
- *   When undefined, use the org-scoped onboarding endpoint directly.
- * @param opts.suppressFallback - When true, a 403 from the team-scoped flow is
- *   surfaced directly rather than triggering the org-scoped fallback. Set only
- *   when the team was explicitly named via `--team` — a 403 there is meaningful
- *   user feedback, not a permission gap.
- * @returns Resolved project identifiers and DSN
- */
-async function resolveProjectCreation(opts: {
-  org: string;
-  name: string;
-  platform: string | null | undefined;
-  team: string | undefined;
-  suppressFallback: boolean;
-}): Promise<ProjectData> {
-  const { org, name, team, suppressFallback } = opts;
-  // Coerce null → undefined: CreateProjectBody.platform is string | undefined.
-  const platform = opts.platform ?? undefined;
-
-  const withPlatformFallback = async (
-    fn: (p: string | undefined) => Promise<ProjectData>
-  ): Promise<ProjectData> => {
-    try {
-      return await fn(platform);
-    } catch (err) {
-      // The registry may include SDK keys whose derived platform slug (e.g.
-      // "javascript-hono") is not yet in the Sentry API's allowed platform
-      // list. Retry without a platform so the project is still created, and
-      // capture to track which slugs need to be added to the API allowlist.
-      if (
-        err instanceof ApiError &&
-        err.status === 400 &&
-        platform &&
-        err.detail?.includes("Invalid platform")
-      ) {
-        captureException(err, {
-          extra: {
-            attemptedPlatform: platform,
-            projectName: name,
-            apiResponseDetail: err.detail,
-            apiStatus: err.status,
-          },
-        });
-        return await fn(undefined);
-      }
-      throw err;
-    }
-  };
-
-  if (!team) {
-    return await withPlatformFallback(async (p) => {
-      const result = await createProjectWithAutoTeam(org, {
-        name,
-        platform: p,
-      });
-      return toProjectData(result);
-    });
-  }
-
-  try {
-    return await withPlatformFallback(async (p) => {
-      const result = await createProjectWithDsn(org, team, {
-        name,
-        platform: p,
-      });
-      return toProjectData(result);
-    });
-  } catch (innerError) {
-    // Fall back to org-scoped endpoint on 403, unless the fallback is suppressed
-    // (explicit --team means the 403 is meaningful feedback, not a permission gap).
-    // Note: a 403 can originate from either the initial createProjectWithDsn call
-    // or from the platform-less retry inside withPlatformFallback — both mean the
-    // caller lacks team:write, so the org-scoped fallback is correct in either case.
-    if (
-      !(innerError instanceof ApiError && innerError.status === 403) ||
-      suppressFallback
-    ) {
-      throw innerError;
-    }
-    // Policy 403: org has disabled member project creation. The org-scoped
-    // endpoint enforces the same flag — re-throw immediately so the outer
-    // catch surfaces the friendly disabled-policy message without a wasted round-trip.
-    if (innerError.detail?.includes(MEMBER_PROJECT_CREATION_DISABLED_DETAIL)) {
-      throw innerError;
-    }
-    return await withPlatformFallback(async (p) => {
-      const result = await createProjectWithAutoTeam(org, {
-        name,
-        platform: p,
-      });
-      return toProjectData(result);
-    });
+/** Preserve user cancellation across the tool-result error boundary. */
+function rethrowWizardCancellation(error: unknown): void {
+  if (error instanceof WizardCancelledError) {
+    throw error;
   }
 }
 
 /**
- * Validate explicit team access for a dry-run, mirroring preflight.ts:resolveTeam.
- *
- * When `team` is undefined, preflight intentionally chose the org-scoped
- * onboarding endpoint, so there is no local team path to validate.
- *
- * @throws Non-403 errors from resolveOrCreateTeam (org not found, network, etc.)
+ * Retry a registry platform unknown to the projects API on the same concrete
+ * route that rejected it. This avoids restarting team-to-organization routing.
  */
-async function validateTeamForDryRun(
-  org: string,
-  team: string | undefined,
-  autoCreateSlug: string
-): Promise<void> {
-  if (!team) {
-    return;
-  }
+async function createProjectWithPlatformFallback(opts: {
+  org: string;
+  name: string;
+  platform: string | null | undefined;
+  team: ResolvedConcreteTeam | undefined;
+}): Promise<ProjectData> {
+  const { name, org, team } = opts;
+  const platform = opts.platform ?? undefined;
+  const create = async (
+    selectedPlatform: string | undefined,
+    selectedTeam: ResolvedConcreteTeam | undefined
+  ) =>
+    toProjectData(
+      await createProjectWithTeamFallback({
+        orgSlug: org,
+        name,
+        platform: selectedPlatform,
+        team: selectedTeam,
+      })
+    );
 
   try {
-    await resolveOrCreateTeam(org, {
-      team,
-      autoCreateSlug,
-      usageHint: "sentry init",
-      dryRun: true,
-      deferAutoCreateOnEmptyOrg: true,
-    });
-  } catch (teamErr) {
-    if (!(teamErr instanceof ApiError && teamErr.status === 403)) {
-      throw teamErr;
+    return await create(platform, team);
+  } catch (error) {
+    if (
+      !(error instanceof ProjectCreationApiError) ||
+      error.status !== 400 ||
+      !platform ||
+      !error.detail?.includes("Invalid platform")
+    ) {
+      throw error;
     }
+
+    captureException(error.cause, {
+      extra: {
+        attemptedPlatform: platform,
+        projectName: name,
+        apiResponseDetail: error.detail,
+        apiStatus: error.status,
+      },
+    });
+    return await create(undefined, error.route === "team" ? team : undefined);
   }
 }
 
 /**
  * Create a new Sentry project using the org that preflight already resolved.
- * When preflight does not resolve a Team Admin team, creation uses the same
- * org-scoped auto-team endpoint as Sentry onboarding.
+ * Team resolution happens here rather than in preflight so existing projects
+ * never trigger a team prompt or API call, and a new team's slug can be based
+ * on the final project name selected by the workflow.
  *
  * New Sentry orgs have member project creation disabled by default
  * (Organization.flags.disable_member_project_creation = true). When the org
  * restricts project creation for members, we surface a clear error with an
  * escape hatch: the user can pass `sentry init <org>/<project-slug>` once an
  * admin creates the project, which resolves to an existing project and skips
- * creation entirely (preflight.ts:261).
+ * creation entirely (`resolveInitProjectContext` in preflight).
  */
 export async function createSentryProject(
   payload: CreateSentryProjectPayload | EnsureSentryProjectPayload,
   context: Pick<
-    ToolContext,
+    ProjectCreationToolContext,
     | "dryRun"
     | "existingProject"
-    | "isExplicitTeam"
     | "org"
     | "team"
     | "project"
-    | "yes"
-  >
+    | "setupIntent"
+    | "chooseTeam"
+  > & { yes?: boolean }
 ): Promise<ToolResult> {
   const name = context.project ?? payload.params.name;
   const slug = slugify(name);
@@ -219,29 +169,22 @@ export async function createSentryProject(
     };
   }
 
-  if (context.existingProject) {
-    return {
-      ok: true,
-      message: `Using existing project "${context.existingProject.projectSlug}" in ${context.existingProject.orgSlug}`,
-      data: context.existingProject,
-    };
+  const existing = existingProjectResult(context);
+  if (existing) {
+    return existing;
   }
 
   const scopeRecovery = captureOAuthScopeRecoveryGate();
   try {
-    const existingProject = await tryGetExistingProjectData(context.org, slug);
-    if (existingProject) {
-      return {
-        ok: true,
-        message: `Using existing project "${existingProject.projectSlug}" in ${existingProject.orgSlug}`,
-        data: existingProject,
-      };
-    }
+    const team = await resolveOrCreateTeam(context.org, {
+      team: context.team?.slug,
+      autoCreateSlug: slug,
+      usageHint: "sentry init",
+      dryRun: context.dryRun,
+      chooseTeam: context.chooseTeam,
+    });
 
     if (context.dryRun) {
-      // Validate team access in dry-run — mirrors preflight.ts:resolveTeam.
-      // Not needed in real runs: resolveProjectCreation handles its own resolution.
-      await validateTeamForDryRun(context.org, context.team, slug);
       return {
         ok: true,
         data: {
@@ -254,15 +197,11 @@ export async function createSentryProject(
       };
     }
 
-    // Use the Team Admin path when preflight found one; otherwise use the
-    // org-scoped onboarding path, which auto-creates a personal team for
-    // eligible members.
-    const projectData = await resolveProjectCreation({
+    const projectData = await createProjectWithPlatformFallback({
       org: context.org,
       name,
       platform: payload.params.platform,
-      team: context.team,
-      suppressFallback: Boolean(context.isExplicitTeam),
+      team,
     });
 
     return {
@@ -273,9 +212,11 @@ export async function createSentryProject(
         projectId: projectData.projectId,
         dsn: projectData.dsn,
         url: projectData.url,
+        ensuredVia: "created",
       },
     };
   } catch (error) {
+    rethrowWizardCancellation(error);
     // Org-level policy: member project creation is disabled on this org.
     // Surface a clear message with the escape hatch.
     if (
@@ -290,7 +231,7 @@ export async function createSentryProject(
     }
     if (
       await scopeRecovery.shouldDelegate(error, {
-        unattended: context.yes || context.dryRun,
+        unattended: context.yes === true || context.dryRun,
       })
     ) {
       throw error;

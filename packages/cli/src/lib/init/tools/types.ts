@@ -1,3 +1,4 @@
+import type { ChooseProjectTeam } from "../../resolve-team.js";
 import type {
   ResolvedInitContext,
   ToolOperation,
@@ -5,10 +6,25 @@ import type {
   ToolResult,
 } from "../types.js";
 
-/**
- * Client-side context available to init tools while the workflow is suspended.
- */
+/** Client-side context shared by every init tool. */
 export type ToolContext = ResolvedInitContext;
+
+/** Narrow interactive capabilities supplied by the local wizard runner. */
+export type ToolCapabilities = {
+  chooseTeam?: ChooseProjectTeam;
+};
+
+export type ProjectCreationToolOperation =
+  | "create-sentry-project"
+  | "ensure-sentry-project";
+
+/** Extra local capabilities visible only to project-creation tools. */
+export type ProjectCreationToolContext = ToolContext & ToolCapabilities;
+
+type ToolContextFor<TOperation extends ToolOperation> =
+  TOperation extends ProjectCreationToolOperation
+    ? ProjectCreationToolContext
+    : ToolContext;
 
 /**
  * A single init tool implementation plus its user-facing spinner copy.
@@ -23,7 +39,7 @@ export type InitToolDefinition<TOperation extends ToolOperation> = {
   /** Execute the tool and return a resumable payload result. */
   execute: (
     payload: Extract<ToolPayload, { operation: TOperation }>,
-    context: ToolContext
+    context: ToolContextFor<TOperation>
   ) => Promise<ToolResult>;
 };
 

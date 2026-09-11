@@ -38,6 +38,8 @@ import * as preflight from "../../../src/lib/init/preflight.js";
 import * as readiness from "../../../src/lib/init/readiness.js";
 // biome-ignore lint/performance/noNamespaceImport: spyOn requires object reference
 import * as registry from "../../../src/lib/init/tools/registry.js";
+// biome-ignore lint/performance/noNamespaceImport: spyOn requires object reference
+import * as toolShared from "../../../src/lib/init/tools/shared.js";
 import type {
   ResolvedInitContext,
   SuspendPayload,
@@ -95,7 +97,7 @@ function makeContext(
     yes: true,
     dryRun: false,
     org: "acme",
-    team: "platform",
+    team: { slug: "platform", source: "explicit" },
     authToken: "test-token",
     ...overrides,
   };
@@ -104,6 +106,7 @@ function makeContext(
 let mockStartResult: WorkflowRunResult;
 let mockResumeResults: WorkflowRunResult[];
 let resumeCallCount = 0;
+let resumeCallArgs: Record<string, unknown>[];
 let sharedResumeAsyncMock: ReturnType<typeof mock>;
 let startAsyncMock: ReturnType<typeof mock>;
 let mockRunByIdResult: WorkflowRunResult | Error;
@@ -116,11 +119,14 @@ let formatErrorSpy: ReturnType<typeof spyOn>;
 let checkGitStatusSpy: ReturnType<typeof spyOn>;
 let handleInteractiveSpy: ReturnType<typeof spyOn>;
 let resolveInitContextSpy: ReturnType<typeof spyOn>;
+let resolveInitProjectContextSpy: ReturnType<typeof spyOn>;
 let describeToolSpy: ReturnType<typeof spyOn>;
 let executeToolSpy: ReturnType<typeof spyOn>;
+let validateToolSandboxSpy: ReturnType<typeof spyOn>;
 let precomputeDirListingSpy: ReturnType<typeof spyOn>;
+let precomputeSentrySetupTargetsSpy: ReturnType<typeof spyOn>;
+let precomputeWorkspaceInventorySpy: ReturnType<typeof spyOn>;
 let preReadCommonFilesSpy: ReturnType<typeof spyOn>;
-let precomputeSentryDetectionSpy: ReturnType<typeof spyOn>;
 let getWorkflowSpy: ReturnType<typeof spyOn>;
 let stderrSpy: ReturnType<typeof spyOn>;
 /**
@@ -223,6 +229,7 @@ beforeEach(() => {
     result: { exitCode: 0, platform: "React" },
   };
   mockResumeResults = [];
+  resumeCallArgs = [];
   resumeCallCount = 0;
   mockRunByIdResult = new Error("runById not configured");
   testRequestSequence = 0;
@@ -249,7 +256,9 @@ beforeEach(() => {
   };
   getUISpy = vi.spyOn(uiFactory, "getUIAsync").mockResolvedValue(wrapped);
 
-  vi.spyOn(readiness, "checkReadiness").mockResolvedValue(undefined);
+  vi.spyOn(readiness, "checkReadiness").mockResolvedValue({
+    improveExistingSetup: true,
+  });
   formatBannerSpy = vi.spyOn(banner, "formatBanner").mockReturnValue("BANNER");
   formatResultSpy = vi.spyOn(fmt, "formatResult").mockImplementation(noop);
   formatErrorSpy = vi.spyOn(fmt, "formatError").mockImplementation(noop);
@@ -262,6 +271,12 @@ beforeEach(() => {
   resolveInitContextSpy = vi
     .spyOn(preflight, "resolveInitContext")
     .mockResolvedValue(makeContext());
+  resolveInitProjectContextSpy = vi
+    .spyOn(preflight, "resolveInitProjectContext")
+    .mockImplementation(async (context) => ({
+      project: context.project,
+      existingProject: context.existingProject,
+    }));
   describeToolSpy = vi
     .spyOn(registry, "describeTool")
     .mockReturnValue("Running tool...");
@@ -269,18 +284,21 @@ beforeEach(() => {
     ok: true,
     data: { results: [] },
   });
+  validateToolSandboxSpy = vi
+    .spyOn(toolShared, "validateToolSandbox")
+    .mockImplementation((payload) => ({ cwd: payload.cwd }));
   precomputeDirListingSpy = vi
     .spyOn(workflowInputs, "precomputeDirListing")
     .mockResolvedValue([]);
+  precomputeSentrySetupTargetsSpy = vi
+    .spyOn(workflowInputs, "precomputeSentrySetupTargets")
+    .mockResolvedValue([]);
+  precomputeWorkspaceInventorySpy = vi
+    .spyOn(workflowInputs, "precomputeWorkspaceTargetInventory")
+    .mockResolvedValue({ complete: false, targets: [] });
   preReadCommonFilesSpy = vi
     .spyOn(workflowInputs, "preReadCommonFiles")
     .mockResolvedValue({});
-  precomputeSentryDetectionSpy = vi
-    .spyOn(workflowInputs, "precomputeSentryDetection")
-    .mockResolvedValue({
-      ok: true,
-      data: { status: "none", signals: [] },
-    });
   stderrSpy = vi
     .spyOn(process.stderr, "write")
     .mockImplementation(() => true as any);
@@ -293,7 +311,8 @@ beforeEach(() => {
       ? Promise.reject(mockRunByIdResult)
       : Promise.resolve(withV1SuspendEnvelopes(mockRunByIdResult))
   );
-  sharedResumeAsyncMock = vi.fn(() => {
+  sharedResumeAsyncMock = vi.fn((args: Record<string, unknown>) => {
+    resumeCallArgs.push(args);
     const result = mockResumeResults[resumeCallCount] ?? {
       status: "success",
       result: { exitCode: 0 },
@@ -337,11 +356,14 @@ afterEach(() => {
   checkGitStatusSpy.mockRestore();
   handleInteractiveSpy.mockRestore();
   resolveInitContextSpy.mockRestore();
+  resolveInitProjectContextSpy.mockRestore();
   describeToolSpy.mockRestore();
   executeToolSpy.mockRestore();
+  validateToolSandboxSpy.mockRestore();
   precomputeDirListingSpy.mockRestore();
+  precomputeSentrySetupTargetsSpy.mockRestore();
+  precomputeWorkspaceInventorySpy.mockRestore();
   preReadCommonFilesSpy.mockRestore();
-  precomputeSentryDetectionSpy.mockRestore();
   getWorkflowSpy.mockRestore();
   stderrSpy.mockRestore();
 
@@ -681,6 +703,325 @@ describe("runWizard", () => {
     expect(spinnerMock.message).toHaveBeenCalledWith("Running tool...");
   });
 
+  test("resolves the project from the selected app detection before platform analysis", async () => {
+    const detectionPayload: ToolPayload = {
+      type: "tool",
+      operation: "detect-sentry",
+      cwd: "/tmp/test/apps/junior",
+      params: {},
+    };
+    const creationPayload: ToolPayload = {
+      type: "tool",
+      operation: "create-sentry-project",
+      cwd: "/tmp/test/apps/junior",
+      params: { name: "junior", platform: "javascript-nextjs" },
+    };
+    const existingProject = {
+      orgSlug: "acme",
+      projectSlug: "junior",
+      projectId: "42",
+      dsn: "https://key@o1.ingest.sentry.io/42",
+      url: "https://sentry.io/settings/acme/projects/junior/",
+      platform: "javascript-nextjs",
+    };
+    resolveInitProjectContextSpy.mockResolvedValue({
+      project: "junior",
+      existingProject,
+      setupIntent: "improve-existing",
+    });
+    executeToolSpy.mockImplementation(async (payload, executionContext) => {
+      if (payload.operation === "detect-sentry") {
+        return {
+          ok: true,
+          data: {
+            status: "installed",
+            signals: ["init: instrumentation.ts"],
+          },
+        };
+      }
+      expect(executionContext.existingProject).toBe(existingProject);
+      return { ok: true, data: {} };
+    });
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["check-existing-sentry"]],
+      steps: {
+        "check-existing-sentry": { suspendPayload: detectionPayload },
+      },
+    };
+    mockResumeResults = [
+      {
+        status: "suspended",
+        suspended: [["ensure-sentry-project"]],
+        steps: {
+          "ensure-sentry-project": { suspendPayload: creationPayload },
+        },
+      },
+      { status: "success", result: { exitCode: 0 } },
+    ];
+
+    await runWizard(makeOptions());
+
+    expect(resolveInitProjectContextSpy).toHaveBeenCalledTimes(1);
+    expect(resolveInitProjectContextSpy).toHaveBeenCalledWith(
+      makeContext(),
+      "/tmp/test/apps/junior",
+      expect.anything(),
+      {
+        setup: {
+          status: "installed",
+          signals: ["init: instrumentation.ts"],
+        },
+        suggestedProjectName: "junior",
+        supportsExistingSetupImprovement: true,
+      }
+    );
+    expect(resumeCallArgs[0]?.resumeData).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          setupIntent: "improve-existing",
+        }),
+      })
+    );
+    expect(executeToolSpy).toHaveBeenCalledTimes(2);
+    expect(spinnerMock.stop).not.toHaveBeenCalledWith("Sentry setup analyzed");
+  });
+
+  test("passes an older service's missing improvement capability to project resolution", async () => {
+    vi.mocked(readiness.checkReadiness).mockResolvedValueOnce({
+      improveExistingSetup: false,
+    });
+    const detectionPayload: ToolPayload = {
+      type: "tool",
+      operation: "detect-sentry",
+      cwd: "/tmp/test",
+      params: {},
+    };
+    executeToolSpy.mockResolvedValue({
+      ok: true,
+      data: {
+        status: "installed",
+        signals: ["init: instrumentation.ts"],
+      },
+    });
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["check-existing-sentry"]],
+      steps: {
+        "check-existing-sentry": { suspendPayload: detectionPayload },
+      },
+    };
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
+
+    await runWizard(makeOptions());
+
+    expect(resolveInitProjectContextSpy).toHaveBeenCalledWith(
+      makeContext(),
+      "/tmp/test",
+      expect.anything(),
+      expect.objectContaining({ supportsExistingSetupImprovement: false })
+    );
+  });
+
+  test("keeps the workflow layout visible between app selection and the setup decision", async () => {
+    const { ui, calls, respond } = createMockUI();
+    respond.select("continue");
+    useMockUI(ui, calls);
+    resolveInitContextSpy.mockResolvedValue(
+      makeContext({ yes: false, dryRun: false })
+    );
+    handleInteractiveSpy.mockResolvedValue({ selectedApp: "junior" });
+
+    const detectionPayload: ToolPayload = {
+      type: "tool",
+      operation: "detect-sentry",
+      cwd: "/tmp/test/packages/junior",
+      params: {},
+    };
+    executeToolSpy.mockResolvedValue({
+      ok: true,
+      data: {
+        status: "installed",
+        signals: ["init: src/instrumentation.ts"],
+      },
+    });
+    resolveInitProjectContextSpy.mockImplementation(async () => {
+      const latestLayoutChange = calls.findLast(
+        (call) => call.kind === "setIntroMode"
+      );
+      expect(latestLayoutChange).toEqual({
+        kind: "setIntroMode",
+        enabled: false,
+      });
+      return {
+        project: "junior",
+        existingProject: {
+          orgSlug: "sentry",
+          projectSlug: "junior",
+          projectId: "42",
+          dsn: "https://key@o1.ingest.sentry.io/42",
+          url: "https://sentry.io/settings/sentry/projects/junior/",
+        },
+      };
+    });
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["select-target-app"]],
+      steps: {
+        "select-target-app": {
+          suspendPayload: {
+            type: "interactive",
+            kind: "select",
+            prompt: "Select the target application or package:",
+            options: ["junior", "docs", "example"],
+          },
+        },
+      },
+    };
+    mockResumeResults = [
+      {
+        status: "suspended",
+        suspended: [["check-existing-sentry"]],
+        steps: {
+          "check-existing-sentry": { suspendPayload: detectionPayload },
+        },
+      },
+      { status: "success", result: { exitCode: 0 } },
+    ];
+
+    await forceStdinTty(() =>
+      runWizard(makeOptions({ yes: false, dryRun: false }))
+    );
+
+    const layoutChanges = calls.filter((call) => call.kind === "setIntroMode");
+    expect(layoutChanges).toEqual([
+      { kind: "setIntroMode", enabled: true },
+      { kind: "setIntroMode", enabled: false },
+    ]);
+    const detectionStepIndex = calls.findIndex(
+      (call) =>
+        call.kind === "setStep" && call.stepId === "check-existing-sentry"
+    );
+    expect(detectionStepIndex).toBeGreaterThanOrEqual(0);
+    expect(handleInteractiveSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "select" }),
+      expect.anything(),
+      expect.anything(),
+      { holdPresentationOnSelect: true }
+    );
+    expect(spinnerMock.stop).not.toHaveBeenCalledWith(
+      "Selecting target application"
+    );
+    expect(spinnerMock.stop).not.toHaveBeenCalledWith("Sentry setup analyzed");
+  });
+
+  test("does not inspect project context when app-scoped detection is sandbox-blocked", async () => {
+    const payload: ToolPayload = {
+      type: "tool",
+      operation: "detect-sentry",
+      cwd: "/outside/project",
+      params: {},
+    };
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["check-existing-sentry"]],
+      steps: {
+        "check-existing-sentry": { suspendPayload: payload },
+      },
+    };
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
+    validateToolSandboxSpy.mockReturnValueOnce({
+      ok: false,
+      error: "Blocked by sandbox",
+    });
+
+    await runWizard(makeOptions());
+
+    expect(executeToolSpy).not.toHaveBeenCalled();
+    expect(resolveInitProjectContextSpy).not.toHaveBeenCalled();
+  });
+
+  test("does not resolve a project for an out-of-sandbox creation fallback", async () => {
+    const payload: ToolPayload = {
+      type: "tool",
+      operation: "create-sentry-project",
+      cwd: "/outside/project",
+      params: { name: "outside", platform: "javascript-node" },
+    };
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["ensure-sentry-project"]],
+      steps: {
+        "ensure-sentry-project": { suspendPayload: payload },
+      },
+    };
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
+    validateToolSandboxSpy.mockReturnValueOnce({
+      ok: false,
+      error: "Blocked by sandbox",
+    });
+
+    await runWizard(makeOptions());
+
+    expect(executeToolSpy).not.toHaveBeenCalled();
+    expect(resolveInitProjectContextSpy).not.toHaveBeenCalled();
+  });
+
+  test("gives interactive project creation a narrow team-choice capability", async () => {
+    const { ui, calls, respond } = createMockUI();
+    respond.select("continue");
+    respond.select("existing");
+    useMockUI(ui, calls);
+    const payload: ToolPayload = {
+      type: "tool",
+      operation: "create-sentry-project",
+      cwd: "/tmp/test",
+      params: { name: "my-app", platform: "javascript-react" },
+    };
+    const context = makeContext({ yes: false, team: undefined });
+    resolveInitContextSpy.mockResolvedValue(context);
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["ensure-sentry-project"]],
+      steps: {
+        "ensure-sentry-project": { suspendPayload: payload },
+      },
+    };
+    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
+    executeToolSpy.mockImplementation(
+      async (_payload, _context, capabilities) => {
+        const choice = await capabilities?.chooseTeam?.([
+          {
+            id: "1",
+            slug: "platform",
+            name: "Platform",
+            access: ["team:admin"],
+          },
+        ]);
+        expect(choice).toEqual({ kind: "existing", slug: "platform" });
+        return { ok: true, data: { results: [] } };
+      }
+    );
+
+    await forceStdinTty(() => runWizard(makeOptions({ yes: false })));
+
+    expect(executeToolSpy).toHaveBeenCalledWith(payload, context, {
+      chooseTeam: expect.any(Function),
+    });
+    expect(calls).toContainEqual({
+      kind: "select",
+      message: "Choose a team for the new project",
+      options: ["create", "existing"],
+    });
+    expect(spinnerMock.stop).toHaveBeenCalledWith("Found available teams");
+    expect(spinnerMock.stop).not.toHaveBeenCalledWith(
+      "Project context analyzed"
+    );
+    expect(spinnerMock.start).toHaveBeenCalledWith(
+      "Creating Sentry project..."
+    );
+  });
+
   test("keeps v1 transport metadata out of local tool payloads", async () => {
     const requestId = "8c7ee6b9-e955-4514-9164-f01844584a28";
     const toolPayload: ToolPayload = {
@@ -745,7 +1086,8 @@ describe("runWizard", () => {
         prompt: "Continue?",
       },
       makeContext(),
-      expect.anything()
+      expect.anything(),
+      {}
     );
     expect(sharedResumeAsyncMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -895,7 +1237,7 @@ describe("runWizard", () => {
     expect(lastFeedbackOutcome()).toBe("failed");
   });
 
-  test("preserves 403 errors thrown for command-level scope inspection", async () => {
+  test("preserves a missing-scope 403 for global OAuth recovery", async () => {
     const payload: ToolPayload = {
       type: "tool",
       operation: "create-sentry-project",
@@ -909,16 +1251,22 @@ describe("runWizard", () => {
         "ensure-sentry-project": { suspendPayload: payload },
       },
     };
-    const scopeError = new ApiError("Forbidden", 403);
+    const scopeError = new ApiError(
+      "Cannot create project",
+      403,
+      "This operation requires the 'team:admin' authorization scope."
+    );
     executeToolSpy.mockRejectedValue(scopeError);
 
-    await expect(runWizard(makeOptions())).rejects.toBe(scopeError);
+    const error = await runWizard(makeOptions()).catch((cause) => cause);
 
+    expect(error).toBe(scopeError);
+    expect(error).not.toBeInstanceOf(WizardError);
     expect(spinnerMock.stop).toHaveBeenCalledWith(
-      "Sentry API request denied",
+      "Authorization update required",
       1
     );
-    expect(lastCancelMessage()).toBe("Sentry API request denied");
+    expect(lastCancelMessage()).toBe("Authorization update required");
   });
 
   test("tears down forwarding and stops the spinner on cancellation", async () => {
@@ -980,6 +1328,34 @@ describe("runWizard", () => {
     expect(lastFeedbackOutcome()).toBe("failed");
   });
 
+  test("shows the reason for a WizardError that has not been rendered", async () => {
+    const payload: ToolPayload = {
+      type: "tool",
+      operation: "run-commands",
+      cwd: "/tmp/test",
+      params: { commands: ["npm install @sentry/node"] },
+    };
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["apply-codemods"]],
+      steps: {
+        "apply-codemods": { suspendPayload: payload },
+      },
+    };
+    executeToolSpy.mockRejectedValue(
+      new WizardError("The setup service cannot improve this setup.", {
+        rendered: false,
+      })
+    );
+
+    await expect(runWizard(makeOptions())).rejects.toThrow(WizardError);
+
+    expect(lastCancelMessage()).toBe(
+      "The setup service cannot improve this setup."
+    );
+    expect(lastFeedbackOutcome()).toBe("failed");
+  });
+
   test("shows count-based messages while reading and analyzing files", async () => {
     mockStartResult = {
       status: "suspended",
@@ -1009,19 +1385,33 @@ describe("runWizard", () => {
     expect(messages).toContain("Analyzing 2 files...");
   });
 
-  test("passes precomputed dirListing/fileCache/existingSentry via initialState, not inputData", async () => {
+  test("passes precomputed dirListing/fileCache via initialState and defers Sentry detection", async () => {
     const dirListing = [
       { name: "package.json", path: "package.json", type: "file" as const },
     ];
     const fileCache = { "package.json": '{"name":"app"}' };
-    const detectedSentry = { status: "none" as const, signals: [] };
-
+    const sentrySetupTargets = [
+      {
+        autoSelect: true,
+        name: "junior",
+        path: "/tmp/test/packages/junior",
+      },
+    ];
+    const workspaceTargets = [
+      {
+        label: "Junior",
+        name: "junior",
+        path: "/tmp/test/packages/junior",
+        role: "runtime" as const,
+      },
+    ];
     precomputeDirListingSpy.mockResolvedValue(dirListing);
-    preReadCommonFilesSpy.mockResolvedValue(fileCache);
-    precomputeSentryDetectionSpy.mockResolvedValue({
-      ok: true,
-      data: detectedSentry,
+    precomputeSentrySetupTargetsSpy.mockResolvedValue(sentrySetupTargets);
+    precomputeWorkspaceInventorySpy.mockResolvedValue({
+      complete: true,
+      targets: workspaceTargets,
     });
+    preReadCommonFilesSpy.mockResolvedValue(fileCache);
 
     await runWizard(makeOptions());
 
@@ -1047,7 +1437,10 @@ describe("runWizard", () => {
     });
     expect(args.initialState?.dirListing).toEqual(dirListing);
     expect(args.initialState?.fileCache).toEqual(fileCache);
-    expect(args.initialState?.existingSentry).toEqual(detectedSentry);
+    expect(args.initialState?.sentrySetupTargets).toEqual(sentrySetupTargets);
+    expect(args.initialState?.workspaceTargets).toEqual(workspaceTargets);
+    expect(args.initialState?.workspaceTargetsComplete).toBe(true);
+    expect(args.initialState).not.toHaveProperty("existingSentry");
   });
 
   test("renders tool result messages as a transient spinner message, not a persisted line", async () => {
@@ -1698,6 +2091,58 @@ describe("runWizard — resumeWithRetry stale-step recovery", () => {
     expect(runByIdMock).toHaveBeenCalledTimes(1);
   });
 
+  test("continues from suspendedPaths when a timed-out resume already advanced", async () => {
+    vi.useFakeTimers();
+    const nextPayload: ToolPayload = {
+      type: "tool",
+      operation: "run-commands",
+      cwd: "/tmp/test",
+      params: { commands: ["echo next-step"] },
+    };
+    mockStartResult = {
+      status: "suspended",
+      suspended: [["detect-platform"]],
+      steps: { "detect-platform": { suspendPayload: toolPayload } },
+    };
+    mockRunByIdResult = {
+      status: "suspended",
+      activeStepsPath: {},
+      suspendedPaths: { "ensure-sentry-project": [5] },
+      steps: {
+        "detect-platform": { status: "success" },
+        "ensure-sentry-project": {
+          status: "suspended",
+          suspendPayload: nextPayload,
+        },
+      },
+    };
+
+    let resumeCount = 0;
+    makeStaleStepRun(() => {
+      resumeCount += 1;
+      if (resumeCount === 1) {
+        return new Promise<WorkflowRunResult>(() => {
+          /* The server advances, but the original response never arrives. */
+        });
+      }
+      return Promise.resolve({ status: "success", result: { exitCode: 0 } });
+    });
+
+    const run = runWizard(makeOptions());
+    await vi.advanceTimersByTimeAsync(210_000);
+    await run;
+
+    expect(runByIdMock).toHaveBeenCalledWith(
+      "test-run-id",
+      expect.objectContaining({
+        fields: expect.arrayContaining(["suspendedPaths"]),
+      })
+    );
+    expect(executeToolSpy).toHaveBeenCalledWith(nextPayload, makeContext());
+    expect(resumeCount).toBe(2);
+    expect(formatResultSpy).toHaveBeenCalled();
+  });
+
   test("throws when stale-step error occurs and runById keeps failing", async () => {
     vi.useFakeTimers();
     mockStartResult = {
@@ -2136,7 +2581,7 @@ describe("runWizard — additional coverage", () => {
     });
   });
 
-  test("uses existing platform name in detect-platform spinner label", async () => {
+  test("does not present stale project metadata as the detected platform", async () => {
     resolveInitContextSpy.mockResolvedValue(
       makeContext({ existingProject: { platform: "javascript-nextjs" } })
     );
@@ -2161,7 +2606,8 @@ describe("runWizard — additional coverage", () => {
     const messages = spinnerMock.message.mock.calls.map(
       (c: unknown[]) => c[0] as string
     );
-    expect(messages.some((m) => m.includes("javascript-nextjs"))).toBe(true);
+    expect(messages).toContain("Analyzing project and Sentry support...");
+    expect(messages.some((m) => m.includes("javascript-nextjs"))).toBe(false);
   });
 });
 

@@ -1,18 +1,20 @@
-import type { SentryTeam } from "../../types/index.js";
-import {
-  getOrganization,
-  listOrganizations,
-  listTeams,
-} from "../api-client.js";
+import type { SentryProject } from "../../types/index.js";
+import { listOrganizations, listProjects } from "../api-client.js";
 import { getAuthToken } from "../db/auth.js";
+import { parseDsn } from "../dsn/index.js";
 import { ApiError, AuthError, HostScopeError, WizardError } from "../errors.js";
-import { buildOrgNotFoundError, resolveOrCreateTeam } from "../resolve-team.js";
+import { logger } from "../logger.js";
+import { resolveAllTargets } from "../resolve-target.js";
 import { captureOAuthScopeRecoveryGate } from "../scope-recovery.js";
+import { getSentryBaseUrl, isSentrySaasUrl } from "../sentry-urls.js";
 import { slugify } from "../utils.js";
 import { WizardCancelledError } from "./clack-utils.js";
 import { tryGetExistingProjectData } from "./existing-project.js";
 import { resolveOrgPrefetched } from "./org-prefetch.js";
-import { formatMemberProjectCreationDisabledError } from "./project-creation-errors.js";
+import {
+  detectSentrySetup,
+  type ExistingSentryDetection,
+} from "./tools/detect-sentry.js";
 import type {
   ExistingProjectData,
   ResolvedInitContext,
@@ -21,51 +23,60 @@ import type {
 import { isCancelled, type WizardUI } from "./ui/types.js";
 
 const NUMERIC_ORG_ID_RE = /^\d+$/;
+const log = logger.withTag("init-preflight");
 
-type ExistingProjectChoice = {
-  project?: string;
-  existingProject?: ExistingProjectData;
-  shouldAbort?: boolean;
-};
-
-type InitContextSeed = {
-  org?: string;
-  project?: string;
-  existingProject?: ExistingProjectData;
+type CanonicalProjectCandidate = {
+  org: string;
+  project: string;
+  detectedDsn?: string;
 };
 
 type ProjectSelection = Pick<
   ResolvedInitContext,
-  "project" | "existingProject"
->;
+  "project" | "existingProject" | "setupIntent"
+> & {
+  /** Canonical slug discovered while resolving a numeric DSN target. */
+  org?: string;
+};
+
+function markExistingSetupForImprovement(
+  selection: ProjectSelection,
+  setup: ExistingSentryDetection
+): ProjectSelection {
+  return setup.status === "none"
+    ? selection
+    : { ...selection, setupIntent: "improve-existing" };
+}
 
 /**
- * Resolve org, project, team, and auth state before the init workflow starts.
+ * Resolve organization and authentication before the remote workflow starts.
+ * Project resolution is deliberately deferred until the workflow has selected
+ * the concrete app in a monorepo.
  */
 export async function resolveInitContext(
   initial: WizardOptions,
   ui: WizardUI
 ): Promise<ResolvedInitContext | null> {
   return await withPreflightHandling(ui, async () => {
-    const seed = await resolveInitContextSeed(initial, ui);
-    if (!seed) {
-      return null;
-    }
+    const codebaseCandidates = initial.org
+      ? []
+      : await resolveCanonicalProjects(initial.directory);
+    const candidateOrgs = [
+      ...new Set(codebaseCandidates.map((candidate) => candidate.org)),
+    ];
+    const inferredOrg =
+      candidateOrgs.length === 1 ? candidateOrgs[0] : undefined;
+    const preferredOrg =
+      initial.org ??
+      inferredOrg ??
+      (await resolvePreferredOrg(initial.directory));
+    const org = await ensureOrg(preferredOrg, initial, ui);
 
-    const org = await ensureOrg(seed.org, initial, ui);
-    const projectSelection = await resolveProjectSelection(
-      org,
-      initial,
-      seed,
-      ui
-    );
-    if (!projectSelection) {
-      return null;
-    }
+    const team = initial.team
+      ? ({ slug: initial.team, source: "explicit" } as const)
+      : undefined;
 
-    const team = await resolveTeam(org, initial, ui);
-
-    return buildResolvedInitContext(initial, org, team, projectSelection);
+    return buildResolvedInitContext(initial, org, team);
   });
 }
 
@@ -103,8 +114,7 @@ async function withPreflightHandling(
 function buildResolvedInitContext(
   initial: WizardOptions,
   org: string,
-  team: string | undefined,
-  selection: ProjectSelection
+  team: ResolvedInitContext["team"]
 ): ResolvedInitContext {
   return {
     directory: initial.directory,
@@ -113,28 +123,18 @@ function buildResolvedInitContext(
     features: initial.features,
     org,
     team,
-    isExplicitTeam: Boolean(initial.team),
-    project: selection.project,
+    project: initial.project,
     app: initial.app,
     authToken: getAuthToken(),
-    existingProject: selection.existingProject,
   };
 }
 
-async function resolveInitContextSeed(
-  initial: WizardOptions,
-  ui: WizardUI
-): Promise<InitContextSeed | null> {
-  const detected = await resolveDetectedProject(initial, ui);
-  if (detected?.shouldAbort) {
-    return null;
-  }
-
-  return {
-    org: detected?.org ?? initial.org,
-    project: detected?.project ?? initial.project,
-    existingProject: detected?.existingProject,
-  };
+/** Resolve organization-only context before project inference. */
+async function resolvePreferredOrg(cwd: string): Promise<string | undefined> {
+  const resolved = await resolveOrgPrefetched(cwd);
+  return resolved && !NUMERIC_ORG_ID_RE.test(resolved.org)
+    ? resolved.org
+    : undefined;
 }
 
 async function ensureOrg(
@@ -154,342 +154,454 @@ async function ensureOrg(
   throw new WizardError(orgResult.error ?? "Failed to resolve organization.");
 }
 
-async function resolveProjectSelection(
-  org: string,
-  initial: WizardOptions,
-  seed: InitContextSeed,
-  ui: WizardUI
-): Promise<ProjectSelection | null> {
-  if (!seed.project) {
-    return {
-      project: seed.project,
-      existingProject: seed.existingProject,
-    };
+/**
+ * Resolve the Sentry project only after the workflow has selected its concrete
+ * project directory. This lets monorepos use app-local DSNs, package files,
+ * repository signals, and cwd inference instead of the workspace root.
+ */
+export async function resolveInitProjectContext(
+  context: ResolvedInitContext,
+  cwd: string,
+  ui: WizardUI,
+  options: {
+    setup?: ExistingSentryDetection;
+    suggestedProjectName?: string;
+    supportsExistingSetupImprovement?: boolean;
+  } = {}
+): Promise<ProjectSelection> {
+  const setup = options.setup ?? (await detectSentrySetup(cwd));
+
+  if (context.project) {
+    return await resolveExplicitProjectSelection(context, cwd, setup, options);
   }
 
-  const resolved = await resolveExistingProjectChoice({
-    org,
-    project: seed.project,
-    existingProject: seed.existingProject,
-    yes: initial.yes,
-    promptOnExisting: Boolean(initial.project && !initial.org),
+  const canonicalSelection = await resolveCanonicalProjectSelection({
+    context,
+    cwd,
+    options,
+    setup,
     ui,
   });
-  if (resolved.shouldAbort) {
-    return null;
+  if (canonicalSelection) {
+    return canonicalSelection;
   }
 
-  return mergeProjectSelection(seed, resolved);
+  return await resolveImplicitProjectSelection(context.org, context.yes, ui);
 }
 
-function mergeProjectSelection(
-  seed: InitContextSeed,
-  resolved: ExistingProjectChoice
-): ProjectSelection {
-  const project = "project" in resolved ? resolved.project : seed.project;
-  const clearedProject =
-    "project" in resolved && resolved.project === undefined;
-
-  return {
-    project,
-    existingProject: clearedProject
-      ? undefined
-      : (resolved.existingProject ?? seed.existingProject),
-  };
-}
-
-async function resolveDetectedProject(
-  initial: WizardOptions,
-  ui: WizardUI
-): Promise<{
-  org?: string;
-  project?: string;
-  existingProject?: ExistingProjectData;
-  shouldAbort?: boolean;
-} | null> {
-  if (initial.org || initial.project) {
-    return null;
-  }
-
-  let detectedProject: { orgSlug: string; projectSlug: string } | null = null;
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
-  try {
-    detectedProject = await detectExistingProject(initial.directory);
-  } catch {
-    return null;
-  }
-  if (!detectedProject) {
-    return null;
-  }
-
-  const existingProject = await tryGetExistingProjectData(
-    detectedProject.orgSlug,
-    detectedProject.projectSlug
-  ).catch(() => null);
-
-  if (initial.yes) {
-    return {
-      org: detectedProject.orgSlug,
-      project: detectedProject.projectSlug,
-      ...(existingProject ? { existingProject } : {}),
-    };
-  }
-
-  const choice = await ui.select<"existing" | "create">({
-    message: "Found an existing Sentry project in this codebase.",
-    options: [
-      {
-        value: "existing",
-        label: `Use existing project (${detectedProject.orgSlug}/${detectedProject.projectSlug})`,
-        hint: "Sentry is already configured here",
-      },
-      {
-        value: "create",
-        label: "Create a new Sentry project",
-      },
-    ],
+async function resolveExplicitProjectSelection(
+  context: ResolvedInitContext,
+  cwd: string,
+  setup: ExistingSentryDetection,
+  options: { supportsExistingSetupImprovement?: boolean }
+): Promise<ProjectSelection> {
+  const explicit = await resolveExistingProjectChoice({
+    org: context.org,
+    project: context.project ?? "",
+    detectedDsn: setup.dsn,
   });
-  if (isCancelled(choice)) {
-    throw new WizardCancelledError();
+  if (!explicit.existingProject || setup.status === "none") {
+    return explicit;
   }
-  if (choice === "existing") {
-    return {
-      org: detectedProject.orgSlug,
-      project: detectedProject.projectSlug,
-      ...(existingProject ? { existingProject } : {}),
-    };
+  const matchesDetectedSetup = setup.dsn
+    ? detectedSetupMatchesProject(setup, explicit.existingProject)
+    : await canonicalProjectMatches(
+        cwd,
+        explicit.existingProject.orgSlug,
+        explicit.existingProject.projectSlug
+      );
+  if (!matchesDetectedSetup) {
+    return explicit;
+  }
+  assertImprovementSupported(setup, options);
+  return markExistingSetupForImprovement(explicit, setup);
+}
+
+async function resolveCanonicalProjectSelection({
+  context,
+  cwd,
+  options,
+  setup,
+  ui,
+}: {
+  context: ResolvedInitContext;
+  cwd: string;
+  options: {
+    suggestedProjectName?: string;
+    supportsExistingSetupImprovement?: boolean;
+  };
+  setup: ExistingSentryDetection;
+  ui: WizardUI;
+}): Promise<ProjectSelection | undefined> {
+  const candidates = await resolveCanonicalProjects(cwd, context.org);
+  const candidate = candidates.length === 1 ? candidates[0] : undefined;
+  if (!candidate) {
+    return;
+  }
+  const detected = await resolveExistingProjectChoice(candidate);
+  if (!detected.existingProject) {
+    return;
+  }
+  if (
+    setup.status !== "none" &&
+    setup.dsn &&
+    !detectedSetupMatchesProject(setup, detected.existingProject)
+  ) {
+    return await resolveImplicitProjectSelection(context.org, context.yes, ui, {
+      avoidProjectSlug: detected.existingProject.projectSlug,
+      suggestedProjectName: options.suggestedProjectName,
+    });
+  }
+  if (setup.status !== "none" && !(context.yes || context.dryRun)) {
+    return await resolveDetectedSetupChoice(
+      {
+        context,
+        detected,
+        setup,
+        suggestedProjectName: options.suggestedProjectName,
+        supportsExistingSetupImprovement:
+          options.supportsExistingSetupImprovement,
+      },
+      ui
+    );
+  }
+  assertImprovementSupported(setup, options);
+  return markExistingSetupForImprovement(detected, setup);
+}
+
+function detectedSetupMatchesProject(
+  setup: ExistingSentryDetection,
+  project: ExistingProjectData
+): boolean {
+  if (setup.status === "none" || !setup.dsn) {
+    return false;
+  }
+  const parsed = parseDsn(setup.dsn);
+  if (!parsed || parsed.projectId !== project.projectId) {
+    return false;
+  }
+  const configuredOrigin = getSentryBaseUrl();
+  if (isSentrySaasUrl(configuredOrigin)) {
+    return parsed.orgId !== undefined;
+  }
+  return parsed.host === new URL(configuredOrigin).host;
+}
+
+async function canonicalProjectMatches(
+  cwd: string,
+  org: string,
+  project: string
+): Promise<boolean> {
+  const candidates = await resolveCanonicalProjects(cwd, org);
+  return (
+    candidates.length === 1 &&
+    candidates[0]?.org === org &&
+    candidates[0]?.project === project
+  );
+}
+
+function assertImprovementSupported(
+  setup: ExistingSentryDetection,
+  options: { supportsExistingSetupImprovement?: boolean }
+): void {
+  if (
+    setup.status !== "none" &&
+    options.supportsExistingSetupImprovement !== true
+  ) {
+    throw new WizardError(
+      "This setup service version cannot safely improve an existing Sentry setup. Deploy or update the setup service before using this CLI version.",
+      { rendered: false }
+    );
+  }
+}
+
+async function resolveCanonicalProjects(
+  cwd: string,
+  organizationFilter?: string
+): Promise<CanonicalProjectCandidate[]> {
+  // Auto-resolution is best-effort: only exact local evidence is safe enough to
+  // reuse implicitly, and self-hosted targets belong to a different API origin.
+  let resolved: Awaited<ReturnType<typeof resolveAllTargets>>;
+  try {
+    resolved = await resolveAllTargets({
+      cwd,
+      resolutionMode: "codebase",
+      ...(organizationFilter ? { organizationFilter } : {}),
+    });
+  } catch (error) {
+    log.debug("Could not auto-resolve an init project", error);
+    return [];
   }
 
-  return {};
+  if (resolved.skippedSelfHosted) {
+    return [];
+  }
+
+  return resolved.targets
+    .filter((target) => target.matchStrength !== "fuzzy")
+    .map((target) => ({
+      org: target.org,
+      project: target.project,
+      ...(target.detectedDsn ? { detectedDsn: target.detectedDsn.raw } : {}),
+    }));
 }
 
 async function resolveExistingProjectChoice(opts: {
   org: string;
   project: string;
-  existingProject?: ExistingProjectData;
-  yes: boolean;
-  promptOnExisting: boolean;
-  ui: WizardUI;
-}): Promise<ExistingProjectChoice> {
+  detectedDsn?: string;
+}): Promise<ProjectSelection> {
   const slug = slugify(opts.project);
   if (!slug) {
     return { project: opts.project };
   }
 
-  const existingProject =
-    opts.existingProject &&
-    opts.existingProject.orgSlug === opts.org &&
-    opts.existingProject.projectSlug === slug
-      ? opts.existingProject
-      : await tryGetExistingProjectData(opts.org, slug).catch(() => null);
+  const existingProject = await tryGetExistingProjectData(opts.org, slug);
   if (!existingProject) {
     return { project: opts.project };
   }
 
-  if (!opts.promptOnExisting || opts.yes) {
-    return {
-      project: existingProject.projectSlug,
-      existingProject,
-    };
-  }
+  const matchingDetectedDsn =
+    opts.detectedDsn &&
+    parseDsn(opts.detectedDsn)?.projectId === existingProject.projectId
+      ? opts.detectedDsn
+      : undefined;
+  const resolvedDsn = existingProject.dsn ?? matchingDetectedDsn;
 
-  const choice = await opts.ui.select<"existing" | "create">({
-    message: `Found existing project '${slug}' in ${opts.org}.`,
+  return {
+    org: existingProject.orgSlug,
+    project: existingProject.projectSlug,
+    existingProject: {
+      ...existingProject,
+      ...(resolvedDsn ? { dsn: resolvedDsn } : {}),
+    },
+  };
+}
+
+async function resolveDetectedSetupChoice(
+  options: {
+    context: ResolvedInitContext;
+    detected: ProjectSelection;
+    setup: ExistingSentryDetection;
+    suggestedProjectName?: string;
+    supportsExistingSetupImprovement?: boolean;
+  },
+  ui: WizardUI
+): Promise<ProjectSelection> {
+  const {
+    context,
+    detected,
+    setup,
+    suggestedProjectName,
+    supportsExistingSetupImprovement,
+  } = options;
+  if (supportsExistingSetupImprovement === false) {
+    ui.log.warn(
+      "The current setup service cannot safely improve this existing Sentry setup. Choose another project or create a new one."
+    );
+    return await resolveImplicitProjectSelection(context.org, false, ui, {
+      avoidProjectSlug:
+        detected.existingProject?.projectSlug ?? detected.project,
+      suggestedProjectName,
+    });
+  }
+  const project = detected.existingProject;
+  const setupContext = project
+    ? `Sentry detected for project ${project.projectDisplay ?? project.projectSlug} in organization ${project.orgDisplay ?? project.orgSlug}. What would you like to do?`
+    : "What would you like to do with this Sentry setup?";
+  const intent = await ui.select<"improve" | "other">({
+    message: setupContext,
     options: [
       {
-        value: "existing",
-        label: `Use existing (${opts.org}/${slug})`,
-        hint: "Already configured",
+        value: "improve",
+        label: "Improve your Sentry setup",
+        description: "Upgrade your current setup and add more Sentry features.",
       },
       {
+        value: "other",
+        label: "Use or create another Sentry project",
+        description: "Use another project or create a new one.",
+      },
+    ],
+    initialValue: "improve",
+  });
+  if (isCancelled(intent)) {
+    throw new WizardCancelledError();
+  }
+  if (intent === "improve") {
+    assertImprovementSupported(setup, { supportsExistingSetupImprovement });
+    return { ...detected, setupIntent: "improve-existing" };
+  }
+  return await resolveImplicitProjectSelection(context.org, false, ui, {
+    avoidProjectSlug: detected.existingProject?.projectSlug ?? detected.project,
+    suggestedProjectName,
+  });
+}
+
+/**
+ * Resolve new-project creation versus an existing project after the shared
+ * resolver found no unique target. Creation is the default and selecting an
+ * existing project is a separate, deliberate action.
+ */
+async function resolveImplicitProjectSelection(
+  org: string,
+  yes: boolean,
+  ui: WizardUI,
+  options: {
+    avoidProjectSlug?: string;
+    suggestedProjectName?: string;
+  } = {}
+): Promise<ProjectSelection> {
+  if (yes) {
+    return options.avoidProjectSlug
+      ? await resolveAlternativeProjectSelection(
+          org,
+          options.avoidProjectSlug,
+          options.suggestedProjectName
+        )
+      : { project: undefined, existingProject: undefined };
+  }
+
+  const intent = await ui.select<"create" | "existing">({
+    message: "How should Sentry be configured for this codebase?",
+    options: [
+      {
         value: "create",
-        label: "Create a new project",
-        hint: "Wizard will detect the project name from your codebase",
+        label: "+ Create a new Sentry project",
+      },
+      {
+        value: "existing",
+        label: "Use an existing Sentry project",
       },
     ],
   });
-  if (isCancelled(choice)) {
+  if (isCancelled(intent)) {
     throw new WizardCancelledError();
   }
-  if (choice === "create") {
-    return { project: undefined };
+  if (intent === "create") {
+    if (options.avoidProjectSlug) {
+      const selection = await resolveAlternativeProjectSelection(
+        org,
+        options.avoidProjectSlug,
+        options.suggestedProjectName
+      );
+      const { project } = selection;
+      ui.log.info(`New project ${project} in organization ${org}`);
+      return selection;
+    }
+    return { project: undefined, existingProject: undefined };
   }
 
+  return await resolveExistingProjectSelection(
+    org,
+    ui,
+    options.avoidProjectSlug
+  );
+}
+
+async function resolveExistingProjectSelection(
+  org: string,
+  ui: WizardUI,
+  avoidProjectSlug?: string
+): Promise<ProjectSelection> {
+  let projects: SentryProject[];
+  try {
+    projects = await listProjects(org);
+  } catch (error) {
+    const reason = error instanceof ApiError ? error.format() : String(error);
+    throw new WizardError(
+      `Could not list existing projects in '${org}'.\n\n${reason}`
+    );
+  }
+  if (avoidProjectSlug) {
+    const avoided = slugify(avoidProjectSlug);
+    projects = projects.filter((project) => project.slug !== avoided);
+  }
+  if (projects.length === 0) {
+    throw new WizardError(
+      `There are no${avoidProjectSlug ? " other" : ""} existing projects in '${org}'. Choose "+ Create a new Sentry project" instead.`
+    );
+  }
+
+  const projectSlug = await ui.select<string>({
+    message: "Which existing Sentry project should be used?",
+    options: projects.map((project) => ({
+      value: project.slug,
+      label: project.name,
+      ...(project.name !== project.slug ? { hint: project.slug } : {}),
+    })),
+  });
+  if (isCancelled(projectSlug)) {
+    throw new WizardCancelledError();
+  }
+
+  const existingProject = await loadExistingProject(
+    org,
+    projectSlug,
+    "your project selection"
+  );
+  if (!existingProject) {
+    throw new WizardError(
+      `Project '${org}/${projectSlug}' is no longer available. Run sentry init again to refresh the project list.`
+    );
+  }
   return {
+    org: existingProject.orgSlug,
     project: existingProject.projectSlug,
     existingProject,
   };
 }
 
-/**
- * Normalize a team-resolution failure into a WizardError, preserving an
- * ApiError's enriched detail (e.g. 401 `member-disabled-over-limit`) via
- * format() instead of collapsing to its bare message + status line.
- */
-function toPreflightWizardError(error: unknown): WizardError {
-  if (error instanceof AuthError || error instanceof HostScopeError) {
-    throw error;
-  }
-  if (error instanceof WizardError) {
-    return error;
-  }
-  if (error instanceof ApiError) {
-    return new WizardError(error.format());
-  }
-  return new WizardError(
-    error instanceof Error ? error.message : String(error)
-  );
-}
-
-async function resolveTeam(
+async function resolveAlternativeProjectSelection(
   org: string,
-  initial: WizardOptions,
-  ui: WizardUI
-): Promise<string | undefined> {
-  if (!initial.team) {
-    return await resolveImplicitTeam(org, initial, ui);
-  }
-
-  const scopeRecovery = captureOAuthScopeRecoveryGate();
-  try {
-    const result = await resolveOrCreateTeam(org, {
-      team: initial.team,
-      usageHint: "sentry init",
-      dryRun: initial.dryRun,
-      deferAutoCreateOnEmptyOrg: true,
-    });
-    return result.source === "deferred" ? undefined : result.slug;
-  } catch (error) {
-    if (error instanceof WizardCancelledError) {
-      throw error;
-    }
-    if (
-      error instanceof ApiError &&
-      (error.status === 401 || error.status === 403) &&
-      (await scopeRecovery.shouldDelegate(error, {
-        unattended: initial.yes || initial.dryRun,
-      }))
-    ) {
-      throw error;
-    }
-    if (error instanceof ApiError && error.status === 403) {
-      return;
-    }
-    throw toPreflightWizardError(error);
-  }
-}
-
-function canCreateProjectInTeam(team: SentryTeam): boolean {
-  return Array.isArray(team.access) && team.access.includes("team:admin");
-}
-
-/**
- * Whether the user's access scopes indicate they can create projects
- * regardless of the org's `allowMemberProjectCreation` flag.
- *
- * Sentry's role hierarchy (from server.py SENTRY_ROLES):
- * - member:  project:read only — blocked when flag is disabled
- * - admin:   project:write, project:admin, team:admin — CAN create projects
- * - manager: org:write, project:admin, is_global — CAN create projects
- * - owner:   org:write, org:admin, is_global — CAN create projects
- *
- * The previous check only looked for `org:write`, which excluded org admins
- * who have `project:write` / `project:admin` but not `org:write`.
- */
-function canBypassMemberCreationRestriction(access: unknown): boolean {
-  if (!Array.isArray(access)) {
-    return false;
-  }
-  return (
-    access.includes("org:write") ||
-    access.includes("project:admin") ||
-    access.includes("project:write")
-  );
-}
-
-async function assertOrgScopedCreationCanProceed(org: string): Promise<void> {
-  let organization: Awaited<ReturnType<typeof getOrganization>>;
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
-  try {
-    organization = await getOrganization(org);
-  } catch {
-    // If org details cannot be fetched, let the actual create endpoint surface
-    // the precise API error during the project-creation step.
-    return;
-  }
-
-  if (
-    organization.allowMemberProjectCreation === false &&
-    !canBypassMemberCreationRestriction(organization.access)
-  ) {
-    throw new WizardError(formatMemberProjectCreationDisabledError(org));
-  }
-}
-
-async function listTeamsForImplicitInit(
-  org: string,
-  unattended: boolean
-): Promise<SentryTeam[] | undefined> {
-  const scopeRecovery = captureOAuthScopeRecoveryGate();
-  try {
-    return await listTeams(org);
-  } catch (error) {
-    // 403 from listTeams means the user cannot inspect team access. Continue
-    // without a team so init mirrors onboarding's org-scoped auto-team path.
-    if (
-      error instanceof ApiError &&
-      (error.status === 401 || error.status === 403) &&
-      (await scopeRecovery.shouldDelegate(error, { unattended }))
-    ) {
-      throw error;
-    }
-    if (error instanceof ApiError && error.status === 403) {
-      await assertOrgScopedCreationCanProceed(org);
-      return;
-    }
-    if (error instanceof ApiError && error.status === 404) {
-      return await buildOrgNotFoundError(org, "sentry init");
-    }
-    throw toPreflightWizardError(error);
-  }
-}
-
-async function resolveImplicitTeam(
-  org: string,
-  initial: WizardOptions,
-  ui: WizardUI
-): Promise<string | undefined> {
-  const teams = await listTeamsForImplicitInit(
+  avoidProjectSlug: string,
+  suggestedProjectName?: string
+): Promise<ProjectSelection> {
+  const project = await findAvailableProjectSlug(
     org,
-    initial.yes || initial.dryRun
+    suggestedProjectName ?? avoidProjectSlug,
+    avoidProjectSlug
   );
-  if (!teams) {
-    return;
+  return { project, existingProject: undefined };
+}
+
+async function findAvailableProjectSlug(
+  org: string,
+  suggestedProjectName: string,
+  avoidedProjectSlug: string
+): Promise<string> {
+  const base = slugify(suggestedProjectName) || "sentry-project";
+  const avoided = slugify(avoidedProjectSlug);
+
+  if (base !== avoided && !(await tryGetExistingProjectData(org, base))) {
+    return base;
   }
 
-  const candidateTeams = teams
-    .filter(canCreateProjectInTeam)
-    .sort((left, right) => left.slug.localeCompare(right.slug));
-  if (candidateTeams.length === 0) {
-    await assertOrgScopedCreationCanProceed(org);
-    return;
-  }
-  if (candidateTeams.length === 1 || initial.yes) {
-    return (candidateTeams[0] as SentryTeam).slug;
+  for (let suffix = 2; suffix <= 100; suffix += 1) {
+    const candidate = `${base}-${suffix}`;
+    if (!(await tryGetExistingProjectData(org, candidate))) {
+      return candidate;
+    }
   }
 
-  const selected = await ui.select<string>({
-    message: "Which team should own this project?",
-    options: candidateTeams.map((team) => ({
-      value: team.slug,
-      label: team.slug,
-      ...(team.name !== team.slug ? { hint: team.name } : {}),
-    })),
-  });
-  if (isCancelled(selected)) {
-    throw new WizardCancelledError();
+  throw new WizardError(
+    `Could not find an available project slug based on '${base}'. Choose an existing Sentry project instead.`
+  );
+}
+
+async function loadExistingProject(
+  org: string,
+  project: string,
+  detectedFrom: string
+): Promise<ExistingProjectData | null> {
+  try {
+    return await tryGetExistingProjectData(org, project);
+  } catch (error) {
+    const reason = error instanceof ApiError ? error.format() : String(error);
+    throw new WizardError(
+      `Found existing project '${org}/${project}' from ${detectedFrom}, but could not load its DSN.\n\n${reason}`
+    );
   }
-  return selected;
 }
 
 /**
@@ -571,7 +683,7 @@ async function resolveOrgSlug(
   }
 
   const selected = await ui.select<string>({
-    message: "Which organization should the project be created in?",
+    message: "Which organization should Sentry use?",
     options: orgs.map((org) => ({
       value: org.slug,
       label: org.name,
@@ -582,29 +694,4 @@ async function resolveOrgSlug(
     throw new WizardCancelledError();
   }
   return selected;
-}
-
-async function detectExistingProject(
-  cwd: string
-): Promise<{ orgSlug: string; projectSlug: string } | null> {
-  const { detectDsn } = await import("../dsn/index.js");
-  const dsn = await detectDsn(cwd);
-  if (!dsn?.publicKey) {
-    return null;
-  }
-
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
-  try {
-    const { resolveDsnByPublicKey } = await import("../resolve-target.js");
-    const resolved = await resolveDsnByPublicKey(dsn);
-    if (!resolved) {
-      return null;
-    }
-    return {
-      orgSlug: resolved.org,
-      projectSlug: resolved.project,
-    };
-  } catch {
-    return null;
-  }
 }

@@ -449,7 +449,7 @@ describe("init command func", () => {
       expect(capturedArgs?.project).toBeUndefined();
     });
 
-    test("bare slug in multiple orgs → throws ValidationError", async () => {
+    test("bare slug in multiple orgs → defers the decision until org resolution", async () => {
       findProjectsSpy.mockImplementation(async (slug: string) => ({
         projects: [mockProject(slug, "org-a"), mockProject(slug, "org-b")],
         orgs: [
@@ -458,9 +458,10 @@ describe("init command func", () => {
         ],
       }));
       const ctx = makeContext();
-      await expect(func.call(ctx, DEFAULT_FLAGS, "my-app")).rejects.toThrow(
-        ValidationError
-      );
+      await func.call(ctx, DEFAULT_FLAGS, "my-app");
+
+      expect(capturedArgs?.org).toBeUndefined();
+      expect(capturedArgs?.project).toBe("my-app");
     });
   });
 

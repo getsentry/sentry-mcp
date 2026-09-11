@@ -46,6 +46,7 @@ import {
 import { setAuthToken } from "../../src/lib/db/auth.js";
 import { setOrgRegion } from "../../src/lib/db/regions.js";
 import { ApiError, AuthError } from "../../src/lib/errors.js";
+import { resolveOrCreateTeam } from "../../src/lib/resolve-team.js";
 import { mockFetch, useTestConfigDir } from "../helpers.js";
 
 // --- Shared test setup ---
@@ -508,6 +509,57 @@ describe("teams.ts", () => {
       const result = await listTeams("test-org");
       expect(result).toHaveLength(2);
     });
+
+    test("lets team resolution select a Team Admin from a later page", async () => {
+      let requestCount = 0;
+      globalThis.fetch = mockFetch(async (input, init) => {
+        const req = new Request(input!, init);
+        requestCount += 1;
+        if (requestCount === 1) {
+          expect(new URL(req.url).searchParams.get("cursor")).toBeNull();
+          return new Response(
+            JSON.stringify([
+              mockTeam({
+                id: "1",
+                slug: "contributors",
+                access: ["team:read"],
+              }),
+            ]),
+            {
+              status: 200,
+              headers: {
+                "Content-Type": "application/json",
+                Link: linkHeader("next-teams-page", true),
+              },
+            }
+          );
+        }
+
+        expect(new URL(req.url).searchParams.get("cursor")).toBe(
+          "next-teams-page"
+        );
+        return new Response(
+          JSON.stringify([
+            mockTeam({
+              id: "2",
+              slug: "platform",
+              access: ["team:read", "team:admin"],
+            }),
+          ]),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      });
+
+      const result = await resolveOrCreateTeam("test-org", {
+        usageHint: "sentry init",
+        autoCreateSlug: "my-app",
+      });
+      expect(result).toEqual({ slug: "platform", source: "auto-selected" });
+      expect(requestCount).toBe(2);
+    });
   });
 
   describe("listProjectTeams", () => {
@@ -530,7 +582,7 @@ describe("teams.ts", () => {
   });
 
   describe("createTeam", () => {
-    test("creates team and adds current user as member", async () => {
+    test("creates a team in one request", async () => {
       const team = mockTeam({ slug: "new-team" });
       const requestUrls: string[] = [];
 
@@ -547,45 +599,12 @@ describe("teams.ts", () => {
             headers: { "Content-Type": "application/json" },
           });
         }
-        if (req.url.includes("/member")) {
-          return new Response(JSON.stringify({}), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
         return new Response("Not found", { status: 404 });
       });
 
       const result = await createTeam("test-org", "new-team");
       expect(result.slug).toBe("new-team");
-      // Should have made at least 2 calls (create + add member)
-      expect(requestUrls.length).toBeGreaterThanOrEqual(2);
-    });
-
-    test("returns team even when member-add fails", async () => {
-      const team = mockTeam({ slug: "new-team" });
-
-      globalThis.fetch = mockFetch(async (input, init) => {
-        const req = new Request(input!, init);
-
-        if (
-          req.method === "POST" &&
-          req.url.includes("/organizations/test-org/teams/")
-        ) {
-          return new Response(JSON.stringify(team), {
-            status: 201,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        // addMemberToTeam fails
-        return new Response(JSON.stringify({ detail: "Permission denied" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        });
-      });
-
-      const result = await createTeam("test-org", "new-team");
-      expect(result.slug).toBe("new-team");
+      expect(requestUrls).toHaveLength(1);
     });
   });
 
@@ -769,6 +788,21 @@ describe("projects.ts", () => {
       await expect(
         createProjectWithAutoTeam("test-org", { name: "Blocked" })
       ).rejects.toMatchObject({ status: 403 });
+    });
+
+    test("rejects a successful response without an owning team slug", async () => {
+      const { team_slug: _missing, ...projectWithoutTeam } = autoTeamProject;
+      globalThis.fetch = mockFetch(
+        async () =>
+          new Response(JSON.stringify(projectWithoutTeam), {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          })
+      );
+
+      await expect(
+        createProjectWithAutoTeam("test-org", { name: "Auto Project" })
+      ).rejects.toThrow("did not return its owning team");
     });
 
     test("returns dsn:null when DSN fetch fails", async () => {

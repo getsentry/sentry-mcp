@@ -1,4 +1,5 @@
 import { ApiError } from "../../errors.js";
+import { WizardCancelledError } from "../clack-utils.js";
 import type { ToolOperation, ToolPayload, ToolResult } from "../types.js";
 import { agentCheckpointTool } from "./agent-checkpoint.js";
 import { applyPatchsetTool } from "./apply-patchset.js";
@@ -14,7 +15,16 @@ import { listDirTool } from "./list-dir.js";
 import { readFilesTool } from "./read-files.js";
 import { runCommandsTool } from "./run-commands.js";
 import { formatToolError, validateToolSandbox } from "./shared.js";
-import type { AnyInitToolDefinition, ToolContext } from "./types.js";
+import type {
+  AnyInitToolDefinition,
+  ToolCapabilities,
+  ToolContext,
+} from "./types.js";
+
+const PROJECT_CREATION_OPERATIONS = new Set<ToolOperation>([
+  "create-sentry-project",
+  "ensure-sentry-project",
+]);
 
 const toolDefinitions = [
   agentCheckpointTool,
@@ -54,7 +64,8 @@ export function describeTool(payload: ToolPayload): string {
  */
 export async function executeTool(
   payload: ToolPayload,
-  context: ToolContext
+  context: ToolContext,
+  capabilities: ToolCapabilities = {}
 ): Promise<ToolResult> {
   const tool = toolRegistry.get(payload.operation);
   if (!tool) {
@@ -74,8 +85,17 @@ export async function executeTool(
   }
 
   try {
-    return await tool.execute(sandboxedPayload as never, context);
+    const executionContext = PROJECT_CREATION_OPERATIONS.has(payload.operation)
+      ? { ...context, chooseTeam: capabilities.chooseTeam }
+      : context;
+    return await tool.execute(
+      sandboxedPayload as never,
+      executionContext as never
+    );
   } catch (error) {
+    if (error instanceof WizardCancelledError) {
+      throw error;
+    }
     if (
       error instanceof ApiError &&
       (error.status === 401 || error.status === 403)
