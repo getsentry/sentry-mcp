@@ -1426,7 +1426,7 @@ describe("listTransactions", () => {
         id: "evt001",
         transaction: "GET /api/users",
         timestamp: "2025-01-30T14:32:15+00:00",
-        "transaction.duration": 245,
+        "span.duration": 245,
         project: "my-project",
       },
     ],
@@ -1501,9 +1501,10 @@ describe("listTransactions", () => {
 
     const url = new URL(capturedUrl);
     expect(url.searchParams.get("cursor")).toBe("1735689600:0:0");
-    expect(url.searchParams.get("sort")).toBe("-transaction.duration");
+    expect(url.searchParams.get("sort")).toBe("-span.duration");
     expect(url.searchParams.get("per_page")).toBe("50");
     expect(url.searchParams.get("query")).toContain("transaction:GET");
+    expect(url.searchParams.get("query")).toContain("is_transaction:true");
   });
 
   test("uses project query param for numeric project IDs", async () => {
@@ -1525,9 +1526,9 @@ describe("listTransactions", () => {
 
     const url = new URL(capturedUrl);
     expect(url.searchParams.get("project")).toBe("12345");
-    // Should NOT include project:12345 in the query
+    // Query should only carry the transaction filter, not project scoping
     const query = url.searchParams.get("query");
-    expect(query).toBeNull();
+    expect(query).toBe("is_transaction:true");
   });
 
   test("uses project:slug in query for non-numeric project slugs", async () => {

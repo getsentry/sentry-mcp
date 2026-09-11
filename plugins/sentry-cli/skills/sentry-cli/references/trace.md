@@ -28,10 +28,10 @@ List recent traces in a project
 | Field | Type | Description |
 |-------|------|-------------|
 | `trace` | string | Trace ID |
-| `id` | string | Event ID |
+| `id` | string | Span ID of the root span |
 | `transaction` | string | Transaction name |
 | `timestamp` | string | Timestamp (ISO 8601) |
-| `transaction.duration` | number | Duration (ms) |
+| `span.duration` | number | Duration (ms) |
 | `project` | string | Project slug |
 
 **Examples:**

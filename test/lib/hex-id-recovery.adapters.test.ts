@@ -94,7 +94,7 @@ describe("adapter context guards", () => {
 // ---------------------------------------------------------------------------
 
 describe("adapter query params", () => {
-  test("event adapter queries the transactions dataset with project scope", async () => {
+  test("event adapter queries the errors dataset with project scope", async () => {
     let queryUrl = "";
     globalThis.fetch = mockFetch(async (input, init) => {
       const req = new Request(input!, init);
@@ -102,19 +102,11 @@ describe("adapter query params", () => {
       return eventsResponse([
         {
           id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          trace: "tr1",
-          transaction: "/api/test1",
           timestamp: "2026-01-01T00:00:00Z",
-          "transaction.duration": 42,
-          project: "test-project",
         },
         {
           id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          trace: "tr2",
-          transaction: "/api/test2",
           timestamp: "2026-01-01T00:00:00Z",
-          "transaction.duration": 17,
-          project: "test-project",
         },
       ]);
     });
@@ -124,8 +116,10 @@ describe("adapter query params", () => {
       project: "test-project",
     });
 
-    expect(queryUrl).toContain("dataset=transactions");
+    expect(queryUrl).toContain("dataset=errors");
+    expect(queryUrl).toContain("field=id");
     expect(queryUrl).toContain("project%3Atest-project"); // project:test-project URL-encoded
+    expect(queryUrl).toContain("sort=-timestamp");
     expect(queryUrl).toContain("statsPeriod=90d");
     expect(ids).toEqual([
       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

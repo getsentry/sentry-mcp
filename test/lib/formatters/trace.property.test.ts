@@ -70,7 +70,7 @@ const transactionItemArb = record({
   id: hexId32Arb,
   transaction: transactionNameArb,
   timestamp: isoTimestampArb,
-  "transaction.duration": positiveDurationArb,
+  "span.duration": positiveDurationArb,
   project: slugArb,
 }) as unknown as import("fast-check").Arbitrary<TransactionListItem>;
 

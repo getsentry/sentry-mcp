@@ -185,7 +185,22 @@ const DEFAULT_FLAGS = {
   fresh: false,
 };
 
+const parseExploreDataset = (
+  exploreCommand.parameters.flags!.dataset as {
+    parse: (value: string) => string;
+  }
+).parse;
+
 describe("sentry explore", () => {
+  describe("dataset parsing", () => {
+    test.each([
+      "transaction",
+      "transactions",
+    ])("accepts %s as the legacy transactions view", (dataset) => {
+      expect(parseExploreDataset(dataset)).toBe(dataset);
+    });
+  });
+
   describe("target resolution", () => {
     test("`<org>/` uses org without project filter", async () => {
       resolveTargetSpy.mockResolvedValue({ org: "my-org" });
@@ -308,7 +323,7 @@ describe("sentry explore", () => {
         context,
         {
           ...DEFAULT_FLAGS,
-          field: ["transaction", "p50(transaction.duration)"],
+          field: ["transaction", "p50(span.duration)"],
         },
         "test-org/"
       );
@@ -316,7 +331,7 @@ describe("sentry explore", () => {
       expect(queryEventsSpy).toHaveBeenCalledWith(
         "test-org",
         expect.objectContaining({
-          fields: ["transaction", "p50(transaction.duration)"],
+          fields: ["transaction", "p50(span.duration)"],
         })
       );
     });
@@ -334,6 +349,53 @@ describe("sentry explore", () => {
       expect(queryEventsSpy).toHaveBeenCalledWith(
         "test-org",
         expect.objectContaining({ dataset: "spans" })
+      );
+    });
+
+    test("routes transactions through spans with an automatic filter", async () => {
+      resolveTargetSpy.mockResolvedValue({ org: "test-org" });
+      const { context } = createContext();
+
+      await func.call(
+        context,
+        {
+          ...DEFAULT_FLAGS,
+          dataset: "transactions",
+          query: "environment:production",
+        },
+        "test-org/"
+      );
+
+      expect(queryEventsSpy).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({
+          dataset: "spans",
+          fields: ["transaction", "count()"],
+          query: "environment:production is_transaction:true",
+        })
+      );
+    });
+
+    test("does not duplicate an explicit transaction filter", async () => {
+      resolveTargetSpy.mockResolvedValue({ org: "test-org", project: "cli" });
+      const { context } = createContext();
+
+      await func.call(
+        context,
+        {
+          ...DEFAULT_FLAGS,
+          dataset: "transactions",
+          query: "is_transaction:true",
+        },
+        "test-org/cli"
+      );
+
+      expect(queryEventsSpy).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({
+          dataset: "spans",
+          query: "project:cli is_transaction:true",
+        })
       );
     });
 
@@ -879,6 +941,25 @@ describe("sentry explore", () => {
         expect.any(String),
         "next",
         "cursor123"
+      );
+    });
+
+    test("preserves transactions in pagination hints", async () => {
+      resolveTargetSpy.mockResolvedValue({ org: "test-org" });
+      queryEventsSpy.mockResolvedValue({
+        data: MOCK_EVENTS_RESPONSE,
+        nextCursor: "cursor123",
+      });
+      const { context, getStdout } = createContext();
+
+      await func.call(
+        context,
+        { ...DEFAULT_FLAGS, dataset: "transactions" },
+        "test-org/"
+      );
+
+      expect(getStdout()).toContain(
+        "sentry explore test-org/ -c next --dataset transactions"
       );
     });
 

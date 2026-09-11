@@ -149,6 +149,31 @@ function issueIndexResponse(
   return { body: issuesFixture };
 }
 
+/**
+ * Resolve the events-endpoint body for the logs dataset.
+ *
+ * If the query contains a sentry.item_id filter, returns the matching detailed
+ * log. Query format: "project:${proj} sentry.item_id:${id}" or
+ * "project:${proj} sentry.item_id:[id1,id2,...]"
+ */
+function resolveLogEventsBody(query: string | null) {
+  if (query?.includes("sentry.item_id:")) {
+    const bracketMatch = query.match(/sentry\.item_id:\[([^\]]+)\]/);
+    const singleMatch = query.match(/sentry\.item_id:([0-9a-f]{32})/i);
+    let ids: string[] = [];
+    if (bracketMatch) {
+      ids = bracketMatch[1].split(",").map((s) => s.trim());
+    } else if (singleMatch) {
+      ids = [singleMatch[1]];
+    }
+    if (ids.includes(TEST_LOG_ID)) {
+      return logDetailFixture;
+    }
+    return { data: [], meta: { fields: {} } };
+  }
+  return logsFixture;
+}
+
 export const apiRoutes: MockRoute[] = [
   // User Regions (multi-region support)
   // Returns the mock server itself as the only region
@@ -393,7 +418,7 @@ export const apiRoutes: MockRoute[] = [
     },
   },
 
-  // Logs & Transactions (Events API - dispatches on dataset param)
+  // Logs & trace list (Events API - dispatches on dataset param)
   {
     method: "GET",
     path: "/api/0/organizations/:orgSlug/events/",
@@ -401,35 +426,14 @@ export const apiRoutes: MockRoute[] = [
       if (params.orgSlug === TEST_ORG) {
         const url = new URL(req.url);
         const dataset = url.searchParams.get("dataset");
-
-        // Transactions dataset (trace list)
-        if (dataset === "transactions") {
+        const query = url.searchParams.get("query");
+        if (
+          dataset === "spans" &&
+          (query ?? "").includes("is_transaction:true")
+        ) {
           return { body: transactionsFixture };
         }
-
-        // Logs dataset (default)
-        const query = url.searchParams.get("query");
-        // If query contains sentry.item_id filter, return detailed log
-        // Query format: "project:${proj} sentry.item_id:${id}" or
-        //               "project:${proj} sentry.item_id:[id1,id2,...]"
-        if (query?.includes("sentry.item_id:")) {
-          // Extract IDs from both single and bracket syntax
-          const bracketMatch = query.match(/sentry\.item_id:\[([^\]]+)\]/);
-          const singleMatch = query.match(/sentry\.item_id:([0-9a-f]{32})/i);
-          let ids: string[] = [];
-          if (bracketMatch) {
-            ids = bracketMatch[1].split(",").map((s) => s.trim());
-          } else if (singleMatch) {
-            ids = [singleMatch[1]];
-          }
-
-          if (ids.includes(TEST_LOG_ID)) {
-            return { body: logDetailFixture };
-          }
-          // Return empty data for non-existent log
-          return { body: { data: [], meta: { fields: {} } } };
-        }
-        return { body: logsFixture };
+        return { body: resolveLogEventsBody(query) };
       }
       return { status: 404, body: notFoundFixture };
     },

@@ -211,9 +211,9 @@ describe("property: classifyUrl", () => {
     expect(classifyUrl(url)).toBe("volatile");
   });
 
-  test("dataset=transactions URLs are volatile", () => {
+  test("dataset=spans URLs are volatile", () => {
     const url =
-      "https://us.sentry.io/api/0/organizations/org/events/?dataset=transactions";
+      "https://us.sentry.io/api/0/organizations/org/events/?dataset=spans";
     expect(classifyUrl(url)).toBe("volatile");
   });
 

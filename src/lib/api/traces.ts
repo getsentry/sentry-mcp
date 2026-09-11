@@ -322,13 +322,13 @@ export function normalizeTraceSpan(span: TraceSpan): TraceSpan {
   return normalized;
 }
 
-/** Fields to request from the transactions API */
+/** Fields to request when listing transactions (root spans) from the spans dataset */
 const TRANSACTION_FIELDS = [
   "trace",
   "id",
   "transaction",
   "timestamp",
-  "transaction.duration",
+  "span.duration",
   "project",
 ];
 
@@ -395,7 +395,9 @@ async function fetchTransactionsPage(
   );
   const projectFilter =
     numericProjectId === undefined ? `project:${projectSlug}` : "";
-  const fullQuery = [projectFilter, options.query].filter(Boolean).join(" ");
+  const fullQuery = ["is_transaction:true", projectFilter, options.query]
+    .filter(Boolean)
+    .join(" ");
 
   const { data: response, headers } =
     await apiRequestToRegion<TransactionsResponse>(
@@ -403,7 +405,7 @@ async function fetchTransactionsPage(
       `/organizations/${orgSlug}/events/`,
       {
         params: {
-          dataset: "transactions",
+          dataset: "spans",
           field: TRANSACTION_FIELDS,
           project:
             numericProjectId === undefined
@@ -420,10 +422,7 @@ async function fetchTransactionsPage(
               : (options.statsPeriod ?? "7d"),
           start: options.start,
           end: options.end,
-          sort:
-            options.sort === "duration"
-              ? "-transaction.duration"
-              : "-timestamp",
+          sort: options.sort === "duration" ? "-span.duration" : "-timestamp",
           cursor: options.cursor,
         },
         schema: TransactionsResponseSchema,
@@ -436,7 +435,8 @@ async function fetchTransactionsPage(
 
 /**
  * List recent transactions for a project.
- * Uses the Explore/Events API with dataset=transactions.
+ * Uses the Explore/Events API with dataset=spans and an `is_transaction:true`
+ * filter — transactions are root spans in EAP storage.
  *
  * Handles project slug vs numeric ID automatically:
  * - Numeric IDs (or `options.projectId`) are passed as the `project` parameter

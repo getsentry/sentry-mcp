@@ -63,6 +63,10 @@ const log = logger.withTag("explore");
 
 /** Default fields when none specified — top errors view */
 const DEFAULT_FIELDS = ["title", "count()"];
+const DEFAULT_TRANSACTION_FIELDS = ["transaction", "count()"];
+const LEGACY_TRANSACTION_DATASETS = new Set(["transaction", "transactions"]);
+const IS_TRANSACTION_FILTER = "is_transaction:true";
+const IS_TRANSACTION_FILTER_PATTERN = /(?:^|\s)is_transaction:true(?:\s|$)/;
 
 /** Default dataset */
 const DEFAULT_DATASET = "errors";
@@ -162,13 +166,13 @@ type ExploreData = {
 function parseDataset(value: string): string {
   const lower = value.toLowerCase();
   const resolved = DATASET_ALIASES[lower];
-  if (!resolved) {
-    throw new ValidationError(
-      `Invalid dataset "${value}". Must be one of: ${[...VALID_DATASETS].join(", ")}`,
-      "dataset"
-    );
+  if (resolved || LEGACY_TRANSACTION_DATASETS.has(lower)) {
+    return resolved ?? lower;
   }
-  return resolved;
+  throw new ValidationError(
+    `Invalid dataset "${value}". Must be one of: ${Array.from(VALID_DATASETS).join(", ")}`,
+    "dataset"
+  );
 }
 
 /**
@@ -301,7 +305,13 @@ function jsonTransformExplore(data: ExploreData, fields?: string[]): unknown {
 const DEFAULT_LIMIT = 25;
 
 function defaultFieldsForDataset(dataset: string): readonly string[] {
-  return dataset === "replays" ? DEFAULT_REPLAY_EXPLORE_FIELDS : DEFAULT_FIELDS;
+  if (dataset === "replays") {
+    return DEFAULT_REPLAY_EXPLORE_FIELDS;
+  }
+  if (LEGACY_TRANSACTION_DATASETS.has(dataset)) {
+    return DEFAULT_TRANSACTION_FIELDS;
+  }
+  return DEFAULT_FIELDS;
 }
 
 /** Append --metric / --agg flags to hint parts */
@@ -380,7 +390,7 @@ function appendFlagHints(
 
 /**
  * Detect the first aggregate function in the field list.
- * Aggregates contain parentheses, e.g., `count()`, `p50(transaction.duration)`.
+ * Aggregates contain parentheses, e.g., `count()`, `p50(span.duration)`.
  */
 function findFirstAggregate(fieldList: string[]): string | undefined {
   return fieldList.find((f) => f.includes("(") && f.includes(")"));
@@ -497,6 +507,19 @@ function buildEnvironmentQuery(
   return `environment:[${environment.join(",")}]`;
 }
 
+function resolveEventsDataset(dataset: string, query: string | undefined) {
+  if (!LEGACY_TRANSACTION_DATASETS.has(dataset)) {
+    return { dataset, query };
+  }
+  if (IS_TRANSACTION_FILTER_PATTERN.test(query ?? "")) {
+    return { dataset: "spans", query };
+  }
+  return {
+    dataset: "spans",
+    query: [query, IS_TRANSACTION_FILTER].filter(Boolean).join(" "),
+  };
+}
+
 /**
  * Resolve dataset-specific configuration: sort, query, validation, and fetch.
  *
@@ -560,13 +583,14 @@ function resolveDatasetConfig(params: {
   // Non-replay datasets: translate --environment into query filter terms
   // since the Discover/Events API expects environment:... in the query string.
   const envPrefix = buildEnvironmentQuery(environment);
+  const resolved = resolveEventsDataset(dataset, flags.query);
   const queryWithEnv =
-    [envPrefix, flags.query].filter(Boolean).join(" ") || undefined;
+    [envPrefix, resolved.query].filter(Boolean).join(" ") || undefined;
 
   const firstAgg = findFirstAggregate(fieldList);
   const rawSort = flags.sort ?? (firstAgg ? `-${firstAgg}` : undefined);
   let sort: string | undefined;
-  if (SORTABLE_DATASETS.has(dataset)) {
+  if (SORTABLE_DATASETS.has(resolved.dataset)) {
     // A deterministic sort is required for correct cursor pagination: the
     // events cursor is offset-based, so without a stable total order the
     // separate page requests overlap and skip rows, producing duplicate and
@@ -592,7 +616,7 @@ function resolveDatasetConfig(params: {
     fetch: async ({ cursor, limit, timeRange }) =>
       queryEvents(org, {
         fields: fieldList,
-        dataset,
+        dataset: resolved.dataset,
         query,
         sort,
         limit,
@@ -624,7 +648,7 @@ export const exploreCommand = buildListCommand("explore", {
     fullDescription:
       "Query the Sentry Explore API for aggregate event data.\n\n" +
       "Supports arbitrary fields including columns (title, project),\n" +
-      "aggregates (count(), count_unique(user), p50(transaction.duration)),\n" +
+      "aggregates (count(), count_unique(user), p50(span.duration)),\n" +
       "and equations. Results are returned as a table.\n\n" +
       "Datasets:\n" +
       "  errors   Error events (default)\n" +
@@ -672,7 +696,7 @@ export const exploreCommand = buildListCommand("explore", {
         kind: "parsed",
         parse: String,
         brief:
-          'API field or aggregate (repeatable). E.g., title, "count()", "p50(transaction.duration)"',
+          'API field or aggregate (repeatable). E.g., title, "count()", "p50(span.duration)"',
         variadic: true,
         optional: true,
       },
@@ -692,7 +716,7 @@ export const exploreCommand = buildListCommand("explore", {
       dataset: {
         kind: "parsed",
         parse: parseDataset,
-        brief: `Dataset to query (${[...VALID_DATASETS].join(", ")})`,
+        brief: `Dataset to query (${[...VALID_DATASETS].join(", ")}; transaction(s) routes to spans)`,
         default: DEFAULT_DATASET,
       },
       query: {

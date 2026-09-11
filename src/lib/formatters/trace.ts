@@ -77,7 +77,7 @@ export function buildTraceRowCells(
   return [
     `\`${item.trace}\``,
     escapeMarkdownCell(item.transaction || "unknown"),
-    formatTraceDuration(item["transaction.duration"]),
+    formatTraceDuration(item["span.duration"]),
     formatRelativeTime(item.timestamp),
   ];
 }

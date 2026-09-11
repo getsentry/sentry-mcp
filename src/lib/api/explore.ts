@@ -21,7 +21,7 @@ import {
 export type ExploreQueryOptions = {
   /** Fields to request — columns, aggregates, or equations */
   fields: string[];
-  /** Dataset to query: errors, transactions, spans, discover */
+  /** Dataset to query: errors, spans, tracemetrics, logs, replays */
   dataset?: string;
   /** Sentry search query filter */
   query?: string;
@@ -159,7 +159,7 @@ export async function queryMetricsMeta(
  *
  * Calls `GET /organizations/{org}/events/` with the specified fields, dataset,
  * query, sort, and time range. Supports all standard Sentry Explore fields
- * including aggregates like `count()`, `count_unique(user)`, `p50(transaction.duration)`.
+ * including aggregates like `count()`, `count_unique(user)`, `p50(span.duration)`.
  *
  * When `limit` exceeds {@link API_MAX_PER_PAGE}, transparently fetches multiple
  * pages using cursor-based pagination (bounded by {@link MAX_PAGINATION_PAGES}).

@@ -76,11 +76,7 @@ const URL_TIER_REGEXPS: Readonly<Record<TtlTier, readonly RegExp[]>> = {
     /\/trace-items\/[0-9a-f]+\//,
   ],
   // Issue endpoints (lists AND detail views), dataset queries, trace-logs
-  volatile: [
-    /\/issues\//,
-    /[?&]dataset=(?:logs|transactions)/,
-    /\/trace-logs\//,
-  ],
+  volatile: [/\/issues\//, /[?&]dataset=(?:logs|spans)/, /\/trace-logs\//],
   // Default fallback — no patterns needed
   stable: [],
 };

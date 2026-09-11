@@ -1097,21 +1097,22 @@ export type TraceLogsResponse = InferOutput<typeof TraceLogsResponseSchema>;
 // Transaction (for trace listing)
 
 /**
- * Transaction list item from the Explore/Events API (dataset=transactions).
+ * Transaction list item from the Explore/Events API (spans dataset,
+ * `is_transaction:true` — transactions are root spans).
  * Fields match the response when querying trace, id, transaction, timestamp, etc.
  */
 export const TransactionListItemSchema = pipe(
   looseObject({
     /** Trace ID this transaction belongs to */
     trace: pipe(string(), description("Trace ID")),
-    /** Event ID of the transaction */
-    id: pipe(string(), description("Event ID")),
+    /** Span ID of the root (transaction) span */
+    id: pipe(string(), description("Span ID of the root span")),
     /** Transaction name (e.g., "GET /api/users") */
     transaction: pipe(string(), description("Transaction name")),
     /** ISO timestamp of the transaction */
     timestamp: pipe(string(), description("Timestamp (ISO 8601)")),
-    /** Transaction duration in milliseconds */
-    "transaction.duration": pipe(number(), description("Duration (ms)")),
+    /** Duration of the root span in milliseconds */
+    "span.duration": pipe(number(), description("Duration (ms)")),
     /** Project slug */
     project: pipe(string(), description("Project slug")),
   }),
@@ -1120,7 +1121,7 @@ export const TransactionListItemSchema = pipe(
 
 export type TransactionListItem = InferOutput<typeof TransactionListItemSchema>;
 
-/** Response from the transactions events endpoint */
+/** Response from the spans events endpoint (is_transaction:true) */
 export const TransactionsResponseSchema = object({
   data: array(TransactionListItemSchema),
   meta: optional(

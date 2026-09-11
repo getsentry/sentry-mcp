@@ -79,7 +79,7 @@ describe("listTransactions", () => {
       id: "string",
       transaction: "string",
       timestamp: "date",
-      "transaction.duration": "duration",
+      "span.duration": "duration",
       project: "string",
     },
   };
@@ -91,7 +91,7 @@ describe("listTransactions", () => {
       id: `id-${i}`,
       transaction: `/api/endpoint-${i}`,
       timestamp: "2024-01-15T00:00:00Z",
-      "transaction.duration": 100 + i,
+      "span.duration": 100 + i,
       project: "my-project",
     }));
   }
@@ -105,12 +105,13 @@ describe("listTransactions", () => {
     expect(capturedUrl).toContain("/api/0/organizations/my-org/events/");
   });
 
-  test("sends dataset=transactions", async () => {
+  test("sends dataset=spans with is_transaction:true", async () => {
     mockOk({ data: [], meta: TX_META });
 
     await listTransactions("my-org", "my-project");
 
-    expect(capturedUrl).toContain("dataset=transactions");
+    expect(capturedUrl).toContain("dataset=spans");
+    expect(decodeURIComponent(capturedUrl)).toContain("is_transaction:true");
   });
 
   test("passes per_page capped at 100 even when limit is higher", async () => {
@@ -144,14 +145,12 @@ describe("listTransactions", () => {
     expect(capturedUrl).toContain(`sort=${encodeURIComponent("-timestamp")}`);
   });
 
-  test('sends sort=-transaction.duration for sort="duration"', async () => {
+  test('sends sort=-span.duration for sort="duration"', async () => {
     mockOk({ data: [], meta: TX_META });
 
     await listTransactions("my-org", "my-project", { sort: "duration" });
 
-    expect(decodeURIComponent(capturedUrl)).toContain(
-      "sort=-transaction.duration"
-    );
+    expect(decodeURIComponent(capturedUrl)).toContain("sort=-span.duration");
   });
 
   test("passes cursor when provided", async () => {
@@ -271,8 +270,8 @@ describe("listTransactions", () => {
 
     await listTransactions("my-org", "my-project");
 
-    expect(decodeURIComponent(capturedUrl)).toContain(
-      "query=project:my-project"
+    expect(decodeURIComponent(capturedUrl).replaceAll("+", " ")).toContain(
+      "query=is_transaction:true project:my-project"
     );
     // Should NOT appear as a separate project= param
     expect(capturedUrl).not.toMatch(/[?&]project=my-project/);
