@@ -3,9 +3,10 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import { type Span, setUser, startSpan } from "@sentry/core";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { UserInputError } from "./errors";
 import { structuredResult } from "./internal/tool-helpers/results";
 import { buildServer } from "./server";
 import type { Skill } from "./skills";
@@ -156,6 +157,50 @@ describe("buildServer", () => {
     },
     handler: async () => "result",
     ...options,
+  });
+
+  describe("tool failure telemetry", () => {
+    it("invokes the tool's onError hook when its handler throws", async () => {
+      const onError = vi.fn();
+      const server = buildServer({
+        context: baseContext,
+        tools: {
+          boom_tool: createMockTool("boom_tool", {
+            onError,
+            handler: async () => {
+              throw new UserInputError("nope");
+            },
+          }),
+        },
+      });
+
+      await callRegisteredTool(server, "boom_tool", {});
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError.mock.calls[0][0]).toBeInstanceOf(UserInputError);
+    });
+
+    it("invokes onError when a tool fails via execute_sentry_tool", async () => {
+      const onError = vi.fn();
+      const registry: Record<string, ToolConfig> = {
+        boom_tool: createMockTool("boom_tool", {
+          onError,
+          handler: async () => {
+            throw new UserInputError("nope");
+          },
+        }),
+      };
+      registry.execute_sentry_tool = createExecuteTool(() => registry);
+      const server = buildServer({ context: baseContext, tools: registry });
+
+      await callRegisteredTool(server, "execute_sentry_tool", {
+        name: "boom_tool",
+        arguments: {},
+      });
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError.mock.calls[0][0]).toBeInstanceOf(UserInputError);
+    });
   });
 
   it("registers and executes tools with the SDK v2 server", async () => {
