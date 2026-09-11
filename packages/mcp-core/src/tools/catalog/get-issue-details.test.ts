@@ -2621,4 +2621,39 @@ describe("structuredContent", () => {
     expect(payload.issue.queryPattern).toBe("SELECT * FROM users WHERE id = ?");
     expect(payload.issue.location).toBe("/api/checkout");
   });
+
+  it("caps related replays and reports the full count", async () => {
+    // a real issue came back with 51 of these
+    const many = Array.from({ length: 51 }, (_, i) =>
+      i.toString(16).padStart(32, "0"),
+    );
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent(),
+            formatted: { format: "json", content: FORMATTER_JSON },
+          }),
+      ),
+      // related ids come from replay-count, keyed by numeric issue id. Echo back whichever
+      // id was asked for: a preceding test can leave a different issue fixture registered.
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/replay-count/",
+        ({ request }) => {
+          const query = new URL(request.url).searchParams.get("query") ?? "";
+          const issueId = query.match(/issue\.id:\[(\d+)\]/)?.[1];
+          return HttpResponse.json(issueId ? { [issueId]: many } : {});
+        },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(payload.replays).not.toBeNull();
+    expect(payload.replays.relatedCount).toBe(51);
+    expect(payload.replays.related).toHaveLength(5);
+  });
 });

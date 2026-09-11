@@ -46,6 +46,8 @@ import { logError } from "../../telem/logging";
 import type { ServerContext } from "../../types";
 import { resolveCodeLocation } from "../support/code-location";
 
+// mirrors MAX_DISPLAY_REPLAYS in the markdown output
+const MAX_RELATED_REPLAYS = 5;
 const MAX_AI_CONVERSATION_MATCHES = 3;
 const AI_CONVERSATION_LOOKUP_WINDOW_MS = 24 * 60 * 60 * 1000;
 const TRACE_ID_PATTERN = /^[0-9a-fA-F]{32}$/;
@@ -108,6 +110,8 @@ export const getIssueDetailsOutputSchema = z.object({
     .object({
       attached: z.string().nullish(),
       related: z.array(z.string()),
+      // the full count, since `related` is capped
+      relatedCount: z.number(),
     })
     .nullish(),
   externalIssues: z
@@ -189,7 +193,12 @@ function buildReplays(
   if (!attached && related.length === 0) {
     return null;
   }
-  return { attached, related };
+  // markdown shows a count plus the first few, not every id
+  return {
+    attached,
+    related: related.slice(0, MAX_RELATED_REPLAYS),
+    relatedCount: related.length,
+  };
 }
 
 function buildIssueDetailsPayload({
