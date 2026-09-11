@@ -92,7 +92,7 @@ function makeTransaction(
     id: "b".repeat(32),
     transaction: "GET /api/users",
     timestamp: "2025-01-15T10:30:00Z",
-    "transaction.duration": 1234,
+    "span.duration": 1234,
     project: "my-project",
     ...overrides,
   };
@@ -160,9 +160,7 @@ describe("formatTraceRow (rendered mode)", () => {
   });
 
   test("includes formatted duration", () => {
-    const row = formatTraceRow(
-      makeTransaction({ "transaction.duration": 245 })
-    );
+    const row = formatTraceRow(makeTransaction({ "span.duration": 245 }));
     expect(row).toContain("245ms");
   });
 
@@ -208,9 +206,7 @@ describe("formatTraceRow (plain mode)", () => {
   });
 
   test("includes formatted duration", () => {
-    const row = formatTraceRow(
-      makeTransaction({ "transaction.duration": 245 })
-    );
+    const row = formatTraceRow(makeTransaction({ "span.duration": 245 }));
     expect(row).toContain("245ms");
   });
 
@@ -423,7 +419,7 @@ describe("formatTraceTable", () => {
 
   test("includes formatted durations", () => {
     const result = stripAnsi(
-      formatTraceTable([makeTransaction({ "transaction.duration": 1500 })])
+      formatTraceTable([makeTransaction({ "span.duration": 1500 })])
     );
     expect(result).toContain("1.50s");
   });

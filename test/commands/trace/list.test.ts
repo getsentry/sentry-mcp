@@ -274,7 +274,7 @@ describe("listCommand.func", () => {
       id: "evt001",
       transaction: "GET /api/users",
       timestamp: "2025-01-30T14:32:15+00:00",
-      "transaction.duration": 245,
+      "span.duration": 245,
       project: "test-project",
     },
     {
@@ -282,7 +282,7 @@ describe("listCommand.func", () => {
       id: "evt002",
       transaction: "POST /api/checkout",
       timestamp: "2025-01-30T14:31:00+00:00",
-      "transaction.duration": 1823,
+      "span.duration": 1823,
       project: "test-project",
     },
   ];

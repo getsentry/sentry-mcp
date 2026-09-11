@@ -26,8 +26,8 @@
 
 import { addBreadcrumb } from "@sentry/node-core/light";
 
-import type { SpanListItem, TransactionListItem } from "../types/index.js";
-import { listLogs, listSpans, listTransactions } from "./api-client.js";
+import type { SpanListItem } from "../types/index.js";
+import { listLogs, listSpans, queryEvents } from "./api-client.js";
 import {
   type ParsedOrgProject,
   ProjectSpecificationType,
@@ -452,12 +452,15 @@ const eventAdapter: FuzzyLookupAdapter = async (ctx) => {
   if (!(ctx.org && ctx.project)) {
     return [];
   }
-  const { data } = await listTransactions(ctx.org, ctx.project, {
+  const { data } = await queryEvents(ctx.org, {
+    dataset: "errors",
+    fields: ["id"],
+    query: `project:${ctx.project}`,
     limit: SCAN_LIMIT,
+    sort: "-timestamp",
     statsPeriod: ctx.period ?? SCAN_PERIODS.event,
-    sort: "date",
   });
-  return (data as TransactionListItem[]).map((t) => t.id);
+  return data.data.map((row) => String(row.id ?? "")).filter(Boolean);
 };
 
 const traceAdapter: FuzzyLookupAdapter = async (ctx) => {
