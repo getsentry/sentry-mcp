@@ -33,6 +33,7 @@ import { MCP_SERVER_NAME } from "./constants";
 import {
   formatErrorForUser,
   isExpectedToolError,
+  recordToolFailure,
 } from "./internal/error-handling";
 import type { Skill } from "./skills";
 import { type LogIssueOptions, logIssue } from "./telem/logging";
@@ -311,11 +312,14 @@ function configureServer({
       }
       setTag("app.server.mode.experimental", experimentalMode);
 
+      // Hoisted so both the handler path and the catch (onError) share one
+      // narrowing instead of re-casting `params`.
+      const rawParams =
+        params && typeof params === "object" && !Array.isArray(params)
+          ? (params as Record<string, unknown>)
+          : {};
+
       try {
-        const rawParams =
-          params && typeof params === "object" && !Array.isArray(params)
-            ? (params as Record<string, unknown>)
-            : {};
         // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
         const paramsWithConstraints = injectConstraintParams(
           rawParams,
@@ -399,6 +403,10 @@ function configureServer({
             await context.onUpstreamUnauthorized();
           } catch {}
         }
+
+        // Let the tool record its own failure telemetry (e.g. search_events
+        // logs the failing query).
+        recordToolFailure(tool, error, rawParams, contextWithToolAvailability);
 
         // CRITICAL: Tool errors MUST be returned as formatted text responses,
         // NOT thrown as exceptions. This ensures consistent error handling

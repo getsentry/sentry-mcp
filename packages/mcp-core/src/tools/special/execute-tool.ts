@@ -1,7 +1,10 @@
 import { type Span, type SpanAttributeValue, startSpan } from "@sentry/core";
 import { z } from "zod";
 import { defineTool } from "../../internal/tool-helpers/define";
-import { isExpectedToolError } from "../../internal/error-handling";
+import {
+  isExpectedToolError,
+  recordToolFailure,
+} from "../../internal/error-handling";
 import { UserInputError } from "../../errors";
 import { ALL_SKILLS } from "../../skills";
 import type { ServerContext } from "../../types";
@@ -67,6 +70,7 @@ async function executeCatalogToolWithSpan({
         if (!isExpectedToolError(error)) {
           span.recordException(error);
         }
+        recordToolFailure(tool, error, params, context);
         throw error;
       }
     },

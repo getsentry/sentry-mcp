@@ -116,3 +116,22 @@ export function sentryBeforeSend(event: any, hint: any): any {
 
   return scrubbedEvent as any;
 }
+
+// Emails in free-form text we log (search queries, error messages) are redacted
+// before logging. Kept out of SCRUB_PATTERNS/sentryBeforeSend on purpose: a
+// `user.email` in event context is intentional and useful.
+const EMAIL_PATTERN = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+
+/**
+ * Scrub tokens (OpenAI/Bearer/Sentry) and emails from a free-form string before
+ * logging it. Applied at the log call site so it covers every sink (stderr and
+ * Sentry Logs).
+ */
+export function scrubSensitiveText(text: string): string {
+  let scrubbed = text;
+  for (const { pattern, replacement } of SCRUB_PATTERNS) {
+    pattern.lastIndex = 0;
+    scrubbed = scrubbed.replace(pattern, replacement);
+  }
+  return scrubbed.replace(EMAIL_PATTERN, "[REDACTED_EMAIL]");
+}

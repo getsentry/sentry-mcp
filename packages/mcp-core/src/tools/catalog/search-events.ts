@@ -11,6 +11,8 @@ import {
   ParamProjectSlug,
   ParamRegionUrl,
 } from "../../schema";
+import { logWarn } from "../../telem/logging";
+import { scrubSensitiveText } from "../../telem/sentry";
 import type { ServerContext } from "../../types";
 import {
   isMetricsDataset,
@@ -466,6 +468,28 @@ export default defineTool({
     readOnlyHint: true,
     destructiveHint: false,
     openWorldHint: true,
+  },
+  // Log the failing query and how it failed so we can see which real queries
+  // fail (the failure surfaces as a UserInputError that isn't reported to
+  // Sentry). Scrubbed here so tokens/emails don't reach any log sink.
+  onError(error, params, context) {
+    const query = params.query;
+    logWarn("search_events query failed", {
+      loggerScope: ["tools", "search_events"],
+      extra: {
+        errorName: error instanceof Error ? error.name : typeof error,
+        // The message distinguishes causes that share a name (e.g.
+        // UserInputError: no-output vs validation vs provider outage).
+        errorMessage: scrubSensitiveText(
+          error instanceof Error ? error.message : String(error),
+        ),
+        organizationSlug:
+          (typeof params.organizationSlug === "string"
+            ? params.organizationSlug
+            : null) ?? context.constraints.organizationSlug,
+        query: typeof query === "string" ? scrubSensitiveText(query) : null,
+      },
+    });
   },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {

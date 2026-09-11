@@ -102,6 +102,16 @@ export interface ToolConfig<
     openWorldHint: boolean;
   };
   handler: ToolHandler<TSchema>;
+  /**
+   * Optional hook invoked when the handler throws, for tool-specific failure
+   * telemetry (e.g. logging the failing query). The error is still formatted
+   * and returned to the client afterward; this must not throw.
+   */
+  onError?(
+    error: unknown,
+    params: Record<string, unknown>,
+    context: ServerContext,
+  ): void;
 }
 
 /**
