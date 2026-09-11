@@ -36,6 +36,26 @@ export const searchEventsAgentOutputSchema = z
       .describe(
         "Separate environment filter for datasets like replays that do not support environment in the query string. Set only to a real environment the user named (see the 'Available environments' list); omit otherwise. Never use wildcards, placeholders, or example values.",
       ),
+    timeSeries: z
+      .object({
+        yAxis: z
+          .string()
+          .describe(
+            "The aggregate to plot over time, e.g. 'count()', 'count_unique(user)', 'sum(span.duration)'.",
+          ),
+        interval: z
+          .string()
+          .nullable()
+          .default(null)
+          .describe(
+            "Bucket size like '1h' or '1d'. Set ONLY when the user names a granularity (e.g. 'per hour' -> '1h'); otherwise null so Sentry picks a sensible bucket for the time range.",
+          ),
+      })
+      .nullable()
+      .default(null)
+      .describe(
+        "Set ONLY when the user wants a metric OVER TIME (e.g. 'per hour', 'per day', 'trend', 'over time'). Otherwise leave null and return a normal query. The interval is decided here, never required from the caller.",
+      ),
     timeRange: z
       .union([
         z.object({
@@ -60,6 +80,11 @@ export const searchEventsAgentOutputSchema = z
   .refine(
     (data) => {
       if (data.dataset === "replays") {
+        return true;
+      }
+
+      // Timeseries requests use yAxis/interval, not sort-in-fields.
+      if (data.timeSeries) {
         return true;
       }
 

@@ -35,6 +35,7 @@ import {
   formatLogResults,
   formatProfileResults,
   formatSpanResults,
+  formatTimeSeriesResults,
   formatTraceMetricsResults,
 } from "../support/search-events/formatters";
 import {
@@ -534,6 +535,7 @@ export default defineTool({
     let timeParams: { statsPeriod?: string; start?: string; end?: string };
     let explanation: string | undefined;
     let environment: string | string[] | null | undefined = params.environment;
+    let timeSeries: { yAxis: string; interval: string | null } | null = null;
 
     const explicitSort = params.sort?.trim() || undefined;
     const hasExplicitDataset = params.dataset !== undefined;
@@ -583,6 +585,7 @@ export default defineTool({
               : (params.fields ?? defaultFieldsForDataset(inputDataset)),
           sort: explicitSort || defaultSortForDataset(inputDataset),
           environment: params.environment ?? null,
+          timeSeries: null,
           timeRange: { statsPeriod: params.period ?? "14d" },
           explanation: "",
         }),
@@ -608,7 +611,11 @@ export default defineTool({
         shouldTrustStructuredTraceSearch ||
         (hasStructuredQuery && parsed.dataset === inputDataset);
 
+      timeSeries = parsed.timeSeries ?? null;
+
+      // Time series requests use yAxis/interval, so sort is not required.
       if (
+        !timeSeries &&
         !parsed.sort?.trim() &&
         !(shouldTrustExplicitSearchParams && hasExplicitSort)
       ) {
@@ -749,6 +756,48 @@ export default defineTool({
         directToolNames: context.directToolNames,
       });
       return withEnvironmentNote(replayOutput);
+    }
+
+    if (timeSeries) {
+      const timeSeriesQuery = applyEnvironmentToEventsQuery(
+        dataset,
+        sentryQuery,
+        environment,
+      );
+      const series = await apiService.getEventsTimeSeries({
+        organizationSlug,
+        query: timeSeriesQuery,
+        yAxis: timeSeries.yAxis,
+        interval: timeSeries.interval ?? undefined,
+        projectId,
+        dataset,
+        ...timeParams,
+      });
+      const statsUrl = apiService.getEventsExplorerUrl(
+        organizationSlug,
+        timeSeriesQuery,
+        projectId,
+        dataset,
+        [timeSeries.yAxis],
+        `-${timeSeries.yAxis}`,
+        [timeSeries.yAxis],
+        [],
+        timeParams.statsPeriod,
+        timeParams.start,
+        timeParams.end,
+      );
+      return withEnvironmentNote(
+        formatTimeSeriesResults({
+          series,
+          yAxis: timeSeries.yAxis,
+          interval: timeSeries.interval,
+          inputQuery: params.query || timeSeriesQuery,
+          includeExplanation: params.includeExplanation,
+          explanation,
+          timeRange: timeParams,
+          url: statsUrl,
+        }),
+      );
     }
 
     // Sentry rejects the request if the sort column isn't in the selected

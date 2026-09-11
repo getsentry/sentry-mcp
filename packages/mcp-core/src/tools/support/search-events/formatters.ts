@@ -927,3 +927,88 @@ export function formatTraceMetricsResults(
 
   return output;
 }
+
+/**
+ * Format an events-stats (timeseries) result: a metric bucketed over time.
+ * `interval` is null when Sentry chose the bucket size for the range.
+ */
+export function formatTimeSeriesResults(params: {
+  series: { data: Array<[number, Array<{ count?: number | null }>]> };
+  yAxis: string;
+  interval: string | null;
+  inputQuery: string;
+  includeExplanation?: boolean;
+  explanation?: string;
+  timeRange?: SearchTimeRange;
+  url?: string;
+}): string {
+  const {
+    series,
+    yAxis,
+    interval,
+    includeExplanation,
+    explanation,
+    timeRange,
+    url,
+  } = params;
+
+  const points = series.data.map(([ts, values]) => ({
+    time: new Date(ts * 1000).toISOString().slice(0, 16).replace("T", " "),
+    value: values[0]?.count ?? 0,
+  }));
+
+  const total = points.reduce((sum, p) => sum + p.value, 0);
+  const peak = points.reduce<(typeof points)[number] | undefined>(
+    (max, p) => (max === undefined || p.value > max.value ? p : max),
+    undefined,
+  );
+
+  const MAX_ROWS = 48;
+  const shown = points.length > MAX_ROWS ? points.slice(-MAX_ROWS) : points;
+  const truncatedNote =
+    points.length > MAX_ROWS
+      ? ` (most recent ${MAX_ROWS} of ${points.length})`
+      : "";
+
+  const lines: string[] = [`# ${yAxis} over time`];
+
+  if (includeExplanation && explanation) {
+    lines.push("", formatExplanation(explanation));
+  }
+
+  lines.push("", "## Series");
+  lines.push(`- **yAxis**: \`${yAxis}\``);
+  lines.push(
+    `- **Interval**: ${interval ? `\`${interval}\`` : "auto (chosen by Sentry for the range)"}`,
+  );
+  if (timeRange?.statsPeriod) {
+    lines.push(`- **Time range**: last ${timeRange.statsPeriod}`);
+  } else if (timeRange?.start && timeRange?.end) {
+    lines.push(`- **Time range**: ${timeRange.start} → ${timeRange.end}`);
+  }
+  lines.push(`- **Total**: ${total.toLocaleString()}`);
+  if (peak) {
+    lines.push(`- **Peak**: ${peak.value.toLocaleString()} at ${peak.time}`);
+  }
+
+  if (shown.length > 0) {
+    lines.push(
+      "",
+      `## Buckets${truncatedNote}`,
+      "",
+      "| Time (UTC) | Value |",
+      "| --- | --- |",
+    );
+    for (const p of shown) {
+      lines.push(`| ${p.time} | ${p.value.toLocaleString()} |`);
+    }
+  } else {
+    lines.push("", "No data points in this range.");
+  }
+
+  if (url) {
+    lines.push("", formatSentryDashboardLink(url).trimEnd());
+  }
+
+  return lines.join("\n");
+}
