@@ -128,6 +128,39 @@ export function parsePort(value: string): number {
 const LOCALHOST_ORIGIN_RE =
   /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 const LOCAL_UI_ORIGIN = "https://local.sentry.dev";
+const LOCAL_UI_PREVIEW_HOST_RE = /^sentry-local-git-[a-z0-9-]+\.sentry\.dev$/;
+
+export function isLoopbackHost(host: string): boolean {
+  const normalized = host.replace(/^\[|\]$/g, "").toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1"
+  );
+}
+
+type LocalReceiverOptions = {
+  /** Enables stateful UI routes only when the receiver itself is loopback-bound. */
+  uiActions?: boolean;
+};
+
+function isHostedUiOrigin(origin: string | undefined): origin is string {
+  if (!origin) {
+    return false;
+  }
+
+  if (!URL.canParse(origin)) {
+    return false;
+  }
+
+  const url = new URL(origin);
+  return (
+    origin === url.origin &&
+    url.protocol === "https:" &&
+    (url.origin === LOCAL_UI_ORIGIN ||
+      LOCAL_UI_PREVIEW_HOST_RE.test(url.hostname))
+  );
+}
 
 function isHostedUiStreamRequest(request: {
   method: string;
@@ -135,7 +168,7 @@ function isHostedUiStreamRequest(request: {
   header: (name: string) => string | undefined;
 }): boolean {
   if (
-    request.header("origin") !== LOCAL_UI_ORIGIN ||
+    !isHostedUiOrigin(request.header("origin")) ||
     request.path !== "/stream"
   ) {
     return false;
@@ -151,9 +184,9 @@ function isHostedUiStreamRequest(request: {
 /**
  * Build the Hono application.
  *
- * CORS is restricted to localhost origins — dev stacks send from arbitrary
- * `localhost:*` ports (Vite, Next, Astro, etc.) but we must not allow
- * arbitrary remote origins to read the SSE envelope stream.
+ * CORS is restricted to localhost origins and the production/current-preview
+ * Sentry Local UIs. Dev stacks send from arbitrary `localhost:*` ports (Vite,
+ * Next, Astro, etc.). Remote origins may read only the SSE envelope stream.
  */
 
 /**
@@ -210,7 +243,8 @@ function buildSSEHandler(
 }
 
 export function buildApp(
-  spotlightBuffer: ReturnType<typeof createSpotlightBuffer>
+  spotlightBuffer: ReturnType<typeof createSpotlightBuffer>,
+  { uiActions = false }: LocalReceiverOptions = {}
 ): Hono {
   const app = new Hono();
 
@@ -221,7 +255,7 @@ export function buildApp(
 
   const localhostCors = cors({
     origin: (origin) => (LOCALHOST_ORIGIN_RE.test(origin) ? origin : null),
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
     allowHeaders: [
       "Content-Type",
       "Content-Encoding",
@@ -230,13 +264,14 @@ export function buildApp(
     ],
   });
   const hostedStreamCors = cors({
-    origin: LOCAL_UI_ORIGIN,
+    origin: (origin) => (isHostedUiOrigin(origin) ? origin : null),
     allowMethods: ["GET", "OPTIONS"],
     allowHeaders: ["Last-Event-ID"],
   });
 
   app.use("*", async (c, next) => {
-    const hostedUiOrigin = c.req.header("origin") === LOCAL_UI_ORIGIN;
+    const requestOrigin = c.req.header("origin") ?? "";
+    const hostedUiOrigin = isHostedUiOrigin(requestOrigin);
     const hostedStreamRequest = isHostedUiStreamRequest(c.req);
 
     // The hosted UI may only read the event stream. CORS alone cannot stop a
@@ -252,7 +287,7 @@ export function buildApp(
     if (c.req.method === "OPTIONS") {
       const isPrivateNetworkRequest =
         c.req.header("access-control-request-private-network") === "true";
-      c.header("Access-Control-Allow-Origin", LOCAL_UI_ORIGIN);
+      c.header("Access-Control-Allow-Origin", requestOrigin);
       c.header("Access-Control-Allow-Methods", "GET, OPTIONS");
       c.header("Access-Control-Allow-Headers", "Last-Event-ID");
       if (isPrivateNetworkRequest) {
@@ -275,6 +310,48 @@ export function buildApp(
   });
 
   app.get("/health", (c) => c.text("OK"));
+
+  // These endpoints deliberately describe and manage only the in-memory
+  // receiver session. They remain unavailable to the hosted UI origin; the
+  // CORS guard above limits them to a loopback-served Local UI.
+  app.get("/capabilities", (c) =>
+    uiActions
+      ? c.json({
+          actions: { clear: true, envelope: true },
+          retention: "session",
+        })
+      : c.body(null, 403)
+  );
+
+  app.delete("/clear", (c) => {
+    if (!uiActions) {
+      return c.body(null, 403);
+    }
+    spotlightBuffer.clear();
+    return c.body(null, 204);
+  });
+
+  app.get("/envelope/:id", (c) => {
+    if (!uiActions) {
+      return c.body(null, 403);
+    }
+    try {
+      const container = spotlightBuffer.read({
+        envelopeId: c.req.param("id"),
+      })[0];
+      if (!container) {
+        return c.body(null, 404);
+      }
+      return new Response(new Uint8Array(container.getData()), {
+        headers: { "Content-Type": container.getContentType() },
+      });
+    } catch (err) {
+      logger.debug(
+        `Envelope lookup failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+      return c.body(null, 404);
+    }
+  });
 
   const ingest = async (c: {
     req: {
@@ -912,7 +989,7 @@ export const serverCommand = buildCommand({
       });
     }
 
-    const app = buildApp(buffer);
+    const app = buildApp(buffer, { uiActions: isLoopbackHost(flags.host) });
 
     const { server, port: boundPort } = await tryListen(
       app,

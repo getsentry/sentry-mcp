@@ -38,6 +38,7 @@ import {
   buildApp,
   consumeSSE,
   DEFAULT_PORT,
+  isLoopbackHost,
   isServerRunning,
   parseFilter,
   parseFormat,
@@ -201,7 +202,7 @@ async function startBackgroundServer({
   showAttributes,
 }: EventTailOptions): Promise<EventTail> {
   const buffer = createSpotlightBuffer(BUFFER_SIZE);
-  const app = buildApp(buffer);
+  const app = buildApp(buffer, { uiActions: isLoopbackHost(host) });
   const { server, port: boundPort } = await tryListen(app, port, host);
   const url = formatLocalServerUrl(host, boundPort);
 
@@ -588,7 +589,7 @@ async function* runWithVerify(
   commandSource: string
 ): AsyncGenerator<never, void, unknown> {
   const buffer = createSpotlightBuffer(BUFFER_SIZE);
-  const app = buildApp(buffer);
+  const app = buildApp(buffer, { uiActions: isLoopbackHost(flags.host) });
   const { server, port: boundPort } = await tryListen(
     app,
     flags.port,
