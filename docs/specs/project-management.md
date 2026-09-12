@@ -25,7 +25,7 @@ Core project tools:
 ```typescript
 create_project({
   organizationSlug: "my-org",
-  teamSlug: "my-team",
+  teamSlug: "my-team",    // optional; inferred when omitted
   name: "My Project",
   slug: "my-project",      // optional
   platform: "javascript",  // optional
@@ -57,7 +57,7 @@ remove_team_from_project({
 
 `create_project` accepts core setup fields:
 - `organizationSlug`
-- `teamSlug`
+- optional `teamSlug`
 - `name`
 - optional `slug`
 - optional `platform`
@@ -66,10 +66,22 @@ remove_team_from_project({
 It does not expose ownership rules, alert rule setup, `defaultRules`, or broader
 project settings.
 
+When `teamSlug` is omitted, the tool infers a deterministic default team from the
+organization team list:
+1. Prefer teams where the caller is a member (`isMember`).
+2. Otherwise prefer teams with `hasAccess`.
+3. Among remaining candidates, pick the earliest `dateCreated`, then lowest slug.
+
+If no teams exist, creation fails with guidance to create a team or pass
+`teamSlug` explicitly. An explicit `teamSlug` always wins and skips inference.
+This local fallback remains until upstream project-create defines an implied
+default team.
+
 Successful responses must include:
 - Project ID
 - Project slug
 - Project name
+- Team slug (marked `(default)` when inferred)
 - `SENTRY_DSN`
 
 The DSN contract is strict because SDK setup normally follows project creation.

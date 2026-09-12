@@ -12,7 +12,7 @@ import {
   ParamTeamSlug,
   ParamPlatform,
 } from "../../schema";
-import type { ClientKey, SentryApiService } from "../../api-client/index";
+import type { ClientKey, SentryApiService, Team } from "../../api-client/index";
 
 type RepositoryMatch = {
   name: string;
@@ -20,6 +20,79 @@ type RepositoryMatch = {
     id: string;
   };
 };
+
+type TeamCandidate = Team & {
+  dateCreated?: string;
+  isMember?: boolean;
+  hasAccess?: boolean;
+};
+
+const DEFAULT_TEAM_LOOKUP_LIMIT = 100;
+
+/**
+ * Choose a deterministic default team when create_project omits teamSlug.
+ *
+ * Rule (stable until upstream project-create gains an implied default):
+ * 1. Prefer teams the caller is a member of (`isMember`), when that signal exists.
+ * 2. Otherwise prefer teams with `hasAccess === true`, when that signal exists.
+ * 3. Among remaining candidates, pick the earliest `dateCreated`, then lowest slug.
+ */
+export function selectDefaultTeam(teams: TeamCandidate[]): TeamCandidate | null {
+  if (teams.length === 0) {
+    return null;
+  }
+
+  const memberTeams = teams.filter((team) => team.isMember === true);
+  const accessibleTeams = teams.filter((team) => team.hasAccess === true);
+  const candidates =
+    memberTeams.length > 0
+      ? memberTeams
+      : accessibleTeams.length > 0
+        ? accessibleTeams
+        : teams;
+
+  return [...candidates].sort((left, right) => {
+    const leftCreated = left.dateCreated
+      ? Date.parse(left.dateCreated)
+      : Number.POSITIVE_INFINITY;
+    const rightCreated = right.dateCreated
+      ? Date.parse(right.dateCreated)
+      : Number.POSITIVE_INFINITY;
+
+    if (leftCreated !== rightCreated) {
+      return leftCreated - rightCreated;
+    }
+
+    return left.slug.localeCompare(right.slug);
+  })[0];
+}
+
+async function resolveTeamSlug({
+  apiService,
+  organizationSlug,
+  teamSlug,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  teamSlug: string | null;
+}): Promise<{ teamSlug: string; inferred: boolean }> {
+  if (teamSlug) {
+    return { teamSlug, inferred: false };
+  }
+
+  const teams = (await apiService.listTeams(organizationSlug, {
+    limit: DEFAULT_TEAM_LOOKUP_LIMIT,
+  })) as TeamCandidate[];
+  const defaultTeam = selectDefaultTeam(teams);
+
+  if (!defaultTeam) {
+    throw new UserInputError(
+      `No teams found in organization "${organizationSlug}". Create a team with create_team, or pass teamSlug explicitly.`,
+    );
+  }
+
+  return { teamSlug: defaultTeam.slug, inferred: true };
+}
 
 function getUsableClientKey(clientKeys: ClientKey[]): ClientKey | undefined {
   return (
@@ -122,10 +195,18 @@ export default defineTool({
     "",
     "Returns the created project slug and a usable SENTRY_DSN when key setup succeeds.",
     "",
+    "teamSlug is optional. When omitted, the project is created on a deterministic default team:",
+    "prefer a team the caller belongs to, then the earliest created accessible team.",
+    "Pass teamSlug explicitly when the caller cares which team owns the project.",
+    "",
     "Be careful when using this tool!",
     "",
     "<examples>",
-    "### Create new project with team",
+    "### Create new project without choosing a team",
+    "```",
+    "create_project(organizationSlug='my-organization', name='my-project', platform='javascript')",
+    "```",
+    "### Create new project with an explicit team",
     "```",
     "create_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')",
     "```",
@@ -138,11 +219,20 @@ export default defineTool({
     "create_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript', repository='getsentry/sentry')",
     "```",
     "</examples>",
+    "",
+    "<hints>",
+    "- Omit teamSlug for headless onboarding when any sensible team is fine.",
+    "- Use find_teams when the user needs to choose among multiple teams.",
+    "</hints>",
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
     regionUrl: ParamRegionUrl.nullable().default(null),
-    teamSlug: ParamTeamSlug,
+    teamSlug: ParamTeamSlug.describe(
+      "Optional team slug. When omitted, uses a deterministic default team (prefer a team the caller belongs to, then the earliest created accessible team). Use find_teams to list teams.",
+    )
+      .nullable()
+      .default(null),
     name: z
       .string()
       .trim()
@@ -174,7 +264,13 @@ export default defineTool({
     const organizationSlug = params.organizationSlug;
 
     setTag("organization.slug", organizationSlug);
-    setTag("team.slug", params.teamSlug);
+
+    const { teamSlug, inferred: teamInferred } = await resolveTeamSlug({
+      apiService,
+      organizationSlug,
+      teamSlug: params.teamSlug,
+    });
+    setTag("team.slug", teamSlug);
 
     // Resolve repository intent before creating the project so bad or ambiguous
     // repo input cannot leave behind an otherwise unwanted project.
@@ -189,7 +285,7 @@ export default defineTool({
 
     const project = await apiService.createProject({
       organizationSlug,
-      teamSlug: params.teamSlug,
+      teamSlug,
       name: params.name,
       slug: params.slug,
       platform: params.platform,
@@ -233,6 +329,7 @@ export default defineTool({
     output += `**ID**: ${project.id}\n`;
     output += `**Slug**: ${project.slug}\n`;
     output += `**Name**: ${project.name}\n`;
+    output += `**Team**: ${teamSlug}${teamInferred ? " (default)" : ""}\n`;
     output += `**SENTRY_DSN**: ${sentryDsn ?? "unavailable"}\n\n`;
     if (repositoryMatch && repositoryLinked) {
       output += `**Repository**: ${repositoryMatch.name} (linked)\n`;
@@ -249,6 +346,9 @@ export default defineTool({
       output += `- Please tell the user the project slug.\n`;
       output += `- Project creation succeeded, but SENTRY_DSN could not be retrieved or created.\n`;
       output += `- Use create_dsn for this project before initializing Sentry SDKs.\n`;
+    }
+    if (teamInferred) {
+      output += `- teamSlug was omitted, so the project was created on default team \`${teamSlug}\`.\n`;
     }
     if (repositoryMatch && repositoryLinked) {
       output += `- Repository linked to project with a root code mapping: ${repositoryMatch.name}\n`;
