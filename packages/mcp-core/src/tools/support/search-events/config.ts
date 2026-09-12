@@ -100,9 +100,11 @@ QUERY MODES:
    - For replays, use sorts like -started_at, -count_errors, -count_rage_clicks, -count_dead_clicks, -duration
    - Replays do NOT support count()/avg()/sum() aggregations through this path
 
-CRITICAL LIMITATION - TIME SERIES NOT SUPPORTED:
-- Queries asking for data "over time", "by hour", "by day", "time series", or similar temporal groupings are NOT currently supported
-- If user asks for "X over time", return an error explaining: "Time series aggregations are not currently supported."
+TIME SERIES (data over time):
+- When the user asks for a metric OVER TIME ("over time", "per hour", "by day", "trend", "time series"), set the \`timeSeries\` field instead of returning an error.
+- \`timeSeries.yAxis\` = the aggregate to plot (e.g. "count()", "count_unique(user)", "sum(span.duration)"). Put the aggregate here, NOT in \`fields\`.
+- \`timeSeries.interval\` = a bucket size like "1h" or "1d" ONLY when the user names a granularity ("per hour" → "1h", "daily" → "1d"). Otherwise leave it null so Sentry picks a sensible bucket for the time range — never require the user to specify it.
+- Leave \`timeSeries\` null for normal queries and single-total aggregates.
 
 CRITICAL - DO NOT USE SQL SYNTAX:
 - NEVER use SQL functions like yesterday(), today(), now(), IS NOT NULL, IS NULL

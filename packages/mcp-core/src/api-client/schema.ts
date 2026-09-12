@@ -2206,3 +2206,21 @@ export const AgenticOnboardingRunSchema = z.object({
   runStatus: AgenticOnboardingRunStatusSchema,
   stages: z.array(AgenticOnboardingStageStateSchema),
 });
+
+/**
+ * Response from the events-stats (timeseries) endpoint for a single yAxis:
+ * a series of `[unixTimestampSeconds, [{ count }]]` buckets. `count` holds the
+ * yAxis value for that bucket regardless of the aggregate function.
+ */
+export const EventsStatsResponseSchema = z
+  .object({
+    data: z.array(
+      z.tuple([
+        z.number(),
+        z.array(z.object({ count: z.number().nullish() }).passthrough()),
+      ]),
+    ),
+    start: z.number().optional(),
+    end: z.number().optional(),
+  })
+  .passthrough();
