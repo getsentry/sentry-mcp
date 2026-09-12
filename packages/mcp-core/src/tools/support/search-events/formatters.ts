@@ -929,6 +929,16 @@ export function formatTraceMetricsResults(
 }
 
 /**
+ * Whether summing per-bucket values yields a meaningful series total.
+ * Only `count()` and `sum(...)` are additive across time buckets;
+ * `count_unique`, `avg`, percentiles, min/max, rates, etc. are not.
+ */
+function isAdditiveAggregate(yAxis: string): boolean {
+  const fn = yAxis.trim().toLowerCase();
+  return fn === "count()" || fn.startsWith("sum(");
+}
+
+/**
  * Format an events-stats (timeseries) result: a metric bucketed over time.
  * `interval` is null when Sentry chose the bucket size for the range.
  */
@@ -946,6 +956,7 @@ export function formatTimeSeriesResults(params: {
     series,
     yAxis,
     interval,
+    inputQuery,
     includeExplanation,
     explanation,
     timeRange,
@@ -957,7 +968,11 @@ export function formatTimeSeriesResults(params: {
     value: values[0]?.count ?? 0,
   }));
 
-  const total = points.reduce((sum, p) => sum + p.value, 0);
+  // Total is only meaningful for additive aggregates; summing count_unique /
+  // avg / percentile buckets would be wrong, so omit it for those.
+  const total = isAdditiveAggregate(yAxis)
+    ? points.reduce((sum, p) => sum + p.value, 0)
+    : null;
   const peak = points.reduce<(typeof points)[number] | undefined>(
     (max, p) => (max === undefined || p.value > max.value ? p : max),
     undefined,
@@ -970,23 +985,20 @@ export function formatTimeSeriesResults(params: {
       ? ` (most recent ${MAX_ROWS} of ${points.length})`
       : "";
 
-  const lines: string[] = [`# ${yAxis} over time`];
+  const lines: string[] = [`# Search Results for "${inputQuery}"`];
 
   if (includeExplanation && explanation) {
     lines.push("", formatExplanation(explanation));
   }
 
-  lines.push("", "## Series");
-  lines.push(`- **yAxis**: \`${yAxis}\``);
+  lines.push("", `## ${yAxis} over time`);
   lines.push(
     `- **Interval**: ${interval ? `\`${interval}\`` : "auto (chosen by Sentry for the range)"}`,
   );
-  if (timeRange?.statsPeriod) {
-    lines.push(`- **Time range**: last ${timeRange.statsPeriod}`);
-  } else if (timeRange?.start && timeRange?.end) {
-    lines.push(`- **Time range**: ${timeRange.start} → ${timeRange.end}`);
+  lines.push(`- **Time range**: ${formatExecutedTimeRange(timeRange)}`);
+  if (total !== null) {
+    lines.push(`- **Total**: ${total.toLocaleString()}`);
   }
-  lines.push(`- **Total**: ${total.toLocaleString()}`);
   if (peak) {
     lines.push(`- **Peak**: ${peak.value.toLocaleString()} at ${peak.time}`);
   }

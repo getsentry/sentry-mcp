@@ -55,6 +55,7 @@ import {
   ErrorsSearchResponseSchema,
   EventAttachmentListSchema,
   EventSchema,
+  EventsStatsResponseSchema,
   ExternalIssueListSchema,
   FlamegraphSchema,
   IssueActivityListResponseSchema,
@@ -97,7 +98,6 @@ import {
   UptimeMonitorSchema,
   UserReportListSchema,
   UserSchema,
-  EventsStatsResponseSchema,
 } from "./schema";
 import type {
   AgenticOnboardingRun,

@@ -244,6 +244,67 @@ describe("search_events", () => {
     expect(result).toContain("| Time (UTC) | Value |");
   });
 
+  it("omits Total for non-additive timeseries aggregates", async () => {
+    const output = {
+      dataset: "errors" as const,
+      query: "",
+      fields: [] as string[],
+      sort: "-timestamp",
+      environment: null,
+      timeSeries: { yAxis: "count_unique(user)", interval: "1h" },
+      timeRange: { statsPeriod: "24h" },
+      explanation: "",
+    };
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify(output),
+      experimental_output: output,
+      finishReason: "stop" as const,
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      warnings: [] as const,
+    } as any);
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events-stats/",
+        () =>
+          HttpResponse.json({
+            data: [
+              [1757548800, [{ count: 5 }]],
+              [1757552400, [{ count: 8 }]],
+            ],
+          }),
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "errors",
+        query: "unique users per hour",
+        fields: null,
+        sort: null,
+        period: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        accessToken: "test-token",
+        userId: "user-123",
+        clientId: "client-123",
+        grantedSkills: new Set(),
+        constraints: {},
+        sentryHost: "sentry.io",
+      },
+    );
+
+    expect(result).toContain("count_unique(user) over time");
+    expect(result).not.toContain("**Total**");
+    // Peak (the max bucket) is still meaningful for non-additive aggregates.
+    expect(result).toContain("**Peak**: 8");
+  });
+
   it("should handle spans dataset queries", async () => {
     // Mock AI response for spans dataset
     mockGenerateText.mockResolvedValueOnce(
