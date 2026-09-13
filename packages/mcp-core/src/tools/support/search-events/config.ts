@@ -256,7 +256,7 @@ COMMON ERRORS TO AVOID:
 export const BASE_COMMON_FIELDS = {
   project: "Project slug",
   timestamp: "When the event occurred",
-  environment: "Environment (production, staging, development)",
+  environment: "Deployment environment name (omit unless the user names one)",
   release: "Release version",
   platform: "Platform (javascript, python, etc.)",
   "user.id": "User ID",

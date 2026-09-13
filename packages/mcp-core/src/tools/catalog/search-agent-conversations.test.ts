@@ -16,7 +16,7 @@ const baseConversation = {
   llmCalls: 2,
   toolCalls: 1,
   totalTokens: 1200,
-  totalCost: 0.012,
+  totalCost: 0.6260719999999997,
   startTimestamp: 1713805400000,
   endTimestamp: 1713805415000,
   traceCount: 1,
@@ -113,7 +113,7 @@ describe("search_agent_conversations", () => {
             "toolNames": [
               "search_events",
             ],
-            "totalCost": 0.012,
+            "totalCost": "$0.626",
             "totalTokens": 1200,
             "traceCount": 1,
             "url": "https://test-org.sentry.io/explore/conversations/conv-123/",
@@ -137,6 +137,42 @@ describe("search_agent_conversations", () => {
     expect(structuredContent.conversations[0]?.user).not.toHaveProperty(
       "ip_address",
     );
+  });
+
+  it("uses the Agent Monitoring display rules for small and missing costs", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/agents/conversations/",
+        () =>
+          HttpResponse.json([
+            {
+              ...baseConversation,
+              conversationId: "sub-cent",
+              totalCost: 0.00333,
+            },
+            { ...baseConversation, conversationId: "missing", totalCost: 0 },
+          ]),
+      ),
+    );
+
+    const result = await searchAIConversations.handler(
+      {
+        organizationSlug: "test-org",
+        period: "30d",
+        limit: 10,
+      },
+      getServerContext(),
+    );
+
+    const structuredContent = getStructuredContent<{
+      conversations: Array<{ totalCost: string }>;
+    }>(result);
+
+    expect(
+      structuredContent.conversations.map(
+        (conversation) => conversation.totalCost,
+      ),
+    ).toEqual(["<$0.01", "—"]);
   });
 
   it("keeps search results concise for large conversations", async () => {

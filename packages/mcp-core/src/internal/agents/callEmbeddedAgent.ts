@@ -1,22 +1,22 @@
 import {
-  generateText,
-  Output,
-  type Tool,
   APICallError,
+  generateText,
   NoObjectGeneratedError,
   NoOutputGeneratedError,
+  Output,
   RetryError,
   stepCountIs,
+  type Tool,
 } from "ai";
-import { getAgentProvider } from "./provider-factory";
+import type { z } from "zod";
 import {
   AgentExecutionError,
   ConfigurationError,
-  UserInputError,
   LLMProviderError,
+  UserInputError,
 } from "../../errors";
 import { logIssue, logWarn } from "../../telem/logging";
-import type { z } from "zod";
+import { getAgentProvider } from "./provider-factory";
 
 /**
  * Resolve the underlying provider failure from an AI SDK error.
@@ -210,6 +210,21 @@ export async function callEmbeddedAgent<
       );
     }
 
+    // NoOutputGeneratedError: the model exhausted its steps without emitting the
+    // structured output (typically after repeated tool/validation failures). This
+    // is a recoverable model limitation, not a system fault — surface it as user
+    // input like its NoObjectGeneratedError sibling and log a warning, instead of
+    // filing a Sentry issue for every occurrence.
+    if (NoOutputGeneratedError.isInstance(error)) {
+      logWarn("Embedded agent produced no output", {
+        loggerScope: ["agents", "embedded"],
+        extra: { errorMessage: error.message },
+      });
+      throw new UserInputError(
+        "The AI could not construct a valid query for this request. Please rephrase or narrow it — for example, specify the fields, a real environment name, or a time range.",
+      );
+    }
+
     // Handle LLM provider errors with user-friendly messages.
     // These are operational availability failures that should NOT create Sentry
     // issues per request (budget exhaustion, rate limits, provider outages).
@@ -242,9 +257,9 @@ export async function callEmbeddedAgent<
       throw error;
     }
 
-    // Unexpected agent failures (including NoOutputGeneratedError): file one
-    // Sentry issue, then throw a typed error so AI-powered tools can fall back
-    // or return a graceful response instead of hard-failing the MCP tool.
+    // Genuinely unexpected agent failures: file one Sentry issue, then throw a
+    // typed error so AI-powered tools can fall back or return a graceful response
+    // instead of hard-failing the MCP tool.
     throw toAgentExecutionError(error);
   }
 }

@@ -339,10 +339,18 @@ function buildNoChangesOutput(params: {
 
 function isAssigneeAlreadySet(
   issue: Issue,
-  requestedAssignee: string | undefined,
+  requestedAssignee: string | null | undefined,
   currentUserId: string | null | undefined,
 ): boolean {
-  if (!requestedAssignee || !issue.assignedTo) {
+  if (requestedAssignee === undefined) {
+    return false;
+  }
+
+  if (requestedAssignee === null) {
+    return !issue.assignedTo;
+  }
+
+  if (!issue.assignedTo) {
     return false;
   }
 
@@ -622,12 +630,13 @@ export default defineTool({
   description: [
     "Update a Sentry issue's status or assignment.",
     "",
-    "Use this to resolve, reopen, assign, or ignore an issue.",
+    "Use this to resolve, reopen, assign, unassign, or ignore an issue.",
     "",
     "<examples>",
     "```",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='resolved')",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', assignedTo='user:123456')",
+    "update_issue(organizationSlug='my-org', issueId='PROJECT-123', assignedTo=null)",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored')",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='forever')",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='untilOccurrenceCount', ignoreCount=100, ignoreWindowMinutes=60)",
@@ -638,7 +647,7 @@ export default defineTool({
     "<hints>",
     "- Provide `issueUrl` or `organizationSlug` + `issueId`.",
     "- At least one of `status` or `assignedTo` is required.",
-    "- `assignedTo` format: `user:ID` or `team:ID_OR_SLUG`.",
+    "- Omit `assignedTo` to leave assignment unchanged. Pass `null` to unassign; otherwise use `user:ID` or `team:ID_OR_SLUG`.",
     "- Use `execute_sentry_tool(name='whoami', arguments={})` to find your user ID for self-assignment.",
     "- Status values: `resolved`, `resolvedInNextRelease`, `unresolved`, `ignored`.",
     "- `status='ignored'` defaults to `ignoreMode='untilEscalating'`.",
@@ -688,7 +697,7 @@ export default defineTool({
     }
 
     // Validate that at least one update parameter is provided
-    if (!params.status && !params.assignedTo) {
+    if (params.status === undefined && params.assignedTo === undefined) {
       throw new UserInputError(
         "At least one of `status` or `assignedTo` must be provided to update the issue",
       );
@@ -762,7 +771,11 @@ export default defineTool({
       currentIssue.shortId,
     );
 
-    if (!updateStatus && !updateAssignedTo && !updateIgnore) {
+    if (
+      updateStatus === undefined &&
+      updateAssignedTo === undefined &&
+      updateIgnore === undefined
+    ) {
       const commentResult = await tryPostReasonComment(
         apiService,
         orgSlug,
@@ -834,7 +847,7 @@ export default defineTool({
       }
     }
 
-    if (updateAssignedTo && assignmentChanged) {
+    if (updateAssignedTo !== undefined && assignmentChanged) {
       const oldAssignee = formatAssignedTo(currentIssue.assignedTo ?? null);
       const newAssignee =
         params.assignedTo === "me"

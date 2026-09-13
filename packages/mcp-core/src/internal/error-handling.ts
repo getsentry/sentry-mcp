@@ -12,7 +12,8 @@ import {
 } from "../api-client";
 import { logIssue, logWarn } from "../telem/logging";
 import { APICallError, NoObjectGeneratedError, RetryError } from "ai";
-import type { TransportType } from "../types";
+import type { ToolConfig } from "../tools/types";
+import type { ServerContext, TransportType } from "../types";
 
 /**
  * Type guard to identify user input validation errors.
@@ -336,4 +337,20 @@ export async function formatErrorForUser(
     }
   }
   return parts.join("\n\n");
+}
+
+/**
+ * Invoke a tool's onError hook for failure telemetry, isolated so a misbehaving
+ * hook can't disrupt the surrounding error handling. Call this at every point
+ * where a tool handler is run and may throw.
+ */
+export function recordToolFailure(
+  tool: Pick<ToolConfig, "onError">,
+  error: unknown,
+  params: Record<string, unknown>,
+  context: ServerContext,
+): void {
+  try {
+    tool.onError?.(error, params, context);
+  } catch {}
 }

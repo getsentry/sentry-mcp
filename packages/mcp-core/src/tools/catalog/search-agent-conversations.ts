@@ -19,6 +19,12 @@ import type { ServerContext } from "../../types";
 
 const PREVIEW_LENGTH = 240;
 const TRACE_ID_SAMPLE_SIZE = 3;
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  notation: "compact",
+  maximumSignificantDigits: 3,
+});
 
 const aiConversationSearchResultSchema = z.object({
   conversationId: z.string(),
@@ -32,7 +38,7 @@ const aiConversationSearchResultSchema = z.object({
   toolCallCount: z.number(),
   toolErrorCount: z.number(),
   totalTokens: z.number(),
-  totalCost: z.number(),
+  totalCost: z.string(),
   traceCount: z.number(),
   sampleTraceIds: z.array(z.string()),
   firstInputPreview: z.string().nullable(),
@@ -111,6 +117,16 @@ function previewText(value: string | null): string | null {
   return `${value.slice(0, PREVIEW_LENGTH - 3)}...`;
 }
 
+function formatLLMCost(cost: number): string {
+  if (cost === 0) {
+    return "—";
+  }
+  if (cost > 0 && cost < 0.01) {
+    return "<$0.01";
+  }
+  return usdFormatter.format(cost);
+}
+
 function projectUser(user: AIConversationSummary["user"]) {
   if (!user) {
     return null;
@@ -165,7 +181,7 @@ function buildArtifact(
         aiCallCount: llmCalls,
         toolCallCount: toolCalls,
         totalTokens,
-        totalCost,
+        totalCost: formatLLMCost(totalCost),
         startTimestamp,
         endTimestamp,
         traceCount,
@@ -190,7 +206,7 @@ export default defineTool({
     "Search Sentry Agent Conversations, formerly called AI Conversations, and return one summary row per conversation.",
     "",
     "Use this tool to find or list Agent Conversations. Results are conversation summaries, not raw span rows.",
-    "Each row includes title (when available), cost, tokens, call counts, previews, and other list metadata.",
+    "Each row includes title (when available), USD cost, tokens, call counts, previews, and other list metadata.",
     "Use get_agent_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.",
     "",
     "<examples>",

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DEFAULT_SEARCH_ISSUES_PERIOD } from "../constants";
 import { ConfigurationError } from "../errors";
+import { retryWithBackoff } from "../internal/fetch-utils";
 import { logIssue, logWarn } from "../telem/logging";
 import type { SentryProtocol } from "../types";
 import {
@@ -30,7 +31,6 @@ import {
   isSentryHost,
   type TraceMetricIdentifier,
 } from "../utils/url-utils";
-import { retryWithBackoff } from "../internal/fetch-utils";
 import { USER_AGENT } from "../version";
 import { apiPath } from "./api-path";
 import {
@@ -70,6 +70,7 @@ import {
   MonitorListSchema,
   MonitorSchema,
   MonitorStatsSchema,
+  OrganizationEnvironmentListSchema,
   OrganizationListSchema,
   OrganizationSchema,
   ProfileChunkResponseSchema,
@@ -130,6 +131,7 @@ import type {
   MonitorCheckInList,
   MonitorList,
   MonitorStats,
+  OrganizationEnvironmentList,
   OrganizationList,
   ProfileChunk,
   Project,
@@ -3416,6 +3418,37 @@ export class SentryApiService {
     return EventsValidationResponseSchema.parse(body);
   }
 
+  /**
+   * List the organization's visible environments, optionally scoped to a
+   * project. The endpoint (`GET /organizations/{org}/environments/`) already
+   * filters to visible environments and excludes the empty-name "No Environment"
+   * pseudo-env; passing `project` narrows the list (verified against
+   * getsentry/sentry `OrganizationEnvironmentsEndpoint`).
+   */
+  async listEnvironments(
+    {
+      organizationSlug,
+      projectId,
+    }: {
+      organizationSlug: string;
+      projectId?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<OrganizationEnvironmentList> {
+    const queryParams = new URLSearchParams();
+    if (projectId) {
+      queryParams.set("project", projectId);
+    }
+    const suffix = queryParams.toString();
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/environments/` +
+        (suffix ? `?${suffix}` : ""),
+      undefined,
+      opts,
+    );
+    return OrganizationEnvironmentListSchema.parse(body);
+  }
+
   private async fetchTraceItemAttributes(
     organizationSlug: string,
     itemType: TraceItemType,
@@ -4109,7 +4142,7 @@ export class SentryApiService {
       organizationSlug: string;
       issueId: string;
       status?: string;
-      assignedTo?: string;
+      assignedTo?: string | null;
       substatus?: string;
       ignoreDuration?: number;
       ignoreCount?: number;
@@ -4130,7 +4163,7 @@ export class SentryApiService {
       ignoreUserWindow?: number;
     } = {};
     if (status !== undefined) updateData.status = status;
-    if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
+    if (assignedTo !== undefined) updateData.assignedTo = assignedTo ?? "";
     if (substatus !== undefined) updateData.substatus = substatus;
     if (ignoreDuration !== undefined)
       updateData.ignoreDuration = ignoreDuration;

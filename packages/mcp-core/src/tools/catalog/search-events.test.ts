@@ -307,6 +307,53 @@ describe("search_events", () => {
     );
   });
 
+  it("flags an unknown environment even on the structured (non-agent) path", async () => {
+    const query = 'transaction:"checkout" environment:nonexistent-xyz';
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/environments/",
+        () =>
+          HttpResponse.json([
+            { id: "1", name: "production" },
+            { id: "2", name: "development" },
+          ]),
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+        HttpResponse.json({ data: [] }),
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query,
+        dataset: "spans",
+        fields: ["id", "timestamp"],
+        sort: "-timestamp",
+        period: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    // No agent runs, but the env typo in the query is still caught + surfaced.
+    expect(mockGenerateText).not.toHaveBeenCalled();
+    expect(result).toContain("not found in this organization");
+    expect(result).toContain("nonexistent-xyz");
+    expect(result).toContain("`production`");
+  });
+
   it("should link directly to AI conversation details for a single conversation id filter", async () => {
     const query = 'gen_ai.conversation.id:"14365297"';
 
