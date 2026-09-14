@@ -138,6 +138,13 @@ describe("formatConversationTable", () => {
     expect(result).toContain("…");
   });
 
+  test("keeps UUID conversation IDs intact on narrow terminals", () => {
+    setTerminalWidth(80);
+    const conversationId = "123e4567-e89b-12d3-a456-426614174000";
+    const result = formatConversationTable([makeListItem({ conversationId })]);
+    expect(result).toContain(conversationId);
+  });
+
   test("formats timestamps correctly (not 1970)", () => {
     const items = [makeListItem({ startTimestamp: 1_716_500_000 })];
     const result = formatConversationTable(items);
