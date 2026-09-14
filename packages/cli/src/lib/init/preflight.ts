@@ -296,8 +296,8 @@ async function resolveCanonicalProjects(
   cwd: string,
   organizationFilter?: string
 ): Promise<CanonicalProjectCandidate[]> {
-  // Auto-resolution is best-effort: only exact local evidence is safe enough to
-  // reuse implicitly, and self-hosted targets belong to a different API origin.
+  // An unresolved DSN does not invalidate another non-fuzzy resolved target.
+  // A detected setup DSN must still match before the project is reused.
   let resolved: Awaited<ReturnType<typeof resolveAllTargets>>;
   try {
     resolved = await resolveAllTargets({
@@ -307,10 +307,6 @@ async function resolveCanonicalProjects(
     });
   } catch (error) {
     log.debug("Could not auto-resolve an init project", error);
-    return [];
-  }
-
-  if (resolved.skippedSelfHosted) {
     return [];
   }
 
