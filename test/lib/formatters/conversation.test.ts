@@ -113,6 +113,23 @@ describe("formatConversationTable", () => {
     expect(result).toContain("—");
   });
 
+  test("links conversation IDs to Sentry", () => {
+    const previousPlainOutput = process.env.SENTRY_PLAIN_OUTPUT;
+    process.env.SENTRY_PLAIN_OUTPUT = "0";
+    try {
+      const webUrl =
+        "https://sentry.io/organizations/test-org/explore/agents/conversations/conv-abc-123/";
+      const result = formatConversationTable([makeListItem({ webUrl })]);
+      expect(result).toContain(`]8;;${webUrl}`);
+    } finally {
+      if (previousPlainOutput === undefined) {
+        delete process.env.SENTRY_PLAIN_OUTPUT;
+      } else {
+        process.env.SENTRY_PLAIN_OUTPUT = previousPlainOutput;
+      }
+    }
+  });
+
   test("truncates long conversation IDs", () => {
     const longId = "a".repeat(60);
     const items = [makeListItem({ conversationId: longId })];

@@ -213,6 +213,8 @@ describe("listConversations", () => {
     const conversations = [
       {
         conversationId: "conv-abc",
+        webUrl:
+          "https://sentry.io/organizations/test-org/explore/agents/conversations/conv-abc/",
         flow: [],
         errors: 0,
         llmCalls: 1,
@@ -234,7 +236,11 @@ describe("listConversations", () => {
     const result = await listConversations(ORG);
 
     expect(result.data).toHaveLength(1);
-    expect(result.data[0].conversationId).toBe("conv-abc");
+    expect(result.data[0]).toMatchObject({
+      conversationId: "conv-abc",
+      webUrl:
+        "https://sentry.io/organizations/test-org/explore/agents/conversations/conv-abc/",
+    });
   });
 
   test("caps per_page at API_MAX_PER_PAGE when limit exceeds it", async () => {
