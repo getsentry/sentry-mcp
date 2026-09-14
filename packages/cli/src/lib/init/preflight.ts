@@ -166,13 +166,12 @@ export async function resolveInitProjectContext(
   options: {
     setup?: ExistingSentryDetection;
     suggestedProjectName?: string;
-    supportsExistingSetupImprovement?: boolean;
   } = {}
 ): Promise<ProjectSelection> {
   const setup = options.setup ?? (await detectSentrySetup(cwd));
 
   if (context.project) {
-    return await resolveExplicitProjectSelection(context, cwd, setup, options);
+    return await resolveExplicitProjectSelection(context, cwd, setup);
   }
 
   const canonicalSelection = await resolveCanonicalProjectSelection({
@@ -192,8 +191,7 @@ export async function resolveInitProjectContext(
 async function resolveExplicitProjectSelection(
   context: ResolvedInitContext,
   cwd: string,
-  setup: ExistingSentryDetection,
-  options: { supportsExistingSetupImprovement?: boolean }
+  setup: ExistingSentryDetection
 ): Promise<ProjectSelection> {
   const explicit = await resolveExistingProjectChoice({
     org: context.org,
@@ -213,7 +211,6 @@ async function resolveExplicitProjectSelection(
   if (!matchesDetectedSetup) {
     return explicit;
   }
-  assertImprovementSupported(setup, options);
   return markExistingSetupForImprovement(explicit, setup);
 }
 
@@ -228,7 +225,6 @@ async function resolveCanonicalProjectSelection({
   cwd: string;
   options: {
     suggestedProjectName?: string;
-    supportsExistingSetupImprovement?: boolean;
   };
   setup: ExistingSentryDetection;
   ui: WizardUI;
@@ -257,15 +253,11 @@ async function resolveCanonicalProjectSelection({
       {
         context,
         detected,
-        setup,
         suggestedProjectName: options.suggestedProjectName,
-        supportsExistingSetupImprovement:
-          options.supportsExistingSetupImprovement,
       },
       ui
     );
   }
-  assertImprovementSupported(setup, options);
   return markExistingSetupForImprovement(detected, setup);
 }
 
@@ -298,21 +290,6 @@ async function canonicalProjectMatches(
     candidates[0]?.org === org &&
     candidates[0]?.project === project
   );
-}
-
-function assertImprovementSupported(
-  setup: ExistingSentryDetection,
-  options: { supportsExistingSetupImprovement?: boolean }
-): void {
-  if (
-    setup.status !== "none" &&
-    options.supportsExistingSetupImprovement !== true
-  ) {
-    throw new WizardError(
-      "This setup service version cannot safely improve an existing Sentry setup. Deploy or update the setup service before using this CLI version.",
-      { rendered: false }
-    );
-  }
 }
 
 async function resolveCanonicalProjects(
@@ -382,29 +359,11 @@ async function resolveDetectedSetupChoice(
   options: {
     context: ResolvedInitContext;
     detected: ProjectSelection;
-    setup: ExistingSentryDetection;
     suggestedProjectName?: string;
-    supportsExistingSetupImprovement?: boolean;
   },
   ui: WizardUI
 ): Promise<ProjectSelection> {
-  const {
-    context,
-    detected,
-    setup,
-    suggestedProjectName,
-    supportsExistingSetupImprovement,
-  } = options;
-  if (supportsExistingSetupImprovement === false) {
-    ui.log.warn(
-      "The current setup service cannot safely improve this existing Sentry setup. Choose another project or create a new one."
-    );
-    return await resolveImplicitProjectSelection(context.org, false, ui, {
-      avoidProjectSlug:
-        detected.existingProject?.projectSlug ?? detected.project,
-      suggestedProjectName,
-    });
-  }
+  const { context, detected, suggestedProjectName } = options;
   const project = detected.existingProject;
   const setupContext = project
     ? `Sentry detected for project ${project.projectDisplay ?? project.projectSlug} in organization ${project.orgDisplay ?? project.orgSlug}. What would you like to do?`
@@ -429,7 +388,6 @@ async function resolveDetectedSetupChoice(
     throw new WizardCancelledError();
   }
   if (intent === "improve") {
-    assertImprovementSupported(setup, { supportsExistingSetupImprovement });
     return { ...detected, setupIntent: "improve-existing" };
   }
   return await resolveImplicitProjectSelection(context.org, false, ui, {

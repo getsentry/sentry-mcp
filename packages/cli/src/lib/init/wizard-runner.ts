@@ -119,7 +119,6 @@ type StepContext = {
   spin: SpinnerHandle;
   spinState: SpinState;
   context: ResolvedInitContext;
-  supportsExistingSetupImprovement: boolean;
   projectContextState: ProjectContextState;
   ui: WizardUI;
   sentryProject: SentryProjectRef;
@@ -455,7 +454,6 @@ async function handleSuspendedStep(
     spin,
     spinState,
     context,
-    supportsExistingSetupImprovement,
     projectContextState,
     ui,
     sentryProject,
@@ -509,7 +507,6 @@ async function handleSuspendedStep(
           {
             setup: toolResult.data,
             suggestedProjectName: nodePath.basename(sandboxedPayload.cwd),
-            supportsExistingSetupImprovement,
           }
         );
         projectContextState.cwd = sandboxedPayload.cwd;
@@ -545,7 +542,6 @@ async function handleSuspendedStep(
           ui,
           {
             suggestedProjectName: sandboxedPayload.params.name,
-            supportsExistingSetupImprovement,
           }
         );
         projectContextState.cwd = sandboxedPayload.cwd;
@@ -1192,7 +1188,7 @@ export async function runWizard(initialOptions: WizardOptions): Promise<void> {
     return;
   }
 
-  const serviceCapabilities = await checkReadiness(ui);
+  await checkReadiness(ui);
 
   const effectiveOptions = dryRun
     ? { ...initialOptions, yes: true }
@@ -1396,8 +1392,6 @@ export async function runWizard(initialOptions: WizardOptions): Promise<void> {
           spin,
           spinState,
           context,
-          supportsExistingSetupImprovement:
-            serviceCapabilities.improveExistingSetup,
           projectContextState,
           ui,
           sentryProject: sentryProjectRef,

@@ -347,8 +347,7 @@ describe("resolveInitProjectContext", () => {
     const result = await resolveInitProjectContext(
       makeContext(),
       "/work/checkout/apps/junior",
-      ui,
-      { supportsExistingSetupImprovement: true }
+      ui
     );
 
     expect(result.existingProject?.projectSlug).toBe("junior");
@@ -416,8 +415,7 @@ describe("resolveInitProjectContext", () => {
     const result = await resolveInitProjectContext(
       makeContext({ org: "1", yes: true }),
       "/work/checkout/apps/junior",
-      ui,
-      { supportsExistingSetupImprovement: true }
+      ui
     );
 
     expect(getProjectSpy).toHaveBeenCalledWith("1", "42");
@@ -453,8 +451,7 @@ describe("resolveInitProjectContext", () => {
     const result = await resolveInitProjectContext(
       makeContext({ dryRun: true, yes: true }),
       "/work/checkout/apps/junior",
-      ui,
-      { supportsExistingSetupImprovement: true }
+      ui
     );
 
     expect(result.setupIntent).toBe("improve-existing");
@@ -494,44 +491,6 @@ describe("resolveInitProjectContext", () => {
     expect(result.existingProject?.dsn).toBe(
       "https://local@o1.ingest.sentry.io/id-junior"
     );
-  });
-
-  test("does not offer improvement when the setup service does not advertise support", async () => {
-    detectSentrySetupSpy.mockResolvedValue({
-      status: "installed",
-      signals: ["init: src/instrumentation.ts"],
-    });
-    resolveAllTargetsSpy.mockResolvedValue({
-      targets: [
-        {
-          org: "acme",
-          project: "junior",
-          matchStrength: "exact",
-        },
-      ],
-    });
-    const { ui, calls, respond } = createMockUI();
-    respond.select("create");
-
-    const result = await resolveInitProjectContext(
-      makeContext(),
-      "/work/checkout/apps/junior",
-      ui,
-      { supportsExistingSetupImprovement: false }
-    );
-
-    expect(result).toEqual({
-      project: "junior-2",
-      existingProject: undefined,
-    });
-    expect(
-      calls.filter((call) => call.kind === "select").map((call) => call.options)
-    ).toEqual([["create", "existing"]]);
-    expect(calls).toContainEqual({
-      kind: "log.warn",
-      message:
-        "The current setup service cannot safely improve this existing Sentry setup. Choose another project or create a new one.",
-    });
   });
 
   test("nests create versus existing under the other-project path", async () => {
@@ -740,8 +699,7 @@ describe("resolveInitProjectContext", () => {
     const result = await resolveInitProjectContext(
       makeContext({ project: "junior" }),
       "/work/checkout/apps/junior",
-      ui,
-      { supportsExistingSetupImprovement: true }
+      ui
     );
 
     expect(result.existingProject?.projectSlug).toBe("junior");
@@ -761,8 +719,7 @@ describe("resolveInitProjectContext", () => {
     const result = await resolveInitProjectContext(
       makeContext({ project: "junior" }),
       "/work/checkout/apps/junior",
-      ui,
-      { supportsExistingSetupImprovement: true }
+      ui
     );
 
     expect(result.existingProject?.dsn).toBe(
@@ -782,8 +739,7 @@ describe("resolveInitProjectContext", () => {
     const result = await resolveInitProjectContext(
       makeContext({ project: "junior" }),
       "/work/checkout/apps/junior",
-      ui,
-      { supportsExistingSetupImprovement: true }
+      ui
     );
 
     expect(result.existingProject).toEqual(
@@ -813,8 +769,7 @@ describe("resolveInitProjectContext", () => {
     const result = await resolveInitProjectContext(
       makeContext({ project: "junior" }),
       "/work/checkout/apps/junior",
-      ui,
-      { supportsExistingSetupImprovement: true }
+      ui
     );
 
     expect(result.existingProject).toEqual(
@@ -835,8 +790,7 @@ describe("resolveInitProjectContext", () => {
     const result = await resolveInitProjectContext(
       makeContext({ project: "junior" }),
       "/work/checkout/apps/junior",
-      ui,
-      { supportsExistingSetupImprovement: true }
+      ui
     );
 
     expect(result.existingProject?.projectSlug).toBe("junior");
@@ -855,8 +809,7 @@ describe("resolveInitProjectContext", () => {
     const result = await resolveInitProjectContext(
       makeContext({ project: "junior" }),
       "/work/checkout/apps/junior",
-      ui,
-      { supportsExistingSetupImprovement: true }
+      ui
     );
 
     expect(result.setupIntent).toBeUndefined();

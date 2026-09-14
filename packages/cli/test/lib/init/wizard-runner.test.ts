@@ -256,9 +256,7 @@ beforeEach(() => {
   };
   getUISpy = vi.spyOn(uiFactory, "getUIAsync").mockResolvedValue(wrapped);
 
-  vi.spyOn(readiness, "checkReadiness").mockResolvedValue({
-    improveExistingSetup: true,
-  });
+  vi.spyOn(readiness, "checkReadiness").mockResolvedValue();
   formatBannerSpy = vi.spyOn(banner, "formatBanner").mockReturnValue("BANNER");
   formatResultSpy = vi.spyOn(fmt, "formatResult").mockImplementation(noop);
   formatErrorSpy = vi.spyOn(fmt, "formatError").mockImplementation(noop);
@@ -773,7 +771,6 @@ describe("runWizard", () => {
           signals: ["init: instrumentation.ts"],
         },
         suggestedProjectName: "junior",
-        supportsExistingSetupImprovement: true,
       }
     );
     expect(resumeCallArgs[0]?.resumeData).toEqual(
@@ -785,42 +782,6 @@ describe("runWizard", () => {
     );
     expect(executeToolSpy).toHaveBeenCalledTimes(2);
     expect(spinnerMock.stop).not.toHaveBeenCalledWith("Sentry setup analyzed");
-  });
-
-  test("passes an older service's missing improvement capability to project resolution", async () => {
-    vi.mocked(readiness.checkReadiness).mockResolvedValueOnce({
-      improveExistingSetup: false,
-    });
-    const detectionPayload: ToolPayload = {
-      type: "tool",
-      operation: "detect-sentry",
-      cwd: "/tmp/test",
-      params: {},
-    };
-    executeToolSpy.mockResolvedValue({
-      ok: true,
-      data: {
-        status: "installed",
-        signals: ["init: instrumentation.ts"],
-      },
-    });
-    mockStartResult = {
-      status: "suspended",
-      suspended: [["check-existing-sentry"]],
-      steps: {
-        "check-existing-sentry": { suspendPayload: detectionPayload },
-      },
-    };
-    mockResumeResults = [{ status: "success", result: { exitCode: 0 } }];
-
-    await runWizard(makeOptions());
-
-    expect(resolveInitProjectContextSpy).toHaveBeenCalledWith(
-      makeContext(),
-      "/tmp/test",
-      expect.anything(),
-      expect.objectContaining({ supportsExistingSetupImprovement: false })
-    );
   });
 
   test("keeps the workflow layout visible between app selection and the setup decision", async () => {
