@@ -7,7 +7,6 @@ import { logWarn } from "@sentry/mcp-core/telem/logging";
 import { Hono } from "hono";
 import { SCOPES } from "../../../constants";
 import {
-  type ApprovalDecision,
   getRememberedSkillsForClient,
   parseRedirectApproval,
   renderApprovalDialog,
@@ -64,95 +63,6 @@ async function redirectToUpstream(
   return new Response(null, {
     status: 302,
     headers: responseHeaders,
-  });
-}
-
-function renderAuthorizationCancelledPage(): Response {
-  const html = `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Authorization Cancelled</title>
-    <style>
-      body {
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #0f172a;
-        color: #e2e8f0;
-      }
-      main {
-        max-width: 640px;
-        margin: 10vh auto;
-        padding: 32px 24px;
-        background: #111827;
-        border: 1px solid #334155;
-        border-radius: 16px;
-      }
-      h1 {
-        margin: 0 0 16px;
-        font-size: 1.75rem;
-      }
-      p {
-        line-height: 1.6;
-      }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>Authorization Cancelled</h1>
-      <p>The authorization request was cancelled. You can close this tab.</p>
-    </main>
-  </body>
-</html>`;
-
-  return new Response(html, {
-    status: 200,
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-    },
-  });
-}
-
-function clientOauthState(state: unknown): string | undefined {
-  return typeof state === "string" ? state : undefined;
-}
-
-function unsafeRedirectResponse(
-  decision: ApprovalDecision,
-  fallback: Response,
-): Response {
-  switch (decision) {
-    case "deny":
-      return renderAuthorizationCancelledPage();
-    case "approve":
-      return fallback;
-    default: {
-      const _exhaustive: never = decision;
-      return fallback;
-    }
-  }
-}
-
-function recordConsentMetric(
-  name:
-    | "app.oauth.consent_prompted"
-    | "app.oauth.consent_denied"
-    | "app.oauth.consent_granted",
-  clientId: string,
-  clientName: string | undefined,
-): void {
-  const registrationMethodTelemetry =
-    getClientRegistrationMethodTelemetry(clientId);
-  Sentry.getActiveSpan()?.setAttribute(
-    CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
-    registrationMethodTelemetry[CLIENT_REGISTRATION_METHOD_ATTRIBUTE],
-  );
-  Sentry.metrics.count(name, 1, {
-    attributes: {
-      "app.client.family": resolveClientFamilyFromName(clientName),
-      ...registrationMethodTelemetry,
-    },
   });
 }
 
@@ -320,11 +230,18 @@ export default new Hono<{ Bindings: Env }>()
       defaultSkills,
     });
 
-    recordConsentMetric(
-      "app.oauth.consent_prompted",
-      clientId,
-      client?.clientName,
+    const registrationMethodTelemetry =
+      getClientRegistrationMethodTelemetry(clientId);
+    Sentry.getActiveSpan()?.setAttribute(
+      CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+      registrationMethodTelemetry[CLIENT_REGISTRATION_METHOD_ATTRIBUTE],
     );
+    Sentry.metrics.count("app.oauth.consent_prompted", 1, {
+      attributes: {
+        "app.client.family": resolveClientFamilyFromName(client?.clientName),
+        ...registrationMethodTelemetry,
+      },
+    });
 
     return response;
   })
@@ -333,7 +250,7 @@ export default new Hono<{ Bindings: Env }>()
    * OAuth Authorization Endpoint (POST /oauth/authorize)
    *
    * Approve redirects to Sentry. Deny redirects the MCP client with
-   * `error=access_denied`, or shows a cancelled page if that URI is unsafe.
+   * `error=access_denied`.
    */
   .post("/", async (c) => {
     // Validates form submission and extracts state. Approve also sets cookies
@@ -349,144 +266,120 @@ export default new Hono<{ Bindings: Env }>()
       return c.text("Invalid request", 400);
     }
 
-    const { state } = result;
+    const { state, headers, skills, decision } = result;
 
     if (!state.oauthReqInfo) {
       return c.text("Invalid request", 400);
     }
 
-    const oauthReqInfo = state.oauthReqInfo;
+    // Store the selected skills in the OAuth request info
+    // This will be passed through to the callback via the state parameter
+    const oauthReqWithSkills = {
+      ...state.oauthReqInfo,
+      skills,
+    };
 
     // Reject redirect URIs with userinfo components
-    if (redirectUriHasUserInfo(oauthReqInfo.redirectUri)) {
+    if (redirectUriHasUserInfo(oauthReqWithSkills.redirectUri)) {
       logWarn("Rejected redirect URI with userinfo component", {
         loggerScope: ["cloudflare", "oauth", "authorize"],
         extra: {
-          clientId: oauthReqInfo.clientId,
-          redirectUri: oauthReqInfo.redirectUri,
+          clientId: oauthReqWithSkills.clientId,
+          redirectUri: oauthReqWithSkills.redirectUri,
         },
       });
-      return unsafeRedirectResponse(
-        result.decision,
-        c.text("Invalid redirect URI", 400),
-      );
+      return c.text("Invalid redirect URI", 400);
     }
 
     // Validate redirectUri first to prevent open redirects from error responses
     let client = null;
     try {
-      client = await c.env.OAUTH_PROVIDER.lookupClient(oauthReqInfo.clientId);
+      client = await c.env.OAUTH_PROVIDER.lookupClient(
+        oauthReqWithSkills.clientId,
+      );
       const uriIsAllowed = isRegisteredRedirectUri(
-        oauthReqInfo.redirectUri,
+        oauthReqWithSkills.redirectUri,
         client?.redirectUris,
       );
       if (!uriIsAllowed) {
         logWarn("Redirect URI not registered for client", {
           loggerScope: ["cloudflare", "oauth", "authorize"],
           extra: {
-            clientId: oauthReqInfo.clientId,
-            redirectUri: oauthReqInfo.redirectUri,
+            clientId: oauthReqWithSkills.clientId,
+            redirectUri: oauthReqWithSkills.redirectUri,
             registeredUris: client?.redirectUris,
             clientName: client?.clientName,
           },
         });
-        return unsafeRedirectResponse(
-          result.decision,
-          c.text("Invalid redirect URI", 400),
-        );
+        return c.text("Invalid redirect URI", 400);
       }
     } catch (lookupErr) {
       logWarn("Failed to validate client redirect URI", {
         loggerScope: ["cloudflare", "oauth", "authorize"],
         extra: { error: String(lookupErr) },
       });
-      return unsafeRedirectResponse(
-        result.decision,
-        c.text("Invalid request", 400),
+      return c.text("Invalid request", 400);
+    }
+
+    if (decision === "deny") {
+      return createAuthorizationErrorRedirect(
+        oauthReqWithSkills.redirectUri,
+        "access_denied",
+        "The user denied the authorization request",
+        oauthReqWithSkills.state ?? undefined,
+        getAuthorizationServerIssuer(c.req.url),
       );
     }
 
-    switch (result.decision) {
-      case "deny": {
-        recordConsentMetric(
-          "app.oauth.consent_denied",
-          oauthReqInfo.clientId,
-          client?.clientName,
-        );
+    // Validate resource parameter (RFC 8707)
+    const resourceFromState = oauthReqWithSkills.resource;
+    if (
+      resourceFromState !== undefined &&
+      !validateResourceParameter(resourceFromState, c.req.url)
+    ) {
+      logWarn("Invalid resource parameter in authorization approval", {
+        loggerScope: ["cloudflare", "oauth", "authorize"],
+        extra: {
+          resource: resourceFromState,
+          clientId: oauthReqWithSkills.clientId,
+        },
+      });
 
-        try {
-          return createAuthorizationErrorRedirect(
-            oauthReqInfo.redirectUri,
-            "access_denied",
-            "The user denied the authorization request",
-            clientOauthState(oauthReqInfo.state),
-            getAuthorizationServerIssuer(c.req.url),
-          );
-        } catch (redirectErr) {
-          logWarn("Failed to redirect OAuth deny to client", {
-            loggerScope: ["cloudflare", "oauth", "authorize"],
-            extra: { error: String(redirectErr) },
-          });
-          return renderAuthorizationCancelledPage();
-        }
-      }
-      case "approve": {
-        const { headers, skills } = result;
-
-        // Store the selected skills in the OAuth request info
-        // This will be passed through to the callback via the state parameter
-        const oauthReqWithSkills = {
-          ...oauthReqInfo,
-          skills,
-        };
-
-        // Validate resource parameter (RFC 8707)
-        const resourceFromState = oauthReqWithSkills.resource;
-        if (
-          resourceFromState !== undefined &&
-          !validateResourceParameter(resourceFromState, c.req.url)
-        ) {
-          logWarn("Invalid resource parameter in authorization approval", {
-            loggerScope: ["cloudflare", "oauth", "authorize"],
-            extra: {
-              resource: resourceFromState,
-              clientId: oauthReqWithSkills.clientId,
-            },
-          });
-
-          return createResourceValidationError(
-            oauthReqWithSkills.redirectUri,
-            oauthReqWithSkills.state,
-            c.req.url,
-          );
-        }
-
-        // Build signed state for redirect to Sentry (10 minute validity)
-        const now = Date.now();
-        const payload: OAuthState = {
-          req: oauthReqWithSkills as unknown as Record<string, unknown>,
-          iat: now,
-          exp: now + 10 * 60 * 1000,
-        };
-        const signedState = await signState(payload, c.env.COOKIE_SECRET);
-
-        recordConsentMetric(
-          "app.oauth.consent_granted",
-          oauthReqWithSkills.clientId,
-          client?.clientName,
-        );
-
-        return redirectToUpstream(
-          c.env,
-          c.req.raw,
-          oauthReqWithSkills,
-          headers,
-          signedState,
-        );
-      }
-      default: {
-        const _exhaustive: never = result;
-        return c.text("Invalid request", 400);
-      }
+      return createResourceValidationError(
+        oauthReqWithSkills.redirectUri,
+        oauthReqWithSkills.state,
+        c.req.url,
+      );
     }
+
+    // Build signed state for redirect to Sentry (10 minute validity)
+    const now = Date.now();
+    const payload: OAuthState = {
+      req: oauthReqWithSkills as unknown as Record<string, unknown>,
+      iat: now,
+      exp: now + 10 * 60 * 1000,
+    };
+    const signedState = await signState(payload, c.env.COOKIE_SECRET);
+
+    const registrationMethodTelemetry = getClientRegistrationMethodTelemetry(
+      oauthReqWithSkills.clientId,
+    );
+    Sentry.getActiveSpan()?.setAttribute(
+      CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+      registrationMethodTelemetry[CLIENT_REGISTRATION_METHOD_ATTRIBUTE],
+    );
+    Sentry.metrics.count("app.oauth.consent_granted", 1, {
+      attributes: {
+        "app.client.family": resolveClientFamilyFromName(client?.clientName),
+        ...registrationMethodTelemetry,
+      },
+    });
+
+    return redirectToUpstream(
+      c.env,
+      c.req.raw,
+      oauthReqWithSkills,
+      headers,
+      signedState,
+    );
   });

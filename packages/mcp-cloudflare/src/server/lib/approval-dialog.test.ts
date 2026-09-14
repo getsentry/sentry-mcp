@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { signState } from "../oauth/state";
 import {
   getRememberedSkillsForClient,
   parseRedirectApproval,
   renderApprovalDialog,
   SKILL_PREFERENCES_COOKIE_NAME,
 } from "./approval-dialog";
-import { signState } from "../oauth/state";
 
 function skillInputAttributes(html: string, skillId: string): string {
   const match = html.match(
@@ -48,7 +48,7 @@ describe("approval-dialog", () => {
   });
 
   describe("renderApprovalDialog", () => {
-    it("should include state in the form", async () => {
+    it("renders the consent form with signed state and a cancel decision", async () => {
       const mockRequest = new Request("https://example.com/oauth/authorize", {
         method: "GET",
       });
@@ -64,21 +64,6 @@ describe("approval-dialog", () => {
       // Check that state is included in the form
       expect(html).toContain('name="state"');
       expect(html).toContain('value="');
-    });
-
-    it("submits cancel as an OAuth deny instead of history.back()", async () => {
-      const html = await (
-        await renderApprovalDialog(
-          new Request("https://example.com/oauth/authorize"),
-          {
-            client: mockClient,
-            server: { name: "Test Server" },
-            state: { oauthReqInfo: { clientId: "test-client" } },
-            cookieSecret: TEST_SECRET,
-          },
-        )
-      ).text();
-
       const approveIndex = html.indexOf('name="decision" value="approve"');
       const denyIndex = html.indexOf('name="decision" value="deny"');
       expect(approveIndex).toBeGreaterThan(-1);

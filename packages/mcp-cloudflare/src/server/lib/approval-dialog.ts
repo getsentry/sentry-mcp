@@ -2,16 +2,16 @@ import type {
   AuthRequest,
   ClientInfo,
 } from "@cloudflare/workers-oauth-provider";
-import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
-import { getUrlHost, sanitizeHtml, sanitizeHrefUrl } from "./html-utils";
 import skillDefinitions, {
   type SkillDefinition,
 } from "@sentry/mcp-core/skillDefinitions";
+import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import {
+  type OAuthState,
   signState,
   verifyAndParseState,
-  type OAuthState,
 } from "../oauth/state";
+import { getUrlHost, sanitizeHrefUrl, sanitizeHtml } from "./html-utils";
 
 const COOKIE_NAME = "mcp-approved-clients";
 export const SKILL_PREFERENCES_COOKIE_NAME = "mcp-skill-preferences";
@@ -718,7 +718,7 @@ export async function renderApprovalDialog(
             gap: var(--space-md);
           }
 
-          /* Approve is first in the DOM so Enter submits approve, not deny. */
+          /* Keep Approve as the form's default submit while rendering Cancel first. */
           .actions .button-primary {
             order: 2;
           }
@@ -1040,39 +1040,26 @@ export async function renderApprovalDialog(
   });
 }
 
-export type ApprovalDecision = "approve" | "deny";
-
 /**
- * Parsed consent form. Deny returns only state so callers cannot persist
- * approval cookies. Missing `decision` is treated as approve so older
- * unnamed Approve posts still work.
+ * Result of parsing an approval or denial from the consent form.
  */
-export type ParsedApprovalResult =
-  | {
-      decision: "deny";
-      state: any;
-    }
-  | {
-      decision: "approve";
-      state: any;
-      headers: Headers;
-      skills: string[];
-    };
-
-function parseApprovalDecision(value: unknown): ApprovalDecision {
-  if (value === "deny") {
-    return "deny";
-  }
-  return "approve";
+export interface ParsedApprovalResult {
+  /** The original state object passed through the form. */
+  state: any;
+  /** Headers to set on approval. Empty when authorization is denied. */
+  headers: Headers;
+  /** Selected skills. Empty when authorization is denied. */
+  skills: string[];
+  /** Whether the user approved or denied authorization. */
+  decision: "approve" | "deny";
 }
 
 /**
- * Parses the consent form. Approve signs cookies for this client and its
- * selected skills. Deny returns state only — no approval cookies.
+ * Parses the consent form and signs approval cookies only when approved.
  *
  * @param request - The incoming POST Request object containing the form data.
  * @param cookieSecret - The secret key used to sign the approval cookie.
- * @returns The parsed consent decision and, on approve, Set-Cookie headers.
+ * @returns The parsed consent decision, state, skills, and response headers.
  * @throws If the request method is not POST, form data is invalid, or state is missing.
  */
 export async function parseRedirectApproval(
@@ -1086,14 +1073,22 @@ export async function parseRedirectApproval(
   let state: any;
   let clientId: string | undefined;
   let skills: string[];
-  let decision: ApprovalDecision;
+  let decision: "approve" | "deny";
 
   try {
     const formData = await request.formData();
     const encodedState = formData.get("state");
+    const formDecision = formData.get("decision");
 
     if (typeof encodedState !== "string" || !encodedState) {
       throw new Error("Missing or invalid 'state' in form data.");
+    }
+    if (
+      formDecision !== null &&
+      formDecision !== "approve" &&
+      formDecision !== "deny"
+    ) {
+      throw new Error("Invalid approval decision.");
     }
 
     state = await decodeState<{ oauthReqInfo?: AuthRequest }>(
@@ -1108,7 +1103,9 @@ export async function parseRedirectApproval(
 
     // Extract skill selections from checkboxes - collect all 'skill' field values
     skills = filterApprovableSkillIds(formData.getAll("skill"));
-    decision = parseApprovalDecision(formData.get("decision"));
+    // Forms opened before this field existed submit no decision; those were
+    // approval-only forms, so preserve their original behavior.
+    decision = formDecision === "deny" ? "deny" : "approve";
   } catch (error) {
     logError(error, {
       loggerScope: ["cloudflare", "approval-dialog"],
@@ -1122,7 +1119,7 @@ export async function parseRedirectApproval(
   }
 
   if (decision === "deny") {
-    return { decision, state };
+    return { decision, state, headers: new Headers(), skills: [] };
   }
 
   // Get existing approved clients
