@@ -66,6 +66,26 @@ describe("approval-dialog", () => {
       expect(html).toContain('value="');
     });
 
+    it("submits cancel as an OAuth deny instead of history.back()", async () => {
+      const html = await (
+        await renderApprovalDialog(
+          new Request("https://example.com/oauth/authorize"),
+          {
+            client: mockClient,
+            server: { name: "Test Server" },
+            state: { oauthReqInfo: { clientId: "test-client" } },
+            cookieSecret: TEST_SECRET,
+          },
+        )
+      ).text();
+
+      const approveIndex = html.indexOf('name="decision" value="approve"');
+      const denyIndex = html.indexOf('name="decision" value="deny"');
+      expect(approveIndex).toBeGreaterThan(-1);
+      expect(denyIndex).toBeGreaterThan(approveIndex);
+      expect(html).not.toContain("history.back");
+    });
+
     it("selects all approvable skills when no remembered defaults are provided", async () => {
       const response = await renderApprovalDialog(
         new Request("https://example.com/oauth/authorize"),

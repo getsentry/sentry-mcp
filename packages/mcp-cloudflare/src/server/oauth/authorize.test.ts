@@ -610,6 +610,73 @@ describe("oauth authorize routes", () => {
       expect(setCookie).toContain("Secure");
       expect(setCookie).toContain("SameSite=Lax");
     });
+
+    it("redirects cancel to the client with access_denied", async () => {
+      const oauthReqInfo = {
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+        state: "original-state",
+      };
+      const formData = new FormData();
+      const signedState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      formData.append("state", signedState);
+      formData.append("decision", "deny");
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "POST",
+        body: formData,
+      });
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("Set-Cookie")).toBeNull();
+      const redirectUrl = new URL(response.headers.get("location")!);
+      expect(redirectUrl.origin + redirectUrl.pathname).toBe(
+        "https://example.com/callback",
+      );
+      expect(redirectUrl.searchParams.get("error")).toBe("access_denied");
+      expect(redirectUrl.searchParams.get("error_description")).toBe(
+        "The user denied the authorization request",
+      );
+      expect(redirectUrl.searchParams.get("state")).toBe("original-state");
+      expect(redirectUrl.searchParams.get("iss")).toBe("http://localhost");
+    });
+
+    it("renders a cancelled page when deny cannot safely redirect", async () => {
+      const oauthReqInfo = {
+        clientId: "test-client",
+        redirectUri: "https://attacker.example/callback",
+        scope: ["read"],
+        state: "original-state",
+      };
+      const formData = new FormData();
+      const signedState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      formData.append("state", signedState);
+      formData.append("decision", "deny");
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "POST",
+        body: formData,
+      });
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("location")).toBeNull();
+      expect(await response.text()).toContain("Authorization Cancelled");
+    });
   });
 
   describe("POST /oauth/authorize (CSRF/validation)", () => {

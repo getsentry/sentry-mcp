@@ -105,7 +105,7 @@ The MCP OAuth Provider is built with `@cloudflare/workers-oauth-provider` and pr
 1. **Dynamic client registration** - MCP clients can register on-demand
 2. **PKCE support** - Secure authorization code flow
 3. **Token management** - Issues and validates MCP tokens
-4. **Consent UI** - Custom approval screen for permissions
+4. **Consent UI** - Custom approval screen for permissions. Cancel submits a deny decision and redirects the MCP client to its registered `redirect_uri` with `error=access_denied` (RFC 6749 §4.1.2.1). If that URI cannot be used safely, the page tells the user the request was cancelled.
 5. **Token encryption** - Stores Sentry tokens encrypted in MCP token props
 
 ### Sentry OAuth Integration

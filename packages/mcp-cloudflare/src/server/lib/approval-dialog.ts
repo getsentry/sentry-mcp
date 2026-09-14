@@ -718,6 +718,15 @@ export async function renderApprovalDialog(
             gap: var(--space-md);
           }
 
+          /* Approve is first in the DOM so Enter submits approve, not deny. */
+          .actions .button-primary {
+            order: 2;
+          }
+
+          .actions .button-secondary {
+            order: 1;
+          }
+
           a {
             color: var(--purple-primary);
             text-decoration: none;
@@ -1012,8 +1021,8 @@ export async function renderApprovalDialog(
                   }
 
                   <div class="actions">
-                    <button type="button" class="button button-secondary" onclick="window.history.back()" aria-label="Cancel authorization">Cancel</button>
-                    <button type="submit" class="button button-primary" aria-label="Approve authorization request">Approve</button>
+                    <button type="submit" name="decision" value="approve" class="button button-primary" aria-label="Approve authorization request">Approve</button>
+                    <button type="submit" name="decision" value="deny" class="button button-secondary" aria-label="Cancel authorization">Cancel</button>
                   </div>
                 </div>
               </div>
@@ -1031,25 +1040,39 @@ export async function renderApprovalDialog(
   });
 }
 
+export type ApprovalDecision = "approve" | "deny";
+
 /**
- * Result of parsing the approval form submission.
+ * Parsed consent form. Deny returns only state so callers cannot persist
+ * approval cookies. Missing `decision` is treated as approve so older
+ * unnamed Approve posts still work.
  */
-export interface ParsedApprovalResult {
-  /** The original state object passed through the form. */
-  state: any;
-  /** Headers to set on the redirect response, including the Set-Cookie header. */
-  headers: Headers;
-  /** Selected skills */
-  skills: string[];
+export type ParsedApprovalResult =
+  | {
+      decision: "deny";
+      state: any;
+    }
+  | {
+      decision: "approve";
+      state: any;
+      headers: Headers;
+      skills: string[];
+    };
+
+function parseApprovalDecision(value: unknown): ApprovalDecision {
+  if (value === "deny") {
+    return "deny";
+  }
+  return "approve";
 }
 
 /**
- * Parses the form submission from the approval dialog, extracts the state,
- * and generates Set-Cookie headers to mark the client as approved.
+ * Parses the consent form. Approve signs cookies for this client and its
+ * selected skills. Deny returns state only — no approval cookies.
  *
  * @param request - The incoming POST Request object containing the form data.
  * @param cookieSecret - The secret key used to sign the approval cookie.
- * @returns A promise resolving to an object containing the parsed state and necessary headers.
+ * @returns The parsed consent decision and, on approve, Set-Cookie headers.
  * @throws If the request method is not POST, form data is invalid, or state is missing.
  */
 export async function parseRedirectApproval(
@@ -1063,6 +1086,7 @@ export async function parseRedirectApproval(
   let state: any;
   let clientId: string | undefined;
   let skills: string[];
+  let decision: ApprovalDecision;
 
   try {
     const formData = await request.formData();
@@ -1084,6 +1108,7 @@ export async function parseRedirectApproval(
 
     // Extract skill selections from checkboxes - collect all 'skill' field values
     skills = filterApprovableSkillIds(formData.getAll("skill"));
+    decision = parseApprovalDecision(formData.get("decision"));
   } catch (error) {
     logError(error, {
       loggerScope: ["cloudflare", "approval-dialog"],
@@ -1094,6 +1119,10 @@ export async function parseRedirectApproval(
     throw new Error(
       `Failed to parse approval form: ${error instanceof Error ? error.message : String(error)}`,
     );
+  }
+
+  if (decision === "deny") {
+    return { decision, state };
   }
 
   // Get existing approved clients
@@ -1125,7 +1154,7 @@ export async function parseRedirectApproval(
     ),
   );
 
-  return { state, headers, skills };
+  return { decision, state, headers, skills };
 }
 
 // sanitizeHtml function is now imported from "./html-utils"
