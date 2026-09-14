@@ -106,9 +106,10 @@ sentry auth whoami
 
 ## Credential Storage
 
-Auth tokens are stored in the Sentry CLI configuration directory (`~/.sentry/`
-by default, overridable with `SENTRY_CONFIG_DIR`) with restricted file
-permissions.
+Auth tokens are stored in the Sentry CLI configuration directory
+(`$XDG_CONFIG_HOME/sentry/`, defaulting to `~/.config/sentry/`, overridable
+with `SENTRY_CONFIG_DIR`) with restricted file permissions. A pre-existing
+legacy `~/.sentry/` directory is still honored.
 
 OAuth access tokens expire. When the server provides a refresh token, the CLI
 stores it and refreshes the access token automatically. Persist the
