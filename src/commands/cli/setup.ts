@@ -9,9 +9,11 @@
 import { existsSync, unlinkSync } from "node:fs";
 import { chmod, copyFile, mkdir, rename, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { isatty } from "node:tty";
 import { captureException } from "@sentry/node-core/light";
 import type { SentryContext } from "../../context.js";
 import { installAgentSkills } from "../../lib/agent-skills.js";
+import { assertAutoLoginHostTrusted } from "../../lib/auto-auth.js";
 import {
   determineInstallDir,
   getBinaryFilename,
@@ -27,6 +29,7 @@ import {
   installCompletions,
 } from "../../lib/completions.js";
 import { CLI_VERSION } from "../../lib/constants.js";
+import { getAuthConfig } from "../../lib/db/auth.js";
 import {
   getAgentSkillsPreference,
   setAgentSkillsPreference,
@@ -38,7 +41,14 @@ import {
   type ReleaseChannel,
   setReleaseChannel,
 } from "../../lib/db/release-channel.js";
+import {
+  detectAgent,
+  detectAgentFromProcessTree,
+} from "../../lib/detect-agent.js";
+import { getEnv } from "../../lib/env.js";
 import { CommandOutput } from "../../lib/formatters/output.js";
+import { runInteractiveLogin } from "../../lib/interactive-login.js";
+import { interactivePromptsAllowed } from "../../lib/interactive-prompts.js";
 import { logger } from "../../lib/logger.js";
 import {
   addToFpath,
@@ -722,11 +732,9 @@ export const setupCommand = buildCommand({
       await bestEffort(
         "Authorization",
         async () => {
-          const [{ runInteractiveLogin }, { ensureCurrentOAuthScopes }] =
-            await Promise.all([
-              import("../../lib/interactive-login.js"),
-              import("../../lib/scope-recovery.js"),
-            ]);
+          const { ensureCurrentOAuthScopes } = await import(
+            "../../lib/scope-recovery.js"
+          );
           await ensureCurrentOAuthScopes(runInteractiveLogin);
         },
         warn
@@ -739,12 +747,44 @@ export const setupCommand = buildCommand({
       printWelcomeMessage(emit, CLI_VERSION, binaryPath);
     }
 
-    return yield new CommandOutput<SetupResult>({
+    yield new CommandOutput<SetupResult>({
       messages,
       warnings,
       freshInstall,
       binaryPath,
       version: CLI_VERSION,
     });
+
+    if (
+      !freshInstall ||
+      flags.method !== "curl" ||
+      flags.quiet ||
+      flags["ensure-auth-scopes"] ||
+      getEnv().SENTRY_INIT === "1" ||
+      !(interactivePromptsAllowed() && isatty(0) && isatty(1) && isatty(2))
+    ) {
+      return;
+    }
+
+    await bestEffort(
+      "Authentication",
+      async () => {
+        if (
+          getAuthConfig() ||
+          detectAgent() ||
+          (await detectAgentFromProcessTree())
+        ) {
+          return;
+        }
+        assertAutoLoginHostTrusted();
+        const result = await runInteractiveLogin();
+        if (result) {
+          log.success("Authenticated with Sentry.");
+        } else {
+          log.info("Run 'sentry auth login' to authenticate later.");
+        }
+      },
+      warn
+    );
   },
 });

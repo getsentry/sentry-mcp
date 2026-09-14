@@ -329,6 +329,14 @@ fi
 # Remove trap — setup will handle temp cleanup on success
 trap - EXIT
 
+# curl | bash leaves stdin on the script pipe. Give setup the controlling
+# terminal only when both output streams are interactive; setup checks whether
+# this is a fresh human install before starting login.
+if [[ "${SENTRY_INIT:-}" != "1" && -t 1 && -t 2 ]] && { exec 3</dev/tty; } 2>/dev/null; then
+  # shellcheck disable=SC2086
+  exec "$tmp_binary" cli setup $setup_args <&3 3<&-
+fi
+
 # shellcheck disable=SC2086
 "$tmp_binary" cli setup $setup_args
 

@@ -12,13 +12,20 @@ import {
   constants,
   existsSync,
   mkdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isatty } from "node:tty";
 import { run } from "@stricli/core";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+
+vi.mock("node:tty", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:tty")>()),
+  isatty: vi.fn().mockReturnValue(false),
+}));
 
 vi.mock("../../../src/lib/interactive-login.js", async (importOriginal) => ({
   ...(await importOriginal<
@@ -36,6 +43,7 @@ vi.mock("../../../src/lib/scope-recovery.js", async (importOriginal) => ({
 
 import { app } from "../../../src/app.js";
 import type { SentryContext } from "../../../src/context.js";
+import { getAuthConfig, setAuthToken } from "../../../src/lib/db/auth.js";
 import {
   getAgentSkillsPreference,
   setAgentSkillsPreference,
@@ -45,6 +53,11 @@ import {
   getInstallInfo,
 } from "../../../src/lib/db/install-info.js";
 import { getReleaseChannel } from "../../../src/lib/db/release-channel.js";
+import {
+  getProcessInfoFromOS,
+  setProcessInfoProvider,
+} from "../../../src/lib/detect-agent.js";
+import { setEnv } from "../../../src/lib/env.js";
 // biome-ignore lint/performance/noNamespaceImport: dynamic setup imports are mocked at the module boundary
 import * as interactiveLogin from "../../../src/lib/interactive-login.js";
 // biome-ignore lint/performance/noNamespaceImport: dynamic setup imports are mocked at the module boundary
@@ -741,6 +754,183 @@ describe("sentry cli setup", () => {
       );
 
       expect(getOutput()).toBe("");
+    });
+  });
+
+  describe("login after a fresh curl install", () => {
+    const getConfigDir = useTestConfigDir("setup-login-");
+
+    beforeEach(() => {
+      vi.mocked(isatty).mockReturnValue(true);
+      setProcessInfoProvider(async () => ({ name: "bash", ppid: 1 }));
+      vi.mocked(interactiveLogin.runInteractiveLogin).mockResolvedValue(null);
+    });
+
+    afterEach(() => {
+      vi.mocked(isatty).mockReturnValue(false);
+      vi.mocked(interactiveLogin.runInteractiveLogin).mockReset();
+      setProcessInfoProvider(getProcessInfoFromOS);
+      setEnv(process.env);
+    });
+
+    /** Prepare a real binary install with isolated auth and captured output. */
+    function createInstall(
+      options: {
+        env?: Record<string, string>;
+        flags?: string[];
+        existingBinary?: boolean;
+        install?: boolean;
+        method?: string;
+      } = {}
+    ) {
+      const sourcePath = join(testDir, "sentry-download");
+      const installDir = join(testDir, "install-dir");
+      const binaryPath = join(installDir, "sentry");
+      writeFileSync(sourcePath, "fixture-binary", { mode: 0o755 });
+      if (options.existingBinary) {
+        mkdirSync(installDir);
+        writeFileSync(binaryPath, "old-binary");
+      }
+      const mock = createMockContext({
+        homeDir: testDir,
+        execPath: sourcePath,
+        env: {
+          SENTRY_INSTALL_DIR: installDir,
+          SENTRY_CONFIG_DIR: getConfigDir(),
+          SENTRY_CLI_NO_TELEMETRY: "1",
+          ...options.env,
+        },
+      });
+      restoreStderr = mock.restore;
+      mock.context.process.exitCode = undefined;
+      setEnv(mock.context.env);
+
+      return {
+        ...mock,
+        binaryPath,
+        run: () =>
+          run(
+            app,
+            [
+              "cli",
+              "setup",
+              ...(options.install === false ? [] : ["--install"]),
+              "--method",
+              options.method ?? "curl",
+              "--no-modify-path",
+              "--no-completions",
+              "--no-agent-skills",
+              ...(options.flags ?? []),
+            ],
+            mock.context
+          ),
+      };
+    }
+
+    test("starts OAuth only after installing the binary and displaying success", async () => {
+      const fixture = createInstall();
+      vi.mocked(interactiveLogin.runInteractiveLogin).mockImplementation(
+        async () => {
+          expect(readFileSync(fixture.binaryPath, "utf8")).toBe(
+            "fixture-binary"
+          );
+          expect(fixture.getOutput()).toContain("Installed sentry v");
+          return { method: "oauth", configPath: getConfigDir() };
+        }
+      );
+
+      await fixture.run();
+
+      expect(interactiveLogin.runInteractiveLogin).toHaveBeenCalledOnce();
+      expect(fixture.context.process.exitCode).toBe(0);
+      expect(fixture.getOutput()).toContain("Authenticated with Sentry.");
+    });
+
+    test.each([0, 1, 2])("skips login when fd %i is not a TTY", async (fd) => {
+      vi.mocked(isatty).mockImplementation((candidate) => candidate !== fd);
+      const fixture = createInstall();
+      await fixture.run();
+      expect(interactiveLogin.runInteractiveLogin).not.toHaveBeenCalled();
+      expect(fixture.context.process.exitCode).toBe(0);
+    });
+
+    test("skips an agent identified by the environment", async () => {
+      const fixture = createInstall({ env: { AI_AGENT: "claude" } });
+      await fixture.run();
+      expect(interactiveLogin.runInteractiveLogin).not.toHaveBeenCalled();
+      expect(fixture.context.process.exitCode).toBe(0);
+    });
+
+    test("waits for process-tree agent detection before starting OAuth", async () => {
+      setProcessInfoProvider(async () => {
+        await Promise.resolve();
+        return { name: "codex", ppid: 1 };
+      });
+      const fixture = createInstall();
+      await fixture.run();
+      expect(interactiveLogin.runInteractiveLogin).not.toHaveBeenCalled();
+      expect(fixture.context.process.exitCode).toBe(0);
+    });
+
+    test("preserves an expired access token with a usable refresh token", async () => {
+      const fixture = createInstall();
+      setAuthToken("stored-token", -1, "refresh-token");
+      await fixture.run();
+      expect(interactiveLogin.runInteractiveLogin).not.toHaveBeenCalled();
+      expect(getAuthConfig()).toMatchObject({
+        token: "stored-token",
+        refreshToken: "refresh-token",
+      });
+      expect(fixture.context.process.exitCode).toBe(0);
+    });
+
+    test.each([
+      { env: { SENTRY_INIT: "1" } },
+      { env: { SENTRY_AUTH_TOKEN: "existing-token" } },
+      { env: { SENTRY_OUTPUT_FORMAT: "json" } },
+      { flags: ["--quiet"] },
+      { flags: ["--json"] },
+      { flags: ["--ensure-auth-scopes"] },
+      { existingBinary: true },
+      { install: false },
+      { method: "npm" },
+    ])("keeps login out of other setup flows: %j", async (options) => {
+      const fixture = createInstall(options);
+      await fixture.run();
+      expect(interactiveLogin.runInteractiveLogin).not.toHaveBeenCalled();
+      expect(fixture.context.process.exitCode).toBe(0);
+    });
+
+    test("refuses an untrusted OAuth host without failing installation", async () => {
+      const fixture = createInstall({
+        env: { SENTRY_HOST: "https://sentry.example.com" },
+      });
+      await fixture.run();
+      expect(interactiveLogin.runInteractiveLogin).not.toHaveBeenCalled();
+      expect(fixture.getOutput()).toContain("Refusing to log in against");
+      expect(fixture.context.process.exitCode).toBe(0);
+      expect(readFileSync(fixture.binaryPath, "utf8")).toBe("fixture-binary");
+    });
+
+    test.each([
+      false,
+      true,
+    ])("keeps installation successful when OAuth fails (throws: %s)", async (throws) => {
+      if (throws) {
+        vi.mocked(interactiveLogin.runInteractiveLogin).mockRejectedValue(
+          new Error("OAuth unavailable")
+        );
+      }
+      const fixture = createInstall();
+      await fixture.run();
+      expect(interactiveLogin.runInteractiveLogin).toHaveBeenCalledOnce();
+      expect(fixture.context.process.exitCode).toBe(0);
+      expect(readFileSync(fixture.binaryPath, "utf8")).toBe("fixture-binary");
+      expect(fixture.getOutput()).toContain(
+        throws
+          ? "Authentication failed: OAuth unavailable"
+          : "Run 'sentry auth login' to authenticate later."
+      );
     });
   });
 
