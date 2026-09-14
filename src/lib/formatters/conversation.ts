@@ -51,6 +51,7 @@ const ID_COLUMN: Column<ConversationListItem> = {
     return c.webUrl ? `[${id}](${c.webUrl})` : id;
   },
   truncate: true,
+  shrinkable: false,
 };
 
 const TITLE_COLUMN: Column<ConversationListItem> = {
