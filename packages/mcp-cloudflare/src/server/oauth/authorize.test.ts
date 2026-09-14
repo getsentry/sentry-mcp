@@ -610,6 +610,39 @@ describe("oauth authorize routes", () => {
       expect(setCookie).toContain("Secure");
       expect(setCookie).toContain("SameSite=Lax");
     });
+
+    it("redirects cancel to the client with access_denied", async () => {
+      const oauthReqInfo = {
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+        state: "original-state",
+      };
+      const formData = new FormData();
+      const signedState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      formData.append("state", signedState);
+      formData.append("decision", "deny");
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "POST",
+        body: formData,
+      });
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("Set-Cookie")).toBeNull();
+      const redirectUrl = new URL(response.headers.get("location")!);
+      expect(redirectUrl.origin).toBe("https://example.com");
+      expect(redirectUrl.pathname).toBe("/callback");
+      expect(redirectUrl.searchParams.get("error")).toBe("access_denied");
+      expect(redirectUrl.searchParams.get("state")).toBe("original-state");
+    });
   });
 
   describe("POST /oauth/authorize (CSRF/validation)", () => {
