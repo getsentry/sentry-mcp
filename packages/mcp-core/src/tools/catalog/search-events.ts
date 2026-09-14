@@ -35,6 +35,7 @@ import {
   formatLogResults,
   formatProfileResults,
   formatSpanResults,
+  formatTimeSeriesResults,
   formatTraceMetricsResults,
 } from "../support/search-events/formatters";
 import {
@@ -375,11 +376,12 @@ export default defineTool({
   description: [
     "Search Sentry events and replays. Use for event counts/statistics.",
     "",
-    "`query` can be natural language or Sentry search syntax. With an agent configured, it fixes dataset, query, fields, and sort before running.",
+    "`query` is natural language or Sentry search syntax; a configured agent fixes dataset, query, fields, and sort.",
     "",
-    "Supports TWO query types:",
+    "Supports THREE query types:",
     "1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'total tokens'",
     "2. Individual events with timestamps: 'error logs from last hour'",
+    "3. TIME SERIES (metric over time): 'errors per hour', 'error trend over time'",
     "",
     "Datasets:",
     "- errors: Exception/crash events with stack traces, usually grouped into issues",
@@ -396,15 +398,14 @@ export default defineTool({
     "",
     "<examples>",
     "search_events(organizationSlug='my-org', query='how many errors today')",
-    "search_events(organizationSlug='my-org', dataset='errors', query='level:error')",
     "search_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')",
+    "search_events(organizationSlug='my-org', query='errors per hour last 24h')",
     "search_events(organizationSlug='my-org', dataset='spans', query='span.op:db', sort='-span.duration')",
     "search_events(organizationSlug='my-org', dataset='replays', query='count_errors:>0', sort='-count_errors')",
     "</examples>",
     "",
     "<hints>",
-    "- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.",
-    "- Parse org/project notation directly without calling find_organizations or find_projects.",
+    "- name/otherName notation means <organizationSlug>/<projectSlug>; parse it directly, don't call find_organizations/find_projects.",
     "- Use fields with aggregate functions like count(), avg(), sum() for statistics",
     "- Sort by -count() for most common, -timestamp for newest",
     "</hints>",
@@ -534,6 +535,7 @@ export default defineTool({
     let timeParams: { statsPeriod?: string; start?: string; end?: string };
     let explanation: string | undefined;
     let environment: string | string[] | null | undefined = params.environment;
+    let timeSeries: { yAxis: string; interval: string | null } | null = null;
 
     const explicitSort = params.sort?.trim() || undefined;
     const hasExplicitDataset = params.dataset !== undefined;
@@ -583,6 +585,7 @@ export default defineTool({
               : (params.fields ?? defaultFieldsForDataset(inputDataset)),
           sort: explicitSort || defaultSortForDataset(inputDataset),
           environment: params.environment ?? null,
+          timeSeries: null,
           timeRange: { statsPeriod: params.period ?? "14d" },
           explanation: "",
         }),
@@ -608,7 +611,11 @@ export default defineTool({
         shouldTrustStructuredTraceSearch ||
         (hasStructuredQuery && parsed.dataset === inputDataset);
 
+      timeSeries = parsed.timeSeries ?? null;
+
+      // Time series requests use yAxis/interval, so sort is not required.
       if (
+        !timeSeries &&
         !parsed.sort?.trim() &&
         !(shouldTrustExplicitSearchParams && hasExplicitSort)
       ) {
@@ -749,6 +756,52 @@ export default defineTool({
         directToolNames: context.directToolNames,
       });
       return withEnvironmentNote(replayOutput);
+    }
+
+    if (timeSeries) {
+      const timeSeriesQuery = applyEnvironmentToEventsQuery(
+        dataset,
+        sentryQuery,
+        environment,
+      );
+      // No validateEventsSearch here: it validates the /events/ (discover)
+      // request shape — fields + orderby — which is not what a timeseries
+      // sends (yAxis + interval, no fields/sort). events-stats validates the
+      // query server-side, so a bad query still surfaces as an API error.
+      const series = await apiService.getEventsTimeSeries({
+        organizationSlug,
+        query: timeSeriesQuery,
+        yAxis: timeSeries.yAxis,
+        interval: timeSeries.interval ?? undefined,
+        projectId,
+        dataset,
+        ...timeParams,
+      });
+      const statsUrl = apiService.getEventsExplorerUrl(
+        organizationSlug,
+        timeSeriesQuery,
+        projectId,
+        dataset,
+        [timeSeries.yAxis],
+        `-${timeSeries.yAxis}`,
+        [timeSeries.yAxis],
+        [],
+        timeParams.statsPeriod,
+        timeParams.start,
+        timeParams.end,
+      );
+      return withEnvironmentNote(
+        formatTimeSeriesResults({
+          series,
+          yAxis: timeSeries.yAxis,
+          interval: timeSeries.interval,
+          inputQuery: params.query || timeSeriesQuery,
+          includeExplanation: params.includeExplanation,
+          explanation,
+          timeRange: timeParams,
+          url: statsUrl,
+        }),
+      );
     }
 
     // Sentry rejects the request if the sort column isn't in the selected

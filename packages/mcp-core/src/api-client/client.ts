@@ -55,6 +55,7 @@ import {
   ErrorsSearchResponseSchema,
   EventAttachmentListSchema,
   EventSchema,
+  EventsStatsResponseSchema,
   ExternalIssueListSchema,
   FlamegraphSchema,
   IssueActivityListResponseSchema,
@@ -4558,6 +4559,60 @@ export class SentryApiService {
       apiPath`/organizations/${organizationSlug}/events/` +
       `?${queryParams.toString()}`;
     return await this.requestJSON(apiUrl, undefined, opts);
+  }
+
+  /**
+   * Fetch a timeseries (events-stats) for a single yAxis, bucketed over time.
+   *
+   * `interval` is optional: omit it to let Sentry pick a sensible bucket size
+   * for the range (mirrors get_interval_from_range in the Sentry source).
+   * Environment and other filters travel in `query`, same as searchEvents.
+   */
+  async getEventsTimeSeries(
+    {
+      organizationSlug,
+      query,
+      yAxis,
+      interval,
+      projectId,
+      dataset = "errors",
+      statsPeriod,
+      start,
+      end,
+    }: {
+      organizationSlug: string;
+      query: string;
+      yAxis: string;
+      interval?: string;
+      projectId?: string;
+      dataset?: EventsDataset;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+    },
+    opts?: RequestOptions,
+  ) {
+    const queryParams = new URLSearchParams();
+    queryParams.set("dataset", normalizeEventsDataset(dataset));
+    queryParams.set("query", query);
+    queryParams.set("yAxis", yAxis);
+    // Omit interval to let Sentry pick a sensible bucket size for the range.
+    if (interval) {
+      queryParams.set("interval", interval);
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
+    if (projectId) {
+      queryParams.set("project", projectId);
+    }
+    // partial=1 keeps the current (in-progress) bucket, matching Sentry's charts.
+    queryParams.set("partial", "1");
+    queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);
+
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/events-stats/` +
+      `?${queryParams.toString()}`;
+    const body = await this.requestJSON(apiUrl, undefined, opts);
+    return EventsStatsResponseSchema.parse(body);
   }
 
   // POST https://us.sentry.io/api/0/issues/5485083130/autofix/
