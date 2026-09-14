@@ -24,8 +24,8 @@ const SOURCE_REFERENCE_RE =
   /\b(?:[a-z_$][\w$]*\.)*(?:env|environ|getenv|config|configuration|settings|secrets?|vault)(?:(?:\s*(?:\.|::)\s*[a-z_$][\w$]*)|(?:\s*[[(]\s*["']?[^)\]\n,"']+["']?\s*[)\]]))*/gi;
 const LEGACY_SOURCE_MAP_RE = /\bsourceMapsUploadOptions\s*:/i;
 const MODERN_SOURCE_MAP_RE = /\bsourcemaps\s*:/i;
-const SOURCE_MAP_TOKENS_RE =
-  /\b(?:sourceMapsUploadOptions|sourcemaps?|source_maps?)\b/gi;
+const SOURCE_MAP_CONFIG_RE =
+  /\b(?:sourceMapsUploadOptions|sourcemaps?|source_maps?)\s*(?:\.\s*[\w$]+\s*)?:/gi;
 const SOURCE_MAP_FIELD_RE =
   /\b(?:org|project|authToken|sourcemaps|assets)\s*:\s*([^,\r\n]+)/gi;
 const SOURCE_MAP_ASSETS_RE = /\bassets\s*:\s*(\[[\s\S]*?\])/gi;
@@ -34,6 +34,7 @@ const SOURCE_MAP_DOTTED_SETTING_RE =
 const WHITESPACE_RE = /\s+/g;
 const TRAILING_BRACE_RE = /\s*}+\s*$/;
 const NEWLINE_RE = /\r?\n/;
+const COMMENT_ONLY_LINE_RE = /^\s*(?:\/\/|#|\/\*|\*|<!--|--)/;
 
 type Evidence = {
   dsn: string[];
@@ -97,13 +98,19 @@ function countMatches(value: string, pattern: RegExp): number {
   return [...value.matchAll(pattern)].length;
 }
 
+function activeSourceMapContent(value: string): string {
+  return value
+    .split(NEWLINE_RE)
+    .filter((line) => !COMMENT_ONLY_LINE_RE.test(line))
+    .join("\n");
+}
+
 function isSentryRelated(value: string, filePath: string): boolean {
   return (
     SENTRY_CONFIG_PATH_RE.test(filePath) ||
     SENTRY_REFERENCE_RE.test(value) ||
     countMatches(value, SENTRY_SETUP_CALLS_RE) > 0 ||
-    LEGACY_SOURCE_MAP_RE.test(value) ||
-    countMatches(value, SOURCE_MAP_TOKENS_RE) > 0 ||
+    countMatches(activeSourceMapContent(value), SOURCE_MAP_CONFIG_RE) > 0 ||
     dsnExpressions(value).length > 0 ||
     configuredFeatures(value.split(NEWLINE_RE)).length > 0
   );
@@ -111,33 +118,38 @@ function isSentryRelated(value: string, filePath: string): boolean {
 
 function hasConcreteSetup(value: string, filePath: string): boolean {
   const sentryReference = SENTRY_REFERENCE_RE.test(value);
+  const sourceMaps = activeSourceMapContent(value);
   return (
     SENTRY_CONFIG_PATH_RE.test(filePath) ||
     countMatches(value, SENTRY_SETUP_CALLS_RE) > 0 ||
-    LEGACY_SOURCE_MAP_RE.test(value) ||
+    LEGACY_SOURCE_MAP_RE.test(sourceMaps) ||
     (sentryReference &&
       (dsnExpressions(value).length > 0 ||
-        MODERN_SOURCE_MAP_RE.test(value) ||
+        MODERN_SOURCE_MAP_RE.test(sourceMaps) ||
         configuredFeatures(value.split(NEWLINE_RE)).length > 0))
   );
 }
 
 function addEvidence(evidence: Evidence, value: string): void {
+  const sourceMaps = activeSourceMapContent(value);
   evidence.setupCallCount += countMatches(value, SENTRY_SETUP_CALLS_RE);
-  evidence.hasLegacySourceMaps ||= LEGACY_SOURCE_MAP_RE.test(value);
-  evidence.hasModernSourceMaps ||= MODERN_SOURCE_MAP_RE.test(value);
-  evidence.sourceMapCount += countMatches(value, SOURCE_MAP_TOKENS_RE);
+  evidence.hasLegacySourceMaps ||= LEGACY_SOURCE_MAP_RE.test(sourceMaps);
+  evidence.hasModernSourceMaps ||= MODERN_SOURCE_MAP_RE.test(sourceMaps);
+  evidence.sourceMapCount += countMatches(sourceMaps, SOURCE_MAP_CONFIG_RE);
   evidence.dsn.push(...dsnExpressions(value));
   evidence.sourceReferences.push(...sourceReferences(value));
-  if (LEGACY_SOURCE_MAP_RE.test(value) || MODERN_SOURCE_MAP_RE.test(value)) {
-    evidence.sourceMapFields.push(...sourceMapValues(value));
+  if (
+    LEGACY_SOURCE_MAP_RE.test(sourceMaps) ||
+    MODERN_SOURCE_MAP_RE.test(sourceMaps)
+  ) {
+    evidence.sourceMapFields.push(...sourceMapValues(sourceMaps));
     evidence.sourceMapAssets.push(
-      ...normalizedMatches(value, SOURCE_MAP_ASSETS_RE)
+      ...normalizedMatches(sourceMaps, SOURCE_MAP_ASSETS_RE)
     );
   }
   evidence.sourceMapSettings.push(
-    ...[...value.matchAll(SOURCE_MAP_DOTTED_SETTING_RE)].flatMap((match) =>
-      match[0] ? [match[0].replace(WHITESPACE_RE, " ")] : []
+    ...[...sourceMaps.matchAll(SOURCE_MAP_DOTTED_SETTING_RE)].flatMap(
+      (match) => (match[0] ? [match[0].replace(WHITESPACE_RE, " ")] : [])
     )
   );
   for (const feature of configuredFeatures(value.split(NEWLINE_RE))) {

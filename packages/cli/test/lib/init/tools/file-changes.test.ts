@@ -932,6 +932,30 @@ describe("apply file changes", () => {
     expect(readFileSync(target, "utf-8")).toBe(original);
   });
 
+  test("does not treat a removed source-map comment as removed configuration", async () => {
+    const target = path.join(directory, "sentry.config.ts");
+    writeFileSync(
+      target,
+      "Sentry.init({ dsn: process.env.SENTRY_DSN });\n// sourcemaps: example only\n"
+    );
+
+    const result = await applyPatchset(
+      request(directory, [
+        {
+          action: "modify",
+          edits: [
+            { newString: "", oldString: "// sourcemaps: example only\n" },
+          ],
+          path: "sentry.config.ts",
+        },
+      ]),
+      { authToken: undefined, dryRun: false }
+    );
+
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    expect(readFileSync(target, "utf-8")).not.toContain("example only");
+  });
+
   test("rejects whole-file replacement of a named Sentry config without language-specific markers", async () => {
     const target = path.join(directory, "sentry.config.custom");
     const original = `${"# existing configuration\n".repeat(3000)}custom_setting = true\n`;
