@@ -148,10 +148,11 @@ export const ENV_VAR_REGISTRY: readonly EnvVarEntry[] = [
   {
     name: "SENTRY_CONFIG_DIR",
     description:
-      "Override the directory where the CLI stores its database (credentials, caches, defaults). Defaults to `~/.sentry/`.",
+      "Override the directory where the CLI stores its database (credentials, caches, defaults). Follows the [XDG Base Directory specification](https://specifications.freedesktop.org/basedir/latest/): defaults to `$XDG_CONFIG_HOME/sentry/` (i.e. `~/.config/sentry/` when `XDG_CONFIG_HOME` is unset). For backward compatibility, a pre-existing legacy `~/.sentry/` directory that contains `cli.db` is still used.",
     example: "/path/to/config",
-    defaultValue: "~/.sentry/",
-    devGuide: "Override credentials/cache directory",
+    defaultValue: "~/.config/sentry/",
+    devGuide:
+      "Override credentials/cache directory (XDG default: ~/.config/sentry/)",
   },
   {
     name: "SENTRY_INSTALL_DIR",

@@ -57,6 +57,12 @@ sentry local -f error -f log
 # Run quietly (suppress per-envelope tail output)
 sentry local --quiet
 
+# Start the server and open the UI
+sentry local --open
+
+# Run your app with the UI
+sentry local run --open -- npm run dev
+
 sentry local -f error -f log    # only errors and logs
 
 sentry local -f ai          # only AI/agent spans
