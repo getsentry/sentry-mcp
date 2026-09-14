@@ -6,6 +6,7 @@ import {
   Output,
   RetryError,
   stepCountIs,
+  type ModelMessage,
   type Tool,
 } from "ai";
 import type { z } from "zod";
@@ -96,6 +97,18 @@ interface EmbeddedAgentResult<T> {
   toolCalls: ToolCall[];
 }
 
+// The embedded agent runs its own multi-step tool loop, capped at this many
+// steps. Its last step is answer-only (see prepareStep in the call below): the
+// top no-output failure is the model spending every step calling tools (fetch
+// attributes, validate, …) and never committing to the structured output.
+const AGENT_STEP_LIMIT = 5;
+
+const FINAL_OUTPUT_TURN_MESSAGE: ModelMessage = {
+  role: "user",
+  content:
+    "This is your final step — you have no tool calls left. Respond now with the structured output, using the information you already have.",
+};
+
 /**
  * Call an embedded agent with tool call capture
  * This is the standard way to call embedded AI agents within MCP tools
@@ -129,7 +142,16 @@ export async function callEmbeddedAgent<
       system,
       prompt,
       tools,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(AGENT_STEP_LIMIT),
+      // On the last step, take the tools away so the model answers instead of
+      // spending its final step on another tool call and returning nothing.
+      prepareStep: ({ stepNumber, messages }) =>
+        stepNumber === AGENT_STEP_LIMIT - 1
+          ? {
+              toolChoice: "none",
+              messages: [...messages, FINAL_OUTPUT_TURN_MESSAGE],
+            }
+          : undefined,
       experimental_output: Output.object({ schema }),
       experimental_telemetry: {
         isEnabled: true,
