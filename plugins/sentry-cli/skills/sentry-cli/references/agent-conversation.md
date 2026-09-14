@@ -27,6 +27,7 @@ List recent agent conversations
 | Field | Type | Description |
 |-------|------|-------------|
 | `conversationId` | string |  |
+| `webUrl` | string |  |
 | `title` | string \| null |  |
 | `flow` | array |  |
 | `errors` | number |  |

@@ -20,6 +20,8 @@ import {
 
 export const ConversationListItemSchema = object({
   conversationId: string(),
+  /** Browser URL for the conversation when provided by the API. */
+  webUrl: optional(string()),
   /** Stored conversation title when available (added by agent tracing list API). */
   title: optional(nullable(string())),
   flow: array(string()),
