@@ -396,6 +396,32 @@ describe("callEmbeddedAgent", () => {
     );
   });
 
+  it("retries once and succeeds when the first attempt produced no output", async () => {
+    // The model is stochastic: an identical retry usually succeeds.
+    mockGenerateText
+      .mockRejectedValueOnce(
+        new NoOutputGeneratedError({ message: "No output generated." }),
+      )
+      .mockResolvedValueOnce({
+        experimental_output: { result: "recovered" },
+      } as never);
+
+    const result = await callEmbeddedAgent({
+      system: "You are a test agent",
+      prompt: "Test prompt",
+      tools: {},
+      schema: testSchema,
+    });
+
+    expect(result.result).toEqual({ result: "recovered" });
+    expect(mockGenerateText).toHaveBeenCalledTimes(2);
+    expect(logWarn).toHaveBeenCalledWith(
+      "Embedded agent produced no usable output; retrying",
+      expect.objectContaining({ loggerScope: ["agents", "embedded"] }),
+    );
+    expect(logIssue).not.toHaveBeenCalled();
+  });
+
   it("treats missing experimental_output as a recoverable UserInputError", async () => {
     mockGenerateText.mockResolvedValue({
       experimental_output: undefined,

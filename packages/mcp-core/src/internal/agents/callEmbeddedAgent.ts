@@ -96,15 +96,60 @@ interface EmbeddedAgentResult<T> {
   toolCalls: ToolCall[];
 }
 
+// One retry: the embedded model is stochastic, so a transient empty or
+// unparseable response frequently succeeds on an identical second attempt.
+const EMBEDDED_AGENT_MAX_ATTEMPTS = 2;
+
 /**
  * Call an embedded agent with tool call capture
  * This is the standard way to call embedded AI agents within MCP tools
  *
  * Error handling:
- * - Errors are re-thrown for the calling agent to handle
+ * - A transient no-output/unparseable result is retried once (see above).
+ * - Other failures are mapped to a typed error and re-thrown for the caller.
  * - Each agent can implement its own error handling strategy
  */
 export async function callEmbeddedAgent<
+  TOutput,
+  TSchema extends z.ZodType<TOutput, unknown>,
+>(options: {
+  system: string;
+  prompt: string;
+  tools: Record<string, Tool>;
+  schema: TSchema;
+}): Promise<EmbeddedAgentResult<TOutput>> {
+  for (let attempt = 1; attempt <= EMBEDDED_AGENT_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await runEmbeddedAgentAttempt(options);
+    } catch (error: unknown) {
+      // A transient empty/unparseable result: retry once before surfacing it.
+      if (
+        attempt < EMBEDDED_AGENT_MAX_ATTEMPTS &&
+        (NoOutputGeneratedError.isInstance(error) ||
+          NoObjectGeneratedError.isInstance(error))
+      ) {
+        logWarn("Embedded agent produced no usable output; retrying", {
+          loggerScope: ["agents", "embedded"],
+          extra: { attempt },
+        });
+        continue;
+      }
+      throw mapEmbeddedAgentError(error);
+    }
+  }
+
+  // The final attempt always returns or throws above; this satisfies the type
+  // checker and guards against an accidental change to the loop bound.
+  throw new Error("callEmbeddedAgent: retry loop exited without a result");
+}
+
+/**
+ * Run a single embedded-agent attempt: translate, capture tool calls, and parse
+ * the structured output. NoObjectGeneratedError is rescued here (per attempt) by
+ * parsing the raw model text through the schema; every other failure is thrown
+ * for the caller to retry or map.
+ */
+async function runEmbeddedAgentAttempt<
   TOutput,
   TSchema extends z.ZodType<TOutput, unknown>,
 >({
@@ -181,87 +226,96 @@ export async function callEmbeddedAgent<
       toolCalls: capturedToolCalls,
     };
   } catch (error: unknown) {
-    // Rescue NoObjectGeneratedError: try to parse the raw LLM text through the schema
-    // (schema defaults like .default("") fill missing fields)
-    if (NoObjectGeneratedError.isInstance(error)) {
-      if (error.text) {
-        const rescued = rescueFromText(error.text, schema);
-        if (rescued) {
-          logWarn("NoObjectGeneratedError rescued via schema defaults", {
-            loggerScope: ["agents", "embedded"],
-            extra: {
-              errorMessage: error.message,
-              finishReason: error.finishReason,
-            },
-          });
-          return { result: rescued, toolCalls: capturedToolCalls };
-        }
+    // Rescue NoObjectGeneratedError: parse the raw LLM text through the schema
+    // (schema defaults like .default("") fill missing fields). Runs per attempt.
+    if (NoObjectGeneratedError.isInstance(error) && error.text) {
+      const rescued = rescueFromText(error.text, schema);
+      if (rescued) {
+        logWarn("NoObjectGeneratedError rescued via schema defaults", {
+          loggerScope: ["agents", "embedded"],
+          extra: {
+            errorMessage: error.message,
+            finishReason: error.finishReason,
+          },
+        });
+        return { result: rescued, toolCalls: capturedToolCalls };
       }
-      logWarn("NoObjectGeneratedError could not be rescued", {
-        loggerScope: ["agents", "embedded"],
-        extra: {
-          errorMessage: error.message,
-          hasText: !!error.text,
-          finishReason: error.finishReason,
-        },
-      });
-      throw new UserInputError(
-        "The AI was unable to process your query. Please try rephrasing.",
-      );
     }
-
-    // NoOutputGeneratedError: the model exhausted its steps without emitting the
-    // structured output (typically after repeated tool/validation failures). This
-    // is a recoverable model limitation, not a system fault — surface it as user
-    // input like its NoObjectGeneratedError sibling and log a warning, instead of
-    // filing a Sentry issue for every occurrence.
-    if (NoOutputGeneratedError.isInstance(error)) {
-      logWarn("Embedded agent produced no output", {
-        loggerScope: ["agents", "embedded"],
-        extra: { errorMessage: error.message },
-      });
-      throw new UserInputError(
-        "The AI could not construct a valid query for this request. Please rephrase or narrow it — for example, specify the fields, a real environment name, or a time range.",
-      );
-    }
-
-    // Handle LLM provider errors with user-friendly messages.
-    // These are operational availability failures that should NOT create Sentry
-    // issues per request (budget exhaustion, rate limits, provider outages).
-    // Also unwrap RetryError: after maxRetries the AI SDK wraps retryable
-    // 5xx/network failures so bare APICallError checks alone would miss them.
-    const providerError = resolveProviderApiCallError(error);
-    if (providerError) {
-      throw toLLMProviderError(providerError, error);
-    }
-
-    // RetryError without an underlying APICallError is still a provider outage
-    // (timeouts/network after retries) and should degrade the same way.
-    if (RetryError.isInstance(error)) {
-      throw new LLMProviderError(
-        `The AI provider is currently unavailable: ${error.message}. Please try again later.`,
-        { cause: error },
-      );
-    }
-
-    // Expected application errors thrown above (schema/user-input/config paths)
-    // must keep their original type so callers do not treat them as unexpected.
-    // ConfigurationError can come from provider.getProviderOptions() (e.g. bad
-    // OPENROUTER_REASONING_EFFORT) and must surface, not silently fall back.
-    if (
-      error instanceof UserInputError ||
-      error instanceof ConfigurationError ||
-      error instanceof LLMProviderError ||
-      error instanceof AgentExecutionError
-    ) {
-      throw error;
-    }
-
-    // Genuinely unexpected agent failures: file one Sentry issue, then throw a
-    // typed error so AI-powered tools can fall back or return a graceful response
-    // instead of hard-failing the MCP tool.
-    throw toAgentExecutionError(error);
+    throw error;
   }
+}
+
+/**
+ * Map a terminal embedded-agent failure (after retries) to the typed error tool
+ * handlers expect. Always throws.
+ */
+function mapEmbeddedAgentError(error: unknown): never {
+  // NoObjectGeneratedError that could not be rescued during the attempt.
+  if (NoObjectGeneratedError.isInstance(error)) {
+    logWarn("NoObjectGeneratedError could not be rescued", {
+      loggerScope: ["agents", "embedded"],
+      extra: {
+        errorMessage: error.message,
+        hasText: !!error.text,
+        finishReason: error.finishReason,
+      },
+    });
+    throw new UserInputError(
+      "The AI was unable to process your query. Please try rephrasing.",
+    );
+  }
+
+  // NoOutputGeneratedError: the model exhausted its steps without emitting the
+  // structured output (typically after repeated tool/validation failures). This
+  // is a recoverable model limitation, not a system fault — surface it as user
+  // input like its NoObjectGeneratedError sibling and log a warning, instead of
+  // filing a Sentry issue for every occurrence.
+  if (NoOutputGeneratedError.isInstance(error)) {
+    logWarn("Embedded agent produced no output", {
+      loggerScope: ["agents", "embedded"],
+      extra: { errorMessage: error.message },
+    });
+    throw new UserInputError(
+      "The AI could not construct a valid query for this request. Please rephrase or narrow it — for example, specify the fields, a real environment name, or a time range.",
+    );
+  }
+
+  // Handle LLM provider errors with user-friendly messages.
+  // These are operational availability failures that should NOT create Sentry
+  // issues per request (budget exhaustion, rate limits, provider outages).
+  // Also unwrap RetryError: after maxRetries the AI SDK wraps retryable
+  // 5xx/network failures so bare APICallError checks alone would miss them.
+  const providerError = resolveProviderApiCallError(error);
+  if (providerError) {
+    throw toLLMProviderError(providerError, error);
+  }
+
+  // RetryError without an underlying APICallError is still a provider outage
+  // (timeouts/network after retries) and should degrade the same way.
+  if (RetryError.isInstance(error)) {
+    throw new LLMProviderError(
+      `The AI provider is currently unavailable: ${error.message}. Please try again later.`,
+      { cause: error },
+    );
+  }
+
+  // Expected application errors thrown above (schema/user-input/config paths)
+  // must keep their original type so callers do not treat them as unexpected.
+  // ConfigurationError can come from provider.getProviderOptions() (e.g. bad
+  // OPENROUTER_REASONING_EFFORT) and must surface, not silently fall back.
+  if (
+    error instanceof UserInputError ||
+    error instanceof ConfigurationError ||
+    error instanceof LLMProviderError ||
+    error instanceof AgentExecutionError
+  ) {
+    throw error;
+  }
+
+  // Genuinely unexpected agent failures: file one Sentry issue, then throw a
+  // typed error so AI-powered tools can fall back or return a graceful response
+  // instead of hard-failing the MCP tool.
+  throw toAgentExecutionError(error);
 }
 
 function toAgentExecutionError(error: unknown): AgentExecutionError {
