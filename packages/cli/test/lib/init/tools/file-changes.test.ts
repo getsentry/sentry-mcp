@@ -677,6 +677,353 @@ describe("apply file changes", () => {
     expect(JSON.stringify(result)).not.toContain(secret);
   });
 
+  test("edits a multi-megabyte Sentry config from complete local content", async () => {
+    const target = path.join(directory, "sentry.config.ts");
+    const original = `${"// filler\n".repeat(120_000)}Sentry.init({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 1 });\nconst marker = "old";\n`;
+    writeFileSync(target, original);
+
+    const result = await applyPatchset(
+      request(directory, [
+        {
+          action: "modify",
+          edits: [
+            {
+              newString: 'const marker = "new";',
+              oldString: 'const marker = "old";',
+            },
+          ],
+          path: "sentry.config.ts",
+        },
+      ]),
+      { authToken: undefined, dryRun: false }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(readFileSync(target, "utf-8")).toBe(
+      original.replace('const marker = "old";', 'const marker = "new";')
+    );
+  });
+
+  test("rejects losing DSN source or a configured feature beyond the first page", async () => {
+    const target = path.join(directory, "sentry.config.ts");
+    const original = `${"// filler\n".repeat(5000)}Sentry.init({ dsn: process.env.SENTRY_DSN, enableLogs: true });\n`;
+    writeFileSync(target, original);
+
+    const dsnResult = await applyPatchset(
+      request(directory, [
+        { action: "create", patch: "created\n", path: "created.txt" },
+        {
+          action: "modify",
+          edits: [
+            {
+              newString: 'dsn: "https://example.invalid/1"',
+              oldString: "dsn: process.env.SENTRY_DSN",
+            },
+          ],
+          path: "sentry.config.ts",
+        },
+      ]),
+      { authToken: undefined, dryRun: false }
+    );
+    const logsResult = await applyPatchset(
+      request(directory, [
+        {
+          action: "modify",
+          edits: [{ newString: "", oldString: "enableLogs: true" }],
+          path: "sentry.config.ts",
+        },
+      ]),
+      { authToken: undefined, dryRun: false }
+    );
+
+    expect(dsnResult).toMatchObject({
+      data: { applied: [], failed: { code: "existing_setup_preservation" } },
+      ok: false,
+    });
+    expect(logsResult).toMatchObject({
+      data: { applied: [], failed: { code: "existing_setup_preservation" } },
+      ok: false,
+    });
+    expect(JSON.stringify(dsnResult)).not.toContain("SENTRY_DSN");
+    expect(readFileSync(target, "utf-8")).toBe(original);
+    expect(existsSync(path.join(directory, "created.txt"))).toBe(false);
+  });
+
+  test("preserves source-map values when moving them across files", async () => {
+    const target = path.join(directory, "sentry.config.ts");
+    const original = `${"// filler\n".repeat(5000)}sourceMapsUploadOptions: { org: process.env.SENTRY_ORG, project: process.env.SENTRY_PROJECT, authToken: process.env.SENTRY_AUTH_TOKEN, assets: ["dist/**"] },\n`;
+    writeFileSync(target, original);
+    const modern =
+      'sourcemaps: {\n  org: process.env.SENTRY_ORG,\n  project: process.env.SENTRY_PROJECT,\n  authToken: process.env.SENTRY_AUTH_TOKEN,\n  assets: ["dist/**"]\n},\n';
+
+    const result = await applyPatchset(
+      request(directory, [
+        {
+          action: "modify",
+          edits: [
+            {
+              newString: "",
+              oldString: original.slice(
+                original.indexOf("sourceMapsUploadOptions")
+              ),
+            },
+          ],
+          path: "sentry.config.ts",
+        },
+        { action: "create", patch: modern, path: "sentry.build.config.ts" },
+      ]),
+      { authToken: undefined, dryRun: false }
+    );
+
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    expect(readFileSync(target, "utf-8")).not.toContain(
+      "sourceMapsUploadOptions"
+    );
+    expect(
+      readFileSync(path.join(directory, "sentry.build.config.ts"), "utf-8")
+    ).toBe(modern);
+  });
+
+  test("rejects deleting an existing Sentry setup file", async () => {
+    const target = path.join(directory, "sentry.config.ts");
+    writeFileSync(target, "Sentry.init({ dsn: process.env.SENTRY_DSN });\n");
+
+    const result = await applyPatchset(
+      request(directory, [{ action: "delete", path: "sentry.config.ts" }]),
+      { authToken: undefined, dryRun: false }
+    );
+
+    expect(result).toMatchObject({
+      data: { applied: [], failed: { code: "existing_setup_preservation" } },
+      ok: false,
+    });
+    expect(existsSync(target)).toBe(true);
+  });
+
+  test("allows deleting documentation that only mentions Sentry", async () => {
+    const target = path.join(directory, "README.md");
+    writeFileSync(
+      target,
+      "Example: @sentry/nextjs with sourcemap.client and enableLogs.\n"
+    );
+
+    const result = await applyPatchset(
+      request(directory, [{ action: "delete", path: "README.md" }]),
+      { authToken: undefined, dryRun: false }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(existsSync(target)).toBe(false);
+  });
+
+  test("keeps every existing Sentry initialization in a multi-SDK file", async () => {
+    const target = path.join(directory, "instrumentation.ts");
+    const original =
+      "Sentry.init({ integrations: [server] });\nSentry.init({ integrations: [worker] });\n";
+    writeFileSync(target, original);
+
+    const result = await applyPatchset(
+      request(directory, [
+        {
+          action: "modify",
+          edits: [
+            {
+              newString: "",
+              oldString: "Sentry.init({ integrations: [worker] });\n",
+            },
+          ],
+          path: "instrumentation.ts",
+        },
+      ]),
+      { authToken: undefined, dryRun: false }
+    );
+
+    expect(result).toMatchObject({
+      data: { applied: [], failed: { code: "existing_setup_preservation" } },
+      ok: false,
+    });
+    expect(readFileSync(target, "utf-8")).toBe(original);
+  });
+
+  test("does not let another changed file mask a removed initialization", async () => {
+    const server = path.join(directory, "server.ts");
+    const worker = path.join(directory, "worker.ts");
+    writeFileSync(server, "Sentry.init({ integrations: [server] });\n");
+    writeFileSync(worker, "Sentry.init({ integrations: [worker] });\n");
+
+    const result = await applyPatchset(
+      request(directory, [
+        {
+          action: "modify",
+          edits: [
+            {
+              newString: "",
+              oldString: "Sentry.init({ integrations: [server] });\n",
+            },
+          ],
+          path: "server.ts",
+        },
+        {
+          action: "modify",
+          edits: [
+            {
+              newString: "Sentry.init({ integrations: [worker] });",
+              oldString: "Sentry.init({ integrations: [worker] });",
+            },
+          ],
+          path: "worker.ts",
+        },
+      ]),
+      { authToken: undefined, dryRun: false }
+    );
+
+    expect(result).toMatchObject({
+      data: { applied: [], failed: { code: "existing_setup_preservation" } },
+      ok: false,
+    });
+    expect(readFileSync(server, "utf-8")).toContain("Sentry.init");
+  });
+
+  test("keeps hidden source maps and every asset glob", async () => {
+    const target = path.join(directory, "nuxt.config.ts");
+    const original =
+      'sourcemap.client: "hidden",\nsourceMapsUploadOptions: { assets: ["dist/client/**", "dist/server/**"] },\n';
+    writeFileSync(target, original);
+
+    const hiddenResult = await applyPatchset(
+      request(directory, [
+        {
+          action: "modify",
+          edits: [
+            {
+              newString: 'sourcemap.client: "false"',
+              oldString: 'sourcemap.client: "hidden"',
+            },
+          ],
+          path: "nuxt.config.ts",
+        },
+      ]),
+      { authToken: undefined, dryRun: false }
+    );
+    const assetResult = await applyPatchset(
+      request(directory, [
+        {
+          action: "modify",
+          edits: [
+            {
+              newString: '["dist/client/**"]',
+              oldString: '["dist/client/**", "dist/server/**"]',
+            },
+          ],
+          path: "nuxt.config.ts",
+        },
+      ]),
+      { authToken: undefined, dryRun: false }
+    );
+
+    expect(hiddenResult).toMatchObject({
+      data: { applied: [], failed: { code: "existing_setup_preservation" } },
+      ok: false,
+    });
+    expect(assetResult).toMatchObject({
+      data: { applied: [], failed: { code: "existing_setup_preservation" } },
+      ok: false,
+    });
+    expect(readFileSync(target, "utf-8")).toBe(original);
+  });
+
+  test("rejects whole-file replacement of a named Sentry config without language-specific markers", async () => {
+    const target = path.join(directory, "sentry.config.custom");
+    const original = `${"# existing configuration\n".repeat(3000)}custom_setting = true\n`;
+    writeFileSync(target, original);
+
+    const result = await applyPatchset(
+      request(directory, [
+        {
+          action: "modify",
+          edits: [
+            { newString: "custom_setting = false\n", oldString: original },
+          ],
+          path: "sentry.config.custom",
+        },
+      ]),
+      { authToken: undefined, dryRun: false }
+    );
+
+    expect(result).toMatchObject({
+      data: { applied: [], failed: { code: "existing_setup_preservation" } },
+      ok: false,
+    });
+    expect(readFileSync(target, "utf-8")).toBe(original);
+  });
+
+  test("does not mistake a feature in another SDK file for preserving both setups", async () => {
+    const first = path.join(directory, "server.ts");
+    const second = path.join(directory, "worker.ts");
+    const setup =
+      "Sentry.init({ dsn: process.env.SENTRY_DSN, enableLogs: true });\n";
+    writeFileSync(first, setup);
+    writeFileSync(second, setup);
+
+    const result = await applyPatchset(
+      request(directory, [
+        {
+          action: "modify",
+          edits: [{ newString: "", oldString: "enableLogs: true" }],
+          path: "server.ts",
+        },
+        {
+          action: "modify",
+          edits: [
+            { newString: "enableLogs: true", oldString: "enableLogs: true" },
+          ],
+          path: "worker.ts",
+        },
+      ]),
+      { authToken: undefined, dryRun: false }
+    );
+
+    expect(result).toMatchObject({
+      data: { applied: [], failed: { code: "existing_setup_preservation" } },
+      ok: false,
+    });
+    expect(readFileSync(first, "utf-8")).toBe(setup);
+  });
+
+  test("allows moving a configured feature between files in one prepared batch", async () => {
+    const first = path.join(directory, "server.ts");
+    const second = path.join(directory, "worker.ts");
+    writeFileSync(
+      first,
+      "Sentry.init({ dsn: process.env.SENTRY_DSN, enableLogs: true });\n"
+    );
+    writeFileSync(second, "Sentry.init({ dsn: process.env.SENTRY_DSN });\n");
+
+    const result = await applyPatchset(
+      request(directory, [
+        {
+          action: "modify",
+          edits: [{ newString: "", oldString: "enableLogs: true" }],
+          path: "server.ts",
+        },
+        {
+          action: "modify",
+          edits: [
+            {
+              newString: "dsn: process.env.SENTRY_DSN, enableLogs: true",
+              oldString: "dsn: process.env.SENTRY_DSN",
+            },
+          ],
+          path: "worker.ts",
+        },
+      ]),
+      { authToken: undefined, dryRun: false }
+    );
+
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    expect(readFileSync(second, "utf-8")).toContain("enableLogs: true");
+  });
+
   test("rejects paths that escape the project", async () => {
     const result = await applyPatchset(
       request(directory, [

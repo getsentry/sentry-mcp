@@ -160,9 +160,12 @@ export type ExistingSentryDetection = {
   features?: string[];
   dsn?: string;
   evidenceTruncated?: boolean;
+  /** This CLI checks complete local files before applying Sentry edits. */
+  localExistingSetupGuard?: true;
 };
 
-function configuredFeatures(lines: readonly string[]): string[] {
+/** Recognize the same configured feature signals used by local preservation. */
+export function configuredFeatures(lines: readonly string[]): string[] {
   const normalizedLines = lines.map((line) => line.toLowerCase());
   return CONFIGURED_FEATURE_MARKERS.flatMap(({ feature, markers }) =>
     markers.some((marker) =>
@@ -299,6 +302,7 @@ export async function detectSentrySetup(
     status,
     signals: uniqueSignals,
     evidence,
+    localExistingSetupGuard: true,
     ...(features.length > 0 ? { features } : {}),
     ...(dsn ? { dsn: dsn.raw } : {}),
     ...((initialization.stats.truncated || configResult.truncated) && {

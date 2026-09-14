@@ -9,6 +9,10 @@ import path from "node:path";
 import { safeReadFile } from "../../../safe-read.js";
 import { safePath } from "../shared.js";
 import {
+  existingSetupPreservationFailure,
+  replacesEntireSentryFile,
+} from "./existing-setup.js";
+import {
   isCanonicalChild,
   resolveCanonicalDestination,
   resolveCanonicalRoot,
@@ -419,6 +423,17 @@ async function prepareModify(
   if (!edited.ok) {
     return edited;
   }
+  if (replacesEntireSentryFile(change.path, initialContent, change.edits)) {
+    return {
+      failure: {
+        action: "modify",
+        code: "existing_setup_preservation",
+        message: `Cannot modify "${change.path}": replace the existing Sentry setup with targeted edits`,
+        path: change.path,
+      },
+      ok: false,
+    };
+  }
   return {
     changes: [
       {
@@ -563,6 +578,10 @@ export async function prepareFileChanges(
       };
     }
     prepared.push(...result.changes);
+  }
+  const preservationFailure = existingSetupPreservationFailure(prepared);
+  if (preservationFailure) {
+    return { failure: preservationFailure, ok: false };
   }
   return { changes: prepared, ok: true };
 }

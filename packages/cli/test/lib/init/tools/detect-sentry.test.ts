@@ -135,6 +135,7 @@ describe("detectSentrySetup", () => {
 
     await expect(detectSentrySetup(directory)).resolves.toEqual({
       evidence: [],
+      localExistingSetupGuard: true,
       status: "none",
       signals: [],
     });
@@ -225,6 +226,7 @@ describe("detectSentrySetup", () => {
 
     await expect(detectSentrySetup(directory)).resolves.toEqual({
       evidence: [],
+      localExistingSetupGuard: true,
       status: "none",
       signals: [],
     });
@@ -240,6 +242,7 @@ describe("detectSentrySetup", () => {
 
     await expect(detectSentrySetup(directory)).resolves.toEqual({
       evidence: [],
+      localExistingSetupGuard: true,
       status: "none",
       signals: [],
     });
@@ -254,6 +257,7 @@ describe("detectSentrySetup", () => {
 
     await expect(detectSentrySetup(directory)).resolves.toEqual({
       evidence: [],
+      localExistingSetupGuard: true,
       status: "none",
       signals: [],
     });

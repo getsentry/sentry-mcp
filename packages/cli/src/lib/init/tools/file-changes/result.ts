@@ -8,6 +8,7 @@ export type FileChangeFailureCode =
   | "duplicate_target"
   | "edit_ambiguous"
   | "edit_not_found"
+  | "existing_setup_preservation"
   | "invalid_path"
   | "missing_file"
   | "not_regular_file"
