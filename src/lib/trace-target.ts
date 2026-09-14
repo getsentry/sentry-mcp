@@ -33,6 +33,8 @@ import {
 import { setOrgProjectContext } from "./telemetry.js";
 import { isTraceId, validateTraceId } from "./trace-id.js";
 
+const log = logger.withTag("trace-target");
+
 /** Match `[<prefix>]<trail>` in usageHint — captures bracket content + trailing placeholder */
 const USAGE_TARGET_RE = /\[.*\]<[^>]+>/;
 
@@ -128,7 +130,6 @@ export function parseTraceTarget(
 
   // Warn about extra positional args that will be ignored
   if (args.length > 2) {
-    const log = logger.withTag("trace-target");
     log.warn(
       `Extra arguments ignored: ${args.slice(2).join(" ")}. Expected: ${usageHint}`
     );
@@ -361,10 +362,10 @@ async function recoveryContextFromTargetArg(
     return { org: "", project: undefined };
   }
   let parsedTarget: ReturnType<typeof parseOrgProjectArg>;
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     parsedTarget = parseOrgProjectArg(targetArg);
-  } catch {
+  } catch (error) {
+    log.debug("Failed to parse target arg for recovery context", error);
     return { org: "", project: undefined };
   }
   return (
@@ -401,8 +402,8 @@ function substituteTraceId(args: string[], recoveredTraceId: string): string[] {
  */
 export function warnIfNormalized(parsed: ParsedTraceTarget, tag: string): void {
   if ("normalized" in parsed && parsed.normalized) {
-    const log = logger.withTag(tag);
-    log.warn(
+    const taggedLog = logger.withTag(tag);
+    taggedLog.warn(
       "Normalized slug (Sentry slugs use lowercase with dashes, not spaces)"
     );
   }

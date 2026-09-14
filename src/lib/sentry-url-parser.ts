@@ -12,8 +12,11 @@ import { DEFAULT_SENTRY_HOST } from "./constants.js";
 import { getEnv } from "./env.js";
 import { HostScopeError } from "./errors.js";
 import { tryNormalizeHexId } from "./hex-id.js";
+import { logger } from "./logger.js";
 import { isSaaSTrustOrigin } from "./sentry-urls.js";
 import { getActiveTokenHost, isHostTrusted } from "./token-host.js";
+
+const log = logger.withTag("url-parser");
 
 const FEEDBACK_SLUG_RE = /^([a-z0-9][a-z0-9_-]*):(\d+)$/i;
 
@@ -372,10 +375,10 @@ export function parseSentryUrl(input: string): ParsedSentryUrl | null {
   }
 
   let url: URL;
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     url = new URL(input);
-  } catch {
+  } catch (error) {
+    log.debug("Failed to parse URL", input, error);
     return null;
   }
 

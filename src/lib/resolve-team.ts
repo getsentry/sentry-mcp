@@ -30,8 +30,11 @@ import {
   ContextError,
   ResolutionError,
 } from "./errors.js";
+import { logger } from "./logger.js";
 import { resolveEffectiveOrg } from "./region.js";
 import { getSentryBaseUrl } from "./sentry-urls.js";
+
+const log = logger.withTag("resolve-team");
 
 /**
  * Best-effort fetch the user's organizations and format as a hint string.
@@ -41,15 +44,14 @@ import { getSentryBaseUrl } from "./sentry-urls.js";
  * @returns Formatted org list like "Your organizations:\n\n  acme-corp\n  other-org"
  */
 async function fetchOrgListHint(fallbackHint: string): Promise<string> {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const orgs = await listOrganizations();
     if (orgs.length > 0) {
       const orgList = orgs.map((o) => `  ${o.slug}`).join("\n");
       return `Your organizations:\n\n${orgList}`;
     }
-  } catch {
-    // Best-effort — if this also fails, use the fallback
+  } catch (error) {
+    log.debug("Failed to fetch org list for hint", error);
   }
   return fallbackHint;
 }
