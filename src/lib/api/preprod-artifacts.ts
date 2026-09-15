@@ -23,6 +23,7 @@ import {
   nullish,
   number,
   object,
+  optional,
   string,
   tuple,
 } from "valibot";
@@ -398,6 +399,7 @@ export async function getLatestBaseSnapshot(
 /** Objectstore config within the snapshots upload-options response. */
 const ObjectstoreUploadOptionsSchema = object({
   url: string(),
+  usecase: optional(string(), "preprod"),
   scopes: array(tuple([string(), string()])),
   authToken: nullish(string()),
   expirationPolicy: string(),
@@ -427,7 +429,7 @@ export async function fetchSnapshotsUploadOptions(
   const { data } = await apiRequestToRegion(
     regionUrl,
     `projects/${org}/${project}/preprodartifacts/snapshots/upload-options/`,
-    { schema: SnapshotsUploadOptionsSchema }
+    { params: { usecase: "auto" }, schema: SnapshotsUploadOptionsSchema }
   );
   return data;
 }
