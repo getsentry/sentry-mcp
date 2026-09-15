@@ -20,6 +20,7 @@ import {
 
 const config: ObjectstoreConfig = {
   url: "https://objectstore.example.com/",
+  usecase: "preprod_snapshots",
   scopes: [
     ["org", "123"],
     ["project", "456"],
@@ -37,7 +38,9 @@ afterEach(() => {
 
 describe("buildObjectUrl", () => {
   test("joins usecase, scope, and key (stripping a trailing slash)", () => {
-    expect(buildObjectUrl(config, "123/456/abc")).toBe(
+    expect(
+      buildObjectUrl({ ...config, usecase: "preprod" }, "123/456/abc")
+    ).toBe(
       "https://objectstore.example.com/v1/objects/preprod/org=123;project=456/123/456/abc"
     );
   });
@@ -49,7 +52,7 @@ describe("objectExists", () => {
     expect(await objectExists(config, "123/456/abc")).toBe(true);
     const [url, init] = customFetchMock.mock.calls[0] ?? [];
     expect(url).toContain(
-      "/v1/objects/preprod/org=123;project=456/123/456/abc"
+      "/v1/objects/preprod_snapshots/org=123;project=456/123/456/abc"
     );
     expect(init.method).toBe("HEAD");
     expect(init.headers["x-os-auth"]).toBe("Bearer jwt-token");
@@ -85,7 +88,9 @@ describe("putObject", () => {
     await putObject(config, "123/456/abc", body);
 
     const [url, init] = customFetchMock.mock.calls[0] ?? [];
-    expect(url).toContain("/123/456/abc");
+    expect(url).toBe(
+      "https://objectstore.example.com/v1/objects/preprod_snapshots/org=123;project=456/123/456/abc"
+    );
     expect(init.method).toBe("PUT");
     expect(init.headers["x-os-auth"]).toBe("Bearer jwt-token");
     expect(init.headers["x-sn-expiration"]).toBe("ttl:30d");
