@@ -55,6 +55,7 @@ function pngBytes(width: number, height: number): Buffer {
 const UPLOAD_OPTIONS = {
   objectstore: {
     url: "https://os.example.com",
+    usecase: "preprod_snapshots",
     scopes: [
       ["org", "1"],
       ["project", "2"],
@@ -103,7 +104,12 @@ describe("snapshots upload", () => {
     return dir;
   }
 
-  test("uploads images and creates a snapshot with a correct manifest", async () => {
+  test.each([
+    "preprod",
+    "preprod_snapshots",
+  ])("uploads images to %s and creates a snapshot with a correct manifest", async (usecase) => {
+    const config = { ...UPLOAD_OPTIONS.objectstore, usecase };
+    uploadOptionsSpy.mockResolvedValue({ objectstore: config });
     const dir = await writeShots();
     const harness = createContext();
     const func = await uploadCommand.loader();
@@ -139,6 +145,8 @@ describe("snapshots upload", () => {
     )?.[1] as string;
     expect(key).toMatch(/^1\/2\/[0-9a-f]{64}$/);
     expect(key.endsWith(hash)).toBe(true);
+    expect(existsSpy).toHaveBeenCalledWith(config, key);
+    expect(putSpy).toHaveBeenCalledWith(config, key, expect.any(Uint8Array));
   });
 
   test("CLI width/height/content_hash override sidecar keys", async () => {

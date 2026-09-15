@@ -15,9 +15,6 @@
 import { customFetch } from "./custom-ca.js";
 import { ApiError } from "./errors.js";
 
-/** The Objectstore usecase snapshots are stored under. */
-export const OBJECTSTORE_USECASE = "preprod";
-
 /** Header carrying the Objectstore bearer token. */
 const AUTH_HEADER = "x-os-auth";
 /** Header carrying an object's expiration policy (e.g. `ttl:30d`). */
@@ -38,6 +35,7 @@ const PUT_TIMEOUT_MS = 120_000;
 export type ObjectstoreConfig = {
   /** Base service URL (may include a path prefix). */
   url: string;
+  usecase: string;
   /** Ordered scope pairs (e.g. `[["org","1"],["project","2"]]`). */
   scopes: [string, string][];
   /** Pre-signed bearer token, or null/absent for unauthenticated stores. */
@@ -59,7 +57,7 @@ function scopeSegment(scopes: [string, string][]): string {
  */
 export function buildObjectUrl(config: ObjectstoreConfig, key: string): string {
   const base = config.url.replace(TRAILING_SLASHES, "");
-  return `${base}/v1/objects/${OBJECTSTORE_USECASE}/${scopeSegment(
+  return `${base}/v1/objects/${config.usecase}/${scopeSegment(
     config.scopes
   )}/${key}`;
 }

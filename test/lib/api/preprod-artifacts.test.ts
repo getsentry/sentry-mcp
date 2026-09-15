@@ -10,7 +10,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { safeParse } from "valibot";
+import { parse, safeParse } from "valibot";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ApiError, ValidationError } from "../../../src/lib/errors.js";
 
@@ -379,23 +379,37 @@ describe("snapshots", () => {
     ).toBe(false);
   });
 
-  test("fetchSnapshotsUploadOptions hits the upload-options endpoint", async () => {
-    apiRequestToRegionMock.mockResolvedValue({
-      data: {
-        objectstore: {
-          url: "https://os.example.com",
-          scopes: [["org", "1"]],
-          authToken: "tok",
-          expirationPolicy: "ttl:30d",
-        },
-      },
-    });
+  test.each([
+    { usecase: "preprod_snapshots", expectedUsecase: "preprod_snapshots" },
+    { usecase: "preprod", expectedUsecase: "preprod" },
+    { usecase: undefined, expectedUsecase: "preprod" },
+  ])("fetchSnapshotsUploadOptions negotiates auto and parses $usecase as $expectedUsecase", async ({
+    usecase,
+    expectedUsecase,
+  }) => {
+    apiRequestToRegionMock.mockImplementation(
+      async (_region, _path, { schema }) => ({
+        data: parse(schema, {
+          objectstore: {
+            url: "https://os.example.com",
+            usecase,
+            scopes: [["org", "1"]],
+            authToken: "tok",
+            expirationPolicy: "ttl:30d",
+          },
+        }),
+      })
+    );
     const opts = await fetchSnapshotsUploadOptions("my-org", "my-project");
     expect(opts.objectstore.url).toBe("https://os.example.com");
-    const [, endpoint] = apiRequestToRegionMock.mock.calls.at(-1) ?? [];
+    expect(opts.objectstore.usecase).toBe(expectedUsecase);
+    const [region, endpoint, options] =
+      apiRequestToRegionMock.mock.calls.at(-1) ?? [];
+    expect(region).toBe("https://us.sentry.io");
     expect(endpoint).toBe(
       "projects/my-org/my-project/preprodartifacts/snapshots/upload-options/"
     );
+    expect(options.params).toEqual({ usecase: "auto" });
   });
 
   test("createPreprodSnapshot POSTs the manifest and parses the response", async () => {
