@@ -1,5 +1,5 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import {
   assertStructuredOnlyResult,
@@ -23,6 +23,17 @@ const params = {
 const endpoint =
   "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/123/";
 
+const slackAction = {
+  id: "21",
+  type: "slack",
+  integrationId: "5",
+  data: { tags: "environment" },
+  config: {
+    targetType: "specific",
+    targetDisplay: "#old-channel",
+    targetIdentifier: "COLD",
+  },
+};
 const alertRule = {
   id: "123",
   name: "Notify backend team",
@@ -30,66 +41,14 @@ const alertRule = {
   config: { frequency: 30 },
   environment: "production",
   owner: "team:7",
+  triggers: null,
   detectorIds: ["789"],
-  triggers: {
-    id: "10",
-    logicType: "any" as const,
-    conditions: [
-      {
-        id: "11",
-        type: "event_frequency_count",
-        comparison: { value: 10, interval: "1h" },
-        conditionResult: true,
-      },
-    ],
-  },
   actionFilters: [
     {
       id: "20",
       logicType: "all" as const,
       conditions: [],
-      actions: [
-        {
-          id: "21",
-          type: "slack",
-          integrationId: "5",
-          data: { tags: "environment" },
-          config: {
-            targetType: "specific",
-            targetDisplay: "#old-channel",
-            targetIdentifier: "COLD",
-          },
-        },
-        {
-          id: "22",
-          type: "email",
-          integrationId: null,
-          data: {},
-          config: {
-            targetType: "team",
-            targetDisplay: null,
-            targetIdentifier: "7",
-          },
-        },
-      ],
-    },
-    {
-      id: "30",
-      logicType: "all" as const,
-      conditions: [],
-      actions: [
-        {
-          id: "31",
-          type: "slack",
-          integrationId: "6",
-          data: { tags: "release" },
-          config: {
-            targetType: "specific",
-            targetDisplay: "#other-channel",
-            targetIdentifier: "COTHER",
-          },
-        },
-      ],
+      actions: [slackAction],
     },
   ],
 };
@@ -185,40 +144,9 @@ describe("update_alert_rule", () => {
                   "integrationId": "5",
                   "type": "slack",
                 },
-                {
-                  "config": {
-                    "targetDisplay": null,
-                    "targetIdentifier": "7",
-                    "targetType": "team",
-                  },
-                  "data": {},
-                  "id": "22",
-                  "integrationId": null,
-                  "type": "email",
-                },
               ],
               "conditions": [],
               "id": "20",
-              "logicType": "all",
-            },
-            {
-              "actions": [
-                {
-                  "config": {
-                    "targetDisplay": "#other-channel",
-                    "targetIdentifier": "COTHER",
-                    "targetType": "specific",
-                  },
-                  "data": {
-                    "tags": "release",
-                  },
-                  "id": "31",
-                  "integrationId": "6",
-                  "type": "slack",
-                },
-              ],
-              "conditions": [],
-              "id": "30",
               "logicType": "all",
             },
           ],
@@ -230,81 +158,77 @@ describe("update_alert_rule", () => {
           "id": "123",
           "name": "Notify backend team",
           "owner": null,
-          "triggers": {
-            "conditions": [
-              {
-                "comparison": {
-                  "interval": "1h",
-                  "value": 10,
-                },
-                "conditionResult": true,
-                "id": "11",
-                "type": "event_frequency_count",
-              },
-            ],
-            "id": "10",
-            "logicType": "any",
-          },
+          "triggers": null,
           "webUrl": "https://sentry-mcp-evals.sentry.io/monitors/alerts/123/",
         },
       }
     `);
   });
 
-  it("repoints a Slack action without changing other actions or action groups", async () => {
-    const { writes } = useAlertRuleHandlers();
-    const actionFilters = structuredClone(alertRule.actionFilters);
-    actionFilters[0].actions[0].config.targetDisplay = "#new-channel";
+  it.each([
+    { source: "copied", inputId: "COLD", expectedId: undefined },
+    { source: "explicit", inputId: "CNEW", expectedId: "CNEW" },
+  ])(
+    "handles a $source Slack channel ID while preserving other actions and groups",
+    async ({ inputId, expectedId }) => {
+      const { writes } = useAlertRuleHandlers();
+      const actionFilters: Parameters<
+        typeof updateAlertRule.handler
+      >[0]["actionFilters"] = structuredClone(alertRule.actionFilters);
+      actionFilters[0].actions.push({
+        id: "22",
+        type: "email",
+        integrationId: null,
+        data: {},
+        config: {
+          targetType: "team",
+          targetDisplay: null,
+          targetIdentifier: "7",
+        },
+      });
+      actionFilters.push({
+        ...actionFilters[0],
+        id: "30",
+        actions: [{ ...slackAction, id: "31" }],
+      });
+      actionFilters[0].actions[0].config = {
+        ...slackAction.config,
+        targetDisplay: "#new-channel",
+        targetIdentifier: inputId,
+      };
+      const savedFilters = structuredClone(actionFilters);
+      savedFilters[0].actions[0].config.targetIdentifier = "CNEW";
+      mswServer.use(
+        http.put(endpoint, async ({ request }) => {
+          writes.push((await request.json()) as Record<string, unknown>);
+          return HttpResponse.json({
+            ...alertRule,
+            actionFilters: savedFilters,
+          });
+        }),
+      );
 
-    const savedFilters = structuredClone(actionFilters);
-    savedFilters[0].actions[0].config.targetIdentifier = "CNEW";
-    mswServer.use(
-      http.put(endpoint, async ({ request }) => {
-        writes.push((await request.json()) as Record<string, unknown>);
-        return HttpResponse.json({ ...alertRule, actionFilters: savedFilters });
-      }),
-    );
-    const result = await updateAlertRule.handler(
-      { ...params, actionFilters },
-      context,
-    );
-    expect(getStructuredContent(result)).toMatchObject({
-      alertRule: { actionFilters: savedFilters },
-    });
-
-    const expectedFilters = structuredClone(actionFilters);
-    const { targetIdentifier: _staleId, ...updatedConfig } =
-      expectedFilters[0].actions[0].config;
-    expect(writes).toEqual([
-      {
-        name: alertRule.name,
-        enabled: false,
-        actionFilters: [
-          {
-            ...expectedFilters[0],
-            actions: [
-              { ...expectedFilters[0].actions[0], config: updatedConfig },
-              alertRule.actionFilters[0].actions[1],
-            ],
-          },
-          alertRule.actionFilters[1],
-        ],
-      },
-    ]);
-  });
-
-  it("keeps an explicitly changed Slack channel ID", async () => {
-    const { writes } = useAlertRuleHandlers();
-    const actionFilters = structuredClone(alertRule.actionFilters);
-    actionFilters[0].actions[0].config.targetDisplay = "#new-channel";
-    actionFilters[0].actions[0].config.targetIdentifier = "CNEW";
-
-    await updateAlertRule.handler({ ...params, actionFilters }, context);
-
-    expect(writes).toEqual([
-      { name: alertRule.name, enabled: false, actionFilters },
-    ]);
-  });
+      const result = await updateAlertRule.handler(
+        { ...params, actionFilters },
+        context,
+      );
+      const expectedFilters = structuredClone(actionFilters);
+      const expectedConfig: Record<string, unknown> =
+        expectedFilters[0].actions[0].config;
+      if (expectedId === undefined) delete expectedConfig.targetIdentifier;
+      else expectedConfig.targetIdentifier = expectedId;
+      expect(writes).toEqual([
+        {
+          name: alertRule.name,
+          enabled: false,
+          actionFilters: expectedFilters,
+        },
+      ]);
+      expect(getStructuredContent(result)).toMatchObject({
+        alertRule: { actionFilters: savedFilters },
+      });
+    },
+  );
 
   it("replaces action filters when an explicit empty array is supplied", async () => {
     const { writes } = useAlertRuleHandlers();
@@ -316,7 +240,7 @@ describe("update_alert_rule", () => {
     ]);
   });
 
-  it("resolves an exact alert name before reading authoritative detail", async () => {
+  it("resolves an exact name and permits an update within the constrained project", async () => {
     const { reads, writes } = useAlertRuleHandlers();
     useProjectScope(["100"]);
     const queries: URL[] = [];
@@ -338,13 +262,14 @@ describe("update_alert_rule", () => {
         projectSlug: "cloudflare-mcp",
         ruleIdOrName: alertRule.name,
         name: "Renamed alert",
+        status: "active",
       },
-      context,
+      { ...context, constraints: { projectSlug: "cloudflare-mcp" } },
     );
 
     expect(queries[0].searchParams.get("projectSlug")).toBe("cloudflare-mcp");
     expect(reads).toHaveLength(1);
-    expect(writes).toEqual([{ name: "Renamed alert", enabled: false }]);
+    expect(writes).toEqual([{ name: "Renamed alert", enabled: true }]);
   });
 
   it("rejects an empty update before reading or writing the API", async () => {
@@ -400,18 +325,6 @@ describe("update_alert_rule", () => {
       expect(writes).toEqual([]);
     },
   );
-
-  it("allows a project-scoped update only when the workflow belongs wholly to that project", async () => {
-    const { writes } = useAlertRuleHandlers();
-    useProjectScope(["100"]);
-
-    await updateAlertRule.handler(
-      { ...params, projectSlug: "cloudflare-mcp", status: "active" },
-      { ...context, constraints: { projectSlug: "cloudflare-mcp" } },
-    );
-
-    expect(writes).toEqual([{ name: alertRule.name, enabled: true }]);
-  });
 
   it.each([
     { projectIds: ["100", "200"], includesAllProjects: false },

@@ -1284,7 +1284,16 @@ describe("buildServer", () => {
       }
     });
 
-    it("execute_sentry_tool rejects unavailable non-inspect tools", async () => {
+    it.each([
+      {
+        name: "update_issue",
+        arguments: { issueId: "CLOUDFLARE-MCP-41", status: "resolved" },
+      },
+      {
+        name: "update_alert_rule",
+        arguments: { ruleIdOrName: "123", status: "disabled" },
+      },
+    ])("execute_sentry_tool rejects unavailable $name", async (call) => {
       const server = buildServer({
         context: {
           ...baseContext,
@@ -1293,40 +1302,16 @@ describe("buildServer", () => {
       });
 
       const result = await callRegisteredTool(server, "execute_sentry_tool", {
-        name: "update_issue",
+        name: call.name,
         arguments: {
           organizationSlug: "sentry-mcp-evals",
-          issueId: "CLOUDFLARE-MCP-41",
-          status: "resolved",
+          ...call.arguments,
         },
       });
 
       expect(result).toMatchObject({ isError: true });
       expect(getTextContent(result)).toContain(
-        'Tool "update_issue" is not available in this session',
-      );
-    });
-
-    it("execute_sentry_tool rejects alert updates in read-only sessions", async () => {
-      const server = buildServer({
-        context: {
-          ...baseContext,
-          grantedSkills: new Set(["inspect"]),
-        },
-      });
-
-      const result = await callRegisteredTool(server, "execute_sentry_tool", {
-        name: "update_alert_rule",
-        arguments: {
-          organizationSlug: "sentry-mcp-evals",
-          ruleIdOrName: "123",
-          status: "disabled",
-        },
-      });
-
-      expect(result).toMatchObject({ isError: true });
-      expect(getTextContent(result)).toContain(
-        'Tool "update_alert_rule" is not available in this session',
+        `Tool "${call.name}" is not available in this session`,
       );
     });
 

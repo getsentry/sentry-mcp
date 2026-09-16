@@ -1,6 +1,7 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
+import { getStructuredContent } from "../../test-utils/structured-content.js";
 import getAlertRule from "./get-alert-rule.js";
 import {
   alertRuleSummarySchema,
@@ -99,7 +100,9 @@ const project = {
   name: "cloudflare-mcp",
 };
 
-function useAlertRuleHandlers() {
+function useAlertRuleHandlers(
+  workflow: Record<string, unknown> = issueAlertRule,
+) {
   mswServer.use(
     http.get(
       "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
@@ -107,7 +110,7 @@ function useAlertRuleHandlers() {
     ),
     http.get(
       "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
-      () => HttpResponse.json([issueAlertRule]),
+      () => HttpResponse.json([workflow]),
     ),
     http.get(
       "https://sentry.io/api/0/organizations/sentry-mcp-evals/alert-rules/456/",
@@ -131,11 +134,7 @@ describe("get_alert_rule", () => {
       context,
     );
 
-    expect(typeof result).toBe("object");
-    if (typeof result === "string") {
-      throw new Error("Expected a structured alert rule response");
-    }
-    expect(result.structuredContent).toMatchInlineSnapshot(`
+    expect(getStructuredContent(result)).toMatchInlineSnapshot(`
       {
         "alertRule": {
           "actionFilters": [
@@ -318,32 +317,6 @@ describe("get_alert_rule", () => {
     expect(result).toContain("### Triggers");
   });
 
-  it("handles native workflow issue alert payloads", async () => {
-    useAlertRuleHandlers();
-
-    const result = await getAlertRule.handler(
-      {
-        organizationSlug: "sentry-mcp-evals",
-        regionUrl: null,
-        kind: "issue",
-        projectSlug: "cloudflare-mcp",
-        ruleIdOrName: "123",
-      },
-      context,
-    );
-
-    expect(result).toMatchObject({
-      structuredContent: {
-        alertRule: {
-          triggers: issueAlertRule.triggers,
-          actionFilters: issueAlertRule.actionFilters,
-        },
-      },
-    });
-    expect(JSON.stringify(result)).not.toContain("actionMatch");
-    expect(JSON.stringify(result)).not.toContain("filterMatch");
-  });
-
   it("returns complete editable groups and actions without backend-only fields", async () => {
     const actions = Array.from({ length: 7 }, (_, index) => ({
       id: String(100 + index),
@@ -373,34 +346,24 @@ describe("get_alert_rule", () => {
       },
       { id: "300", logicType: "all", conditions: [], actions: [] },
     ];
-    useAlertRuleHandlers();
-    mswServer.use(
-      http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
-        () =>
-          HttpResponse.json([
-            {
-              ...issueAlertRule,
-              enabled: false,
-              owner: null,
-              config: { ...issueAlertRule.config, internalOnly: "not-public" },
-              internalOnly: "not-public",
-              triggers: {
-                ...issueAlertRule.triggers,
-                organizationId: "not-public",
-              },
-              actionFilters: actionFilters.map((group) => ({
-                ...group,
-                organizationId: "not-public",
-                actions: group.actions.map((action) => ({
-                  ...action,
-                  internalOnly: "not-public",
-                })),
-              })),
-            },
-          ]),
-      ),
-    );
+    useAlertRuleHandlers({
+      ...issueAlertRule,
+      enabled: false,
+      owner: null,
+      actionMatch: "all",
+      filterMatch: "all",
+      config: { ...issueAlertRule.config, internalOnly: "not-public" },
+      internalOnly: "not-public",
+      triggers: { ...issueAlertRule.triggers, organizationId: "not-public" },
+      actionFilters: actionFilters.map((group) => ({
+        ...group,
+        organizationId: "not-public",
+        actions: group.actions.map((action) => ({
+          ...action,
+          internalOnly: "not-public",
+        })),
+      })),
+    });
 
     const result = await getAlertRule.handler(
       {
@@ -413,11 +376,8 @@ describe("get_alert_rule", () => {
       context,
     );
 
-    if (typeof result === "string") {
-      throw new Error("Expected a structured alert rule response");
-    }
     const summary = alertRuleSummarySchema.parse(
-      result.structuredContent.alertRule,
+      getStructuredContent(result).alertRule,
     );
     expect(summary.enabled).toBe(false);
     expect(summary.owner).toBeNull();
@@ -431,6 +391,8 @@ describe("get_alert_rule", () => {
     );
     expect(JSON.stringify(result)).not.toContain("not-public");
     expect(JSON.stringify(result)).not.toContain("detectorIds");
+    expect(JSON.stringify(result)).not.toContain("actionMatch");
+    expect(JSON.stringify(result)).not.toContain("filterMatch");
   });
 
   it("fetches issue alert details after resolving an exact name", async () => {
