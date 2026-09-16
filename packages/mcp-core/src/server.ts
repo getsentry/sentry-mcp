@@ -26,8 +26,8 @@ import {
   type SpanAttributeValue,
   setTag,
   setUser,
-  wrapMcpServerWithSentry,
 } from "@sentry/core";
+import { wrapMcpServerWithSentry } from "@sentry/core/server";
 import { isApiAuthenticationErrorDeep } from "./api-client";
 import { MCP_SERVER_NAME } from "./constants";
 import {
