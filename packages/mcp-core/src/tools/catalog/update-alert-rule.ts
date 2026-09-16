@@ -30,7 +30,7 @@ export const updateAlertRuleOutputSchema = z.object({
   alertRule: alertRuleSummarySchema,
 });
 
-/** Preserve copied actions while asking Sentry to resolve a renamed Slack destination. */
+/** Preserve copied actions while asking Sentry to resolve a changed Slack destination. */
 function resolveChangedSlackDestinations(
   groups: z.infer<typeof ParamAlertActionFilters>,
   current: IssueAlertRule,
@@ -51,12 +51,13 @@ function resolveChangedSlackDestinations(
         !isPlainObject(previous.config) ||
         typeof action.config.targetDisplay !== "string" ||
         action.config.targetDisplay.length === 0 ||
-        action.config.targetDisplay === previous.config.targetDisplay ||
+        (action.config.targetDisplay === previous.config.targetDisplay &&
+          String(action.integrationId) === String(previous.integrationId)) ||
         action.config.targetIdentifier !== previous.config.targetIdentifier
       ) {
         return action;
       }
-      // A copied channel ID would keep routing to the old destination. Let Sentry resolve the new name.
+      // Slack validates a supplied ID against the name and workspace; discard a copied stale ID.
       const config = { ...action.config };
       delete config.targetIdentifier;
       return { ...action, config };
@@ -69,11 +70,12 @@ export default defineTool({
   skills: ["project-management"],
   requiredScopes: ["org:read", "project:read", "alerts:write"],
   description: [
-    "Update an existing Sentry Alert (workflow), including its Slack notification destination.",
+    "Update an existing Sentry Alert (workflow), including Slack, Microsoft Teams, and other notification actions.",
     "Use get_alert_rule with kind='issue' first to inspect the complete triggers and actionFilters configuration.",
     "Omit fields to leave them unchanged. Pass null to clear owner or environment.",
     "triggers replaces the trigger conditions. actionFilters replaces ALL action groups: copy the complete configuration, retain existing IDs, and change only the intended values. Omitted groups, conditions, and actions are removed.",
-    "For a Slack action, change config.targetDisplay to the channel name. An unchanged old targetIdentifier is cleared so Sentry resolves the new channel using the existing integrationId. You may also supply the new channel's targetIdentifier explicitly.",
+    "For Slack or Microsoft Teams, change config.targetDisplay to the channel name and use integrationId for the workspace or team. Sentry resolves the channel ID. Slack also accepts an explicit new targetIdentifier; a copied old ID is cleared when the name or workspace changes.",
+    "Other actions use their provider's config and data. For Discord, PagerDuty, Opsgenie, and email, update targetIdentifier to the channel, service, team, or recipient ID; changing only its display name does not change the destination.",
     "This edits notification alerts, not Metric Monitor detection queries or thresholds. It does not change connected monitors.",
     "A project-constrained session can only edit alerts affecting that project exclusively.",
     "Be careful when using this tool! Requires an API token with alerts:write; reconnect OAuth if the existing token lacks it.",

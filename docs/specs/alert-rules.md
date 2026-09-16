@@ -35,14 +35,27 @@ The read and update results expose the documented editable configuration in
 structured content. Component IDs are included because they are needed for
 subsequent edits. Lists are not truncated; unrelated backend metadata is omitted.
 
-## Changing a Slack destination
+## Changing notification destinations
 
-Read the alert, copy all `actionFilters`, and change the Slack action's
-`config.targetDisplay` to the new channel name. Preserve `integrationId`, action
-IDs, filters, and all other actions. If the copied `targetIdentifier` still
-contains the old channel ID, the handler removes it so Sentry resolves the new
-name using that Slack integration. An explicitly supplied new channel ID is
-preserved. The integration must have access to the destination.
+Read the alert, copy all `actionFilters`, and edit the intended action. Preserve
+action IDs, filters, and other actions. Every provider uses the same tool;
+Sentry validates the provider's native `config` and `data`.
+
+| Action | Fields to change |
+| --- | --- |
+| Slack or Microsoft Teams | `config.targetDisplay` for the channel name; `integrationId` for the workspace or team |
+| Discord | `config.targetIdentifier` for the channel ID |
+| PagerDuty or Opsgenie | `config.targetIdentifier` for the service or team ID |
+| Email | `config.targetType` and `targetIdentifier` for the recipient user or team |
+| Sentry App or webhook | The app's `data.settings` or `config.targetIdentifier`, as appropriate |
+
+Teams always resolves the channel name and replaces the incoming channel ID.
+Slack validates an explicit ID against its name and workspace. When either
+changes and the copied ID still points to the old destination, the handler
+removes that ID so Sentry resolves the new destination. An explicitly supplied
+new Slack channel ID is preserved. ID-based providers retain their IDs because
+those identify the destination; changing a display label alone is insufficient.
+
 If Sentry saves the alert without resolving a Slack channel ID, the tool reports
 that the alert was saved but the destination remains unresolved. Read it again
 and retry with the channel name and explicit channel ID.
@@ -67,6 +80,6 @@ The implementation uses the existing Sentry API client with:
 - `PUT /organizations/{organization}/workflows/{id}/`
 - `GET /organizations/{organization}/workflows/{id}/project-scope/`
 
-The workflow validators, serializers, Slack action validator, and project-scope
+The workflow validators, serializers, notification action validators, and project-scope
 endpoint were checked against Sentry source. Writes are synchronous. Creation,
 deletion, and Metric Monitor operations are separate changes.

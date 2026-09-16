@@ -53,18 +53,18 @@ const alertRule = {
   ],
 };
 
-function useAlertRuleHandlers() {
+function useAlertRuleHandlers(workflow: Record<string, unknown> = alertRule) {
   const reads: string[] = [];
   const writes: Record<string, unknown>[] = [];
   mswServer.use(
     http.get(endpoint, ({ request }) => {
       reads.push(request.url);
-      return HttpResponse.json(alertRule);
+      return HttpResponse.json(workflow);
     }),
     http.put(endpoint, async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       writes.push(body);
-      return HttpResponse.json({ ...alertRule, ...body });
+      return HttpResponse.json({ ...workflow, ...body });
     }),
   );
   return { reads, writes };
@@ -168,9 +168,21 @@ describe("update_alert_rule", () => {
   it.each([
     { source: "copied", inputId: "COLD", expectedId: undefined },
     { source: "explicit", inputId: "CNEW", expectedId: "CNEW" },
+    {
+      source: "changed workspace",
+      inputId: "COLD",
+      expectedId: undefined,
+      integrationId: "6",
+      targetDisplay: "#old-channel",
+    },
   ])(
     "handles a $source Slack channel ID while preserving other actions and groups",
-    async ({ inputId, expectedId }) => {
+    async ({
+      inputId,
+      expectedId,
+      integrationId = "5",
+      targetDisplay = "#new-channel",
+    }) => {
       const { writes } = useAlertRuleHandlers();
       const actionFilters: Parameters<
         typeof updateAlertRule.handler
@@ -193,9 +205,10 @@ describe("update_alert_rule", () => {
       });
       actionFilters[0].actions[0].config = {
         ...slackAction.config,
-        targetDisplay: "#new-channel",
+        targetDisplay,
         targetIdentifier: inputId,
       };
+      actionFilters[0].actions[0].integrationId = integrationId;
       const savedFilters = structuredClone(actionFilters);
       savedFilters[0].actions[0].config.targetIdentifier = "CNEW";
       mswServer.use(
@@ -226,6 +239,83 @@ describe("update_alert_rule", () => {
       ]);
       expect(getStructuredContent(result)).toMatchObject({
         alertRule: { actionFilters: savedFilters },
+      });
+    },
+  );
+
+  it.each([
+    ["msteams", "specific", "19:old@thread.tacv2", {}, "5"],
+    ["discord", "specific", "1234567890", { tags: "environment" }, "5"],
+    ["pagerduty", "specific", "42", { priority: "critical" }, "5"],
+    ["opsgenie", "specific", "42", { priority: "P1" }, "5"],
+    ["email", "team", "7", {}, null],
+    ["webhook", null, "notification-app", {}, null],
+    [
+      "sentry_app",
+      "sentry_app",
+      "42",
+      { settings: [{ name: "channel", value: "Incidents" }] },
+      null,
+    ],
+  ] as const)(
+    "edits %s notification settings using its native action contract",
+    async (type, targetType, targetIdentifier, data, integrationId) => {
+      const action = {
+        id: "21",
+        type,
+        integrationId,
+        data,
+        config: {
+          ...(targetType ? { targetType } : {}),
+          targetIdentifier,
+          ...(type === "msteams" ? { targetDisplay: "Incidents" } : {}),
+        },
+      };
+      const currentAction = {
+        ...action,
+        config: {
+          ...action.config,
+          ...(type === "msteams"
+            ? { targetDisplay: "Previous" }
+            : { targetIdentifier: "1" }),
+        },
+      };
+      const group = { ...alertRule.actionFilters[0], actions: [currentAction] };
+      const { writes } = useAlertRuleHandlers({
+        ...alertRule,
+        actionFilters: [group],
+      });
+      const actionFilters = [{ ...group, actions: [action] }];
+      // Teams always resolves the supplied name, replacing even an old channel ID.
+      const savedAction =
+        type === "msteams"
+          ? {
+              ...action,
+              config: {
+                ...action.config,
+                targetIdentifier: "19:new@thread.tacv2",
+              },
+            }
+          : action;
+      mswServer.use(
+        http.put(endpoint, async ({ request }) => {
+          writes.push((await request.json()) as Record<string, unknown>);
+          return HttpResponse.json({
+            ...alertRule,
+            actionFilters: [{ ...group, actions: [savedAction] }],
+          });
+        }),
+      );
+
+      const result = await updateAlertRule.handler(
+        { ...params, actionFilters },
+        context,
+      );
+      expect(writes).toEqual([
+        { name: alertRule.name, enabled: false, actionFilters },
+      ]);
+      expect(getStructuredContent(result)).toMatchObject({
+        alertRule: { actionFilters: [{ ...group, actions: [savedAction] }] },
       });
     },
   );
