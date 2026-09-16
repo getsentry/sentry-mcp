@@ -62,6 +62,7 @@ import { traceRoute } from "./commands/trace/index.js";
 import { listCommand as traceListCommand } from "./commands/trace/list.js";
 import { trialRoute } from "./commands/trial/index.js";
 import { listCommand as trialListCommand } from "./commands/trial/list.js";
+import { wasmSplitCommand } from "./commands/wasm-split.js";
 import {
   getCommandSuggestion,
   getSynonymSuggestionFromArgv,
@@ -149,6 +150,7 @@ export const routes = buildRouteMap({
     local: localRoute,
     api: apiCommand,
     schema: schemaCommand,
+    "wasm-split": wasmSplitCommand,
     // Backward-compat aliases for old sentry-cli — hidden from help
     "send-event": sendEventCommand,
     "send-envelope": sendEnvelopeCommand,
