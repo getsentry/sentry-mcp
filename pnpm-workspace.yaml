@@ -79,7 +79,7 @@ catalog:
   typescript: ^5.8.3
   valibot: ^1.4.2
   vite: ^6.3.5
-  vitest: ^4.1.10
+  vitest: ^4.1.11
   vitest-evals: ^0.4.0
   workers-mcp: 0.1.0-3
   wrangler: 4.80.0
