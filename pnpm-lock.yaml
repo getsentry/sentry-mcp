@@ -182,6 +182,9 @@ overrides:
   sharp: ^0.35.4
   undici: ^7.24.4
 
+patchedDependencies:
+  '@cloudflare/workers-oauth-provider@0.10.3': 34910b67929c1888b1492384c514d6baeedc4a439f66e21375dee5af404834f8
+
 importers:
 
   .:
@@ -243,7 +246,7 @@ importers:
         version: 3.0.232(react@19.2.8)(zod@4.4.3)
       '@cloudflare/workers-oauth-provider':
         specifier: 'catalog:'
-        version: 0.10.3
+        version: 0.10.3(patch_hash=34910b67929c1888b1492384c514d6baeedc4a439f66e21375dee5af404834f8)
       '@modelcontextprotocol/sdk':
         specifier: 1.30.0
         version: 1.30.0(@cfworker/json-schema@4.1.1)(supports-color@8.1.1)(zod@4.4.3)
@@ -5898,7 +5901,7 @@ snapshots:
   '@cloudflare/workerd-windows-64@1.20260401.1':
     optional: true
 
-  '@cloudflare/workers-oauth-provider@0.10.3': {}
+  '@cloudflare/workers-oauth-provider@0.10.3(patch_hash=34910b67929c1888b1492384c514d6baeedc4a439f66e21375dee5af404834f8)': {}
 
   '@cloudflare/workers-types@4.20260405.1': {}
 

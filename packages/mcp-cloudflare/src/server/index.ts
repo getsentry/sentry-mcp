@@ -20,6 +20,7 @@ import {
   stripResponseMetricHeaders,
 } from "./metrics";
 import { tokenExchangeCallback } from "./oauth";
+import { CLIENT_ID_METADATA_DOCUMENTS } from "./oauth/client-metadata";
 import {
   ACCESS_METHOD_ATTRIBUTE,
   CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
@@ -347,6 +348,7 @@ const wrappedOAuthProvider = {
       // Root AS metadata advertises support automatically; scoped metadata is
       // handled in authorization-server-metadata.ts.
       clientIdMetadataDocumentEnabled: true,
+      clientIdMetadataDocuments: CLIENT_ID_METADATA_DOCUMENTS,
       tokenExchangeCallback: (options) =>
         tokenExchangeCallback(options, env, request, clientFamily),
       scopesSupported: Object.keys(SCOPES),
