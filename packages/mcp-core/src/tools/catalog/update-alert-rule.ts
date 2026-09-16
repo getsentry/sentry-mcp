@@ -114,7 +114,8 @@ export default defineTool({
   annotations: {
     readOnlyHint: false,
     destructiveHint: true,
-    idempotentHint: true,
+    // Replacement groups without IDs create new components on each invocation.
+    idempotentHint: false,
     openWorldHint: true,
   },
   outputSchema: updateAlertRuleOutputSchema,
