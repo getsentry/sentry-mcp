@@ -1,7 +1,12 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import getAlertRule from "./get-alert-rule.js";
+import {
+  alertRuleSummarySchema,
+  ParamAlertActionFilters,
+  ParamAlertTriggers,
+} from "./support/alert-rule-config";
 
 const context = {
   constraints: {
@@ -126,36 +131,53 @@ describe("get_alert_rule", () => {
       context,
     );
 
-    expect(result).toMatchInlineSnapshot(`
-      "# Alert Rule in **sentry-mcp-evals/cloudflare-mcp**
-
-      ## Notify backend team
-
-      **Kind**: Issue Alert
-      **ID**: 123
-      **Project**: cloudflare-mcp
-      **Status**: enabled
-      **Frequency**: 30 minutes
-      **Environment**: production
-      **Owner**: team:backend
-      **Created**: 2026-01-02T03:04:05.000Z
-      **Updated**: 2026-01-02T04:04:05.000Z
-      **URL**: https://sentry-mcp-evals.sentry.io/monitors/alerts/123/
-
-      ### Triggers
-
-      - Logic: any
-      - Conditions: Event frequency count (comparison: 10, result: true)
-
-      ### Action Filters
-
-      - Logic: all
-      - Actions: Email (target type: Team, target: 1)
-
-      ## Response Notes
-
-      - Use these details to inspect alert conditions, filters, routing, and notification actions before changing the rule in Sentry.
-      "
+    expect(typeof result).toBe("object");
+    if (typeof result === "string") {
+      throw new Error("Expected a structured alert rule response");
+    }
+    expect(result.structuredContent).toMatchInlineSnapshot(`
+      {
+        "alertRule": {
+          "actionFilters": [
+            {
+              "actions": [
+                {
+                  "config": {
+                    "targetIdentifier": "1",
+                    "targetType": "Team",
+                  },
+                  "id": "action-1",
+                  "type": "email",
+                },
+              ],
+              "conditions": [],
+              "id": "filter-1",
+              "logicType": "all",
+            },
+          ],
+          "config": {
+            "frequency": 30,
+          },
+          "enabled": true,
+          "environment": "production",
+          "id": "123",
+          "name": "Notify backend team",
+          "owner": "team:backend",
+          "triggers": {
+            "conditions": [
+              {
+                "comparison": 10,
+                "conditionResult": true,
+                "id": "condition-1",
+                "type": "event_frequency_count",
+              },
+            ],
+            "id": "trigger-1",
+            "logicType": "any",
+          },
+          "webUrl": "https://sentry-mcp-evals.sentry.io/monitors/alerts/123/",
+        },
+      }
     `);
   });
 
@@ -310,11 +332,105 @@ describe("get_alert_rule", () => {
       context,
     );
 
-    expect(result).toContain("**Kind**: Issue Alert");
-    expect(result).toContain("### Triggers");
-    expect(result).toContain("### Action Filters");
-    expect(result).not.toContain("**Action Match**");
-    expect(result).not.toContain("**Filter Match**");
+    expect(result).toMatchObject({
+      structuredContent: {
+        alertRule: {
+          triggers: issueAlertRule.triggers,
+          actionFilters: issueAlertRule.actionFilters,
+        },
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("actionMatch");
+    expect(JSON.stringify(result)).not.toContain("filterMatch");
+  });
+
+  it("returns complete editable groups and actions without backend-only fields", async () => {
+    const actions = Array.from({ length: 7 }, (_, index) => ({
+      id: String(100 + index),
+      type: "slack",
+      integrationId: "42",
+      config: {
+        targetType: "specific",
+        targetDisplay: `#alerts-${index}`,
+        targetIdentifier: `C00000000${index}`,
+      },
+      data: { tags: "environment,release", notes: "Investigate new failures" },
+      status: "active",
+    }));
+    const actionFilters = [
+      {
+        id: "200",
+        logicType: "none",
+        conditions: [
+          {
+            id: "201",
+            type: "tagged_event",
+            comparison: { key: "environment", value: "test", match: "eq" },
+            conditionResult: true,
+          },
+        ],
+        actions,
+      },
+      { id: "300", logicType: "all", conditions: [], actions: [] },
+    ];
+    useAlertRuleHandlers();
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/",
+        () =>
+          HttpResponse.json([
+            {
+              ...issueAlertRule,
+              enabled: false,
+              owner: null,
+              config: { ...issueAlertRule.config, internalOnly: "not-public" },
+              internalOnly: "not-public",
+              triggers: {
+                ...issueAlertRule.triggers,
+                organizationId: "not-public",
+              },
+              actionFilters: actionFilters.map((group) => ({
+                ...group,
+                organizationId: "not-public",
+                actions: group.actions.map((action) => ({
+                  ...action,
+                  internalOnly: "not-public",
+                })),
+              })),
+            },
+          ]),
+      ),
+    );
+
+    const result = await getAlertRule.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        kind: "issue",
+        projectSlug: "cloudflare-mcp",
+        ruleIdOrName: "123",
+      },
+      context,
+    );
+
+    if (typeof result === "string") {
+      throw new Error("Expected a structured alert rule response");
+    }
+    const summary = alertRuleSummarySchema.parse(
+      result.structuredContent.alertRule,
+    );
+    expect(summary.enabled).toBe(false);
+    expect(summary.owner).toBeNull();
+    expect(summary.config).toEqual(issueAlertRule.config);
+    expect(summary.actionFilters).toEqual(actionFilters);
+    expect(ParamAlertActionFilters.parse(summary.actionFilters)).toEqual(
+      actionFilters,
+    );
+    expect(ParamAlertTriggers.parse(summary.triggers)).toEqual(
+      issueAlertRule.triggers,
+    );
+    expect(JSON.stringify(result)).not.toContain("not-public");
+    expect(JSON.stringify(result)).not.toContain("detectorIds");
   });
 
   it("fetches issue alert details after resolving an exact name", async () => {
@@ -358,10 +474,9 @@ describe("get_alert_rule", () => {
     expect(listParams.get("query")).toBe('name:"*Notify backend team*"');
     expect(listParams.get("projectSlug")).toBe("cloudflare-mcp");
     expect(detailRequestCount).toBe(1);
-    expect(result).toContain("### Triggers");
-    expect(result).toContain(
-      "Event frequency count (comparison: 10, result: true)",
-    );
+    expect(result).toMatchObject({
+      structuredContent: { alertRule: { triggers: issueAlertRule.triggers } },
+    });
   });
 
   it("quotes issue alert name lookups for workflow query syntax", async () => {
@@ -400,7 +515,9 @@ describe("get_alert_rule", () => {
     expect(new URL(listRequestUrl ?? "").searchParams.get("query")).toBe(
       'name:"*Critical: backend*"',
     );
-    expect(result).toContain("## Critical: backend");
+    expect(result).toMatchObject({
+      structuredContent: { alertRule: { name: "Critical: backend" } },
+    });
   });
 
   it("ignores unattached organization workflows during issue detail lookup", async () => {
@@ -464,8 +581,9 @@ describe("get_alert_rule", () => {
       context,
     );
 
-    expect(result).toContain("## 123");
-    expect(result).toContain("**ID**: 789");
+    expect(result).toMatchObject({
+      structuredContent: { alertRule: { name: "123", id: "789" } },
+    });
   });
 
   it("treats digit-only values as exact names with kind all", async () => {

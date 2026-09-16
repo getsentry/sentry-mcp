@@ -48,6 +48,7 @@ import type {
   AIConversationSummaryListSchema,
   AIConversationSummarySchema,
   AIConversationUserSchema,
+  AlertRuleProjectScopeSchema,
   AssignedToSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
@@ -140,6 +141,16 @@ export type ProjectRepositoryMapping = z.infer<
   typeof ProjectRepositoryMappingSchema
 >;
 export type IssueAlertRule = z.infer<typeof IssueAlertRuleSchema>;
+export type AlertRuleProjectScope = z.infer<typeof AlertRuleProjectScopeSchema>;
+export type AlertRuleUpdate = {
+  name: string;
+  enabled: boolean;
+  config?: Record<string, unknown>;
+  environment?: string | null;
+  owner?: string | null;
+  triggers?: NonNullable<IssueAlertRule["triggers"]>;
+  actionFilters?: NonNullable<IssueAlertRule["actionFilters"]>;
+};
 export type MetricAlertRule = z.infer<typeof MetricAlertRuleSchema>;
 export type ClientKey = z.infer<typeof ClientKeySchema>;
 export type Release = z.infer<typeof ReleaseSchema>;

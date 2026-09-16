@@ -71,6 +71,18 @@ describe("requestDeviceCode", () => {
       DeviceCodeError,
     );
   });
+
+  it("requests alert write access in the default device authorization", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify(mockDeviceCodeResponse), { status: 200 }),
+    );
+
+    await requestDeviceCode("test-client-id", "sentry.io");
+
+    const [, options] = vi.mocked(fetch).mock.calls[0];
+    const body = new URLSearchParams(String(options?.body));
+    expect(body.get("scope")?.split(" ")).toContain("alerts:write");
+  });
 });
 
 describe("pollForToken", () => {

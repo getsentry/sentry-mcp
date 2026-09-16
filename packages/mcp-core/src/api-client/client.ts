@@ -43,6 +43,7 @@ import {
   AgenticOnboardingRunSchema,
   AIConversationDetailsResponseSchema,
   AIConversationSummaryListSchema,
+  AlertRuleProjectScopeSchema,
   ApiErrorSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
@@ -60,6 +61,7 @@ import {
   FlamegraphSchema,
   IssueActivityListResponseSchema,
   IssueAlertRuleListSchema,
+  IssueAlertRuleSchema,
   IssueCommentListSchema,
   IssueCommentSchema,
   IssueListSchema,
@@ -105,6 +107,8 @@ import type {
   AIConversationDetails,
   AIConversationSpanList,
   AIConversationSummary,
+  AlertRuleProjectScope,
+  AlertRuleUpdate,
   AutofixRun,
   AutofixRunState,
   ClientKey,
@@ -2125,6 +2129,65 @@ export class SentryApiService {
       );
     }
     return rule;
+  }
+
+  async getAlertRule(
+    {
+      organizationSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      ruleId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/`,
+      undefined,
+      opts,
+    );
+    return IssueAlertRuleSchema.parse(body);
+  }
+
+  async updateAlertRule(
+    {
+      organizationSlug,
+      ruleId,
+      body,
+    }: {
+      organizationSlug: string;
+      ruleId: string | number;
+      body: AlertRuleUpdate;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const response = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      },
+      opts,
+    );
+    return IssueAlertRuleSchema.parse(response);
+  }
+
+  async getAlertRuleProjectScope(
+    {
+      organizationSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      ruleId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<AlertRuleProjectScope> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/project-scope/`,
+      undefined,
+      opts,
+    );
+    return AlertRuleProjectScopeSchema.parse(body);
   }
 
   async listMetricAlertRules(

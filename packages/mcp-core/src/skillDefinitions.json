@@ -54,7 +54,7 @@
       },
       {
         "name": "get_alert_rule",
-        "description": "Get details for a Sentry alert rule.\n\nUse this tool when you need to inspect an alert rule's exact conditions, query, triggers, and actions before explaining or planning changes.\n\n<examples>\nget_alert_rule(organizationSlug='my-org', kind='metric', ruleIdOrName='12345')\nget_alert_rule(organizationSlug='my-org', kind='issue', projectSlug='backend', ruleIdOrName='Notify backend team')\nget_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='P95 latency')\n</examples>\n\n<hints>\n- Use `kind='issue'` or `kind='metric'` for numeric IDs because issue and metric alerts use separate endpoints.\n- With `kind='all'`, a digit-only `ruleIdOrName` is treated as an exact alert rule name.\n- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.\n</hints>",
+        "description": "Get details for a Sentry alert rule.\n\nUse this tool when you need to inspect an alert rule's exact conditions, query, triggers, and actions before explaining or planning changes.\n\n<examples>\nget_alert_rule(organizationSlug='my-org', kind='metric', ruleIdOrName='12345')\nget_alert_rule(organizationSlug='my-org', kind='issue', projectSlug='backend', ruleIdOrName='Notify backend team')\nget_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='P95 latency')\n</examples>\n\n<hints>\n- Use `kind='issue'` or `kind='metric'` for numeric IDs because issue and metric alerts use separate endpoints.\n- With `kind='all'`, a digit-only `ruleIdOrName` is treated as an exact alert rule name.\n- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.\n- Issue alert details include the complete editable configuration and component IDs for update_alert_rule. Preserve unchanged groups, conditions, and actions when editing.\n</hints>",
         "requiredScopes": ["org:read", "project:read"]
       },
       {
@@ -413,10 +413,10 @@
   {
     "id": "project-management",
     "name": "Manage Projects & Teams",
-    "description": "Create and modify projects, teams, DSNs, and uptime monitors",
+    "description": "Create and modify projects, teams, DSNs, uptime monitors, and alert rules",
     "defaultEnabled": false,
     "order": 5,
-    "toolCount": 16,
+    "toolCount": 17,
     "tools": [
       {
         "name": "add_team_to_project",
@@ -477,6 +477,11 @@
         "name": "remove_team_from_project",
         "description": "Revoke a team's access to an existing Sentry project.\n\nUse this tool when you need to:\n- Remove a team from a project\n- Revoke team access without changing project metadata\n- Check project team assignments before removing access\n\nBe careful when using this tool because it revokes project access.\n\n<examples>\nremove_team_from_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- The team must already be assigned to the project.\n- This tool will not remove the last team assigned to a project.\n</hints>",
         "requiredScopes": ["project:write", "team:read", "org:read"]
+      },
+      {
+        "name": "update_alert_rule",
+        "description": "Update an existing Sentry Alert (workflow), including its Slack notification destination.\nUse get_alert_rule with kind='issue' first to inspect the complete triggers and actionFilters configuration.\nOmit fields to leave them unchanged. Pass null to clear owner or environment.\ntriggers replaces the trigger conditions. actionFilters replaces ALL action groups: copy the complete configuration, retain existing IDs, and change only the intended values. Omitted groups, conditions, and actions are removed.\nFor a Slack action, change config.targetDisplay to the channel name. An unchanged old targetIdentifier is cleared so Sentry resolves the new channel using the existing integrationId. You may also supply the new channel's targetIdentifier explicitly.\nThis edits notification alerts, not Metric Monitor detection queries or thresholds. It does not change connected monitors.\nA project-constrained session can only edit alerts affecting that project exclusively.\nBe careful when using this tool! Requires an API token with alerts:write; reconnect OAuth if the existing token lacks it.\n<examples>\nupdate_alert_rule(organizationSlug='my-org', ruleIdOrName='12345', status='disabled')\nupdate_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='Notify backend team', frequencyMinutes=30)\n</examples>",
+        "requiredScopes": ["org:read", "project:read", "alerts:write"]
       },
       {
         "name": "update_dsn",

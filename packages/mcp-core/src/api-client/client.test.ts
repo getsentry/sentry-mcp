@@ -1,5 +1,5 @@
 import { mswServer, teamFixture } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigurationError } from "../errors";
 import { SentryApiService } from "./client";
@@ -407,6 +407,100 @@ describe("getEventsExplorerUrl", () => {
       expect(url.searchParams.has("logsFields")).toBe(false);
       expect(url.searchParams.has("logsSortBys")).toBe(false);
     });
+  });
+});
+
+describe("alert rule workflow endpoints", () => {
+  const rule = {
+    id: "123",
+    name: "Notify on new issues",
+    enabled: false,
+    environment: null,
+    owner: "team:42",
+    config: { frequency: 30 },
+    triggers: {
+      id: "1",
+      logicType: "any-short",
+      conditions: [
+        {
+          id: "2",
+          type: "first_seen_event",
+          comparison: true,
+          conditionResult: true,
+        },
+      ],
+    },
+    actionFilters: [],
+    detectorIds: ["456"],
+    organizationId: "789",
+  };
+  const params = { organizationSlug: "my-org", ruleId: "123" };
+  const apiService = new SentryApiService({
+    host: "sentry.io",
+    accessToken: "test-token",
+  });
+
+  it("retrieves the workflow document without losing its nested fields", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/workflows/123/",
+        () => HttpResponse.json(rule),
+      ),
+    );
+
+    expect(await apiService.getAlertRule(params)).toMatchObject(rule);
+  });
+
+  it("sends the selected writable fields and parses the updated workflow", async () => {
+    const body = {
+      name: rule.name,
+      enabled: false,
+      environment: null,
+      owner: null,
+      triggers: rule.triggers,
+      actionFilters: [],
+    };
+    let requestBody: unknown;
+    mswServer.use(
+      http.put(
+        "https://sentry.io/api/0/organizations/my-org/workflows/123/",
+        async ({ request }) => {
+          requestBody = await request.json();
+          return HttpResponse.json({ ...rule, ...body });
+        },
+      ),
+    );
+
+    expect(await apiService.updateAlertRule({ ...params, body })).toMatchObject(
+      {
+        ...rule,
+        ...body,
+      },
+    );
+    expect(requestBody).toEqual(body);
+  });
+
+  it("retrieves every project connected to the workflow", async () => {
+    const scope = { projectIds: ["456", "789"], includesAllProjects: false };
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/workflows/123/project-scope/",
+        () => HttpResponse.json(scope),
+      ),
+    );
+
+    expect(await apiService.getAlertRuleProjectScope(params)).toEqual(scope);
+  });
+
+  it("rejects a project scope response missing its all-projects flag", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/workflows/123/project-scope/",
+        () => HttpResponse.json({ projectIds: [] }),
+      ),
+    );
+
+    await expect(apiService.getAlertRuleProjectScope(params)).rejects.toThrow();
   });
 });
 

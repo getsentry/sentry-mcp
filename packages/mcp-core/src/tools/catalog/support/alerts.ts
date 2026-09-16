@@ -1,9 +1,9 @@
+import type { SentryApiService } from "../../../api-client";
+import { ApiNotFoundError } from "../../../api-client";
 import type {
   IssueAlertRule,
   MetricAlertRule,
 } from "../../../api-client/types";
-import type { SentryApiService } from "../../../api-client";
-import { ApiNotFoundError } from "../../../api-client";
 import { UserInputError } from "../../../errors";
 import { isPlainObject } from "../../../internal/type-guards";
 import {
@@ -252,78 +252,6 @@ function formatComponentSummary(
     lines.push(`- ...and ${components.length - 5} more`);
   }
   return lines;
-}
-
-function getIssueAlertRuleFrequency(rule: IssueAlertRule): number | null {
-  if (rule.frequency !== undefined && rule.frequency !== null) {
-    return rule.frequency;
-  }
-  const frequency = rule.config.frequency;
-  return typeof frequency === "number" ? frequency : null;
-}
-
-export function formatIssueAlertRule(
-  rule: IssueAlertRule,
-  projectSlug: string,
-  options: {
-    headingLevel?: number;
-    includeComponents?: boolean;
-    url?: string;
-  } = {},
-): string {
-  const headingLevel = options.headingLevel ?? 2;
-  const includeComponents = options.includeComponents ?? true;
-  const heading = "#".repeat(Math.min(headingLevel, 6));
-  const owner = rule.owner ? formatActor(rule.owner) : null;
-  const frequency = getIssueAlertRuleFrequency(rule);
-  const lines = compactLines([
-    `${heading} ${rule.name}`,
-    "",
-    `**Kind**: Issue Alert`,
-    `**ID**: ${formatId(rule.id)}`,
-    `**Project**: ${projectSlug}`,
-    rule.status
-      ? `**Status**: ${rule.status}`
-      : rule.enabled !== undefined
-        ? `**Status**: ${rule.enabled ? "enabled" : "disabled"}`
-        : null,
-    rule.actionMatch ? `**Action Match**: ${rule.actionMatch}` : null,
-    rule.filterMatch ? `**Filter Match**: ${rule.filterMatch}` : null,
-    frequency !== null ? `**Frequency**: ${frequency} minutes` : null,
-    rule.environment ? `**Environment**: ${rule.environment}` : null,
-    owner ? `**Owner**: ${owner}` : null,
-    formatDate(rule.dateCreated)
-      ? `**Created**: ${formatDate(rule.dateCreated)}`
-      : null,
-    formatDate(rule.dateUpdated)
-      ? `**Updated**: ${formatDate(rule.dateUpdated)}`
-      : null,
-    formatDate(rule.lastTriggered)
-      ? `**Last Triggered**: ${formatDate(rule.lastTriggered)}`
-      : null,
-    options.url ? `**URL**: ${options.url}` : null,
-  ]);
-
-  if (includeComponents) {
-    const workflowTriggers = rule.triggers ? [rule.triggers] : [];
-    lines.push(
-      ...formatComponentSummary(
-        "Conditions",
-        rule.conditions,
-        headingLevel + 1,
-      ),
-      ...formatComponentSummary("Filters", rule.filters, headingLevel + 1),
-      ...formatComponentSummary("Actions", rule.actions, headingLevel + 1),
-      ...formatComponentSummary("Triggers", workflowTriggers, headingLevel + 1),
-      ...formatComponentSummary(
-        "Action Filters",
-        rule.actionFilters ?? [],
-        headingLevel + 1,
-      ),
-    );
-  }
-
-  return lines.join("\n");
 }
 
 export function formatMetricAlertRule(

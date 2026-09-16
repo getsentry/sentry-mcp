@@ -1240,6 +1240,7 @@ describe("buildServer", () => {
         ["create_project", ["project-management"]],
         ["create_team", ["project-management"]],
         ["update_project", ["project-management"]],
+        ["update_alert_rule", ["project-management"]],
         ["add_team_to_project", ["project-management"]],
         ["remove_team_from_project", ["project-management"]],
         ["create_dsn", ["project-management"]],
@@ -1303,6 +1304,29 @@ describe("buildServer", () => {
       expect(result).toMatchObject({ isError: true });
       expect(getTextContent(result)).toContain(
         'Tool "update_issue" is not available in this session',
+      );
+    });
+
+    it("execute_sentry_tool rejects alert updates in read-only sessions", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["inspect"]),
+        },
+      });
+
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
+        name: "update_alert_rule",
+        arguments: {
+          organizationSlug: "sentry-mcp-evals",
+          ruleIdOrName: "123",
+          status: "disabled",
+        },
+      });
+
+      expect(result).toMatchObject({ isError: true });
+      expect(getTextContent(result)).toContain(
+        'Tool "update_alert_rule" is not available in this session',
       );
     });
 
@@ -1462,6 +1486,48 @@ describe("buildServer", () => {
         "# Updated DSN in **sentry-mcp-evals/cloudflare-mcp**",
       );
       expect(getTextContent(result)).toContain("**Rate Limit**: Disabled");
+    });
+
+    it("execute_sentry_tool dispatches a catalog-only alert update with constrained organization", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["project-management"]),
+          constraints: { organizationSlug: "sentry-mcp-evals" },
+        },
+      });
+      const rule = {
+        id: "123",
+        name: "Notify backend team",
+        enabled: true,
+        config: { frequency: 30 },
+      };
+      let requestBody: unknown;
+      const endpoint =
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/123/";
+      mswServer.use(
+        http.get(endpoint, () => HttpResponse.json(rule)),
+        http.put(endpoint, async ({ request }) => {
+          requestBody = await request.json();
+          return HttpResponse.json({ ...rule, enabled: false });
+        }),
+      );
+
+      expect(getRegisteredToolNames(server)).not.toContain("update_alert_rule");
+
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
+        name: "update_alert_rule",
+        arguments: {
+          organizationSlug: "other-org",
+          ruleIdOrName: "123",
+          status: "disabled",
+        },
+      });
+
+      expect(requestBody).toEqual({ name: rule.name, enabled: false });
+      expect(getStructuredContent(result)).toMatchObject({
+        alertRule: { id: "123", name: rule.name, enabled: false },
+      });
     });
 
     it("execute_sentry_tool dispatches to catalog-only whoami", async () => {
