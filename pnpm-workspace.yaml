@@ -104,3 +104,6 @@ minimumReleaseAgeExclude:
   - '@sentry/replay@11.0.0-rc.0'
   - '@sentry/server-runtime-injection@11.0.0-rc.0'
   - '@sentry/server-utils@11.0.0-rc.0'
+
+patchedDependencies:
+  '@cloudflare/workers-oauth-provider@0.10.3': patches/@cloudflare__workers-oauth-provider@0.10.3.patch

@@ -167,9 +167,49 @@ const oAuthProvider = new OAuthProvider({
   authorizeEndpoint: "/oauth/authorize",
   tokenEndpoint: "/oauth/token", 
   clientRegistrationEndpoint: "/oauth/register",
+  clientIdMetadataDocumentEnabled: true,
+  clientIdMetadataDocuments: CLIENT_ID_METADATA_DOCUMENTS,
   scopesSupported: Object.keys(SCOPES),
 });
 ```
+
+#### Operator-managed client metadata
+
+URL-based clients normally use Client ID Metadata Documents (CIMD). The provider
+fetches and validates the document during authorization, code exchange, and
+refresh. A failed fetch can block these operations; requests using an existing
+valid MCP access token do not need that lookup.
+
+The exact Codex client ID, `https://chatgpt.com/oauth/codex/client.json`, is
+registered in
+[`client-metadata.ts`](../../packages/mcp-cloudflare/src/server/oauth/client-metadata.ts)
+using its official metadata. This registration takes precedence over remote
+fetches and their cache, so an upstream `403` cannot block this client's OAuth
+flow. Other URL-based clients still use CIMD, and dynamic client registration
+is unchanged. Query-string variants of the Codex client ID are distinct clients
+and are not covered by this registration.
+
+The provider's existing metadata and client ID validation still applies. The
+registration allows only the official loopback callback URIs (with the existing
+native-client port matching), requires S256 PKCE, and does not skip user consent
+or Sentry authentication.
+
+MCP maintainers own this registration. Changes to the official document,
+including removal of a redirect URI or retirement of the client, must be reviewed
+and reflected here; they are not adopted automatically. To resume remote lookup,
+remove the entry after verifying fetches from a deployed Worker. Do not populate
+registrations from incoming requests or use a failed fetch to restore previously
+removed metadata.
+
+The `clientIdMetadataDocuments` option is provided by the version-specific pnpm
+patch in [`patches/`](../../patches/@cloudflare__workers-oauth-provider@0.10.3.patch), because provider 0.10.3 has no supported
+registration override while CIMD is enabled. It resolves registrations in the
+provider's common client lookup, covering authorization helpers and the token
+endpoint. When upgrading the provider, port the patch or adopt an equivalent
+upstream option, and run
+`pnpm --filter @sentry/mcp-cloudflare exec vitest run src/server/oauth/client-metadata.integration.test.ts`.
+The regression exercises the production provider with blocked metadata, token
+exchange and refresh, and checks that OAuth validation remains enforced.
 
 ### 2. API Handler
 
