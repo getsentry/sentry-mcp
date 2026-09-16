@@ -34,6 +34,9 @@ vi.mock("@sentry/core", () => ({
   ),
   captureException: vi.fn(),
   captureMessage: vi.fn(),
+}));
+
+vi.mock("@sentry/core/server", () => ({
   wrapMcpServerWithSentry: vi.fn((server) => server),
 }));
 
