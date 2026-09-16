@@ -703,6 +703,14 @@ Browse the Sentry API schema
 
 → Full flags and examples: `references/schema.md`
 
+### Wasm-split
+
+Add build ids to WebAssembly modules and split out debug data
+
+- `sentry wasm-split <input>` — Add build ids to WebAssembly modules and split out debug data
+
+→ Full flags and examples: `references/wasm-split.md`
+
 ## Global Options
 
 All commands support the following global options:
