@@ -1,22 +1,23 @@
-import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "../../internal/tool-helpers/define";
-import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import { UserInputError } from "../../errors";
+import { z } from "zod";
 import type { IssueAlertRule, MetricAlertRule } from "../../api-client/types";
-import type { ServerContext } from "../../types";
+import { UserInputError } from "../../errors";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import {
   ParamOrganizationSlug,
   ParamProjectSlugOrAll,
   ParamRegionUrl,
 } from "../../schema";
-import { assertProjectRefWithinConstraint } from "./support/project-constraints";
+import type { ServerContext } from "../../types";
+import { toAlertRuleSummary } from "./support/alert-rule-config";
 import {
-  formatIssueAlertRule,
   formatMetricAlertRule,
   resolveIssueAlertRule,
   resolveMetricAlertRule,
 } from "./support/alerts";
+import { assertProjectRefWithinConstraint } from "./support/project-constraints";
 
 const AlertRuleKind = z
   .enum(["all", "issue", "metric"])
@@ -75,6 +76,7 @@ export default defineTool({
     "- Use `kind='issue'` or `kind='metric'` for numeric IDs because issue and metric alerts use separate endpoints.",
     "- With `kind='all'`, a digit-only `ruleIdOrName` is treated as an exact alert rule name.",
     "- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.",
+    "- Issue alert details include the complete editable configuration and component IDs for update_alert_rule. Preserve unchanged groups, conditions, and actions when editing.",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -217,24 +219,22 @@ export default defineTool({
       }
     }
 
+    if (match.kind === "issue") {
+      return structuredResult({
+        alertRule: toAlertRuleSummary(
+          match.rule,
+          apiService.getIssueAlertRuleUrl(organizationSlug, match.rule.id),
+        ),
+      });
+    }
+
     const scopeLabel = projectSlug
       ? `${organizationSlug}/${projectSlug}`
       : organizationSlug;
     let output = `# Alert Rule in **${scopeLabel}**\n\n`;
-    output +=
-      match.kind === "issue"
-        ? formatIssueAlertRule(match.rule, match.projectSlug, {
-            url: apiService.getIssueAlertRuleUrl(
-              organizationSlug,
-              match.rule.id,
-            ),
-          })
-        : formatMetricAlertRule(match.rule, {
-            url: apiService.getMetricAlertRuleUrl(
-              organizationSlug,
-              match.rule.id,
-            ),
-          });
+    output += formatMetricAlertRule(match.rule, {
+      url: apiService.getMetricAlertRuleUrl(organizationSlug, match.rule.id),
+    });
     output += "\n\n## Response Notes\n\n";
     output +=
       "- Use these details to inspect alert conditions, filters, routing, and notification actions before changing the rule in Sentry.\n";

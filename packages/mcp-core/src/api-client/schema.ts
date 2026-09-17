@@ -293,6 +293,11 @@ export const IssueAlertRuleSchema = z
 
 export const IssueAlertRuleListSchema = z.array(IssueAlertRuleSchema);
 
+export const AlertRuleProjectScopeSchema = z.object({
+  projectIds: z.array(z.string()),
+  includesAllProjects: z.boolean(),
+});
+
 export const MetricAlertRuleSchema = z
   .object({
     id: z.union([z.string(), z.number()]),

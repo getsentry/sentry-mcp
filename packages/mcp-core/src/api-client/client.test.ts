@@ -1,5 +1,5 @@
 import { mswServer, teamFixture } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigurationError } from "../errors";
 import { SentryApiService } from "./client";
@@ -407,6 +407,28 @@ describe("getEventsExplorerUrl", () => {
       expect(url.searchParams.has("logsFields")).toBe(false);
       expect(url.searchParams.has("logsSortBys")).toBe(false);
     });
+  });
+});
+
+describe("alert rule workflow endpoints", () => {
+  it("rejects a project scope response missing its all-projects flag", async () => {
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/workflows/123/project-scope/",
+        () => HttpResponse.json({ projectIds: [] }),
+      ),
+    );
+
+    await expect(
+      apiService.getAlertRuleProjectScope({
+        organizationSlug: "my-org",
+        ruleId: "123",
+      }),
+    ).rejects.toThrow("includesAllProjects");
   });
 });
 
