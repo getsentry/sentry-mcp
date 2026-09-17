@@ -14,6 +14,10 @@ import type {
 } from "../../api-client/types";
 import { UserInputError } from "../../errors";
 import type { CodeLocation } from "../../internal/code-location";
+import {
+  SelectedEventPackagesSchema,
+  selectEventPackages,
+} from "../../internal/event-packages";
 import type { AIConversationReference } from "../../internal/tool-helpers/ai-conversation-actions";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
@@ -40,6 +44,7 @@ import {
   ParamIssueShortId,
   ParamIssueUrl,
   ParamOrganizationSlug,
+  ParamPackageNames,
   ParamRegionUrl,
 } from "../../schema";
 import { logError } from "../../telem/logging";
@@ -90,6 +95,7 @@ export const getIssueDetailsOutputSchema = z.object({
     type: z.string().nullish(),
     occurredAt: z.string().nullish(),
     body: z.record(z.string(), z.unknown()),
+    packageVersions: SelectedEventPackagesSchema.optional(),
   }),
   seer: z
     .object({
@@ -202,6 +208,7 @@ function buildReplays(
 }
 
 function buildIssueDetailsPayload({
+  packageNames,
   organizationSlug,
   issue,
   event,
@@ -213,6 +220,7 @@ function buildIssueDetailsPayload({
   aiConversations,
   codeLocation,
 }: {
+  packageNames?: string[];
   organizationSlug: string;
   issue: Issue;
   event: Event;
@@ -229,6 +237,7 @@ function buildIssueDetailsPayload({
   // would dwarf the rest of the payload
   const summaries = autofix ? getAutofixArtifactSummaries(autofix) : undefined;
   const isPerf = isPerformanceIssueType(issue) && !!issue.metadata;
+  const packageVersions = selectEventPackages(event.packages, packageNames);
 
   return {
     issue: {
@@ -265,6 +274,7 @@ function buildIssueDetailsPayload({
       type: typeof event.type === "string" ? event.type : null,
       occurredAt: eventOccurredAt(event),
       body,
+      ...(packageVersions ? { packageVersions } : {}),
     },
     seer: autofix
       ? {
@@ -313,6 +323,7 @@ export default defineTool({
     "- Provide a specific issue ID (e.g., 'CLOUDFLARE-MCP-41', 'PROJECT-123')",
     "- Ask to 'explain [ISSUE-ID]', 'tell me about [ISSUE-ID]'",
     "- Want details/stacktrace/analysis for a known issue",
+    "- Need installed package versions for an exact event (pass eventId and packageNames)",
     "- Provide a Sentry issue URL",
     "",
     "DO NOT USE for:",
@@ -352,6 +363,7 @@ export default defineTool({
     issueId: ParamIssueShortId.optional(),
     eventId: ParamEventId.optional(),
     issueUrl: ParamIssueUrl.optional(),
+    packageNames: ParamPackageNames.optional(),
   },
   // outputSchema is deliberately not declared yet. tools/list would export it immediately,
   // while an org that is not on sentry's formatter rollout still gets a markdown result with
@@ -363,6 +375,11 @@ export default defineTool({
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
+    if (params.packageNames && !params.eventId) {
+      throw new UserInputError(
+        "`packageNames` requires an explicit `eventId`.",
+      );
+    }
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
     });
@@ -441,6 +458,7 @@ export default defineTool({
       if (body) {
         return structuredResult(
           buildIssueDetailsPayload({
+            packageNames: params.packageNames,
             organizationSlug: orgSlug,
             issue,
             event,
@@ -458,6 +476,7 @@ export default defineTool({
       // no shared-formatter body for this org yet: keep returning markdown rather than a
       // structured result that is missing the event itself
       return formatIssueOutput({
+        packageNames: params.packageNames,
         organizationSlug: orgSlug,
         issue,
         event,
