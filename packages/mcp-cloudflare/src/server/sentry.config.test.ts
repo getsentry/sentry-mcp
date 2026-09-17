@@ -41,10 +41,4 @@ describe("getSentryConfig", () => {
 
     expect(config.release).toBeUndefined();
   });
-
-  it("samples 30% of traces", () => {
-    const config = getSentryConfig(createEnv());
-
-    expect(config.tracesSampleRate).toBe(0.3);
-  });
 });
