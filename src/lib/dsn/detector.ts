@@ -37,7 +37,7 @@ import {
 } from "./env-file.js";
 import { isRegularFile } from "./fs-utils.js";
 import { createDetectedDsn, createDsnFingerprint, parseDsn } from "./parser.js";
-import { findProjectRoot } from "./project-root.js";
+import { findProjectRoot, isHomeOrAncestor } from "./project-root.js";
 import type {
   CachedDsnEntry,
   DetectedDsn,
@@ -65,7 +65,15 @@ import type {
 export async function detectDsn(cwd: string): Promise<DetectedDsn | null> {
   // 1. Find project root (may find DSN in .env along the way, but we don't
   //    return it immediately - code DSNs take priority)
-  const { projectRoot } = await findProjectRoot(cwd);
+  const { projectRoot, reason } = await findProjectRoot(cwd);
+
+  // When project root detection fell back to the home directory (or an
+  // ancestor of it), a downward scan would reach OS app-data and credential
+  // directories (~/Library, ~/.ssh, ~/.aws, …). Skip the filesystem scan
+  // entirely in that case and only consult the SENTRY_DSN env var.
+  if (reason === "fallback" && isHomeOrAncestor(projectRoot)) {
+    return detectFromEnv();
+  }
 
   // 2. Check cache for project root (fast path)
   const cached = getCachedDsn(projectRoot);
@@ -131,18 +139,36 @@ export async function detectDsn(cwd: string): Promise<DetectedDsn | null> {
 export async function detectAllDsns(cwd: string): Promise<DsnDetectionResult> {
   // 1. Get project root (cached or walk-up)
   let projectRoot: string;
+  let reason: string;
   const cachedRoot = await getCachedProjectRoot(cwd);
 
   if (cachedRoot) {
     projectRoot = cachedRoot.projectRoot;
+    reason = cachedRoot.reason;
   } else {
     const rootResult = await findProjectRoot(cwd);
     projectRoot = rootResult.projectRoot;
+    reason = rootResult.reason;
     // Cache the project root lookup
     await setCachedProjectRoot(cwd, {
       projectRoot: rootResult.projectRoot,
       reason: rootResult.reason,
     });
+  }
+
+  // When project root detection fell back to the home directory (or an
+  // ancestor of it), a downward scan would reach OS app-data and credential
+  // directories (~/Library, ~/.ssh, ~/.aws, …). Skip the filesystem scan
+  // entirely and only report the SENTRY_DSN env var, if any.
+  if (reason === "fallback" && isHomeOrAncestor(projectRoot)) {
+    const envDsn = detectFromEnv();
+    const all = envDsn ? [envDsn] : [];
+    return {
+      primary: all[0] ?? null,
+      all,
+      hasMultiple: false,
+      fingerprint: createDsnFingerprint(all),
+    };
   }
 
   // 2. Try cached detection result

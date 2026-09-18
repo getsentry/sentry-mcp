@@ -31,6 +31,7 @@ import {
   hasBuildSystemMarker,
   hasLanguageMarker,
   hasRepoRootMarker,
+  isHomeOrAncestor,
   STAT_CONCURRENCY,
 } from "../../../src/lib/dsn/project-root.js";
 
@@ -62,6 +63,32 @@ describe("project-root", () => {
     } catch {
       // Ignore cleanup errors
     }
+  });
+
+  describe("isHomeOrAncestor", () => {
+    test("returns true for the home directory itself", () => {
+      expect(isHomeOrAncestor(homedir())).toBe(true);
+    });
+
+    test("returns true for ancestors of home", () => {
+      expect(isHomeOrAncestor(join(homedir(), ".."))).toBe(true);
+      // Two levels up (e.g. /Users when home is /Users/alice) is still an
+      // ancestor and must be treated as at/above home.
+      expect(isHomeOrAncestor(join(homedir(), "..", ".."))).toBe(true);
+      expect(isHomeOrAncestor("/")).toBe(true);
+    });
+
+    test("returns true for a non-canonical ancestor path", () => {
+      // A trailing slash or "." segment must resolve to the same ancestor
+      // and not fail open the same way a raw string compare would.
+      expect(isHomeOrAncestor(`${join(homedir(), "..")}/`)).toBe(true);
+      expect(isHomeOrAncestor(join(homedir(), "..", "."))).toBe(true);
+    });
+
+    test("returns false for directories under home", () => {
+      expect(isHomeOrAncestor(join(homedir(), "projects", "app"))).toBe(false);
+      expect(isHomeOrAncestor(join(homedir(), "Library"))).toBe(false);
+    });
   });
 
   describe("getStopBoundary", () => {

@@ -45,6 +45,21 @@ describe("dsnScanOptions", () => {
     expect(DSN_ADDITIONAL_SKIP_DIRS.includes("test")).toBe(true);
     expect(skipSet.has("test")).toBe(true);
   });
+
+  test("skips OS app-data and credential dirs (defence in depth)", () => {
+    const opts = dsnScanOptions();
+    const skipSet = new Set(opts.alwaysSkipDirs);
+    for (const d of [
+      "Library",
+      "AppData",
+      ".ssh",
+      ".aws",
+      ".gnupg",
+      ".config",
+    ]) {
+      expect(skipSet.has(d)).toBe(true);
+    }
+  });
 });
 
 describe("dsnDescentHook", () => {
