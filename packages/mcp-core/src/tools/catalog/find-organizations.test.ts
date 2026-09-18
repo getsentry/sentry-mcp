@@ -9,11 +9,17 @@ import {
 } from "../../test-utils/structured-content.js";
 import findOrganizations from "./find-organizations.js";
 
-function mockOrganizations(organizations: unknown[]) {
+function mockOrganizations(
+  organizations: unknown[],
+  headers?: Record<string, string>,
+) {
   mswServer.use(
     http.get("https://sentry.io/api/0/organizations/", ({ request }) => {
-      expect(new URL(request.url).searchParams.get("per_page")).toBe("26");
-      return HttpResponse.json(organizations);
+      expect(new URL(request.url).searchParams.get("per_page")).toBe("100");
+      return HttpResponse.json(
+        organizations,
+        headers ? { headers } : undefined,
+      );
     }),
   );
 }
@@ -42,13 +48,14 @@ describe("find_organizations", () => {
     ]);
 
     const result = await findOrganizations.handler(
-      { query: null },
+      { query: null, cursor: null },
       getServerContext(),
     );
 
     expect(getStructuredContent(result)).toMatchInlineSnapshot(`
       {
         "hasMore": false,
+        "nextCursor": null,
         "organizations": [
           {
             "regionUrl": "https://us.sentry.io",
@@ -70,20 +77,23 @@ describe("find_organizations", () => {
     vi.spyOn(
       SentryApiService.prototype,
       "listOrganizations",
-    ).mockResolvedValueOnce([
-      {
-        id: "1",
-        slug: "whitespace-region-org",
-        name: "Whitespace Region Org",
-        links: {
-          organizationUrl: "https://sentry.io/whitespace-region-org",
-          regionUrl: " \t\n ",
+    ).mockResolvedValueOnce({
+      organizations: [
+        {
+          id: "1",
+          slug: "whitespace-region-org",
+          name: "Whitespace Region Org",
+          links: {
+            organizationUrl: "https://sentry.io/whitespace-region-org",
+            regionUrl: " \t\n ",
+          },
         },
-      },
-    ]);
+      ],
+      nextCursor: null,
+    });
 
     const result = await findOrganizations.handler(
-      { query: null },
+      { query: null, cursor: null },
       getServerContext(),
     );
 
@@ -96,13 +106,14 @@ describe("find_organizations", () => {
         },
       ],
       hasMore: false,
+      nextCursor: null,
     });
     assertStructuredOnlyResult(result);
   });
 
-  it("requests 26 organizations and returns 25 with hasMore", async () => {
+  it("returns up to 100 organizations per call and reports a cursor when there are more", async () => {
     mockOrganizations(
-      Array.from({ length: 26 }, (_, index) => ({
+      Array.from({ length: 100 }, (_, index) => ({
         id: String(index + 1),
         slug: `organization-${index + 1}`,
         name: `Organization ${index + 1}`,
@@ -111,22 +122,27 @@ describe("find_organizations", () => {
           regionUrl: "https://us.sentry.io",
         },
       })),
+      {
+        Link: '<https://sentry.io/api/0/organizations/?cursor=page-2>; rel="next"; results="true"; cursor="page-2"',
+      },
     );
 
     const result = await findOrganizations.handler(
-      { query: null },
+      { query: null, cursor: null },
       getServerContext(),
     );
     const structuredContent = getStructuredContent<{
       organizations: Array<{ slug: string }>;
       hasMore: boolean;
+      nextCursor: string | null;
     }>(result);
 
-    expect(structuredContent.organizations).toHaveLength(25);
+    expect(structuredContent.organizations).toHaveLength(100);
     expect(structuredContent.organizations.at(-1)?.slug).toBe(
-      "organization-25",
+      "organization-100",
     );
     expect(structuredContent.hasMore).toBe(true);
+    expect(structuredContent.nextCursor).toBe("page-2");
     assertStructuredOnlyResult(result);
   });
 });

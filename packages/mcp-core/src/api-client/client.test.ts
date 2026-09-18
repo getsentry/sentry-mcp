@@ -972,6 +972,7 @@ describe("listOrganizations", () => {
       if (url.includes("/organizations/")) {
         return Promise.resolve({
           ok: true,
+          headers: new Headers({ "content-type": "application/json" }),
           json: () => Promise.resolve(mockOrgs),
         });
       }
@@ -983,12 +984,17 @@ describe("listOrganizations", () => {
       accessToken: "test-token",
     });
 
-    const result = await apiService.listOrganizations();
+    const { organizations, nextCursor } = await apiService.listOrganizations();
 
     expect(callCount).toBe(1); // Single call, no region fanout
-    expect(result).toHaveLength(2);
-    expect(result).toContainEqual(expect.objectContaining({ slug: "org-us" }));
-    expect(result).toContainEqual(expect.objectContaining({ slug: "org-eu" }));
+    expect(organizations).toHaveLength(2);
+    expect(organizations).toContainEqual(
+      expect.objectContaining({ slug: "org-us" }),
+    );
+    expect(organizations).toContainEqual(
+      expect.objectContaining({ slug: "org-eu" }),
+    );
+    expect(nextCursor).toBeNull();
     // Region fanout is no longer used
     expect(globalThis.fetch).not.toHaveBeenCalledWith(
       expect.stringContaining("/users/me/regions/"),
@@ -1008,6 +1014,7 @@ describe("listOrganizations", () => {
       if (url.includes("/organizations/")) {
         return Promise.resolve({
           ok: true,
+          headers: new Headers({ "content-type": "application/json" }),
           json: () => Promise.resolve(mockOrgs),
         });
       }
@@ -1019,11 +1026,12 @@ describe("listOrganizations", () => {
       accessToken: "test-token",
     });
 
-    const result = await apiService.listOrganizations();
+    const { organizations, nextCursor } = await apiService.listOrganizations();
 
     expect(callCount).toBe(1); // Only 1 org call, no regions call
-    expect(result).toHaveLength(2);
-    expect(result).toEqual(mockOrgs);
+    expect(organizations).toHaveLength(2);
+    expect(organizations).toEqual(mockOrgs);
+    expect(nextCursor).toBeNull();
     // Verify that regions endpoint was not called
     expect(globalThis.fetch).not.toHaveBeenCalledWith(
       expect.stringContaining("/users/me/regions/"),
