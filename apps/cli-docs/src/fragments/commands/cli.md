@@ -53,7 +53,7 @@ The CLI detects how it was installed and uses the appropriate upgrade method:
 
 | Method | Detection |
 |--------|-----------|
-| curl | Binary in `~/.sentry/bin` (installed via cli.sentry.dev) |
+| curl | Binary installed via cli.sentry.dev (XDG: `~/.local/bin`; legacy: `~/.sentry/bin`) |
 | brew | Binary in a Homebrew Cellar (`brew install getsentry/tools/sentry`) |
 | npm | Globally installed via `npm install -g sentry` |
 | pnpm | Globally installed via `pnpm add -g sentry` |

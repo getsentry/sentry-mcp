@@ -39,6 +39,7 @@ Env vars injected into the child process:
 | `SENTRY_SPOTLIGHT` | `http://localhost:<port>/stream` |
 | `<PREFIX>SENTRY_SPOTLIGHT` | `http://localhost:<port>/stream` |
 | `SENTRY_TRACES_SAMPLE_RATE` | `1` (unless already set) |
+| `SENTRY_RELEASE` | `sentry-cli-local` (unless already set) |
 
 The `<PREFIX>` variants cover every common framework client prefix so the spotlight URL is inlined into your browser bundle no matter which bundler you use: `PUBLIC_` (SvelteKit, Astro, Qwik), `NEXT_PUBLIC_` (Next.js), `VITE_` (Vite), `NUXT_PUBLIC_` (Nuxt), `REACT_APP_` (Create React App), `VUE_APP_` (Vue CLI), and `GATSBY_` (Gatsby).
 
@@ -55,6 +56,20 @@ For browser/client events, the CLI exposes the spotlight URL under every framewo
 // (e.g. import.meta.env.VITE_SENTRY_SPOTLIGHT for Vite-based frameworks).
 Sentry.init({ spotlight: process.env.NEXT_PUBLIC_SENTRY_SPOTLIGHT ?? false });
 ```
+
+## Browser UI
+
+Use `--open` to launch the Sentry Local UI ([local.sentry.dev](https://local.sentry.dev)) in your browser. The UI connects to the local receiver via the loopback stream endpoint and provides a visual workspace for browsing errors, traces, logs, and AI spans captured during the session.
+
+```bash
+# Start the server and open the UI
+sentry local --open
+
+# Run your app with the UI
+sentry local run --open -- npm run dev
+```
+
+The `--open` flag requires a loopback `--host` (localhost, 127.0.0.1, or ::1). The UI is read-only — it reads the SSE stream but cannot ingest or clear data. Session data stays in memory for the duration of the server; nothing is sent to sentry.io unless a DSN is configured.
 
 ## Endpoints
 

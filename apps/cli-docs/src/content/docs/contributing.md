@@ -88,7 +88,8 @@ cli/
 │   │   ├── help.ts      # Help command
 │   │   ├── info.ts      # Print configuration and verify authentication
 │   │   ├── init.ts      # Initialize Sentry in your project (experimental)
-│   │   └── schema.ts    # Browse the Sentry API schema
+│   │   ├── schema.ts    # Browse the Sentry API schema
+│   │   └── wasm-split.ts# Add build ids to WebAssembly modules and split out debug data
 │   ├── lib/            # Shared utilities
 │   └── types/          # TypeScript types and Valibot schemas
 ├── test/               # Test files (mirrors src/ structure)
