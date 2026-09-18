@@ -15,7 +15,7 @@
 
 import { opendir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import pLimit from "p-limit";
 import picomatch from "picomatch";
 import { anyTrue } from "../promises.js";
@@ -399,6 +399,28 @@ export function getStopBoundary(): string {
   } catch {
     return "/";
   }
+}
+
+/**
+ * True when `dir` is the home directory or an ancestor of it (e.g. `/`,
+ * `/Users`, `$HOME`). Used to suppress the downward DSN scan when project
+ * root detection fell back to a directory at/above home — scanning down
+ * from there reaches OS app-data and credential dirs (`~/Library`, `~/.ssh`,
+ * `~/.aws`, …) that must never be touched.
+ */
+export function isHomeOrAncestor(dir: string): boolean {
+  // Normalize both sides through resolve() so a trailing slash or other
+  // non-canonical form of $HOME (getStopBoundary returns homedir() raw)
+  // can't make the equality and relative() checks disagree and fail open.
+  const home = resolve(getStopBoundary());
+  const resolvedDir = resolve(dir);
+  if (resolvedDir === home) {
+    return true;
+  }
+  // `dir` is an ancestor of home when the path from dir → home doesn't
+  // climb back out (no leading "..") and stays relative.
+  const rel = relative(resolvedDir, home);
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
 
 /**
