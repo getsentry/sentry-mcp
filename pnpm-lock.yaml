@@ -177,6 +177,7 @@ overrides:
   undici: ^7.24.4
 
 patchedDependencies:
+  '@ai-sdk/provider-utils@2.2.8': 4649a74595006c4a262d453549e091db331ade06b4f4320957af1b2c659b8ee3
   '@cloudflare/workers-oauth-provider@0.10.3': 34910b67929c1888b1492384c514d6baeedc4a439f66e21375dee5af404834f8
   '@sentry/core@10.63.0': e663994979ff877a26ab6d4dea5968fbaee4ccdfdeb85623983535a572678940
   '@sentry/node-core@10.63.0': 0a5f08471bd72cb833a2b36220c96001d966e5c390d71aaf598fdef75b552640
@@ -8294,7 +8295,7 @@ snapshots:
       '@ai-sdk/provider-utils': 4.0.11(zod@4.4.3)
       zod: 4.4.3
 
-  '@ai-sdk/provider-utils@2.2.8(zod@4.6.5)':
+  '@ai-sdk/provider-utils@2.2.8(patch_hash=4649a74595006c4a262d453549e091db331ade06b4f4320957af1b2c659b8ee3)(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 1.1.3
       nanoid: 3.3.18
@@ -8363,7 +8364,7 @@ snapshots:
   '@ai-sdk/ui-utils@1.2.11(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 1.1.3
-      '@ai-sdk/provider-utils': 2.2.8(zod@4.6.5)
+      '@ai-sdk/provider-utils': 2.2.8(patch_hash=4649a74595006c4a262d453549e091db331ade06b4f4320957af1b2c659b8ee3)(zod@4.6.5)
       zod: 4.6.5
       zod-to-json-schema: 3.25.1(zod@4.6.5)
 
