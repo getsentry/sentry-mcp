@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DEFAULT_SEARCH_ISSUES_PERIOD } from "../constants";
 import { ConfigurationError } from "../errors";
+import { retryWithBackoff } from "../internal/fetch-utils";
 import { logIssue, logWarn } from "../telem/logging";
 import type { SentryProtocol } from "../types";
 import {
@@ -30,7 +31,6 @@ import {
   isSentryHost,
   type TraceMetricIdentifier,
 } from "../utils/url-utils";
-import { retryWithBackoff } from "../internal/fetch-utils";
 import { USER_AGENT } from "../version";
 import { apiPath } from "./api-path";
 import {
@@ -55,6 +55,7 @@ import {
   ErrorsSearchResponseSchema,
   EventAttachmentListSchema,
   EventSchema,
+  EventsStatsResponseSchema,
   ExternalIssueListSchema,
   FlamegraphSchema,
   IssueActivityListResponseSchema,
@@ -70,6 +71,7 @@ import {
   MonitorListSchema,
   MonitorSchema,
   MonitorStatsSchema,
+  OrganizationEnvironmentListSchema,
   OrganizationListSchema,
   OrganizationSchema,
   ProfileChunkResponseSchema,
@@ -130,6 +132,7 @@ import type {
   MonitorCheckInList,
   MonitorList,
   MonitorStats,
+  OrganizationEnvironmentList,
   OrganizationList,
   ProfileChunk,
   Project,
@@ -3416,6 +3419,37 @@ export class SentryApiService {
     return EventsValidationResponseSchema.parse(body);
   }
 
+  /**
+   * List the organization's visible environments, optionally scoped to a
+   * project. The endpoint (`GET /organizations/{org}/environments/`) already
+   * filters to visible environments and excludes the empty-name "No Environment"
+   * pseudo-env; passing `project` narrows the list (verified against
+   * getsentry/sentry `OrganizationEnvironmentsEndpoint`).
+   */
+  async listEnvironments(
+    {
+      organizationSlug,
+      projectId,
+    }: {
+      organizationSlug: string;
+      projectId?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<OrganizationEnvironmentList> {
+    const queryParams = new URLSearchParams();
+    if (projectId) {
+      queryParams.set("project", projectId);
+    }
+    const suffix = queryParams.toString();
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/environments/` +
+        (suffix ? `?${suffix}` : ""),
+      undefined,
+      opts,
+    );
+    return OrganizationEnvironmentListSchema.parse(body);
+  }
+
   private async fetchTraceItemAttributes(
     organizationSlug: string,
     itemType: TraceItemType,
@@ -4525,6 +4559,60 @@ export class SentryApiService {
       apiPath`/organizations/${organizationSlug}/events/` +
       `?${queryParams.toString()}`;
     return await this.requestJSON(apiUrl, undefined, opts);
+  }
+
+  /**
+   * Fetch a timeseries (events-stats) for a single yAxis, bucketed over time.
+   *
+   * `interval` is optional: omit it to let Sentry pick a sensible bucket size
+   * for the range (mirrors get_interval_from_range in the Sentry source).
+   * Environment and other filters travel in `query`, same as searchEvents.
+   */
+  async getEventsTimeSeries(
+    {
+      organizationSlug,
+      query,
+      yAxis,
+      interval,
+      projectId,
+      dataset = "errors",
+      statsPeriod,
+      start,
+      end,
+    }: {
+      organizationSlug: string;
+      query: string;
+      yAxis: string;
+      interval?: string;
+      projectId?: string;
+      dataset?: EventsDataset;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+    },
+    opts?: RequestOptions,
+  ) {
+    const queryParams = new URLSearchParams();
+    queryParams.set("dataset", normalizeEventsDataset(dataset));
+    queryParams.set("query", query);
+    queryParams.set("yAxis", yAxis);
+    // Omit interval to let Sentry pick a sensible bucket size for the range.
+    if (interval) {
+      queryParams.set("interval", interval);
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
+    if (projectId) {
+      queryParams.set("project", projectId);
+    }
+    // partial=1 keeps the current (in-progress) bucket, matching Sentry's charts.
+    queryParams.set("partial", "1");
+    queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);
+
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/events-stats/` +
+      `?${queryParams.toString()}`;
+    const body = await this.requestJSON(apiUrl, undefined, opts);
+    return EventsStatsResponseSchema.parse(body);
   }
 
   // POST https://us.sentry.io/api/0/issues/5485083130/autofix/

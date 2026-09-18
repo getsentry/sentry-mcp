@@ -1,0 +1,33 @@
+diff --git a/dist/oauth-provider.d.ts b/dist/oauth-provider.d.ts
+index 01141b6b4e708a7f40b32667ed8dd9cf33592888..33c099916cedc3666a5330675f1b3dc88d60a5c1 100644
+--- a/dist/oauth-provider.d.ts
++++ b/dist/oauth-provider.d.ts
+@@ -684,6 +684,12 @@ interface OAuthProviderOptions<Env = Cloudflare.Env> {
+    * Defaults to false.
+    */
+   clientIdMetadataDocumentEnabled?: boolean;
++  /**
++   * Operator-managed metadata keyed by exact client ID URL. Entries take precedence
++   * over remote CIMD fetches and are validated with the same metadata rules.
++   * Requires CIMD to be enabled. The operator owns updates and revocation.
++   */
++  clientIdMetadataDocuments?: Readonly<Record<string, unknown>>;
+   /**
+    * When true, requested-vs-granted resource validation compares origins only
+    * (scheme + host + port) instead of exact URIs. This allows an origin-only
+diff --git a/dist/oauth-provider.js b/dist/oauth-provider.js
+index c15348c226f1064f6c277f45f10740b9266219e9..43b4d2bc3fca7aa844722c57c895c68951b76d55 100644
+--- a/dist/oauth-provider.js
++++ b/dist/oauth-provider.js
+@@ -2806,6 +2806,11 @@ var OAuthProviderImpl = class {
+ 			}
+ 			if (!this.hasGlobalFetchStrictlyPublic()) throw new Error(`CIMD is enabled but 'global_fetch_strictly_public' compatibility flag is not set.`);
+ 			try {
++				const documents = this.options.clientIdMetadataDocuments;
++				if (documents && Object.hasOwn(documents, clientId)) {
++					validateClientIdentifierUrl(clientId);
++					return resolveClientIdMetadataDocument(clientId, documents[clientId], this.serverCapabilities);
++				}
+ 				return await fetchClientIdMetadataDocument(clientId, this.serverCapabilities);
+ 			} catch (error) {
+ 				console.warn(`CIMD fetch failed for ${clientId}:`, error instanceof Error ? error.message : error);

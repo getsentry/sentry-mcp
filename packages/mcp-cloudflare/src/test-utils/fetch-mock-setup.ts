@@ -106,6 +106,21 @@ export function registerFetchMockInterceptors(fetchMock: FetchMockLike) {
 
   fetchMockConfigured = true;
 
+  // Public CIMD endpoints blocked by upstream security filtering. Keep the
+  // lookalike separate so tests verify that pre-registration matches exactly.
+  const codexMetadata = fetchMock.get("https://chatgpt.com");
+  for (const path of [
+    "/oauth/codex/client.json",
+    "/oauth/codex/client.json?other-client=1",
+  ]) {
+    codexMetadata
+      .intercept({ path, method: "GET" })
+      .reply(403, "Forbidden", {
+        headers: { "Content-Type": "text/html", "Cache-Control": "no-store" },
+      })
+      .persist();
+  }
+
   for (const host of SENTRY_HOSTS) {
     const pool = fetchMock.get(host);
 

@@ -990,6 +990,15 @@ export const restHandlers = buildHandlers([
 
   {
     method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/environments/",
+    fetch: () =>
+      HttpResponse.json([
+        { id: "1", name: "production" },
+        { id: "2", name: "development" },
+      ]),
+  },
+  {
+    method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/releases/",
     fetch: () => HttpResponse.json([releaseFixture]),
   },

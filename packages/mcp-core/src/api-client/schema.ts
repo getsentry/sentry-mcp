@@ -1349,6 +1349,17 @@ export const EventAttachmentSchema = z.object({
 
 export const EventAttachmentListSchema = z.array(EventAttachmentSchema);
 
+// GET /organizations/{org}/environments/ — visible environments (the endpoint
+// excludes the empty-name "No Environment" and hidden environments by default).
+export const OrganizationEnvironmentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+
+export const OrganizationEnvironmentListSchema = z.array(
+  OrganizationEnvironmentSchema,
+);
+
 /**
  * Schema for individual tag values within an issue's tag distribution.
  *
@@ -2195,3 +2206,21 @@ export const AgenticOnboardingRunSchema = z.object({
   runStatus: AgenticOnboardingRunStatusSchema,
   stages: z.array(AgenticOnboardingStageStateSchema),
 });
+
+/**
+ * Response from the events-stats (timeseries) endpoint for a single yAxis:
+ * a series of `[unixTimestampSeconds, [{ count }]]` buckets. `count` holds the
+ * yAxis value for that bucket regardless of the aggregate function.
+ */
+export const EventsStatsResponseSchema = z
+  .object({
+    data: z.array(
+      z.tuple([
+        z.number(),
+        z.array(z.object({ count: z.number().nullish() }).passthrough()),
+      ]),
+    ),
+    start: z.number().optional(),
+    end: z.number().optional(),
+  })
+  .passthrough();

@@ -43,17 +43,17 @@ catalogs:
       specifier: ^1.2.3
       version: 1.2.3
     '@sentry/cloudflare':
-      specifier: 11.0.0-alpha.2
-      version: 11.0.0-alpha.2
+      specifier: 11.0.0-rc.0
+      version: 11.0.0-rc.0
     '@sentry/core':
-      specifier: 11.0.0-alpha.2
-      version: 11.0.0-alpha.2
+      specifier: 11.0.0-rc.0
+      version: 11.0.0-rc.0
     '@sentry/node':
-      specifier: 11.0.0-alpha.2
-      version: 11.0.0-alpha.2
+      specifier: 11.0.0-rc.0
+      version: 11.0.0-rc.0
     '@sentry/react':
-      specifier: 11.0.0-alpha.2
-      version: 11.0.0-alpha.2
+      specifier: 11.0.0-rc.0
+      version: 11.0.0-rc.0
     '@sentry/vite-plugin':
       specifier: ^4.6.1
       version: 4.6.1
@@ -100,8 +100,8 @@ catalogs:
       specifier: ^8.0.0
       version: 8.0.0
     hono:
-      specifier: ^4.12.34
-      version: 4.12.34
+      specifier: ^4.13.5
+      version: 4.13.8
     lint-staged:
       specifier: ^15.5.2
       version: 15.5.2
@@ -157,8 +157,8 @@ catalogs:
       specifier: ^6.3.5
       version: 6.3.5
     vitest:
-      specifier: ^4.1.10
-      version: 4.1.10
+      specifier: ^4.1.11
+      version: 4.1.11
     vitest-evals:
       specifier: ^0.4.0
       version: 0.4.0
@@ -177,6 +177,7 @@ overrides:
   undici: ^7.24.4
 
 patchedDependencies:
+  '@cloudflare/workers-oauth-provider@0.10.3': 34910b67929c1888b1492384c514d6baeedc4a439f66e21375dee5af404834f8
   '@sentry/core@10.63.0': e663994979ff877a26ab6d4dea5968fbaee4ccdfdeb85623983535a572678940
   '@sentry/node-core@10.63.0': 0a5f08471bd72cb833a2b36220c96001d966e5c390d71aaf598fdef75b552640
   '@stricli/core@1.2.8': 892258f886d48063b409e0ac6141260023c396d1ed4f915231701f6a34edffcc
@@ -208,7 +209,7 @@ importers:
         version: 2.13.1
       tsdown:
         specifier: 'catalog:'
-        version: 0.12.9(supports-color@8.1.1)(typescript@5.8.3)
+        version: 0.12.9(typescript@5.8.3)
       tsx:
         specifier: 'catalog:'
         version: 4.20.3
@@ -220,10 +221,10 @@ importers:
         version: 1.4.2(typescript@5.8.3)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
       vitest-evals:
         specifier: 'catalog:'
-        version: 0.4.0(tinyrainbow@3.1.0)(vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0)))
+        version: 0.4.0(tinyrainbow@3.1.0)(vitest@4.1.11)
     devDependencies:
       '@types/json-schema':
         specifier: ^7.0.15
@@ -285,7 +286,7 @@ importers:
         version: 10.63.0(patch_hash=e663994979ff877a26ab6d4dea5968fbaee4ccdfdeb85623983535a572678940)
       '@sentry/node':
         specifier: 10.65.0
-        version: 10.65.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(supports-color@8.1.1)
+        version: 10.65.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))
       '@sentry/node-core':
         specifier: 10.63.0
         version: 10.63.0(patch_hash=0a5f08471bd72cb833a2b36220c96001d966e5c390d71aaf598fdef75b552640)(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/instrumentation@0.220.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))
@@ -444,7 +445,7 @@ importers:
         version: 3.0.232(react@19.2.8)(zod@4.4.3)
       '@cloudflare/workers-oauth-provider':
         specifier: 'catalog:'
-        version: 0.10.3
+        version: 0.10.3(patch_hash=34910b67929c1888b1492384c514d6baeedc4a439f66e21375dee5af404834f8)
       '@modelcontextprotocol/sdk':
         specifier: 1.30.0
         version: 1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
@@ -459,10 +460,10 @@ importers:
         version: 1.2.3(@types/react@19.1.8)(react@19.2.8)
       '@sentry/cloudflare':
         specifier: 'catalog:'
-        version: 11.0.0-alpha.2(@cloudflare/workers-types@4.20260405.1)(wrangler@4.80.0(@cloudflare/workers-types@4.20260405.1)(@types/node@24.13.5))
+        version: 11.0.0-rc.0(@cloudflare/workers-types@4.20260405.1)(wrangler@4.80.0(@cloudflare/workers-types@4.20260405.1)(@types/node@24.13.5))
       '@sentry/react':
         specifier: 'catalog:'
-        version: 11.0.0-alpha.2(react@19.2.8)
+        version: 11.0.0-rc.0(react-router@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       agents:
         specifier: 'catalog:'
         version: 0.20.1(@ai-sdk/react@3.0.232(react@19.2.8)(zod@4.4.3))(@babel/core@7.28.0)(@babel/runtime@7.28.4)(@cloudflare/workers-types@4.20260405.1)(@modelcontextprotocol/client@2.0.0)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(@modelcontextprotocol/server@2.0.0)(ai@6.0.64(zod@4.4.3))(chat@4.40.0(ai@6.0.64(zod@4.4.3))(zod@4.4.3))(react@19.2.8)(rolldown@1.0.0-beta.23)(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))(zod@4.4.3)
@@ -480,7 +481,7 @@ importers:
         version: 2.1.1
       hono:
         specifier: 'catalog:'
-        version: 4.12.34
+        version: 4.13.8
       lucide-react:
         specifier: 'catalog:'
         version: 0.503.0(react@19.2.8)
@@ -520,7 +521,7 @@ importers:
         version: 1.13.15(@types/node@24.13.5)(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))(workerd@1.20260401.1)(wrangler@4.80.0(@cloudflare/workers-types@4.20260405.1)(@types/node@24.13.5))
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.14.1(@cloudflare/workers-types@4.20260405.1)(@types/node@24.13.5)(@vitest/runner@4.1.10)(@vitest/snapshot@4.1.10)(vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(msw@2.10.2(@types/node@24.13.5)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3)))
+        version: 0.14.1(@cloudflare/workers-types@4.20260405.1)(@types/node@24.13.5)(@vitest/runner@4.1.10)(@vitest/snapshot@4.1.10)(vitest@4.1.11)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
         version: 4.20260405.1
@@ -568,7 +569,7 @@ importers:
         version: 6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(msw@2.10.2(@types/node@24.13.5)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@24.13.5)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))
       wrangler:
         specifier: 4.80.0
         version: 4.80.0(@cloudflare/workers-types@4.20260405.1)(@types/node@24.13.5)
@@ -598,7 +599,7 @@ importers:
         version: 2.0.0
       '@sentry/core':
         specifier: 'catalog:'
-        version: 11.0.0-alpha.2
+        version: 11.0.0-rc.0
       ai:
         specifier: 'catalog:'
         version: 6.0.64(zod@4.4.3)
@@ -644,10 +645,10 @@ importers:
         version: 1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
       '@sentry/core':
         specifier: 'catalog:'
-        version: 11.0.0-alpha.2
+        version: 11.0.0-rc.0
       '@sentry/node':
         specifier: 'catalog:'
-        version: 11.0.0-alpha.2(rollup@4.62.4)
+        version: 11.0.0-rc.0(rollup@4.62.4)
       dotenv:
         specifier: 'catalog:'
         version: 16.6.1
@@ -669,7 +670,7 @@ importers:
         version: 22.16.0
       tsdown:
         specifier: 'catalog:'
-        version: 0.12.9(supports-color@8.1.1)(typescript@5.8.3)
+        version: 0.12.9(typescript@5.8.3)
       tsx:
         specifier: 'catalog:'
         version: 4.20.3
@@ -678,7 +679,7 @@ importers:
         version: 5.8.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
 
   packages/mcp-server-evals:
     dependencies:
@@ -717,10 +718,10 @@ importers:
         version: 5.8.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
       vitest-evals:
         specifier: 'catalog:'
-        version: 0.4.0(tinyrainbow@3.1.0)(vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)))
+        version: 0.4.0(tinyrainbow@3.1.0)(vitest@4.1.11)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -753,13 +754,13 @@ importers:
         version: 1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
       '@sentry/core':
         specifier: 'catalog:'
-        version: 11.0.0-alpha.2
+        version: 11.0.0-rc.0
       '@sentry/mcp-core':
         specifier: workspace:*
         version: link:../mcp-core
       '@sentry/node':
         specifier: 'catalog:'
-        version: 11.0.0-alpha.2(rollup@4.62.4)
+        version: 11.0.0-rc.0(rollup@4.62.4)
       ai:
         specifier: 'catalog:'
         version: 6.0.64(zod@4.4.3)
@@ -781,7 +782,7 @@ importers:
     devDependencies:
       tsdown:
         specifier: 'catalog:'
-        version: 0.12.9(supports-color@8.1.1)(typescript@5.8.3)
+        version: 0.12.9(typescript@5.8.3)
       tsx:
         specifier: 'catalog:'
         version: 4.20.3
@@ -790,7 +791,7 @@ importers:
         version: 5.8.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
 
   packages/smoke-tests:
     devDependencies:
@@ -799,7 +800,7 @@ importers:
         version: 22.16.0
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.9.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@22.16.0)(typescript@5.9.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
 packages:
 
@@ -3393,16 +3394,16 @@ packages:
     resolution: {integrity: sha512-yZfdQ87RLat/7retF8zA6Z9zCAT12IyaPvIiu+bbi1E1V1OqDpS8MKNa/6LF69Ap7DVTORi9ITEgjlAqTXF0xQ==}
     engines: {node: '>=18'}
 
-  '@sentry/browser-utils@11.0.0-alpha.2':
-    resolution: {integrity: sha512-6jr3V9hqAsAJ7WgOd0TtJtmOgI9CCfv1utfW+2D9NxqcGy68fFbXeDucCSt8z0hFrEJaOSCejhvQva297P8xMA==}
+  '@sentry/browser-utils@11.0.0-rc.0':
+    resolution: {integrity: sha512-Mxate9W4UEkx8Ez+78ygWdxB3KFMVjwXFSd5dwXjHl/Bv/+t375l8JCV1vW5IQ/V5qQBWi/ess/IA4Rq7pmQjQ==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
 
   '@sentry/browser@10.75.0':
     resolution: {integrity: sha512-CKGSJLWISQ6LgMaGnMpY+XvwWQ2iiHTayUs6SGLIvYeaGo2GTjS/Z4pnbCVHb2t1VxLZksyehgcC6ZYGJeQpzQ==}
     engines: {node: '>=18'}
 
-  '@sentry/browser@11.0.0-alpha.2':
-    resolution: {integrity: sha512-uRSfYolWGt4bBAq41wTp48ejK/wvyXW/QYQ8/vvlB2o1HgNcdaYZhPjHvkL4uDa19z+/dfEldSFRh0ZZP/w1qA==}
+  '@sentry/browser@11.0.0-rc.0':
+    resolution: {integrity: sha512-S/PSQvvoI0vtwJZt1jUMUJau4cxMH1a+rN8Ul5KOvDHP5P8tGkB5fl7GtHVchlil8JPp5xd4bp7PyFHPkvAPPw==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
 
   '@sentry/bundler-plugin-core@4.6.1':
@@ -3421,8 +3422,8 @@ packages:
       webpack:
         optional: true
 
-  '@sentry/bundler-plugins@11.0.0-alpha.2':
-    resolution: {integrity: sha512-cWTtt94lsNmZTGo8Rr0IDilfc4wuuaDnEvhoZqvuo2RJixMtwr3Erq9S1nbiX4jnP2fcLNnZm8nc/R4BbLIHrg==}
+  '@sentry/bundler-plugins@11.0.0-rc.0':
+    resolution: {integrity: sha512-mfRtTo7MNMgAghHsTzcRV5XwdpV+YqdqA4OGgOSRqLEY5H1jxfO8j+orEjUvLk8pCgR4Y1cORsXKqpVXI4nh3w==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
     peerDependencies:
       rollup: '>=3.2.0'
@@ -3537,8 +3538,8 @@ packages:
     engines: {node: '>= 10'}
     hasBin: true
 
-  '@sentry/cloudflare@11.0.0-alpha.2':
-    resolution: {integrity: sha512-CCNM8gTFv+TpjrK/noMoOfQ7y9D0LdWQhwi7rjiBhXakvPVxI1+TBju7mLDEDkHUt/T3oPMDVw8b2Akm5DusmA==}
+  '@sentry/cloudflare@11.0.0-rc.0':
+    resolution: {integrity: sha512-mzhLWRvXn7HrNzTjK2FI9MoSse/MVDxGLQJvKIur/KXZS402fcOURX1n3nBqJfzkgL3rZ1oQAM4eKOF5BY3QkA==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
     peerDependencies:
       '@cloudflare/workers-types': ^4.x || ^5.x
@@ -3561,8 +3562,8 @@ packages:
     resolution: {integrity: sha512-fO9PLmHdVURcSPUpWCItWAtgKiMwGdJHbovoSEyLplX5sxs2ugvI4CBPTrkkgqhObnZOD0CnWBKDzSVQYBKEyQ==}
     engines: {node: '>=14'}
 
-  '@sentry/conventions@0.20.0':
-    resolution: {integrity: sha512-nAL3tL+xgom6Dbuxq0NCEZZfBNIrUspjDJRcMMRl3WLiBCSeZzNCa7an48IpnrZoVMpAi2NQ2v9rFU+EQziKuQ==}
+  '@sentry/conventions@0.23.0':
+    resolution: {integrity: sha512-+Euyo7CNVecoOusgUnq27oV97oshifgceKfnGnuKfXrPUVWA/cisvii3E1rlvy2yBrKvl9K1gCEo1Jqog5zjEQ==}
     engines: {node: '>=14'}
 
   '@sentry/core@10.63.0':
@@ -3577,8 +3578,8 @@ packages:
     resolution: {integrity: sha512-5wDQpQqjJ6RHdPR+z6Q+47XlwoxRKBv0yyB0LKHqL/1azPOQbR+nllyLmmQDcoJpaksuLSmLA1q6hFX7gjDT2w==}
     engines: {node: '>=18'}
 
-  '@sentry/core@11.0.0-alpha.2':
-    resolution: {integrity: sha512-GvqlS+z2UxCy92nrH0PMYn/Xw5Tw40VNGkJ85G/C7S55O/NO3c8vU+oJG9/exCKgs/N+u7fSKYgPubuvaArkLQ==}
+  '@sentry/core@11.0.0-rc.0':
+    resolution: {integrity: sha512-6KXLKGq1YgysUIzeD0cYQH/8Tg62V+UJV1d9FVNvKb0HnRgbiO9VWCCm1wGyYSENdGPdSa9zOOnk5ZC7WxLaAw==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
 
   '@sentry/core@9.34.0':
@@ -3589,8 +3590,8 @@ packages:
     resolution: {integrity: sha512-YLVAFQXELJAOg7ke4oLkd8t5l0fJUockLlTQJg/2Trh7SB5Q4mkSwlnAkEAqDQ618vnpFsG/tnYMwtfZeffHjA==}
     engines: {node: '>=18'}
 
-  '@sentry/feedback@11.0.0-alpha.2':
-    resolution: {integrity: sha512-sbEoZ1wIgYBEg1ecDwBLy68djJxBM9bg4zVGR+2nrQ9TID8wDn08kw0TQiVzwg2EO6PGVvjj1ukviJRMiuS6qA==}
+  '@sentry/feedback@11.0.0-rc.0':
+    resolution: {integrity: sha512-jb/xd0kxtYM8XVAZtsMxayv27Agv4aWHBumnVT0jxUSNj2eoX5Tfz0PsinV7lcqITZ8HaLeYkUQcll4ANqjX5w==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
 
   '@sentry/node-core@10.63.0':
@@ -3664,8 +3665,8 @@ packages:
     resolution: {integrity: sha512-XdYW+SEiscQnuugh1hMldfnHurmleKSTSDqgfro6Y1yd7s0r2csnZ5/SEYxIeL4lSl1QXg1lIA1pBmAXjcdnKA==}
     engines: {node: '>=18'}
 
-  '@sentry/node@11.0.0-alpha.2':
-    resolution: {integrity: sha512-RDlLF3gUsiRD63V8NdkAk2mAbKqkib4qhsErOargPJ9rrNKXtslq/DgUIM1Aa8SoxduyO2H2U5hbWf/twlShzA==}
+  '@sentry/node@11.0.0-rc.0':
+    resolution: {integrity: sha512-hztnJEx8Fcyp0wNJgVbrgWIy9jgkefo7A3c7Y7r7wrCwCl5gKwzzo53XYOkY2lf/rjTLaJCG8b21VjHaFldOZw==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
 
   '@sentry/opentelemetry@10.63.0':
@@ -3692,32 +3693,40 @@ packages:
       '@opentelemetry/core': ^1.30.1 || ^2.1.0
       '@opentelemetry/sdk-trace-base': ^1.30.1 || ^2.1.0
 
-  '@sentry/opentelemetry@11.0.0-alpha.2':
-    resolution: {integrity: sha512-dojGEVXP48Qcjy+lnqmgmph7y1EHjbdUy3Oq6PT4Wqc1kAdIAaA+KN84g9A1hB6zc6auDx+hgUdhgGyPITzYOA==}
+  '@sentry/opentelemetry@11.0.0-rc.0':
+    resolution: {integrity: sha512-28Yy+Qoo84Ckxu40f2sB/NE+J2uacVkT+rD/GnK3+ExZfW/o2nV7eotIwKUprhoHM1w8EaMQusjZAMTzHc4geQ==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
     peerDependencies:
       '@opentelemetry/api': ^1.9.0
 
-  '@sentry/react@11.0.0-alpha.2':
-    resolution: {integrity: sha512-enBOQlUn5wk/buUNhLE92TGVQukT4dS9a5/OkHOBnoKeW5NhKEUsKntV/ybYOLMszQgK0CN/sGKHSZEF3u2qEw==}
+  '@sentry/react@11.0.0-rc.0':
+    resolution: {integrity: sha512-IsXgQ5E6DtIVBhoIxZqkZJqyDgFN8RJX/FrUUwDIDjSCXftK1SZnfPXxPWUE/vF9RBrF0UScqstvOKvJJkq1Mw==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
     peerDependencies:
       react: 17.x || 18.x || 19.x
+      react-router: 6.x || 7.x || 8.x
+    peerDependenciesMeta:
+      react-router:
+        optional: true
 
   '@sentry/replay-canvas@10.75.0':
     resolution: {integrity: sha512-LNokI5Ud22nZ/o2il/2SfbNIARupWrbS6Mh9jZroZTjD38FN0Oi9vIexj6h1HN81C6+lP2Tmpaj+fl3/wOizzA==}
     engines: {node: '>=18'}
 
-  '@sentry/replay-canvas@11.0.0-alpha.2':
-    resolution: {integrity: sha512-Pui732KXikj5L1EJd8hsQ4GbhKhNaZ0aHSEdlNJRMQMYCIApvJCY9CM/j86NrEt8bY3ShLs46r8T1iyT4NRJfw==}
+  '@sentry/replay-canvas@11.0.0-rc.0':
+    resolution: {integrity: sha512-7KSOyhmhRjlMg0NX4P+gNsgaT40uAWhJrI+3hsHxSU1dsvBdylhBzHM3/2Qie5QuFvrdBWqJefeQ5tFs7GCPoQ==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
 
   '@sentry/replay@10.75.0':
     resolution: {integrity: sha512-p4xxEo/ayiMZG9tygr09YjqYAd52uq8Qi0EVoRRgUe70nQda0HVPVW519JLq0G+Th/5O5sKME9y1layLU3xlPg==}
     engines: {node: '>=18'}
 
-  '@sentry/replay@11.0.0-alpha.2':
-    resolution: {integrity: sha512-djxcu+7VSnFcGUaxH+McUyrTAo2JiKf0vwoFWF9ACJiYN3craSIWUlc0jopeoL0xD40piNBAQltbmh0WDf1Dwg==}
+  '@sentry/replay@11.0.0-rc.0':
+    resolution: {integrity: sha512-7TIGKTFc0dfmC7uGj4HZ4sRyk25ZuUdvMO8yY4gcflIZfZAE18USE1S9fM+QTmCMlbrPEXgni7Iw2ij4zsxMYQ==}
+    engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
+
+  '@sentry/server-runtime-injection@11.0.0-rc.0':
+    resolution: {integrity: sha512-x8XppxyzDZxweoHlfsW0l12ghquvp79o2UNXOcXETRb+40ud+RF+YdPtnv4yvsrByXScPkNzKVdJSjxevJCcrA==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
 
   '@sentry/server-utils@10.65.0':
@@ -3728,8 +3737,8 @@ packages:
     resolution: {integrity: sha512-7fIa9vFGNzB13hmxl8Sip3xImSkqpc4wETzuQ7CLzVOwPvwI6y/gVEm0pxRhtJSq8SzfOp26eJWl80u8v78Osg==}
     engines: {node: '>=18'}
 
-  '@sentry/server-utils@11.0.0-alpha.2':
-    resolution: {integrity: sha512-qJjK1IjWXXoK7rkziPPwa+DvA+FkLGPNVt4jWxw4EjNXEdQSTxamC3LjlQXRpwtsAAfE0623FkZMZesNWJTv4w==}
+  '@sentry/server-utils@11.0.0-rc.0':
+    resolution: {integrity: sha512-0+nsGmRdz8U+U5Cbe52FVfsBztcSY8v7u37id3lsEOktZQi8uJRQShp7BgvD8+ReXEuoVK/L2w7LxzTdtmxQig==}
     engines: {node: '>=20.19.0 <22.0.0 || >=22.12.0 <23.0.0 || >=23.2.0'}
 
   '@sentry/sqlish@1.0.1':
@@ -4188,8 +4197,22 @@ packages:
   '@vitest/expect@4.1.10':
     resolution: {integrity: sha512-YsCn+qAk1GWjQOWFEsEcL2gNQ0zmVmQu3T03qP6UyjhtmdtwtbuI+DASn/7iQB3HGTXkdBwGddzxPlmiql5vlA==}
 
+  '@vitest/expect@4.1.11':
+    resolution: {integrity: sha512-VX2x5vNJXET47KAFzwERI+KRMtTTCSWTfSMKsW7JsUsXV4psq++e3DvZpuTDOpHcxytiDs6p2nhVb2tVDiiUYw==}
+
   '@vitest/mocker@4.1.10':
     resolution: {integrity: sha512-v0xaezt+DKEmKfaxg133ldzADrwLGd7Ze1MfQQTYfvs8OqZIwbxyxaYURivwV7sWy5fqn3rH5uOrSp07bp44Ow==}
+    peerDependencies:
+      msw: ^2.4.9
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
+    peerDependenciesMeta:
+      msw:
+        optional: true
+      vite:
+        optional: true
+
+  '@vitest/mocker@4.1.11':
+    resolution: {integrity: sha512-2XJVD55d1o5AZous5CCGKS74g/riOj9odEt2bQpCVZeblHyHdnMeFl4jl0XjU21stf4mbjUkew2eXQZt65g5CQ==}
     peerDependencies:
       msw: ^2.4.9
       vite: ^6.0.0 || ^7.0.0 || ^8.0.0
@@ -4208,11 +4231,20 @@ packages:
   '@vitest/runner@4.1.10':
     resolution: {integrity: sha512-IKI6kpIH+LmpROplyLwBBaCfMgOZOMsygVa6BARD6ahA04VRuJSa6OaVG7kRvSEMD870Vd91rSSw0eegtWyLGg==}
 
+  '@vitest/runner@4.1.11':
+    resolution: {integrity: sha512-LztvUgdwMNJMIkj3hQnnxiC2Xy1zNxq928W/xhjCLaNCzqTZOudjwbQf6v9IntZGPw132i2Lq2rgTRZHD3JHNw==}
+
   '@vitest/snapshot@4.1.10':
     resolution: {integrity: sha512-xRkfOT1qpTAi/Ti4Y1LtfRc3kEuqxGw59eN2jN9pRWMtS/XDevekhcFSqvQqjUNGksfjMJu3Y+oJ+4Ypn2OaJw==}
 
+  '@vitest/snapshot@4.1.11':
+    resolution: {integrity: sha512-pN7ikn1ON7h8ee4gIAp4AzyK+zBtJPzVbqOgu5LCEh4VaJVbPQcgYQYJIMGQPXVeJJq1fnfazis7a5pFNPahog==}
+
   '@vitest/spy@4.1.10':
     resolution: {integrity: sha512-PLf/Ugvoq5wO/b4rwYCR1h2PSIdXz7wnkQFMiUpLdtM7l6pqVFcQIBEHyT1+l+cj7mNwAfZHzqXqDyjvOuwbDw==}
+
+  '@vitest/spy@4.1.11':
+    resolution: {integrity: sha512-apNa/prQy2qCeywhnixOHPRCgGNhvg7T4Dapfl1GahLp/R+uhBm5cPyFoNVyqsNd2h1nJxL6BqqdIjiABL60YA==}
 
   '@vitest/utils@4.1.10':
     resolution: {integrity: sha512-fy9am/HWxbaGt/Sawrp90vt6Y6jQwf1RX77cz3uwoJwJVMli/e1IEwRPnMNJ7vKfPTwo0diXifkpPvwH9v7nGA==}
@@ -5545,6 +5577,10 @@ packages:
 
   hono@4.12.34:
     resolution: {integrity: sha512-GqXJqY/xJkJmuloTrnV1ZEXG3fqte+VjkUqoRNZXcrUidiUOP4fMSIHHY4tsqZBK++kVyWmt/AAfSUuy57/eSA==}
+    engines: {node: '>=16.9.0'}
+
+  hono@4.13.8:
+    resolution: {integrity: sha512-/Gng7NfoykZl2pjukW5Z6+8Yxm3BPRf86GTbQnt0SbySkvax4fyL4H3HhY1cCpBGmiW9XDRFzRV+CXK2W8QudQ==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -7972,6 +8008,47 @@ packages:
       jsdom:
         optional: true
 
+  vitest@4.1.11:
+    resolution: {integrity: sha512-fhACrNXUidIbGSBr5FlbuBkO7VWC1ZyLl0DO4CU2DrQoAPxX84Ysxs+HeGQpii5lZWV1Q4gBZTTu49mF+A6Edw==}
+    engines: {node: ^20.0.0 || ^22.0.0 || >=24.0.0}
+    hasBin: true
+    peerDependencies:
+      '@edge-runtime/vm': '*'
+      '@opentelemetry/api': ^1.9.0
+      '@types/node': ^20.0.0 || ^22.0.0 || >=24.0.0
+      '@vitest/browser-playwright': 4.1.11
+      '@vitest/browser-preview': 4.1.11
+      '@vitest/browser-webdriverio': 4.1.11
+      '@vitest/coverage-istanbul': 4.1.11
+      '@vitest/coverage-v8': 4.1.11
+      '@vitest/ui': 4.1.11
+      happy-dom: '*'
+      jsdom: '*'
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
+    peerDependenciesMeta:
+      '@edge-runtime/vm':
+        optional: true
+      '@opentelemetry/api':
+        optional: true
+      '@types/node':
+        optional: true
+      '@vitest/browser-playwright':
+        optional: true
+      '@vitest/browser-preview':
+        optional: true
+      '@vitest/browser-webdriverio':
+        optional: true
+      '@vitest/coverage-istanbul':
+        optional: true
+      '@vitest/coverage-v8':
+        optional: true
+      '@vitest/ui':
+        optional: true
+      happy-dom:
+        optional: true
+      jsdom:
+        optional: true
+
   walk-back@5.1.1:
     resolution: {integrity: sha512-e/FRLDVdZQWFrAzU6Hdvpm7D7m2ina833gIKLptQykRK49mmCYHLHq7UqjPDbxbKLZkTkW1rFqbengdE3sLfdw==}
     engines: {node: '>=12.17'}
@@ -8402,7 +8479,7 @@ snapshots:
       semifies: 1.0.0
       source-map: 0.6.1
 
-  '@apm-js-collab/tracing-hooks@0.10.1(supports-color@8.1.1)':
+  '@apm-js-collab/tracing-hooks@0.10.1':
     dependencies:
       '@apm-js-collab/code-transformer': 0.15.0
       debug: 4.4.3(supports-color@8.1.1)
@@ -8506,7 +8583,7 @@ snapshots:
       '@types/hast': 3.0.4
       '@types/mdast': 4.0.4
       js-yaml: 4.3.2
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       retext-smartypants: 6.2.0
       shiki: 4.4.3
       smol-toml: 1.8.0
@@ -8517,7 +8594,7 @@ snapshots:
       '@types/hast': 3.0.4
       '@types/mdast': 4.0.4
       js-yaml: 4.3.2
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       retext-smartypants: 6.2.0
       shiki: 4.4.3
       smol-toml: 1.8.0
@@ -8566,7 +8643,7 @@ snapshots:
       '@mdx-js/mdx': 3.1.1
       acorn: 8.18.0
       astro: 7.3.3(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)(@types/node@24.13.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
-      es-module-lexer: 2.0.0
+      es-module-lexer: 2.3.2
       estree-util-visit: 2.0.0
       hast-util-to-html: 9.0.5
       piccolore: 0.1.3
@@ -9121,14 +9198,14 @@ snapshots:
       - utf-8-validate
       - workerd
 
-  '@cloudflare/vitest-pool-workers@0.14.1(@cloudflare/workers-types@4.20260405.1)(@types/node@24.13.5)(@vitest/runner@4.1.10)(@vitest/snapshot@4.1.10)(vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(msw@2.10.2(@types/node@24.13.5)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3)))':
+  '@cloudflare/vitest-pool-workers@0.14.1(@cloudflare/workers-types@4.20260405.1)(@types/node@24.13.5)(@vitest/runner@4.1.10)(@vitest/snapshot@4.1.10)(vitest@4.1.11)':
     dependencies:
       '@vitest/runner': 4.1.10
       '@vitest/snapshot': 4.1.10
       cjs-module-lexer: 1.4.3
       esbuild: 0.27.3
       miniflare: 4.20260401.0(@types/node@24.13.5)
-      vitest: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(msw@2.10.2(@types/node@24.13.5)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))
+      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@24.13.5)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))
       wrangler: 4.80.0(@cloudflare/workers-types@4.20260405.1)(@types/node@24.13.5)
       zod: 3.25.76
     transitivePeerDependencies:
@@ -9182,7 +9259,7 @@ snapshots:
   '@cloudflare/workerd-windows-64@1.20260916.1':
     optional: true
 
-  '@cloudflare/workers-oauth-provider@0.10.3': {}
+  '@cloudflare/workers-oauth-provider@0.10.3(patch_hash=34910b67929c1888b1492384c514d6baeedc4a439f66e21375dee5af404834f8)': {}
 
   '@cloudflare/workers-types@4.20260405.1': {}
 
@@ -9630,9 +9707,9 @@ snapshots:
     dependencies:
       hono: 4.12.34
 
-  '@hono/node-server@1.19.9(hono@4.12.34)':
+  '@hono/node-server@1.19.9(hono@4.13.8)':
     dependencies:
-      hono: 4.12.34
+      hono: 4.13.8
 
   '@hono/node-server@2.1.1(hono@4.12.34)':
     dependencies:
@@ -9839,7 +9916,7 @@ snapshots:
 
   '@jridgewell/gen-mapping@0.3.12':
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
       '@jridgewell/trace-mapping': 0.3.29
 
   '@jridgewell/remapping@2.3.5':
@@ -9861,7 +9938,7 @@ snapshots:
   '@jridgewell/trace-mapping@0.3.31':
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
 
   '@jridgewell/trace-mapping@0.3.9':
     dependencies:
@@ -9934,7 +10011,7 @@ snapshots:
       lru-cache: 11.5.2
       p-map: 7.0.8
       p-retry: 7.1.1
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       posthog-node: 5.52.4
       tokenx: 1.6.0
       ws: 8.21.3
@@ -10003,7 +10080,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)':
     dependencies:
-      '@hono/node-server': 1.19.9(hono@4.12.34)
+      '@hono/node-server': 1.19.9(hono@4.13.8)
       ajv: 8.17.1
       ajv-formats: 3.0.1(ajv@8.17.1)
       content-type: 1.0.5
@@ -10013,7 +10090,7 @@ snapshots:
       eventsource-parser: 3.1.0
       express: 5.2.1
       express-rate-limit: 8.2.1(express@5.2.1)
-      hono: 4.12.34
+      hono: 4.13.8
       jose: 6.2.4
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
@@ -10027,7 +10104,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.6.5)':
     dependencies:
-      '@hono/node-server': 1.19.9(hono@4.12.34)
+      '@hono/node-server': 1.19.9(hono@4.13.8)
       ajv: 8.17.1
       ajv-formats: 3.0.1(ajv@8.17.1)
       content-type: 1.0.5
@@ -10037,7 +10114,7 @@ snapshots:
       eventsource-parser: 3.1.0
       express: 5.2.1
       express-rate-limit: 8.2.1(express@5.2.1)
-      hono: 4.12.34
+      hono: 4.13.8
       jose: 6.2.4
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
@@ -10433,7 +10510,7 @@ snapshots:
   '@rolldown/plugin-babel@0.2.3(@babel/core@7.28.0)(@babel/runtime@7.28.4)(rolldown@1.0.0-beta.23)(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))':
     dependencies:
       '@babel/core': 7.28.0
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       rolldown: 1.0.0-beta.23
     optionalDependencies:
       '@babel/runtime': 7.28.4
@@ -10550,10 +10627,10 @@ snapshots:
       '@sentry/conventions': 0.16.0
       '@sentry/core': 10.75.0
 
-  '@sentry/browser-utils@11.0.0-alpha.2':
+  '@sentry/browser-utils@11.0.0-rc.0':
     dependencies:
-      '@sentry/conventions': 0.20.0
-      '@sentry/core': 11.0.0-alpha.2
+      '@sentry/conventions': 0.23.0
+      '@sentry/core': 11.0.0-rc.0
       web-vitals: 6.2.1
 
   '@sentry/browser@10.75.0':
@@ -10565,14 +10642,14 @@ snapshots:
       '@sentry/replay': 10.75.0
       '@sentry/replay-canvas': 10.75.0
 
-  '@sentry/browser@11.0.0-alpha.2':
+  '@sentry/browser@11.0.0-rc.0':
     dependencies:
-      '@sentry/browser-utils': 11.0.0-alpha.2
-      '@sentry/conventions': 0.20.0
-      '@sentry/core': 11.0.0-alpha.2
-      '@sentry/feedback': 11.0.0-alpha.2
-      '@sentry/replay': 11.0.0-alpha.2
-      '@sentry/replay-canvas': 11.0.0-alpha.2
+      '@sentry/browser-utils': 11.0.0-rc.0
+      '@sentry/conventions': 0.23.0
+      '@sentry/core': 11.0.0-rc.0
+      '@sentry/feedback': 11.0.0-rc.0
+      '@sentry/replay': 11.0.0-rc.0
+      '@sentry/replay-canvas': 11.0.0-rc.0
 
   '@sentry/bundler-plugin-core@4.6.1':
     dependencies:
@@ -10603,12 +10680,11 @@ snapshots:
       - encoding
       - supports-color
 
-  '@sentry/bundler-plugins@11.0.0-alpha.2(rollup@4.62.4)':
+  '@sentry/bundler-plugins@11.0.0-rc.0(rollup@4.62.4)':
     dependencies:
       '@babel/core': 7.28.0(supports-color@8.1.1)
-      '@sentry/core': 11.0.0-alpha.2
+      '@sentry/core': 11.0.0-rc.0
       dotenv: 17.4.2
-      find-up: 5.0.0
       glob: 13.0.6
       magic-string: 0.30.21
       sentry: 0.44.1
@@ -10704,13 +10780,13 @@ snapshots:
       - encoding
       - supports-color
 
-  '@sentry/cloudflare@11.0.0-alpha.2(@cloudflare/workers-types@4.20260405.1)(wrangler@4.80.0(@cloudflare/workers-types@4.20260405.1)(@types/node@24.13.5))':
+  '@sentry/cloudflare@11.0.0-rc.0(@cloudflare/workers-types@4.20260405.1)(wrangler@4.80.0(@cloudflare/workers-types@4.20260405.1)(@types/node@24.13.5))':
     dependencies:
       '@opentelemetry/api': 1.9.1
-      '@sentry/conventions': 0.20.0
-      '@sentry/core': 11.0.0-alpha.2
-      '@sentry/opentelemetry': 11.0.0-alpha.2(@opentelemetry/api@1.9.1)
-      '@sentry/server-utils': 11.0.0-alpha.2
+      '@sentry/conventions': 0.23.0
+      '@sentry/core': 11.0.0-rc.0
+      '@sentry/opentelemetry': 11.0.0-rc.0(@opentelemetry/api@1.9.1)
+      '@sentry/server-utils': 11.0.0-rc.0
       magic-string: 0.30.21
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260405.1
@@ -10722,7 +10798,7 @@ snapshots:
 
   '@sentry/conventions@0.16.0': {}
 
-  '@sentry/conventions@0.20.0': {}
+  '@sentry/conventions@0.23.0': {}
 
   '@sentry/core@10.63.0(patch_hash=e663994979ff877a26ab6d4dea5968fbaee4ccdfdeb85623983535a572678940)': {}
 
@@ -10734,9 +10810,9 @@ snapshots:
     dependencies:
       '@sentry/conventions': 0.16.0
 
-  '@sentry/core@11.0.0-alpha.2':
+  '@sentry/core@11.0.0-rc.0':
     dependencies:
-      '@sentry/conventions': 0.20.0
+      '@sentry/conventions': 0.23.0
 
   '@sentry/core@9.34.0': {}
 
@@ -10744,9 +10820,9 @@ snapshots:
     dependencies:
       '@sentry/core': 10.75.0
 
-  '@sentry/feedback@11.0.0-alpha.2':
+  '@sentry/feedback@11.0.0-rc.0':
     dependencies:
-      '@sentry/core': 11.0.0-alpha.2
+      '@sentry/core': 11.0.0-rc.0
 
   '@sentry/node-core@10.63.0(patch_hash=0a5f08471bd72cb833a2b36220c96001d966e5c390d71aaf598fdef75b552640)(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/instrumentation@0.220.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))':
     dependencies:
@@ -10784,7 +10860,7 @@ snapshots:
       '@opentelemetry/instrumentation': 0.220.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-base': 2.11.0(@opentelemetry/api@1.9.1)
 
-  '@sentry/node@10.65.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(supports-color@8.1.1)':
+  '@sentry/node@10.65.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/instrumentation': 0.220.0(@opentelemetry/api@1.9.1)
@@ -10793,7 +10869,7 @@ snapshots:
       '@sentry/core': 10.65.0
       '@sentry/node-core': 10.65.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/instrumentation@0.220.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))
       '@sentry/opentelemetry': 10.65.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))
-      '@sentry/server-utils': 10.65.0(supports-color@8.1.1)
+      '@sentry/server-utils': 10.65.0
       import-in-the-middle: 3.5.1
     transitivePeerDependencies:
       - '@opentelemetry/core'
@@ -10816,14 +10892,15 @@ snapshots:
       - '@opentelemetry/exporter-trace-otlp-http'
       - supports-color
 
-  '@sentry/node@11.0.0-alpha.2(rollup@4.62.4)':
+  '@sentry/node@11.0.0-rc.0(rollup@4.62.4)':
     dependencies:
       '@opentelemetry/api': 1.9.1
-      '@sentry/bundler-plugins': 11.0.0-alpha.2(rollup@4.62.4)
-      '@sentry/conventions': 0.20.0
-      '@sentry/core': 11.0.0-alpha.2
-      '@sentry/opentelemetry': 11.0.0-alpha.2(@opentelemetry/api@1.9.1)
-      '@sentry/server-utils': 11.0.0-alpha.2
+      '@sentry/bundler-plugins': 11.0.0-rc.0(rollup@4.62.4)
+      '@sentry/conventions': 0.23.0
+      '@sentry/core': 11.0.0-rc.0
+      '@sentry/opentelemetry': 11.0.0-rc.0(@opentelemetry/api@1.9.1)
+      '@sentry/server-runtime-injection': 11.0.0-rc.0
+      '@sentry/server-utils': 11.0.0-rc.0
     transitivePeerDependencies:
       - rollup
       - webpack
@@ -10852,44 +10929,51 @@ snapshots:
       '@sentry/conventions': 0.16.0
       '@sentry/core': 10.75.0
 
-  '@sentry/opentelemetry@11.0.0-alpha.2(@opentelemetry/api@1.9.1)':
+  '@sentry/opentelemetry@11.0.0-rc.0(@opentelemetry/api@1.9.1)':
     dependencies:
       '@opentelemetry/api': 1.9.1
-      '@sentry/conventions': 0.20.0
-      '@sentry/core': 11.0.0-alpha.2
+      '@sentry/conventions': 0.23.0
+      '@sentry/core': 11.0.0-rc.0
 
-  '@sentry/react@11.0.0-alpha.2(react@19.2.8)':
+  '@sentry/react@11.0.0-rc.0(react-router@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@sentry/browser': 11.0.0-alpha.2
-      '@sentry/conventions': 0.20.0
-      '@sentry/core': 11.0.0-alpha.2
+      '@sentry/browser': 11.0.0-rc.0
+      '@sentry/conventions': 0.23.0
+      '@sentry/core': 11.0.0-rc.0
       react: 19.2.8
+    optionalDependencies:
+      react-router: 7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
 
   '@sentry/replay-canvas@10.75.0':
     dependencies:
       '@sentry/core': 10.75.0
       '@sentry/replay': 10.75.0
 
-  '@sentry/replay-canvas@11.0.0-alpha.2':
+  '@sentry/replay-canvas@11.0.0-rc.0':
     dependencies:
-      '@sentry/core': 11.0.0-alpha.2
-      '@sentry/replay': 11.0.0-alpha.2
+      '@sentry/core': 11.0.0-rc.0
+      '@sentry/replay': 11.0.0-rc.0
 
   '@sentry/replay@10.75.0':
     dependencies:
       '@sentry/browser-utils': 10.75.0
       '@sentry/core': 10.75.0
 
-  '@sentry/replay@11.0.0-alpha.2':
+  '@sentry/replay@11.0.0-rc.0':
     dependencies:
-      '@sentry/browser-utils': 11.0.0-alpha.2
-      '@sentry/core': 11.0.0-alpha.2
+      '@sentry/browser-utils': 11.0.0-rc.0
+      '@sentry/core': 11.0.0-rc.0
 
-  '@sentry/server-utils@10.65.0(supports-color@8.1.1)':
+  '@sentry/server-runtime-injection@11.0.0-rc.0':
+    dependencies:
+      '@sentry/core': 11.0.0-rc.0
+      '@sentry/server-utils': 11.0.0-rc.0
+
+  '@sentry/server-utils@10.65.0':
     dependencies:
       '@apm-js-collab/code-transformer': 0.15.0
       '@apm-js-collab/code-transformer-bundler-plugins': 0.5.0
-      '@apm-js-collab/tracing-hooks': 0.10.1(supports-color@8.1.1)
+      '@apm-js-collab/tracing-hooks': 0.10.1
       '@sentry/conventions': 0.15.1
       '@sentry/core': 10.65.0
       magic-string: 0.30.21
@@ -10901,11 +10985,11 @@ snapshots:
       '@sentry/conventions': 0.16.0
       '@sentry/core': 10.75.0
 
-  '@sentry/server-utils@11.0.0-alpha.2':
+  '@sentry/server-utils@11.0.0-rc.0':
     dependencies:
       '@opentelemetry/api': 1.9.1
-      '@sentry/conventions': 0.20.0
-      '@sentry/core': 11.0.0-alpha.2
+      '@sentry/conventions': 0.23.0
+      '@sentry/core': 11.0.0-rc.0
 
   '@sentry/sqlish@1.0.1(react@19.2.8)':
     optionalDependencies:
@@ -11046,7 +11130,7 @@ snapshots:
       '@jridgewell/trace-mapping': 0.3.29
       '@modelcontextprotocol/sdk': 1.30.0(@cfworker/json-schema@4.1.1)(zod@4.6.5)
       '@sentry/core': 10.63.0(patch_hash=e663994979ff877a26ab6d4dea5968fbaee4ccdfdeb85623983535a572678940)
-      '@sentry/node': 10.65.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(supports-color@8.1.1)
+      '@sentry/node': 10.65.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))
       anser: 2.3.5
       chalk: 5.6.2
       eventsource: 4.1.1
@@ -11344,6 +11428,21 @@ snapshots:
       tinyrainbow: 3.1.0
       vitest: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.20.3)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@22.20.3)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
+  '@vitest/coverage-v8@4.1.11(vitest@4.1.11)':
+    dependencies:
+      '@bcoe/v8-coverage': 1.0.2
+      '@vitest/utils': 4.1.11
+      ast-v8-to-istanbul: 1.0.6
+      istanbul-lib-coverage: 3.2.2
+      istanbul-lib-report: 3.0.1
+      istanbul-reports: 3.2.0
+      magicast: 0.5.5
+      obug: 2.1.1
+      std-env: 4.0.0
+      tinyrainbow: 3.1.0
+      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
+    optional: true
+
   '@vitest/expect@4.1.10':
     dependencies:
       '@standard-schema/spec': 1.1.0
@@ -11353,23 +11452,14 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.1.10(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))':
+  '@vitest/expect@4.1.11':
     dependencies:
-      '@vitest/spy': 4.1.10
-      estree-walker: 3.0.3
-      magic-string: 0.30.21
-    optionalDependencies:
-      msw: 2.10.2(@types/node@22.16.0)(typescript@5.8.3)
-      vite: 8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0)
-
-  '@vitest/mocker@4.1.10(msw@2.10.2(@types/node@22.16.0)(typescript@5.9.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))':
-    dependencies:
-      '@vitest/spy': 4.1.10
-      estree-walker: 3.0.3
-      magic-string: 0.30.21
-    optionalDependencies:
-      msw: 2.10.2(@types/node@22.16.0)(typescript@5.9.3)
-      vite: 8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
+      '@standard-schema/spec': 1.1.0
+      '@types/chai': 5.2.2
+      '@vitest/spy': 4.1.11
+      '@vitest/utils': 4.1.11
+      chai: 6.2.2
+      tinyrainbow: 3.1.0
 
   '@vitest/mocker@4.1.10(msw@2.10.2(@types/node@22.20.3)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))':
     dependencies:
@@ -11380,27 +11470,45 @@ snapshots:
       msw: 2.10.2(@types/node@22.20.3)(typescript@5.9.3)
       vite: 8.3.0(@types/node@22.20.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
 
-  '@vitest/mocker@4.1.10(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))':
+  '@vitest/mocker@4.1.11(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))':
     dependencies:
-      '@vitest/spy': 4.1.10
+      '@vitest/spy': 4.1.11
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      msw: 2.10.2(@types/node@22.16.0)(typescript@5.8.3)
+      vite: 8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0)
+
+  '@vitest/mocker@4.1.11(msw@2.10.2(@types/node@22.16.0)(typescript@5.9.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))':
+    dependencies:
+      '@vitest/spy': 4.1.11
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      msw: 2.10.2(@types/node@22.16.0)(typescript@5.9.3)
+      vite: 8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
+
+  '@vitest/mocker@4.1.11(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))':
+    dependencies:
+      '@vitest/spy': 4.1.11
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
       msw: 2.10.2(@types/node@24.13.5)(typescript@5.8.3)
       vite: 8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0)
 
-  '@vitest/mocker@4.1.10(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))':
+  '@vitest/mocker@4.1.11(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))':
     dependencies:
-      '@vitest/spy': 4.1.10
+      '@vitest/spy': 4.1.11
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
       msw: 2.10.2(@types/node@24.13.5)(typescript@5.8.3)
       vite: 8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
 
-  '@vitest/mocker@4.1.10(msw@2.10.2(@types/node@24.13.5)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))':
+  '@vitest/mocker@4.1.11(msw@2.10.2(@types/node@24.13.5)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))':
     dependencies:
-      '@vitest/spy': 4.1.10
+      '@vitest/spy': 4.1.11
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
@@ -11420,6 +11528,11 @@ snapshots:
       '@vitest/utils': 4.1.10
       pathe: 2.0.3
 
+  '@vitest/runner@4.1.11':
+    dependencies:
+      '@vitest/utils': 4.1.11
+      pathe: 2.0.3
+
   '@vitest/snapshot@4.1.10':
     dependencies:
       '@vitest/pretty-format': 4.1.10
@@ -11427,7 +11540,16 @@ snapshots:
       magic-string: 0.30.21
       pathe: 2.0.3
 
+  '@vitest/snapshot@4.1.11':
+    dependencies:
+      '@vitest/pretty-format': 4.1.11
+      '@vitest/utils': 4.1.11
+      magic-string: 0.30.21
+      pathe: 2.0.3
+
   '@vitest/spy@4.1.10': {}
+
+  '@vitest/spy@4.1.11': {}
 
   '@vitest/utils@4.1.10':
     dependencies:
@@ -12605,6 +12727,10 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.5
 
+  fdir@6.5.0(picomatch@4.0.7):
+    optionalDependencies:
+      picomatch: 4.0.7
+
   fflate@0.8.3: {}
 
   figures@6.1.0:
@@ -13013,6 +13139,8 @@ snapshots:
       hono: 4.12.34
 
   hono@4.12.34: {}
+
+  hono@4.13.8: {}
 
   hookable@5.5.3: {}
 
@@ -13494,7 +13622,7 @@ snapshots:
 
   magic-string@0.30.21:
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
 
   magic-string@0.30.8:
     dependencies:
@@ -14897,7 +15025,7 @@ snapshots:
 
   rfdc@1.4.1: {}
 
-  rolldown-plugin-dts@0.13.13(rolldown@1.0.0-beta.23)(supports-color@8.1.1)(typescript@5.8.3):
+  rolldown-plugin-dts@0.13.13(rolldown@1.0.0-beta.23)(typescript@5.8.3):
     dependencies:
       '@babel/generator': 7.28.0
       '@babel/parser': 7.28.0
@@ -15440,8 +15568,8 @@ snapshots:
 
   tinyglobby@0.2.15:
     dependencies:
-      fdir: 6.5.0(picomatch@4.0.5)
-      picomatch: 4.0.5
+      fdir: 6.5.0(picomatch@4.0.7)
+      picomatch: 4.0.7
 
   tinyglobby@0.2.17:
     dependencies:
@@ -15489,7 +15617,7 @@ snapshots:
     dependencies:
       typescript: 5.7.3
 
-  tsdown@0.12.9(supports-color@8.1.1)(typescript@5.8.3):
+  tsdown@0.12.9(typescript@5.8.3):
     dependencies:
       ansis: 4.1.0
       cac: 6.7.14
@@ -15499,7 +15627,7 @@ snapshots:
       empathic: 2.0.0
       hookable: 5.5.3
       rolldown: 1.0.0-beta.23
-      rolldown-plugin-dts: 0.13.13(rolldown@1.0.0-beta.23)(supports-color@8.1.1)(typescript@5.8.3)
+      rolldown-plugin-dts: 0.13.13(rolldown@1.0.0-beta.23)(typescript@5.8.3)
       semver: 7.7.4
       tinyexec: 1.0.4
       tinyglobby: 0.2.15
@@ -15880,71 +16008,10 @@ snapshots:
     optionalDependencies:
       vite: 8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
 
-  vitest-evals@0.4.0(tinyrainbow@3.1.0)(vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))):
+  vitest-evals@0.4.0(tinyrainbow@3.1.0)(vitest@4.1.11):
     dependencies:
       tinyrainbow: 3.1.0
-      vitest: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
-
-  vitest-evals@0.4.0(tinyrainbow@3.1.0)(vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))):
-    dependencies:
-      tinyrainbow: 3.1.0
-      vitest: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
-
-  vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0)):
-    dependencies:
-      '@vitest/expect': 4.1.10
-      '@vitest/mocker': 4.1.10(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
-      '@vitest/pretty-format': 4.1.10
-      '@vitest/runner': 4.1.10
-      '@vitest/snapshot': 4.1.10
-      '@vitest/spy': 4.1.10
-      '@vitest/utils': 4.1.10
-      es-module-lexer: 2.0.0
-      expect-type: 1.3.0
-      magic-string: 0.30.21
-      obug: 2.1.1
-      pathe: 2.0.3
-      picomatch: 4.0.5
-      std-env: 4.0.0
-      tinybench: 2.9.0
-      tinyexec: 1.0.4
-      tinyglobby: 0.2.17
-      tinyrainbow: 3.1.0
-      vite: 8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0)
-      why-is-node-running: 2.3.0
-    optionalDependencies:
-      '@opentelemetry/api': 1.9.1
-      '@types/node': 22.16.0
-    transitivePeerDependencies:
-      - msw
-
-  vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(msw@2.10.2(@types/node@22.16.0)(typescript@5.9.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)):
-    dependencies:
-      '@vitest/expect': 4.1.10
-      '@vitest/mocker': 4.1.10(msw@2.10.2(@types/node@22.16.0)(typescript@5.9.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
-      '@vitest/pretty-format': 4.1.10
-      '@vitest/runner': 4.1.10
-      '@vitest/snapshot': 4.1.10
-      '@vitest/spy': 4.1.10
-      '@vitest/utils': 4.1.10
-      es-module-lexer: 2.0.0
-      expect-type: 1.3.0
-      magic-string: 0.30.21
-      obug: 2.1.1
-      pathe: 2.0.3
-      picomatch: 4.0.5
-      std-env: 4.0.0
-      tinybench: 2.9.0
-      tinyexec: 1.0.4
-      tinyglobby: 0.2.17
-      tinyrainbow: 3.1.0
-      vite: 8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
-      why-is-node-running: 2.3.0
-    optionalDependencies:
-      '@opentelemetry/api': 1.9.1
-      '@types/node': 22.16.0
-    transitivePeerDependencies:
-      - msw
+      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
 
   vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.20.3)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@22.20.3)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)):
     dependencies:
@@ -15975,24 +16042,82 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0)):
+  vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0)):
     dependencies:
-      '@vitest/expect': 4.1.10
-      '@vitest/mocker': 4.1.10(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
-      '@vitest/pretty-format': 4.1.10
-      '@vitest/runner': 4.1.10
-      '@vitest/snapshot': 4.1.10
-      '@vitest/spy': 4.1.10
-      '@vitest/utils': 4.1.10
-      es-module-lexer: 2.0.0
+      '@vitest/expect': 4.1.11
+      '@vitest/mocker': 4.1.11(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
+      '@vitest/pretty-format': 4.1.11
+      '@vitest/runner': 4.1.11
+      '@vitest/snapshot': 4.1.11
+      '@vitest/spy': 4.1.11
+      '@vitest/utils': 4.1.11
+      es-module-lexer: 2.3.2
       expect-type: 1.3.0
       magic-string: 0.30.21
       obug: 2.1.1
       pathe: 2.0.3
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       std-env: 4.0.0
       tinybench: 2.9.0
-      tinyexec: 1.0.4
+      tinyexec: 1.3.1
+      tinyglobby: 0.2.17
+      tinyrainbow: 3.1.0
+      vite: 8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0)
+      why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.1
+      '@types/node': 22.16.0
+      '@vitest/coverage-v8': 4.1.11(vitest@4.1.11)
+    transitivePeerDependencies:
+      - msw
+
+  vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.16.0)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@22.16.0)(typescript@5.9.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)):
+    dependencies:
+      '@vitest/expect': 4.1.11
+      '@vitest/mocker': 4.1.11(msw@2.10.2(@types/node@22.16.0)(typescript@5.9.3))(vite@8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+      '@vitest/pretty-format': 4.1.11
+      '@vitest/runner': 4.1.11
+      '@vitest/snapshot': 4.1.11
+      '@vitest/spy': 4.1.11
+      '@vitest/utils': 4.1.11
+      es-module-lexer: 2.3.2
+      expect-type: 1.3.0
+      magic-string: 0.30.21
+      obug: 2.1.1
+      pathe: 2.0.3
+      picomatch: 4.0.7
+      std-env: 4.0.0
+      tinybench: 2.9.0
+      tinyexec: 1.3.1
+      tinyglobby: 0.2.17
+      tinyrainbow: 3.1.0
+      vite: 8.3.0(@types/node@22.16.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
+      why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.1
+      '@types/node': 22.16.0
+      '@vitest/coverage-v8': 4.1.11(vitest@4.1.11)
+    transitivePeerDependencies:
+      - msw
+
+  vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0)):
+    dependencies:
+      '@vitest/expect': 4.1.11
+      '@vitest/mocker': 4.1.11(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0))
+      '@vitest/pretty-format': 4.1.11
+      '@vitest/runner': 4.1.11
+      '@vitest/snapshot': 4.1.11
+      '@vitest/spy': 4.1.11
+      '@vitest/utils': 4.1.11
+      es-module-lexer: 2.3.2
+      expect-type: 1.3.0
+      magic-string: 0.30.21
+      obug: 2.1.1
+      pathe: 2.0.3
+      picomatch: 4.0.7
+      std-env: 4.0.0
+      tinybench: 2.9.0
+      tinyexec: 1.3.1
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
       vite: 8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.20.3)(yaml@2.9.0)
@@ -16000,27 +16125,28 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
       '@types/node': 24.13.5
+      '@vitest/coverage-v8': 4.1.11(vitest@4.1.11)
     transitivePeerDependencies:
       - msw
 
-  vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)):
+  vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)):
     dependencies:
-      '@vitest/expect': 4.1.10
-      '@vitest/mocker': 4.1.10(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
-      '@vitest/pretty-format': 4.1.10
-      '@vitest/runner': 4.1.10
-      '@vitest/snapshot': 4.1.10
-      '@vitest/spy': 4.1.10
-      '@vitest/utils': 4.1.10
-      es-module-lexer: 2.0.0
+      '@vitest/expect': 4.1.11
+      '@vitest/mocker': 4.1.11(msw@2.10.2(@types/node@24.13.5)(typescript@5.8.3))(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+      '@vitest/pretty-format': 4.1.11
+      '@vitest/runner': 4.1.11
+      '@vitest/snapshot': 4.1.11
+      '@vitest/spy': 4.1.11
+      '@vitest/utils': 4.1.11
+      es-module-lexer: 2.3.2
       expect-type: 1.3.0
       magic-string: 0.30.21
       obug: 2.1.1
       pathe: 2.0.3
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       std-env: 4.0.0
       tinybench: 2.9.0
-      tinyexec: 1.0.4
+      tinyexec: 1.3.1
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
       vite: 8.3.0(@types/node@24.13.5)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
@@ -16028,27 +16154,28 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
       '@types/node': 24.13.5
+      '@vitest/coverage-v8': 4.1.11(vitest@4.1.11)
     transitivePeerDependencies:
       - msw
 
-  vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(msw@2.10.2(@types/node@24.13.5)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3)):
+  vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/coverage-v8@4.1.11)(msw@2.10.2(@types/node@24.13.5)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3)):
     dependencies:
-      '@vitest/expect': 4.1.10
-      '@vitest/mocker': 4.1.10(msw@2.10.2(@types/node@24.13.5)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))
-      '@vitest/pretty-format': 4.1.10
-      '@vitest/runner': 4.1.10
-      '@vitest/snapshot': 4.1.10
-      '@vitest/spy': 4.1.10
-      '@vitest/utils': 4.1.10
-      es-module-lexer: 2.0.0
+      '@vitest/expect': 4.1.11
+      '@vitest/mocker': 4.1.11(msw@2.10.2(@types/node@24.13.5)(typescript@5.9.3))(vite@6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))
+      '@vitest/pretty-format': 4.1.11
+      '@vitest/runner': 4.1.11
+      '@vitest/snapshot': 4.1.11
+      '@vitest/spy': 4.1.11
+      '@vitest/utils': 4.1.11
+      es-module-lexer: 2.3.2
       expect-type: 1.3.0
       magic-string: 0.30.21
       obug: 2.1.1
       pathe: 2.0.3
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       std-env: 4.0.0
       tinybench: 2.9.0
-      tinyexec: 1.0.4
+      tinyexec: 1.3.1
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
       vite: 6.3.5(@types/node@24.13.5)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3)
@@ -16056,6 +16183,7 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
       '@types/node': 24.13.5
+      '@vitest/coverage-v8': 4.1.11(vitest@4.1.11)
     transitivePeerDependencies:
       - msw
 
@@ -16126,7 +16254,7 @@ snapshots:
       '@silvia-odwyer/photon-node': 0.3.4
       chalk: 5.4.1
       fs-extra: 11.3.0
-      hono: 4.12.34
+      hono: 4.13.8
       jsdoc-api: 9.3.4
       just-filter-object: 3.2.0
       just-map-values: 3.2.0
