@@ -107,3 +107,4 @@ minimumReleaseAgeExclude:
 
 patchedDependencies:
   '@cloudflare/workers-oauth-provider@0.10.3': patches/@cloudflare__workers-oauth-provider@0.10.3.patch
+  '@modelcontextprotocol/server@2.0.0': patches/@modelcontextprotocol__server@2.0.0.patch

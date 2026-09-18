@@ -184,6 +184,7 @@ overrides:
 
 patchedDependencies:
   '@cloudflare/workers-oauth-provider@0.10.3': 34910b67929c1888b1492384c514d6baeedc4a439f66e21375dee5af404834f8
+  '@modelcontextprotocol/server@2.0.0': 27c78dc97f049b09f34e6a8448ec10665d26f1983e1920e1c20e43f9e7d6057b
 
 importers:
 
@@ -252,7 +253,7 @@ importers:
         version: 1.30.0(@cfworker/json-schema@4.1.1)(supports-color@8.1.1)(zod@4.4.3)
       '@modelcontextprotocol/server':
         specifier: 'catalog:'
-        version: 2.0.0
+        version: 2.0.0(patch_hash=27c78dc97f049b09f34e6a8448ec10665d26f1983e1920e1c20e43f9e7d6057b)
       '@radix-ui/react-accordion':
         specifier: 'catalog:'
         version: 1.2.20(@types/react-dom@19.1.6(@types/react@19.1.8))(@types/react@19.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -267,7 +268,7 @@ importers:
         version: 11.0.0-rc.0(react-router@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       agents:
         specifier: 'catalog:'
-        version: 0.20.1(@ai-sdk/react@3.0.232(react@19.2.8)(zod@4.4.3))(@babel/core@7.28.0)(@babel/runtime@7.28.4)(@cloudflare/workers-types@4.20260405.1)(@modelcontextprotocol/client@2.0.0)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@8.1.1)(zod@4.4.3))(@modelcontextprotocol/server@2.0.0)(ai@6.0.64(zod@4.4.3))(react@19.2.8)(rolldown@1.0.0-beta.23)(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))(zod@4.4.3)
+        version: 0.20.1(@ai-sdk/react@3.0.232(react@19.2.8)(zod@4.4.3))(@babel/core@7.28.0)(@babel/runtime@7.28.4)(@cloudflare/workers-types@4.20260405.1)(@modelcontextprotocol/client@2.0.0)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@8.1.1)(zod@4.4.3))(@modelcontextprotocol/server@2.0.0(patch_hash=27c78dc97f049b09f34e6a8448ec10665d26f1983e1920e1c20e43f9e7d6057b))(ai@6.0.64(zod@4.4.3))(react@19.2.8)(rolldown@1.0.0-beta.23)(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))(zod@4.4.3)
       ai:
         specifier: 'catalog:'
         version: 6.0.64(zod@4.4.3)
@@ -400,7 +401,7 @@ importers:
         version: 1.30.0(@cfworker/json-schema@4.1.1)(supports-color@8.1.1)(zod@4.4.3)
       '@modelcontextprotocol/server':
         specifier: 'catalog:'
-        version: 2.0.0
+        version: 2.0.0(patch_hash=27c78dc97f049b09f34e6a8448ec10665d26f1983e1920e1c20e43f9e7d6057b)
       '@sentry/core':
         specifier: 'catalog:'
         version: 11.0.0-rc.0
@@ -6537,7 +6538,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@modelcontextprotocol/server@2.0.0':
+  '@modelcontextprotocol/server@2.0.0(patch_hash=27c78dc97f049b09f34e6a8448ec10665d26f1983e1920e1c20e43f9e7d6057b)':
     dependencies:
       '@modelcontextprotocol/core': 2.0.0
       zod: 4.4.3
@@ -7356,13 +7357,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  agents@0.20.1(@ai-sdk/react@3.0.232(react@19.2.8)(zod@4.4.3))(@babel/core@7.28.0)(@babel/runtime@7.28.4)(@cloudflare/workers-types@4.20260405.1)(@modelcontextprotocol/client@2.0.0)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@8.1.1)(zod@4.4.3))(@modelcontextprotocol/server@2.0.0)(ai@6.0.64(zod@4.4.3))(react@19.2.8)(rolldown@1.0.0-beta.23)(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))(zod@4.4.3):
+  agents@0.20.1(@ai-sdk/react@3.0.232(react@19.2.8)(zod@4.4.3))(@babel/core@7.28.0)(@babel/runtime@7.28.4)(@cloudflare/workers-types@4.20260405.1)(@modelcontextprotocol/client@2.0.0)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@8.1.1)(zod@4.4.3))(@modelcontextprotocol/server@2.0.0(patch_hash=27c78dc97f049b09f34e6a8448ec10665d26f1983e1920e1c20e43f9e7d6057b))(ai@6.0.64(zod@4.4.3))(react@19.2.8)(rolldown@1.0.0-beta.23)(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))(zod@4.4.3):
     dependencies:
       '@babel/plugin-proposal-decorators': 8.0.2(@babel/core@7.28.0)
       '@cfworker/json-schema': 4.1.1
       '@modelcontextprotocol/client': 2.0.0
       '@modelcontextprotocol/sdk': 1.30.0(@cfworker/json-schema@4.1.1)(supports-color@8.1.1)(zod@4.4.3)
-      '@modelcontextprotocol/server': 2.0.0
+      '@modelcontextprotocol/server': 2.0.0(patch_hash=27c78dc97f049b09f34e6a8448ec10665d26f1983e1920e1c20e43f9e7d6057b)
       '@rolldown/plugin-babel': 0.2.3(@babel/core@7.28.0)(@babel/runtime@7.28.4)(rolldown@1.0.0-beta.23)(vite@6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.32.0)(tsx@4.20.3)(yaml@2.8.3))
       cron-schedule: 6.0.0
       esbuild: 0.28.1
