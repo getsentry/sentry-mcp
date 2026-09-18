@@ -298,12 +298,29 @@ describe("classifySilenced", () => {
     expect(classifySilenced(err)).toBeNull();
   });
 
+  test("silences ValidationError with field 'project.ambiguous_org'", () => {
+    // A project slug that exists in multiple orgs is user-input ambiguity, not
+    // a CLI bug. Silence it so it doesn't pollute the issue tracker.
+    expect(
+      classifySilenced(
+        new ValidationError(
+          'Project "webapp-backend" exists in multiple organizations.',
+          "project.ambiguous_org"
+        )
+      )
+    ).toBe("user_validation");
+  });
+
   test.each([
     [
       "ResolutionError",
       new ResolutionError("Project 'x'", "not found", "sentry issue list"),
     ],
-    ["ValidationError", new ValidationError("bad")],
+    ["ValidationError (no field)", new ValidationError("bad")],
+    [
+      "ValidationError (other field)",
+      new ValidationError("Invalid trace ID", "trace_id"),
+    ],
     ["SeerError", new SeerError("not_enabled")],
     ["ConfigError", new ConfigError("bad")],
     ["generic Error", new Error("boom")],
