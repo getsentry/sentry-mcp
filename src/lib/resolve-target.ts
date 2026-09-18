@@ -1826,7 +1826,8 @@ export async function resolveProjectBySlug(
       : "";
     throw new ValidationError(
       `Project "${displaySlug}" exists in multiple organizations.\n\n` +
-        `Specify the organization:\n${orgList}${example}`
+        `Specify the organization:\n${orgList}${example}`,
+      "project.ambiguous_org"
     );
   }
   const foundProject = projects[0] as (typeof projects)[0];
