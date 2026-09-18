@@ -8,8 +8,16 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+      statuses: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -43,24 +51,126 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Determine package scope
+        id: scope
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "all=true" >> "$GITHUB_OUTPUT"
+            echo "cli=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "all=false" >> "$GITHUB_OUTPUT"
+          echo "base=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "cli=false" >> "$GITHUB_OUTPUT"
+          git diff --name-only "$BASE_SHA" HEAD > "$RUNNER_TEMP/changed-paths"
+          git diff --diff-filter=D --name-only "$BASE_SHA" HEAD > "$RUNNER_TEMP/deleted-paths"
+
+          if grep -q '^packages/cli/' "$RUNNER_TEMP/changed-paths"; then
+            echo "cli=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          if grep -Eq '^(package.json|pnpm-lock.yaml|pnpm-workspace.yaml|\.github/workflows/test\.yml)$' "$RUNNER_TEMP/changed-paths"; then
+            echo "all=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          if grep -Eq '^(apps|packages)/[^/]+/package.json$' "$RUNNER_TEMP/deleted-paths"; then
+            echo "all=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run build
-        run: pnpm build
+        env:
+          SENTRY_CLIENT_ID: ci-fork-pr-dummy
+        run: |
+          if [[ "${{ steps.scope.outputs.all }}" == "true" ]]; then
+            pnpm build
+          else
+            pnpm --filter "...[${{ steps.scope.outputs.base }}]..." --if-present run build
+            if [[ "${{ steps.scope.outputs.cli }}" == "true" ]]; then
+              pnpm --filter sentry-cli-docs run build
+            fi
+          fi
 
       - name: Check generated definitions
         run: pnpm run check:generated
 
       - name: Run type checking
-        run: pnpm -w run tsc
+        run: |
+          if [[ "${{ steps.scope.outputs.all }}" == "true" ]]; then
+            pnpm tsc
+          else
+            pnpm --filter "...[${{ steps.scope.outputs.base }}]" --if-present run tsc
+            pnpm --filter "...[${{ steps.scope.outputs.base }}]" --if-present run typecheck
+          fi
 
       - name: Run linter
-        run: pnpm lint
+        run: |
+          if [[ "${{ steps.scope.outputs.all }}" == "true" ]]; then
+            pnpm lint
+            pnpm -r --if-present run lint
+          else
+            if grep -Eq '^(biome.json|sgconfig.yml|ast-grep-rules/|ast-grep-rule-tests/|packages/mcp-)' "$RUNNER_TEMP/changed-paths"; then
+              pnpm lint
+            fi
+            pnpm --filter "...[${{ steps.scope.outputs.base }}]" --if-present run lint
+          fi
 
       - name: Run tests
-        run: pnpm test:ci
+        run: |
+          if [[ "${{ steps.scope.outputs.all }}" == "true" ]]; then
+            pnpm -r --filter '!@sentry/mcp-smoke-tests' --if-present run test:ci
+            pnpm --filter sentry run test
+          else
+            pnpm --filter "...[${{ steps.scope.outputs.base }}]" --filter '!@sentry/mcp-smoke-tests' --if-present run test:ci
+            if [[ "${{ steps.scope.outputs.cli }}" == "true" ]]; then
+              pnpm --filter sentry run test
+            fi
+          fi
+
+      - name: Verify CLI coverage report
+        if: ${{ steps.scope.outputs.all == 'true' || steps.scope.outputs.cli == 'true' }}
+        run: test -s packages/cli/coverage/lcov.info
+
+      - name: Publish CLI coverage report
+        if: ${{ steps.scope.outputs.all == 'true' || steps.scope.outputs.cli == 'true' }}
+        uses: getsentry/coverage-action@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: ./packages/cli/coverage/lcov.info
+          informational-patch: ${{ github.event_name == 'push' }}
+
+      - name: Run CLI policy checks
+        if: ${{ steps.scope.outputs.all == 'true' || steps.scope.outputs.cli == 'true' }}
+        run: |
+          pnpm --filter sentry run check:patches
+          pnpm --filter sentry run check:deps
+          pnpm --filter sentry run check:errors
+          pnpm --filter sentry run check:fragments
+          pnpm --filter sentry run check:docs-sections
+          pnpm --filter sentry run check:env-coverage
+          pnpm --filter sentry run check:stale-refs
+
+      - name: Setup Node.js for CLI E2E
+        if: ${{ steps.scope.outputs.all == 'true' || steps.scope.outputs.cli == 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+
+      - name: Run CLI E2E tests
+        if: ${{ steps.scope.outputs.all == 'true' || steps.scope.outputs.cli == 'true' }}
+        env:
+          SENTRY_CLI_BINARY: ${{ github.workspace }}/packages/cli/dist-bin/sentry-linux-x64
+        run: |
+          pnpm --filter sentry run test:e2e
 
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && hashFiles('**/*.junit.xml') != '' }}
         with:
           report_paths: "**/*.junit.xml"
           comment: false
