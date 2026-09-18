@@ -1615,7 +1615,8 @@ export class SentryApiService {
   async listOrganizations(params?: {
     query?: string;
     limit?: number;
-  }): Promise<OrganizationList> {
+    cursor?: string | null;
+  }): Promise<{ organizations: OrganizationList; nextCursor: string | null }> {
     const limit = params?.limit ?? 25;
 
     // Build query parameters
@@ -1623,6 +1624,9 @@ export class SentryApiService {
     queryParams.set("per_page", String(limit));
     if (params?.query) {
       queryParams.set("query", params.query);
+    }
+    if (params?.cursor) {
+      queryParams.set("cursor", params.cursor);
     }
     const queryString = queryParams.toString();
     const path = `/organizations/?${queryString}`;
@@ -1633,8 +1637,13 @@ export class SentryApiService {
       host = "sentry.io";
     }
 
-    const body = await this.requestJSON(path, undefined, { host });
-    return OrganizationListSchema.parse(body);
+    const response = await this.request(path, undefined, { host });
+    const body = await this.parseJsonResponse(response);
+
+    return {
+      organizations: OrganizationListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   /**
@@ -1665,20 +1674,28 @@ export class SentryApiService {
    */
   async listTeams(
     organizationSlug: string,
-    params?: { query?: string; limit?: number },
+    params?: { query?: string; limit?: number; cursor?: string | null },
     opts?: RequestOptions,
-  ): Promise<TeamList> {
+  ): Promise<{ teams: TeamList; nextCursor: string | null }> {
     const queryParams = new URLSearchParams();
     queryParams.set("per_page", String(params?.limit ?? 25));
     if (params?.query) {
       queryParams.set("query", params.query);
     }
+    if (params?.cursor) {
+      queryParams.set("cursor", params.cursor);
+    }
     const queryString = queryParams.toString();
     const teamsPath = apiPath`/organizations/${organizationSlug}/teams/`;
     const path = `${teamsPath}?${queryString}`;
 
-    const body = await this.requestJSON(path, undefined, opts);
-    return TeamListSchema.parse(body);
+    const response = await this.request(path, undefined, opts);
+    const body = await this.parseJsonResponse(response);
+
+    return {
+      teams: TeamListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   /**
@@ -1719,25 +1736,34 @@ export class SentryApiService {
    * @param params Query parameters
    * @param params.query Search query to filter projects by name/slug
    * @param params.limit Maximum number of projects to return
+   * @param params.cursor Pagination cursor from a previous call's nextCursor
    * @param opts Request options
-   * @returns Array of projects in the organization
+   * @returns Projects in the organization, plus a cursor for the next page (null once exhausted)
    */
   async listProjects(
     organizationSlug: string,
-    params?: { query?: string; limit?: number },
+    params?: { query?: string; limit?: number; cursor?: string | null },
     opts?: RequestOptions,
-  ): Promise<ProjectList> {
+  ): Promise<{ projects: ProjectList; nextCursor: string | null }> {
     const queryParams = new URLSearchParams();
     queryParams.set("per_page", String(params?.limit ?? 25));
     if (params?.query) {
       queryParams.set("query", params.query);
     }
+    if (params?.cursor) {
+      queryParams.set("cursor", params.cursor);
+    }
     const queryString = queryParams.toString();
     const projectsPath = apiPath`/organizations/${organizationSlug}/projects/`;
     const path = `${projectsPath}?${queryString}`;
 
-    const body = await this.requestJSON(path, undefined, opts);
-    return ProjectListSchema.parse(body);
+    const response = await this.request(path, undefined, opts);
+    const body = await this.parseJsonResponse(response);
+
+    return {
+      projects: ProjectListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   async listDashboards(
