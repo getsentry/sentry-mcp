@@ -150,6 +150,27 @@ export const DSN_ADDITIONAL_SKIP_DIRS: readonly string[] = [
   "__mocks__",
   "fixtures",
   "__fixtures__",
+  // OS / app-data and credential directories. Defence in depth: a DSN
+  // scan that falls back to $HOME (or runs anywhere near one of these)
+  // must never descend into OS app-data or secret stores. Reaching them
+  // trips security monitoring and opens sensitive files for the 8 KB
+  // content sniff. See getsentry/cli#1590.
+  // macOS / Windows OS app-data
+  "Library",
+  "AppData",
+  // SSH / GPG / cloud credentials
+  ".ssh",
+  ".gnupg",
+  ".aws",
+  ".azure",
+  ".kube",
+  ".docker",
+  // Password managers / secret stores
+  ".password-store",
+  ".gpg",
+  // XDG / user config + local data
+  ".config",
+  ".local",
 ];
 
 /**
