@@ -46,13 +46,40 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 
 /**
- * Read `patchedDependencies` from the workspace-root package.json.
+ * Read `patchedDependencies` from the workspace configuration.
  *
- * In the pnpm workspace, pnpm settings (`patchedDependencies`) are a
- * workspace-root-only concern, so they live in the root package.json (two
- * levels up from this package), not in this package's own manifest.
+ * pnpm 11 reads workspace-root settings from `pnpm-workspace.yaml`.
  */
-const ROOT_PKG_PATH = "../../package.json";
+const WORKSPACE_PATH = "../../pnpm-workspace.yaml";
+const PATCHED_DEPENDENCIES_SECTION = /^patchedDependencies:\n((?: {2}.+\n)*)/m;
+const PATCHED_DEPENDENCY_ENTRY = /^ {2}"([^"]+)": (\S+)$/;
+
+/**
+ * Parse the quoted scalar mapping used by the workspace's patchedDependencies.
+ *
+ * This intentionally accepts only the narrow representation maintained in the
+ * checked-in workspace file. Unexpected YAML fails closed instead of silently
+ * disabling patch verification.
+ */
+function parsePatchedDependencies(source: string): Record<string, string> {
+  const section = source.match(PATCHED_DEPENDENCIES_SECTION)?.[1];
+  if (section === undefined) {
+    throw new Error(`Missing patchedDependencies in ${WORKSPACE_PATH}`);
+  }
+
+  const patches: Record<string, string> = {};
+  for (const line of section.trimEnd().split("\n")) {
+    const entry = line.match(PATCHED_DEPENDENCY_ENTRY);
+    if (!entry) {
+      throw new Error(
+        `Unsupported patchedDependencies entry in ${WORKSPACE_PATH}: ${line}`
+      );
+    }
+    const [, key, patchPath] = entry;
+    patches[key] = patchPath;
+  }
+  return patches;
+}
 
 /**
  * Resolve an installed package file to the copy THIS package actually uses.
@@ -106,11 +133,9 @@ function resolvePackageFile(subpath: string): string | null {
   }
 }
 
-const pkg: {
-  pnpm?: { patchedDependencies?: Record<string, string> };
-} = JSON.parse(await readFile(ROOT_PKG_PATH, "utf-8"));
-
-const patches = pkg.pnpm?.patchedDependencies ?? {};
+const patches = parsePatchedDependencies(
+  await readFile(WORKSPACE_PATH, "utf-8")
+);
 const warnings: string[] = [];
 const errors: string[] = [];
 

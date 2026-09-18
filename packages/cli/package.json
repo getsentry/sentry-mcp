@@ -56,7 +56,7 @@
     "build": "pnpm run generate:schema && pnpm run generate:docs && pnpm run generate:sdk && pnpm tsx script/build.ts --single",
     "build:all": "pnpm run generate:schema && pnpm run generate:docs && pnpm run generate:sdk && pnpm tsx script/build.ts",
     "bundle": "pnpm run generate:schema && pnpm run generate:docs && pnpm run generate:sdk && pnpm tsx script/bundle.ts",
-    "typecheck": "pnpm run generate:docs && pnpm run generate:sdk && tsc --noEmit",
+    "typecheck": "pnpm run generate:schema && pnpm run generate:docs && pnpm run generate:sdk && tsc --noEmit",
     "lint": "biome check --no-errors-on-unmatched --error-on-warnings --max-diagnostics=none ./",
     "lint:fix": "biome check --write --no-errors-on-unmatched --max-diagnostics=none ./",
     "test": "pnpm run test:unit",
