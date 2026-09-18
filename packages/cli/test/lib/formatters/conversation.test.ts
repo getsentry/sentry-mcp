@@ -113,12 +113,36 @@ describe("formatConversationTable", () => {
     expect(result).toContain("—");
   });
 
+  test("links conversation IDs to Sentry", () => {
+    const previousPlainOutput = process.env.SENTRY_PLAIN_OUTPUT;
+    process.env.SENTRY_PLAIN_OUTPUT = "0";
+    try {
+      const webUrl =
+        "https://sentry.io/organizations/test-org/explore/agents/conversations/conv-abc-123/";
+      const result = formatConversationTable([makeListItem({ webUrl })]);
+      expect(result).toContain(`]8;;${webUrl}`);
+    } finally {
+      if (previousPlainOutput === undefined) {
+        delete process.env.SENTRY_PLAIN_OUTPUT;
+      } else {
+        process.env.SENTRY_PLAIN_OUTPUT = previousPlainOutput;
+      }
+    }
+  });
+
   test("truncates long conversation IDs", () => {
     const longId = "a".repeat(60);
     const items = [makeListItem({ conversationId: longId })];
     const result = formatConversationTable(items);
     expect(result).not.toContain(longId);
     expect(result).toContain("…");
+  });
+
+  test("keeps UUID conversation IDs intact on narrow terminals", () => {
+    setTerminalWidth(80);
+    const conversationId = "123e4567-e89b-12d3-a456-426614174000";
+    const result = formatConversationTable([makeListItem({ conversationId })]);
+    expect(result).toContain(conversationId);
   });
 
   test("formats timestamps correctly (not 1970)", () => {

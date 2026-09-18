@@ -1706,7 +1706,7 @@ describe("traces.ts (transactions)", () => {
             id: "evt-1",
             transaction: "GET /api/users",
             timestamp: "2024-01-01T00:00:00Z",
-            "transaction.duration": 150,
+            "span.duration": 150,
             project: "test-project",
           },
         ],
@@ -1717,7 +1717,8 @@ describe("traces.ts (transactions)", () => {
         const req = new Request(input!, init);
         const url = new URL(req.url);
         expect(url.pathname).toContain("/organizations/test-org/events/");
-        expect(url.searchParams.get("dataset")).toBe("transactions");
+        expect(url.searchParams.get("dataset")).toBe("spans");
+        expect(url.searchParams.get("query")).toContain("is_transaction:true");
         expect(url.searchParams.get("query")).toContain("project:test-project");
         return new Response(JSON.stringify(txnResponse), {
           status: 200,
@@ -1763,7 +1764,7 @@ describe("traces.ts (transactions)", () => {
       globalThis.fetch = mockFetch(async (input, init) => {
         const req = new Request(input!, init);
         const url = new URL(req.url);
-        expect(url.searchParams.get("sort")).toBe("-transaction.duration");
+        expect(url.searchParams.get("sort")).toBe("-span.duration");
         expect(url.searchParams.get("statsPeriod")).toBe("24h");
         return new Response(JSON.stringify(txnResponse), {
           status: 200,

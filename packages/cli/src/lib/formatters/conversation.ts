@@ -46,8 +46,12 @@ const WIDE_TABLE_MIN_TERM_WIDTH = 100;
 
 const ID_COLUMN: Column<ConversationListItem> = {
   header: "ID",
-  value: (c) => escapeMarkdownCell(truncate(c.conversationId, 40)),
+  value: (c) => {
+    const id = escapeMarkdownCell(truncate(c.conversationId, 40));
+    return c.webUrl ? `[${id}](${c.webUrl})` : id;
+  },
   truncate: true,
+  shrinkable: false,
 };
 
 const TITLE_COLUMN: Column<ConversationListItem> = {

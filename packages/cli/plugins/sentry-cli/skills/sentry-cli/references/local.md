@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-local
-version: 0.45.0
+version: 0.46.0-dev.0
 description: Sentry for local development
 requires:
   bins: ["sentry"]
@@ -56,6 +56,12 @@ sentry local -f error -f log
 
 # Run quietly (suppress per-envelope tail output)
 sentry local --quiet
+
+# Start the server and open the UI
+sentry local --open
+
+# Run your app with the UI
+sentry local run --open -- npm run dev
 
 sentry local -f error -f log    # only errors and logs
 

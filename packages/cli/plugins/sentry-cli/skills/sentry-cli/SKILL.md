@@ -1,6 +1,6 @@
 ---
 name: sentry-cli
-version: 0.45.0
+version: 0.46.0-dev.0
 description: Guide for using the Sentry CLI to interact with Sentry from the command line. Use when the user asks about viewing issues, events, projects, organizations, making API calls, or authenticating with Sentry via CLI.
 requires:
   bins: ["sentry"]
@@ -702,6 +702,14 @@ Browse the Sentry API schema
 - `sentry schema <resource...>` — Browse the Sentry API schema
 
 → Full flags and examples: `references/schema.md`
+
+### Wasm-split
+
+Add build ids to WebAssembly modules and split out debug data
+
+- `sentry wasm-split <input>` — Add build ids to WebAssembly modules and split out debug data
+
+→ Full flags and examples: `references/wasm-split.md`
 
 ## Global Options
 
