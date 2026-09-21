@@ -35,4 +35,7 @@ sentry replay view my-org/frontend/346789a703f6454384f1de473b8b9fcc
 
 # Open a replay in the browser
 sentry replay view my-org/346789a703f6454384f1de473b8b9fcc --web
+
+# View the replay linked to a trace
+sentry replay view my-org/frontend/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ```
