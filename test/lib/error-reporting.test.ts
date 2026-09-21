@@ -311,11 +311,15 @@ describe("classifySilenced", () => {
     ).toBe("user_validation");
   });
 
+  test("silences ResolutionError (user provided a value that wasn't found)", () => {
+    expect(
+      classifySilenced(
+        new ResolutionError("Project 'x'", "not found", "sentry issue list")
+      )
+    ).toBe("user_input_error");
+  });
+
   test.each([
-    [
-      "ResolutionError",
-      new ResolutionError("Project 'x'", "not found", "sentry issue list"),
-    ],
     ["ValidationError (no field)", new ValidationError("bad")],
     [
       "ValidationError (other field)",
@@ -525,14 +529,26 @@ describe("reportCliError integration", () => {
     expect(traceErr["cli_error.kind"]).not.toBe(eventErr["cli_error.kind"]);
   });
 
-  test("captures ResolutionError", () => {
+  test("silences ResolutionError and emits metric (CLI-RP)", () => {
+    // ResolutionError is user-input noise (value provided but not found),
+    // not a CLI bug — silence it so it doesn't pollute the issue tracker.
     const err = new ResolutionError(
       "Project 'x'",
       "not found",
       "sentry issue list <org>/x"
     );
     reportCliError(err);
-    expect(captureSpy).toHaveBeenCalledWith(err);
+    expect(captureSpy).not.toHaveBeenCalled();
+    expect(metricSpy).toHaveBeenCalledWith(
+      "cli.error.silenced",
+      1,
+      expect.objectContaining({
+        attributes: expect.objectContaining({
+          error_class: "ResolutionError",
+          reason: "user_input_error",
+        }),
+      })
+    );
   });
 
   test("captures SeerError (marketing dashboard)", () => {

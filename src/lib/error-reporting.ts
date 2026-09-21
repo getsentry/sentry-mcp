@@ -56,7 +56,8 @@ type SilenceReason =
   | "api_user_error"
   | "network_error"
   | "process_exit"
-  | "user_validation";
+  | "user_validation"
+  | "user_input_error";
 
 /**
  * Classify whether an error should be silenced.
@@ -102,6 +103,12 @@ export function classifySilenced(error: unknown): SilenceReason | null {
     error.field === "project.ambiguous_org"
   ) {
     return "user_validation";
+  }
+  // A ResolutionError means the user provided a value (event ID, project slug,
+  // etc.) that was looked up but not found. This is pure user-input noise, not
+  // a CLI bug — the user sees a clear "not found" message (CLI-RP).
+  if (error instanceof ResolutionError) {
+    return "user_input_error";
   }
   if (error instanceof ApiError && error.status > 400 && error.status < 500) {
     return "api_user_error";
