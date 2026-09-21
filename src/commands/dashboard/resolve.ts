@@ -696,7 +696,6 @@ async function build404Error(
       "Check the dashboard ID or title with: sentry dashboard list",
     ];
     if (ctx.orgSlug) {
-      // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
       try {
         const { data } = await listDashboardsPaginated(ctx.orgSlug, {
           perPage: MAX_404_SUGGESTIONS,
@@ -707,8 +706,8 @@ async function build404Error(
           );
           alternatives.push(`Available dashboards:\n${lines.join("\n")}`);
         }
-      } catch {
-        // Suggestion fetch failed — don't mask the original error
+      } catch (error) {
+        log.debug("Suggestion fetch failed for 404 alternatives", error);
       }
     }
     throw new ResolutionError(
