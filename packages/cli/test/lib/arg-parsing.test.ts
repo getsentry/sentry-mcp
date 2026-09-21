@@ -21,6 +21,8 @@ import {
 import { stripDsnOrgPrefix } from "../../src/lib/dsn/index.js";
 import { ValidationError } from "../../src/lib/errors.js";
 
+const PROJECT_LIST_OPTIONS = { allowProjectList: true } as const;
+
 describe("stripDsnOrgPrefix", () => {
   test("strips 'o' prefix from DSN-style org IDs", () => {
     expect(stripDsnOrgPrefix("o1081365")).toBe("1081365");
@@ -69,6 +71,64 @@ describe("parseOrgProjectArg", () => {
       org: "sentry",
       project: "spotlight-electron",
     });
+  });
+
+  test("comma-separated slugs return explicit with projects", () => {
+    expect(
+      parseOrgProjectArg("acme/frontend,backend", PROJECT_LIST_OPTIONS)
+    ).toEqual({
+      type: "explicit",
+      org: "acme",
+      project: "frontend",
+      projects: ["frontend", "backend"],
+    });
+  });
+
+  test("trims and de-duplicates comma-separated slugs", () => {
+    expect(
+      parseOrgProjectArg("acme/web, api,web", PROJECT_LIST_OPTIONS)
+    ).toEqual({
+      type: "explicit",
+      org: "acme",
+      project: "web",
+      projects: ["web", "api"],
+    });
+  });
+
+  test("trailing comma is treated as a single slug", () => {
+    expect(parseOrgProjectArg("acme/web,", PROJECT_LIST_OPTIONS)).toEqual({
+      type: "explicit",
+      org: "acme",
+      project: "web",
+    });
+  });
+
+  test("empty comma list throws ValidationError", () => {
+    expect(() => parseOrgProjectArg("acme/,,,", PROJECT_LIST_OPTIONS)).toThrow(
+      ValidationError
+    );
+    expect(() => parseOrgProjectArg("acme/,,,", PROJECT_LIST_OPTIONS)).toThrow(
+      "empty"
+    );
+  });
+
+  test("bare comma list is a single project-search slug", () => {
+    expect(parseOrgProjectArg("web,api")).toEqual({
+      type: "project-search",
+      projectSlug: "web,api",
+    });
+  });
+
+  test("comma-separated display names are rejected", () => {
+    expect(() =>
+      parseOrgProjectArg("acme/My App,Other App", PROJECT_LIST_OPTIONS)
+    ).toThrow("must be slugs");
+  });
+
+  test("invalid character in one comma token throws", () => {
+    expect(() =>
+      parseOrgProjectArg("acme/web,api?x", PROJECT_LIST_OPTIONS)
+    ).toThrow(ValidationError);
   });
 
   // Error case - verify specific message
