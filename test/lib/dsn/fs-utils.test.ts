@@ -85,6 +85,26 @@ describe("handleFileError", () => {
       });
       expect(captureException).not.toHaveBeenCalled();
     });
+
+    test("UNKNOWN code — non-POSIX error with UNKNOWN code", () => {
+      handleFileError(errnoError("UNKNOWN", "Unknown system error -11"), {
+        operation: "scandir",
+        path: "/Users/austin/Documents/app-audit.trace",
+      });
+      expect(captureException).not.toHaveBeenCalled();
+    });
+
+    test("Unknown system error — macOS non-POSIX errno with no standard code", () => {
+      const err = new Error(
+        "Unknown system error -11: Unknown system error -11, scandir '/Users/austin/Documents/app-audit.trace'"
+      ) as NodeJS.ErrnoException;
+      // No code property — Node.js couldn't map errno to a POSIX name
+      handleFileError(err, {
+        operation: "scandir",
+        path: "/Users/austin/Documents/app-audit.trace",
+      });
+      expect(captureException).not.toHaveBeenCalled();
+    });
   });
 
   describe("unexpected errors (SHOULD report to Sentry)", () => {
