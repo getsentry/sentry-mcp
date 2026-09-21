@@ -198,6 +198,35 @@ sentry release deploy my-org/1.0.0 production
 - `--auto` requires a Sentry repository integration (GitHub/GitLab/Bitbucket) **and** a local git checkout. It matches your `origin` remote against Sentry's repo list. Without a checkout, use `--local`.
 - With no flag, `set-commits` tries `--auto` first and falls back to `--local` on failure.
 
+### View Agent Conversations
+
+```bash
+# List recent agent conversations (org auto-detected)
+sentry agent-conversation list
+
+# Explicit org, last 24 hours
+sentry agent-conversation list my-org --period 24h
+
+# View a conversation transcript
+sentry agent-conversation view my-org/conv-123
+
+# JSON output for programmatic access
+sentry agent-conversation view conv-123 --json
+```
+
+### Process WebAssembly Modules
+
+```bash
+# Add a build id to a wasm module (no auth required)
+sentry wasm-split app.wasm
+
+# Capture the build id for a later debug-files upload
+BUILD_ID=$(sentry wasm-split app.wasm)
+
+# Split debug data into a companion and strip the shipped binary
+sentry wasm-split app.wasm --debug-out app.debug.wasm --strip
+```
+
 ### Arbitrary API Access
 
 ```bash
