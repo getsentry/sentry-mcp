@@ -10,10 +10,13 @@
  * look up by `org_id = '1081365'` → get the slug).
  */
 
+import { logger } from "../logger.js";
 import { normalizeOrigin } from "../sentry-urls.js";
 import { recordCacheHit } from "../telemetry.js";
 import { getDatabase } from "./index.js";
 import { runUpsert } from "./utils.js";
+
+const log = logger.withTag("db.regions");
 
 const TABLE = "org_regions";
 
@@ -36,7 +39,6 @@ function seedTrustedRegionOriginsIfNeeded(): void {
     return;
   }
   trustedRegionOriginsSeeded = true;
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const db = getDatabase();
     const rows = db
@@ -48,9 +50,8 @@ function seedTrustedRegionOriginsIfNeeded(): void {
         trustedRegionOrigins.add(origin);
       }
     }
-  } catch {
-    // No DB / no table yet — first-run callers will populate via
-    // setOrgRegion(s) or registerTrustedRegionUrls.
+  } catch (error) {
+    log.debug("Failed to seed trusted region origins from DB", error);
   }
 }
 
