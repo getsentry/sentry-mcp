@@ -328,8 +328,10 @@ describe("viewCommand.func", () => {
     expect(getDetailedTraceSpy).toHaveBeenCalledWith(
       "my-org",
       "aaaa1111bbbb2222cccc3333dddd4444",
-      expect.any(Number),
       expect.objectContaining({ projectId: undefined })
+    );
+    expect(getDetailedTraceSpy.mock.calls[0]?.[2]).not.toHaveProperty(
+      "timestamp"
     );
   });
 
@@ -439,7 +441,6 @@ describe("viewCommand.func", () => {
     expect(getDetailedTraceSpy).toHaveBeenCalledWith(
       "test-org",
       traceIdFromEvent,
-      expect.any(Number),
       { additionalAttributes: undefined, projectId: undefined }
     );
 

@@ -86,13 +86,54 @@ export const REDUNDANT_DETAIL_ATTRS = new Set([
 // They are also re-exported from this module (see top of file) for callers
 // that already import from traces.ts.
 
+/**
+ * First lookup window when the event time is unknown.
+ * Matches the Sentry UI `DEFAULT_STATS_PERIOD`.
+ */
+export const TRACE_LOOKUP_STATS_PERIOD = "14d";
+
+/**
+ * Widened window if the first lookup returns no spans.
+ * Matches the Sentry UI `maxPickableDays` fallback (90 days).
+ */
+export const TRACE_LOOKUP_FALLBACK_STATS_PERIOD = "90d";
+
 /** Options for {@link getDetailedTrace}. */
 type GetDetailedTraceOptions = {
   /** Extra attribute names to include on each span */
   additionalAttributes?: string[];
   /** Numeric project ID to filter spans. Omit or -1 for all projects. */
   projectId?: number;
+  /**
+   * Unix timestamp (seconds) of a known event in this trace.
+   * The backend then searches ±1.5 days around it and does not widen.
+   * Pass this only when the event time is known (e.g. `dateCreated`) —
+   * never `Date.now()`.
+   */
+  timestamp?: number;
 };
+
+async function requestTrace(
+  regionUrl: string,
+  orgSlug: string,
+  traceId: string,
+  params: GetDetailedTraceOptions & { statsPeriod?: string }
+): Promise<TraceSpan[]> {
+  const { data } = await apiRequestToRegion<TraceSpan[]>(
+    regionUrl,
+    `/organizations/${orgSlug}/trace/${traceId}/`,
+    {
+      params: {
+        timestamp: params.timestamp,
+        statsPeriod: params.statsPeriod,
+        limit: 10_000,
+        project: params.projectId ?? -1,
+        additional_attributes: params.additionalAttributes,
+      },
+    }
+  );
+  return data.map(normalizeTraceSpan);
+}
 
 /**
  * Get detailed trace with nested children structure.
@@ -102,33 +143,49 @@ type GetDetailedTraceOptions = {
  * When `projectId` is provided, the API returns only spans belonging to that
  * project. Pass `-1` (or omit) to fetch spans from all projects.
  *
+ * Time window (matches the Sentry UI):
+ * - Known event `timestamp` → one query around that instant (no retry).
+ * - Unknown time → `statsPeriod=14d`, then `90d` if the first response is empty.
+ *
  * @param orgSlug - Organization slug
  * @param traceId - The trace ID (from event.contexts.trace.trace_id)
- * @param timestamp - Unix timestamp (seconds) from the event's dateCreated
- * @param options - Optional additional attributes and project filter
+ * @param options - Optional timestamp, additional attributes, and project filter
  * @returns Array of root spans with nested children
  */
 export async function getDetailedTrace(
   orgSlug: string,
   traceId: string,
-  timestamp: number,
   options: GetDetailedTraceOptions = {}
 ): Promise<TraceSpan[]> {
   const regionUrl = await resolveOrgRegion(orgSlug);
+  const shared = {
+    additionalAttributes: options.additionalAttributes,
+    projectId: options.projectId,
+  };
+  const timestamp =
+    options.timestamp !== undefined && Number.isFinite(options.timestamp)
+      ? options.timestamp
+      : undefined;
 
-  const { data } = await apiRequestToRegion<TraceSpan[]>(
-    regionUrl,
-    `/organizations/${orgSlug}/trace/${traceId}/`,
-    {
-      params: {
-        timestamp,
-        limit: 10_000,
-        project: options.projectId ?? -1,
-        additional_attributes: options.additionalAttributes,
-      },
-    }
+  if (timestamp !== undefined) {
+    return requestTrace(regionUrl, orgSlug, traceId, { ...shared, timestamp });
+  }
+
+  const spans = await requestTrace(regionUrl, orgSlug, traceId, {
+    ...shared,
+    statsPeriod: TRACE_LOOKUP_STATS_PERIOD,
+  });
+  if (spans.length > 0) {
+    return spans;
+  }
+
+  log.debug(
+    `No spans for trace ${traceId} in ${TRACE_LOOKUP_STATS_PERIOD}; retrying ${TRACE_LOOKUP_FALLBACK_STATS_PERIOD}`
   );
-  return data.map(normalizeTraceSpan);
+  return requestTrace(regionUrl, orgSlug, traceId, {
+    ...shared,
+    statsPeriod: TRACE_LOOKUP_FALLBACK_STATS_PERIOD,
+  });
 }
 
 type GetTraceItemDetailOptions = {
