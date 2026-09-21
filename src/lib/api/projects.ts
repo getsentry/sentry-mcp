@@ -40,6 +40,7 @@ import {
   MAX_PAGINATION_PAGES,
   ORG_FANOUT_CONCURRENCY,
   type PaginatedResponse,
+  paginate,
   unwrapPaginatedResult,
   unwrapResult,
 } from "./infrastructure.js";
@@ -90,6 +91,9 @@ export async function listProjects(orgSlug: string): Promise<SentryProject[]> {
  * Returns a single page of results with cursor metadata for manual pagination.
  * Uses region-aware routing for multi-region support.
  *
+ * `perPage` is capped at {@link API_MAX_PER_PAGE}: the org projects endpoint
+ * returns 400 for larger values instead of silently truncating.
+ *
  * @param orgSlug - Organization slug
  * @param options - Pagination options
  * @returns Single page of projects with cursor metadata
@@ -99,19 +103,43 @@ export async function listProjectsPaginated(
   options: { cursor?: string; perPage?: number } = {}
 ): Promise<PaginatedResponse<SentryProject[]>> {
   const config = await getOrgSdkConfig(orgSlug);
+  const perPage = Math.min(
+    options.perPage ?? API_MAX_PER_PAGE,
+    API_MAX_PER_PAGE
+  );
 
   const result = await listOrganizationProjects({
     ...config,
     path: { organization_id_or_slug: orgSlug },
     query: {
       cursor: options.cursor,
-      per_page: options.perPage ?? API_MAX_PER_PAGE,
+      per_page: perPage,
     } as { cursor?: string; per_page?: number },
   });
 
   return unwrapPaginatedResult<SentryProject[]>(
     result,
     "Failed to list projects"
+  );
+}
+
+/**
+ * List projects up to `limit`, auto-paginating when the limit exceeds
+ * {@link API_MAX_PER_PAGE}.
+ *
+ * Delegates to {@link paginate} so the `per_page` cap and cursor threading
+ * stay on the shared list helper (#1486).
+ *
+ * @param orgSlug - Organization slug
+ * @param options - Total item limit and optional resume cursor
+ * @returns Combined page of projects with optional next cursor
+ */
+export function listProjectsAllPages(
+  orgSlug: string,
+  options: { limit: number; cursor?: string }
+): Promise<PaginatedResponse<SentryProject[]>> {
+  return paginate(options, (perPage, cursor) =>
+    listProjectsPaginated(orgSlug, { cursor, perPage })
   );
 }
 

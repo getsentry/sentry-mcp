@@ -320,6 +320,13 @@ function mockProjectFetch(
 
     // listProjects / listProjectsPaginated (via /organizations/{org}/projects/)
     if (url.includes("/projects/")) {
+      const perPage = Number(new URL(url).searchParams.get("per_page") ?? "0");
+      if (perPage > 100) {
+        return new Response(JSON.stringify({ detail: "invalid per_page" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       const linkParts: string[] = [
         `<${url}>; rel="previous"; results="false"; cursor="0:0:1"`,
       ];
@@ -641,6 +648,67 @@ describe("handleOrgAll", () => {
 
     expect(result.header).toContain("--platform python");
     expect(result.header).toContain("-c next");
+  });
+
+  test("auto-paginates --limit above API per_page cap without sending per_page>100", async () => {
+    const total = 250;
+    const pool = Array.from({ length: total }, (_, i) =>
+      makeProject({
+        id: String(i + 1),
+        slug: `proj-${i}`,
+        name: `Project ${i}`,
+      })
+    );
+    const perPageValues: number[] = [];
+
+    // @ts-expect-error - partial mock
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      const parsed = new URL(req.url);
+      if (!parsed.pathname.includes("/projects/")) {
+        return new Response(JSON.stringify({ detail: "Not found" }), {
+          status: 404,
+        });
+      }
+
+      const perPage = Number(parsed.searchParams.get("per_page") ?? "0");
+      perPageValues.push(perPage);
+      expect(perPage).toBeGreaterThan(0);
+      expect(perPage).toBeLessThanOrEqual(100);
+
+      const cursor = parsed.searchParams.get("cursor");
+      const offset = cursor ? Number(cursor) : 0;
+      const page = pool.slice(offset, offset + perPage);
+      const nextOffset = offset + page.length;
+      const hasMore = nextOffset < total;
+      const linkParts = [
+        `<${parsed.href}>; rel="previous"; results="false"; cursor="0:0:1"`,
+        hasMore
+          ? `<${parsed.href}>; rel="next"; results="true"; cursor="${nextOffset}"`
+          : `<${parsed.href}>; rel="next"; results="false"; cursor="0:0:0"`,
+      ];
+      return new Response(JSON.stringify(page), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          Link: linkParts.join(", "),
+        },
+      });
+    };
+
+    const result = await handleOrgAll({
+      org: "test-org",
+      flags: { limit: 200, json: true, fresh: false },
+      contextKey: "type:org:test-org",
+      cursor: undefined,
+      direction: "next",
+    });
+
+    expect(result.items).toHaveLength(200);
+    expect(result.items[0]?.slug).toBe("proj-0");
+    expect(result.items[199]?.slug).toBe("proj-199");
+    expect(perPageValues).toEqual([100, 100]);
+    expect(result.hasMore).toBe(true);
   });
 });
 

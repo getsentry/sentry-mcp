@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { resolveEventInOrg } from "../../src/lib/api/events.js";
 import { unwrapResult } from "../../src/lib/api/infrastructure.js";
 import {
+  API_MAX_PER_PAGE,
   addMemberToTeam,
   apiRequest,
   apiRequestToRegion,
@@ -30,6 +31,7 @@ import {
   listIssuesAllPages,
   listLogs,
   listProjects,
+  listProjectsAllPages,
   listProjectsPaginated,
   listProjectTeams,
   listRepositories,
@@ -681,6 +683,7 @@ describe("projects.ts", () => {
         const req = new Request(input!, init);
         const url = new URL(req.url);
         expect(url.searchParams.get("cursor")).toBe("my-cursor");
+        expect(url.searchParams.get("per_page")).toBe("50");
         return new Response(JSON.stringify([]), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -691,6 +694,75 @@ describe("projects.ts", () => {
         cursor: "my-cursor",
         perPage: 50,
       });
+    });
+
+    test("caps perPage at API_MAX_PER_PAGE", async () => {
+      globalThis.fetch = mockFetch(async (input, init) => {
+        const req = new Request(input!, init);
+        const url = new URL(req.url);
+        expect(url.searchParams.get("per_page")).toBe(String(API_MAX_PER_PAGE));
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+
+      await listProjectsPaginated("test-org", { perPage: 500 });
+    });
+  });
+
+  describe("listProjectsAllPages", () => {
+    test("auto-paginates when limit exceeds API_MAX_PER_PAGE", async () => {
+      const perPageValues: number[] = [];
+      let callCount = 0;
+
+      globalThis.fetch = mockFetch(async (input, init) => {
+        const req = new Request(input!, init);
+        const url = new URL(req.url);
+        const perPage = Number(url.searchParams.get("per_page"));
+        perPageValues.push(perPage);
+        callCount += 1;
+
+        const page = Array.from({ length: API_MAX_PER_PAGE }, (_, i) =>
+          mockProject({
+            id: String((callCount - 1) * API_MAX_PER_PAGE + i + 1),
+            slug: `proj-${(callCount - 1) * API_MAX_PER_PAGE + i}`,
+          })
+        );
+
+        const hasMore = callCount === 1;
+        return new Response(JSON.stringify(page), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            Link: linkHeader("page2", hasMore),
+          },
+        });
+      });
+
+      const result = await listProjectsAllPages("test-org", { limit: 200 });
+      expect(result.data).toHaveLength(200);
+      expect(callCount).toBe(2);
+      expect(perPageValues).toEqual([API_MAX_PER_PAGE, API_MAX_PER_PAGE]);
+      expect(result.nextCursor).toBeUndefined();
+    });
+
+    test("single request when limit fits in one API page", async () => {
+      let callCount = 0;
+      globalThis.fetch = mockFetch(async (input, init) => {
+        callCount += 1;
+        const req = new Request(input!, init);
+        const url = new URL(req.url);
+        expect(url.searchParams.get("per_page")).toBe("25");
+        return new Response(JSON.stringify([mockProject()]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+
+      const result = await listProjectsAllPages("test-org", { limit: 25 });
+      expect(result.data).toHaveLength(1);
+      expect(callCount).toBe(1);
     });
   });
 

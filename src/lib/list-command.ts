@@ -49,8 +49,9 @@ import { PERIOD_BRIEF, parsePeriod } from "./time-range.js";
 /**
  * Absolute maximum items a list command will return.
  *
- * The Sentry API silently caps `per_page` at 100; commands auto-paginate
- * to fill larger limits but stop at this ceiling for practical CLI use.
+ * The Sentry API max `per_page` is 100 (some endpoints 400 if larger);
+ * commands auto-paginate to fill larger limits but stop at this ceiling
+ * for practical CLI use.
  */
 export const LIST_MAX_LIMIT = 1000;
 

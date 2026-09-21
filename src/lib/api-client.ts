@@ -136,6 +136,7 @@ export {
   getProject,
   getProjectKeys,
   listProjects,
+  listProjectsAllPages,
   listProjectsPaginated,
   MEMBER_PROJECT_CREATION_DISABLED_DETAIL,
   matchesWordBoundary,
