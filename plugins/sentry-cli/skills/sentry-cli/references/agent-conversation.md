@@ -74,11 +74,14 @@ View an agent conversation transcript
 **Examples:**
 
 ```bash
-# View full transcript
-sentry agent-conversation view my-org conv-123
+# View full transcript (org auto-detected)
+sentry agent-conversation view conv-123
+
+# Explicit org (slash-separated)
+sentry agent-conversation view my-org/conv-123
 
 # JSON output
-sentry agent-conversation view my-org conv-123 --json
+sentry agent-conversation view my-org/conv-123 --json
 ```
 
 All commands also support `--json`, `--fields`, `--help`, `--log-level`, and `--verbose` flags.

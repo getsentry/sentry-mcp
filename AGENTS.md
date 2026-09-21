@@ -113,10 +113,14 @@ Top-level layout:
 
 - **`src/bin.ts`** — entry point; **`src/app.ts`** — Stricli application setup;
   **`src/context.ts`** — dependency-injection context.
-- **`src/commands/`** — one directory per command group (`auth`, `cli`, `dashboard`,
-  `event`, `issue`, `log`, `org`, `project`, `release`, `replay`, `repo`, `sourcemap`,
-  `span`, `team`, `trace`, `trial`, `local`, …) plus standalone command files
-  (`api.ts`, `explore.ts`, `help.ts`, `init.ts`, `schema.ts`).
+- **`src/commands/`** — one directory per command group (`agent-conversation`,
+  `alert`, `auth`, `build`, `cli`, `code-mappings`, `dart-symbol-map`,
+  `dashboard`, `debug-files`, `docs`, `event`, `feedback`, `issue`, `local`,
+  `log`, `monitor`, `org`, `platform`, `proguard`, `project`, `react-native`,
+  `release`, `replay`, `repo`, `snapshots`, `sourcemap`, `span`, `status`,
+  `team`, `trace`, `trial`) plus standalone command files (`api.ts`,
+  `explore.ts`, `help.ts`, `info.ts`, `init.ts`, `schema.ts`,
+  `wasm-split.ts`).
 - **`src/lib/`** — shared utilities. Key subtrees: `api/` (domain API modules),
   `db/` (SQLite layer), `dsn/` (DSN detection, with per-language extractors under
   `dsn/languages/`), and `formatters/` (output formatting). See the file-locations
