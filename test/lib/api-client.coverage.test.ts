@@ -1115,11 +1115,9 @@ describe("traces.ts", () => {
         });
       });
 
-      const result = await getDetailedTrace(
-        "test-org",
-        "abc123def456",
-        1_700_000_000
-      );
+      const result = await getDetailedTrace("test-org", "abc123def456", {
+        timestamp: 1_700_000_000,
+      });
       expect(result).toHaveLength(1);
       expect(result[0]!.span_id).toBe("span-1");
     });

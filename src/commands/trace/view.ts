@@ -560,10 +560,7 @@ export const viewCommand = buildCommand({
       numericProjectId = toNumericId(projectData.id);
     }
 
-    // The trace API requires a timestamp to help locate the trace data.
-    // Use current time - the API will search around this timestamp.
-    const timestamp = Math.floor(Date.now() / 1000);
-    const spans = await getDetailedTrace(org, traceId, timestamp, {
+    const spans = await getDetailedTrace(org, traceId, {
       additionalAttributes,
       projectId: numericProjectId,
     });

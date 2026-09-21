@@ -427,8 +427,7 @@ export const viewCommand = buildCommand({
       )
     );
     // Fetch trace data (single fetch for all span lookups)
-    const timestamp = Math.floor(Date.now() / 1000);
-    const spans = await getDetailedTrace(org, traceId, timestamp);
+    const spans = await getDetailedTrace(org, traceId);
 
     if (spans.length === 0) {
       throw new ValidationError(

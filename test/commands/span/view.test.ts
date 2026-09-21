@@ -465,11 +465,7 @@ describe("viewCommand.func", () => {
       VALID_SPAN_ID
     );
 
-    expect(getDetailedTraceSpy).toHaveBeenCalledWith(
-      "my-org",
-      VALID_TRACE_ID,
-      expect.any(Number)
-    );
+    expect(getDetailedTraceSpy).toHaveBeenCalledWith("my-org", VALID_TRACE_ID);
     expect(resolveOrgAndProjectSpy).not.toHaveBeenCalled();
   });
 
