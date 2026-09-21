@@ -9,6 +9,7 @@ import {
   getReplayRecordingSegments,
   listReplayIdsForIssue,
   listReplays,
+  resolveReplay,
 } from "../../../src/lib/api/replays.js";
 import { DEFAULT_SENTRY_URL } from "../../../src/lib/constants.js";
 import { setAuthToken } from "../../../src/lib/db/auth.js";
@@ -241,6 +242,131 @@ describe("getReplay", () => {
     expect(replay.info_ids).toEqual([]);
     expect(replay.trace_ids).toEqual([]);
     expect(replay.warning_ids).toEqual([]);
+  });
+});
+
+describe("resolveReplay", () => {
+  let originalFetch: typeof globalThis.fetch;
+  const TRACE_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+  beforeEach(async () => {
+    originalFetch = globalThis.fetch;
+    await setAuthToken("test-token");
+    setOrgRegion("test-org", DEFAULT_SENTRY_URL);
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  test("returns the replay when the detail endpoint hits", async () => {
+    const capturedUrls: string[] = [];
+
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const req = new Request(input!, init);
+      capturedUrls.push(req.url);
+      return jsonResponse({ data: replayRow() });
+    });
+
+    const replay = await resolveReplay("test-org", REPLAY_ID);
+
+    expect(replay.id).toBe(REPLAY_ID);
+    expect(capturedUrls).toHaveLength(1);
+    expect(capturedUrls[0]).toContain(
+      `/api/0/organizations/test-org/replays/${REPLAY_ID}/`
+    );
+  });
+
+  test("falls back to a linked trace search after a 404", async () => {
+    const capturedUrls: string[] = [];
+
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const req = new Request(input!, init);
+      capturedUrls.push(req.url);
+      const url = new URL(req.url);
+
+      if (url.pathname.endsWith(`/replays/${TRACE_ID}/`)) {
+        return jsonResponse({ detail: "Not Found" }, 404);
+      }
+      if (url.pathname.endsWith(`/replays/${REPLAY_ID}/`)) {
+        return jsonResponse({ data: replayRow() });
+      }
+      if (url.pathname.endsWith("/replays/")) {
+        return jsonResponse({ data: [replayRow()] });
+      }
+      throw new Error(`unexpected request ${req.url}`);
+    });
+
+    const replay = await resolveReplay("test-org", TRACE_ID, {
+      projectSlugs: ["javascript"],
+    });
+
+    expect(replay.id).toBe(REPLAY_ID);
+    expect(capturedUrls).toHaveLength(3);
+
+    const listUrl = new URL(capturedUrls[1]!);
+    expect(listUrl.pathname).toContain(
+      "/api/0/organizations/test-org/replays/"
+    );
+    expect(listUrl.searchParams.get("query")).toBe(`trace:${TRACE_ID}`);
+    expect(listUrl.searchParams.get("statsPeriod")).toBe("90d");
+    expect(listUrl.searchParams.get("per_page")).toBe("1");
+    expect(listUrl.searchParams.get("sort")).toBe("-started_at");
+    expect(listUrl.searchParams.get("projectSlug")).toBe("javascript");
+    expect(listUrl.searchParams.get("project")).toBeNull();
+  });
+
+  test("rethrows the original 404 when no replay is linked to the id", async () => {
+    const capturedUrls: string[] = [];
+
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const req = new Request(input!, init);
+      capturedUrls.push(req.url);
+      const url = new URL(req.url);
+
+      if (url.pathname.endsWith(`/replays/${TRACE_ID}/`)) {
+        return jsonResponse({ detail: "Replay not found" }, 404);
+      }
+      if (url.pathname.endsWith("/replays/")) {
+        return jsonResponse({ data: [] });
+      }
+      throw new Error(`unexpected request ${req.url}`);
+    });
+
+    await expect(resolveReplay("test-org", TRACE_ID)).rejects.toMatchObject({
+      name: "ApiError",
+      status: 404,
+      detail: "Replay not found",
+    });
+
+    const listUrl = new URL(capturedUrls[1]!);
+    expect(listUrl.searchParams.get("query")).toBe(`trace:${TRACE_ID}`);
+    expect(listUrl.searchParams.get("project")).toBe("-1");
+    expect(listUrl.searchParams.get("projectSlug")).toBeNull();
+  });
+
+  test("does not search by trace when the detail endpoint fails with a non-404", async () => {
+    const capturedUrls: string[] = [];
+
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const req = new Request(input!, init);
+      capturedUrls.push(req.url);
+      return jsonResponse({ detail: "Bad Request" }, 400);
+    });
+
+    await expect(resolveReplay("test-org", TRACE_ID)).rejects.toMatchObject({
+      name: "ApiError",
+      status: 400,
+    });
+    expect(capturedUrls).toHaveLength(1);
+    expect(capturedUrls[0]).toContain(`/replays/${TRACE_ID}/`);
   });
 });
 

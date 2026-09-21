@@ -7,10 +7,10 @@
 import type { SentryContext } from "../../context.js";
 import {
   getProject,
-  getReplay,
   getReplayRecordingSegments,
   getTraceMeta,
   listIssuesPaginated,
+  resolveReplay,
 } from "../../lib/api-client.js";
 import {
   detectSwappedViewArgs,
@@ -327,9 +327,10 @@ export const viewCommand = buildCommand({
     brief: "View a Session Replay",
     fullDescription:
       "View detailed information about a Session Replay.\n\n" +
-      "Replay ID formats:\n" +
-      "  <replay-id>              - auto-detect org from config or DSN\n" +
-      "  <org>/<replay-id>        - explicit organization\n" +
+      "Pass a replay ID, a Sentry replay URL, or a trace ID linked to a replay.\n\n" +
+      "ID formats:\n" +
+      "  <id>                     - auto-detect org from config or DSN\n" +
+      "  <org>/<id>               - explicit organization\n" +
       "  <org>/<project>/<id>     - explicit org/project context\n" +
       "  <replay-url>             - parse org and replay ID from a Sentry URL\n\n" +
       "Examples:\n" +
@@ -360,7 +361,7 @@ export const viewCommand = buildCommand({
       kind: "array",
       parameter: {
         placeholder: "replay-id-or-url",
-        brief: "[<org>/<project>] <replay-id> or <replay-url>",
+        brief: "[<org>/<project>] <replay-id or trace-id> or <replay-url>",
         parse: String,
       },
     },
@@ -390,14 +391,11 @@ export const viewCommand = buildCommand({
       "replay view"
     );
 
-    if (flags.web) {
-      await openInBrowser(buildReplayUrl(resolved.org, replayId), "replay");
-      return;
-    }
-
     let replay: ReplayDetails;
     try {
-      replay = await getReplay(resolved.org, replayId);
+      replay = await resolveReplay(resolved.org, replayId, {
+        projectSlugs: resolved.project ? [resolved.project] : undefined,
+      });
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         throw new ResolutionError(
@@ -411,6 +409,11 @@ export const viewCommand = buildCommand({
         );
       }
       throw error;
+    }
+
+    if (flags.web) {
+      await openInBrowser(buildReplayUrl(resolved.org, replay.id), "replay");
+      return;
     }
 
     await validateReplayProjectScope({
