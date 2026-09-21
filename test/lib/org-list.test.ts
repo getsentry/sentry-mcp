@@ -487,6 +487,42 @@ describe("handleOrgAll", () => {
       undefined
     );
   });
+
+  test("auto-paginates when limit exceeds API_MAX_PER_PAGE and never requests a larger page", async () => {
+    const listPaginated = vi.fn(
+      (_org: string, opts: { cursor?: string; perPage: number }) => {
+        expect(opts.perPage).toBeLessThanOrEqual(100);
+        const offset = opts.cursor ? Number(opts.cursor) : 0;
+        const data = Array.from({ length: opts.perPage }, (_, i) => ({
+          id: String(offset + i),
+          name: `W${offset + i}`,
+        }));
+        return Promise.resolve({
+          data,
+          nextCursor: String(offset + opts.perPage),
+        });
+      }
+    );
+    const config = makeConfig({ listPaginated });
+
+    const result = await handleOrgAll({
+      config,
+      org: "my-org",
+      flags: { limit: 250, json: true },
+      contextKey: "key",
+      cursor: undefined,
+      direction: "next",
+    });
+
+    expect(result.items).toHaveLength(250);
+    expect(listPaginated).toHaveBeenCalledTimes(3);
+    expect(listPaginated.mock.calls.map((call) => call[1].perPage)).toEqual([
+      100, 100, 100,
+    ]);
+    // Overshoot trims and drops nextCursor so navigation cannot skip rows.
+    expect(result.hasMore).toBe(false);
+    expect(result.nextCursor).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

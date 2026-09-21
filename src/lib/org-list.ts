@@ -30,8 +30,8 @@
  * how to render the result — JSON envelope, human table, or custom formatting.
  */
 
+import { paginate } from "./api/infrastructure.js";
 import {
-  API_MAX_PER_PAGE,
   findProjectsBySlug,
   listOrganizations,
   type PaginatedResponse,
@@ -449,6 +449,11 @@ function runOrgAll<TEntity, TWithOrg>(
 /**
  * Handle org-all mode: cursor-paginated listing for a single org.
  *
+ * `--limit` is the total number of items to return. When it exceeds the API
+ * page size, this handler auto-paginates via {@link paginate} instead of
+ * sending an oversized `per_page` (some endpoints 400 rather than silently
+ * cap).
+ *
  * Returns a {@link ListResult} with items, pagination state, and human hints.
  * Cursor side effects (advancePaginationState/clearPaginationState) are performed
  * inside the handler so callers don't need to manage them.
@@ -464,10 +469,12 @@ export async function handleOrgAll<TEntity, TWithOrg>(
       json: flags.json,
     },
     () =>
-      config.listPaginated(org, {
-        cursor,
-        perPage: Math.min(flags.limit, API_MAX_PER_PAGE),
-      })
+      paginate({ limit: flags.limit, cursor }, (perPage, pageCursor) =>
+        config.listPaginated(org, {
+          cursor: pageCursor,
+          perPage,
+        })
+      )
   );
 
   const { data: rawItems, nextCursor } = response;

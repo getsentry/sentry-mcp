@@ -12,12 +12,11 @@
 
 import type { SentryContext } from "../../context.js";
 import {
-  API_MAX_PER_PAGE,
   findProjectsBySlug,
   getProject,
   listOrganizations,
   listProjects,
-  listProjectsPaginated,
+  listProjectsAllPages,
   type PaginatedResponse,
 } from "../../lib/api-client.js";
 import {
@@ -244,7 +243,7 @@ export function displayProjectTable(projects: ProjectWithOrg[]): string {
 }
 
 /**
- * Fetch a single page of projects from one org, with error handling
+ * Fetch up to `limit` projects from one org, with error handling
  * that mirrors `fetchOrgProjectsSafe` — re-throws auth errors but
  * silently returns empty for other failures (403, network errors).
  */
@@ -255,7 +254,7 @@ async function fetchPaginatedSafe(
   limit: number
 ): Promise<PaginatedResult> {
   const result = await withAuthGuard(async () => {
-    const response = await listProjectsPaginated(org, { perPage: limit });
+    const response = await listProjectsAllPages(org, { limit });
     return {
       projects: response.data.map((p) => ({ ...p, orgSlug: org })),
       nextCursor: response.nextCursor,
@@ -268,8 +267,9 @@ async function fetchPaginatedSafe(
  * Fetch projects for auto-detect mode.
  *
  * Optimization: when targeting a single org without platform filter, uses
- * single-page pagination (`perPage=limit`) to avoid fetching all projects.
- * Multi-org or filtered queries still require full fetch + client-side slicing.
+ * {@link listProjectsAllPages} (capped `per_page`, auto-paginate up to
+ * `limit`) instead of fetching every project. Multi-org or filtered queries
+ * still require full fetch + client-side slicing.
  */
 async function fetchAutoDetectProjects(
   orgs: string[],
@@ -439,6 +439,8 @@ export type OrgAllOptions = {
 /**
  * Handle org-all mode (e.g., sentry/).
  * Uses cursor pagination for efficient page-by-page listing.
+ * `--limit` above the API page size auto-paginates via
+ * {@link listProjectsAllPages} instead of sending an oversized `per_page`.
  */
 export async function handleOrgAll(
   options: OrgAllOptions
@@ -449,11 +451,7 @@ export async function handleOrgAll(
       message: `Fetching projects (up to ${flags.limit})...`,
       json: flags.json,
     },
-    () =>
-      listProjectsPaginated(org, {
-        cursor,
-        perPage: Math.min(flags.limit, API_MAX_PER_PAGE),
-      })
+    () => listProjectsAllPages(org, { limit: flags.limit, cursor })
   );
 
   const projects: ProjectWithOrg[] = response.data.map((p) => ({

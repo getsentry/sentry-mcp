@@ -367,7 +367,9 @@ export const MAX_PAGINATION_PAGES = Math.max(
 
 /**
  * Sentry API's maximum items per page.
- * Requests for more items are silently capped server-side.
+ * Some endpoints silently cap larger `per_page` values; others (org project
+ * list) return 400. Always send at most this many and auto-paginate for
+ * larger `--limit`s via {@link paginate}.
  */
 export const API_MAX_PER_PAGE = 100;
 
