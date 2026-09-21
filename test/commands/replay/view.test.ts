@@ -58,6 +58,7 @@ import * as resolveTarget from "../../../src/lib/resolve-target.js";
 import type { ReplayDetails } from "../../../src/types/index.js";
 
 const REPLAY_ID = "346789a703f6454384f1de473b8b9fcc";
+const TRACE_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 function sampleReplay(overrides: Partial<ReplayDetails> = {}): ReplayDetails {
   return {
@@ -70,7 +71,7 @@ function sampleReplay(overrides: Partial<ReplayDetails> = {}): ReplayDetails {
     started_at: "2025-01-30T14:32:15+00:00",
     tags: {},
     project_id: "42",
-    trace_ids: ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+    trace_ids: [TRACE_ID],
     urls: [],
     user: { display_name: "Test User" },
     warning_ids: [],
@@ -141,7 +142,7 @@ describe("parsePositionalArgs", () => {
 
 describe("viewCommand.func", () => {
   let getProjectSpy: ReturnType<typeof spyOn>;
-  let getReplaySpy: ReturnType<typeof spyOn>;
+  let resolveReplaySpy: ReturnType<typeof spyOn>;
   let getReplayRecordingSegmentsSpy: ReturnType<typeof spyOn>;
   let getTraceMetaSpy: ReturnType<typeof spyOn>;
   let listIssuesPaginatedSpy: ReturnType<typeof spyOn>;
@@ -166,7 +167,7 @@ describe("viewCommand.func", () => {
       slug: "cli",
       name: "CLI",
     });
-    getReplaySpy = vi.spyOn(apiClient, "getReplay");
+    resolveReplaySpy = vi.spyOn(apiClient, "resolveReplay");
     getReplayRecordingSegmentsSpy = vi
       .spyOn(apiClient, "getReplayRecordingSegments")
       .mockResolvedValue([
@@ -205,7 +206,7 @@ describe("viewCommand.func", () => {
 
   afterEach(() => {
     getProjectSpy.mockRestore();
-    getReplaySpy.mockRestore();
+    resolveReplaySpy.mockRestore();
     getReplayRecordingSegmentsSpy.mockRestore();
     getTraceMetaSpy.mockRestore();
     listIssuesPaginatedSpy.mockRestore();
@@ -215,7 +216,7 @@ describe("viewCommand.func", () => {
 
   test("renders JSON output", async () => {
     resolveTargetSpy.mockResolvedValue({ org: "test-org", project: "cli" });
-    getReplaySpy.mockResolvedValue(
+    resolveReplaySpy.mockResolvedValue(
       sampleReplay({
         error_ids: ["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
       })
@@ -255,6 +256,7 @@ describe("viewCommand.func", () => {
 
   test("opens the replay in the browser with --web", async () => {
     resolveTargetSpy.mockResolvedValue({ org: "test-org", project: "cli" });
+    resolveReplaySpy.mockResolvedValue(sampleReplay());
 
     const { context } = createMockContext();
     const func = await viewCommand.loader();
@@ -272,6 +274,7 @@ describe("viewCommand.func", () => {
 
   test("opens the replay URL target from a replay URL with --web", async () => {
     resolveTargetSpy.mockResolvedValue({ org: "test-org", project: undefined });
+    resolveReplaySpy.mockResolvedValue(sampleReplay());
 
     const { context } = createMockContext();
     const func = await viewCommand.loader();
@@ -287,9 +290,27 @@ describe("viewCommand.func", () => {
     );
   });
 
+  test("opens the linked replay id in the browser when given a trace id", async () => {
+    resolveTargetSpy.mockResolvedValue({ org: "test-org", project: "cli" });
+    resolveReplaySpy.mockResolvedValue(sampleReplay());
+
+    const { context } = createMockContext();
+    const func = await viewCommand.loader();
+    await func.call(
+      context,
+      { json: false, web: true, fresh: false },
+      TRACE_ID
+    );
+
+    expect(openInBrowserSpy).toHaveBeenCalledWith(
+      "https://test-org.sentry.io/explore/replays/346789a703f6454384f1de473b8b9fcc/",
+      "replay"
+    );
+  });
+
   test("converts missing replays into ResolutionError", async () => {
     resolveTargetSpy.mockResolvedValue({ org: "test-org", project: "cli" });
-    getReplaySpy.mockRejectedValue(
+    resolveReplaySpy.mockRejectedValue(
       new ApiError("Failed to get replay", 404, "Not Found")
     );
 
@@ -303,7 +324,7 @@ describe("viewCommand.func", () => {
 
   test("rejects replays outside the explicit project scope", async () => {
     resolveTargetSpy.mockResolvedValue({ org: "test-org", project: "cli" });
-    getReplaySpy.mockResolvedValue(sampleReplay({ project_id: "999" }));
+    resolveReplaySpy.mockResolvedValue(sampleReplay({ project_id: "999" }));
 
     const { context } = createMockContext();
     const func = await viewCommand.loader();
@@ -315,7 +336,7 @@ describe("viewCommand.func", () => {
 
   test("allows archived replays with no project ID in explicit project scope", async () => {
     resolveTargetSpy.mockResolvedValue({ org: "test-org", project: "cli" });
-    getReplaySpy.mockResolvedValue(
+    resolveReplaySpy.mockResolvedValue(
       sampleReplay({
         count_segments: 0,
         is_archived: true,
@@ -339,7 +360,7 @@ describe("viewCommand.func", () => {
 
   test("renders activity and related sections in human output", async () => {
     resolveTargetSpy.mockResolvedValue({ org: "test-org", project: "cli" });
-    getReplaySpy.mockResolvedValue(
+    resolveReplaySpy.mockResolvedValue(
       sampleReplay({
         error_ids: ["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
         urls: ["/checkout"],
@@ -364,7 +385,7 @@ describe("viewCommand.func", () => {
 
   test("anchors activity offsets to the replay start time", async () => {
     resolveTargetSpy.mockResolvedValue({ org: "test-org", project: "cli" });
-    getReplaySpy.mockResolvedValue(
+    resolveReplaySpy.mockResolvedValue(
       sampleReplay({
         started_at: "2025-01-01T00:00:00.000Z",
       })

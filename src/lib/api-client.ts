@@ -172,6 +172,7 @@ export {
   REPLAY_SORT_FIELDS,
   type ReplaySortField,
   type ReplaySortValue,
+  resolveReplay,
 } from "./api/replays.js";
 export {
   listAllRepositories,

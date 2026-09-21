@@ -22,6 +22,7 @@ import {
 } from "../../types/index.js";
 
 import { ApiError } from "../errors.js";
+import { logger } from "../logger.js";
 import { resolveOrgRegion } from "../region.js";
 
 import {
@@ -34,6 +35,8 @@ import {
   parseLinkHeader,
   unwrapPaginatedResult,
 } from "./infrastructure.js";
+
+const log = logger.withTag("api.replays");
 
 /** Replay sort field names supported by the backend replay index endpoint. */
 export const REPLAY_SORT_FIELDS = [
@@ -93,6 +96,8 @@ export type ListReplaysOptions = {
   fields?: string[];
   /** Project slugs to filter by. */
   projectSlugs?: string[];
+  /** Numeric project IDs. `"-1"` searches all projects. */
+  project?: string;
   /** Sort expression for the replay index endpoint. */
   sort?: ReplaySortValue;
   /** Pagination cursor from a previous response. */
@@ -196,6 +201,7 @@ async function fetchReplayPage(
             ? options.fields
             : [...REPLAY_LIST_FIELDS],
         per_page: perPage,
+        project: options.project,
         projectSlug: options.projectSlugs,
         query: options.query,
         sort: options.sort ?? "-started_at",
@@ -257,6 +263,44 @@ export async function getReplay(
     }
   );
   return normalizeReplayProjectId(data.data);
+}
+
+/**
+ * Fetch a replay by replay ID, or by a trace ID linked on that replay.
+ *
+ * `GET /replays/{id}/` only matches replay primary keys. If that 404s, query
+ * the replay index with `trace:{id}` over 90d and load the newest hit.
+ * Org-wide searches send `project=-1` because omitting the project filter
+ * returns empty on large organizations.
+ */
+export async function resolveReplay(
+  orgSlug: string,
+  replayOrTraceId: string,
+  options: Pick<ListReplaysOptions, "projectSlugs"> = {}
+): Promise<ReplayDetails> {
+  try {
+    return await getReplay(orgSlug, replayOrTraceId);
+  } catch (error) {
+    if (!(error instanceof ApiError && error.status === 404)) {
+      throw error;
+    }
+
+    log.debug(
+      `Replay ${replayOrTraceId} not found by id; searching by linked trace`
+    );
+    const { data } = await listReplays(orgSlug, {
+      query: `trace:${replayOrTraceId}`,
+      statsPeriod: "90d",
+      limit: 1,
+      projectSlugs: options.projectSlugs,
+      project: options.projectSlugs?.length ? undefined : "-1",
+    });
+    const match = data[0];
+    if (!match) {
+      throw error;
+    }
+    return getReplay(orgSlug, match.id);
+  }
 }
 
 /**
