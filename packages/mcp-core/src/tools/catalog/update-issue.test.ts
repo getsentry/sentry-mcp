@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { issueFixture, mswServer } from "@sentry/mcp-server-mocks";
+import { prepareToolParams } from "../catalog-runtime/availability.js";
 import updateIssue from "./update-issue.js";
 
 type MockIssue = typeof issueFixture;
@@ -1022,5 +1023,20 @@ describe("update_issue", () => {
     expect(result).toContain("**Status**: unresolved → **resolved**");
     // Comment failure should be reported gracefully, not thrown
     expect(result).toContain("**Comment not posted**");
+  });
+
+  it("strips null bytes from reason before posting as a comment", async () => {
+    // prepareToolParams runs the Zod schema (including transforms) the same
+    // way the MCP server does at runtime, so this exercises the full parse path.
+    const prepared = prepareToolParams({
+      tool: updateIssue,
+      params: {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        reason: "Resolved\0because\0fix deployed",
+      },
+      context: serverContext,
+    });
+    expect(prepared.reason).toBe("Resolvedbecausefix deployed");
   });
 });

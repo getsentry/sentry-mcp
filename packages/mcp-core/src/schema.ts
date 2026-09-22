@@ -229,6 +229,7 @@ export const ParamReason = z
   .string()
   .trim()
   .min(1)
+  .transform((s) => s.replace(/\0/g, ""))
   .describe(
     "Optional reason for taking this action. When provided, it will be posted as a comment on the issue's activity feed.",
   );
