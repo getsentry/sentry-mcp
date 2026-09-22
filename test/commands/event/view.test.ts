@@ -952,10 +952,12 @@ describe("resolveAutoDetectTarget", () => {
 // ============================================================================
 
 describe("viewCommand.func", () => {
-  let getEventSpy: ReturnType<typeof spyOn>;
-  let getSpanTreeLinesSpy: ReturnType<typeof spyOn>;
-  let openInBrowserSpy: ReturnType<typeof spyOn>;
-  let resolveProjectBySlugSpy: ReturnType<typeof spyOn>;
+  let getEventSpy: ReturnType<typeof vi.spyOn>;
+  let getSpanTreeLinesSpy: ReturnType<typeof vi.spyOn>;
+  let openInBrowserSpy: ReturnType<typeof vi.spyOn>;
+  let resolveProjectBySlugSpy: ReturnType<typeof vi.spyOn>;
+  let listEventAttachmentsSpy: ReturnType<typeof vi.spyOn>;
+  let getIssueInOrgSpy: ReturnType<typeof vi.spyOn>;
 
   const VALID_EVENT_ID = "abc123def456abc123def456abc123de";
   const sampleEvent: SentryEvent = {
@@ -964,6 +966,18 @@ describe("viewCommand.func", () => {
     metadata: {},
     contexts: {},
   } as unknown as SentryEvent;
+  const attachment = {
+    id: "attachment-1",
+    event_id: VALID_EVENT_ID,
+    type: "event.attachment",
+    name: "screenshot.png",
+    mimetype: "image/png",
+    dateCreated: "2026-07-16T12:00:00Z",
+    size: 2048,
+    headers: {},
+    sha1: null,
+  };
+  const attachmentDownloadUrl = `https://sentry.io/sentry/api/0/projects/test-org/test-proj/events/${VALID_EVENT_ID}/attachments/attachment-1/?download=1`;
 
   function createMockContext() {
     const stdoutWrite = vi.fn(() => true);
@@ -982,7 +996,13 @@ describe("viewCommand.func", () => {
     getSpanTreeLinesSpy = vi.spyOn(spanTree, "getSpanTreeLines");
     openInBrowserSpy = vi.spyOn(browser, "openInBrowser");
     resolveProjectBySlugSpy = vi.spyOn(resolveTarget, "resolveProjectBySlug");
-    setOrgRegion("test-org", DEFAULT_SENTRY_URL);
+    listEventAttachmentsSpy = vi
+      .spyOn(apiClient, "listEventAttachments")
+      .mockResolvedValue([]);
+    getIssueInOrgSpy = vi.spyOn(apiClient, "getIssueInOrg").mockResolvedValue({
+      project: { slug: "test-proj" },
+    } as never);
+    setOrgRegion("test-org", `${DEFAULT_SENTRY_URL}/sentry`);
   });
 
   afterEach(() => {
@@ -990,6 +1010,8 @@ describe("viewCommand.func", () => {
     getSpanTreeLinesSpy.mockRestore();
     openInBrowserSpy.mockRestore();
     resolveProjectBySlugSpy.mockRestore();
+    listEventAttachmentsSpy.mockRestore();
+    getIssueInOrgSpy.mockRestore();
   });
 
   test("logs warning when args appear swapped", async () => {
@@ -1035,6 +1057,99 @@ describe("viewCommand.func", () => {
     );
 
     expect(result?.hint).toBeUndefined();
+  });
+
+  test("includes attachment metadata and download URLs in JSON", async () => {
+    getEventSpy.mockResolvedValue(sampleEvent);
+    getSpanTreeLinesSpy.mockResolvedValue({
+      lines: [],
+      spans: null,
+      traceId: null,
+      success: false,
+    });
+    listEventAttachmentsSpy.mockResolvedValue([attachment]);
+
+    const { context, stdoutWrite } = createMockContext();
+    const func = await viewCommand.loader();
+    await func.call(
+      context,
+      { json: true, web: false, spans: 0 },
+      "test-org/test-proj",
+      VALID_EVENT_ID
+    );
+
+    expect(listEventAttachmentsSpy).toHaveBeenCalledWith(
+      "test-org",
+      "test-proj",
+      VALID_EVENT_ID
+    );
+    const output = JSON.parse(
+      stdoutWrite.mock.calls.map((call) => call[0]).join("")
+    );
+    expect(output.attachments).toEqual([
+      expect.objectContaining({
+        id: "attachment-1",
+        name: "screenshot.png",
+        download: attachmentDownloadUrl,
+      }),
+    ]);
+  });
+
+  test("shell-quotes the attachment download command", async () => {
+    getEventSpy.mockResolvedValue(sampleEvent);
+    getSpanTreeLinesSpy.mockResolvedValue({
+      lines: [],
+      spans: null,
+      traceId: null,
+      success: false,
+    });
+    listEventAttachmentsSpy.mockResolvedValue([
+      { ...attachment, name: "$(touch /tmp/pwned).png" },
+    ]);
+
+    const { context, stdoutWrite } = createMockContext();
+    const func = await viewCommand.loader();
+    await func.call(
+      context,
+      { json: false, web: false, spans: 0 },
+      "test-org/test-proj",
+      VALID_EVENT_ID
+    );
+
+    const output = stdoutWrite.mock.calls
+      .map((call) => String(call[0]))
+      .join("");
+    expect(output).toContain("sentry api");
+    expect(output).toContain(`'${attachmentDownloadUrl}'`);
+    expect(output).toContain("> '$(touch /tmp/pwned).png'");
+  });
+
+  test("keeps event output when attachment listing fails", async () => {
+    getEventSpy.mockResolvedValue(sampleEvent);
+    getSpanTreeLinesSpy.mockResolvedValue({
+      lines: [],
+      spans: null,
+      traceId: null,
+      success: false,
+    });
+    listEventAttachmentsSpy.mockRejectedValue(
+      new Error("attachments unavailable")
+    );
+
+    const { context, stdoutWrite } = createMockContext();
+    const func = await viewCommand.loader();
+    await func.call(
+      context,
+      { json: true, web: false, spans: 0 },
+      "test-org/test-proj",
+      VALID_EVENT_ID
+    );
+
+    const output = JSON.parse(
+      stdoutWrite.mock.calls.map((call) => call[0]).join("")
+    );
+    expect(output.eventID).toBe(VALID_EVENT_ID);
+    expect(output.attachments).toEqual([]);
   });
 
   test("auto-redirects issue short ID in two-arg form via issueShortId path", async () => {
@@ -1089,6 +1204,9 @@ describe("viewCommand.func", () => {
     const getLatestEventSpy = vi
       .spyOn(apiClient, "getLatestEvent")
       .mockResolvedValue(sampleEvent);
+    getIssueInOrgSpy.mockResolvedValue({
+      project: { slug: "auto-project" },
+    } as never);
     getSpanTreeLinesSpy.mockResolvedValue({
       lines: [],
       spans: null,
@@ -1102,6 +1220,11 @@ describe("viewCommand.func", () => {
 
     expect(resolveOrgSpy).toHaveBeenCalled();
     expect(getLatestEventSpy).toHaveBeenCalledWith("auto-org", "17370");
+    expect(listEventAttachmentsSpy).toHaveBeenCalledWith(
+      "auto-org",
+      "auto-project",
+      VALID_EVENT_ID
+    );
 
     resolveOrgSpy.mockRestore();
     getLatestEventSpy.mockRestore();
@@ -1252,7 +1375,11 @@ describe("fetchEventWithContext", () => {
       "my-project",
       "abc123"
     );
-    expect(result).toBe(mockEvent);
+    expect(result).toEqual({
+      org: "my-org",
+      project: "my-project",
+      event: mockEvent,
+    });
     expect(getEventSpy).not.toHaveBeenCalled();
   });
 
@@ -1266,7 +1393,11 @@ describe("fetchEventWithContext", () => {
       "my-project",
       "abc123"
     );
-    expect(result).toBe(mockEvent);
+    expect(result).toEqual({
+      org: "my-org",
+      project: "my-project",
+      event: mockEvent,
+    });
     expect(getEventSpy).toHaveBeenCalledWith("my-org", "my-project", "abc123");
   });
 
@@ -1290,7 +1421,11 @@ describe("fetchEventWithContext", () => {
       "my-project",
       "abc123"
     );
-    expect(result).toBe(resolvedEvent);
+    expect(result).toEqual({
+      org: "my-org",
+      project: "other-project",
+      event: resolvedEvent,
+    });
   });
 
   test("throws ResolutionError when project-scoped, org-wide, and cross-org all fail", async () => {
@@ -1326,7 +1461,11 @@ describe("fetchEventWithContext", () => {
       "my-project",
       "abc123"
     );
-    expect(result).toBe(crossOrgEvent);
+    expect(result).toEqual({
+      org: "other-org",
+      project: "other-project",
+      event: crossOrgEvent,
+    });
   });
 
   test("cross-org fallback passes excludeOrgs when same-org search succeeded", async () => {
@@ -1467,7 +1606,11 @@ describe("fetchEventWithContext", () => {
       "my-project",
       "abc123"
     );
-    expect(result).toBe(crossOrgEvent);
+    expect(result).toEqual({
+      org: "other-org",
+      project: "other-project",
+      event: crossOrgEvent,
+    });
     expect(findSpy).toHaveBeenCalled();
   });
 
@@ -1744,7 +1887,7 @@ describe("fetchMultipleEvents", () => {
       prefetchedEvent: null,
       primaryId: "abc123",
     });
-    expect(result).toEqual([event]);
+    expect(result).toEqual([{ org: "my-org", project: "my-project", event }]);
   });
 
   test("uses prefetched event for primary ID", async () => {
@@ -1757,7 +1900,9 @@ describe("fetchMultipleEvents", () => {
       prefetchedEvent: prefetched,
       primaryId: "abc123",
     });
-    expect(result).toEqual([prefetched]);
+    expect(result).toEqual([
+      { org: "my-org", project: "my-project", event: prefetched },
+    ]);
   });
 
   test("fetches multiple events in parallel", async () => {
@@ -1776,8 +1921,8 @@ describe("fetchMultipleEvents", () => {
       primaryId: "event1",
     });
     expect(result).toHaveLength(2);
-    expect(result[0]?.eventID).toBe("event1");
-    expect(result[1]?.eventID).toBe("event2");
+    expect(result[0]?.event.eventID).toBe("event1");
+    expect(result[1]?.event.eventID).toBe("event2");
   });
 
   test("warns on individual fetch failures and continues", async () => {
@@ -1797,7 +1942,9 @@ describe("fetchMultipleEvents", () => {
       primaryId: "event1",
     });
     // Only the successful event is returned
-    expect(result).toEqual([event1]);
+    expect(result).toEqual([
+      { org: "my-org", project: "my-project", event: event1 },
+    ]);
   });
 
   test("re-throws primary event error when all fetches fail", async () => {

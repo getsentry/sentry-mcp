@@ -24,6 +24,7 @@ import { requireDsn, sendEnvelopeRequest } from "../lib/envelope/transport.js";
 import { ValidationError } from "../lib/errors.js";
 import { CommandOutput } from "../lib/formatters/output.js";
 import { logger } from "../lib/logger.js";
+import { shellQuote } from "../lib/utils.js";
 
 const log = logger.withTag("bash-hook");
 
@@ -100,16 +101,6 @@ else
     2> >(tee >(awk '{ system(""); print strftime("%Y-%m-%d %H:%M:%S %z:"), "stderr:", $0; system(""); }' >> "$_SENTRY_LOG_FILE") >&2)
 fi
 `;
-
-/**
- * Shell-quote a value for safe embedding in the generated bash script.
- * Wraps in single quotes and escapes embedded single quotes.
- *
- * @internal Exported for testing
- */
-export function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
-}
 
 /** Shape of the data yielded for script output mode. */
 type BashHookResult = {

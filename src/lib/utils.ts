@@ -5,6 +5,7 @@
 import { userInfo } from "node:os";
 
 const ALL_DIGITS_PATTERN = /^\d+$/;
+const SINGLE_QUOTE_PATTERN = /'/g;
 
 /**
  * Check if a string contains only digits (0-9).
@@ -18,6 +19,16 @@ const ALL_DIGITS_PATTERN = /^\d+$/;
  */
 export function isAllDigits(str: string): boolean {
   return ALL_DIGITS_PATTERN.test(str);
+}
+
+/**
+ * Quote a value for safe use as one POSIX shell argument.
+ *
+ * @param value - Untrusted value to quote
+ * @returns A single-quoted shell argument
+ */
+export function shellQuote(value: string): string {
+  return `'${value.replace(SINGLE_QUOTE_PATTERN, "'\\''")}'`;
 }
 
 /**

@@ -76,6 +76,7 @@ export {
   apiRequest,
   apiRequestToRegion,
   apiRequestToRegionNoContent,
+  appendSearchParams,
   autoPaginate,
   buildSearchParams,
   isTextualContentType,

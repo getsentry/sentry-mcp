@@ -45,10 +45,10 @@ const PRE_ENCODED_PATTERN = /%[0-9a-fA-F]{2}/;
 const CONTROL_CHAR_PATTERN = /[\x00-\x1f]/;
 
 /**
- * Matches `..` path segments that could be used for path traversal.
+ * Matches literal or percent-encoded `..` path segments.
  * Anchored to segment boundaries (start/end of string or `/`).
  */
-const PATH_TRAVERSAL_PATTERN = /(^|\/)\.\.(\/|$)/;
+const PATH_TRAVERSAL_PATTERN = /(^|\/)(?:\.|%2e){2}(\/|$)/i;
 
 /**
  * Human-readable descriptions for the first forbidden character found.

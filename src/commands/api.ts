@@ -9,7 +9,7 @@ import { access, readFile } from "node:fs/promises";
 // biome-ignore lint/performance/noNamespaceImport: Sentry SDK recommends namespace import
 import * as Sentry from "@sentry/node-core/light";
 import type { SentryContext } from "../context.js";
-import { buildSearchParams, rawApiRequest } from "../lib/api-client.js";
+import { appendSearchParams, rawApiRequest } from "../lib/api-client.js";
 import { buildCommand } from "../lib/command.js";
 import { OutputError, ValidationError } from "../lib/errors.js";
 import { filterFields } from "../lib/formatters/json.js";
@@ -17,7 +17,7 @@ import { CommandOutput } from "../lib/formatters/output.js";
 import { validateEndpoint } from "../lib/input-validation.js";
 import { imageBytesToKitty } from "../lib/kitty-image.js";
 import { logger } from "../lib/logger.js";
-import { getDefaultSdkConfig } from "../lib/sentry-client.js";
+import { getDefaultSdkConfig, getSdkConfig } from "../lib/sentry-client.js";
 import {
   canRenderKitty,
   canRenderSixel,
@@ -29,6 +29,8 @@ const log = logger.withTag("api");
 
 /** Strips line breaks and surrounding indentation from copy-pasted endpoints. */
 const LINE_BREAK_PATTERN = /[ \t]*[\r\n]+[ \t]*/g;
+const API_PREFIX = "/api/0";
+const API_PREFIX_WITH_SLASH = `${API_PREFIX}/`;
 
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
@@ -88,11 +90,62 @@ export function parseMethod(value: string): HttpMethod {
 }
 
 /**
+ * Parse an absolute HTTP(S) API URL.
+ */
+function parseAbsoluteApiUrl(endpoint: string): URL | undefined {
+  const lowerEndpoint = endpoint.toLowerCase();
+  if (
+    !(
+      lowerEndpoint.startsWith("http://") ||
+      lowerEndpoint.startsWith("https://")
+    )
+  ) {
+    return;
+  }
+  try {
+    return new URL(endpoint);
+  } catch {
+    throw new ValidationError("Invalid absolute API URL", "endpoint");
+  }
+}
+
+type AbsoluteApiTarget = {
+  endpoint: string;
+  baseUrl: string;
+  strippedApiPrefix: boolean;
+};
+
+function splitAbsoluteApiUrl(url: URL): AbsoluteApiTarget {
+  const prefixIndex = url.pathname.indexOf(API_PREFIX_WITH_SLASH);
+  if (prefixIndex !== -1) {
+    return {
+      endpoint: `${url.pathname.slice(prefixIndex + API_PREFIX_WITH_SLASH.length)}${url.search}`,
+      baseUrl: `${url.origin}${url.pathname.slice(0, prefixIndex)}`,
+      strippedApiPrefix: true,
+    };
+  }
+  if (url.pathname.endsWith(API_PREFIX)) {
+    return {
+      endpoint: url.search,
+      baseUrl: `${url.origin}${url.pathname.slice(0, -API_PREFIX.length)}`,
+      strippedApiPrefix: true,
+    };
+  }
+  return {
+    endpoint: `${url.pathname}${url.search}`,
+    baseUrl: url.origin,
+    strippedApiPrefix: false,
+  };
+}
+
+/**
  * Normalize an API endpoint to ensure the path has a trailing slash.
  * Sentry API requires trailing slashes on endpoints.
  * Handles query strings correctly by only modifying the path portion.
  *
- * @param endpoint - API endpoint path (may include query string)
+ * Accepts paths relative to `/api/0/` and absolute HTTP(S) URLs.
+ *
+ * @param endpoint - API endpoint path or absolute URL (may include query string)
  * @returns Endpoint with trailing slash on path, query string preserved
  * @internal Exported for testing
  */
@@ -102,16 +155,31 @@ export function normalizeEndpoint(endpoint: string): string {
   // producing newlines and indentation (CLI-FR, 215 events).
   // Other control characters (NUL, etc.) are left for validateEndpoint
   // to reject — those indicate corruption, not copy-paste.
-  const cleaned = endpoint.replace(LINE_BREAK_PATTERN, "").trim();
-  if (cleaned !== endpoint) {
+  const rawEndpoint = endpoint.replace(LINE_BREAK_PATTERN, "").trim();
+  if (rawEndpoint !== endpoint) {
     log.warn("Stripped line breaks from endpoint (copy-paste artifact)");
   }
 
-  // Reject path traversal and remaining control characters after cleaning
-  validateEndpoint(cleaned);
+  // Stage 1: validate the caller's representation before WHATWG URL parsing
+  // can normalize dot segments away.
+  validateEndpoint(rawEndpoint);
+
+  // Absolute Sentry API URLs (from `attachments[].download` or copy-paste)
+  // collapse to a path relative to /api/0/. The command retains the base URL
+  // separately when it executes the request.
+  const absoluteUrl = parseAbsoluteApiUrl(rawEndpoint);
+  const relativeEndpoint = absoluteUrl
+    ? splitAbsoluteApiUrl(absoluteUrl).endpoint
+    : rawEndpoint;
+
+  // Stage 2: validate the transformed path that rawApiRequest will receive
+  // after origin and API-prefix extraction.
+  validateEndpoint(relativeEndpoint);
 
   // Remove leading slash if present (rawApiRequest handles the base URL)
-  let trimmed = cleaned.startsWith("/") ? cleaned.slice(1) : cleaned;
+  let trimmed = relativeEndpoint.startsWith("/")
+    ? relativeEndpoint.slice(1)
+    : relativeEndpoint;
 
   // Strip api/0/ prefix if user accidentally included it — the base URL
   // already includes /api/0/, so keeping it would produce a doubled path
@@ -133,6 +201,30 @@ export function normalizeEndpoint(endpoint: string): string {
   const query = trimmed.substring(queryIndex);
   const normalizedPath = path.endsWith("/") ? path : `${path}/`;
   return `${normalizedPath}${query}`;
+}
+
+function resolveApiTarget(endpoint: string): {
+  normalizedEndpoint: string;
+  requestBaseUrl?: string;
+  strippedApiPrefix: boolean;
+} {
+  const cleaned = endpoint.replace(LINE_BREAK_PATTERN, "").trim();
+  const absoluteUrl = parseAbsoluteApiUrl(cleaned);
+  const absoluteTarget = absoluteUrl
+    ? splitAbsoluteApiUrl(absoluteUrl)
+    : undefined;
+  const comparableEndpoint = absoluteTarget?.endpoint ?? cleaned;
+  const withoutLeadingSlash = comparableEndpoint.startsWith("/")
+    ? comparableEndpoint.slice(1)
+    : comparableEndpoint;
+  return {
+    normalizedEndpoint: normalizeEndpoint(endpoint),
+    requestBaseUrl: absoluteTarget?.baseUrl,
+    strippedApiPrefix:
+      absoluteTarget?.strippedApiPrefix ??
+      (withoutLeadingSlash.startsWith("api/0/") ||
+        withoutLeadingSlash === "api/0"),
+  };
 }
 
 /**
@@ -1054,17 +1146,19 @@ function formatApiResponseJson(data: unknown, fields?: string[]): unknown {
  */
 export function resolveRequestUrl(
   endpoint: string,
-  params?: Record<string, string | string[]>
+  params?: Record<string, string | string[]>,
+  baseUrl?: string
 ): string {
-  // Use getDefaultSdkConfig().baseUrl — same as rawApiRequest — to ensure
+  // Use the same SDK config selection as rawApiRequest to ensure
   // trailing slashes are stripped and the URL matches what would be sent.
-  const { baseUrl } = getDefaultSdkConfig();
+  const { baseUrl: normalizedBaseUrl } = baseUrl
+    ? getSdkConfig(baseUrl)
+    : getDefaultSdkConfig();
   const normalizedEndpoint = endpoint.startsWith("/")
     ? endpoint.slice(1)
     : endpoint;
-  const searchParams = buildSearchParams(params);
-  const queryString = searchParams ? `?${searchParams.toString()}` : "";
-  return `${baseUrl}/api/0/${normalizedEndpoint}${queryString}`;
+  const endpointWithParams = appendSearchParams(normalizedEndpoint, params);
+  return `${normalizedBaseUrl}/api/0/${endpointWithParams}`;
 }
 
 /**
@@ -1362,6 +1456,8 @@ export const apiCommand = buildCommand({
     fullDescription:
       "Make a raw API request to the Sentry API. Similar to 'gh api' for GitHub. " +
       "The endpoint is relative to /api/0/ (do not include the prefix). " +
+      "Absolute HTTP(S) Sentry URLs are also accepted; their origin is " +
+      "validated against your authenticated host. " +
       "Authentication is handled automatically using your stored credentials.\n\n" +
       "Body options:\n" +
       '  --data/-d \'{"key":"value"}\'   Inline JSON body (like curl -d)\n' +
@@ -1384,7 +1480,7 @@ export const apiCommand = buildCommand({
       kind: "tuple",
       parameters: [
         {
-          brief: "API endpoint relative to /api/0/ (e.g., organizations/)",
+          brief: "API endpoint relative to /api/0/, or an absolute HTTP(S) URL",
           parse: String,
           placeholder: "endpoint",
         },
@@ -1462,18 +1558,9 @@ export const apiCommand = buildCommand({
   async *func(this: SentryContext, flags: ApiFlags, endpoint: string) {
     const { stdin } = this;
 
-    const normalizedEndpoint = normalizeEndpoint(endpoint);
-
-    // Detect whether normalizeEndpoint stripped the api/0/ prefix (CLI-K1).
-    // Compare against the cleaned endpoint (line breaks removed, trimmed,
-    // leading slash removed) since normalizeEndpoint also strips copy-paste
-    // artifacts before the api/0/ check. Without this, line-break removal
-    // alone would shrink the length and trigger a false api/0/ warning.
-    const cleaned = endpoint.replace(LINE_BREAK_PATTERN, "").trim();
-    const baseLen = cleaned.startsWith("/")
-      ? cleaned.length - 1
-      : cleaned.length;
-    if (normalizedEndpoint.length < baseLen) {
+    const { normalizedEndpoint, requestBaseUrl, strippedApiPrefix } =
+      resolveApiTarget(endpoint);
+    if (strippedApiPrefix) {
       // Silent auto-fix — not a warning. Users commonly copy/paste URLs
       // that include the /api/0/ prefix; we strip it transparently and
       // only surface the detail at debug level for troubleshooting
@@ -1493,7 +1580,7 @@ export const apiCommand = buildCommand({
     if (flags["dry-run"]) {
       yield new CommandOutput({
         method: flags.method,
-        url: resolveRequestUrl(normalizedEndpoint, params),
+        url: resolveRequestUrl(normalizedEndpoint, params, requestBaseUrl),
         headers: resolveEffectiveHeaders(headers, body),
         body: body ?? null,
       });
@@ -1506,11 +1593,14 @@ export const apiCommand = buildCommand({
       logRequest(flags.method, normalizedEndpoint, headers);
     }
 
+    // The shared authenticated fetch validates requestBaseUrl against the
+    // token host and registered regional origins before adding credentials.
     const response = await rawApiRequest(normalizedEndpoint, {
       method: flags.method,
       body,
       params,
       headers,
+      baseUrl: requestBaseUrl,
     });
 
     const isError = isApiErrorStatus(response.status);

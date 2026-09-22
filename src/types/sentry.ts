@@ -25,8 +25,10 @@ import type {
 } from "@sentry/api";
 import {
   vBaseTeam,
+  vEventAttachmentDetailsResponse,
   vGetOrganizationIssueResponse,
   vGroupEventsResponseDict,
+  vIssueEventDetailsResponse,
 } from "@sentry/api/valibot";
 import {
   array,
@@ -412,6 +414,45 @@ export type SentryEvent = Omit<
   /** URL/function where the error occurred (not in OpenAPI spec for events) */
   culprit?: string | null;
 };
+
+const EventViewAttachmentSchema = looseObject({
+  ...vEventAttachmentDetailsResponse.entries,
+  download: pipe(
+    string(),
+    url(),
+    description("Absolute authenticated API URL for the attachment bytes")
+  ),
+});
+
+/**
+ * Documentation schema for the flattened `event view` JSON output.
+ *
+ * Event API fields remain optional because responses vary by event type. The
+ * CLI always adds `trace` and `attachments`; multi-event output is an array of
+ * this shape.
+ */
+export const EventViewOutputSchema = pipe(
+  looseObject({
+    ...partial(vIssueEventDetailsResponse).entries,
+    eventID: pipe(string(), description("UUID-format event ID")),
+    trace: pipe(
+      nullable(
+        object({
+          traceId: pipe(string(), description("Trace ID")),
+          spans: pipe(array(unknown()), description("Span tree data")),
+        })
+      ),
+      description("Trace context, or null when unavailable")
+    ),
+    attachments: pipe(
+      array(EventViewAttachmentSchema),
+      description(
+        "Event attachments; each includes metadata and an absolute authenticated download URL"
+      )
+    ),
+  }),
+  description("Event view output")
+);
 
 // Issue Event (list endpoint)
 
