@@ -192,17 +192,22 @@ describe("project create", () => {
     });
   });
 
-  test("passes the paired platform to createProject", async () => {
+  test.each([
+    "python-flask",
+    "node-mastra",
+    "node-flue",
+    "node-eve",
+  ])("passes the paired platform %s to createProject", async (platform) => {
     const { context } = createMockContext();
     const func = await createCommand.loader();
-    await func.call(context, { json: false }, "my-app:python-flask");
+    await func.call(context, { json: false }, `my-app:${platform}`);
 
     expect(createProjectWithDsnSpy).toHaveBeenCalledWith(
       "acme-corp",
       "engineering",
       {
         name: "my-app",
-        platform: "python-flask",
+        platform,
       }
     );
   });
