@@ -23,6 +23,7 @@ import { LIB_VERSION } from "./version";
 // Mock the Sentry core module
 vi.mock("@sentry/core", () => ({
   setTag: vi.fn(),
+  setAttribute: vi.fn(),
   setUser: vi.fn(),
   getActiveSpan: vi.fn(),
   startSpan: vi.fn(),

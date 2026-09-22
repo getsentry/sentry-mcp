@@ -1,5 +1,6 @@
 import { getActiveSpan, setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import { SEARCH_ISSUES_PERIOD_VALUES } from "../../constants";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { withProviderFallback } from "../../internal/agents/provider-fallback";
@@ -119,7 +120,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationContext(params.organizationSlug);
     if (params.projectSlugOrId) {
       if (isNumericId(params.projectSlugOrId)) {
         setTag("project.id", params.projectSlugOrId);

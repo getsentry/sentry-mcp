@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import {
@@ -94,7 +95,7 @@ export default defineTool({
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? context.constraints.regionUrl ?? undefined,
     });
-    setTag("organization.slug", parsed.organizationSlug);
+    setOrganizationContext(parsed.organizationSlug);
     setTag("issue.id", parsed.issueId);
 
     await ensureIssueWithinProjectConstraint({

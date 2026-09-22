@@ -1,5 +1,6 @@
 import { setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import { UserInputError } from "../../errors";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
@@ -121,7 +122,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
     const organizationSlug = params.organizationSlug;
-    setTag("organization.slug", organizationSlug);
+    setOrganizationContext(organizationSlug);
     setTag("project.slug", params.projectSlug);
     setTag("uptime.monitor_id", params.uptimeMonitorId);
 

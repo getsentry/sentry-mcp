@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { structuredResult } from "../../internal/tool-helpers/results";
@@ -89,7 +90,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationContext(organizationSlug);
     setTag("project.slug", params.projectSlug);
 
     const hasProjectUpdates = params.name || params.slug || params.platform;
