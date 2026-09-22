@@ -14,7 +14,7 @@ sentry react-native gradle \
   --dist 1000
 
 # Xcode build phase (usually added automatically to your build script)
-../node_modules/.bin/sentry-cli react-native xcode
+sentry react-native xcode
 ```
 
 ## Xcode build step (`react-native xcode`)

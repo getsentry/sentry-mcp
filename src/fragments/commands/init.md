@@ -51,11 +51,10 @@ Path-like arguments (starting with `.`, `/`, or `~`) are always treated as the d
 | `tracing` | Performance tracing |
 | `logs` | Log integration |
 | `replay` | Session replay |
-| `metrics` | Custom metrics |
 | `profiling` | Profiling |
-| `sourcemaps` | Source map uploads |
 | `crons` | Cron job monitoring |
 | `agent-tracing` | Agent tracing for AI/LLM apps |
+| `mcp-observability` | MCP (Model Context Protocol) observability |
 
 ## What the Wizard Does
 
