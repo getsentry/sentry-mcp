@@ -5,7 +5,9 @@
  * Covers region discovery, fan-out, and region-aware routing.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+// biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
+import * as Sentry from "@sentry/node-core/light";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   findProjectByDsnKey,
   getUserRegions,
@@ -647,10 +649,34 @@ describe("findProjectByDsnKey (multi-region)", () => {
         ),
     });
 
-    const project = await findProjectByDsnKey("abc123");
+    const captureSpy = vi.spyOn(Sentry, "captureException");
+    const withScopeSpy = vi.spyOn(Sentry, "withScope");
+    withScopeSpy.mockImplementation((fn: (scope: unknown) => void) => {
+      fn({
+        setTag() {
+          /* noop */
+        },
+        setContext() {
+          /* noop */
+        },
+        setFingerprint() {
+          /* noop */
+        },
+      });
+    });
+    try {
+      const project = await findProjectByDsnKey("abc123");
 
-    // Should find project despite US region failing
-    expect(project?.slug).toBe("found-project");
+      // Should find project despite US region failing
+      expect(project?.slug).toBe("found-project");
+      expect(captureSpy).toHaveBeenCalledTimes(1);
+      expect(captureSpy.mock.calls[0]?.[0]).toMatchObject({
+        message: "Network error",
+      });
+    } finally {
+      captureSpy.mockRestore();
+      withScopeSpy.mockRestore();
+    }
   });
 });
 

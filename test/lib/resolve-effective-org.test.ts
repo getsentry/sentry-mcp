@@ -6,7 +6,7 @@
  * org_regions cache.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { setAuthToken } from "../../src/lib/db/auth.js";
 import {
   getOrgByNumericId,
@@ -14,6 +14,7 @@ import {
   setOrgRegion,
   setOrgRegions,
 } from "../../src/lib/db/regions.js";
+import { logger } from "../../src/lib/logger.js";
 import { resolveEffectiveOrg } from "../../src/lib/region.js";
 import { mockFetch, useTestConfigDir } from "../helpers.js";
 
@@ -253,6 +254,38 @@ describe("resolveEffectiveOrg with API refresh", () => {
 
     const result = await resolveEffectiveOrg("o1081365");
     expect(result).toBe("o1081365");
+  });
+
+  test("logs when resolveOrgRegion throws for a slug", async () => {
+    const { clearAuth } = await import("../../src/lib/db/auth.js");
+    await clearAuth();
+
+    const savedAuthToken = process.env.SENTRY_AUTH_TOKEN;
+    const savedSentryToken = process.env.SENTRY_TOKEN;
+    delete process.env.SENTRY_AUTH_TOKEN;
+    delete process.env.SENTRY_TOKEN;
+
+    const debugSpy = vi.spyOn(logger, "debug");
+    try {
+      const result = await resolveEffectiveOrg("missing-org");
+      expect(result).toBe("missing-org");
+      expect(debugSpy).toHaveBeenCalledWith(
+        "resolveOrgRegion failed for 'missing-org', using raw slug",
+        expect.anything()
+      );
+    } finally {
+      debugSpy.mockRestore();
+      if (savedAuthToken === undefined) {
+        delete process.env.SENTRY_AUTH_TOKEN;
+      } else {
+        process.env.SENTRY_AUTH_TOKEN = savedAuthToken;
+      }
+      if (savedSentryToken === undefined) {
+        delete process.env.SENTRY_TOKEN;
+      } else {
+        process.env.SENTRY_TOKEN = savedSentryToken;
+      }
+    }
   });
 
   test("passes through non-DSN slugs starting with o", async () => {

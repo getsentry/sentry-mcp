@@ -6,8 +6,10 @@
  * pattern as api-client.seer.test.ts.
  */
 
+// biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
+import * as Sentry from "@sentry/node-core/light";
 import { number, object, string } from "valibot";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { resolveEventInOrg } from "../../src/lib/api/events.js";
 import { unwrapResult } from "../../src/lib/api/infrastructure.js";
 import {
@@ -964,8 +966,49 @@ describe("projects.ts", () => {
           })
       );
 
-      const dsn = await tryGetPrimaryDsn("test-org", "test-project");
-      expect(dsn).toBeNull();
+      const captureSpy = vi.spyOn(Sentry, "captureException");
+      try {
+        const dsn = await tryGetPrimaryDsn("test-org", "test-project");
+        expect(dsn).toBeNull();
+        // 404 is expected user/API noise — silenced, not an issue.
+        expect(captureSpy).not.toHaveBeenCalled();
+      } finally {
+        captureSpy.mockRestore();
+      }
+    });
+
+    test("reports unexpected DSN fetch failures to Sentry", async () => {
+      globalThis.fetch = mockFetch(
+        async () =>
+          new Response(JSON.stringify({ detail: "Internal error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          })
+      );
+
+      const captureSpy = vi.spyOn(Sentry, "captureException");
+      const withScopeSpy = vi.spyOn(Sentry, "withScope");
+      withScopeSpy.mockImplementation((fn: (scope: unknown) => void) => {
+        fn({
+          setTag() {
+            /* noop */
+          },
+          setContext() {
+            /* noop */
+          },
+          setFingerprint() {
+            /* noop */
+          },
+        });
+      });
+      try {
+        const dsn = await tryGetPrimaryDsn("test-org", "test-project");
+        expect(dsn).toBeNull();
+        expect(captureSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        captureSpy.mockRestore();
+        withScopeSpy.mockRestore();
+      }
     });
   });
 });

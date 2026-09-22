@@ -64,6 +64,27 @@ describe("getCachedDsn", () => {
     expect(result?.source).toBe("env");
     expect(result?.sourcePath).toBe(".env");
   });
+
+  test("treats empty DSN rows from setCachedDetection as cache misses", async () => {
+    const { stat } = await import("node:fs/promises");
+    const rootStats = await stat(testProjectDir);
+    const rootDirMtime = Math.floor(rootStats.mtimeMs);
+
+    setCachedDetection(testProjectDir, {
+      fingerprint: "fp-empty",
+      allDsns: [],
+      sourceMtimes: {},
+      dirMtimes: {},
+      rootDirMtime,
+    });
+
+    // Single-DSN callers must not receive dsn="".
+    expect(getCachedDsn(testProjectDir)).toBeUndefined();
+
+    // Full-detection cache still records a valid empty scan so we don't rescan.
+    const detection = await getCachedDetection(testProjectDir);
+    expect(detection?.allDsns).toHaveLength(0);
+  });
 });
 
 describe("setCachedDsn", () => {
