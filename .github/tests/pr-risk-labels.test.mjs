@@ -216,10 +216,40 @@ test("concurrent repository label creation still publishes", async () => {
   );
 });
 
-test("repeated publication leaves one risk label and preserves unrelated labels", async () => {
-  await withPR({}, async ({ run, labels }) => {
+for (const risk of ["low", "medium", "high"]) {
+  test(`unchanged ${risk} leaves the PR timeline untouched`, async () => {
+    await withPR(
+      { result: { risk_label: risk }, labels: ["area: auth", `risk: ${risk}`] },
+      async ({ run, labels, writes }) => {
+        await run();
+        assert.deepEqual(writes, []);
+        assert.deepEqual([...labels], ["area: auth", `risk: ${risk}`]);
+      },
+    );
+  });
+}
+
+test("an existing verdict removes competing risk labels without re-adding itself", async () => {
+  await withPR(
+    {
+      result: { risk_label: "medium" },
+      labels: ["area: auth", "risk: medium", "risk: high"],
+    },
+    async ({ run, labels, writes }) => {
+      await run();
+      assert.deepEqual(writes, [["remove", "risk: high"]]);
+      assert.deepEqual([...labels], ["area: auth", "risk: medium"]);
+    },
+  );
+});
+
+test("a second identical publication makes no label mutations", async () => {
+  await withPR({}, async ({ run, labels, writes }) => {
     await run();
+    assert.deepEqual([...labels], ["area: auth", "risk: low"]);
+    writes.length = 0;
     await run();
+    assert.deepEqual(writes, []);
     assert.deepEqual([...labels], ["area: auth", "risk: low"]);
   });
 });
