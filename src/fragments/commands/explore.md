@@ -66,6 +66,17 @@ sentry explore my-org/ \
   --dataset metrics --period 7d
 ```
 
+### Replays
+
+```bash
+# List recent replays
+sentry explore my-org/cli --dataset replays --period 24h
+
+# Filter replays by activity level
+sentry explore my-org/cli --dataset replays -F activity -F duration \
+  -F "count_errors" --period 7d
+```
+
 ### Logs
 
 ```bash
@@ -84,6 +95,16 @@ sentry explore my-org/cli -F title -F "count()" --json | jq '.data[:5]'
 sentry explore my-org/cli -F title -F "count()" -F "count_unique(user)" \
   --json --limit 100
 ```
+
+## Datasets
+
+| Dataset | Description |
+|---------|-------------|
+| `errors` | Error events (default) |
+| `spans` | Span/transaction data for performance analysis |
+| `metrics` | Custom and built-in metrics |
+| `logs` | Structured log entries |
+| `replays` | Session replay recordings |
 
 ## Target Patterns
 

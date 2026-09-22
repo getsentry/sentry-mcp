@@ -4,6 +4,8 @@
 
 ### Inject debug IDs
 
+`sentry sourcemap inject` is a purely local file operation — it does not make any API calls and does not require authentication. You can run it in CI before authenticating.
+
 ```bash
 # Inject debug IDs into all JS files in dist/
 sentry sourcemap inject ./dist
