@@ -27,7 +27,9 @@ import {
   setCachedProjectByDsnKey,
 } from "../db/project-cache.js";
 import { getCachedOrganizations } from "../db/regions.js";
+import { reportCliError } from "../error-reporting.js";
 import { type AuthGuardSuccess, withAuthGuard } from "../errors.js";
+import { logger } from "../logger.js";
 import { getApiBaseUrl } from "../sentry-client.js";
 import { buildProjectUrl } from "../sentry-urls.js";
 import { isAllDigits } from "../utils.js";
@@ -45,6 +47,20 @@ import {
   unwrapResult,
 } from "./infrastructure.js";
 import { getUserRegions, listOrganizations } from "./organizations.js";
+
+const log = logger.withTag("api.projects");
+
+/**
+ * Surface a swallowed best-effort failure without failing the caller.
+ *
+ * `log.debug` is for `--verbose` local diagnosis. {@link reportCliError}
+ * is what makes unexpected failures visible as Sentry issues for users
+ * who never pass `--verbose`.
+ */
+function reportBestEffortFailure(message: string, error: unknown): void {
+  log.debug(message, error);
+  reportCliError(error);
+}
 
 /**
  * List all projects in an organization.
@@ -74,13 +90,15 @@ export async function listProjects(orgSlug: string): Promise<SentryProject[]> {
 
   // Populate project cache for shell completions (best-effort).
   // Mirrors how listOrganizations() calls setOrgRegions().
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const orgs = getCachedOrganizations();
     const orgName = orgs.find((o) => o.slug === orgSlug)?.name ?? orgSlug;
     cacheProjectsForOrg(orgSlug, orgName, allResults);
-  } catch {
-    // Cache population is best-effort — never fail the command
+  } catch (error) {
+    reportBestEffortFailure(
+      `Failed to cache projects for org '${orgSlug}'`,
+      error
+    );
   }
 
   return allResults;
@@ -192,7 +210,7 @@ export type CreatedProjectDetails = {
 /**
  * Seed both project caches after a successful creation.
  *
- * Best-effort: cache failures are silently swallowed so they never break
+ * Best-effort: cache failures are reported to Sentry but never break
  * project creation. Called by both `createProjectWithDsn` (team-scoped)
  * and `createProjectWithAutoTeam` (org-scoped) to keep cache behaviour
  * consistent across both creation paths.
@@ -202,17 +220,18 @@ function seedProjectCaches(
   project: SentryProject,
   dsn: string | null
 ): void {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const orgName = resolveOrgDisplayName(orgSlug, project.organization?.name);
     cacheProjectsForOrg(orgSlug, orgName, [
       { id: project.id, slug: project.slug, name: project.name },
     ]);
-  } catch {
-    // Best-effort — don't let cache failures break project creation
+  } catch (error) {
+    reportBestEffortFailure(
+      `Failed to seed project cache for '${project.slug}'`,
+      error
+    );
   }
   if (dsn) {
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       const publicKey = extractPublicKeyFromDsn(dsn);
       if (publicKey) {
@@ -224,8 +243,11 @@ function seedProjectCaches(
           projectId: project.id,
         });
       }
-    } catch {
-      // Best-effort — don't let cache failures break project creation
+    } catch (error) {
+      reportBestEffortFailure(
+        `Failed to seed DSN key cache for '${project.slug}'`,
+        error
+      );
     }
   }
 }
@@ -532,7 +554,6 @@ export async function findProjectByDsnKey(
   const results = await Promise.all(
     regions.map((region) =>
       limit(async () => {
-        // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
         try {
           // Same `?query=dsn:` escape hatch as above (see the region-fallback
           // branch) — internal search param, no typed SDK operation yet.
@@ -542,7 +563,11 @@ export async function findProjectByDsnKey(
             { params: { query: `dsn:${publicKey}` } }
           );
           return data;
-        } catch {
+        } catch (error) {
+          reportBestEffortFailure(
+            `DSN key lookup failed in region '${region.url}'`,
+            error
+          );
           return [];
         }
       })
@@ -649,8 +674,8 @@ export async function getProjectKeys(
  * Fetch the primary DSN for a project.
  * Returns the public DSN of the first active key, or null on any error.
  *
- * Best-effort: failures are silently swallowed so callers can treat
- * DSN display as optional (e.g., after project creation or in views).
+ * Best-effort: failures are reported to Sentry but callers can treat DSN
+ * display as optional (e.g., after project creation or in views).
  *
  * @param orgSlug - Organization slug
  * @param projectSlug - Project slug
@@ -660,12 +685,15 @@ export async function tryGetPrimaryDsn(
   orgSlug: string,
   projectSlug: string
 ): Promise<string | null> {
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
     const keys = await getProjectKeys(orgSlug, projectSlug);
     const activeKey = keys.find((k) => k.isActive);
     return activeKey?.dsn.public ?? keys[0]?.dsn.public ?? null;
-  } catch {
+  } catch (error) {
+    reportBestEffortFailure(
+      `Failed to fetch DSN for '${orgSlug}/${projectSlug}'`,
+      error
+    );
     return null;
   }
 }

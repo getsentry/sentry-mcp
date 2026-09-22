@@ -388,9 +388,15 @@ function setCliErrorContext(scope: Sentry.Scope, error: unknown): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Report a command-level error to Sentry.
+ * Report an error to Sentry without rethrowing.
  *
- * - Silenced errors emit a metric and return without calling `captureException`.
+ * Call this at the command boundary for thrown failures, and in best-effort
+ * catch blocks that swallow the error so the command can continue. A debug
+ * log is not a substitute: users do not run `--verbose`, so swallowed
+ * unexpected failures must become Sentry issues.
+ *
+ * - Silenced errors (network, expected auth, 4xx) emit a metric and return
+ *   without calling `captureException`.
  * - Captured errors get grouping tags + structured context on a fresh scope.
  */
 export function reportCliError(error: unknown): void {

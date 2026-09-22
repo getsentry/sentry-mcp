@@ -148,6 +148,14 @@ export function getCachedDsn(directory: string): CachedDsnEntry | undefined {
     return;
   }
 
+  // Rows written by setCachedDetection() with an empty allDsns array store
+  // dsn="" and project_id="". Treat these as cache misses for the single-DSN
+  // path — callers expect a usable DSN when the result is defined.
+  if (!row.dsn) {
+    recordCacheHit("dsn", false);
+    return;
+  }
+
   recordCacheHit("dsn", true);
   touchCacheEntry("dsn_cache", "directory", directory);
   return rowToCachedDsnEntry(row);
