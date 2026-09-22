@@ -83,11 +83,18 @@ function getUserLabel(event: IssueEvent): string {
   return label ? escapeMarkdownCell(label) : colorTag("muted", "—");
 }
 
-/** Table columns for event listing */
+/**
+ * Table columns for event listing.
+ *
+ * The event ID is printed in full. Sentry search cannot match a partial
+ * event ID, and agents copy this cell into `sentry event view`. A 12-char
+ * prefix (the old display) then fails lookup on any project whose event
+ * is not in the newest page.
+ */
 export const EVENT_COLUMNS: Column<IssueEvent>[] = [
   {
     header: "EVENT ID",
-    value: (e) => `\`${e.eventID.slice(0, 12)}\``,
+    value: (e) => `\`${e.eventID}\``,
     shrinkable: false,
   },
   {
@@ -130,7 +137,9 @@ export function formatEventsHuman(result: EventsResult): string {
       : "No events found for this issue.";
   }
 
-  return `Events for ${issueShortId}:\n\n${formatTable(events, EVENT_COLUMNS)}`;
+  // Wider than a default 80-column terminal so the 32-char event ID stays
+  // on one line and does not force the title into a few characters.
+  return `Events for ${issueShortId}:\n\n${formatTable(events, EVENT_COLUMNS, { maxWidth: 160 })}`;
 }
 
 /**

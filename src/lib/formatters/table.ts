@@ -78,6 +78,12 @@ export function buildMarkdownTable<T>(
  */
 /** Options for writeTable. */
 export type WriteTableOptions = {
+  /**
+   * Maximum table width in columns. Defaults to the terminal width (or 80).
+   * Pass a larger value when a column must stay intact, such as a full
+   * event ID, so the fitter does not wrap that row's neighbors into it.
+   */
+  maxWidth?: number;
   /** Truncate cells to one line with "\u2026" instead of wrapping. @default false */
   truncate?: boolean;
   /**
@@ -115,6 +121,7 @@ export function formatTable<T>(
     alignments,
     minWidths,
     shrinkable,
+    maxWidth: options?.maxWidth,
     truncate: options?.truncate,
     // Strip ANSI color from row separators in plain mode
     rowSeparator: isPlainOutput()
