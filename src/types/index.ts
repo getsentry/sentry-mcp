@@ -175,6 +175,7 @@ export {
   CustomerTrialInfoSchema,
   DetailedLogsResponseSchema,
   DetailedSentryLogSchema,
+  EventViewOutputSchema,
   ISSUE_LEVELS,
   ISSUE_STATUSES,
   IssueEventSchema,

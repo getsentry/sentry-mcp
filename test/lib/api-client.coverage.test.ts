@@ -2178,17 +2178,20 @@ describe("infrastructure.ts (rawApiRequest)", () => {
       expect(capturedAccept).toBe("text/csv");
     });
 
-    test("includes query params", async () => {
+    test("merges query params with an existing endpoint query", async () => {
       globalThis.fetch = mockFetch(async (input) => {
-        const url = String(input instanceof Request ? input.url : input);
-        expect(url).toContain("per_page=10");
+        const url = new URL(
+          String(input instanceof Request ? input.url : input)
+        );
+        expect(url.searchParams.get("download")).toBe("1");
+        expect(url.searchParams.get("per_page")).toBe("10");
         return new Response(JSON.stringify({}), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       });
 
-      await rawApiRequest("/test/", {
+      await rawApiRequest("/test/?download=1", {
         params: { per_page: 10 },
       });
     });

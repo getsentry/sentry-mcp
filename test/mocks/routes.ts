@@ -397,6 +397,13 @@ export const apiRoutes: MockRoute[] = [
           ],
         };
       }
+      if (
+        params.orgSlug === TEST_ORG &&
+        params.projectSlug === TEST_PROJECT &&
+        params.eventId === TEST_EVENT_ID
+      ) {
+        return { body: [] };
+      }
       return { status: 404, body: notFoundFixture };
     },
   },

@@ -65,7 +65,7 @@ sentry api organizations/ --verbose
 # Preview the request without sending
 sentry api organizations/ --dry-run
 
-sentry api "projects/my-org/my-project/events/EVENT_ID/attachments/ATTACHMENT_ID/?download=1" > screenshot.png
+sentry api "https://sentry.io/api/0/projects/my-org/my-project/events/EVENT_ID/attachments/ATTACHMENT_ID/?download=1" > screenshot.png
 ```
 
 All commands also support `--json`, `--fields`, `--help`, `--log-level`, and `--verbose` flags.

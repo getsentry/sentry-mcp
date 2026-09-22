@@ -7,7 +7,7 @@ import {
   throwApiError,
 } from "../../../src/lib/api/infrastructure.js";
 import { setAuthToken } from "../../../src/lib/db/auth.js";
-import { ApiError } from "../../../src/lib/errors.js";
+import { ApiError, HostScopeError } from "../../../src/lib/errors.js";
 import { mockFetch, useTestConfigDir } from "../../helpers.js";
 
 describe("throwApiError", () => {
@@ -586,6 +586,21 @@ describe("rawApiRequest binary handling", () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  test("rejects an absolute base URL outside the token trust scope", async () => {
+    setAuthToken("test-token", undefined, undefined, {
+      host: "https://sentry.io",
+    });
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(
+      rawApiRequest("organizations/", {
+        baseUrl: "https://example.invalid",
+      })
+    ).rejects.toBeInstanceOf(HostScopeError);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   test("returns Uint8Array for image/png without UTF-8 corruption", async () => {

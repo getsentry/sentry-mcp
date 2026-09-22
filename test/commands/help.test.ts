@@ -141,6 +141,20 @@ describe("sentry help --json <group> <command>", () => {
     expect(parsed).toHaveProperty("path", "sentry api");
     expect(parsed).toHaveProperty("flags");
   });
+
+  test("event view documents attachment download URLs", async () => {
+    const output = await runHelp(["--json", "event", "view"]);
+    const parsed = JSON.parse(output);
+    const attachments = parsed.jsonFields?.find(
+      (field: { name: string }) => field.name === "attachments"
+    );
+
+    expect(attachments).toMatchObject({
+      type: "array",
+      description:
+        "Event attachments; each includes metadata and an absolute authenticated download URL",
+    });
+  });
 });
 
 describe("sentry help --json nested routes (dashboard widget)", () => {

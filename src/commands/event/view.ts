@@ -10,7 +10,9 @@ import {
   findEventAcrossOrgs,
   getEvent,
   getIssueByShortId,
+  getIssueInOrg,
   getLatestEvent,
+  ISSUE_DETAIL_COLLAPSE,
   ORG_FANOUT_CONCURRENCY,
   type ResolvedEvent,
   resolveEventInOrg,
@@ -33,6 +35,13 @@ import {
   ResolutionError,
   ValidationError,
 } from "../../lib/errors.js";
+import {
+  attachmentDownloadHint,
+  type EventViewAttachment,
+  eventProjectSlug,
+  formatEventAttachments,
+  loadEventAttachments,
+} from "../../lib/event-attachments.js";
 import { formatEventDetails } from "../../lib/formatters/index.js";
 import { filterFields } from "../../lib/formatters/json.js";
 import { CommandOutput } from "../../lib/formatters/output.js";
@@ -62,7 +71,7 @@ import {
 import { buildEventSearchUrl } from "../../lib/sentry-urls.js";
 import { getSpanTreeLines } from "../../lib/span-tree.js";
 import { isAllDigits } from "../../lib/utils.js";
-import type { SentryEvent } from "../../types/index.js";
+import { EventViewOutputSchema, type SentryEvent } from "../../types/index.js";
 
 type ViewFlags = {
   readonly json: boolean;
@@ -78,6 +87,10 @@ type SingleEventViewData = {
   trace: { traceId: string; spans: unknown[] } | null;
   /** Pre-formatted span tree lines for human output (not serialized) */
   spanTreeLines?: string[];
+  /** Attachment metadata; omitted from human output when empty */
+  attachments?: EventViewAttachment[];
+  /** Resolved organization, including cross-org fallback results */
+  org?: string;
 };
 
 /**
@@ -109,6 +122,11 @@ export function formatEventView(data: EventViewData): string {
     if (entry.spanTreeLines && entry.spanTreeLines.length > 0) {
       parts.push(entry.spanTreeLines.join("\n"));
     }
+
+    const attachments = formatEventAttachments(entry.attachments ?? []);
+    if (attachments) {
+      parts.push(attachments);
+    }
   }
 
   return parts.join("\n");
@@ -119,7 +137,9 @@ export function formatEventView(data: EventViewData): string {
  *
  * For single-event output, flattens the event as the primary object so that
  * `--fields eventID,title` works directly on event properties. The `trace`
- * enrichment data is attached as a nested key.
+ * enrichment data is attached as a nested key. Attachment metadata is always
+ * present as `attachments` (empty array when none), with a `download` URL for
+ * each listed attachment.
  *
  * For multi-event output, returns an array of flattened event objects.
  * This preserves backward compatibility: single-event callers still get
@@ -133,6 +153,7 @@ export function jsonTransformEventView(
     const result: Record<string, unknown> = {
       ...entry.event,
       trace: entry.trace,
+      attachments: entry.attachments ?? [],
     };
     if (fields && fields.length > 0) {
       return filterFields(result, fields) as Record<string, unknown>;
@@ -164,6 +185,21 @@ function replayHint(org: string, event: SentryEvent): string | undefined {
 function joinHintParts(parts: Array<string | undefined>): string | undefined {
   const hints = parts.filter((part): part is string => Boolean(part));
   return hints.length > 0 ? hints.join(" | ") : undefined;
+}
+
+function viewOutputHint(
+  org: string,
+  data: SingleEventViewData | undefined,
+  extra?: string
+): string | undefined {
+  if (!data) {
+    return extra;
+  }
+  return joinHintParts([
+    extra,
+    replayHint(org, data.event),
+    attachmentDownloadHint(data.attachments ?? []),
+  ]);
 }
 
 /** Usage hint for ContextError messages */
@@ -656,19 +692,32 @@ export async function resolveAutoDetectTarget(
  * @param org - Organization slug (needed for span tree API call)
  * @param event - Already-fetched event
  * @param spans - Span tree depth (0 = skip)
+ * @param project - Project slug for attachment listing, when already resolved
  */
 async function buildSingleEventViewData(
   org: string,
   event: SentryEvent,
-  spans: number
+  spans: number,
+  project?: string
 ): Promise<SingleEventViewData> {
-  const spanTreeResult =
-    spans > 0 ? await getSpanTreeLines(org, event, spans) : undefined;
+  const projectSlug = project ?? eventProjectSlug(event);
+  const [spanTreeResult, attachments] = await Promise.all([
+    spans > 0
+      ? getSpanTreeLines(org, event, spans)
+      : Promise.resolve(undefined),
+    loadEventAttachments(org, projectSlug, event.eventID),
+  ]);
   const trace =
     spanTreeResult?.success && spanTreeResult.traceId
       ? { traceId: spanTreeResult.traceId, spans: spanTreeResult.spans ?? [] }
       : null;
-  return { event, trace, spanTreeLines: spanTreeResult?.lines };
+  return {
+    event,
+    trace,
+    spanTreeLines: spanTreeResult?.lines,
+    attachments,
+    org,
+  };
 }
 
 /**
@@ -678,10 +727,11 @@ async function buildSingleEventViewData(
 async function fetchLatestEventData(
   org: string,
   issueId: string,
-  spans: number
+  spans: number,
+  project?: string
 ): Promise<SingleEventViewData> {
   const event = await getLatestEvent(org, issueId);
-  return buildSingleEventViewData(org, event, spans);
+  return buildSingleEventViewData(org, event, spans, project);
 }
 
 /**
@@ -690,14 +740,14 @@ async function fetchLatestEventData(
  * 1. Same-org fallback: tries the eventids resolution endpoint within `org`.
  * 2. Cross-org fallback: fans out to all accessible orgs (skipping `org`).
  *
- * Returns the event and logs a warning when found in a different location,
- * or returns null if the event cannot be found anywhere.
+ * Returns the resolved location and event, or null when the event cannot be
+ * found anywhere.
  */
 async function tryEventFallbacks(
   org: string,
   project: string,
   eventId: string
-): Promise<SentryEvent | null> {
+): Promise<ResolvedEvent | null> {
   // Same-org fallback: try cross-project lookup within the specified org.
   // Handles wrong-project resolution from DSN auto-detect or config defaults.
   // Track whether the search completed so we can skip the org in cross-org
@@ -714,7 +764,7 @@ async function tryEventFallbacks(
       logger.warn(
         `Event not found in ${org}/${project}, but found in ${resolved.org}/${resolved.project}.`
       );
-      return resolved.event;
+      return resolved;
     }
   } catch (sameOrgError) {
     // Propagate auth errors — they indicate a global problem (expired token)
@@ -745,7 +795,7 @@ async function tryEventFallbacks(
           ? `Event not found in ${org}/${project}`
           : `Event not found in '${org}'`;
       logger.warn(`${prefix}, but found in ${location}.`);
-      return crossOrg.event;
+      return crossOrg;
     }
   } catch (fallbackError) {
     // Propagate auth errors — they indicate a global problem (expired token)
@@ -773,19 +823,20 @@ async function tryEventFallbacks(
  * @param org - Organization slug
  * @param project - Project slug
  * @param eventId - Event ID being looked up
- * @returns The event data
+ * @returns The event and its resolved organization/project
  */
 export async function fetchEventWithContext(
   prefetchedEvent: SentryEvent | null,
   org: string,
   project: string,
   eventId: string
-): Promise<SentryEvent> {
+): Promise<ResolvedEvent> {
   if (prefetchedEvent) {
-    return prefetchedEvent;
+    return { org, project, event: prefetchedEvent };
   }
   try {
-    return await getEvent(org, project, eventId);
+    const event = await getEvent(org, project, eventId);
+    return { org, project, event };
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       const fallback = await tryEventFallbacks(org, project, eventId);
@@ -835,7 +886,7 @@ async function resolveIssueShortIdEvent(
   spans: number
 ): Promise<SingleEventViewData> {
   const issue = await getIssueByShortId(org, issueShortId);
-  return fetchLatestEventData(org, issue.id, spans);
+  return fetchLatestEventData(org, issue.id, spans, issue.project?.slug);
 }
 
 /** Result from an issue-based shortcut (URL or short ID) */
@@ -856,12 +907,31 @@ type IssueShortcutOptions = {
 };
 
 /**
+ * Best-effort project resolution for numeric issue shortcuts.
+ */
+async function tryResolveIssueProject(
+  org: string,
+  issueId: string
+): Promise<string | undefined> {
+  try {
+    const issue = await getIssueInOrg(org, issueId, {
+      collapse: ISSUE_DETAIL_COLLAPSE,
+    });
+    return issue.project?.slug;
+  } catch (error) {
+    logger
+      .withTag("event.view")
+      .debug("Failed to resolve project for issue attachments", error);
+    return;
+  }
+}
+
+/**
  * Fetch the latest event for a numeric issue ID (or issue-URL issue ID).
  *
- * getLatestEvent only needs org + issue ID, so the org is taken from the
- * explicit target when one was supplied (`org/` or `org/project`) and
- * otherwise auto-detected via env/config/DSN. Using resolveEffectiveOrg("")
- * here would skip auto-detection and fail when no org was on the command line.
+ * The organization comes from an explicit target (`org/` or `org/project`) or
+ * auto-detection. When the project is not explicit, issue details provide its
+ * slug so attachment lookup can use the project-scoped endpoint.
  */
 async function resolveIssueIdShortcut(
   parsed: ReturnType<typeof parseOrgProjectArg>,
@@ -880,7 +950,18 @@ async function resolveIssueIdShortcut(
   }
   const org = resolved.org;
   log.info(`Fetching latest event for issue ${issueId}...`);
-  const data = await fetchLatestEventData(org, issueId, spans);
+  const explicitProject =
+    parsed.type === ProjectSpecificationType.Explicit
+      ? parsed.project
+      : undefined;
+  const projectPromise = explicitProject
+    ? Promise.resolve(explicitProject)
+    : tryResolveIssueProject(org, issueId);
+  const [event, project] = await Promise.all([
+    getLatestEvent(org, issueId),
+    projectPromise,
+  ]);
+  const data = await buildSingleEventViewData(org, event, spans, project);
   return { org, data, hint: `Showing latest event for issue ${issueId}` };
 }
 
@@ -938,7 +1019,12 @@ async function resolveIssueShortcut(
         );
       }
       const event = await getEvent(resolved.org, issueProject, eventId);
-      const data = await buildSingleEventViewData(resolved.org, event, spans);
+      const data = await buildSingleEventViewData(
+        resolved.org,
+        event,
+        spans,
+        issueProject
+      );
       return {
         org: resolved.org,
         data,
@@ -1023,7 +1109,7 @@ type FetchMultipleOptions = {
  */
 export async function fetchMultipleEvents(
   options: FetchMultipleOptions
-): Promise<SentryEvent[]> {
+): Promise<ResolvedEvent[]> {
   const { eventIds, org, project, prefetchedEvent, primaryId } = options;
   const log = logger.withTag("event.view");
   const limit = pLimit(ORG_FANOUT_CONCURRENCY);
@@ -1041,7 +1127,7 @@ export async function fetchMultipleEvents(
     )
   );
 
-  const events: SentryEvent[] = [];
+  const events: ResolvedEvent[] = [];
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
     if (result?.status === "fulfilled") {
@@ -1071,11 +1157,15 @@ export const viewCommand = buildCommand({
       "  sentry event view <org>/<proj> <event-id> [<id>...]  # explicit org and project\n" +
       "  sentry event view <project> <event-id> [<id>...]     # find project across all orgs\n\n" +
       "Multiple event IDs can be passed as separate arguments or newline-separated\n" +
-      "within a single argument (handy when piping from other commands).",
+      "within a single argument (handy when piping from other commands).\n\n" +
+      "Attachment metadata (id, name, size, mimetype, download URL) is included when available.\n" +
+      "Download bytes with:\n" +
+      '  sentry api "<attachments[].download>" > file',
   },
   output: {
     human: formatEventView,
     jsonTransform: jsonTransformEventView,
+    schema: EventViewOutputSchema,
   },
   parameters: {
     positional: {
@@ -1145,10 +1235,11 @@ export const viewCommand = buildCommand({
         requestedCount: 1,
       });
       return {
-        hint: joinHintParts([
-          issueShortcut.hint,
-          replayHint(issueShortcut.org, issueShortcut.data.event),
-        ]),
+        hint: viewOutputHint(
+          issueShortcut.org,
+          issueShortcut.data,
+          issueShortcut.hint
+        ),
       };
     }
 
@@ -1195,8 +1286,13 @@ export const viewCommand = buildCommand({
 
     // Build view data for each event in parallel
     const viewDataEntries = await Promise.all(
-      fetchedEvents.map((event) =>
-        buildSingleEventViewData(target.org, event, flags.spans)
+      fetchedEvents.map((resolved) =>
+        buildSingleEventViewData(
+          resolved.org,
+          resolved.event,
+          flags.spans,
+          resolved.project
+        )
       )
     );
 
@@ -1205,12 +1301,11 @@ export const viewCommand = buildCommand({
       requestedCount: allEventIds.length,
     });
     return {
-      hint: joinHintParts([
-        target.detectedFrom
-          ? `Detected from ${target.detectedFrom}`
-          : undefined,
-        fetchedEvents[0] ? replayHint(target.org, fetchedEvents[0]) : undefined,
-      ]),
+      hint: viewOutputHint(
+        viewDataEntries[0]?.org ?? target.org,
+        viewDataEntries[0],
+        target.detectedFrom ? `Detected from ${target.detectedFrom}` : undefined
+      ),
     };
   },
 });

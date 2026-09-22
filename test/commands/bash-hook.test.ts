@@ -8,8 +8,8 @@
 import { run } from "@stricli/core";
 import { describe, expect, test } from "vitest";
 import { app } from "../../src/app.js";
-import { shellQuote } from "../../src/commands/bash-hook.js";
 import type { SentryContext } from "../../src/context.js";
+import { shellQuote } from "../../src/lib/utils.js";
 import { useTestConfigDir } from "../helpers.js";
 
 useTestConfigDir("bash-hook-");
