@@ -43,15 +43,10 @@ export async function createTracedToolHandler<T extends ToolName>(
 
 ### Organization Context
 
-After resolving an organization's slug, tool handlers call
-`setOrganizationContext(slug)` from `packages/mcp-core/src/telem/organization.ts`.
-The helper sets the `organization.slug` scope attribute for streamed spans,
-logs, and metrics, and retains the scope tag for error events. SDK v11 does
-not copy scope tags onto streamed spans, including root/segment spans used by
-the Unique Organizations dashboard.
-
-Keep this call at the resolved-organization point so URL-derived organizations
-and catalog execution have the same telemetry as explicit tool arguments.
+Call `setOrganizationContext(slug)` from `src/telem/organization.ts` after
+resolving the organization, including from URLs. It sets `organization.slug`
+as a scope attribute for streamed spans, logs, and metrics, and as a tag for
+errors. SDK v11 no longer copies scope tags onto spans.
 
 ### Span Management
 

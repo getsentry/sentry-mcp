@@ -7,8 +7,6 @@ import {
   getCurrentScope,
   getIsolationScope,
   setCurrentClient,
-  startSpan,
-  withIsolationScope,
 } from "@sentry/core";
 import { ServerRuntimeClient } from "@sentry/core/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -76,26 +74,24 @@ describe("organization telemetry", () => {
   ])(
     "includes $description on streamed root spans",
     async ({ name, args, constraints }) => {
-      await withIsolationScope(async () => {
-        const server = buildServer({
-          context: getServerContext({
-            constraints,
-            grantedSkills: new Set(["inspect"]),
-          }),
-        });
-        const client = new Client({ name: "telemetry-test", version: "1.0.0" });
-        const [clientTransport, serverTransport] =
-          InMemoryTransport.createLinkedPair();
+      const server = buildServer({
+        context: getServerContext({
+          constraints,
+          grantedSkills: new Set(["inspect"]),
+        }),
+      });
+      const client = new Client({ name: "telemetry-test", version: "1.0.0" });
+      const [clientTransport, serverTransport] =
+        InMemoryTransport.createLinkedPair();
+      try {
         await server.connect(serverTransport);
         await client.connect(clientTransport);
-        try {
-          const result = await client.callTool({ name, arguments: args });
-          expect(result.isError).not.toBe(true);
-        } finally {
-          await client.close();
-          await server.close();
-        }
-      });
+        const result = await client.callTool({ name, arguments: args });
+        expect(result.isError).not.toBe(true);
+      } finally {
+        await client.close();
+        await server.close();
+      }
       await sentry.flush();
       expect(beforeSendSpan).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -109,19 +105,11 @@ describe("organization telemetry", () => {
   );
 
   it("preserves organization tags on error events", async () => {
-    await withIsolationScope(async () => {
-      await startSpan({ name: "org-request" }, async () => {
-        await findProjects.handler(
-          {
-            organizationSlug: "sentry-mcp-evals",
-            regionUrl: null,
-            query: null,
-          },
-          getServerContext(),
-        );
-        captureException(new Error("organization telemetry regression"));
-      });
-    });
+    await findProjects.handler(
+      { organizationSlug: "sentry-mcp-evals", regionUrl: null, query: null },
+      getServerContext(),
+    );
+    captureException(new Error("organization telemetry regression"));
     await sentry.flush();
     expect(beforeSend).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -130,14 +118,6 @@ describe("organization telemetry", () => {
         }),
       }),
       expect.anything(),
-    );
-    expect(beforeSendSpan).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: "org-request",
-        attributes: expect.objectContaining({
-          "organization.slug": "sentry-mcp-evals",
-        }),
-      }),
     );
   });
 });

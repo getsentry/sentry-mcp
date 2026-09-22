@@ -3,7 +3,6 @@ import type {
   ImageContent,
   TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
-
 import { setOrganizationContext } from "../../telem/organization";
 import { DEFAULT_MAX_INLINE_ATTACHMENT_BYTES } from "../../api-client";
 import { bytesToBase64 } from "../../internal/blob-utils";
