@@ -251,6 +251,7 @@ describe("eventsCommand.func()", () => {
     expect(output).toContain("TypeError");
     expect(output).toContain("ReferenceError");
     expect(output).toContain("Showing 2 events.");
+    expect(output).toContain("aaaa1111bbbb2222cccc3333dddd4444");
   });
 
   test("shows next page hint when nextCursor is present", async () => {

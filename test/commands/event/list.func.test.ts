@@ -206,6 +206,9 @@ describe("event list command func()", () => {
     const output = stdoutWrite.mock.calls.map((c) => c[0]).join("");
     expect(output).toContain("Events for CLI-G5:");
     expect(output).toContain("Showing 2 events.");
+    // Full ID, not a 12-char prefix. Agents copy this cell into event view,
+    // and Sentry cannot search a partial event ID.
+    expect(output).toContain("aaaa1111bbbb2222cccc3333dddd4444");
   });
 
   test("pagination hints use 'sentry event list', not 'sentry issue events'", async () => {

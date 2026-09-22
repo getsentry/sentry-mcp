@@ -346,7 +346,7 @@ describe("recoverHexId decision tree", () => {
     const r = await recoverHexId("05d6975ab9bb", "event", CLEAN_CTX);
     expect(r.kind).toBe("failed");
     expect(r.kind === "failed" && r.reason).toBe("no-matches");
-    expect(r.kind === "failed" && r.hint).toContain("90d");
+    expect(r.kind === "failed" && r.hint).toContain("32-character ID");
   });
 
   test("31-hex off-by-one falls through to fuzzy", async () => {

@@ -578,6 +578,13 @@ function buildNoMatchHint(
   if (entityType === "span") {
     return "No span matched this prefix within the trace.";
   }
+  if (entityType === "event") {
+    return (
+      `No event matched this prefix in the last ${window}. ` +
+      "Sentry cannot search by a partial event ID — pass the full " +
+      "32-character ID printed by `sentry event list`."
+    );
+  }
   return (
     `No ${entityType} matched this prefix in the last ${window}. ` +
     `The ID format is valid but no matching ${entityType} exists in this project — ` +
