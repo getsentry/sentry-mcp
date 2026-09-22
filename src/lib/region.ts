@@ -10,6 +10,7 @@ import { getConfiguredSentryUrl } from "./constants.js";
 import { getOrgByNumericId, getOrgRegion, setOrgRegion } from "./db/regions.js";
 import { stripDsnOrgPrefix } from "./dsn/index.js";
 import { withAuthGuard } from "./errors.js";
+import { logger } from "./logger.js";
 import { getSdkConfig } from "./sentry-client.js";
 import { getSentryBaseUrl, isSentrySaasUrl } from "./sentry-urls.js";
 
@@ -59,6 +60,31 @@ export function resolveOrgRegion(orgSlug: string): Promise<string> {
 }
 
 /**
+ * Coerce a regionUrl from the API into an absolute URL.
+ *
+ * Self-hosted instances may return a relative regionUrl (e.g. "/") which is
+ * truthy but breaks fetch calls that depend on an absolute base URL. Resolve
+ * a relative value against baseUrl so it becomes absolute instead of being
+ * discarded; an already-absolute value is returned unchanged.
+ */
+function toAbsoluteRegionUrl(rawRegionUrl: string, baseUrl: string): string {
+  // Already absolute — use verbatim.
+  if (URL.canParse(rawRegionUrl)) {
+    return rawRegionUrl;
+  }
+
+  // Relative (e.g. "/") — resolve against baseUrl to get an absolute origin.
+  if (URL.canParse(rawRegionUrl, baseUrl)) {
+    return new URL(rawRegionUrl, baseUrl).origin;
+  }
+
+  logger.debug(
+    `regionUrl "${rawRegionUrl}" from API could not be resolved to an absolute URL; falling back to baseUrl`
+  );
+  return baseUrl;
+}
+
+/**
  * Resolve org region from SQLite cache or API.
  * Called at most once per orgSlug per process lifetime.
  */
@@ -85,7 +111,14 @@ async function resolveOrgRegionUncached(orgSlug: string): Promise<string> {
       throw response.error;
     }
 
-    const regionUrl = response.data?.links?.regionUrl || baseUrl;
+    // Self-hosted instances may return a relative regionUrl (e.g. "/") which
+    // is truthy but would break fetch calls that depend on an absolute base
+    // URL. Resolve it against baseUrl so a relative value becomes absolute
+    // instead of being discarded; keep an already-absolute value as-is.
+    const rawRegionUrl = response.data?.links?.regionUrl;
+    const regionUrl = rawRegionUrl
+      ? toAbsoluteRegionUrl(rawRegionUrl, baseUrl)
+      : baseUrl;
 
     // Cache for future use. setOrgRegion also extends the in-process
     // trust class so the subsequent request to this region passes the
