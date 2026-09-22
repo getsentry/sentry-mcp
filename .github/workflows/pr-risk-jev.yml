@@ -74,7 +74,7 @@ jobs:
             }
             const target = result.status === 'ok' ? `risk: ${result.risk_label}` : null;
             const existing = pr.labels.map(label => label.name);
-            if (target) {
+            if (target && !existing.includes(target)) {
               try {
                 await github.rest.issues.getLabel({ ...repo, name: target });
               } catch (error) {

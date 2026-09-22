@@ -28,7 +28,8 @@ and also supports drafts.
 
 The pinned risk Action reads PR metadata and Git diffs without checking out or
 executing PR code. Labels are only published for the analyzed revision; unrelated
-labels are preserved. If a current-revision analysis fails, previous risk labels
+labels are preserved. An unchanged classification makes no label changes.
+If a current-revision analysis fails, previous risk labels
 are cleared and the PR stays unclassified. Results are retained as workflow
 artifacts for 30 days.
 
