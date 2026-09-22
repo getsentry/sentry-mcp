@@ -43,6 +43,86 @@ export type ResourceSummary = {
 /** Type the imported JSON array */
 const schema = endpoints as ApiEndpoint[];
 
+const HTTP_METHOD_PREFIX = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+/i;
+const HTTP_URL_PREFIX = /^https?:\/\//i;
+const WHITESPACE = /\s/;
+
+/** Parsed `METHOD /path` or `/api/...` query used by `sentry schema`. */
+export type ParsedEndpointQuery = {
+  /** Uppercase HTTP method when the query starts with one */
+  method?: string;
+  /** Normalized API path when the query looks like one */
+  path?: string;
+  /** Remainder after stripping a leading HTTP method */
+  text: string;
+};
+
+/**
+ * Parse `GET /api/0/...`, `/api/0/...`, or a keyword.
+ * Path-shaped input includes `/api/...`, `api/0/...`, and full Sentry URLs.
+ */
+export function parseEndpointQuery(query: string): ParsedEndpointQuery {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return { text: "" };
+  }
+
+  const methodMatch = trimmed.match(HTTP_METHOD_PREFIX);
+  const method = methodMatch?.[1]?.toUpperCase();
+  const afterMethod = methodMatch
+    ? trimmed.slice(methodMatch[0].length).trim()
+    : trimmed;
+
+  const path = extractApiPath(afterMethod);
+  if (path) {
+    return { method, path, text: afterMethod };
+  }
+  return { method, text: afterMethod };
+}
+
+/**
+ * Find endpoints whose path matches `path`, optionally filtered by HTTP method.
+ * `{param}` in the schema matches a concrete slug; an OpenAPI-style query
+ * (`{param}` in the input) only matches schema params at that segment.
+ */
+export function findEndpointsByPath(
+  path: string,
+  method?: string
+): ApiEndpoint[] {
+  const methodUpper = method?.toUpperCase();
+  const normalized = normalizeApiPath(path);
+  const candidates = schema.filter((endpoint) => {
+    if (methodUpper && endpoint.method !== methodUpper) {
+      return false;
+    }
+    return pathsEquivalent(endpoint.path, normalized);
+  });
+  if (candidates.length <= 1) {
+    return candidates;
+  }
+
+  const exact = candidates.filter(
+    (endpoint) => normalizeApiPath(endpoint.path) === normalized
+  );
+  if (exact.length > 0) {
+    return exact;
+  }
+
+  let bestScore = -1;
+  const ranked: ApiEndpoint[] = [];
+  for (const endpoint of candidates) {
+    const score = literalSegmentScore(endpoint.path, normalized);
+    if (score > bestScore) {
+      bestScore = score;
+      ranked.length = 0;
+      ranked.push(endpoint);
+    } else if (score === bestScore) {
+      ranked.push(endpoint);
+    }
+  }
+  return ranked;
+}
+
 /** Get all unique resource names, sorted alphabetically */
 export function getAllResources(): string[] {
   const resources = new Set(schema.map((e) => e.resource));
@@ -88,10 +168,24 @@ export function getEndpoint(
   );
 }
 
-/** Search endpoints by query string (matches fn, path, description, resource, operationId) */
+/**
+ * Search endpoints by query string.
+ * Path-shaped input (`GET /api/0/...`, `/api/0/...`, or a Sentry API URL)
+ * uses path matching. Anything else is a case-insensitive substring of
+ * fn, path, description, resource, or operationId.
+ */
 export function searchEndpoints(query: string): ApiEndpoint[] {
-  const lower = query.toLowerCase();
-  return schema.filter(
+  const parsed = parseEndpointQuery(query);
+  if (parsed.path) {
+    return findEndpointsByPath(parsed.path, parsed.method);
+  }
+
+  const lower = parsed.text.toLowerCase();
+  if (!lower) {
+    return [];
+  }
+
+  const matches = schema.filter(
     (e) =>
       e.fn.toLowerCase().includes(lower) ||
       e.path.toLowerCase().includes(lower) ||
@@ -99,6 +193,99 @@ export function searchEndpoints(query: string): ApiEndpoint[] {
       e.resource.toLowerCase().includes(lower) ||
       e.operationId.toLowerCase().includes(lower)
   );
+  if (!parsed.method) {
+    return matches;
+  }
+  const methodMatches = matches.filter((e) => e.method === parsed.method);
+  return methodMatches.length > 0 ? methodMatches : matches;
+}
+
+function extractApiPath(input: string): string | undefined {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return;
+  }
+
+  if (HTTP_URL_PREFIX.test(trimmed)) {
+    const token = trimmed.split(WHITESPACE)[0] ?? trimmed;
+    if (!URL.canParse(token)) {
+      return;
+    }
+    const pathname = new URL(token).pathname;
+    if (pathname.startsWith("/api/")) {
+      return normalizeApiPath(pathname);
+    }
+    return;
+  }
+
+  const token = trimmed.split(WHITESPACE)[0] ?? trimmed;
+  if (token.startsWith("/api/")) {
+    return normalizeApiPath(token);
+  }
+  if (token.startsWith("api/0/") || token.startsWith("api/1/")) {
+    return normalizeApiPath(`/${token}`);
+  }
+  return;
+}
+
+function normalizeApiPath(path: string): string {
+  const noQuery = path.split("?")[0] ?? path;
+  const withLeading = noQuery.startsWith("/") ? noQuery : `/${noQuery}`;
+  return withLeading.endsWith("/") ? withLeading : `${withLeading}/`;
+}
+
+function isTemplateSegment(segment: string): boolean {
+  return segment.startsWith("{") && segment.endsWith("}") && segment.length > 2;
+}
+
+function splitPath(path: string): string[] {
+  return path.split("/").filter((segment) => segment.length > 0);
+}
+
+/**
+ * Schema `{param}` matches a concrete slug. Query `{param}` only matches a
+ * schema param — so an OpenAPI path does not collapse onto a static sibling
+ * like `latest-base` or a shorter resource like `getProject`.
+ */
+function pathsEquivalent(schemaPath: string, queryPath: string): boolean {
+  const left = normalizeApiPath(schemaPath);
+  const right = normalizeApiPath(queryPath);
+  if (left === right) {
+    return true;
+  }
+
+  const leftSegs = splitPath(left);
+  const rightSegs = splitPath(right);
+  if (leftSegs.length !== rightSegs.length) {
+    return false;
+  }
+
+  const queryIsTemplate = right.includes("{");
+  return leftSegs.every((schemaSeg, i) => {
+    const querySeg = rightSegs[i];
+    if (querySeg === undefined) {
+      return false;
+    }
+    if (schemaSeg === querySeg) {
+      return true;
+    }
+    if (queryIsTemplate) {
+      return isTemplateSegment(schemaSeg) && isTemplateSegment(querySeg);
+    }
+    return isTemplateSegment(schemaSeg);
+  });
+}
+
+function literalSegmentScore(schemaPath: string, queryPath: string): number {
+  const schemaSegs = splitPath(normalizeApiPath(schemaPath));
+  const querySegs = splitPath(normalizeApiPath(queryPath));
+  let score = 0;
+  for (let i = 0; i < schemaSegs.length; i++) {
+    if (schemaSegs[i] === querySegs[i]) {
+      score += 1;
+    }
+  }
+  return score;
 }
 
 /** Get all endpoints (returns a readonly reference to the internal array) */
