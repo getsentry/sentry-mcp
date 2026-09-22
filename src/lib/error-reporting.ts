@@ -104,6 +104,12 @@ export function classifySilenced(error: unknown): SilenceReason | null {
   ) {
     return "user_validation";
   }
+  // A ValidationError with field "input" means the --input file path the user
+  // supplied does not exist on disk. Pure user-input noise, not a CLI bug —
+  // the user sees a clear "File not found" message (CLI-1JY).
+  if (error instanceof ValidationError && error.field === "input") {
+    return "user_input_error";
+  }
   // A ResolutionError means the user provided a value (event ID, project slug,
   // etc.) that was looked up but not found. This is pure user-input noise, not
   // a CLI bug — the user sees a clear "not found" message (CLI-RP).

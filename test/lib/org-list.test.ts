@@ -516,12 +516,15 @@ describe("handleOrgAll", () => {
 
     expect(result.items).toHaveLength(250);
     expect(listPaginated).toHaveBeenCalledTimes(3);
+    // Each request uses only the remaining item budget, capped at API_MAX_PER_PAGE,
+    // so the final page requests only the remaining 50 items (250 - 100 - 100).
     expect(listPaginated.mock.calls.map((call) => call[1].perPage)).toEqual([
-      100, 100, 100,
+      100, 100, 50,
     ]);
-    // Overshoot trims and drops nextCursor so navigation cannot skip rows.
-    expect(result.hasMore).toBe(false);
-    expect(result.nextCursor).toBeNull();
+    // The mock always returns a nextCursor, so hasMore is true and
+    // the cursor points to the first item beyond the fetched 250.
+    expect(result.hasMore).toBe(true);
+    expect(result.nextCursor).toBe("250");
   });
 });
 

@@ -311,6 +311,15 @@ describe("classifySilenced", () => {
     ).toBe("user_validation");
   });
 
+  test("silences ValidationError with field 'input' (--input file not found)", () => {
+    // A missing --input file is pure user-input noise, not a CLI bug (CLI-1JY).
+    expect(
+      classifySilenced(
+        new ValidationError("File not found: /tmp/does-not-exist.json", "input")
+      )
+    ).toBe("user_input_error");
+  });
+
   test("silences ResolutionError (user provided a value that wasn't found)", () => {
     expect(
       classifySilenced(
