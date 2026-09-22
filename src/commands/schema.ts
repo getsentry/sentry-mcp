@@ -10,6 +10,7 @@
  *   sentry schema --search <query>     → search endpoints by keyword
  *   sentry schema <resource>           → show endpoints for a resource
  *   sentry schema <resource> <op>      → show detailed endpoint info
+ *   sentry schema <operation-id>       → show details by exact operation ID
  *   sentry schema "GET /api/0/..."     → show details for one endpoint
  *   sentry schema monitor*             → glob search for resources
  */
@@ -17,6 +18,7 @@
 import type { SentryContext } from "../context.js";
 import {
   type ApiEndpoint,
+  findEndpointsByIdentifier,
   findEndpointsByPath,
   getAllEndpoints,
   getEndpoint,
@@ -321,11 +323,25 @@ function resolvePathLookup(
   throw pathNotFoundError(queryLabel(resource, operation), query);
 }
 
+/** Resolve one exact SDK function name or OpenAPI operation ID. */
+function resolveIdentifierLookup(identifier: string): SchemaResult | undefined {
+  const matches = findEndpointsByIdentifier(identifier);
+  const [single] = matches;
+  if (matches.length === 1 && single) {
+    return { kind: "endpoint", endpoint: single };
+  }
+  if (matches.length > 1) {
+    return { kind: "endpoints", endpoints: matches };
+  }
+  return;
+}
+
 /**
  * Resolve a resource + optional operation into a SchemaResult.
  * Throws ResolutionError for no-match cases; throws OutputError with the
  * resource's endpoints when the resource exists but the operation does not.
- * Path-shaped queries (`GET /api/0/...`) resolve by method+path first.
+ * Path-shaped queries (`GET /api/0/...`) resolve by method+path first. A
+ * single exact SDK function name or OpenAPI operation ID resolves directly.
  */
 export function resolveResourceQuery(
   resource: string,
@@ -383,6 +399,10 @@ export function resolveResourceQuery(
   // Resource only: show all endpoints for that resource
   const endpoints = getEndpointsByResource(resource);
   if (endpoints.length === 0) {
+    const identifierResult = resolveIdentifierLookup(resource);
+    if (identifierResult) {
+      return identifierResult;
+    }
     throw noResourceMatchError(resource);
   }
   return { kind: "endpoints", endpoints };
@@ -408,6 +428,7 @@ export const schemaCommand = buildCommand({
       "  sentry schema                      List all API resources\n" +
       "  sentry schema issues                Show endpoints for a resource\n" +
       "  sentry schema issues list            Show details for one endpoint\n" +
+      "  sentry schema listOrganizationEvents Show details by operation ID\n" +
       '  sentry schema "GET /api/0/organizations/{organization_id_or_slug}/issues/"\n' +
       "  sentry schema --all                 Flat list of all endpoints\n" +
       "  sentry schema --search monitor      Search endpoints by keyword",
@@ -434,7 +455,7 @@ export const schemaCommand = buildCommand({
     positional: {
       kind: "array",
       parameter: {
-        brief: "Resource, operation, or METHOD /path",
+        brief: "Resource, exact operation ID, or METHOD /path",
         parse: String,
         placeholder: "resource",
       },

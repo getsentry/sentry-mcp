@@ -4,6 +4,7 @@
 
 import { describe, expect, test } from "vitest";
 import {
+  findEndpointsByIdentifier,
   findEndpointsByPath,
   getAllEndpoints,
   getAllResources,
@@ -176,6 +177,36 @@ describe("findEndpointsByPath", () => {
       "GET"
     );
     expect(matches).toEqual([]);
+  });
+});
+
+describe("findEndpointsByIdentifier", () => {
+  test("finds an endpoint by exact SDK function name", () => {
+    const matches = findEndpointsByIdentifier("listOrganizationEvents");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.fn).toBe("listOrganizationEvents");
+  });
+
+  test("finds an endpoint by exact OpenAPI operation ID", () => {
+    const endpoint = getAllEndpoints().find(
+      (candidate) =>
+        candidate.fn &&
+        candidate.operationId &&
+        candidate.fn !== candidate.operationId
+    );
+    expect(endpoint).toBeDefined();
+    if (!endpoint) {
+      return;
+    }
+
+    expect(findEndpointsByIdentifier(endpoint.operationId)).toContain(endpoint);
+  });
+
+  test("is case-insensitive but does not accept partial identifiers", () => {
+    expect(findEndpointsByIdentifier("LISTORGANIZATIONEVENTS")[0]?.fn).toBe(
+      "listOrganizationEvents"
+    );
+    expect(findEndpointsByIdentifier("OrganizationEvents")).toEqual([]);
   });
 });
 

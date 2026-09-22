@@ -123,6 +123,24 @@ export function findEndpointsByPath(
   return ranked;
 }
 
+/**
+ * Find endpoints by an exact SDK function name or OpenAPI operation ID.
+ *
+ * Matching is case-insensitive but deliberately not fuzzy: partial operation
+ * names can match many unrelated endpoints and should use `--search` instead.
+ */
+export function findEndpointsByIdentifier(identifier: string): ApiEndpoint[] {
+  const normalized = identifier.trim().toLowerCase();
+  if (!normalized) {
+    return [];
+  }
+  return schema.filter(
+    (endpoint) =>
+      endpoint.fn.toLowerCase() === normalized ||
+      endpoint.operationId.toLowerCase() === normalized
+  );
+}
+
 /** Get all unique resource names, sorted alphabetically */
 export function getAllResources(): string[] {
   const resources = new Set(schema.map((e) => e.resource));
