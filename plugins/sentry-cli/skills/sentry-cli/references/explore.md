@@ -73,6 +73,13 @@ sentry explore my-org/ \
   -F "sum(value,llm.token_usage,distribution,none)" \
   --dataset metrics --period 7d
 
+# List recent replays
+sentry explore my-org/cli --dataset replays --period 24h
+
+# Filter replays by activity level
+sentry explore my-org/cli --dataset replays -F activity -F duration \
+  -F "count_errors" --period 7d
+
 # Log severity counts in the last hour
 sentry explore my-org/cli -F severity -F "count()" \
   --dataset logs --period 1h
