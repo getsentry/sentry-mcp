@@ -1,5 +1,5 @@
-import { setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import type { SentryApiService } from "../../api-client";
 import { ApiNotFoundError } from "../../api-client";
 import type {
@@ -376,7 +376,7 @@ export default defineTool({
         );
       }
 
-      setTag("organization.slug", orgSlug);
+      setOrganizationContext(orgSlug);
       // Use issueId directly if provided (e.g., from URL parsing), otherwise search by eventId
       let issue: Awaited<ReturnType<typeof apiService.getIssue>>;
       if (params.issueId) {
@@ -494,7 +494,7 @@ export default defineTool({
         issueUrl: params.issueUrl,
       });
 
-    setTag("organization.slug", orgSlug);
+    setOrganizationContext(orgSlug);
 
     // For the main issue lookup, provide parameter context on 404
     let issue: Awaited<ReturnType<typeof apiService.getIssue>>;

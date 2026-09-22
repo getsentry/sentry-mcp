@@ -41,6 +41,13 @@ export async function createTracedToolHandler<T extends ToolName>(
 }
 ```
 
+### Organization Context
+
+Call `setOrganizationContext(slug)` from `src/telem/organization.ts` after
+resolving the organization, including from URLs. It sets `organization.slug`
+as a scope attribute for streamed spans, logs, and metrics, and as a tag for
+errors. SDK v11 no longer copies scope tags onto spans.
+
 ### Span Management
 
 ```typescript

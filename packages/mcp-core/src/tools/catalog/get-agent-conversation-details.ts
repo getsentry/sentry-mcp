@@ -3,6 +3,7 @@
 // oriented instead of mirroring every raw span attribute.
 import { z } from "zod";
 import { setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { structuredResult } from "../../internal/tool-helpers/results";
@@ -703,7 +704,7 @@ export default defineTool({
   outputSchema: aiConversationDetailsOutputSchema,
 
   async handler(params, context: ServerContext) {
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationContext(params.organizationSlug);
     setTag("ai_conversation.id", params.conversationId);
 
     if ((params.start && !params.end) || (!params.start && params.end)) {
