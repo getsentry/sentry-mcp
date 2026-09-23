@@ -158,6 +158,45 @@ describe("react-native xcode", () => {
     expect(sourcemaps.uploadSourcemaps).not.toHaveBeenCalled();
   });
 
+  test.each([
+    ["missing", 0],
+    ["missing", 7],
+    ["malformed", 0],
+    ["malformed", 7],
+  ] as const)("skips upload for a %s report and preserves build status %i", async (reportState, status) => {
+    spawnMock.mockImplementation(
+      (
+        _cmd: string,
+        _args: readonly string[] | undefined,
+        spawnOpts?: { env?: NodeJS.ProcessEnv }
+      ) => {
+        const reportPath = spawnOpts?.env?.SENTRY_RN_SOURCEMAP_REPORT;
+        if (reportPath) {
+          if (reportState === "missing") {
+            rmSync(reportPath);
+          } else {
+            writeFileSync(reportPath, '{"packager_bundle_path":');
+          }
+        }
+        return {
+          status,
+          stdout: "",
+          stderr: "",
+          pid: 1,
+          output: [],
+          signal: null,
+        };
+      }
+    );
+
+    const ctx = createContext({ CONFIGURATION: "Release" });
+    const func = await xcodeCommand.loader();
+    await func.call(ctx, { "build-script": script });
+
+    expect(ctx.process.exitCode).toBe(status === 0 ? undefined : status);
+    expect(sourcemaps.uploadSourcemaps).not.toHaveBeenCalled();
+  });
+
   test("warns and skips upload when the build produced no sourcemaps", async () => {
     spawnMock.mockImplementation(
       (
