@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SentryApiService } from "../api-client";
+import { EventSchema } from "../api-client/schema";
 import type { AutofixRunState, Event, Issue } from "../api-client/types";
 import {
   formatEventOutput,
@@ -405,6 +406,36 @@ describe("formatFrameHeader", () => {
 });
 
 describe("formatEventOutput", () => {
+  it.each(
+    [
+      null,
+      undefined,
+      ["one", 2],
+      "legacy extra",
+      0,
+      false,
+      { key: "value" },
+    ].map((context) => ({ context })),
+  )(
+    "parses and renders arbitrary legacy extra data: $context",
+    ({ context }) => {
+      const event = EventSchema.parse({
+        ...testEvents.pythonException("Invalid value"),
+        context,
+      });
+      const output = formatEventOutput(event);
+      expect(output).toContain("Invalid value");
+      if (context === null || context === undefined) {
+        expect(output).not.toContain("### Extra Data");
+      } else if (typeof context === "object" && !Array.isArray(context)) {
+        expect(output).toContain('**key**: "value"');
+      } else {
+        expect(output).toContain(JSON.stringify(context, undefined, 2));
+        expect(output).toContain("### Extra Data");
+      }
+    },
+  );
+
   it("formats Java thread stack traces correctly", () => {
     const event = testEvents.javaThreadError(
       "Cannot use this function, please use update(String sql, PreparedStatementSetter pss) instead",

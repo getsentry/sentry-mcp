@@ -1898,7 +1898,13 @@ function formatEventUser(user: z.infer<typeof EventSchema>["user"]) {
 }
 
 function formatContext(context: z.infer<typeof EventSchema>["context"]) {
-  if (!context || Object.keys(context).length === 0) {
+  if (context === null || context === undefined) {
+    return "";
+  }
+  if (typeof context !== "object" || Array.isArray(context)) {
+    return `### Extra Data\n\nAdditional data attached to this event.\n\n${JSON.stringify(context, undefined, 2)}\n\n`;
+  }
+  if (Object.keys(context).length === 0) {
     return "";
   }
   return `### Extra Data\n\nAdditional data attached to this event.\n\n${Object.entries(
