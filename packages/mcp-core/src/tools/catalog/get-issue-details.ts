@@ -406,7 +406,7 @@ export default defineTool({
         apiService
           .getEventForIssue({
             organizationSlug: orgSlug,
-            issueId: issue.shortId,
+            issueId: String(issue.id),
             eventId,
           })
           // Optionally enhance 404 errors with parameter context
@@ -414,7 +414,7 @@ export default defineTool({
             if (error instanceof ApiNotFoundError) {
               throw enhanceNotFoundError(error, {
                 organizationSlug: orgSlug,
-                issueId: issue.shortId,
+                issueId: String(issue.id),
                 eventId,
               });
             }
@@ -524,7 +524,7 @@ export default defineTool({
       apiService
         .getLatestEventForIssue({
           organizationSlug: orgSlug,
-          issueId: issue.shortId,
+          issueId: String(issue.id),
         })
         .then(async (event) => ({
           event,
@@ -648,7 +648,7 @@ async function fetchIssueEnrichmentData({
       seerEnabled,
     }),
     apiService
-      .getIssueExternalLinks({ organizationSlug, issueId: issue.shortId })
+      .getIssueExternalLinks({ organizationSlug, issueId })
       .catch(() => undefined),
     apiService
       .listReplayIdsForIssue({
@@ -691,7 +691,7 @@ async function maybeFetchAutofixState({
   }
 
   return apiService
-    .getAutofixState({ organizationSlug, issueId: issue.shortId })
+    .getAutofixState({ organizationSlug, issueId: String(issue.id) })
     .catch(() => undefined);
 }
 

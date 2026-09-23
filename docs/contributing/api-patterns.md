@@ -63,6 +63,13 @@ await api.issues.update({
 });
 ```
 
+### Resolved Issue IDs
+
+After resolving an issue, use `String(issue.id)` for follow-up API requests,
+including events, external links, and Seer analysis. Do not switch back to
+`issue.shortId`: short-ID resolution can fail for legacy mixed-case project
+slugs even when numeric-ID lookup succeeds. Keep short IDs for display.
+
 ### Multi-Region Support
 
 Sentry uses region-specific URLs:

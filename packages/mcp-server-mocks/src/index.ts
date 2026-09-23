@@ -1334,6 +1334,20 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
     fetch: () => HttpResponse.json({ autofix: null }),
   },
+  // Issue details use the resolved numeric ID for enrichment requests.
+  ...[
+    issueFixture.id,
+    "7890123456", // PERF-N1-001
+    "123456", // DEFAULT-001 / CONTEXT-001
+    "123456789", // TEAM-ISSUE-001
+    "6898891101", // MCP-SERVER-EQE
+    "7777777777", // FUTURE-TYPE-001
+    "4256774711", // BLOG-CSP-4XC
+  ].map((issueId) => ({
+    method: "get" as const,
+    path: `/api/0/organizations/sentry-mcp-evals/issues/${issueId}/autofix/`,
+    fetch: () => HttpResponse.json({ autofix: null }),
+  })),
   {
     method: "post",
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/autofix/",
