@@ -6,7 +6,11 @@
  * which returns blocks instead of steps.
  */
 
-import type { AutofixResponse, AutofixState } from "../../types/seer.js";
+import {
+  type AutofixResponse,
+  AutofixResponseSchema,
+  type AutofixState,
+} from "../../types/seer.js";
 
 import { resolveOrgRegion } from "../region.js";
 
@@ -96,6 +100,7 @@ export async function getAutofixState(
     `/organizations/${orgSlug}/issues/${issueId}/autofix/`,
     {
       params: EXPLORER_MODE_PARAMS,
+      schema: AutofixResponseSchema,
     }
   );
 
