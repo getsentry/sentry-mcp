@@ -3393,7 +3393,7 @@ export class SentryApiService {
     try {
       return EventsValidationResponseSchema.parse(body);
     } catch (err) {
-      if (err instanceof z.ZodError) {
+      if (response.status === 400 && err instanceof z.ZodError) {
         // The API returned a 400 with a generic error body (e.g. {detail: "..."})
         // rather than a structured validation result. Treat it as an API client error.
         const detail =

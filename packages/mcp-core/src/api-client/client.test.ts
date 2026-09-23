@@ -3,6 +3,38 @@ import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigurationError } from "../errors";
 import { SentryApiService } from "./client";
+import { ApiValidationError } from "./errors";
+import { z } from "zod";
+
+describe("validateEvents error bodies", () => {
+  afterEach(() => mswServer.resetHandlers());
+
+  it.each([400, 200])(
+    "preserves error classification for HTTP %i",
+    async (status) => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/validate/",
+          () => HttpResponse.json({ detail: "Invalid query" }, { status }),
+        ),
+      );
+      const api = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+      const result = api.validateEvents({ organizationSlug: "test-org" });
+      if (status === 400) {
+        await expect(result).rejects.toBeInstanceOf(ApiValidationError);
+        await expect(result).rejects.toMatchObject({
+          status: 400,
+          detail: "Invalid query",
+        });
+      } else {
+        await expect(result).rejects.toBeInstanceOf(z.ZodError);
+      }
+    },
+  );
+});
 
 describe("getIssueUrl", () => {
   it("should work with sentry.io", () => {
