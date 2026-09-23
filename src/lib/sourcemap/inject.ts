@@ -11,9 +11,11 @@ import ignore from "ignore";
 import { NODE_MODULES_DIRNAME } from "../constants.js";
 import { ValidationError } from "../errors.js";
 import { logger } from "../logger.js";
+import { isLikelyBinary } from "../scan/binary.js";
 import { walkFiles } from "../scan/index.js";
 import {
   EXISTING_DEBUGID_RE,
+  hasDebugIdRegistration,
   injectDebugId,
   injectInlineDebugId,
   readSourcemapDebugId,
@@ -51,7 +53,7 @@ export type InjectResult = {
    * `undefined` for inline maps (which have no standalone file).
    */
   mapPath?: string;
-  /** Whether debug IDs were injected (false if already present or skipped). */
+  /** Whether injection changed the files (or would change them in dry-run mode). */
   injected: boolean;
   /** The debug ID (injected or pre-existing). */
   debugId: string;
@@ -102,17 +104,19 @@ export async function injectDirectory(
   for (const { jsPath, map } of filePairs) {
     const mapPath = map.kind === "external" ? map.mapPath : undefined;
     if (options.dryRun) {
-      // Resolve the debug ID the real run would use, without modifying
-      // anything. Mirrors injectDebugId's precedence: the JS comment first,
-      // then an ID the sourcemap already carries — either means no injection.
-      const js = await readFile(jsPath, "utf-8");
+      // Match the real run's ID precedence and runtime registration check.
+      const jsBytes = await readFile(jsPath);
+      const js = jsBytes.toString("utf-8");
       const existing =
         js.match(EXISTING_DEBUGID_RE)?.[1] ?? (await readMapDebugId(map));
       results.push({
         jsPath,
         map,
         mapPath,
-        injected: !existing,
+        injected: !(
+          existing &&
+          (isLikelyBinary(jsBytes) || hasDebugIdRegistration(js, existing))
+        ),
         debugId: existing ?? "(pending)",
       });
       continue;

@@ -7,12 +7,14 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runInNewContext } from "node:vm";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { injectCommand } from "../../../src/commands/sourcemap/inject.js";
 import { uploadCommand } from "../../../src/commands/sourcemap/upload.js";
 // biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
 import * as sourcemapsApi from "../../../src/lib/api/sourcemaps.js";
 import { ValidationError } from "../../../src/lib/errors.js";
+import { getDebugIdSnippet } from "../../../src/lib/sourcemap/debug-id.js";
 
 type InjectFuncArgs = {
   ext?: string;
@@ -730,6 +732,86 @@ describe("sourcemap upload command — --allow-empty behavior", () => {
     }
   });
 
+  test.each([
+    { mapKind: "external", idSource: "comment and map" },
+    { mapKind: "external", idSource: "map only" },
+    { mapKind: "inline", idSource: "comment and map" },
+    { mapKind: "inline", idSource: "map only" },
+  ])("$mapKind map with ID in $idSource: uploads runtime registration and shifted mappings once", async ({
+    mapKind,
+    idSource,
+  }) => {
+    const debugId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    const jsPath = join(dir, "app.js");
+    const mapPath = join(dir, "app.js.map");
+    const map = JSON.stringify({
+      version: 3,
+      sources: ["app.ts"],
+      sourcesContent: ["globalThis.completed = true;"],
+      names: [],
+      mappings: "AAAA",
+      debug_id: debugId,
+    });
+    const mapUrl =
+      mapKind === "inline"
+        ? `data:application/json;base64,${Buffer.from(map).toString("base64")}`
+        : "app.js.map";
+    const comment =
+      idSource === "comment and map" ? `//# debugId=${debugId}\n` : "";
+    await writeFile(
+      jsPath,
+      `globalThis.completed = true;\n${comment}//# sourceMappingURL=${mapUrl}\n`
+    );
+    if (mapKind === "external") {
+      await writeFile(mapPath, map);
+    }
+
+    const uploadSpy = vi
+      .spyOn(sourcemapsApi, "uploadSourcemaps")
+      .mockResolvedValue(undefined);
+    try {
+      const ctx = makeContext();
+      await func.call(ctx, {}, dir);
+      const files = uploadSpy.mock.calls[0]?.[0]?.files ?? [];
+      expect(files).toHaveLength(2);
+      const jsFile = files.find((file) => file.type === "minified_source");
+      const mapFile = files.find((file) => file.type === "source_map");
+      expect(jsFile?.path).toBe(jsPath);
+      expect(jsFile?.debugId).toBe(debugId);
+      expect(mapFile?.debugId).toBe(debugId);
+
+      const uploadedJs = await readFile(jsPath, "utf-8");
+      const runtime: {
+        _sentryDebugIds?: Record<string, string>;
+        completed?: boolean;
+      } = {};
+      runInNewContext(uploadedJs, runtime);
+      expect(runtime.completed).toBe(true);
+      expect(Object.values(runtime._sentryDebugIds ?? {})).toEqual([debugId]);
+      const uploadedMap =
+        mapFile?.content?.toString("utf-8") ??
+        (await readFile(mapPath, "utf-8"));
+      expect(JSON.parse(uploadedMap)).toMatchObject({
+        debug_id: debugId,
+        debugId,
+        mappings: ";AAAA",
+      });
+
+      await func.call(ctx, {}, dir);
+      expect(uploadSpy).toHaveBeenCalledTimes(2);
+      expect(await readFile(jsPath, "utf-8")).toBe(uploadedJs);
+      const secondMap = uploadSpy.mock.calls[1]?.[0]?.files.find(
+        (file) => file.type === "source_map"
+      );
+      expect(
+        secondMap?.content?.toString("utf-8") ??
+          (await readFile(mapPath, "utf-8"))
+      ).toBe(uploadedMap);
+    } finally {
+      uploadSpy.mockRestore();
+    }
+  });
+
   test("pre-existing map debug ID: uploaded on both entries, files untouched", async () => {
     // What a bundler plugin running with `sourcemaps.disable: 'disable-upload'`
     // emits: the ID lives on the map, and the bundle is left alone so its
@@ -737,12 +819,12 @@ describe("sourcemap upload command — --allow-empty behavior", () => {
     const pluginId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
     const jsPath = join(dir, "app.js");
     const mapPath = join(dir, "app.js.map");
-    const js = `;!function(){e._sentryDebugIdIdentifier="sentry-dbid-${pluginId}"}();\nconsole.log(1)\n//# sourceMappingURL=app.js.map\n`;
+    const js = `${getDebugIdSnippet(pluginId)}\nconsole.log(1)\n//# sourceMappingURL=app.js.map\n`;
     const map = JSON.stringify({
       version: 3,
       sources: ["app.ts"],
       names: [],
-      mappings: "AAAA",
+      mappings: ";AAAA",
       debug_id: pluginId,
     });
     await writeFile(jsPath, js);
@@ -776,11 +858,11 @@ describe("sourcemap upload command — --allow-empty behavior", () => {
       version: 3,
       sources: ["a.ts"],
       names: [],
-      mappings: "AAAA",
+      mappings: ";AAAA",
       debug_id: pluginId,
     };
     const dataUrl = `data:application/json;base64,${Buffer.from(JSON.stringify(map)).toString("base64")}`;
-    const js = `console.log(1)\n//# sourceMappingURL=${dataUrl}\n`;
+    const js = `${getDebugIdSnippet(pluginId)}\nconsole.log(1)\n//# sourceMappingURL=${dataUrl}\n`;
     await writeFile(jsPath, js);
 
     const uploadSpy = vi
