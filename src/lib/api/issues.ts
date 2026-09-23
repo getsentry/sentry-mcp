@@ -692,20 +692,23 @@ export async function mergeIssues(
 /**
  * Resolve a share ID to basic issue data via the public share endpoint.
  *
- * This endpoint does not require authentication and is not org-scoped.
- * The response includes the numeric `groupID` needed to fetch full issue
+ * This org-scoped endpoint does not require authentication.
+ * The response includes the numeric issue `id` needed to fetch full issue
  * details via the authenticated API.
  *
  * @param baseUrl - The Sentry instance base URL (from the share URL)
+ * @param orgSlug - The organization that owns the shared issue
  * @param shareId - The share ID extracted from the share URL
- * @returns Object containing the numeric groupID
+ * @returns Object containing the numeric issue ID
  * @throws {ApiError} When the share link is expired, disabled, or invalid
  */
 export async function getSharedIssue(
   baseUrl: string,
+  orgSlug: string,
   shareId: string
-): Promise<{ groupID: string }> {
-  const url = `${baseUrl}/api/0/shared/issues/${encodeURIComponent(shareId)}/`;
+): Promise<{ id: string }> {
+  const path = `organizations/${encodeURIComponent(orgSlug)}/shared/issues/${encodeURIComponent(shareId)}/`;
+  const url = `${baseUrl.replace(TRAILING_SLASH_RE, "")}/api/0/${path}`;
   const headers = new Headers({ "Content-Type": "application/json" });
   // URL-scoped: headers only attach when `url`'s origin matches the trusted
   // host, so IAP tokens etc. can't leak to an attacker-controlled share URL.
@@ -721,7 +724,7 @@ export async function getSharedIssue(
         "TLS certificate error",
         0,
         buildTlsErrorDetail(error),
-        `shared/issues/${shareId}`
+        path
       );
     }
     throw error;
@@ -734,16 +737,46 @@ export async function getSharedIssue(
         404,
         "The share link may have been disabled by the issue owner.\n" +
           "  Ask them to re-enable sharing, or use the issue ID directly.",
-        `shared/issues/${shareId}`
+        path
       );
     }
     throw new ApiError(
       "Failed to resolve share link",
       response.status,
       undefined,
-      `shared/issues/${shareId}`
+      path
     );
   }
 
-  return (await response.json()) as { groupID: string };
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) {
+      throw error;
+    }
+    throw new ApiError(
+      "Share link returned invalid JSON",
+      response.status,
+      undefined,
+      path
+    );
+  }
+
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("id" in data) ||
+    typeof data.id !== "string" ||
+    data.id.length === 0
+  ) {
+    throw new ApiError(
+      "Share link response missing a valid issue ID",
+      response.status,
+      undefined,
+      path
+    );
+  }
+
+  return { id: data.id };
 }

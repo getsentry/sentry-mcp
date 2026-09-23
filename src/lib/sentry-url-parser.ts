@@ -72,6 +72,10 @@ function matchOrganizationsPath(
     return { baseUrl, org, issueId: segments[3], eventId };
   }
 
+  if (segments[2] === "share" && segments[3] === "issue" && segments[4]) {
+    return { baseUrl, org, shareId: segments[4] };
+  }
+
   const tracePath = matchTracePath(segments, 2);
   if (tracePath.status === "detail") {
     return { baseUrl, org, traceId: tracePath.traceId };
@@ -344,6 +348,7 @@ function matchSharePath(
  * Recognizes these path patterns (both SaaS and self-hosted):
  * - `/organizations/{org}/issues/{id}/`
  * - `/organizations/{org}/issues/{id}/events/{eventId}/`
+ * - `/organizations/{org}/share/issue/{shareId}/`
  * - `/settings/{org}/projects/{project}/`
  * - `/organizations/{org}/explore/traces/trace/{traceId}/` (canonical)
  * - `/organizations/{org}/traces/{traceId}/` (legacy)

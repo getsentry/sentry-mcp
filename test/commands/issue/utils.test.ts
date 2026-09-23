@@ -16,8 +16,17 @@ import { DEFAULT_SENTRY_URL } from "../../../src/lib/constants.js";
 import { setAuthToken } from "../../../src/lib/db/auth.js";
 import { setCachedProject } from "../../../src/lib/db/project-cache.js";
 import { setOrgRegion } from "../../../src/lib/db/regions.js";
-import { ApiError, ResolutionError } from "../../../src/lib/errors.js";
-import { mockFetch, useTestConfigDir } from "../../helpers.js";
+import {
+  ApiError,
+  ContextError,
+  ResolutionError,
+} from "../../../src/lib/errors.js";
+import {
+  mockFetch,
+  resetHostScopingState,
+  useEnvSandbox,
+  useTestConfigDir,
+} from "../../helpers.js";
 
 describe("buildCommandHint", () => {
   test("suggests <org>/ID for numeric IDs", () => {
@@ -2265,135 +2274,139 @@ describe("resolveIssue: project-search DSN shortcut", () => {
 });
 
 describe("resolveIssue with share URLs", () => {
-  const cwd = "/tmp/test-share";
+  useEnvSandbox([
+    "SENTRY_AUTH_TOKEN",
+    "SENTRY_TOKEN",
+    "SENTRY_HOST",
+    "SENTRY_URL",
+    "SENTRY_ORG",
+    "SENTRY_PROJECT",
+    "SENTRY_DSN",
+  ]);
+  beforeEach(resetHostScopingState);
+  afterEach(resetHostScopingState);
 
-  test("resolves share URL with org from subdomain", async () => {
-    setOrgRegion("gibush-kq", DEFAULT_SENTRY_URL);
+  const shareId = "aabbccdd11223344aabbccdd11223344";
 
-    // @ts-expect-error - partial mock
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const req = new Request(input, init);
-      const url = req.url;
-
-      // Share API endpoint (public, no auth)
-      if (url.includes("/shared/issues/f1abd515c51346778384ff25dfb341e5")) {
-        return new Response(JSON.stringify({ groupID: "99124558" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
+  test.each([
+    [
+      "SaaS subdomain",
+      "https://test-org.sentry.io",
+      "test-org",
+      `/share/issue/${shareId}/`,
+    ],
+    [
+      "SaaS org path",
+      "https://sentry.io",
+      "test-org",
+      `/organizations/test-org/share/issue/${shareId}/`,
+    ],
+    [
+      "self-hosted org path",
+      "https://sentry.example.com",
+      "self-hosted-org",
+      `/organizations/self-hosted-org/share/issue/${shareId}/`,
+    ],
+    [
+      "legacy URL with default org",
+      "https://sentry.io",
+      "test-org",
+      `/share/issue/${shareId}/`,
+    ],
+  ])("resolves %s using the shared issue id", async (name, baseUrl, org, path) => {
+    const { setDefaultOrganization } = await import(
+      "../../../src/lib/db/defaults.js"
+    );
+    setDefaultOrganization(
+      name === "legacy URL with default org" ? org : "other-org"
+    );
+    const apiBaseUrl =
+      baseUrl === "https://sentry.example.com" ? baseUrl : DEFAULT_SENTRY_URL;
+    setAuthToken("test-token", undefined, undefined, { host: apiBaseUrl });
+    setOrgRegion(org, apiBaseUrl);
+    const requests: Request[] = [];
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const request = new Request(input, init);
+      requests.push(request);
+      if (
+        request.url ===
+        `${baseUrl}/api/0/organizations/${org}/shared/issues/${shareId}/`
+      ) {
+        return Response.json({
+          id: "12345",
+          title: "Shared issue",
+          project: { slug: "backend" },
         });
       }
-
-      // Authenticated issue fetch
-      if (url.includes("/organizations/gibush-kq/issues/99124558/")) {
-        return new Response(
-          JSON.stringify({
-            id: "99124558",
-            shortId: "BACKEND-A1",
-            title: "Share Test Issue",
-            status: "unresolved",
-            platform: "python",
-            type: "error",
-            count: "5",
-            userCount: 3,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        );
+      if (
+        new URL(request.url).pathname ===
+        `/api/0/organizations/${org}/issues/12345/`
+      ) {
+        return Response.json({
+          id: "12345",
+          shortId: "BACKEND-A1",
+          title: "Shared issue",
+          status: "unresolved",
+          platform: "python",
+          type: "error",
+          count: "5",
+          userCount: 3,
+        });
       }
-
-      return new Response(JSON.stringify({ detail: "Not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
-    };
+      return Response.json({ detail: "Not found" }, { status: 404 });
+    });
 
     const result = await resolveIssue({
-      issueArg:
-        "https://gibush-kq.sentry.io/share/issue/f1abd515c51346778384ff25dfb341e5/",
-      cwd,
+      issueArg: `${baseUrl}${path}`,
+      cwd: getConfigDir(),
       command: "view",
     });
 
-    expect(result.org).toBe("gibush-kq");
-    expect(result.issue.id).toBe("99124558");
+    expect(result.org).toBe(org);
+    expect(result.issue.id).toBe("12345");
     expect(result.issue.shortId).toBe("BACKEND-A1");
+    expect(requests).toHaveLength(2);
+    expect(requests[0]?.headers.has("Authorization")).toBe(false);
+    expect(requests[1]?.headers.get("Authorization")).toBe("Bearer test-token");
   });
 
-  test("resolves share URL without org via unscoped fetch", async () => {
-    // @ts-expect-error - partial mock
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const req = new Request(input, init);
-      const url = req.url;
-
-      // Share API endpoint
-      if (url.includes("/shared/issues/aabbccdd11223344aabbccdd11223344")) {
-        return new Response(JSON.stringify({ groupID: "55555" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
-      // Unscoped issue fetch
-      if (url.includes("/issues/55555/")) {
-        return new Response(
-          JSON.stringify({
-            id: "55555",
-            shortId: "WEB-B2",
-            title: "Unscoped Share Issue",
-            status: "unresolved",
-            platform: "javascript",
-            type: "error",
-            count: "1",
-            userCount: 1,
-            permalink: "https://test-org.sentry.io/issues/55555/",
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        );
-      }
-
-      return new Response(JSON.stringify({ detail: "Not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
-    };
-
-    const result = await resolveIssue({
-      issueArg:
-        "https://sentry.io/share/issue/aabbccdd11223344aabbccdd11223344/",
-      cwd,
-      command: "view",
+  test("requires organization context before requesting a legacy share URL", async () => {
+    const requests: string[] = [];
+    globalThis.fetch = mockFetch(async (input, init) => {
+      requests.push(new Request(input, init).url);
+      return Response.json({ detail: "Not found" }, { status: 404 });
     });
-
-    expect(result.issue.id).toBe("55555");
-    expect(result.org).toBe("test-org");
-  });
-
-  test("throws ApiError when share link is expired/disabled", async () => {
-    // @ts-expect-error - partial mock
-    globalThis.fetch = async () =>
-      new Response(JSON.stringify({ detail: "Not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
 
     await expect(
       resolveIssue({
-        issueArg:
-          "https://sentry.io/share/issue/deadbeefdeadbeefdeadbeefdeadbeef/",
-        cwd,
+        issueArg: `https://sentry.io/share/issue/${shareId}/`,
+        cwd: getConfigDir(),
         command: "view",
       })
-    ).rejects.toThrow(ApiError);
+    ).rejects.toBeInstanceOf(ContextError);
+    expect(requests).toEqual([]);
+  });
 
-    try {
-      await resolveIssue({
-        issueArg:
-          "https://sentry.io/share/issue/deadbeefdeadbeefdeadbeefdeadbeef/",
-        cwd,
+  test("reports an expired share link without fetching issue details", async () => {
+    const requests: string[] = [];
+    globalThis.fetch = mockFetch(async (input, init) => {
+      requests.push(new Request(input, init).url);
+      return Response.json({ detail: "Not found" }, { status: 404 });
+    });
+
+    await expect(
+      resolveIssue({
+        issueArg: `https://test-org.sentry.io/share/issue/${shareId}/`,
+        cwd: getConfigDir(),
         command: "view",
-      });
-    } catch (error) {
-      expect(error).toBeInstanceOf(ApiError);
-      expect((error as ApiError).message).toContain("Share link not found");
-    }
+      })
+    ).rejects.toMatchObject({
+      name: "ApiError",
+      message: "Share link not found or expired",
+      status: 404,
+    });
+    expect(requests).toEqual([
+      `https://test-org.sentry.io/api/0/organizations/test-org/shared/issues/${shareId}/`,
+    ]);
   });
 });
