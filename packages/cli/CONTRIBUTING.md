@@ -44,7 +44,7 @@ sentry event view [<org>/<project>] <event-id> [--json] [-w]   # event ID requir
 Context (org, project) is resolved in this priority order:
 
 1. **Positional arguments** (`<org>/<project>`) - explicit, always wins
-2. **Config defaults** - set via `sentry config set`
+2. **Config defaults** - set via `sentry cli defaults`
 3. **DSN auto-detection** - from `SENTRY_DSN` env var or source code
 
 ## Common Flags

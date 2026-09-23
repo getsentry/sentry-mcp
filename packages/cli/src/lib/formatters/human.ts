@@ -1366,9 +1366,12 @@ export function formatEventDetails(
   return withSerializeSpan("formatEventDetails", () => {
     const sections: string[] = [];
 
-    sections.push(
-      `## ${escapeMarkdownInline(header)} (\`${event.eventID.slice(0, 8)}\`)`
-    );
+    // The heading is copy-pasted into `event view`. A short prefix is not
+    // searchable, so include the full ID unless the caller already did.
+    const heading = header.includes(event.eventID)
+      ? `## ${escapeMarkdownInline(header)}`
+      : `## ${escapeMarkdownInline(header)} (\`${event.eventID}\`)`;
+    sections.push(heading);
     sections.push("");
 
     // Basic info table

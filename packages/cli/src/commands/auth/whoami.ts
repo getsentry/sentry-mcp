@@ -106,7 +106,6 @@ export const whoamiCommand = buildCommand({
 
     // Keep cached user info up to date. Non-fatal: display must succeed even
     // if the DB write fails (read-only filesystem, corrupted database, etc.).
-    // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
     try {
       setUserInfo({
         userId: user.id,
@@ -114,8 +113,8 @@ export const whoamiCommand = buildCommand({
         username: user.username ?? undefined,
         name: user.name ?? undefined,
       });
-    } catch {
-      // Cache update failure is non-essential — user identity was already fetched.
+    } catch (error) {
+      log.debug("Failed to update cached user info", error);
     }
 
     return yield new CommandOutput(user);

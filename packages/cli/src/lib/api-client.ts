@@ -76,6 +76,7 @@ export {
   apiRequest,
   apiRequestToRegion,
   apiRequestToRegionNoContent,
+  appendSearchParams,
   autoPaginate,
   buildSearchParams,
   isTextualContentType,
@@ -136,6 +137,7 @@ export {
   getProject,
   getProjectKeys,
   listProjects,
+  listProjectsAllPages,
   listProjectsPaginated,
   MEMBER_PROJECT_CREATION_DISABLED_DETAIL,
   matchesWordBoundary,
@@ -171,6 +173,7 @@ export {
   REPLAY_SORT_FIELDS,
   type ReplaySortField,
   type ReplaySortValue,
+  resolveReplay,
 } from "./api/replays.js";
 export {
   listAllRepositories,

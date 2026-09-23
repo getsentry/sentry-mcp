@@ -67,10 +67,11 @@ export async function getSpanTreeLines(
   maxDepth: number
 ): Promise<SpanTreeResult> {
   const traceId = event.contexts?.trace?.trace_id ?? null;
-  const dateCreated = (event as { dateCreated?: string }).dateCreated;
-  const timestamp = dateCreated
-    ? new Date(dateCreated).getTime() / 1000
+  const parsed = event.dateCreated
+    ? new Date(event.dateCreated).getTime() / 1000
     : undefined;
+  const timestamp =
+    parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined;
 
   if (!traceId) {
     return {
@@ -80,17 +81,13 @@ export async function getSpanTreeLines(
       success: false,
     };
   }
-  if (!timestamp) {
-    return {
-      lines: [muted("\nNo timestamp available to fetch span tree.")],
-      spans: null,
-      traceId,
-      success: false,
-    };
-  }
 
   try {
-    const spans = await getDetailedTrace(orgSlug, traceId, timestamp);
+    const spans = await getDetailedTrace(
+      orgSlug,
+      traceId,
+      timestamp === undefined ? {} : { timestamp }
+    );
     const lines = formatSimpleSpanTree(traceId, spans, maxDepth);
     // Truncate spans to match depth limit for JSON output
     const truncatedSpans =

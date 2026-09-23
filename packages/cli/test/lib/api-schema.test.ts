@@ -4,11 +4,14 @@
 
 import { describe, expect, test } from "vitest";
 import {
+  findEndpointsByIdentifier,
+  findEndpointsByPath,
   getAllEndpoints,
   getAllResources,
   getEndpoint,
   getEndpointsByResource,
   getResourceSummaries,
+  parseEndpointQuery,
   searchEndpoints,
 } from "../../src/lib/api-schema.js";
 
@@ -99,6 +102,111 @@ describe("getEndpoint", () => {
   test("returns undefined for unknown endpoint", () => {
     expect(getEndpoint("issues", "xyznonexistent123")).toBeUndefined();
     expect(getEndpoint("nonexistent", "list")).toBeUndefined();
+  });
+});
+
+describe("parseEndpointQuery", () => {
+  test("parses METHOD + OpenAPI path", () => {
+    const parsed = parseEndpointQuery(
+      "GET /api/0/organizations/{organization_id_or_slug}/issues/"
+    );
+    expect(parsed.method).toBe("GET");
+    expect(parsed.path).toBe(
+      "/api/0/organizations/{organization_id_or_slug}/issues/"
+    );
+  });
+
+  test("parses a bare /api/ path and adds a trailing slash", () => {
+    const parsed = parseEndpointQuery(
+      "/api/0/organizations/{organization_id_or_slug}/issues"
+    );
+    expect(parsed.method).toBeUndefined();
+    expect(parsed.path).toBe(
+      "/api/0/organizations/{organization_id_or_slug}/issues/"
+    );
+  });
+
+  test("parses a full Sentry URL and strips the query string", () => {
+    const parsed = parseEndpointQuery(
+      "https://sentry.io/api/0/organizations/acme/issues/?query=is:unresolved"
+    );
+    expect(parsed.path).toBe("/api/0/organizations/acme/issues/");
+  });
+
+  test("leaves keyword searches alone", () => {
+    expect(parseEndpointQuery("issues")).toEqual({ text: "issues" });
+    expect(parseEndpointQuery("GET issues").method).toBe("GET");
+    expect(parseEndpointQuery("GET issues").path).toBeUndefined();
+    expect(parseEndpointQuery("GET issues").text).toBe("issues");
+  });
+});
+
+describe("findEndpointsByPath", () => {
+  test("matches a concrete org slug against {organization_id_or_slug}", () => {
+    const matches = findEndpointsByPath(
+      "/api/0/organizations/acme/issues/",
+      "GET"
+    );
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.fn).toBe("listOrganizationIssues");
+  });
+
+  test("does not treat a query {param} as a wildcard for static siblings", () => {
+    const matches = findEndpointsByPath(
+      "/api/0/organizations/{organization_id_or_slug}/preprodartifacts/snapshots/{snapshot_id}/",
+      "GET"
+    );
+    expect(matches.map((e) => e.fn)).toEqual([
+      "getOrganizationPreprodArtifactSnapshot",
+    ]);
+  });
+
+  test("prefers a static segment over a neighboring {param}", () => {
+    const matches = findEndpointsByPath(
+      "/api/0/organizations/acme/preprodartifacts/snapshots/latest-base/",
+      "GET"
+    );
+    expect(matches.map((e) => e.fn)).toEqual([
+      "getOrganizationPreprodArtifactSnapshotLatestBase",
+    ]);
+  });
+
+  test("does not match getProject when the query is an OpenAPI /issues/ path", () => {
+    const matches = findEndpointsByPath(
+      "/api/0/projects/{organization_id_or_slug}/issues/",
+      "GET"
+    );
+    expect(matches).toEqual([]);
+  });
+});
+
+describe("findEndpointsByIdentifier", () => {
+  test("finds an endpoint by exact SDK function name", () => {
+    const matches = findEndpointsByIdentifier("listOrganizationEvents");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.fn).toBe("listOrganizationEvents");
+  });
+
+  test("finds an endpoint by exact OpenAPI operation ID", () => {
+    const endpoint = getAllEndpoints().find(
+      (candidate) =>
+        candidate.fn &&
+        candidate.operationId &&
+        candidate.fn !== candidate.operationId
+    );
+    expect(endpoint).toBeDefined();
+    if (!endpoint) {
+      return;
+    }
+
+    expect(findEndpointsByIdentifier(endpoint.operationId)).toContain(endpoint);
+  });
+
+  test("is case-insensitive but does not accept partial identifiers", () => {
+    expect(findEndpointsByIdentifier("LISTORGANIZATIONEVENTS")[0]?.fn).toBe(
+      "listOrganizationEvents"
+    );
+    expect(findEndpointsByIdentifier("OrganizationEvents")).toEqual([]);
   });
 });
 

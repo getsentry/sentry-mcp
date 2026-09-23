@@ -20,6 +20,51 @@ View details of one or more events
 - `--spans <value> - Span tree depth limit (number, "all" for unlimited, "no" to disable) - (default: "3")`
 - `-f, --fresh - Bypass cache, re-detect projects, and fetch fresh data`
 
+**JSON Fields** (use `--json --fields` to select specific fields):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string |  |
+| `groupID` | string \| null |  |
+| `eventID` | string | UUID-format event ID |
+| `projectID` | string |  |
+| `message` | string \| null |  |
+| `title` | string |  |
+| `location` | string \| null |  |
+| `user` | object \| null |  |
+| `tags` | array |  |
+| `platform` | string |  |
+| `dateReceived` | string \| null |  |
+| `contexts` | object \| null |  |
+| `size` | number \| null |  |
+| `entries` | array |  |
+| `dist` | string \| null |  |
+| `sdk` | object \| null |  |
+| `context` | object \| null |  |
+| `packages` | object |  |
+| `type` | string |  |
+| `metadata` | object |  |
+| `errors` | array |  |
+| `occurrence` | object \| null |  |
+| `_meta` | object |  |
+| `crashFile` | string \| null |  |
+| `culprit` | string \| null |  |
+| `dateCreated` | string |  |
+| `fingerprints` | array |  |
+| `groupingConfig` | object |  |
+| `startTimestamp` | number |  |
+| `endTimestamp` | number |  |
+| `measurements` | object \| null |  |
+| `breakdowns` | object \| null |  |
+| `release` | object \| null |  |
+| `userReport` | object \| null |  |
+| `sdkUpdates` | array |  |
+| `resolvedWith` | array |  |
+| `nextEventID` | string \| null |  |
+| `previousEventID` | string \| null |  |
+| `trace` | object \| null | Trace context, or null when unavailable |
+| `attachments` | array | Event attachments; each includes metadata and an absolute authenticated download URL |
+
 **Examples:**
 
 ```bash

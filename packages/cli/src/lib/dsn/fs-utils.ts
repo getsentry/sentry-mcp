@@ -20,6 +20,8 @@ import * as Sentry from "@sentry/node-core/light";
  * - EINVAL: Invalid argument (e.g., scandir on a special/virtual filesystem entry like /proc paths)
  * - ELOOP: Too many symbolic links (e.g., cyclic symlink encountered during scan)
  * - ETIMEDOUT: Connection timed out (e.g., transient read on a network or cloud-mounted filesystem)
+ * - Unknown system error: Non-POSIX kernel errors on macOS (e.g., errno -11 / EAGAIN on .trace bundles)
+ *   that Node.js cannot map to a standard code string
  *
  * All other errors are unexpected and should be reported to Sentry.
  *
@@ -27,20 +29,28 @@ import * as Sentry from "@sentry/node-core/light";
  * @returns True if the error is expected and should be ignored
  */
 function isIgnorableFileError(error: unknown): boolean {
-  if (error instanceof Error && "code" in error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    return (
-      code === "ENOENT" ||
-      code === "EACCES" ||
-      code === "EPERM" ||
-      code === "EISDIR" ||
-      code === "ENOTDIR" ||
-      code === "EINVAL" ||
-      code === "ELOOP" ||
-      code === "ETIMEDOUT"
-    );
+  if (!(error instanceof Error)) {
+    return false;
   }
-  return false;
+  const code = (error as NodeJS.ErrnoException).code;
+  if (
+    code === "ENOENT" ||
+    code === "EACCES" ||
+    code === "EPERM" ||
+    code === "EISDIR" ||
+    code === "ENOTDIR" ||
+    code === "EINVAL" ||
+    code === "ELOOP" ||
+    code === "ETIMEDOUT" ||
+    // macOS surfaces non-POSIX kernel errors (e.g. errno -11 on .trace bundles)
+    // as "Unknown system error -N" without a standard POSIX code string.
+    code === "UNKNOWN"
+  ) {
+    return true;
+  }
+  // Node.js may omit the code entirely for non-POSIX kernel errors; fall back
+  // to matching the message prefix that macOS / libuv uses in that case.
+  return error.message.startsWith("Unknown system error");
 }
 
 /**

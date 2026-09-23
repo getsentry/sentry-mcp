@@ -22,6 +22,20 @@ describe("resolveResourceQuery", () => {
     }
   });
 
+  test("returns one endpoint for an exact operation identifier", () => {
+    const result = resolveResourceQuery("listOrganizationEvents");
+    expect(result.kind).toBe("endpoint");
+    if (result.kind === "endpoint") {
+      expect(result.endpoint.fn).toBe("listOrganizationEvents");
+      expect(result.endpoint.resource).toBe("events");
+    }
+  });
+
+  test("does not interpret a partial operation identifier as exact", () => {
+    expect(() => resolveResourceQuery("OrganizationEvents")).toThrow(
+      ResolutionError
+    );
+  });
   test("no-match resource throws ResolutionError instead of listing everything", () => {
     let thrown: unknown;
     try {

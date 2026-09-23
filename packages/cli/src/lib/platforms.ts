@@ -6,7 +6,7 @@
 
 import { levenshtein } from "./fuzzy.js";
 
-/** Full list of valid Sentry platform identifiers (112 from backend + "other"). */
+/** Full list of valid Sentry platform identifiers from the backend, plus "other". */
 export const VALID_PLATFORMS = [
   "android",
   "apple",
@@ -73,12 +73,15 @@ export const VALID_PLATFORMS = [
   "node-cloudflare-pages",
   "node-cloudflare-workers",
   "node-connect",
+  "node-eve",
   "node-express",
   "node-fastify",
+  "node-flue",
   "node-gcpfunctions",
   "node-hapi",
   "node-hono",
   "node-koa",
+  "node-mastra",
   "node-nestjs",
   "other",
   "php",

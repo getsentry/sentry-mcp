@@ -344,6 +344,28 @@ export function buildSearchParams(
 }
 
 /**
+ * Append query parameters without replacing an endpoint's existing query.
+ *
+ * @param endpoint - API endpoint, optionally with a query string
+ * @param params - Additional query parameters
+ * @returns Endpoint containing both existing and additional parameters
+ */
+export function appendSearchParams(
+  endpoint: string,
+  params?: ApiRequestOptions["params"]
+): string {
+  const searchParams = buildSearchParams(params);
+  if (!searchParams) {
+    return endpoint;
+  }
+  let separator = "?";
+  if (endpoint.includes("?")) {
+    separator = endpoint.endsWith("?") || endpoint.endsWith("&") ? "" : "&";
+  }
+  return `${endpoint}${separator}${searchParams.toString()}`;
+}
+
+/**
  * Get SDK config for an organization's region.
  * Resolves the org's region URL and returns the config.
  */
@@ -367,7 +389,9 @@ export const MAX_PAGINATION_PAGES = Math.max(
 
 /**
  * Sentry API's maximum items per page.
- * Requests for more items are silently capped server-side.
+ * Some endpoints silently cap larger `per_page` values; others (org project
+ * list) return 400. Always send at most this many and auto-paginate for
+ * larger `--limit`s via {@link paginate}.
  */
 export const API_MAX_PER_PAGE = 100;
 
@@ -451,7 +475,9 @@ export async function autoPaginate<T>(
  * Centralizes the two things every list endpoint kept re-deriving by hand and
  * occasionally got wrong (see #1458): capping `per_page` at
  * {@link API_MAX_PER_PAGE} and threading `limit` plus the initial cursor into
- * {@link autoPaginate}. Callers still own region resolution and
+ * {@link autoPaginate}. Each request asks only for the remaining item budget,
+ * so a partial final page can return a cursor without skipping trimmed rows.
+ * Callers still own region resolution and
  * endpoint-specific query building inside `fetchPage`.
  *
  * @param options - Caller list options; `limit` bounds total rows, `cursor` is the start cursor
@@ -468,9 +494,16 @@ export function paginate<T>(
   defaultLimit = 10
 ): Promise<PaginatedResponse<T[]>> {
   const limit = options.limit ?? defaultLimit;
-  const perPage = Math.min(limit, API_MAX_PER_PAGE);
+  let remaining = limit;
   return autoPaginate(
-    (cursor) => fetchPage(perPage, cursor),
+    async (cursor) => {
+      const result = await fetchPage(
+        Math.min(remaining, API_MAX_PER_PAGE),
+        cursor
+      );
+      remaining -= result.data.length;
+      return result;
+    },
     limit,
     options.cursor
   );
@@ -494,13 +527,12 @@ export async function apiRequestToRegion<T>(
   const { method = "GET", body, bodyEncoding, params, schema } = options;
   const config = getSdkConfig(regionUrl);
 
-  const searchParams = buildSearchParams(params);
   const normalizedEndpoint = endpoint.startsWith("/")
     ? endpoint.slice(1)
     : endpoint;
-  const queryString = searchParams ? `?${searchParams.toString()}` : "";
+  const endpointWithParams = appendSearchParams(normalizedEndpoint, params);
   // getSdkConfig.baseUrl is the plain region URL; add /api/0/ for raw requests
-  const url = `${config.baseUrl}/api/0/${normalizedEndpoint}${queryString}`;
+  const url = `${config.baseUrl}/api/0/${endpointWithParams}`;
 
   const fetchFn = config.fetch;
   const headers: Record<string, string> = {
@@ -748,30 +780,45 @@ export function isTextualContentType(contentType: string | null): boolean {
  * `Uint8Array` so binary downloads stay byte-for-byte intact.
  *
  * @param endpoint - API endpoint path (e.g., "/organizations/")
- * @param options - Request options including method, body, params, and custom headers
+ * @param options - Request options including method, body, params, custom headers, and optional trusted base URL
  * @returns Response status, status text, headers, and parsed body
- * @throws {AuthError} Only on authentication failure (not on API errors)
+ * @throws {AuthError} On authentication failure
+ * @throws {HostScopeError} Before credentials are attached to an untrusted origin
  */
 export async function rawApiRequest(
   endpoint: string,
-  options: ApiRequestOptions & { headers?: Record<string, string> } = {}
+  options: ApiRequestOptions & {
+    headers?: Record<string, string>;
+    /**
+     * Sentry instance or regional base URL. The authenticated fetch rejects
+     * origins outside the active token's trust scope before adding credentials.
+     */
+    baseUrl?: string;
+  } = {}
 ): Promise<{
   status: number;
   statusText: string;
   headers: Headers;
   body: unknown;
 }> {
-  const { method = "GET", body, params, headers: customHeaders = {} } = options;
+  const {
+    method = "GET",
+    body,
+    params,
+    headers: customHeaders = {},
+    baseUrl,
+  } = options;
 
-  const config = getDefaultSdkConfig();
+  // Both configs share createAuthenticatedFetch(), whose prepareHeaders()
+  // enforces isRequestOriginTrusted() before attaching Authorization.
+  const config = baseUrl ? getSdkConfig(baseUrl) : getDefaultSdkConfig();
 
-  const searchParams = buildSearchParams(params);
   const normalizedEndpoint = endpoint.startsWith("/")
     ? endpoint.slice(1)
     : endpoint;
-  const queryString = searchParams ? `?${searchParams.toString()}` : "";
+  const endpointWithParams = appendSearchParams(normalizedEndpoint, params);
   // getSdkConfig.baseUrl is the plain region URL; add /api/0/ for raw requests
-  const url = `${config.baseUrl}/api/0/${normalizedEndpoint}${queryString}`;
+  const url = `${config.baseUrl}/api/0/${endpointWithParams}`;
 
   // Build request headers and body.
   // String bodies: no Content-Type unless the caller explicitly provides one.

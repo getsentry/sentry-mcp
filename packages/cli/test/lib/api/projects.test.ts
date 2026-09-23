@@ -7,8 +7,13 @@
  * re-scan files and hit the API.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { createProjectWithDsn } from "../../../src/lib/api/projects.js";
+// biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
+import * as Sentry from "@sentry/node-core/light";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import {
+  createProjectWithDsn,
+  listProjects,
+} from "../../../src/lib/api/projects.js";
 import { setAuthToken } from "../../../src/lib/db/auth.js";
 import {
   getCachedProjectByDsnKey,
@@ -17,6 +22,44 @@ import {
 import { setOrgRegion } from "../../../src/lib/db/regions.js";
 import type { SentryProject } from "../../../src/types/index.js";
 import { mockFetch, useTestConfigDir } from "../../helpers.js";
+
+const projectCacheMocks = vi.hoisted(() => ({
+  cacheProjectsForOrg: vi.fn(),
+  setCachedProjectByDsnKey: vi.fn(),
+  restoreActual: () => {
+    /* set in vi.mock factory */
+  },
+}));
+
+vi.mock("../../../src/lib/db/project-cache.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../src/lib/db/project-cache.js")
+    >();
+  projectCacheMocks.cacheProjectsForOrg.mockImplementation(
+    actual.cacheProjectsForOrg
+  );
+  projectCacheMocks.setCachedProjectByDsnKey.mockImplementation(
+    actual.setCachedProjectByDsnKey
+  );
+  projectCacheMocks.restoreActual = () => {
+    projectCacheMocks.cacheProjectsForOrg.mockImplementation(
+      actual.cacheProjectsForOrg
+    );
+    projectCacheMocks.setCachedProjectByDsnKey.mockImplementation(
+      actual.setCachedProjectByDsnKey
+    );
+  };
+  return {
+    ...actual,
+    cacheProjectsForOrg: (
+      ...args: Parameters<typeof actual.cacheProjectsForOrg>
+    ) => projectCacheMocks.cacheProjectsForOrg(...args),
+    setCachedProjectByDsnKey: (
+      ...args: Parameters<typeof actual.setCachedProjectByDsnKey>
+    ) => projectCacheMocks.setCachedProjectByDsnKey(...args),
+  };
+});
 
 useTestConfigDir("api-projects-test-");
 
@@ -56,11 +99,41 @@ beforeEach(async () => {
   originalFetch = globalThis.fetch;
   await setAuthToken("test-token");
   setOrgRegion("test-org", "https://us.sentry.io");
+  projectCacheMocks.restoreActual();
 });
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  projectCacheMocks.restoreActual();
 });
+
+function spyCaptureException(): {
+  captureSpy: ReturnType<typeof vi.spyOn>;
+  restore: () => void;
+} {
+  const captureSpy = vi.spyOn(Sentry, "captureException");
+  const withScopeSpy = vi.spyOn(Sentry, "withScope");
+  withScopeSpy.mockImplementation((fn: (scope: unknown) => void) => {
+    fn({
+      setTag() {
+        /* noop */
+      },
+      setContext() {
+        /* noop */
+      },
+      setFingerprint() {
+        /* noop */
+      },
+    });
+  });
+  return {
+    captureSpy,
+    restore() {
+      captureSpy.mockRestore();
+      withScopeSpy.mockRestore();
+    },
+  };
+}
 
 /**
  * Build a mock fetch that responds to the project-create POST and then
@@ -206,22 +279,72 @@ describe("createProjectWithDsn", () => {
     expect(cached!.orgName).toBe("test-org");
   });
 
-  test("returns correct result even when cache write throws", async () => {
-    // This test verifies the try/catch around cache writes doesn't break
-    // the main creation flow. We test indirectly: if the function returns
-    // successfully, the try/catch is working (DB errors in cache-write
-    // paths don't propagate).
+  test("reports project-cache write failures to Sentry without failing creation", async () => {
     globalThis.fetch = mockCreateAndKeysFlow();
-
-    const result = await createProjectWithDsn("test-org", "test-team", {
-      name: "My New Project",
+    projectCacheMocks.cacheProjectsForOrg.mockImplementation(() => {
+      throw new Error("disk full");
     });
+    const { captureSpy, restore } = spyCaptureException();
+    try {
+      const result = await createProjectWithDsn("test-org", "test-team", {
+        name: "My New Project",
+      });
+      expect(result.project.id).toBe("42");
+      expect(result.dsn).toBe(SAMPLE_DSN);
+      expect(captureSpy).toHaveBeenCalledTimes(1);
+      expect(captureSpy.mock.calls[0]?.[0]).toMatchObject({
+        message: "disk full",
+      });
+    } finally {
+      restore();
+    }
+  });
 
-    // Primary result should always be returned
-    expect(result.project.id).toBe("42");
-    expect(result.project.slug).toBe("my-new-project");
-    expect(result.dsn).toBe(SAMPLE_DSN);
-    expect(result.url).toContain("test-org");
-    expect(result.url).toContain("my-new-project");
+  test("reports DSN-key cache write failures to Sentry without failing creation", async () => {
+    globalThis.fetch = mockCreateAndKeysFlow();
+    projectCacheMocks.setCachedProjectByDsnKey.mockImplementation(() => {
+      throw new Error("dsn cache locked");
+    });
+    const { captureSpy, restore } = spyCaptureException();
+    try {
+      const result = await createProjectWithDsn("test-org", "test-team", {
+        name: "My New Project",
+      });
+      expect(result.project.slug).toBe("my-new-project");
+      expect(result.dsn).toBe(SAMPLE_DSN);
+      expect(captureSpy).toHaveBeenCalledTimes(1);
+      expect(captureSpy.mock.calls[0]?.[0]).toMatchObject({
+        message: "dsn cache locked",
+      });
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe("listProjects cache seeding", () => {
+  test("reports cache write failures to Sentry without failing the list", async () => {
+    globalThis.fetch = mockFetch(
+      async () =>
+        new Response(JSON.stringify([SAMPLE_PROJECT]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+    );
+    projectCacheMocks.cacheProjectsForOrg.mockImplementation(() => {
+      throw new Error("disk full");
+    });
+    const { captureSpy, restore } = spyCaptureException();
+    try {
+      const result = await listProjects("test-org");
+      expect(result).toHaveLength(1);
+      expect(result[0]?.slug).toBe("my-new-project");
+      expect(captureSpy).toHaveBeenCalledTimes(1);
+      expect(captureSpy.mock.calls[0]?.[0]).toMatchObject({
+        message: "disk full",
+      });
+    } finally {
+      restore();
+    }
   });
 });

@@ -56,7 +56,8 @@ type SilenceReason =
   | "api_user_error"
   | "network_error"
   | "process_exit"
-  | "user_validation";
+  | "user_validation"
+  | "user_input_error";
 
 /**
  * Classify whether an error should be silenced.
@@ -102,6 +103,18 @@ export function classifySilenced(error: unknown): SilenceReason | null {
     error.field === "project.ambiguous_org"
   ) {
     return "user_validation";
+  }
+  // A ValidationError with field "input" means the --input file path the user
+  // supplied does not exist on disk. Pure user-input noise, not a CLI bug —
+  // the user sees a clear "File not found" message (CLI-1JY).
+  if (error instanceof ValidationError && error.field === "input") {
+    return "user_input_error";
+  }
+  // A ResolutionError means the user provided a value (event ID, project slug,
+  // etc.) that was looked up but not found. This is pure user-input noise, not
+  // a CLI bug — the user sees a clear "not found" message (CLI-RP).
+  if (error instanceof ResolutionError) {
+    return "user_input_error";
   }
   if (error instanceof ApiError && error.status > 400 && error.status < 500) {
     return "api_user_error";
@@ -375,9 +388,15 @@ function setCliErrorContext(scope: Sentry.Scope, error: unknown): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Report a command-level error to Sentry.
+ * Report an error to Sentry without rethrowing.
  *
- * - Silenced errors emit a metric and return without calling `captureException`.
+ * Call this at the command boundary for thrown failures, and in best-effort
+ * catch blocks that swallow the error so the command can continue. A debug
+ * log is not a substitute: users do not run `--verbose`, so swallowed
+ * unexpected failures must become Sentry issues.
+ *
+ * - Silenced errors (network, expected auth, 4xx) emit a metric and return
+ *   without calling `captureException`.
  * - Captured errors get grouping tags + structured context on a fresh scope.
  */
 export function reportCliError(error: unknown): void {

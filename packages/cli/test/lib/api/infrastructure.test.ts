@@ -7,7 +7,7 @@ import {
   throwApiError,
 } from "../../../src/lib/api/infrastructure.js";
 import { setAuthToken } from "../../../src/lib/db/auth.js";
-import { ApiError } from "../../../src/lib/errors.js";
+import { ApiError, HostScopeError } from "../../../src/lib/errors.js";
 import { mockFetch, useTestConfigDir } from "../../helpers.js";
 
 describe("throwApiError", () => {
@@ -588,6 +588,21 @@ describe("rawApiRequest binary handling", () => {
     globalThis.fetch = originalFetch;
   });
 
+  test("rejects an absolute base URL outside the token trust scope", async () => {
+    setAuthToken("test-token", undefined, undefined, {
+      host: "https://sentry.io",
+    });
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(
+      rawApiRequest("organizations/", {
+        baseUrl: "https://example.invalid",
+      })
+    ).rejects.toBeInstanceOf(HostScopeError);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   test("returns Uint8Array for image/png without UTF-8 corruption", async () => {
     // Real PNG signature: 89 50 4e 47 0d 0a 1a 0a — the leading 0x89 is not
     // valid UTF-8 and would become EF BF BD if response.text() were used.
@@ -722,6 +737,25 @@ describe("paginate", () => {
   });
 
   test("accumulates across pages when limit exceeds cap", async () => {
+    const spy = vi.fn((perPage: number, cursor: string | undefined) => {
+      const offset = cursor ? Number(cursor) : 0;
+      const data = Array.from({ length: perPage }, (_, i) => offset + i);
+      return Promise.resolve({
+        data,
+        nextCursor: String(offset + perPage),
+      });
+    });
+
+    const result = await paginate({ limit: 150 }, spy);
+    expect(result.data).toEqual(Array.from({ length: 150 }, (_, i) => i));
+    expect(spy.mock.calls.map(([perPage]) => perPage)).toEqual([
+      API_MAX_PER_PAGE,
+      50,
+    ]);
+    expect(result.nextCursor).toBe("150");
+  });
+
+  test("drops nextCursor when a page exceeds the remaining budget", async () => {
     const spy = vi
       .fn()
       .mockResolvedValueOnce({
@@ -730,15 +764,15 @@ describe("paginate", () => {
       })
       .mockResolvedValueOnce({
         data: Array.from({ length: 100 }, (_, i) => 100 + i),
-        nextCursor: undefined,
+        nextCursor: "c2",
       });
 
     const result = await paginate({ limit: 150 }, spy);
-    expect(result.data.length).toBe(150);
-    expect(result.data).toEqual(Array.from({ length: 150 }, (_, i) => i));
-    expect(spy).toHaveBeenCalledTimes(2);
-    expect(
-      spy.mock.calls.every(([perPage]) => perPage === API_MAX_PER_PAGE)
-    ).toBe(true);
+    expect(result.data).toHaveLength(150);
+    expect(result.nextCursor).toBeUndefined();
+    expect(spy.mock.calls.map(([perPage]) => perPage)).toEqual([
+      API_MAX_PER_PAGE,
+      50,
+    ]);
   });
 });

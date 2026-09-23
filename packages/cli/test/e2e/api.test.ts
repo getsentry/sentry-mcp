@@ -64,6 +64,17 @@ describe("sentry api", () => {
     expect(Array.isArray(data)).toBe(true);
   });
 
+  test("GET request accepts an absolute Sentry API URL", async () => {
+    await ctx.setAuthToken(TEST_TOKEN);
+
+    const result = await ctx.run([
+      "api",
+      `${mockServer.url}/api/0/organizations/`,
+    ]);
+
+    expect(result.exitCode, result.stderr + result.stdout).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual(expect.any(Array));
+  });
   test("--json includes the HTTP response envelope", async () => {
     await ctx.setAuthToken(TEST_TOKEN);
 
