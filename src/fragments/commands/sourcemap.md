@@ -6,6 +6,13 @@
 
 `sentry sourcemap inject` is a purely local file operation — it does not make any API calls and does not require authentication. You can run it in CI before authenticating.
 
+Existing debug IDs from JavaScript comments or sourcemaps are preserved. If a
+bundler emits an ID without Sentry's runtime registration snippet, `inject`
+adds the snippet and adjusts the sourcemap mappings. Bundles that already
+register their ID are left unchanged. `sourcemap upload` applies the same
+injection by default, unless `--no-rewrite` is passed.
+Binary bundles with an existing debug ID in their sourcemap are left unchanged.
+
 ```bash
 # Inject debug IDs into all JS files in dist/
 sentry sourcemap inject ./dist
