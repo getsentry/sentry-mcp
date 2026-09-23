@@ -1025,7 +1025,7 @@ describe("update_issue", () => {
     expect(result).toContain("**Comment not posted**");
   });
 
-  it("strips null bytes from reason before posting as a comment", async () => {
+  it("strips null bytes from reason before posting as a comment", () => {
     // prepareToolParams runs the Zod schema (including transforms) the same
     // way the MCP server does at runtime, so this exercises the full parse path.
     const prepared = prepareToolParams({
@@ -1033,10 +1033,27 @@ describe("update_issue", () => {
       params: {
         organizationSlug: "sentry-mcp-evals",
         issueId: "CLOUDFLARE-MCP-41",
-        reason: "Resolved\0because\0fix deployed",
+        reason: "\0 Resolved\0because\0fix deployed \0",
       },
       context: serverContext,
     });
     expect(prepared.reason).toBe("Resolvedbecausefix deployed");
   });
+
+  it.each(["\0", " \0 \0 "])(
+    "rejects a reason that is empty after removing null bytes: %j",
+    (reason) => {
+      expect(() =>
+        prepareToolParams({
+          tool: updateIssue,
+          params: {
+            organizationSlug: "sentry-mcp-evals",
+            issueId: "CLOUDFLARE-MCP-41",
+            reason,
+          },
+          context: serverContext,
+        }),
+      ).toThrow();
+    },
+  );
 });
