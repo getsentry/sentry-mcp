@@ -75,22 +75,30 @@ const cronQuerySchema = z.object({
 function sourceDetails(source: Record<string, unknown>) {
   const type = typeof source.type === "string" ? source.type : "unknown";
   const query = source.queryObj;
+  const unavailable = {
+    type,
+    unavailableReason: "Source configuration is unavailable.",
+  };
   if (!isPlainObject(query)) {
-    return { type, unavailableReason: "Source configuration is unavailable." };
+    return unavailable;
   }
   if (type === "snuba_query_subscription") {
-    const { timeWindow, ...config } = metricQuerySchema.parse(query.snubaQuery);
+    const parsed = metricQuerySchema.safeParse(query.snubaQuery);
+    if (!parsed.success) {
+      return unavailable;
+    }
+    const { timeWindow, ...config } = parsed.data;
     return { type, query: { ...config, timeWindowSeconds: timeWindow } };
   }
   if (type === "uptime_subscription") {
-    return {
-      type,
-      query: uptimeQuerySchema.parse(query),
-      omittedFields: ["headers", "body"],
-    };
+    const parsed = uptimeQuerySchema.safeParse(query);
+    return parsed.success
+      ? { type, query: parsed.data, omittedFields: ["headers", "body"] }
+      : unavailable;
   }
   if (type === "cron_monitor") {
-    return { type, query: cronQuerySchema.parse(query) };
+    const parsed = cronQuerySchema.safeParse(query);
+    return parsed.success ? { type, query: parsed.data } : unavailable;
   }
   return {
     type,

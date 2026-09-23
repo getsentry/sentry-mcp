@@ -730,6 +730,41 @@ describe("get_alert_rule", () => {
     );
   });
 
+  it.each([
+    ["snuba_query_subscription", { snubaQuery: null }],
+    ["uptime_subscription", { url: "https://example.com/health" }],
+    ["cron_monitor", { config: { schedule: "0 0 * * *" } }],
+  ])("isolates incomplete %s source configuration", async (type, queryObj) => {
+    mswServer.use(
+      http.get("*/detectors/789/", () =>
+        HttpResponse.json({
+          ...detector,
+          dataSources: [...detector.dataSources, { type, queryObj }],
+        }),
+      ),
+    );
+    expect(getStructuredContent(await getRule())).toEqual({
+      alertRule: expect.objectContaining({
+        id: issueAlertRule.id,
+        triggers: issueAlertRule.triggers,
+        actionFilters: issueAlertRule.actionFilters,
+        sources: [
+          expect.objectContaining({
+            id: detector.id,
+            status: "available",
+            dataSources: [
+              expect.objectContaining({
+                type: "snuba_query_subscription",
+                query: expect.objectContaining({ query: "level:error" }),
+              }),
+              { type, unavailableReason: expect.any(String) },
+            ],
+          }),
+        ],
+      }),
+    });
+  });
+
   it.each(["issue", "all"] as const)(
     "rejects incomplete name searches with kind %s",
     async (kind) => {

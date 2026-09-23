@@ -31,7 +31,8 @@ Issue Alert detail returns structured `alertRule` content:
 
 Source IDs support correlating connections. Source 403/404 responses appear as
 `unavailable`; authentication failures and server errors propagate normally.
-Unknown or missing source configuration is explicitly marked unavailable.
+Unknown, missing, or invalid source configuration is explicitly marked unavailable
+without discarding other data sources or the Alert detail.
 Uptime request headers and bodies are omitted and identified as omitted fields,
 consistent with keeping credentials out of inspection responses.
 
