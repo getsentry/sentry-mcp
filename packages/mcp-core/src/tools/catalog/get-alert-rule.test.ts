@@ -1,6 +1,7 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
+import { getStructuredContent } from "../../test-utils/structured-content";
 import getAlertRule from "./get-alert-rule.js";
 
 const context = {
@@ -393,8 +394,8 @@ describe("get_alert_rule", () => {
     const listParams = new URL(listRequestUrl ?? "").searchParams;
     expect(listParams.get("query")).toBe('name:"*Notify backend team*"');
     expect(listParams.get("projectSlug")).toBe("cloudflare-mcp");
-    expect(result).toMatchObject({
-      structuredContent: { alertRule: { triggers: issueAlertRule.triggers } },
+    expect(getStructuredContent(result)).toMatchObject({
+      alertRule: { triggers: issueAlertRule.triggers },
     });
   });
 
@@ -418,8 +419,8 @@ describe("get_alert_rule", () => {
     expect(new URL(listRequestUrl ?? "").searchParams.get("query")).toBe(
       'name:"*Critical: backend*"',
     );
-    expect(result).toMatchObject({
-      structuredContent: { alertRule: { id: "123" } },
+    expect(getStructuredContent(result)).toMatchObject({
+      alertRule: { id: "123" },
     });
   });
 
@@ -432,10 +433,8 @@ describe("get_alert_rule", () => {
         HttpResponse.json({ projectIds: [], includesAllProjects: false }),
       ),
     );
-    expect(await getRule()).toMatchObject({
-      structuredContent: {
-        alertRule: { sources: [], scope: { projectIds: [] } },
-      },
+    expect(getStructuredContent(await getRule())).toMatchObject({
+      alertRule: { sources: [], scope: { projectIds: [] } },
     });
     await expect(getRule({}, projectConstrainedContext)).rejects.toThrow();
   });
@@ -459,8 +458,8 @@ describe("get_alert_rule", () => {
 
     const result = await getRule({ projectSlug: "cloudflare-mcp" });
 
-    expect(result).toMatchObject({
-      structuredContent: { alertRule: { id: "789", name: "123" } },
+    expect(getStructuredContent(result)).toMatchObject({
+      alertRule: { id: "789", name: "123" },
     });
   });
 
@@ -559,27 +558,25 @@ describe("get_alert_rule", () => {
       ),
     );
     const result = await getRule();
-    expect(result).toMatchObject({
-      structuredContent: {
-        alertRule: {
-          triggers: { conditions },
-          actionFilters: groups,
-          sources: [
-            {
-              config: detector.config,
-              conditionGroup: detector.conditionGroup,
-              dataSources: [
-                {
-                  query: {
-                    query: "level:error",
-                    aggregate: "count()",
-                    timeWindowSeconds: 300,
-                  },
+    expect(getStructuredContent(result)).toMatchObject({
+      alertRule: {
+        triggers: { conditions },
+        actionFilters: groups,
+        sources: [
+          {
+            config: detector.config,
+            conditionGroup: detector.conditionGroup,
+            dataSources: [
+              {
+                query: {
+                  query: "level:error",
+                  aggregate: "count()",
+                  timeWindowSeconds: 300,
                 },
-              ],
-            },
-          ],
-        },
+              },
+            ],
+          },
+        ],
       },
     });
     expect(JSON.stringify(result)).not.toMatch(
@@ -615,20 +612,18 @@ describe("get_alert_rule", () => {
       ),
     );
     const result = await getRule({}, projectConstrainedContext);
-    expect(result).toMatchObject({
-      structuredContent: {
-        alertRule: {
-          scope: {
-            projectIds: [project.id],
-            outsideProjectCount: 1,
-            limitedToProject: project.slug,
-          },
-          sources: [
-            { id: "789", status: "available" },
-            { id: "790", status: "outside_project_constraint" },
-            { id: "791", status: "unavailable" },
-          ],
+    expect(getStructuredContent(result)).toMatchObject({
+      alertRule: {
+        scope: {
+          projectIds: [project.id],
+          outsideProjectCount: 1,
+          limitedToProject: project.slug,
         },
+        sources: [
+          { id: "789", status: "available" },
+          { id: "790", status: "outside_project_constraint" },
+          { id: "791", status: "unavailable" },
+        ],
       },
     });
     expect(JSON.stringify(result)).not.toMatch(
@@ -653,12 +648,10 @@ describe("get_alert_rule", () => {
       ),
     );
     const result = await getRule({}, projectConstrainedContext);
-    expect(result).toMatchObject({
-      structuredContent: {
-        alertRule: {
-          scope: { includesAllProjects: true },
-          sources: [{ projectId: null, config: {} }],
-        },
+    expect(getStructuredContent(result)).toMatchObject({
+      alertRule: {
+        scope: { includesAllProjects: true },
+        sources: [{ projectId: null, config: {} }],
       },
     });
     expect(JSON.stringify(result)).not.toMatch(
@@ -706,32 +699,30 @@ describe("get_alert_rule", () => {
       ),
     );
     const result = await getRule();
-    expect(result).toMatchObject({
-      structuredContent: {
-        alertRule: {
-          sources: [
-            {
-              dataSources: [
-                {
-                  type: "uptime_subscription",
-                  query: { url: uptime.url, timeoutMs: 1000 },
-                  omittedFields: ["headers", "body"],
+    expect(getStructuredContent(result)).toMatchObject({
+      alertRule: {
+        sources: [
+          {
+            dataSources: [
+              {
+                type: "uptime_subscription",
+                query: { url: uptime.url, timeoutMs: 1000 },
+                omittedFields: ["headers", "body"],
+              },
+              {
+                type: "cron_monitor",
+                query: {
+                  slug: cron.slug,
+                  config: { schedule: "0 0 * * *", timezone: null },
                 },
-                {
-                  type: "cron_monitor",
-                  query: {
-                    slug: cron.slug,
-                    config: { schedule: "0 0 * * *", timezone: null },
-                  },
-                },
-                {
-                  type: "future_source",
-                  unavailableReason: expect.any(String),
-                },
-              ],
-            },
-          ],
-        },
+              },
+              {
+                type: "future_source",
+                unavailableReason: expect.any(String),
+              },
+            ],
+          },
+        ],
       },
     });
     expect(JSON.stringify(result)).not.toMatch(
@@ -791,12 +782,12 @@ describe("get_alert_rule", () => {
       ),
     );
     expect(
-      await getRule({ kind: "all", ruleIdOrName: issueAlertRule.name }),
+      getStructuredContent(
+        await getRule({ kind: "all", ruleIdOrName: issueAlertRule.name }),
+      ),
     ).toMatchObject({
-      structuredContent: {
-        alertRule: { id: "123", name: issueAlertRule.name },
-        warnings: [expect.stringContaining("retired")],
-      },
+      alertRule: { id: "123", name: issueAlertRule.name },
+      warnings: [expect.stringContaining("retired")],
     });
   });
 });

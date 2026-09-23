@@ -298,7 +298,8 @@ export function formatMetricAlertRule(
   return lines.join("\n");
 }
 
-async function findExactIssueAlertRuleMatches(
+/** Resolve case-insensitive names only when the search results are complete. */
+export async function findExactIssueAlertRuleMatches(
   apiService: SentryApiService,
   params: {
     organizationSlug: string;

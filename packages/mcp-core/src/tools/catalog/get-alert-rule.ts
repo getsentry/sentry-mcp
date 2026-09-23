@@ -16,6 +16,7 @@ import {
 } from "../../schema";
 import { assertProjectRefWithinConstraint } from "./support/project-constraints";
 import {
+  findExactIssueAlertRuleMatches,
   formatMetricAlertRule,
   resolveIssueAlertRule,
   resolveMetricAlertRule,
@@ -139,30 +140,15 @@ export default defineTool({
       match = { kind: "metric", rule, projectSlug };
     } else {
       const matches: AlertRuleMatch[] = [];
-      const issuePage = await apiService.listIssueAlertRulesPage({
+      const issueRules = await findExactIssueAlertRuleMatches(apiService, {
         organizationSlug,
         projectSlug,
-        query: params.ruleIdOrName,
-        limit: 100,
+        ruleName: params.ruleIdOrName,
       });
-      if (issuePage.nextCursor) {
-        throw new UserInputError(
-          "Alert name search is incomplete. Find the Alert with find_alert_rules and retry with its numeric ID and explicit kind.",
-        );
-      }
       matches.push(
-        ...issuePage.rules
-          .filter(
-            (rule) =>
-              rule.name.toLowerCase() === params.ruleIdOrName.toLowerCase(),
-          )
-          .map(
-            (rule): AlertRuleMatch => ({
-              kind: "issue",
-              rule,
-              projectSlug,
-            }),
-          ),
+        ...issueRules.map(
+          (rule): AlertRuleMatch => ({ kind: "issue", rule, projectSlug }),
+        ),
       );
 
       try {

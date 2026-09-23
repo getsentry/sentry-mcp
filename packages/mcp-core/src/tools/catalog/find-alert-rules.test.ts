@@ -142,15 +142,7 @@ describe("find_alert_rules", () => {
     );
 
     const result = await findAlertRules.handler(
-      {
-        organizationSlug: "sentry-mcp-evals",
-        regionUrl: null,
-        kind: "all",
-        projectSlug: "cloudflare-mcp",
-        query: null,
-        cursor: null,
-        limit: 10,
-      },
+      { ...params, projectSlug: "cloudflare-mcp" },
       context,
     );
 
@@ -218,18 +210,7 @@ describe("find_alert_rules", () => {
   it("lists Alerts and metric alerts organization-wide without a project", async () => {
     useAlertRuleHandlers();
 
-    const result = await findAlertRules.handler(
-      {
-        organizationSlug: "sentry-mcp-evals",
-        regionUrl: null,
-        kind: "all",
-        projectSlug: null,
-        query: null,
-        cursor: null,
-        limit: 10,
-      },
-      context,
-    );
+    const result = await findAlertRules.handler(params, context);
 
     expect(getStructuredContent(result)).toMatchObject({
       issueRules: [{ id: "123", name: "Notify backend team" }],
@@ -258,15 +239,7 @@ describe("find_alert_rules", () => {
     );
 
     await findAlertRules.handler(
-      {
-        organizationSlug: "sentry-mcp-evals",
-        regionUrl: null,
-        kind: "metric",
-        projectSlug: "legacy-cloudflare-mcp",
-        query: null,
-        cursor: null,
-        limit: 10,
-      },
+      { ...params, kind: "metric", projectSlug: "legacy-cloudflare-mcp" },
       context,
     );
 
@@ -291,15 +264,7 @@ describe("find_alert_rules", () => {
     );
 
     const result = await findAlertRules.handler(
-      {
-        organizationSlug: "sentry-mcp-evals",
-        regionUrl: null,
-        kind: "issue",
-        projectSlug: "cloudflare-mcp",
-        query: null,
-        cursor: null,
-        limit: 10,
-      },
+      { ...params, kind: "issue", projectSlug: "cloudflare-mcp" },
       context,
     );
 
@@ -331,15 +296,7 @@ describe("find_alert_rules", () => {
     );
 
     const result = await findAlertRules.handler(
-      {
-        organizationSlug: "sentry-mcp-evals",
-        regionUrl: null,
-        kind: "all",
-        projectSlug: "cloudflare-mcp",
-        query: "backend",
-        cursor: null,
-        limit: 10,
-      },
+      { ...params, projectSlug: "cloudflare-mcp", query: "backend" },
       context,
     );
 
@@ -458,13 +415,10 @@ describe("find_alert_rules", () => {
 
     const result = await findAlertRules.handler(
       {
-        organizationSlug: "sentry-mcp-evals",
-        regionUrl: null,
+        ...params,
         kind: "metric",
         projectSlug: "cloudflare-mcp",
         query: "latency",
-        cursor: null,
-        limit: 10,
       },
       context,
     );
@@ -559,15 +513,7 @@ describe("find_alert_rules", () => {
     async (projectSlug) => {
       await expect(
         findAlertRules.handler(
-          {
-            organizationSlug: "sentry-mcp-evals",
-            regionUrl: null,
-            kind: "all",
-            projectSlug,
-            query: null,
-            cursor: "endpoint-specific-cursor",
-            limit: 10,
-          },
+          { ...params, projectSlug, cursor: "endpoint-specific-cursor" },
           context,
         ),
       ).rejects.toThrow(
