@@ -12,6 +12,12 @@ sentry schema issues
 # View details for a specific operation
 sentry schema issues list
 
+# Look up an endpoint by its exact operation ID
+sentry schema listOrganizationEvents
+
+# Look up an endpoint by HTTP method and path
+sentry schema "GET /api/0/organizations/{organization_id_or_slug}/issues/"
+
 # Search for monitoring-related endpoints
 sentry schema --search monitor
 
