@@ -163,10 +163,10 @@ sentry-cli() {
   local envs=() lead=() headers="" allow_failure=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --auth-token)   envs+=("SENTRY_AUTH_TOKEN=$2"); shift 2 2>/dev/null || shift ;;
-      --auth-token=*) envs+=("SENTRY_AUTH_TOKEN=${1#*=}"); shift ;;
-      --url)          envs+=("SENTRY_URL=$2"); shift 2 2>/dev/null || shift ;;
-      --url=*)        envs+=("SENTRY_URL=${1#*=}"); shift ;;
+      --auth-token)   envs+=("SENTRY_AUTH_TOKEN=$2" "SENTRY_FORCE_ENV_TOKEN=1"); shift 2 2>/dev/null || shift ;;
+      --auth-token=*) envs+=("SENTRY_AUTH_TOKEN=${1#*=}" "SENTRY_FORCE_ENV_TOKEN=1"); shift ;;
+      --url)          envs+=("SENTRY_HOST=$2" "SENTRY_URL=$2"); shift 2 2>/dev/null || shift ;;
+      --url=*)        envs+=("SENTRY_HOST=${1#*=}" "SENTRY_URL=${1#*=}"); shift ;;
       # Multiple --header flags merge into one semicolon-separated var.
       --header)       headers="${headers:+$headers; }$2"; shift 2 2>/dev/null || shift ;;
       --header=*)     headers="${headers:+$headers; }${1#*=}"; shift ;;
@@ -192,9 +192,20 @@ sentry-cli() {
   # environment/name as positionals, not v3's `-e`/`-n` flags — so flag those.
   local deploy_msg='sentry-cli: `deploys new` changed in v4 — environment/name are positionals now:\n  sentry release deploy <version> <environment> [name] [--url … --started … --finished …]\n'
   _scli_deploys() {
-    local a dargs=()
+    local a release="" dargs=()
     for a in "$@"; do [ "$a" = "new" ] && { printf '%b' "$deploy_msg" >&2; return 64; }; done
-    for a in "$@"; do [ "$a" = "list" ] || dargs+=("$a"); done  # drop v3 `list`
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        list) shift ;;
+        -r|--release)
+          release="${2:-}"
+          shift 2 2>/dev/null || shift
+          ;;
+        --release=*) release="${1#*=}"; shift ;;
+        *) dargs+=("$1"); shift ;;
+      esac
+    done
+    [ -n "$release" ] && dargs=("$release" "${dargs[@]}")
     "${run[@]}" release deploys "${dargs[@]}"
   }
 
@@ -303,8 +314,9 @@ Command-specific flags changed more than the global ones, and some v3 flags
 don't exist in v4 yet. A few notable ones:
 
 - `release set-commits` drops `--ignore-missing` and `--ignore-empty`.
-- `release deploy` takes the environment and name as part of the positional
-  target (`org/version/env/name`), not `--env`/`--name`.
+- `release deploy` takes separate positional arguments for the release,
+  environment, and optional name (`[<org>/]<version> <environment> [name]`),
+  not `--env`/`--name`.
 - `sourcemap upload`/`inject` drop several flags (see [Sourcemaps](#sourcemaps)).
 
 Before relying on a flag, confirm it with `sentry <command> --help` — that's the
@@ -361,7 +373,7 @@ Mapping:
 | `cli.releases.finalize(v)` | `sdk.release.finalize({ orgVersion: v })` |
 | `cli.releases.setCommits(v, o)` | `sdk.release["set-commits"]({ orgVersion: v, ...o })` |
 | `cli.releases.uploadSourceMaps(v, { include })` | `sdk.sourcemap.upload({ directory, release: v })` |
-| `cli.releases.newDeploy(v, { env, name, url })` | `sdk.run("release", "deploy", v, env, name, "--url", url)` (the typed `sdk.release.deploy` can only pass one positional, so it can't supply the required environment — use the `run()` escape hatch for the raw args) |
+| `cli.releases.newDeploy(v, { env, name, url })` | `sdk.release.deploy({ orgVersion: v, environment: env, name, url })` |
 | `cli.releases.proposeVersion()` | `sdk.release["propose-version"]()` |
 | `cli.execute(args)` | `sdk.run(...args)` |
 
@@ -441,9 +453,9 @@ export SENTRY_AUTH_TOKEN=sntrys_…
 sentry auth status
 ```
 
-`SENTRY_AUTH_TOKEN` works exactly as before and takes precedence over stored
-credentials, so existing CI pipelines don't need changes. (v4 also accepts
-`SENTRY_TOKEN` as an alias for it.)
+Stored OAuth credentials take precedence over `SENTRY_AUTH_TOKEN` by default.
+Set `SENTRY_FORCE_ENV_TOKEN=1` when an environment token must override a stored
+login. (v4 also accepts `SENTRY_TOKEN` as an alias for it.)
 
 Note: there is **no `--auth-token` flag** in v4 — authentication comes from
 `sentry auth login`, `SENTRY_AUTH_TOKEN`, or `.sentryclirc`. See

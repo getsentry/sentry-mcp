@@ -110,8 +110,13 @@ function inferFlagType(def: FlagDef): {
   kind: SdkFlagInfo["kind"];
   values?: string[];
 } {
+  const arrayType = (tsType: string): string =>
+    def.variadic
+      ? `${tsType.includes(" | ") ? `(${tsType})` : tsType}[]`
+      : tsType;
+
   if (def.kind === "boolean") {
-    return { tsType: "boolean", kind: "boolean" };
+    return { tsType: arrayType("boolean"), kind: "boolean" };
   }
 
   if (def.kind === "enum") {
@@ -119,22 +124,22 @@ function inferFlagType(def: FlagDef): {
     if (enumDef.values) {
       const values = [...enumDef.values];
       const tsType = values.map((v: string) => `"${v}"`).join(" | ");
-      return { tsType, kind: "enum", values };
+      return { tsType: arrayType(tsType), kind: "enum", values };
     }
-    return { tsType: "string", kind: "enum" };
+    return { tsType: arrayType("string"), kind: "enum" };
   }
 
   // kind === "parsed" — infer from default value
   if (def.default !== undefined && typeof def.default === "number") {
-    return { tsType: "number", kind: "parsed" };
+    return { tsType: arrayType("number"), kind: "parsed" };
   }
   if (def.default !== undefined && typeof def.default === "string") {
     const numVal = Number(def.default);
     if (!Number.isNaN(numVal) && def.default !== "") {
-      return { tsType: "number", kind: "parsed" };
+      return { tsType: arrayType("number"), kind: "parsed" };
     }
   }
-  return { tsType: "string", kind: "parsed" };
+  return { tsType: arrayType("string"), kind: "parsed" };
 }
 
 /** Extract SDK-relevant flag info from a Stricli Command's parameters. */

@@ -182,6 +182,14 @@ describe("a value flag does not swallow --help", () => {
     expect(stderr).not.toContain(NO_COMMAND_REGISTERED);
     expect(stdout).toContain("USAGE");
   });
+
+  test.each([
+    "--json",
+    "-v",
+  ])("%s after a missing value flag still reaches the leaf command", async (flag) => {
+    const { stderr } = await runApp(["--org", flag, "issue", "list"]);
+    expect(stderr).not.toContain(NO_COMMAND_REGISTERED);
+  });
 });
 
 describe("escape sequence is still respected", () => {

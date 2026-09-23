@@ -33,7 +33,7 @@ SENTRY_CLIENT_ID=your-client-id sentry auth login --url https://sentry.example.c
 Or pass the instance URL via environment variable:
 
 ```bash
-SENTRY_HOST=https://sentry.example.com SENTRY_CLIENT_ID=your-client-id sentry auth login
+SENTRY_HOST=https://sentry.example.com SENTRY_CLIENT_ID=your-client-id sentry auth login --url https://sentry.example.com
 ```
 
 :::tip
@@ -61,7 +61,7 @@ If your instance is on an older version or you prefer not to create an OAuth app
 3. Pass it to the CLI:
 
 ```bash
-SENTRY_HOST=https://sentry.example.com sentry auth login --token YOUR_TOKEN
+SENTRY_HOST=https://sentry.example.com sentry auth login --token YOUR_TOKEN --url https://sentry.example.com
 ```
 
 ## After Login

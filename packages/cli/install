@@ -67,7 +67,6 @@ report_error() {
 die() {
   echo -e "${RED}$1${NC}" >&2
   report_error "$1" "${2:-unknown}"
-  wait 2>/dev/null || true  # Let the background curl finish; ignore its exit status
   exit 1
 }
 
@@ -205,10 +204,12 @@ fi
 # Download binary to a temp location
 tmpdir="${TMPDIR:-${TMP:-${TEMP:-/tmp}}}"
 tmp_binary="${tmpdir}/sentry-install-$$${suffix}"
+blob_headers="${tmpdir}/sentry-install-headers-$$"
+blob_file="${tmpdir}/sentry-install-blob-$$"
 version=""
 
-# Clean up temp binary on failure (setup handles cleanup on success)
-trap 'rm -f "$tmp_binary"' EXIT
+# Clean up temporary files on failure (setup handles the installed binary).
+trap 'rm -f "$tmp_binary" "$blob_headers" "$blob_file"' EXIT
 
 if [[ "$requested_version" == "nightly" ]]; then
   # Nightly build: download from GHCR via OCI blob protocol.
@@ -261,35 +262,49 @@ if [[ "$requested_version" == "nightly" ]]; then
     die "No nightly build found for ${gz_filename}" "ghcr-digest"
   fi
 
-  # Step 5: Get the redirect URL from the blob endpoint (don't use -L: auth
-  # header must NOT be forwarded to the Azure Blob Storage redirect target)
-  redir_url=$(curl -s -w '\n%{redirect_url}' -o /dev/null \
+  # Step 5: Fetch the blob. GHCR normally redirects to Azure, but it can also
+  # return the blob directly with HTTP 200. Do not forward the auth header to
+  # the redirect target.
+  if ! blob_status=$(curl -sS -D "$blob_headers" -o "$blob_file" -w '%{http_code}' \
     -H "Authorization: Bearer $GHCR_TOKEN" \
-    "https://ghcr.io/v2/getsentry/cli/blobs/${digest}" | tail -1)
-  if [[ -z "$redir_url" ]]; then
-    die "Failed to get blob redirect URL from GHCR" "ghcr-redirect"
+    "https://ghcr.io/v2/getsentry/cli/blobs/${digest}"); then
+    die "Failed to fetch nightly blob from GHCR" "ghcr-blob"
   fi
 
-  # Step 6: Download the .gz blob and decompress (without auth header)
-  curl -sf "$redir_url" | gunzip > "$tmp_binary"
+  case "$blob_status" in
+    200)
+      gunzip "$blob_file" > "$tmp_binary"
+      ;;
+    3??)
+      redir_url=$(awk '/^[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]:[[:space:]]*/ { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$blob_headers")
+      if [[ -z "$redir_url" ]]; then
+        die "Failed to get blob redirect URL from GHCR" "ghcr-redirect"
+      fi
+      curl -fsSL "$redir_url" | gunzip > "$tmp_binary"
+      ;;
+    *)
+      die "Failed to fetch nightly blob from GHCR (HTTP ${blob_status})" "ghcr-blob"
+      ;;
+  esac
 
 else
   # Stable build: resolve version and download from GitHub Releases.
 
   if [[ -z "$requested_version" ]]; then
-    version=$(curl -fsSL https://api.github.com/repos/getsentry/cli/releases/latest \
-      | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')
-    if [[ -z "$version" ]]; then
+    release_tag=$(curl -fsSL 'https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100' \
+      | awk -F'"' '/^[[:space:]]*\{/ { tag="" } /"tag_name":[[:space:]]*"cli@/ { tag=$4 } /"prerelease":[[:space:]]*false/ && tag != "" { print tag; exit }')
+    if [[ -z "$release_tag" ]]; then
       die "Failed to fetch latest version" "gh-version"
     fi
+    version="${release_tag#cli@}"
   else
     version="$requested_version"
+    version="${version#cli@}"
+    version="${version#v}"
   fi
 
-  # Strip leading 'v' if present (releases use version without 'v' prefix)
-  version="${version#v}"
   filename="sentry-${os}-${arch}${libc_suffix}${suffix}"
-  url="https://github.com/getsentry/cli/releases/download/${version}/${filename}"
+  url="https://github.com/getsentry/sentry-mcp/releases/download/cli@${version}/${filename}"
 
   echo -e "${MUTED}Downloading sentry v${version}...${NC}"
 
@@ -326,19 +341,19 @@ if [[ "$no_agent_skills" == "true" ]]; then
   setup_args="$setup_args --no-agent-skills"
 fi
 
-# Remove trap — setup will handle temp cleanup on success
-trap - EXIT
-
 # curl | bash leaves stdin on the script pipe. Give setup the controlling
 # terminal only when both output streams are interactive; setup checks whether
 # this is a fresh human install before starting login.
+trap - ERR
 if [[ "${SENTRY_INIT:-}" != "1" && -t 1 && -t 2 ]] && { exec 3</dev/tty; } 2>/dev/null; then
+  trap - EXIT
   # shellcheck disable=SC2086
   exec "$tmp_binary" cli setup $setup_args <&3 3<&-
 fi
 
 # shellcheck disable=SC2086
 "$tmp_binary" cli setup $setup_args
+trap - EXIT
 
 # Optionally launch the setup wizard after install.
 # Reconnect stdin to the real terminal so the wizard can prompt
@@ -355,8 +370,8 @@ if [[ "${SENTRY_INIT:-}" == "1" ]]; then
   fi
   for dir in "${SENTRY_INSTALL_DIR:-}" "$xdg_bin_home" "$HOME/.local/bin" "$HOME/bin" "$HOME/.sentry/bin"; do
     [[ -z "$dir" ]] && continue
-    if [[ -x "${dir}/sentry" ]]; then
-      sentry_bin="${dir}/sentry"
+    if [[ -x "${dir}/sentry${suffix}" ]]; then
+      sentry_bin="${dir}/sentry${suffix}"
       break
     fi
   done

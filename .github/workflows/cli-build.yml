@@ -1,0 +1,238 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+      - release/cli/**
+  workflow_dispatch:
+
+concurrency:
+  group: cli-build-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  SENTRY_CLIENT_ID: ${{ vars.SENTRY_CLIENT_ID || 'ci-release-dummy' }}
+  NODE_VERSION_20: "20.20.2"
+  NODE_VERSION_22: "22.23.1"
+  NODE_VERSION_24: "24.18.0"
+
+jobs:
+  build-binary:
+    name: Build Binary (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    environment: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/cli/')) && 'production' || '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            os: macos-latest
+          - target: darwin-x64
+            os: ubuntu-latest
+          - target: linux-x64
+            os: ubuntu-latest
+          - target: linux-arm64
+            os: ubuntu-latest
+          - target: windows-x64
+            os: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION_22 }}
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Setup codesign dependencies
+        env:
+          APPLE_CERT_DATA: ${{ secrets.APPLE_CERT_DATA }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" && "$RUNNER_ARCH" == "ARM64" ]]; then
+            RCODESIGN_ARCHIVE="apple-codesign-0.29.0-aarch64-apple-darwin.tar.gz"
+            RCODESIGN_SHA256="d1a532150adaf90048260d76359261aa716abafc45c53c5dc18845029184334a"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            RCODESIGN_ARCHIVE="apple-codesign-0.29.0-x86_64-apple-darwin.tar.gz"
+            RCODESIGN_SHA256="14ef11bedd51a8d95eafd767939ae96d5900e5a61511bef75bb21db6e7c74140"
+          else
+            RCODESIGN_ARCHIVE="apple-codesign-0.29.0-x86_64-unknown-linux-musl.tar.gz"
+            RCODESIGN_SHA256="dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002"
+          fi
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            BASE64_DECODE="-D"
+          else
+            BASE64_DECODE="--decode"
+          fi
+          curl -fsSL "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.29.0/${RCODESIGN_ARCHIVE}" -o rcodesign.tar.gz
+          echo "${RCODESIGN_SHA256}  rcodesign.tar.gz" | shasum -a 256 -c
+          tar -xzf rcodesign.tar.gz --strip-components=1
+          sudo mv rcodesign /usr/local/bin/rcodesign
+          rm rcodesign.tar.gz
+          if [[ -n "$APPLE_CERT_DATA" ]]; then
+            echo "$APPLE_CERT_DATA" | base64 "$BASE64_DECODE" > /tmp/certs.p12
+            {
+              echo 'APPLE_CERT_PATH=/tmp/certs.p12'
+            } >> "$GITHUB_ENV"
+          fi
+          if [[ -n "$APPLE_API_KEY" ]]; then
+            echo "$APPLE_API_KEY" | base64 "$BASE64_DECODE" > /tmp/apple_key.json
+            jq -r .private_key /tmp/apple_key.json > /tmp/apple_key.pem
+            {
+              echo "APPLE_API_KEY_ISSUER_ID=$(jq -r .issuer_id /tmp/apple_key.json | tr -d '\n\r')"
+              echo "APPLE_API_KEY_ID=$(jq -r .key_id /tmp/apple_key.json | tr -d '\n\r')"
+              echo 'APPLE_API_KEY_P8_PATH=/tmp/apple_key.pem'
+              echo 'APPLE_API_KEY_PATH=/tmp/apple_key.json'
+            } >> "$GITHUB_ENV"
+          fi
+      - name: Build
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          RELEASE_BUILD: "1"
+          FOSSILIZE_SIGN: ${{ (github.ref_name == 'main' || startsWith(github.ref_name, 'release/cli/')) && 'y' || 'n' }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm --filter sentry run build -- --target ${{ matrix.target }}
+      - name: Smoke test
+        if: matrix.target == 'linux-x64'
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_TOKEN: ""
+          SENTRY_CONFIG_DIR: ${{ runner.temp }}/.sentry-smoke
+        run: |
+          packages/cli/dist-bin/sentry-linux-x64 --help
+          output=$(packages/cli/dist-bin/sentry-linux-x64 auth status 2>&1) && status=$? || status=$?
+          test "$status" -eq 10
+          printf '%s\n' "$output" | grep -qi 'not authenticated'
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentry-${{ matrix.target }}
+          path: |
+            packages/cli/dist-bin/sentry-*
+            !packages/cli/dist-bin/*.gz
+      - name: Upload compressed artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentry-${{ matrix.target }}-gz
+          path: packages/cli/dist-bin/*.gz
+
+  build-npm:
+    name: Build npm Package
+    runs-on: ubuntu-latest
+    environment: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/cli/')) && 'production' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION_22 }}
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Bundle
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: pnpm --filter sentry run bundle
+      - name: Smoke test
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_TOKEN: ""
+          SENTRY_CONFIG_DIR: ${{ runner.temp }}/.sentry-smoke
+        run: node packages/cli/dist/bin.cjs --help
+      - name: Pack
+        working-directory: packages/cli
+        run: npm pack
+      - name: Upload npm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: packages/cli/*.tgz
+
+  test-npm:
+    name: Test npm Package (Node ${{ matrix.node }})
+    needs: build-npm
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node == 24 && env.NODE_VERSION_24 || matrix.node == 20 && env.NODE_VERSION_20 || env.NODE_VERSION_22 }}
+      - name: Download npm artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+          path: packages/cli
+      - name: Test packaged CLI
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_TOKEN: ""
+          SENTRY_CONFIG_DIR: ${{ runner.temp }}/.sentry-smoke
+        run: |
+          package_file=$(find packages/cli -maxdepth 1 -name 'sentry-*.tgz' -print -quit)
+          test -n "$package_file"
+          npm install --ignore-scripts --prefix "$RUNNER_TEMP/npm-smoke" "$GITHUB_WORKSPACE/$package_file"
+          node "$RUNNER_TEMP/npm-smoke/node_modules/sentry/dist/bin.cjs" --help
+
+  build-docs:
+    name: Build Docs
+    needs: build-binary
+    runs-on: ubuntu-latest
+    environment: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/cli/')) && 'production' || '' }}
+    env:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION_24 }}
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate CLI docs
+        run: pnpm --filter sentry run generate:schema && pnpm --filter sentry run generate:docs
+      - name: Build docs
+        run: pnpm --filter sentry-cli-docs run build
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: sentry-linux-x64
+          path: dist-bin
+      - name: Inject debug IDs and upload sourcemaps
+        if: github.event_name == 'push' && env.SENTRY_AUTH_TOKEN != ''
+        env:
+          SENTRY_ORG: sentry
+          SENTRY_PROJECT: cli-website
+        run: |
+          chmod +x dist-bin/sentry-linux-x64
+          ./dist-bin/sentry-linux-x64 sourcemap inject apps/cli-docs/dist/
+          # shellcheck disable=SC2088
+          ./dist-bin/sentry-linux-x64 sourcemap upload apps/cli-docs/dist/ \
+            --release "$(node -p 'require("./packages/cli/package.json").version')" \
+            --url-prefix "~/"
+      - name: Remove sourcemaps
+        run: find apps/cli-docs/dist -name '*.map' -delete
+      - name: Package docs
+        run: |
+          output_dir="$RUNNER_TEMP/vercel-output"
+          rm -rf "$output_dir"
+          mkdir -p "$output_dir/.vercel/output/static"
+          cp -R apps/cli-docs/dist/. "$output_dir/.vercel/output/static/"
+          printf '%s\n' '{"version":3}' > "$output_dir/.vercel/output/config.json"
+          (cd "$output_dir" && zip -qr "$GITHUB_WORKSPACE/vercel.zip" .vercel)
+      - name: Upload docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vercel
+          path: vercel.zip

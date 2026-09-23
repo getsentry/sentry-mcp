@@ -53,11 +53,14 @@ index a9afbc1ab78cad7ba97d53882a80236af62854df..141532779be923b8f3b421b0afc031b5
    return {
      next: (input) => {
        if (!treatInputsAsArguments && config.allowArgumentEscapeSequence && input === "--") {
-@@ -1293,6 +1329,11 @@ function buildRouteScanner(root, config, startingPrefix) {
+@@ -1293,6 +1329,14 @@ function buildRouteScanner(root, config, startingPrefix) {
          unprocessedInputs.push(input);
          return;
        }
-+      if (!treatInputsAsArguments && !target && expectTopLevelFlagValue && input !== "--help" && input !== "-h" && input !== "--helpAll" && input !== "--help-all" && input !== "--version") {
++      if (!treatInputsAsArguments && !target && expectTopLevelFlagValue && input.startsWith("-")) {
++        expectTopLevelFlagValue = false;
++      }
++      if (!treatInputsAsArguments && !target && expectTopLevelFlagValue && !input.startsWith("-") && input !== "--help" && input !== "-h" && input !== "--helpAll" && input !== "--help-all" && input !== "--version") {
 +        expectTopLevelFlagValue = false;
 +        unprocessedInputs.push(input);
 +        return;
@@ -380,11 +383,14 @@ index f76639637e812453d107bda3e3ec165fc195f4d8..eff534dc79cdbe5bf8ee14839157b6d8
    return {
      next: (input) => {
        if (!treatInputsAsArguments && config.allowArgumentEscapeSequence && input === "--") {
-@@ -1245,6 +1281,11 @@ function buildRouteScanner(root, config, startingPrefix) {
+@@ -1245,6 +1281,14 @@ function buildRouteScanner(root, config, startingPrefix) {
          unprocessedInputs.push(input);
          return;
        }
-+      if (!treatInputsAsArguments && !target && expectTopLevelFlagValue && input !== "--help" && input !== "-h" && input !== "--helpAll" && input !== "--help-all" && input !== "--version") {
++      if (!treatInputsAsArguments && !target && expectTopLevelFlagValue && input.startsWith("-")) {
++        expectTopLevelFlagValue = false;
++      }
++      if (!treatInputsAsArguments && !target && expectTopLevelFlagValue && !input.startsWith("-") && input !== "--help" && input !== "-h" && input !== "--helpAll" && input !== "--help-all" && input !== "--version") {
 +        expectTopLevelFlagValue = false;
 +        unprocessedInputs.push(input);
 +        return;

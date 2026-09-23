@@ -232,4 +232,16 @@ process.exitCode = result.status ?? 1;
     expect(recorded("post-args")).toEqual([]);
     expect(existsSync(join(installDir, "sentry"))).toBe(true);
   });
+
+  test.each([1, 130])("preserves non-interactive setup exit %i", (exitCode) => {
+    env.SENTRY_TEST_SETUP_EXIT = String(exitCode);
+    const result = spawnSync("bash", [installScript, "--version", "0.31.0"], {
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    expect(result.status, result.stdout + result.stderr).toBe(exitCode);
+    expect(recorded("post-args")).toEqual([]);
+    expect(existsSync(join(installDir, "sentry"))).toBe(true);
+  });
 });

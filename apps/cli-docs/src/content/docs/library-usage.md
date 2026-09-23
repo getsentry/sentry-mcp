@@ -82,8 +82,8 @@ const dashboard = await sdk.dashboard.view({}, "acme/", "my-dashboard");
 
 // Nested widget commands
 await sdk.dashboard.widget.add(
-  { display: "line", query: "count" },
-  "acme/", "my-dashboard"
+  { display: "line", query: ["count"] },
+  "acme/", "my-dashboard", "Errors over time"
 );
 ```
 
@@ -233,7 +233,7 @@ When using streaming flags, methods return an `AsyncIterable` instead of a `Prom
 const sdk = createSentrySDK({ token: "sntrys_..." });
 
 // Stream logs as they arrive (polls every 5 seconds)
-for await (const log of sdk.log.list({ follow: "5", orgProject: "acme/backend" })) {
+for await (const log of sdk.log.list({ follow: "5" }, "acme/backend")) {
   console.log(log);
 }
 
