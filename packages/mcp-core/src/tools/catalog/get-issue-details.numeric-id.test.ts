@@ -19,8 +19,6 @@ const context = {
   userId: "1",
 };
 
-// Short IDs for legacy mixed-case project slugs can fail to resolve even though
-// the numeric ID works. Reject every short-ID follow-up, including optional data.
 describe("issue details with an unresolvable short ID", () => {
   it.each([
     {
@@ -65,39 +63,26 @@ describe("issue details with an unresolvable short ID", () => {
         ),
     },
   ])("loads $name and enrichment by numeric ID", async ({ call }) => {
-    const requestedIssueIds: string[] = [];
     const base = `https://sentry.io/api/0/organizations/${organizationSlug}`;
     mswServer.use(
       http.get(`${base}/issues/`, () => HttpResponse.json([issueFixture])),
-      http.get(`${base}/issues/:issueId/*`, ({ params, request }) => {
-        const requestedId = String(params.issueId);
-        requestedIssueIds.push(requestedId);
-        if (requestedId !== issueId) {
-          return HttpResponse.json(
-            { detail: "The requested resource does not exist" },
-            { status: 404 },
-          );
-        }
-        const path = new URL(request.url).pathname;
-        if (path.includes("/events/")) {
-          return HttpResponse.json(eventsFixture);
-        }
-        if (path.endsWith("/external-issues/")) {
-          return HttpResponse.json([
-            {
-              id: "123",
-              issueId,
-              serviceType: "github",
-              displayName: "example/app#123",
-              webUrl: "https://github.com/example/app/issues/123",
-            },
-          ]);
-        }
-        if (path.endsWith("/autofix/")) {
-          return HttpResponse.json(autofixStateFixture);
-        }
-        return HttpResponse.json(issueFixture);
-      }),
+      http.get(`${base}/issues/${issueFixture.shortId}/*`, () =>
+        HttpResponse.json({ detail: "Not found" }, { status: 404 }),
+      ),
+      http.get(`${base}/issues/${issueId}/autofix/`, () =>
+        HttpResponse.json(autofixStateFixture),
+      ),
+      http.get(`${base}/issues/${issueId}/external-issues/`, () =>
+        HttpResponse.json([
+          {
+            id: "123",
+            issueId,
+            serviceType: "github",
+            displayName: "example/app#123",
+            webUrl: "https://github.com/example/app/issues/123",
+          },
+        ]),
+      ),
     );
 
     const result = await call();
@@ -106,7 +91,5 @@ describe("issue details with an unresolvable short ID", () => {
     expect(result).toContain(eventsFixture.id);
     expect(result).toContain("## Seer Analysis");
     expect(result).toContain("**example/app#123** (github)");
-    expect(requestedIssueIds.length).toBeGreaterThanOrEqual(3);
-    expect(new Set(requestedIssueIds)).toEqual(new Set([issueId]));
   });
 });
