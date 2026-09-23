@@ -288,12 +288,15 @@ biggest migration gotcha is flags that silently no longer exist.
 
 | v3 flag | v4 replacement |
 |---------|----------------|
-| `--auth-token <tok>` | `SENTRY_AUTH_TOKEN` (or `sentry auth login`) |
+| `--auth-token <tok>` | `SENTRY_AUTH_TOKEN` plus `SENTRY_FORCE_ENV_TOKEN=1` to override stored OAuth credentials (or `sentry auth login`) |
 | `--url <url>` (self-hosted) | `SENTRY_URL` / `SENTRY_HOST`, or pass the URL as a command argument |
 | `--header "K: V"` | `SENTRY_CUSTOM_HEADERS` |
 
 The [compatibility shim](#drop-in-compatibility-shim) above translates
-`--auth-token`, `--url`, and `--header` into these env vars automatically.
+`--auth-token`, `--url`, and `--header` into these env vars automatically. For
+`--auth-token`, it sets both `SENTRY_AUTH_TOKEN` and
+`SENTRY_FORCE_ENV_TOKEN=1` so the explicit flag overrides stored OAuth
+credentials as it did in v3.
 
 ### Dropped
 

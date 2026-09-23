@@ -273,7 +273,7 @@ if [[ "$requested_version" == "nightly" ]]; then
 
   case "$blob_status" in
     200)
-      gunzip "$blob_file" > "$tmp_binary"
+      gunzip -c "$blob_file" > "$tmp_binary"
       ;;
     3??)
       redir_url=$(awk '/^[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]:[[:space:]]*/ { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$blob_headers")
