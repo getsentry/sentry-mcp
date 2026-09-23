@@ -254,78 +254,6 @@ function formatComponentSummary(
   return lines;
 }
 
-function getIssueAlertRuleFrequency(rule: IssueAlertRule): number | null {
-  if (rule.frequency !== undefined && rule.frequency !== null) {
-    return rule.frequency;
-  }
-  const frequency = rule.config.frequency;
-  return typeof frequency === "number" ? frequency : null;
-}
-
-export function formatIssueAlertRule(
-  rule: IssueAlertRule,
-  projectSlug: string,
-  options: {
-    headingLevel?: number;
-    includeComponents?: boolean;
-    url?: string;
-  } = {},
-): string {
-  const headingLevel = options.headingLevel ?? 2;
-  const includeComponents = options.includeComponents ?? true;
-  const heading = "#".repeat(Math.min(headingLevel, 6));
-  const owner = rule.owner ? formatActor(rule.owner) : null;
-  const frequency = getIssueAlertRuleFrequency(rule);
-  const lines = compactLines([
-    `${heading} ${rule.name}`,
-    "",
-    `**Kind**: Issue Alert`,
-    `**ID**: ${formatId(rule.id)}`,
-    `**Project**: ${projectSlug}`,
-    rule.status
-      ? `**Status**: ${rule.status}`
-      : rule.enabled !== undefined
-        ? `**Status**: ${rule.enabled ? "enabled" : "disabled"}`
-        : null,
-    rule.actionMatch ? `**Action Match**: ${rule.actionMatch}` : null,
-    rule.filterMatch ? `**Filter Match**: ${rule.filterMatch}` : null,
-    frequency !== null ? `**Frequency**: ${frequency} minutes` : null,
-    rule.environment ? `**Environment**: ${rule.environment}` : null,
-    owner ? `**Owner**: ${owner}` : null,
-    formatDate(rule.dateCreated)
-      ? `**Created**: ${formatDate(rule.dateCreated)}`
-      : null,
-    formatDate(rule.dateUpdated)
-      ? `**Updated**: ${formatDate(rule.dateUpdated)}`
-      : null,
-    formatDate(rule.lastTriggered)
-      ? `**Last Triggered**: ${formatDate(rule.lastTriggered)}`
-      : null,
-    options.url ? `**URL**: ${options.url}` : null,
-  ]);
-
-  if (includeComponents) {
-    const workflowTriggers = rule.triggers ? [rule.triggers] : [];
-    lines.push(
-      ...formatComponentSummary(
-        "Conditions",
-        rule.conditions,
-        headingLevel + 1,
-      ),
-      ...formatComponentSummary("Filters", rule.filters, headingLevel + 1),
-      ...formatComponentSummary("Actions", rule.actions, headingLevel + 1),
-      ...formatComponentSummary("Triggers", workflowTriggers, headingLevel + 1),
-      ...formatComponentSummary(
-        "Action Filters",
-        rule.actionFilters ?? [],
-        headingLevel + 1,
-      ),
-    );
-  }
-
-  return lines.join("\n");
-}
-
 export function formatMetricAlertRule(
   rule: MetricAlertRule,
   options: {
@@ -374,17 +302,22 @@ async function findExactIssueAlertRuleMatches(
   apiService: SentryApiService,
   params: {
     organizationSlug: string;
-    projectSlug: string;
+    projectSlug?: string;
     ruleName: string;
   },
 ): Promise<IssueAlertRule[]> {
-  const rules = await apiService.listIssueAlertRules({
+  const page = await apiService.listIssueAlertRulesPage({
     organizationSlug: params.organizationSlug,
     projectSlug: params.projectSlug,
     query: params.ruleName,
     limit: 100,
   });
-  return rules.filter(
+  if (page.nextCursor) {
+    throw new UserInputError(
+      "Alert name search is incomplete. Find the Alert with find_alert_rules and retry with its numeric ID and explicit kind.",
+    );
+  }
+  return page.rules.filter(
     (rule) => rule.name.toLowerCase() === params.ruleName.toLowerCase(),
   );
 }
@@ -412,7 +345,7 @@ export async function resolveIssueAlertRule(
   apiService: SentryApiService,
   params: {
     organizationSlug: string;
-    projectSlug: string;
+    projectSlug?: string;
     ruleIdOrName: string;
   },
 ): Promise<IssueAlertRule> {
@@ -449,7 +382,7 @@ export async function resolveIssueAlertRule(
     );
   }
   throw new UserInputError(
-    `Issue alert rule "${params.ruleIdOrName}" was not found in project ${params.projectSlug}.`,
+    `Issue alert rule "${params.ruleIdOrName}" was not found${params.projectSlug ? ` in project ${params.projectSlug}` : ""}.`,
   );
 }
 
