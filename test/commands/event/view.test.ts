@@ -5,6 +5,8 @@
  * and viewCommand func() body in src/commands/event/view.ts
  */
 
+// biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
+import * as Sentry from "@sentry/node-core/light";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   collectEventIds,
@@ -729,12 +731,14 @@ describe("resolveEventTarget", () => {
   let findEventAcrossOrgsSpy: ReturnType<typeof spyOn>;
   let resolveOrgAndProjectSpy: ReturnType<typeof spyOn>;
   let resolveProjectBySlugSpy: ReturnType<typeof spyOn>;
+  let setTagSpy: ReturnType<typeof spyOn>;
 
   beforeEach(async () => {
     resolveEventInOrgSpy = vi.spyOn(apiClient, "resolveEventInOrg");
     findEventAcrossOrgsSpy = vi.spyOn(apiClient, "findEventAcrossOrgs");
     resolveOrgAndProjectSpy = vi.spyOn(resolveTarget, "resolveOrgAndProject");
     resolveProjectBySlugSpy = vi.spyOn(resolveTarget, "resolveProjectBySlug");
+    setTagSpy = vi.spyOn(Sentry, "setTag");
     setOrgRegion("acme", DEFAULT_SENTRY_URL);
   });
 
@@ -743,6 +747,7 @@ describe("resolveEventTarget", () => {
     findEventAcrossOrgsSpy.mockRestore();
     resolveOrgAndProjectSpy.mockRestore();
     resolveProjectBySlugSpy.mockRestore();
+    setTagSpy.mockRestore();
   });
 
   test("returns explicit target directly", async () => {
@@ -803,6 +808,8 @@ describe("resolveEventTarget", () => {
     expect(result?.org).toBe("acme");
     expect(result?.project).toBe("backend");
     expect(result?.prefetchedEvent).toBeDefined();
+    expect(setTagSpy).toHaveBeenCalledWith("sentry.org", "acme");
+    expect(setTagSpy).toHaveBeenCalledWith("sentry.project", "backend");
   });
 
   test("delegates AutoDetect to resolveAutoDetectTarget", async () => {

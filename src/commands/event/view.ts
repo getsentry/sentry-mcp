@@ -70,6 +70,7 @@ import {
 } from "../../lib/sentry-url-parser.js";
 import { buildEventSearchUrl } from "../../lib/sentry-urls.js";
 import { getSpanTreeLines } from "../../lib/span-tree.js";
+import { setOrgProjectContext } from "../../lib/telemetry.js";
 import { isAllDigits } from "../../lib/utils.js";
 import { EventViewOutputSchema, type SentryEvent } from "../../types/index.js";
 
@@ -571,6 +572,8 @@ type ResolveTargetOptions = {
  *
  * Handles all target types (explicit, search, org-all, auto-detect)
  * including cross-project fallback via the eventids endpoint.
+ * Tags `sentry.org` / `sentry.project` on success because several of
+ * those paths skip `resolve-target`'s telemetry helper.
  *
  * @internal Exported for testing
  */
@@ -579,15 +582,17 @@ export async function resolveEventTarget(
 ): Promise<ResolvedEventTarget | null> {
   const { parsed, eventId, cwd } = options;
 
+  let target: ResolvedEventTarget | null;
   switch (parsed.type) {
     case ProjectSpecificationType.Explicit: {
       const org = await resolveEffectiveOrg(parsed.org);
-      return {
+      target = {
         org,
         project: parsed.project,
         orgDisplay: parsed.org,
         projectDisplay: parsed.project,
       };
+      break;
     }
 
     case ProjectSpecificationType.ProjectSearch: {
@@ -597,25 +602,36 @@ export async function resolveEventTarget(
         `sentry event view <org>/${parsed.projectSlug} ${eventId}`,
         parsed.originalSlug
       );
-      return {
+      target = {
         org: resolved.org,
         project: resolved.project,
         orgDisplay: resolved.org,
         projectDisplay: resolved.project,
       };
+      break;
     }
 
     case ProjectSpecificationType.OrgAll: {
       const org = await resolveEffectiveOrg(parsed.org);
-      return resolveOrgAllTarget(org, eventId, cwd);
+      target = await resolveOrgAllTarget(org, eventId, cwd);
+      break;
     }
 
     case ProjectSpecificationType.AutoDetect:
-      return resolveAutoDetectTarget(eventId, cwd);
+      target = await resolveAutoDetectTarget(eventId, cwd);
+      break;
 
-    default:
-      return null;
+    default: {
+      const _exhaustiveCheck: never = parsed;
+      target = null;
+      break;
+    }
   }
+
+  if (target) {
+    setOrgProjectContext([target.org], [target.project]);
+  }
+  return target;
 }
 
 /**
