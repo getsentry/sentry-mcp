@@ -298,6 +298,45 @@ export const AlertRuleProjectScopeSchema = z.object({
   includesAllProjects: z.boolean(),
 });
 
+export const AlertActionOptionSchema = z.object({
+  type: z.string(),
+  handlerGroup: z.string(),
+  configSchema: z.record(z.string(), z.unknown()),
+  dataSchema: z.record(z.string(), z.unknown()),
+  integrations: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        services: z
+          .array(z.object({ id: z.string(), name: z.string() }))
+          .optional(),
+      }),
+    )
+    .optional(),
+  services: z
+    .array(z.object({ slug: z.string(), name: z.string() }))
+    .optional(),
+  sentryApp: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      installationId: z.string(),
+      installationUuid: z.string(),
+      status: z.number(),
+      settings: z.record(z.string(), z.unknown()).optional(),
+      title: z.string().optional(),
+    })
+    .optional(),
+});
+
+export const AlertConditionOptionSchema = z.object({
+  type: z.string(),
+  handlerGroup: z.string(),
+  handlerSubgroup: z.string().optional(),
+  comparisonJsonSchema: z.record(z.string(), z.unknown()),
+});
+
 // Source: workflow_engine/endpoints/serializers/detector_serializer.py.
 // Configuration and data sources vary by detector type; preserve their native fields.
 export const DetectorSchema = z

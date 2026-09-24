@@ -5,7 +5,7 @@
     "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, cron monitors, uptime monitors, profiles, documentation, and project metadata",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 38,
+    "toolCount": 39,
     "tools": [
       {
         "name": "find_alert_rules",
@@ -51,6 +51,11 @@
         "name": "get_agent_conversation_details",
         "description": "Fetch the chronological transcript and debugging details for one agent conversation, formerly called an AI conversation.\n\nReturns a timeline of user messages, assistant messages, and tool calls, with trace/span IDs for deeper debugging. To discover or list conversations, use search_agent_conversations.",
         "requiredScopes": ["event:read", "project:read"]
+      },
+      {
+        "name": "get_alert_options",
+        "description": "Discover available actions, conditions, or sources for a Sentry Alert (notification workflow).\n\nChoose one section per call; reuse its cursor with the same section and filters.\n- actions: installed integrations, notification services, native config/data schemas and Sentry App settings. These schemas use Sentry's internal field names and target enums; inputGuide explains the update format.\n- conditions: condition types and comparison schemas for workflow triggers or action filters.\n- sources: accessible monitors and project issue streams. Use an issue_stream source to connect all issues from its project; a source with projectId=null covers all projects.\nSlack and Teams accept channel names; Discord needs a channel ID or URL. Dynamic Sentry App fields require explicit values; this tool does not enumerate their external choices.\n\n<examples>\nget_alert_options(organizationSlug='my-org', section='actions', actionTypes=['slack', 'msteams'])\nget_alert_options(organizationSlug='my-org', section='conditions', conditionGroup='action_filter')\nget_alert_options(organizationSlug='my-org', section='sources', projectSlug='backend', sourceTypes=['issue_stream'])\n</examples>",
+        "requiredScopes": ["org:read", "project:read"]
       },
       {
         "name": "get_alert_rule",

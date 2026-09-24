@@ -16,6 +16,7 @@ import updateUptimeMonitor from "./update-uptime-monitor";
 import deleteUptimeMonitor from "./delete-uptime-monitor";
 import findAlertRules from "./find-alert-rules";
 import getAlertRule from "./get-alert-rule";
+import getAlertOptions from "./get-alert-options";
 import getIssueDetails from "./get-issue-details";
 import getEventStacktrace from "./get-event-stacktrace";
 import getIssueActivity from "./get-issue-activity";
@@ -102,6 +103,7 @@ const catalogTools = {
   delete_uptime_monitor: deleteUptimeMonitor,
   find_alert_rules: findAlertRules,
   get_alert_rule: getAlertRule,
+  get_alert_options: getAlertOptions,
   get_issue_details: getIssueDetails,
   get_event_stacktrace: getEventStacktrace,
   get_issue_activity: getIssueActivity,

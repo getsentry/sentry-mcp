@@ -1,8 +1,9 @@
-# Alert inspection
+# Alert inspection and configuration options
 
 `find_alert_rules` and `get_alert_rule` inspect Alerts through the searchable
-catalog (`search_sentry_tools` and `execute_sentry_tool`). No new direct tools
-or write scopes are required.
+catalog (`search_sentry_tools` and `execute_sentry_tool`). `get_alert_options`
+discovers available configuration choices through the same catalog. No new direct
+tools or write scopes are required.
 
 The `issue` selector reads Sentry Alerts: notification workflows that can be
 shared across projects and monitors, cover all projects, or have no connected
@@ -42,6 +43,23 @@ sources are marked `outside_project_constraint`, and scope includes
 `limitedToProject` and, for a concrete project list, `outsideProjectCount`.
 The real all-projects flag remains visible without guessing a project count.
 Detached or unrelated Alerts are rejected for constrained sessions.
+
+## Configuration options
+
+`get_alert_options` returns one paginated section per call:
+
+- `actions`: action types, installed integrations and services, native config/data
+  schemas, and Sentry App settings. `inputGuide` maps internal config field names
+  and target enums to the update format.
+- `conditions`: available condition types and comparison schemas for the required
+  `workflow_trigger` or `action_filter` group.
+- `sources`: accessible detectors, including each project's system `issue_stream`.
+  Filter by project, type, or monitor query. Each source includes its ID, project,
+  enabled state, and connected workflow IDs.
+
+Reuse cursors with the same section and filters. Discovery does not enumerate
+every channel, member, or dynamic Sentry App choice; destinations and dynamic
+settings may require explicit values. It never invents IDs.
 
 ## Legacy metrics and interpretation
 
