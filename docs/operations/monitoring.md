@@ -16,6 +16,17 @@ Different Sentry SDKs for different environments:
 
 See `logIssue` in `packages/mcp-server/src/telem/logging.ts` (documented in [Logging Reference](logging.md)) for the canonical way to create an Issue and structured log entry.
 
+### Event Schema Failures
+
+`Event failed schema validation` includes `contextType` in the issue's `log`
+context and structured log properties. This is the outer type of the legacy
+`context`/`extra` field: `null`, `array`, or JavaScript `typeof` (including
+`undefined` when absent). It never contains extra-data keys or values.
+Compare it with `validationIssues`: the failure may concern another field.
+Use this evidence before changing the map contract; a record-validation error
+alone does not establish whether the rejected value was null, an array, or a
+scalar. This diagnostic does not make invalid events parse successfully.
+
 ### Tracing Pattern
 
 ```typescript
