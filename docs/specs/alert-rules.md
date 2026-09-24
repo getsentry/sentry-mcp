@@ -80,7 +80,9 @@ Connection changes are additive/subtractive: `addProjectSlugs` and
 `removeProjectSlugs` resolve existing `issue_stream` detectors, while
 `addDetectorIds` and `removeDetectorIds` address individual monitors. Unmentioned
 connections remain intact. Removing a project's issue stream does not disconnect
-its other monitors. Missing or ambiguous issue streams fail before the PUT;
+its other monitors. Already connected detector IDs can be removed even when their
+details are unavailable; Sentry still checks removal permissions on the PUT.
+Missing or ambiguous issue streams fail before the PUT;
 MCP does not create a detector or substitute another type.
 
 Project-constrained writes require the Alert to belong exclusively to that

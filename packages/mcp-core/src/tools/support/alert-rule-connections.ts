@@ -17,7 +17,8 @@ export async function resolveAlertRuleConnections(
 ): Promise<string[]> {
   const additions = new Set<string>();
   const removals = new Set<string>();
-  for (const [projectSlugs, detectorIds, resolvedIds] of [
+  const detectorIds = new Set(params.currentDetectorIds.map(String));
+  for (const [projectSlugs, requestedDetectorIds, resolvedIds] of [
     [params.addProjectSlugs, params.addDetectorIds, additions],
     [params.removeProjectSlugs, params.removeDetectorIds, removals],
   ] as const) {
@@ -69,7 +70,12 @@ export async function resolveAlertRuleConnections(
       resolvedIds.add(detectorId);
     }
 
-    for (const detectorId of new Set(detectorIds ?? [])) {
+    for (const detectorId of new Set(requestedDetectorIds ?? [])) {
+      // An attached monitor can outlive access to its details; the PUT authorizes removal.
+      if (resolvedIds === removals && detectorIds.has(detectorId)) {
+        removals.add(detectorId);
+        continue;
+      }
       const detector = await api.getDetector({
         organizationSlug: params.organizationSlug,
         detectorId,
@@ -91,7 +97,6 @@ export async function resolveAlertRuleConnections(
     );
   }
 
-  const detectorIds = new Set(params.currentDetectorIds.map(String));
   for (const id of removals) {
     detectorIds.delete(id);
   }

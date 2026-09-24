@@ -485,6 +485,68 @@ describe("update_alert_rule", () => {
     });
   });
 
+  it.each([null, "cloudflare-mcp"])(
+    "disconnects an attached unavailable monitor under project constraint %s",
+    async (projectSlug) => {
+      const { writes } = useAlertRuleHandlers({
+        ...alertRule,
+        detectorIds: ["789", "321"],
+      });
+      useProjectScope(["100"]);
+      mswServer.use(
+        http.get(`${detectorsEndpoint}321/`, () =>
+          HttpResponse.json({ detail: "Unavailable monitor" }, { status: 404 }),
+        ),
+      );
+
+      const result = await updateAlertRule.handler(
+        { ...params, removeDetectorIds: ["321"] },
+        { ...context, constraints: { ...context.constraints, projectSlug } },
+      );
+
+      expect(writes).toEqual([
+        { name: alertRule.name, enabled: false, detectorIds: ["789"] },
+      ]);
+      expect(getStructuredContent(result)).toMatchObject({
+        alertRule: { detectorIds: ["789"] },
+      });
+    },
+  );
+
+  it.each([
+    { field: "addDetectorIds", id: "456", status: 403, method: "GET" },
+    { field: "addDetectorIds", id: "456", status: 404, method: "GET" },
+    { field: "removeDetectorIds", id: "456", status: 404, method: "GET" },
+    { field: "removeDetectorIds", id: "789", status: 403, method: "PUT" },
+  ])(
+    "propagates $method $status for $field without bypassing authorization",
+    async ({ field, id, status, method }) => {
+      const { writes } = useAlertRuleHandlers();
+      mswServer.use(
+        http.get(`${detectorsEndpoint}${id}/`, () =>
+          HttpResponse.json(
+            { detail: "Unavailable monitor" },
+            { status: method === "GET" ? status : 404 },
+          ),
+        ),
+        http.put(endpoint, async ({ request }) => {
+          writes.push((await request.json()) as Record<string, unknown>);
+          return HttpResponse.json({ detail: "Forbidden update" }, { status });
+        }),
+      );
+
+      await expect(
+        updateAlertRule.handler({ ...params, [field]: [id] }, context),
+      ).rejects.toMatchObject({
+        status,
+        message: expect.stringContaining(
+          method === "GET" ? "Unavailable monitor" : "Forbidden update",
+        ),
+      });
+      expect(writes).toHaveLength(method === "PUT" ? 1 : 0);
+    },
+  );
+
   it.each([
     {
       type: "error",
