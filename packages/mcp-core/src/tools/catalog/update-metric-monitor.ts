@@ -15,7 +15,6 @@ import {
   metricMonitorReferenceFields,
   toMetricMonitorDetails,
 } from "../support/metric-monitors";
-import { assertProjectRefWithinConstraint } from "./support/project-constraints";
 
 export default defineTool({
   name: "update_metric_monitor",
@@ -45,13 +44,6 @@ export default defineTool({
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
-    if (params.projectSlug) {
-      assertProjectRefWithinConstraint({
-        resourceLabel: "Metric Monitor",
-        scopedProjectSlug: context.constraints.projectSlug,
-        project: { slug: params.projectSlug },
-      });
-    }
     const {
       organizationSlug,
       regionUrl,
@@ -68,7 +60,8 @@ export default defineTool({
     const current = await getMetricMonitor(api, {
       organizationSlug,
       monitorId,
-      projectSlug,
+      projectSlug: requestedProject,
+      scopedProjectSlug: context.constraints.projectSlug,
     });
     const updated = await api.updateMetricMonitor({
       organizationSlug,

@@ -13,15 +13,19 @@ import updateMetricMonitor from "./update-metric-monitor";
 
 const endpoint =
   "https://sentry.io/api/0/organizations/test-org/detectors/123/";
-const conditions = [
-  { type: "gt", comparison: 110, conditionResult: 75 },
-  { type: "lte", comparison: 105, conditionResult: 0 },
-];
+const thresholdGroup = {
+  ...metricMonitor.conditionGroup,
+  conditions: [
+    { ...metricMonitor.conditionGroup.conditions[0], comparison: 110 },
+    { ...metricMonitor.conditionGroup.conditions[1], comparison: 105 },
+  ],
+};
 const anomaly = {
   type: "anomaly_detection",
   comparison: { sensitivity: "high", seasonality: "auto", thresholdType: 2 },
   conditionResult: 75,
 };
+const dynamicGroup = { logicType: "any", conditions: [anomaly] };
 
 function update(changes: Record<string, unknown>) {
   return executeToolHandler({
@@ -58,27 +62,17 @@ describe("update_metric_monitor", () => {
           detectionType,
           comparisonDelta: detectionType === "percent" ? 3600 : null,
         },
-        conditionGroup: {
-          logicType: "any",
-          conditions: detectionType === "dynamic" ? [anomaly] : conditions,
-        },
+        conditionGroup:
+          detectionType === "dynamic" ? dynamicGroup : thresholdGroup,
       });
-      await update({
+      const metadata = {
         name: "Renamed",
-        status: "active",
         owner: null,
         description: null,
         workflowIds: [],
-      });
-      expect(writes).toEqual([
-        {
-          name: "Renamed",
-          enabled: true,
-          owner: null,
-          description: null,
-          workflowIds: [],
-        },
-      ]);
+      };
+      await update({ ...metadata, status: "active" });
+      expect(writes).toEqual([{ ...metadata, enabled: true }]);
     },
   );
 
@@ -144,47 +138,24 @@ describe("update_metric_monitor", () => {
     `);
   });
 
-  it("merges query and percent settings without changing native thresholds or leaking source IDs", async () => {
+  it("merges percent settings without changing native thresholds or condition IDs", async () => {
     const writes = useMonitor({
       config: { detectionType: "percent", comparisonDelta: 3600 },
     });
-    const conditionGroup = {
-      id: "10",
-      logicType: "any",
-      conditions: conditions.map((condition, i) => ({
-        ...condition,
-        id: String(i + 11),
-      })),
-    };
     await update({
-      query: {
-        query: "level:fatal",
-        timeWindowSeconds: 900,
-        environment: null,
-      },
       config: { comparisonDeltaSeconds: 86400 },
-      conditionGroup,
+      conditionGroup: thresholdGroup,
     });
     expect(writes).toEqual([
       {
-        dataSources: [
-          {
-            dataset: "events",
-            query: "level:fatal",
-            aggregate: "count()",
-            timeWindow: 900,
-            environment: null,
-            eventTypes: ["error"],
-            extrapolationMode: null,
-          },
-        ],
         config: { detectionType: "percent", comparisonDelta: 86400 },
-        conditionGroup,
+        conditionGroup: thresholdGroup,
       },
     ]);
   });
 
   it.each([
+    ["events", ["error"], "count()", null],
     [
       "events_analytics_platform",
       ["trace_item_span"],
@@ -206,7 +177,7 @@ describe("update_metric_monitor", () => {
     ],
     ["generic_metrics", ["transaction"], "p95(transaction.duration)", null],
   ])(
-    "preserves %s / %j source settings across metadata and query edits",
+    "preserves %s / %j source settings when editing query filters",
     async (dataset, eventTypes, aggregate, extrapolationMode) => {
       const query = {
         dataset,
@@ -217,28 +188,18 @@ describe("update_metric_monitor", () => {
         query: "",
         environment: null,
       };
-      const source = metricMonitor.dataSources[0];
-      const writes = useMonitor({
-        dataSources: [
-          {
-            ...source,
-            queryObj: {
-              ...source.queryObj,
-              snubaQuery: {
-                ...source.queryObj.snubaQuery,
-                ...query,
-                query: "release:previous",
-                environment: "production",
-              },
-            },
-          },
-        ],
+      const source = structuredClone(metricMonitor.dataSources[0]);
+      Object.assign(source.queryObj.snubaQuery, {
+        ...query,
+        timeWindow: 7200,
+        query: "release:previous",
+        environment: "production",
       });
-      await update({ name: "Renamed" });
+      const writes = useMonitor({ dataSources: [source] });
       await update({
         query: { query: "", timeWindowSeconds: 3600, environment: null },
       });
-      expect(writes).toEqual([{ name: "Renamed" }, { dataSources: [query] }]);
+      expect(writes).toEqual([{ dataSources: [query] }]);
     },
   );
 
@@ -255,10 +216,8 @@ describe("update_metric_monitor", () => {
           comparisonDelta: previousMode === "percent" ? 3600 : null,
         },
       });
-      const conditionGroup = {
-        logicType: "any",
-        conditions: detectionType === "dynamic" ? [anomaly] : conditions,
-      };
+      const conditionGroup =
+        detectionType === "dynamic" ? dynamicGroup : thresholdGroup;
       await update({
         conditionGroup,
         ...(previousMode !== detectionType
@@ -275,48 +234,36 @@ describe("update_metric_monitor", () => {
   );
 
   it.each([
-    [{}, {}],
-    [{}, { config: { comparisonDeltaSeconds: 3600 } }],
-    [
-      {},
-      {
-        config: { detectionType: "percent" },
-        conditionGroup: { logicType: "any", conditions },
+    {},
+    { config: { comparisonDeltaSeconds: 3600 } },
+    { config: { detectionType: "percent" }, conditionGroup: thresholdGroup },
+    {
+      config: { detectionType: "dynamic" },
+      conditionGroup: { ...dynamicGroup, conditions: [anomaly, anomaly] },
+    },
+    {
+      config: { detectionType: "dynamic" },
+      conditionGroup: {
+        ...dynamicGroup,
+        conditions: [{ ...anomaly, comparison: 100 }],
       },
-    ],
-    [
-      {},
-      {
-        config: { detectionType: "dynamic" },
-        conditionGroup: { logicType: "any", conditions: [anomaly, anomaly] },
-      },
-    ],
-    [
-      {},
-      {
-        config: { detectionType: "dynamic" },
-        conditionGroup: {
-          logicType: "any",
-          conditions: [{ ...anomaly, comparison: 100 }],
-        },
-      },
-    ],
-    [{}, { config: { detectionType: "dynamic" } }],
-    [
-      {},
-      {
-        config: { detectionType: "dynamic" },
-        conditionGroup: { logicType: "any", conditions },
-      },
-    ],
-    [{}, { conditionGroup: { logicType: "any", conditions: [anomaly] } }],
-    [{ dataSources: [] }, { query: { aggregate: "count_unique(user)" } }],
+    },
+    { config: { detectionType: "dynamic" } },
+    { config: { detectionType: "dynamic" }, conditionGroup: thresholdGroup },
   ])(
-    "rejects incomplete or incompatible edits before writing: %j %j",
-    async (monitor, changes) => {
-      const writes = useMonitor(monitor);
+    "rejects incomplete or incompatible edits before writing: %j",
+    async (changes) => {
+      const writes = useMonitor();
       await expect(update(changes)).rejects.toThrow(UserInputError);
       expect(writes).toEqual([]);
     },
   );
+
+  it("refuses to merge a query whose source is unavailable", async () => {
+    const writes = useMonitor({ dataSources: [] });
+    await expect(
+      update({ query: { aggregate: "count_unique(user)" } }),
+    ).rejects.toThrow(UserInputError);
+    expect(writes).toEqual([]);
+  });
 });

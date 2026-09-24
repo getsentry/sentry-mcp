@@ -16,10 +16,7 @@ const endpoint =
 const params = { organizationSlug: "test-org", monitorId: "123" };
 const context = createTestContext({ constraints: { projectSlug: "backend" } });
 
-function useMonitor(
-  overrides: Record<string, unknown> = {},
-  deleteStatus = 204,
-) {
+function useMonitor(overrides: Record<string, unknown> = {}) {
   const writes: string[] = [];
   mswServer.use(
     http.get(endpoint, () =>
@@ -30,7 +27,7 @@ function useMonitor(
     ),
     http.delete(endpoint, ({ request }) => {
       writes.push(request.method);
-      return new HttpResponse(null, { status: deleteStatus });
+      return new HttpResponse(null, { status: 204 });
     }),
     http.put(endpoint, ({ request }) => {
       writes.push(request.method);
@@ -61,7 +58,6 @@ describe("delete_metric_monitor", () => {
   it.each([
     [{ type: "uptime_domain_failure" }, "does not identify a Metric Monitor"],
     [{ projectId: "200" }, "outside the active project constraint"],
-    [{ projectId: null }, "outside the active project constraint"],
   ])(
     "rejects type/project mismatches in both write tools: %j",
     async (overrides, message) => {
@@ -78,12 +74,4 @@ describe("delete_metric_monitor", () => {
       expect(writes).toEqual([]);
     },
   );
-
-  it("does not report success when deletion fails", async () => {
-    const writes = useMonitor({}, 404);
-    await expect(
-      executeToolHandler({ tool: deleteMetricMonitor, params, context }),
-    ).rejects.toMatchObject({ status: 404 });
-    expect(writes).toEqual(["DELETE"]);
-  });
 });

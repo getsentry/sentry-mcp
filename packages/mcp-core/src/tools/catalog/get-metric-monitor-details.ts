@@ -11,7 +11,6 @@ import {
   metricMonitorReferenceFields,
   toMetricMonitorDetails,
 } from "../support/metric-monitors";
-import { assertProjectRefWithinConstraint } from "./support/project-constraints";
 
 export const getMetricMonitorDetailsOutputSchema = z.object({
   monitor: metricMonitorDetailsSchema,
@@ -36,20 +35,16 @@ export default defineTool({
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
-    if (params.projectSlug) {
-      assertProjectRefWithinConstraint({
-        resourceLabel: "Metric Monitor",
-        scopedProjectSlug: context.constraints.projectSlug,
-        project: { slug: params.projectSlug },
-      });
-    }
     const projectSlug = context.constraints.projectSlug ?? params.projectSlug;
     setOrganizationContext(params.organizationSlug);
     if (projectSlug) setTag("project.slug", projectSlug);
     const api = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
     });
-    const detector = await getMetricMonitor(api, { ...params, projectSlug });
+    const detector = await getMetricMonitor(api, {
+      ...params,
+      scopedProjectSlug: context.constraints.projectSlug,
+    });
     return structuredResult({
       monitor: toMetricMonitorDetails(api, params.organizationSlug, detector),
     });

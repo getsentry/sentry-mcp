@@ -8,7 +8,6 @@ import {
   getMetricMonitor,
   metricMonitorReferenceFields,
 } from "../support/metric-monitors";
-import { assertProjectRefWithinConstraint } from "./support/project-constraints";
 
 export default defineTool({
   name: "delete_metric_monitor",
@@ -30,20 +29,13 @@ export default defineTool({
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
-    if (params.projectSlug) {
-      assertProjectRefWithinConstraint({
-        resourceLabel: "Metric Monitor",
-        scopedProjectSlug: context.constraints.projectSlug,
-        project: { slug: params.projectSlug },
-      });
-    }
     const api = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
     });
     setOrganizationContext(params.organizationSlug);
     await getMetricMonitor(api, {
       ...params,
-      projectSlug: context.constraints.projectSlug ?? params.projectSlug,
+      scopedProjectSlug: context.constraints.projectSlug,
     });
     await api.deleteMetricMonitor({
       organizationSlug: params.organizationSlug,

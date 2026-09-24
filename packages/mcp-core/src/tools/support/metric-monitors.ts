@@ -8,7 +8,10 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import { formatActor, formatDate } from "../catalog/support/api-formatting";
-import { assertProjectConstraintEvidence } from "../catalog/support/project-constraints";
+import {
+  assertProjectConstraintEvidence,
+  assertProjectRefWithinConstraint,
+} from "../catalog/support/project-constraints";
 import {
   conditionGroupSchema,
   getMetricQuery,
@@ -157,8 +160,17 @@ export async function getMetricMonitor(
     organizationSlug: string;
     monitorId: string;
     projectSlug?: string;
+    scopedProjectSlug?: string | null;
   },
 ): Promise<Detector> {
+  if (params.projectSlug) {
+    assertProjectRefWithinConstraint({
+      resourceLabel: "Metric Monitor",
+      scopedProjectSlug: params.scopedProjectSlug,
+      project: { slug: params.projectSlug },
+    });
+  }
+  const projectSlug = params.scopedProjectSlug ?? params.projectSlug;
   const detector = await api.getDetector({
     organizationSlug: params.organizationSlug,
     detectorId: params.monitorId,
@@ -168,14 +180,14 @@ export async function getMetricMonitor(
       "This ID does not identify a Metric Monitor. Use find_metric_monitors to find its monitor ID.",
     );
   }
-  if (params.projectSlug) {
+  if (projectSlug) {
     const project = await api.getProject({
       organizationSlug: params.organizationSlug,
-      projectSlugOrId: params.projectSlug,
+      projectSlugOrId: projectSlug,
     });
     assertProjectConstraintEvidence({
       resourceLabel: "Metric Monitor",
-      scopedProjectSlug: params.projectSlug,
+      scopedProjectSlug: projectSlug,
       hasEvidence: detector.projectId === String(project.id),
     });
   }
