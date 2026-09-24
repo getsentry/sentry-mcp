@@ -139,6 +139,7 @@ import type {
   IssueTagValues,
   MetricAlertRule,
   MetricAlertRuleList,
+  MetricMonitorCreate,
   MetricMonitorUpdate,
   Monitor,
   MonitorCheckInList,
@@ -2178,6 +2179,29 @@ export class SentryApiService {
       opts,
     );
     return DetectorSchema.parse(body);
+  }
+
+  async createMetricMonitor(
+    {
+      organizationSlug,
+      projectSlug,
+      body,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      body: MetricMonitorCreate;
+    },
+    opts?: RequestOptions,
+  ): Promise<Detector> {
+    const response = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/projects/${projectSlug}/detectors/`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      opts,
+    );
+    return DetectorSchema.parse(response);
   }
 
   async updateMetricMonitor(

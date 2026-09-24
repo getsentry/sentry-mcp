@@ -1245,6 +1245,7 @@ describe("buildServer", () => {
         ["update_alert_rule", ["project-management"]],
         ["create_alert_rule", ["project-management"]],
         ["delete_alert_rule", ["project-management"]],
+        ["create_metric_monitor", ["project-management"]],
         ["update_metric_monitor", ["project-management"]],
         ["delete_metric_monitor", ["project-management"]],
         ["add_team_to_project", ["project-management"]],
@@ -1572,6 +1573,20 @@ describe("buildServer", () => {
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/detectors/123/";
       const writes: string[] = [];
       mswServer.use(
+        http.post(
+          "https://sentry.io/api/0/organizations/sentry-mcp-evals/projects/cloudflare-mcp/detectors/",
+          async ({ request }) => {
+            writes.push("POST");
+            expect(await request.json()).toMatchObject({
+              type: "metric_issue",
+              dataSources: [{ dataset: "events", timeWindow: 300 }],
+            });
+            return HttpResponse.json(
+              { ...monitor, id: "124", enabled: true, workflowIds: [] },
+              { status: 201 },
+            );
+          },
+        ),
         http.get(endpoint, () => HttpResponse.json(monitor)),
         http.put(endpoint, async ({ request }) => {
           writes.push("PUT");
@@ -1585,13 +1600,35 @@ describe("buildServer", () => {
       );
       for (const [name, args, expected] of [
         [
+          "create_metric_monitor",
+          {
+            name: monitor.name,
+            query: {
+              dataset: "events",
+              query: "level:error",
+              aggregate: "count()",
+              timeWindowSeconds: 300,
+              eventTypes: ["error"],
+            },
+            config: { detectionType: "static" },
+            conditionGroup: metricMonitor.conditionGroup,
+          },
+          {
+            monitor: { id: "124", enabled: true, projectId: monitor.projectId },
+          },
+        ],
+        [
           "update_metric_monitor",
-          { status: "active" },
+          { monitorId: "123", status: "active" },
           {
             monitor: { id: "123", enabled: true, projectId: monitor.projectId },
           },
         ],
-        ["delete_metric_monitor", {}, { success: true, monitorId: "123" }],
+        [
+          "delete_metric_monitor",
+          { monitorId: "123" },
+          { success: true, monitorId: "123" },
+        ],
       ] as const) {
         expect(getRegisteredToolNames(server)).not.toContain(name);
         const search = await callRegisteredTool(server, "search_sentry_tools", {
@@ -1606,14 +1643,13 @@ describe("buildServer", () => {
           arguments: {
             organizationSlug: "other-org",
             projectSlug: "other-project",
-            monitorId: "123",
             ...args,
           },
         });
         expect(result.isError).not.toBe(true);
         expect(getStructuredContent(result)).toMatchObject(expected);
       }
-      expect(writes).toEqual(["PUT", "DELETE"]);
+      expect(writes).toEqual(["POST", "PUT", "DELETE"]);
     });
 
     it("execute_sentry_tool dispatches a catalog-only alert update with constrained organization", async () => {
