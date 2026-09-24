@@ -609,6 +609,30 @@ describe("Alert inspection endpoints", () => {
     "https://sentry.io/api/0/organizations/test-org/workflows/";
   const workflow = { id: "10", name: "Notify on new issues", detectorIds: [] };
 
+  it("resolves legacy metric alert IDs through the detector mapping", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/alert-rule-detector/",
+        ({ request }) => {
+          expect(new URL(request.url).searchParams.get("alert_rule_id")).toBe(
+            "123",
+          );
+          return HttpResponse.json({
+            alertRuleId: "123",
+            detectorId: "456",
+            ruleId: null,
+          });
+        },
+      ),
+    );
+    expect(
+      await api.getDetectorForAlertRule({
+        organizationSlug,
+        alertRuleId: "123",
+      }),
+    ).toBe("456");
+  });
+
   it("keeps unattached workflows and returns the backend page cursor organization-wide", async () => {
     mswServer.use(
       http.get(workflowUrl, ({ request }) => {

@@ -1141,10 +1141,17 @@ export class SentryApiService {
     organizationSlug: string,
     uptimeMonitorId: string | number,
   ): string {
+    return this.getDetectorUrl(organizationSlug, uptimeMonitorId);
+  }
+
+  getDetectorUrl(
+    organizationSlug: string,
+    detectorId: string | number,
+  ): string {
     return getUptimeMonitorUrlUtil(
       this.host,
       organizationSlug,
-      uptimeMonitorId,
+      detectorId,
       this.protocol,
     );
   }
@@ -2138,6 +2145,22 @@ export class SentryApiService {
       opts,
     );
     return AlertRuleProjectScopeSchema.parse(body);
+  }
+
+  async getDetectorForAlertRule(
+    {
+      organizationSlug,
+      alertRuleId,
+    }: { organizationSlug: string; alertRuleId: string | number },
+    opts?: RequestOptions,
+  ): Promise<string> {
+    const query = new URLSearchParams({ alert_rule_id: String(alertRuleId) });
+    const body = await this.requestJSON(
+      `${apiPath`/organizations/${organizationSlug}/alert-rule-detector/`}?${query}`,
+      undefined,
+      opts,
+    );
+    return z.object({ detectorId: z.string() }).parse(body).detectorId;
   }
 
   async getDetector(

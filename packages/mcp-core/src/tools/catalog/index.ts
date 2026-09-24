@@ -11,6 +11,8 @@ import findMonitors from "./find-monitors";
 import getMonitorDetails from "./get-monitor-details";
 import findUptimeMonitors from "./find-uptime-monitors";
 import getUptimeMonitorDetails from "./get-uptime-monitor-details";
+import findMetricMonitors from "./find-metric-monitors";
+import getMetricMonitorDetails from "./get-metric-monitor-details";
 import createUptimeMonitor from "./create-uptime-monitor";
 import updateUptimeMonitor from "./update-uptime-monitor";
 import deleteUptimeMonitor from "./delete-uptime-monitor";
@@ -99,6 +101,8 @@ const catalogTools = {
   get_monitor_details: getMonitorDetails,
   find_uptime_monitors: findUptimeMonitors,
   get_uptime_monitor_details: getUptimeMonitorDetails,
+  find_metric_monitors: findMetricMonitors,
+  get_metric_monitor_details: getMetricMonitorDetails,
   create_uptime_monitor: createUptimeMonitor,
   update_uptime_monitor: updateUptimeMonitor,
   delete_uptime_monitor: deleteUptimeMonitor,

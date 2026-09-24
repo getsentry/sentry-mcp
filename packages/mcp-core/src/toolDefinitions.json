@@ -621,7 +621,7 @@
   },
   {
     "name": "find_alert_rules",
-    "description": "Find Sentry alert rules.\n\nUse this tool when you need to:\n- List Alerts (workflows) for an organization or project, including Alerts without connected sources\n- List metric alert rules for an organization or project\n- Find an alert rule ID by name before inspecting it\n- Check alert conditions, queries, triggers, actions, owner, or environment\n\n<examples>\nfind_alert_rules(organizationSlug='my-org')\nfind_alert_rules(organizationSlug='my-org', projectSlug='backend')\nfind_alert_rules(organizationSlug='my-org', kind='issue', projectSlug='backend', query='critical')\n</examples>\n\n<hints>\n- Omit `projectSlug` to search organization-wide. A project filter finds connected Alerts, which may also cover other projects.\n- With `kind='all'`, an unavailable legacy metric alert API is reported in `warnings`; the returned Alerts are still usable.\n- Issue and metric alert rules have independent pagination state. Reuse a nextCursor only with its matching kind.\n</hints>",
+    "description": "Find Sentry alert rules.\n\nUse this tool when you need to:\n- List Alerts (workflows) for an organization or project, including Alerts without connected sources\n- List Metric Monitors using compatibility references; prefer find_metric_monitors for canonical monitor IDs\n- Find an alert rule ID by name before inspecting it\n- Check alert conditions, queries, triggers, actions, owner, or environment\n\n<examples>\nfind_alert_rules(organizationSlug='my-org')\nfind_alert_rules(organizationSlug='my-org', projectSlug='backend')\nfind_alert_rules(organizationSlug='my-org', kind='issue', projectSlug='backend', query='critical')\n</examples>\n\n<hints>\n- Omit `projectSlug` to search organization-wide. A project filter finds connected Alerts, which may also cover other projects.\n- Metric entries expose monitorId and projectId. id retains a legacy alert-rule ID when available, otherwise detector:<monitorId>. status describes enabled/disabled monitoring, not a legacy alert status.\n- Issue and metric alert rules have independent pagination state. Reuse a nextCursor only with its matching kind.\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -645,7 +645,7 @@
           "default": "all",
           "type": "string",
           "enum": ["all", "issue", "metric"],
-          "description": "Which alert rule family to search. Use `all` to include Alerts (workflows) and legacy metric alerts."
+          "description": "Which alert rule family to search. Use `all` to include Alerts (workflows) and Metric Monitors."
         },
         "projectSlug": {
           "default": null,
@@ -824,27 +824,31 @@
             "type": "object",
             "properties": {
               "id": {
+                "type": "string",
+                "description": "Legacy alert-rule ID when available, otherwise detector:<monitorId>."
+              },
+              "monitorId": {
                 "type": "string"
               },
-              "name": {
-                "type": "string"
-              },
-              "status": {
+              "projectId": {
                 "anyOf": [
                   {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "number"
-                      }
-                    ]
+                    "type": "string"
                   },
                   {
                     "type": "null"
                   }
                 ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["enabled", "disabled"]
               },
               "dataset": {
                 "anyOf": [
@@ -886,12 +890,6 @@
                   }
                 ]
               },
-              "projects": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
               "environment": {
                 "anyOf": [
                   {
@@ -928,13 +926,15 @@
             },
             "required": [
               "id",
+              "monitorId",
+              "projectId",
+              "enabled",
               "name",
               "status",
               "dataset",
               "aggregate",
               "query",
               "timeWindowMinutes",
-              "projects",
               "environment",
               "owner",
               "dateCreated",
@@ -998,11 +998,8 @@
           "required": ["issue", "metric"],
           "additionalProperties": false
         },
-        "warnings": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
+        "metricMonitorHint": {
+          "type": "string"
         }
       },
       "required": ["issueRules", "metricRules", "pagination"],
@@ -1244,6 +1241,127 @@
     },
     "requiredScopes": ["project:read"],
     "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
+    "name": "find_metric_monitors",
+    "description": "Find Sentry Metric Monitors that evaluate errors, performance, logs, metrics or crash rates.\nUse this tool to find a monitor ID before inspecting its query and detection conditions with get_metric_monitor_details.\nResults contain native monitor IDs, separate from legacy metric alert IDs. Alerts connected through workflowIds control notifications; inspect them with get_alert_rule(kind='issue').\nOmit projectSlug to search all accessible projects. Pass nextCursor as cursor with the same filters to retrieve more results.\nfind_metric_monitors(organizationSlug='my-org', projectSlug='backend', query='latency')",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug."
+        },
+        "query": {
+          "description": "Optional monitor search, such as a name or name:\"latency\". This searches monitor metadata, not the monitored event query. Results are always restricted to Metric Monitors.",
+          "type": "string",
+          "minLength": 1
+        },
+        "cursor": {
+          "description": "nextCursor from the previous page.",
+          "type": "string"
+        },
+        "limit": {
+          "default": 10,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": ["organizationSlug"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "monitors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "projectId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "owner": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "workflowIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "webUrl": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "projectId",
+              "enabled",
+              "owner",
+              "workflowIds",
+              "webUrl"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["monitors", "nextCursor"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["org:read", "project:read"],
+    "skills": ["inspect"],
     "surface": "catalog"
   },
   {
@@ -3439,7 +3557,7 @@
   },
   {
     "name": "get_alert_rule",
-    "description": "Get details for a Sentry alert rule.\n\nUse this tool when you need to inspect an alert rule's exact conditions, query, triggers, and actions before explaining or planning changes.\n\n<examples>\nget_alert_rule(organizationSlug='my-org', kind='metric', ruleIdOrName='12345')\nget_alert_rule(organizationSlug='my-org', kind='issue', projectSlug='backend', ruleIdOrName='Notify backend team')\nget_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='P95 latency')\n</examples>\n\n<hints>\n- Use `kind='issue'` or `kind='metric'` for numeric IDs because issue and metric alerts use separate endpoints.\n- With `kind='all'`, a digit-only `ruleIdOrName` is treated as an exact alert rule name.\n- Issue Alerts are notification workflows and may cover multiple projects or have no connected sources. Omit projectSlug to inspect organization-wide.\n- Issue details include complete conditions, notification actions, connected monitors and project scope. Inaccessible or session-restricted sources are marked explicitly.\n</hints>",
+    "description": "Get details for a Sentry alert rule.\n\nUse this tool when you need to inspect an alert rule's exact conditions, query, triggers, and actions before explaining or planning changes.\n\n<examples>\nget_alert_rule(organizationSlug='my-org', kind='metric', ruleIdOrName='12345')\nget_alert_rule(organizationSlug='my-org', kind='issue', projectSlug='backend', ruleIdOrName='Notify backend team')\nget_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='P95 latency')\n</examples>\n\n<hints>\n- Prefer get_metric_monitor_details for Metric Monitors. With kind=metric, numeric IDs retain their legacy alert-rule meaning; detector:123 explicitly identifies monitor 123.\n- With `kind='all'`, a digit-only `ruleIdOrName` is treated as an exact alert rule name.\n- Issue Alerts are notification workflows and may cover multiple projects or have no connected sources. Omit projectSlug to inspect organization-wide.\n- Issue details include complete conditions, notification actions, connected monitors and project scope. Inaccessible or session-restricted sources are marked explicitly.\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3463,7 +3581,7 @@
           "default": "all",
           "type": "string",
           "enum": ["all", "issue", "metric"],
-          "description": "Which alert rule family to inspect. Use `issue` or `metric` for numeric IDs; `all` treats the value as an exact-name lookup."
+          "description": "Which alert family to inspect. Numeric metric IDs are legacy alert-rule IDs, not monitor IDs. `all` performs an exact-name lookup."
         },
         "projectSlug": {
           "default": null,
@@ -3480,7 +3598,7 @@
         "ruleIdOrName": {
           "type": "string",
           "minLength": 1,
-          "description": "The alert rule's numeric ID, or an exact alert rule name."
+          "description": "An Alert ID or exact name. Metric references accept legacy numeric alert-rule IDs or detector:123 for canonical monitor IDs."
         }
       },
       "required": ["organizationSlug", "ruleIdOrName"]
@@ -4012,6 +4130,274 @@
       "required": ["organizationSlug", "appId"]
     },
     "requiredScopes": ["project:read"],
+    "skills": ["inspect"],
+    "surface": "catalog"
+  },
+  {
+    "name": "get_metric_monitor_details",
+    "description": "Inspect a Sentry Metric Monitor's query, dataset, detection mode, thresholds, resolution conditions and connected Alerts.\nUse monitorId from find_metric_monitors, not a legacy metric alert ID. Time windows and comparison deltas are in seconds.\nCondition results use 75 for critical, 50 for warning and 0 for resolved. Percent comparisons are absolute percentages (110 means 10% higher); dynamic conditions include sensitivity and direction.\nworkflowIds identify notification Alerts; inspect their actions with get_alert_rule(kind='issue').\nget_metric_monitor_details(organizationSlug='my-org', monitorId='12345')",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "monitorId": {
+          "type": "string",
+          "pattern": "^\\d+$",
+          "description": "Native Metric Monitor ID from find_metric_monitors."
+        }
+      },
+      "required": ["organizationSlug", "monitorId"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "monitor": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "projectId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "owner": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "workflowIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "webUrl": {
+              "type": "string"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "config": {
+              "type": "object",
+              "properties": {
+                "detectionType": {
+                  "type": "string"
+                },
+                "comparisonDeltaSeconds": {
+                  "type": "number"
+                }
+              },
+              "required": ["detectionType"],
+              "additionalProperties": false
+            },
+            "conditionGroup": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ]
+                    },
+                    "logicType": {
+                      "type": "string"
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "comparison": {},
+                          "conditionResult": {}
+                        },
+                        "required": ["type", "comparison", "conditionResult"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["logicType", "conditions"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Native detection conditions, including resolution. Results: 75 critical, 50 warning, 0 resolved. Percent comparisons are absolute percentages (110 means 10% higher). Dynamic comparisons contain sensitivity, seasonality and thresholdType."
+            },
+            "dataSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "query": {
+                    "type": "object",
+                    "properties": {
+                      "dataset": {
+                        "type": "string"
+                      },
+                      "query": {
+                        "type": "string"
+                      },
+                      "aggregate": {
+                        "type": "string"
+                      },
+                      "environment": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "eventTypes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "extrapolationMode": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "timeWindowSeconds": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "dataset",
+                      "query",
+                      "aggregate",
+                      "environment",
+                      "eventTypes",
+                      "timeWindowSeconds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "unavailableReason": {
+                    "type": "string"
+                  }
+                },
+                "required": ["type"],
+                "additionalProperties": false
+              }
+            },
+            "dateCreated": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dateUpdated": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "projectId",
+            "enabled",
+            "owner",
+            "workflowIds",
+            "webUrl",
+            "description",
+            "config",
+            "conditionGroup",
+            "dataSources",
+            "dateCreated",
+            "dateUpdated"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["monitor"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["org:read", "project:read"],
     "skills": ["inspect"],
     "surface": "catalog"
   },

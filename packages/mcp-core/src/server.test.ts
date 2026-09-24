@@ -2,7 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import { type Span, setUser, startSpan } from "@sentry/core";
-import { mswServer } from "@sentry/mcp-server-mocks";
+import { mswServer, projectFixture } from "@sentry/mcp-server-mocks";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -10,6 +10,7 @@ import { UserInputError } from "./errors";
 import { structuredResult } from "./internal/tool-helpers/results";
 import { buildServer } from "./server";
 import type { Skill } from "./skills";
+import { metricMonitor } from "./test-utils/metric-monitor";
 import {
   getGeneratedTextFromStructuredContent,
   getStructuredContent,
@@ -1473,6 +1474,72 @@ describe("buildServer", () => {
       );
       expect(getTextContent(result)).toContain("**Rate Limit**: Disabled");
     });
+
+    it.each([
+      ["find_metric_monitors", {}],
+      ["get_metric_monitor_details", { monitorId: "123" }],
+    ])(
+      "discovers and dispatches %s with injected constraints",
+      async (name, args) => {
+        const server = buildServer({
+          context: {
+            ...baseContext,
+            grantedSkills: new Set(["inspect"]),
+            constraints: {
+              organizationSlug: "sentry-mcp-evals",
+              projectSlug: "cloudflare-mcp",
+            },
+          },
+        });
+        const endpoint =
+          "https://sentry.io/api/0/organizations/sentry-mcp-evals/detectors/";
+        const monitor = {
+          ...metricMonitor,
+          projectId: String(projectFixture.id),
+        };
+        mswServer.use(
+          http.get(endpoint, ({ request }) => {
+            const query = new URL(request.url).searchParams;
+            expect(query.get("project")).toBe(monitor.projectId);
+            expect(query.getAll("type")).toEqual(["metric_issue"]);
+            return HttpResponse.json([monitor]);
+          }),
+          http.get(`${endpoint}123/`, () => HttpResponse.json(monitor)),
+        );
+        expect(getRegisteredToolNames(server)).not.toContain(name);
+        const discovered = await callRegisteredTool(
+          server,
+          "search_sentry_tools",
+          {
+            query: name,
+            limit: 1,
+          },
+        );
+        expect(getStructuredContent(discovered)).toMatchObject({
+          results: [{ name }],
+        });
+
+        const result = await callRegisteredTool(server, "execute_sentry_tool", {
+          name,
+          arguments: {
+            organizationSlug: "other-org",
+            projectSlug: "other-project",
+            ...args,
+          },
+        });
+        expect(result.isError).not.toBe(true);
+        const expected = {
+          id: "123",
+          projectId: monitor.projectId,
+          enabled: metricMonitor.enabled,
+        };
+        expect(getStructuredContent(result)).toMatchObject(
+          name === "find_metric_monitors"
+            ? { monitors: [expected] }
+            : { monitor: expected },
+        );
+      },
+    );
 
     it("execute_sentry_tool dispatches a catalog-only alert update with constrained organization", async () => {
       const server = buildServer({
