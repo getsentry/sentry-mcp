@@ -112,6 +112,7 @@ import type {
   AIConversationSummary,
   AlertActionOption,
   AlertConditionOption,
+  AlertRuleCreate,
   AlertRuleProjectScope,
   AlertRuleUpdate,
   AutofixRun,
@@ -2282,6 +2283,27 @@ export class SentryApiService {
     };
   }
 
+  async createAlertRule(
+    {
+      organizationSlug,
+      body,
+    }: {
+      organizationSlug: string;
+      body: AlertRuleCreate;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const response = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      opts,
+    );
+    return IssueAlertRuleSchema.parse(response);
+  }
+
   async updateAlertRule(
     {
       organizationSlug,
@@ -2303,6 +2325,23 @@ export class SentryApiService {
       opts,
     );
     return IssueAlertRuleSchema.parse(response);
+  }
+
+  async deleteAlertRule(
+    {
+      organizationSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      ruleId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.request(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/`,
+      { method: "DELETE" },
+      opts,
+    );
   }
 
   async listMetricAlertRules(

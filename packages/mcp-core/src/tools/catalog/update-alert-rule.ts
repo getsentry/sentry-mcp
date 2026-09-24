@@ -13,9 +13,14 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import type { ServerContext } from "../../types";
-import { resolveAlertRuleConnections } from "../support/alert-rule-connections";
+import {
+  resolveAlertRuleConnections,
+  validateAlertRuleProjectScope,
+} from "../support/alert-rule-connections";
 import {
   alertRuleSummarySchema,
+  alertRuleConfigFields,
+  assertResolvedAlertDestinations,
   ParamAlertActionFilters,
   ParamAlertTriggers,
   toAlertRuleSummary,
@@ -24,10 +29,7 @@ import {
   findExactIssueAlertRuleMatches,
   isNumericAlertRuleId,
 } from "./support/alerts";
-import {
-  assertProjectConstraintEvidence,
-  assertProjectRefWithinConstraint,
-} from "./support/project-constraints";
+import { assertProjectRefWithinConstraint } from "./support/project-constraints";
 
 // Owns workflow configuration and connection edits; constrained writes must remain exclusive.
 
@@ -103,21 +105,7 @@ export default defineTool({
       .describe(
         "Workflow ID or exact alert name. Digit-only values are treated as IDs. Use IDs from get_alert_rule(kind='issue').",
       ),
-    name: z.string().trim().min(1).max(256).optional(),
-    status: z.enum(["active", "disabled"]).optional(),
-    frequencyMinutes: z
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe("Minimum interval between notifications, in minutes."),
-    environment: z.string().min(1).nullable().optional(),
-    owner: z
-      .string()
-      .regex(/^(user|team):\d+$/)
-      .nullable()
-      .optional()
-      .describe("Owner actor user:ID or team:ID. Pass null to clear."),
+    ...alertRuleConfigFields,
     triggers: ParamAlertTriggers.optional(),
     actionFilters: ParamAlertActionFilters.optional(),
     addProjectSlugs: z
@@ -210,35 +198,12 @@ export default defineTool({
       organizationSlug,
       ruleId,
     });
-    let scopedProject: { id: string; slug: string } | undefined;
-    if (projectSlug) {
-      const [project, scope] = await Promise.all([
-        apiService.getProject({
-          organizationSlug,
-          projectSlugOrId: projectSlug,
-        }),
-        apiService.getAlertRuleProjectScope({ organizationSlug, ruleId }),
-      ]);
-      assertProjectConstraintEvidence({
-        resourceLabel: "Alert rule",
-        scopedProjectSlug: context.constraints.projectSlug,
-        hasEvidence:
-          !scope.includesAllProjects &&
-          scope.projectIds.length > 0 &&
-          scope.projectIds.every((id) => id === String(project.id)),
-      });
-      if (
-        !scope.includesAllProjects &&
-        !scope.projectIds.includes(String(project.id))
-      ) {
-        throw new UserInputError(
-          `Alert rule is outside project "${projectSlug}".`,
-        );
-      }
-      if (context.constraints.projectSlug) {
-        scopedProject = { id: String(project.id), slug: project.slug };
-      }
-    }
+    const scopedProject = await validateAlertRuleProjectScope(apiService, {
+      organizationSlug,
+      ruleId,
+      projectSlug,
+      scopedProjectSlug: context.constraints.projectSlug,
+    });
     if (typeof current.enabled !== "boolean") {
       throw new Error(
         "Sentry returned an alert without its enabled state; refusing to update it.",
@@ -289,21 +254,8 @@ export default defineTool({
       updated,
       apiService.getIssueAlertRuleUrl(organizationSlug, updated.id),
     );
-    // Slack lookup timeouts can be saved by Sentry with an empty channel ID despite HTTP 200.
-    if (
-      params.actionFilters !== undefined &&
-      alertRule.actionFilters?.some((group) =>
-        group.actions?.some(
-          (action) =>
-            action.type === "slack" &&
-            (typeof action.config?.targetIdentifier !== "string" ||
-              action.config.targetIdentifier.length === 0),
-        ),
-      )
-    ) {
-      throw new UserInputError(
-        "The alert was saved, but Sentry did not resolve a Slack destination. Read the alert again and retry with both the channel name (targetDisplay) and explicit channel ID (targetIdentifier).",
-      );
+    if (params.actionFilters !== undefined) {
+      assertResolvedAlertDestinations(alertRule);
     }
     return structuredResult({ alertRule });
   },
