@@ -1465,6 +1465,49 @@ describe("buildServer", () => {
       expect(getTextContent(result)).toContain("**Rate Limit**: Disabled");
     });
 
+    it("discovers and dispatches alert options with injected project constraints", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["inspect"]),
+          constraints: {
+            organizationSlug: "sentry-mcp-evals",
+            projectSlug: "cloudflare-mcp",
+          },
+        },
+      });
+      let requestedProject: string | null = null;
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/sentry-mcp-evals/detectors/",
+          ({ request }) => {
+            requestedProject = new URL(request.url).searchParams.get("project");
+            return HttpResponse.json([]);
+          },
+        ),
+      );
+      expect(getRegisteredToolNames(server)).not.toContain(
+        "get_alert_rule_options",
+      );
+      const search = await callRegisteredTool(server, "search_sentry_tools", {
+        query: "get_alert_rule_options",
+        limit: 1,
+      });
+      expect(getStructuredContent(search)).toMatchObject({
+        results: [{ name: "get_alert_rule_options" }],
+      });
+      const result = await callRegisteredTool(server, "execute_sentry_tool", {
+        name: "get_alert_rule_options",
+        arguments: { section: "sources", projectSlug: "other-project" },
+      });
+      expect(requestedProject).toBe("4509109104082945");
+      expect(getStructuredContent(result)).toEqual({
+        section: "sources",
+        sources: [],
+        nextCursor: null,
+      });
+    });
+
     it("execute_sentry_tool dispatches to catalog-only whoami", async () => {
       const server = buildServer({
         context: {

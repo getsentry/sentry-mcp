@@ -43,6 +43,8 @@ import {
   AgenticOnboardingRunSchema,
   AIConversationDetailsResponseSchema,
   AIConversationSummaryListSchema,
+  AlertActionOptionSchema,
+  AlertConditionOptionSchema,
   AlertRuleProjectScopeSchema,
   ApiErrorSchema,
   AutofixRunSchema,
@@ -108,6 +110,8 @@ import type {
   AIConversationDetails,
   AIConversationSpanList,
   AIConversationSummary,
+  AlertActionOption,
+  AlertConditionOption,
   AlertRuleProjectScope,
   AutofixRun,
   AutofixRunState,
@@ -2147,6 +2151,110 @@ export class SentryApiService {
       opts,
     );
     return DetectorSchema.parse(body);
+  }
+
+  async listDetectorsPage(
+    {
+      organizationSlug,
+      projectId,
+      types,
+      query,
+      cursor,
+      limit = 25,
+    }: {
+      organizationSlug: string;
+      projectId?: string;
+      types?: string[];
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ detectors: Detector[]; nextCursor: string | null }> {
+    const search = new URLSearchParams({
+      project: projectId ?? "-1",
+      per_page: String(limit),
+    });
+    for (const type of types ?? []) {
+      search.append("type", type);
+    }
+    if (query) search.set("query", query);
+    if (cursor) search.set("cursor", cursor);
+    const response = await this.request(
+      `${apiPath`/organizations/${organizationSlug}/detectors/`}?${search}`,
+      undefined,
+      opts,
+    );
+    return {
+      detectors: z
+        .array(DetectorSchema)
+        .parse(await this.parseJsonResponse(response)),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async listAvailableAlertActionsPage(
+    {
+      organizationSlug,
+      types,
+      cursor,
+      limit = 25,
+    }: {
+      organizationSlug: string;
+      types?: string[];
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ actions: AlertActionOption[]; nextCursor: string | null }> {
+    const search = new URLSearchParams({ per_page: String(limit) });
+    for (const type of types ?? []) {
+      search.append("type", type);
+    }
+    if (cursor) search.set("cursor", cursor);
+    const response = await this.request(
+      `${apiPath`/organizations/${organizationSlug}/available-actions/`}?${search}`,
+      undefined,
+      opts,
+    );
+    return {
+      actions: z
+        .array(AlertActionOptionSchema)
+        .parse(await this.parseJsonResponse(response)),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async listAlertConditionsPage(
+    {
+      organizationSlug,
+      group,
+      cursor,
+      limit = 25,
+    }: {
+      organizationSlug: string;
+      group: "workflow_trigger" | "action_filter";
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{
+    conditions: AlertConditionOption[];
+    nextCursor: string | null;
+  }> {
+    const search = new URLSearchParams({ group, per_page: String(limit) });
+    if (cursor) search.set("cursor", cursor);
+    const response = await this.request(
+      `${apiPath`/organizations/${organizationSlug}/data-conditions/`}?${search}`,
+      undefined,
+      opts,
+    );
+    return {
+      conditions: z
+        .array(AlertConditionOptionSchema)
+        .parse(await this.parseJsonResponse(response)),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   async listMetricAlertRules(
