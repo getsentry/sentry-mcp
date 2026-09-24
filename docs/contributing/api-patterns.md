@@ -70,6 +70,11 @@ fail to resolve for legacy mixed-case project slugs; keep them for display.
 
 ### Multi-Region Support
 
+Organization discovery uses a single `/api/0/organizations/` request. Public
+SaaS hosts use `sentry.io` to list organizations across regions. Single-tenant
+hosts under `*.my.sentry.io` and self-hosted instances keep their configured
+host for this request.
+
 Sentry uses region-specific URLs:
 
 ```typescript
