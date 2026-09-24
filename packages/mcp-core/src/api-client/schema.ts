@@ -293,6 +293,73 @@ export const IssueAlertRuleSchema = z
 
 export const IssueAlertRuleListSchema = z.array(IssueAlertRuleSchema);
 
+export const AlertRuleProjectScopeSchema = z.object({
+  projectIds: z.array(z.string()),
+  includesAllProjects: z.boolean(),
+});
+
+export const AlertActionOptionSchema = z.object({
+  type: z.string(),
+  handlerGroup: z.string(),
+  configSchema: z.record(z.string(), z.unknown()),
+  dataSchema: z.record(z.string(), z.unknown()),
+  integrations: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        services: z
+          .array(z.object({ id: z.string(), name: z.string() }))
+          .optional(),
+      }),
+    )
+    .optional(),
+  services: z
+    .array(z.object({ slug: z.string(), name: z.string() }))
+    .optional(),
+  sentryApp: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      installationId: z.string(),
+      installationUuid: z.string(),
+      status: z.number(),
+      settings: z.record(z.string(), z.unknown()).optional(),
+      title: z.string().optional(),
+    })
+    .optional(),
+});
+
+export const AlertConditionOptionSchema = z.object({
+  type: z.string(),
+  handlerGroup: z.string(),
+  handlerSubgroup: z.string().optional(),
+  comparisonJsonSchema: z.record(z.string(), z.unknown()),
+});
+
+// Source: workflow_engine/endpoints/serializers/detector_serializer.py.
+// Configuration and data sources vary by detector type; preserve their native fields.
+export const DetectorSchema = z
+  .object({
+    id: z.string(),
+    projectId: z.string().nullable(),
+    name: z.string(),
+    type: z.string(),
+    enabled: z.boolean(),
+    config: z.record(z.string(), z.unknown()),
+    conditionGroup: AlertRuleComponentSchema.nullable(),
+    dataSources: z.array(AlertRuleComponentSchema).nullable(),
+    workflowIds: z.array(z.string()).nullable(),
+    description: z.string().nullable().optional(),
+    owner: z.unknown().optional(),
+    createdBy: z.string().nullable().optional(),
+    dateCreated: z.string(),
+    dateUpdated: z.string(),
+    alertRuleId: z.number().nullable().optional(),
+    ruleId: z.number().nullable().optional(),
+  })
+  .passthrough();
+
 export const MetricAlertRuleSchema = z
   .object({
     id: z.union([z.string(), z.number()]),

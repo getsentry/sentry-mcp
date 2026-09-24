@@ -1,9 +1,13 @@
-import { mswServer, teamFixture } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
+import {
+  mswServer,
+  projectFixture,
+  teamFixture,
+} from "@sentry/mcp-server-mocks";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigurationError } from "../errors";
 import { SentryApiService } from "./client";
-import { ApiServerError } from "./errors";
+import { ApiNotFoundError, ApiServerError } from "./errors";
 
 describe("getIssueUrl", () => {
   it("should work with sentry.io", () => {
@@ -571,6 +575,92 @@ describe("getIssue", () => {
 
     expect(issue.shortId).toBe("123456");
   });
+});
+
+describe("Alert inspection endpoints", () => {
+  const api = new SentryApiService({
+    host: "sentry.io",
+    accessToken: "test-token",
+  });
+  const organizationSlug = "test-org";
+  const workflowUrl =
+    "https://sentry.io/api/0/organizations/test-org/workflows/";
+  const workflow = { id: "10", name: "Notify on new issues", detectorIds: [] };
+
+  it("keeps unattached workflows and returns the backend page cursor organization-wide", async () => {
+    mswServer.use(
+      http.get(workflowUrl, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        expect(params.get("projectSlug")).toBeNull();
+        expect(params.get("query")).toBe('name:"*new issues*"');
+        expect(params.get("cursor")).toBe("previous");
+        expect(params.get("per_page")).toBe("1");
+        return HttpResponse.json([workflow], {
+          headers: {
+            Link: `<${workflowUrl}?cursor=next>; rel="next"; results="true"; cursor="next"`,
+          },
+        });
+      }),
+    );
+    const params = {
+      organizationSlug,
+      query: "new issues",
+      cursor: "previous",
+      limit: 1,
+    };
+    const page = await api.listIssueAlertRulesPage(params);
+    expect(page.nextCursor).toBe("next");
+    expect(page.rules).toMatchObject([workflow]);
+    expect(await api.listIssueAlertRules(params)).toEqual(page.rules);
+  });
+
+  it.each([
+    {
+      scope: {
+        projectIds: [String(projectFixture.id), "99"],
+        includesAllProjects: false,
+      },
+      allowed: true,
+    },
+    { scope: { projectIds: [], includesAllProjects: true }, allowed: true },
+    {
+      scope: { projectIds: ["99"], includesAllProjects: false },
+      allowed: false,
+    },
+    { scope: { projectIds: [], includesAllProjects: false }, allowed: false },
+    { scope: null, allowed: false },
+  ])(
+    "checks explicit project membership before returning a workflow: $scope",
+    async ({ scope, allowed }) => {
+      let detailReads = 0;
+      const attachedWorkflow = { ...workflow, detectorIds: ["20"] };
+      mswServer.use(
+        http.get("https://sentry.io/api/0/projects/test-org/backend/", () =>
+          HttpResponse.json(projectFixture),
+        ),
+        http.get(`${workflowUrl}10/project-scope/`, () =>
+          scope
+            ? HttpResponse.json(scope)
+            : HttpResponse.json({ detail: "Not found" }, { status: 404 }),
+        ),
+        http.get(`${workflowUrl}10/`, () => {
+          detailReads++;
+          return HttpResponse.json(attachedWorkflow);
+        }),
+      );
+      const result = api.getIssueAlertRule({
+        organizationSlug,
+        projectSlug: "backend",
+        ruleId: "10",
+      });
+      if (allowed) {
+        expect(await result).toMatchObject(attachedWorkflow);
+      } else {
+        await expect(result).rejects.toBeInstanceOf(ApiNotFoundError);
+      }
+      expect(detailReads).toBe(allowed ? 1 : 0);
+    },
+  );
 });
 
 describe("network error handling", () => {

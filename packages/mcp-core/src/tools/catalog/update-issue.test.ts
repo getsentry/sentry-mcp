@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import { issueFixture, mswServer } from "@sentry/mcp-server-mocks";
+import { prepareToolParams } from "../catalog-runtime/availability.js";
 import updateIssue from "./update-issue.js";
 import { logIssue } from "../../telem/logging";
 
@@ -1079,4 +1080,36 @@ describe("update_issue", () => {
     // Expected 403 permission errors must NOT be logged as Sentry issues
     expect(logIssue).not.toHaveBeenCalled();
   });
+
+  it("strips null bytes from reason before posting as a comment", () => {
+    // prepareToolParams runs the Zod schema (including transforms) the same
+    // way the MCP server does at runtime, so this exercises the full parse path.
+    const prepared = prepareToolParams({
+      tool: updateIssue,
+      params: {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        reason: "\0 Resolved\0because\0fix deployed \0",
+      },
+      context: serverContext,
+    });
+    expect(prepared.reason).toBe("Resolvedbecausefix deployed");
+  });
+
+  it.each(["\0", " \0 \0 "])(
+    "rejects a reason that is empty after removing null bytes: %j",
+    (reason) => {
+      expect(() =>
+        prepareToolParams({
+          tool: updateIssue,
+          params: {
+            organizationSlug: "sentry-mcp-evals",
+            issueId: "CLOUDFLARE-MCP-41",
+            reason,
+          },
+          context: serverContext,
+        }),
+      ).toThrow();
+    },
+  );
 });

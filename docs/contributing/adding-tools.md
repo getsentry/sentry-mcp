@@ -164,8 +164,9 @@ async handler(params, context: ServerContext) {
     );
   }
 
-  // 3. Set monitoring tags
-  setTag("organization.slug", params.organizationSlug);
+  // 3. Set organization telemetry for streamed spans and error events
+  // Import from ../../telem/organization.
+  setOrganizationContext(params.organizationSlug);
 
   // 4. Call API
   const data = await api.yourMethod(params);

@@ -1,4 +1,5 @@
 import { setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import type {
   Issue,
   ReplayDetails,
@@ -97,7 +98,7 @@ export default defineTool({
       regionUrl: regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", resolved.organizationSlug);
+    setOrganizationContext(resolved.organizationSlug);
     setTag("replay.id", resolved.replayId);
 
     const replay = await apiService.getReplayDetails({

@@ -1,5 +1,6 @@
 import { getActiveSpan, setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import type { SentryApiService } from "../../api-client";
 import { UserInputError } from "../../errors";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
@@ -528,7 +529,7 @@ export default defineTool({
     });
 
     setTag("resource.type", resolved.type);
-    setTag("organization.slug", resolved.organizationSlug);
+    setOrganizationContext(resolved.organizationSlug);
     if (resolved.spanId) {
       setTag("trace.span_id", resolved.spanId);
     }

@@ -43,6 +43,9 @@ import {
   AgenticOnboardingRunSchema,
   AIConversationDetailsResponseSchema,
   AIConversationSummaryListSchema,
+  AlertActionOptionSchema,
+  AlertConditionOptionSchema,
+  AlertRuleProjectScopeSchema,
   ApiErrorSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
@@ -52,6 +55,7 @@ import {
   DashboardListSchema,
   DashboardSchema,
   DeployListSchema,
+  DetectorSchema,
   ErrorsSearchResponseSchema,
   EventAttachmentListSchema,
   EventSchema,
@@ -60,6 +64,7 @@ import {
   FlamegraphSchema,
   IssueActivityListResponseSchema,
   IssueAlertRuleListSchema,
+  IssueAlertRuleSchema,
   IssueCommentListSchema,
   IssueCommentSchema,
   IssueListSchema,
@@ -105,6 +110,9 @@ import type {
   AIConversationDetails,
   AIConversationSpanList,
   AIConversationSummary,
+  AlertActionOption,
+  AlertConditionOption,
+  AlertRuleProjectScope,
   AutofixRun,
   AutofixRunState,
   ClientKey,
@@ -113,6 +121,7 @@ import type {
   Dashboard,
   DashboardListItem,
   DeployList,
+  Detector,
   Event,
   EventAttachment,
   EventAttachmentList,
@@ -198,13 +207,6 @@ function normalizeStatsPeriod(statsPeriod?: string): string | undefined {
 function formatWorkflowNameQuery(query: string): string {
   const escapedQuery = query.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `name:"*${escapedQuery}*"`;
-}
-
-// Workflow projectSlug responses can include unattached org-level workflows.
-function filterAttachedIssueAlertRules(
-  rules: IssueAlertRuleList,
-): IssueAlertRuleList {
-  return rules.filter((rule) => (rule.detectorIds ?? []).length > 0);
 }
 
 function parseStatsPeriod(statsPeriod: string): {
@@ -1628,8 +1630,9 @@ export class SentryApiService {
     const path = `/organizations/?${queryString}`;
 
     let host = undefined;
-    // For SaaS, always use the main sentry.io host, not regional hosts
-    if (this.isSaas()) {
+    // Public SaaS lists across regions on sentry.io; single-tenant instances
+    // must keep organization discovery on their configured host.
+    if (this.isSaas() && !this.host.endsWith(".my.sentry.io")) {
       host = "sentry.io";
     }
 
@@ -2017,7 +2020,7 @@ export class SentryApiService {
   async listIssueAlertRules(
     params: {
       organizationSlug: string;
-      projectSlug: string;
+      projectSlug?: string;
       query?: string;
       cursor?: string;
       limit?: number;
@@ -2037,55 +2040,44 @@ export class SentryApiService {
       limit,
     }: {
       organizationSlug: string;
-      projectSlug: string;
+      projectSlug?: string;
       query?: string;
       cursor?: string;
       limit?: number;
     },
     opts?: RequestOptions,
   ): Promise<{ rules: IssueAlertRuleList; nextCursor: string | null }> {
-    const rules: IssueAlertRuleList = [];
+    const searchQuery = new URLSearchParams({ sortBy: "-id" });
+    if (projectSlug) {
+      searchQuery.set("projectSlug", projectSlug);
+    }
+    if (query) {
+      searchQuery.set("query", formatWorkflowNameQuery(query));
+    }
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const response = await this.request(
+      apiPath`/organizations/${organizationSlug}/workflows/` +
+        `?${searchQuery.toString()}`,
+      undefined,
+      opts,
+    );
+    const rules = IssueAlertRuleListSchema.parse(
+      await this.parseJsonResponse(response),
+    );
     const targetLimit = limit ?? 100;
-    let currentCursor: string | null | undefined = cursor;
-    let nextCursor: string | null = null;
-
-    do {
-      const searchQuery = new URLSearchParams();
-      searchQuery.append("projectSlug", projectSlug);
-      searchQuery.set("sortBy", "-id");
-      if (query) {
-        searchQuery.set("query", formatWorkflowNameQuery(query));
-      }
-      if (currentCursor) {
-        searchQuery.set("cursor", currentCursor);
-      }
-      if (limit !== undefined) {
-        searchQuery.set("per_page", String(targetLimit - rules.length));
-      }
-
-      const response = await this.request(
-        apiPath`/organizations/${organizationSlug}/workflows/` +
-          `?${searchQuery.toString()}`,
-        undefined,
-        opts,
-      );
-      const body = await this.parseJsonResponse(response);
-      const attachedRules = filterAttachedIssueAlertRules(
-        IssueAlertRuleListSchema.parse(body),
-      );
-      const remaining = targetLimit - rules.length;
-      if (attachedRules.length > remaining) {
-        rules.push(...attachedRules.slice(0, remaining));
-        nextCursor = null;
-        break;
-      }
-
-      rules.push(...attachedRules);
-      nextCursor = getNextCursor(response.headers.get("link"));
-      currentCursor = nextCursor;
-    } while (rules.length < targetLimit && nextCursor);
-
-    return { rules, nextCursor };
+    return {
+      rules: rules.slice(0, targetLimit),
+      nextCursor:
+        rules.length > targetLimit
+          ? null
+          : getNextCursor(response.headers.get("link")),
+    };
   }
 
   async getIssueAlertRule(
@@ -2095,36 +2087,175 @@ export class SentryApiService {
       ruleId,
     }: {
       organizationSlug: string;
-      projectSlug: string;
+      projectSlug?: string;
       ruleId: string | number;
     },
     opts?: RequestOptions,
   ): Promise<IssueAlertRule> {
-    const searchQuery = new URLSearchParams();
-    searchQuery.append("projectSlug", projectSlug);
-    searchQuery.append("id", String(ruleId));
-    searchQuery.set("per_page", "1");
+    // Workflow list ID filters override project filters. Verify the association explicitly.
+    if (projectSlug) {
+      const [project, scope] = await Promise.all([
+        this.getProject(
+          { organizationSlug, projectSlugOrId: projectSlug },
+          opts,
+        ),
+        this.getAlertRuleProjectScope({ organizationSlug, ruleId }, opts),
+      ]);
+      if (
+        !scope.includesAllProjects &&
+        !scope.projectIds.includes(String(project.id))
+      ) {
+        throw new ApiNotFoundError(
+          "Workflow not found in this project",
+          undefined,
+          undefined,
+          "workflow",
+          String(ruleId),
+        );
+      }
+    }
 
-    const response = await this.request(
-      apiPath`/organizations/${organizationSlug}/workflows/` +
-        `?${searchQuery.toString()}`,
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/`,
       undefined,
       opts,
     );
-    const rules = filterAttachedIssueAlertRules(
-      IssueAlertRuleListSchema.parse(await this.parseJsonResponse(response)),
+    return IssueAlertRuleSchema.parse(body);
+  }
+
+  /** Private Sentry endpoint: keep the complete association check separate from filtered lists. */
+  async getAlertRuleProjectScope(
+    {
+      organizationSlug,
+      ruleId,
+    }: { organizationSlug: string; ruleId: string | number },
+    opts?: RequestOptions,
+  ): Promise<AlertRuleProjectScope> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/project-scope/`,
+      undefined,
+      opts,
     );
-    const rule = rules[0];
-    if (!rule) {
-      throw new ApiNotFoundError(
-        "Workflow not found",
-        undefined,
-        undefined,
-        "workflow",
-        String(ruleId),
-      );
+    return AlertRuleProjectScopeSchema.parse(body);
+  }
+
+  async getDetector(
+    {
+      organizationSlug,
+      detectorId,
+    }: { organizationSlug: string; detectorId: string | number },
+    opts?: RequestOptions,
+  ): Promise<Detector> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/detectors/${detectorId}/`,
+      undefined,
+      opts,
+    );
+    return DetectorSchema.parse(body);
+  }
+
+  async listDetectorsPage(
+    {
+      organizationSlug,
+      projectId,
+      types,
+      query,
+      cursor,
+      limit = 25,
+    }: {
+      organizationSlug: string;
+      projectId?: string;
+      types?: string[];
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ detectors: Detector[]; nextCursor: string | null }> {
+    const search = new URLSearchParams({
+      project: projectId ?? "-1",
+      per_page: String(limit),
+    });
+    for (const type of types ?? []) {
+      search.append("type", type);
     }
-    return rule;
+    if (query) search.set("query", query);
+    if (cursor) search.set("cursor", cursor);
+    const response = await this.request(
+      `${apiPath`/organizations/${organizationSlug}/detectors/`}?${search}`,
+      undefined,
+      opts,
+    );
+    return {
+      detectors: z
+        .array(DetectorSchema)
+        .parse(await this.parseJsonResponse(response)),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async listAvailableAlertActionsPage(
+    {
+      organizationSlug,
+      types,
+      cursor,
+      limit = 25,
+    }: {
+      organizationSlug: string;
+      types?: string[];
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ actions: AlertActionOption[]; nextCursor: string | null }> {
+    const search = new URLSearchParams({ per_page: String(limit) });
+    for (const type of types ?? []) {
+      search.append("type", type);
+    }
+    if (cursor) search.set("cursor", cursor);
+    const response = await this.request(
+      `${apiPath`/organizations/${organizationSlug}/available-actions/`}?${search}`,
+      undefined,
+      opts,
+    );
+    return {
+      actions: z
+        .array(AlertActionOptionSchema)
+        .parse(await this.parseJsonResponse(response)),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async listAlertConditionsPage(
+    {
+      organizationSlug,
+      group,
+      cursor,
+      limit = 25,
+    }: {
+      organizationSlug: string;
+      group: "workflow_trigger" | "action_filter";
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{
+    conditions: AlertConditionOption[];
+    nextCursor: string | null;
+  }> {
+    const search = new URLSearchParams({ group, per_page: String(limit) });
+    if (cursor) search.set("cursor", cursor);
+    const response = await this.request(
+      `${apiPath`/organizations/${organizationSlug}/data-conditions/`}?${search}`,
+      undefined,
+      opts,
+    );
+    return {
+      conditions: z
+        .array(AlertConditionOptionSchema)
+        .parse(await this.parseJsonResponse(response)),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   async listMetricAlertRules(

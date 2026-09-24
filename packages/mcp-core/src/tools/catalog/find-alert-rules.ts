@@ -1,23 +1,25 @@
-import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "../../internal/tool-helpers/define";
-import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import { structuredResult } from "../../internal/tool-helpers/results";
-import { UserInputError } from "../../errors";
-import type { ServerContext } from "../../types";
+import { z } from "zod";
+import { ApiError } from "../../api-client";
 import type { IssueAlertRule, MetricAlertRule } from "../../api-client/types";
+import { UserInputError } from "../../errors";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import {
   ParamOrganizationSlug,
   ParamProjectSlugOrAll,
   ParamRegionUrl,
 } from "../../schema";
-import { assertProjectRefWithinConstraint } from "./support/project-constraints";
+import { setOrganizationContext } from "../../telem/organization";
+import type { ServerContext } from "../../types";
 import { formatActor, formatDate } from "./support/api-formatting";
+import { assertProjectRefWithinConstraint } from "./support/project-constraints";
 
 const AlertRuleKind = z
   .enum(["all", "issue", "metric"])
   .describe(
-    "Which alert rule family to search. Use `all` to include metric alerts, plus issue alerts when a project is available.",
+    "Which alert rule family to search. Use `all` to include Alerts (workflows) and legacy metric alerts.",
   );
 
 const issueAlertRuleSummarySchema = z.object({
@@ -61,6 +63,7 @@ export const findAlertRulesOutputSchema = z.object({
     issue: paginationStateSchema.nullable(),
     metric: paginationStateSchema.nullable(),
   }),
+  warnings: z.array(z.string()).optional(),
 });
 
 function getIssueAlertRuleFrequency(rule: IssueAlertRule): number | null {
@@ -93,7 +96,7 @@ export default defineTool({
     "Find Sentry alert rules.",
     "",
     "Use this tool when you need to:",
-    "- List issue alert rules for a project",
+    "- List Alerts (workflows) for an organization or project, including Alerts without connected sources",
     "- List metric alert rules for an organization or project",
     "- Find an alert rule ID by name before inspecting it",
     "- Check alert conditions, queries, triggers, actions, owner, or environment",
@@ -105,8 +108,8 @@ export default defineTool({
     "</examples>",
     "",
     "<hints>",
-    "- Issue alert rules are project-scoped, so `projectSlug` is required when `kind` is `issue`.",
-    "- Metric alert rules can be listed organization-wide or project-scoped.",
+    "- Omit `projectSlug` to search organization-wide. A project filter finds connected Alerts, which may also cover other projects.",
+    "- With `kind='all'`, an unavailable legacy metric alert API is reported in `warnings`; the returned Alerts are still usable.",
     "- Issue and metric alert rules have independent pagination state. Reuse a nextCursor only with its matching kind.",
     "</hints>",
   ].join("\n"),
@@ -157,40 +160,24 @@ export default defineTool({
     }
     const projectSlug = context.constraints.projectSlug ?? requestedProjectSlug;
 
-    if (params.kind === "issue" && !projectSlug) {
-      throw new UserInputError(
-        "projectSlug is required when searching issue alert rules.",
-      );
-    }
-
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
     });
     const organizationSlug = params.organizationSlug;
-    setTag("organization.slug", organizationSlug);
+    setOrganizationContext(organizationSlug);
     if (projectSlug) {
       setTag("project.slug", projectSlug);
     }
 
-    const includeIssue = params.kind !== "metric" && Boolean(projectSlug);
+    const includeIssue = params.kind !== "metric";
     const includeMetric = params.kind !== "issue";
     if (params.cursor && includeIssue && includeMetric) {
       throw new UserInputError(
         "cursor cannot be used with `kind='all'` when both issue and metric alert rules are included. Retry with `kind='issue'` or `kind='metric'` using a cursor from the same alert rule family.",
       );
     }
-    const issuePage =
-      includeIssue && projectSlug
-        ? await apiService.listIssueAlertRulesPage({
-            organizationSlug,
-            projectSlug,
-            query: params.query ?? undefined,
-            cursor: params.cursor ?? undefined,
-            limit: params.limit,
-          })
-        : { rules: [], nextCursor: null };
-    const metricPage = includeMetric
-      ? await apiService.listMetricAlertRulesPage({
+    const issuePage = includeIssue
+      ? await apiService.listIssueAlertRulesPage({
           organizationSlug,
           projectSlug,
           query: params.query ?? undefined,
@@ -198,6 +185,30 @@ export default defineTool({
           limit: params.limit,
         })
       : { rules: [], nextCursor: null };
+    const warnings: string[] = [];
+    const metricPage = includeMetric
+      ? await apiService
+          .listMetricAlertRulesPage({
+            organizationSlug,
+            projectSlug,
+            query: params.query ?? undefined,
+            cursor: params.cursor ?? undefined,
+            limit: params.limit,
+          })
+          .catch((error: unknown) => {
+            if (
+              params.kind !== "all" ||
+              !(error instanceof ApiError) ||
+              error.status !== 410
+            ) {
+              throw error;
+            }
+            warnings.push(
+              "Metric alerts could not be listed: Sentry's legacy metric alert API is no longer available for this organization.",
+            );
+            return null;
+          })
+      : null;
     return structuredResult({
       issueRules: issuePage.rules.map((rule: IssueAlertRule) => ({
         id: String(rule.id),
@@ -213,7 +224,7 @@ export default defineTool({
         lastTriggered: formatDate(rule.lastTriggered),
         webUrl: apiService.getIssueAlertRuleUrl(organizationSlug, rule.id),
       })),
-      metricRules: metricPage.rules.map((rule: MetricAlertRule) => ({
+      metricRules: (metricPage?.rules ?? []).map((rule: MetricAlertRule) => ({
         id: String(rule.id),
         name: rule.name,
         status: rule.status ?? null,
@@ -229,8 +240,9 @@ export default defineTool({
       })),
       pagination: {
         issue: includeIssue ? { nextCursor: issuePage.nextCursor } : null,
-        metric: includeMetric ? { nextCursor: metricPage.nextCursor } : null,
+        metric: metricPage ? { nextCursor: metricPage.nextCursor } : null,
       },
+      ...(warnings.length > 0 ? { warnings } : {}),
     });
   },
 });

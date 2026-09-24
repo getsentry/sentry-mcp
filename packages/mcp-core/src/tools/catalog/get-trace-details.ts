@@ -1,4 +1,5 @@
 import { setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import type { SentryApiService, Trace, TraceSpan } from "../../api-client";
 import { UserInputError } from "../../errors";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
@@ -130,7 +131,7 @@ export default defineTool({
       regionUrl: regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationContext(params.organizationSlug);
     setTag("trace.id", params.traceId);
     if (params.spanId) {
       setTag("trace.span_id", params.spanId);

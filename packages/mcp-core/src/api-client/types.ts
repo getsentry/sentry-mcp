@@ -48,6 +48,9 @@ import type {
   AIConversationSummaryListSchema,
   AIConversationSummarySchema,
   AIConversationUserSchema,
+  AlertActionOptionSchema,
+  AlertConditionOptionSchema,
+  AlertRuleProjectScopeSchema,
   AssignedToSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
@@ -61,6 +64,7 @@ import type {
   DefaultEventSchema,
   DeployListSchema,
   DeploySchema,
+  DetectorSchema,
   ErrorEventSchema,
   EventAttachmentListSchema,
   EventAttachmentSchema,
@@ -140,6 +144,10 @@ export type ProjectRepositoryMapping = z.infer<
   typeof ProjectRepositoryMappingSchema
 >;
 export type IssueAlertRule = z.infer<typeof IssueAlertRuleSchema>;
+export type AlertActionOption = z.infer<typeof AlertActionOptionSchema>;
+export type AlertConditionOption = z.infer<typeof AlertConditionOptionSchema>;
+export type AlertRuleProjectScope = z.infer<typeof AlertRuleProjectScopeSchema>;
+export type Detector = z.infer<typeof DetectorSchema>;
 export type MetricAlertRule = z.infer<typeof MetricAlertRuleSchema>;
 export type ClientKey = z.infer<typeof ClientKeySchema>;
 export type Release = z.infer<typeof ReleaseSchema>;

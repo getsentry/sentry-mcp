@@ -227,6 +227,7 @@ export const ParamIgnoreUserWindowMinutes = z
 
 export const ParamReason = z
   .string()
+  .overwrite((s) => s.replace(/\0/g, ""))
   .trim()
   .min(1)
   .describe(
