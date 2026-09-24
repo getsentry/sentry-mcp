@@ -19,7 +19,7 @@ import {
   ParamAlertActionFilters,
   ParamAlertTriggers,
   toAlertRuleSummary,
-} from "./support/alert-rule-config";
+} from "../support/alert-rule-config";
 import {
   findExactIssueAlertRuleMatches,
   isNumericAlertRuleId,

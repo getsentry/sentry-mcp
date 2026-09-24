@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { IssueAlertRule } from "../../../api-client/types";
+import type { IssueAlertRule } from "../../api-client/types";
 
 const componentId = z.union([z.string(), z.number()]);
 const logicType = z.enum(["all", "any", "any-short", "none"]);

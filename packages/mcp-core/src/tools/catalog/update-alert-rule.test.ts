@@ -70,6 +70,13 @@ const alertRule = {
   ],
 };
 
+function updateRule(
+  changes: Partial<Parameters<typeof updateAlertRule.handler>[0]> = {},
+  toolContext: Parameters<typeof updateAlertRule.handler>[1] = context,
+) {
+  return updateAlertRule.handler({ ...params, ...changes }, toolContext);
+}
+
 function useAlertRuleHandlers(workflow: Record<string, unknown> = alertRule) {
   const reads: string[] = [];
   const writes: Record<string, unknown>[] = [];
@@ -111,9 +118,7 @@ describe("update_alert_rule", () => {
     actionFilters[0].actions[0].config.targetDisplay = "#new-channel";
     actionFilters[0].actions[0].config.targetIdentifier = "";
 
-    await expect(
-      updateAlertRule.handler({ ...params, actionFilters }, context),
-    ).rejects.toThrow(
+    await expect(updateRule({ actionFilters })).rejects.toThrow(
       "The alert was saved, but Sentry did not resolve a Slack destination.",
     );
     expect(writes[0]).toMatchObject({ enabled: false, actionFilters });
@@ -122,15 +127,11 @@ describe("update_alert_rule", () => {
   it("preserves a disabled alert and untouched configuration while clearing optional fields", async () => {
     const { writes } = useAlertRuleHandlers();
 
-    const result = await updateAlertRule.handler(
-      {
-        ...params,
-        frequencyMinutes: 0,
-        environment: null,
-        owner: null,
-      },
-      context,
-    );
+    const result = await updateRule({
+      frequencyMinutes: 0,
+      environment: null,
+      owner: null,
+    });
 
     expect(writes).toEqual([
       {
@@ -241,10 +242,7 @@ describe("update_alert_rule", () => {
         }),
       );
 
-      const result = await updateAlertRule.handler(
-        { ...params, actionFilters },
-        context,
-      );
+      const result = await updateRule({ actionFilters });
       const expectedFilters = structuredClone(actionFilters);
       const expectedConfig: Record<string, unknown> =
         expectedFilters[0].actions[0].config;
@@ -415,7 +413,7 @@ describe("update_alert_rule", () => {
   it("replaces action filters when an explicit empty array is supplied", async () => {
     const { writes } = useAlertRuleHandlers();
 
-    await updateAlertRule.handler({ ...params, actionFilters: [] }, context);
+    await updateRule({ actionFilters: [] });
 
     expect(writes).toEqual([
       { name: alertRule.name, enabled: false, actionFilters: [] },
@@ -449,15 +447,11 @@ describe("update_alert_rule", () => {
       ),
     );
 
-    const result = await updateAlertRule.handler(
-      {
-        ...params,
-        addProjectSlugs: ["cloudflare-mcp"],
-        addDetectorIds: ["654"],
-        removeDetectorIds: ["321"],
-      },
-      context,
-    );
+    const result = await updateRule({
+      addProjectSlugs: ["cloudflare-mcp"],
+      addDetectorIds: ["654"],
+      removeDetectorIds: ["321"],
+    });
 
     expect(
       queries.map((url) => [
@@ -499,8 +493,8 @@ describe("update_alert_rule", () => {
         ),
       );
 
-      const result = await updateAlertRule.handler(
-        { ...params, removeDetectorIds: ["321"] },
+      const result = await updateRule(
+        { removeDetectorIds: ["321"] },
         { ...context, constraints: { ...context.constraints, projectSlug } },
       );
 
@@ -535,9 +529,7 @@ describe("update_alert_rule", () => {
         }),
       );
 
-      await expect(
-        updateAlertRule.handler({ ...params, [field]: [id] }, context),
-      ).rejects.toMatchObject({
+      await expect(updateRule({ [field]: [id] })).rejects.toMatchObject({
         status,
         message: expect.stringContaining(
           method === "GET" ? "Unavailable monitor" : "Forbidden update",
@@ -571,10 +563,7 @@ describe("update_alert_rule", () => {
       );
 
       await expect(
-        updateAlertRule.handler(
-          { ...params, addProjectSlugs: ["cloudflare-mcp"], removeDetectorIds },
-          context,
-        ),
+        updateRule({ addProjectSlugs: ["cloudflare-mcp"], removeDetectorIds }),
       ).rejects.toThrow(message);
       expect(writes).toEqual([]);
     },
@@ -608,10 +597,10 @@ describe("update_alert_rule", () => {
       );
 
       await expect(
-        updateAlertRule.handler(
-          { ...params, ...changes },
-          { ...context, constraints: { projectSlug: "cloudflare-mcp" } },
-        ),
+        updateRule(changes, {
+          ...context,
+          constraints: { projectSlug: "cloudflare-mcp" },
+        }),
       ).rejects.toThrow(message);
       expect(writes).toEqual([]);
     },
@@ -630,9 +619,9 @@ describe("update_alert_rule", () => {
       }),
     );
 
-    await expect(
-      updateAlertRule.handler({ ...params, status: "active" }, context),
-    ).rejects.toMatchObject({ name: "ApiNotFoundError" });
+    await expect(updateRule({ status: "active" })).rejects.toMatchObject({
+      name: "ApiNotFoundError",
+    });
     expect(searches).toEqual([]);
     expect(writes).toEqual([]);
   });
@@ -653,9 +642,8 @@ describe("update_alert_rule", () => {
       ),
     );
 
-    await updateAlertRule.handler(
+    await updateRule(
       {
-        ...params,
         projectSlug: "cloudflare-mcp",
         ruleIdOrName: alertRule.name,
         name: "Renamed alert",
@@ -672,7 +660,7 @@ describe("update_alert_rule", () => {
   it("rejects an empty update before reading or writing the API", async () => {
     const { reads, writes } = useAlertRuleHandlers();
 
-    await expect(updateAlertRule.handler(params, context)).rejects.toThrow(
+    await expect(updateRule()).rejects.toThrow(
       "Provide at least one field to update",
     );
 
@@ -707,15 +695,11 @@ describe("update_alert_rule", () => {
       );
 
       await expect(
-        updateAlertRule.handler(
-          {
-            ...params,
-            projectSlug: "cloudflare-mcp",
-            ruleIdOrName: alertRule.name,
-            name: "Renamed alert",
-          },
-          context,
-        ),
+        updateRule({
+          projectSlug: "cloudflare-mcp",
+          ruleIdOrName: alertRule.name,
+          name: "Renamed alert",
+        }),
       ).rejects.toThrow(
         hasMore
           ? "Alert name search is incomplete"
@@ -736,8 +720,8 @@ describe("update_alert_rule", () => {
     useProjectScope(scope.projectIds, scope.includesAllProjects);
 
     await expect(
-      updateAlertRule.handler(
-        { ...params, projectSlug: "cloudflare-mcp", status: "active" },
+      updateRule(
+        { projectSlug: "cloudflare-mcp", status: "active" },
         { ...context, constraints: { projectSlug: "cloudflare-mcp" } },
       ),
     ).rejects.toThrow("outside the active project constraint");
