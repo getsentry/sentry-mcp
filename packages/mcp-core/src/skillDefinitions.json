@@ -2,20 +2,25 @@
   {
     "id": "inspect",
     "name": "Inspect Issues & Events",
-    "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, cron monitors, uptime monitors, profiles, documentation, and project metadata",
+    "description": "Read-only access to core Sentry data: issues, events, traces, replays, releases, cron monitors, uptime monitors, metric monitors, profiles, documentation, and project metadata",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 39,
+    "toolCount": 41,
     "tools": [
       {
         "name": "find_alert_rules",
-        "description": "Find Sentry alert rules.\n\nUse this tool when you need to:\n- List Alerts (workflows) for an organization or project, including Alerts without connected sources\n- List metric alert rules for an organization or project\n- Find an alert rule ID by name before inspecting it\n- Check alert conditions, queries, triggers, actions, owner, or environment\n\n<examples>\nfind_alert_rules(organizationSlug='my-org')\nfind_alert_rules(organizationSlug='my-org', projectSlug='backend')\nfind_alert_rules(organizationSlug='my-org', kind='issue', projectSlug='backend', query='critical')\n</examples>\n\n<hints>\n- Omit `projectSlug` to search organization-wide. A project filter finds connected Alerts, which may also cover other projects.\n- With `kind='all'`, an unavailable legacy metric alert API is reported in `warnings`; the returned Alerts are still usable.\n- Issue and metric alert rules have independent pagination state. Reuse a nextCursor only with its matching kind.\n</hints>",
+        "description": "Find Sentry alert rules.\n\nUse this tool when you need to:\n- List Alerts (workflows) for an organization or project, including Alerts without connected sources\n- List Metric Monitors using compatibility references; prefer find_metric_monitors for canonical monitor IDs\n- Find an alert rule ID by name before inspecting it\n- Check alert conditions, queries, triggers, actions, owner, or environment\n\n<examples>\nfind_alert_rules(organizationSlug='my-org')\nfind_alert_rules(organizationSlug='my-org', projectSlug='backend')\nfind_alert_rules(organizationSlug='my-org', kind='issue', projectSlug='backend', query='critical')\n</examples>\n\n<hints>\n- Omit `projectSlug` to search organization-wide. A project filter finds connected Alerts, which may also cover other projects.\n- Metric entries expose monitorId and projectId. id retains a legacy alert-rule ID when available, otherwise detector:<monitorId>. status describes enabled/disabled monitoring, not a legacy alert status.\n- Issue and metric alert rules have independent pagination state. Reuse a nextCursor only with its matching kind.\n</hints>",
         "requiredScopes": ["org:read", "project:read"]
       },
       {
         "name": "find_dashboards",
         "description": "Find Sentry dashboards in an organization.\n\nUse this tool when you need to:\n- List dashboards in an organization\n- Find a dashboard ID before calling get_dashboard_details\n- Search dashboards by title\n\n<examples>\nfind_dashboards(organizationSlug='my-organization')\nfind_dashboards(organizationSlug='my-organization', titleQuery='errors')\n</examples>\n\n<hints>\n- Dashboard IDs are organization-scoped.\n- Use `get_dashboard_details` after finding the correct dashboard ID.\n</hints>",
         "requiredScopes": ["org:read"]
+      },
+      {
+        "name": "find_metric_monitors",
+        "description": "Find Sentry Metric Monitors that evaluate errors, performance, logs, metrics or crash rates.\nUse this tool to find a monitor ID before inspecting its query and detection conditions with get_metric_monitor_details.\nResults contain native monitor IDs, separate from legacy metric alert IDs. Alerts connected through workflowIds control notifications; inspect them with get_alert_rule(kind='issue').\nOmit projectSlug to search all accessible projects. Pass nextCursor as cursor with the same filters to retrieve more results.\nfind_metric_monitors(organizationSlug='my-org', projectSlug='backend', query='latency')",
+        "requiredScopes": ["org:read", "project:read"]
       },
       {
         "name": "find_monitors",
@@ -59,7 +64,7 @@
       },
       {
         "name": "get_alert_rule",
-        "description": "Get details for a Sentry alert rule.\n\nUse this tool when you need to inspect an alert rule's exact conditions, query, triggers, and actions before explaining or planning changes.\n\n<examples>\nget_alert_rule(organizationSlug='my-org', kind='metric', ruleIdOrName='12345')\nget_alert_rule(organizationSlug='my-org', kind='issue', projectSlug='backend', ruleIdOrName='Notify backend team')\nget_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='P95 latency')\n</examples>\n\n<hints>\n- Use `kind='issue'` or `kind='metric'` for numeric IDs because issue and metric alerts use separate endpoints.\n- With `kind='all'`, a digit-only `ruleIdOrName` is treated as an exact alert rule name.\n- Issue Alerts are notification workflows and may cover multiple projects or have no connected sources. Omit projectSlug to inspect organization-wide.\n- Issue details include complete conditions, notification actions, connected monitors and project scope. Inaccessible or session-restricted sources are marked explicitly.\n</hints>",
+        "description": "Get details for a Sentry alert rule.\n\nUse this tool when you need to inspect an alert rule's exact conditions, query, triggers, and actions before explaining or planning changes.\n\n<examples>\nget_alert_rule(organizationSlug='my-org', kind='metric', ruleIdOrName='12345')\nget_alert_rule(organizationSlug='my-org', kind='issue', projectSlug='backend', ruleIdOrName='Notify backend team')\nget_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='P95 latency')\n</examples>\n\n<hints>\n- Prefer get_metric_monitor_details for Metric Monitors. With kind=metric, numeric IDs retain their legacy alert-rule meaning; detector:123 explicitly identifies monitor 123.\n- With `kind='all'`, a digit-only `ruleIdOrName` is treated as an exact alert rule name.\n- Issue Alerts are notification workflows and may cover multiple projects or have no connected sources. Omit projectSlug to inspect organization-wide.\n- Issue details include complete conditions, notification actions, connected monitors and project scope. Inaccessible or session-restricted sources are marked explicitly.\n</hints>",
         "requiredScopes": ["org:read", "project:read"]
       },
       {
@@ -111,6 +116,11 @@
         "name": "get_latest_base_snapshot",
         "description": "Get the latest UI screenshots/images for an app from the preprod snapshot system.\n\nThis is the primary tool for retrieving app screenshots — not search_events or search_issues.\n\nUse this tool when you need to:\n- Get screenshots, screens, golden images, or reference images for an app\n- Find what the current UI looks like (latest screenshots from the main/default branch)\n- List available snapshots or browse images before requesting specific ones\n- Look up dark mode, light mode, or other variant screenshots\n- Understand what baseline images exist when investigating snapshot test or visual regression CI failures\n\nThe appId parameter is the app identifier (e.g. 'sentry-frontend', 'com.emergetools.hackernews').\nReturns compact image metadata (display_name, image_file_name, group, description) for every image.\n\n<examples>\n### Get the latest screenshots for an app\n\n```\nget_latest_base_snapshot(organizationSlug=\"sentry\", appId=\"sentry-frontend\", project=\"frontend\")\n```\n\n### Get the latest screenshots for a specific branch\n\n```\nget_latest_base_snapshot(organizationSlug=\"sentry\", appId=\"sentry-frontend\", project=\"frontend\", branch=\"main\")\n```\n</examples>\n\n<hints>\n- The response includes compact metadata per image. Scan the list to find images matching what you need (e.g. filter by group or name containing 'button').\n- To view a specific image, use get_sentry_resource(url='<snapshot_url>?selectedSnapshot=<image_file_name>').\n- If you need to investigate a specific snapshot comparison, use get_sentry_resource with the snapshot URL.\n</hints>",
         "requiredScopes": ["project:read"]
+      },
+      {
+        "name": "get_metric_monitor_details",
+        "description": "Inspect a Sentry Metric Monitor's query, dataset, detection mode, thresholds, resolution conditions and connected Alerts.\nUse monitorId from find_metric_monitors, not a legacy metric alert ID. Time windows and comparison deltas are in seconds.\nCondition results use 75 for critical, 50 for warning and 0 for resolved. Percent comparisons are absolute percentages (110 means 10% higher); dynamic conditions include sensitivity and direction.\nworkflowIds identify notification Alerts; inspect their actions with get_alert_rule(kind='issue').\nget_metric_monitor_details(organizationSlug='my-org', monitorId='12345')",
+        "requiredScopes": ["org:read", "project:read"]
       },
       {
         "name": "get_monitor_details",

@@ -1,4 +1,4 @@
-# Alert inspection and editing
+# Alert and Metric Monitor inspection and editing
 
 `find_alert_rules` and `get_alert_rule` inspect Alerts through the searchable
 catalog (`search_sentry_tools` and `execute_sentry_tool`). `get_alert_options`
@@ -98,18 +98,57 @@ transactional, but the preceding read has no compare-and-swap protection against
 concurrent edits. This operation does not create/delete Alerts or edit monitor
 detection queries and thresholds.
 
-## Legacy metrics and interpretation
+## Metric Monitors
 
-`kind='metric'` continues to use the existing metric alert API until the Metric
-Monitor read migration. With `kind='all'`, an HTTP 410 from that API does not
-hide valid workflow results: `warnings` explicitly reports that metrics were
-unavailable; listing also sets `pagination.metric` to `null`. Other errors
-propagate. Empty metric results in this case do not mean no Metric Monitors exist.
+`find_metric_monitors` and `get_metric_monitor_details` are read-only catalog
+tools with the same `org:read` and `project:read` scopes. They use native monitor
+IDs from the Detectors API. Lists support organization/project scope, monitor
+search and cursor pagination. The metric type filter is separate from the search
+query; other monitor types cannot enter the results. Detail reads verify both
+the monitor type and any requested or session-constrained project.
+
+Details include name, description, enabled state, owner, project ID, timestamps,
+connected Alert IDs (`workflowIds`), detection configuration and all conditions.
+Read connected notification actions with `get_alert_rule(kind='issue')`.
+Metric queries expose dataset, event types, query, aggregate, environment,
+extrapolation mode and `timeWindowSeconds`. Subscription IDs and backend metadata
+are excluded; unavailable source configuration is marked explicitly.
+
+Static, Percent and Dynamic detection preserve their native conditions, including
+resolution. `comparisonDeltaSeconds` identifies the Percent comparison window.
+Percent thresholds use absolute percentages: 110 means 10% higher, 80 means 20%
+lower. Dynamic comparisons retain sensitivity, seasonality and threshold type.
+Condition results are native priorities: 75 critical, 50 warning and 0 resolved.
+
+## Legacy metric references and interpretation
+
+`find_alert_rules(kind='metric'|'all')` now searches Detectors instead of the
+retired metric alert APIs. Each metric result includes the native `monitorId`
+and `projectId`, enabled state and a native monitor URL. `status` is
+`enabled`/`disabled`; project identity uses `projectId` rather than legacy slugs.
+`timeWindowMinutes` retains its existing unit for compatibility. The existing
+`id` remains the legacy alert-rule ID when Sentry supplies one, or an explicit
+`detector:<monitorId>` reference for a monitor without a legacy mapping.
+
+`get_alert_rule(kind='metric')` accepts these references and returns structured
+`metricMonitor` details. A bare numeric ID always means a legacy metric alert:
+the compatibility endpoint resolves it before reading the actual monitor.
+This also handles legacy synthetic IDs through Sentry's mapping, without
+calculating an offset in MCP. A missing mapping never falls back to the same
+number as a native monitor ID. Use `find_metric_monitors` followed by
+`get_metric_monitor_details` when a legacy mapping is unavailable.
+
+Exact-name lookups search native monitors and reject ambiguous or incomplete
+results. With `kind='all'`, digit-only input still means a name. The canonical
+tools and list/name adapters do not depend on the experimental mapping endpoint
+or retired alert-rule APIs. API failures propagate rather than appearing as an
+empty, complete search.
 
 Current configuration helps explain which Alerts could match an issue. It does
 not prove a notification was delivered historically. In particular, last-triggered
 timestamps are not evidence of successful delivery.
 
-The implementation uses workflow detail/list, workflow project scope, and
-detector detail endpoints, verified against Sentry's endpoint and serializer
-source. Project scope is a private endpoint; missing access fails explicitly.
+The implementation uses workflow detail/list, workflow project scope, detector
+detail/list and legacy alert-rule mapping endpoints, verified against Sentry's
+endpoint and serializer source. Project scope is a private endpoint; missing
+access fails explicitly.
