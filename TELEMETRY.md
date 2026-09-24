@@ -25,15 +25,10 @@ the pivots and recipes below.
 
 ## Event Validation Diagnostics
 
-For `Event failed schema validation`, inspect `contexts.log.contextType` on
-the issue event (or `contextType` in structured log properties), alongside
-`validationIssues`. It describes only the legacy `context`/`extra` outer shape:
-`null`, `array`, or JavaScript `typeof`, including `undefined` when absent.
-No extra-data keys or values are captured. It is recorded on all event schema
-failures, so an `object` shape can accompany an unrelated validation error.
-Do not infer support for arbitrary outer values from a record-validation
-failure alone; this diagnostic supplies evidence for a later targeted fix.
-This is an issue/log diagnostic, not a span semantic convention or metric.
+For `Event failed schema validation`, check `contexts.log.contextType` on the
+issue event or `contextType` in log properties. It records the legacy `context`
+container type (`null`, `array`, or JavaScript `typeof`), never its keys or values.
+Read it alongside `validationIssues`; another field may have failed.
 
 ## Investigation Pivots
 

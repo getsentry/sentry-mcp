@@ -3731,8 +3731,7 @@ export class SentryApiService {
         eventId: bodyObj.id,
         validationError: parseResult.error.message,
         validationIssues: parseResult.error.issues,
-        // Capture only the outer shape, never user-provided extra keys or values.
-        // This distinguishes a null/malformed container from arbitrary map values.
+        // Log the container type, not user-provided extra data.
         contextType:
           bodyObj.context === null
             ? "null"
