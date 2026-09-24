@@ -175,6 +175,16 @@ export type MetricMonitorUpdate = {
     extrapolationMode?: string | null;
   }>;
 };
+export type MetricMonitorCreate = Pick<
+  MetricMonitorUpdate,
+  "description" | "owner"
+> &
+  Required<
+    Pick<
+      MetricMonitorUpdate,
+      "name" | "config" | "conditionGroup" | "dataSources" | "workflowIds"
+    >
+  > & { type: "metric_issue" };
 export type AlertRuleUpdate = {
   name: string;
   enabled: boolean;

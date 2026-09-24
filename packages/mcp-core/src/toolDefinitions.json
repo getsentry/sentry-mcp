@@ -637,6 +637,506 @@
     "surface": "catalog"
   },
   {
+    "name": "create_metric_monitor",
+    "description": "Create a Sentry Metric Monitor with Static, Percent or Dynamic detection in a project.\nProvide the complete query, detection config and conditions. Time windows and comparison deltas use seconds. Percent comparisons are absolute: 110 means 10% higher.\nTo copy a monitor, use the query, config and conditionGroup from get_metric_monitor_details. Component IDs are discarded; new condition groups use logicType='any'.\nNew monitors start ACTIVE and immediately evaluate data. Initially disabled creation is not supported. Use update_metric_monitor to disable an existing monitor.\nworkflowIds optionally connect existing notification Alerts, including shared Alerts, without modifying their configuration. Create an Alert separately with create_alert_rule if needed.\nDataset access, quota, aggregate, window and historical-data requirements are enforced by Sentry. Dynamic detection requires sufficient history and Seer availability.\nCreation can fail after persisting a monitor, especially during Dynamic setup. After an error or timeout, use find_metric_monitors with the name and project before retrying; do not assume rollback or blindly repeat creation.\ncreate_metric_monitor(organizationSlug='my-org', projectSlug='backend', name='High error count', query={dataset:'events', query:'level:error', aggregate:'count()', eventTypes:['error'], timeWindowSeconds:300}, config={detectionType:'static'}, conditionGroup={conditions:[{type:'gt', comparison:100, conditionResult:75}, {type:'lte', comparison:50, conditionResult:0}]})",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner": {
+          "description": "Owner actor, e.g. team:123 or user:123. Pass null to clear.",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(user|team):\\d+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "dataset": {
+              "type": "string",
+              "enum": [
+                "events",
+                "transactions",
+                "generic_metrics",
+                "metrics",
+                "events_analytics_platform"
+              ]
+            },
+            "query": {
+              "type": "string"
+            },
+            "aggregate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "default": null,
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "eventTypes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "extrapolationMode": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timeWindowSeconds": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "dataset",
+            "query",
+            "aggregate",
+            "eventTypes",
+            "timeWindowSeconds"
+          ],
+          "description": "Complete query: dataset, aggregate, filter, eventTypes and timeWindowSeconds. metrics is crash-free Releases; events_analytics_platform supports spans, logs and application metrics via eventTypes. Omitted environment means all environments."
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "detectionType": {
+              "type": "string",
+              "enum": ["static", "percent", "dynamic"]
+            },
+            "comparisonDeltaSeconds": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": ["detectionType"],
+          "description": "Detection mode. Percent requires comparisonDeltaSeconds. Static and Dynamic do not use a comparison delta."
+        },
+        "conditionGroup": {
+          "type": "object",
+          "properties": {
+            "logicType": {
+              "default": "any",
+              "type": "string",
+              "const": "any"
+            },
+            "conditions": {
+              "minItems": 1,
+              "maxItems": 3,
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["gt", "lt", "gte", "lte"]
+                      },
+                      "comparison": {
+                        "type": "number"
+                      },
+                      "conditionResult": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "const": 75
+                          },
+                          {
+                            "type": "number",
+                            "const": 50
+                          },
+                          {
+                            "type": "number",
+                            "const": 0
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["type", "comparison", "conditionResult"]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "anomaly_detection"
+                      },
+                      "comparison": {
+                        "type": "object",
+                        "properties": {
+                          "sensitivity": {
+                            "type": "string",
+                            "enum": ["low", "medium", "high"]
+                          },
+                          "seasonality": {
+                            "type": "string",
+                            "const": "auto"
+                          },
+                          "thresholdType": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "const": 0
+                              },
+                              {
+                                "type": "number",
+                                "const": 1
+                              },
+                              {
+                                "type": "number",
+                                "const": 2
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "sensitivity",
+                          "seasonality",
+                          "thresholdType"
+                        ]
+                      },
+                      "conditionResult": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "const": 75
+                          },
+                          {
+                            "type": "number",
+                            "const": 50
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["type", "comparison", "conditionResult"]
+                  }
+                ]
+              }
+            }
+          },
+          "required": ["conditions"],
+          "description": "Complete conditions, using logicType any. Copied group and condition IDs are discarded. Static/Percent require thresholds and resolution (results 75 critical, 50 warning, 0 resolved). Percent 110 means 10% higher. Dynamic requires one anomaly_detection condition: sensitivity, seasonality:auto, thresholdType 0 above/1 below/2 both."
+        },
+        "workflowIds": {
+          "default": [],
+          "description": "Existing notification Alert IDs to connect. Omit or pass [] to create without connected Alerts. Use find_alert_rules(kind='issue') to find workflow IDs.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          }
+        }
+      },
+      "required": [
+        "organizationSlug",
+        "projectSlug",
+        "name",
+        "query",
+        "config",
+        "conditionGroup"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "monitor": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "projectId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "owner": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "workflowIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "webUrl": {
+              "type": "string"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "config": {
+              "type": "object",
+              "properties": {
+                "detectionType": {
+                  "type": "string"
+                },
+                "comparisonDeltaSeconds": {
+                  "type": "number"
+                }
+              },
+              "required": ["detectionType"],
+              "additionalProperties": false
+            },
+            "conditionGroup": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ]
+                    },
+                    "logicType": {
+                      "type": "string"
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "comparison": {},
+                          "conditionResult": {}
+                        },
+                        "required": ["type", "comparison", "conditionResult"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["logicType", "conditions"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Native detection conditions, including resolution. Results: 75 critical, 50 warning, 0 resolved. Percent comparisons are absolute percentages (110 means 10% higher). Dynamic comparisons contain sensitivity, seasonality and thresholdType."
+            },
+            "dataSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "query": {
+                    "type": "object",
+                    "properties": {
+                      "dataset": {
+                        "type": "string"
+                      },
+                      "query": {
+                        "type": "string"
+                      },
+                      "aggregate": {
+                        "type": "string"
+                      },
+                      "environment": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "eventTypes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "extrapolationMode": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "timeWindowSeconds": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "dataset",
+                      "query",
+                      "aggregate",
+                      "environment",
+                      "eventTypes",
+                      "timeWindowSeconds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "unavailableReason": {
+                    "type": "string"
+                  }
+                },
+                "required": ["type"],
+                "additionalProperties": false
+              }
+            },
+            "dateCreated": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dateUpdated": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "projectId",
+            "enabled",
+            "owner",
+            "workflowIds",
+            "webUrl",
+            "description",
+            "config",
+            "conditionGroup",
+            "dataSources",
+            "dateCreated",
+            "dateUpdated"
+          ],
+          "additionalProperties": false
+        },
+        "guidance": {
+          "type": "string"
+        }
+      },
+      "required": ["monitor"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["org:read", "project:read", "alerts:write"],
+    "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
     "name": "create_project",
     "description": "Create a new project in Sentry (provisions DSN automatically).\n\nUSE THIS TOOL WHEN USERS WANT TO:\n- 'Create a new project'\n- 'Set up a project for [app/service] with team [X]'\n- 'I need a new Sentry project'\n- Create project AND need DSN in one step\n- Create project and link an existing repository\n\nReturns the created project slug and a usable SENTRY_DSN when key setup succeeds.\n\nBe careful when using this tool!\n\n<examples>\n### Create new project with team\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')\n```\n### Create project with an explicit slug\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='My Project', slug='my-project', platform='javascript')\n```\n### Create project and link to a repository\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript', repository='getsentry/sentry')\n```\n</examples>",
     "inputSchema": {

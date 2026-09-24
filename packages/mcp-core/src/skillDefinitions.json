@@ -428,10 +428,10 @@
   {
     "id": "project-management",
     "name": "Manage Projects & Teams",
-    "description": "Manage projects, teams, DSNs, uptime monitors, metric monitors, and alert rules",
+    "description": "Create and modify projects, teams, DSNs, uptime monitors, metric monitors, and alert rules",
     "defaultEnabled": false,
     "order": 5,
-    "toolCount": 21,
+    "toolCount": 22,
     "tools": [
       {
         "name": "add_team_to_project",
@@ -447,6 +447,11 @@
         "name": "create_dsn",
         "description": "Create an additional DSN for an EXISTING project.\n\nUSE THIS TOOL WHEN:\n- Project already exists and needs additional DSN\n- 'Create another DSN for project X'\n- 'I need a production DSN for existing project'\n\nDO NOT USE for new projects (use create_project instead)\n\nBe careful when using this tool!\n\n<examples>\n### Create additional DSN for existing project\n```\ncreate_dsn(organizationSlug='my-organization', projectSlug='my-project', name='Production')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n</hints>",
         "requiredScopes": ["project:write"]
+      },
+      {
+        "name": "create_metric_monitor",
+        "description": "Create a Sentry Metric Monitor with Static, Percent or Dynamic detection in a project.\nProvide the complete query, detection config and conditions. Time windows and comparison deltas use seconds. Percent comparisons are absolute: 110 means 10% higher.\nTo copy a monitor, use the query, config and conditionGroup from get_metric_monitor_details. Component IDs are discarded; new condition groups use logicType='any'.\nNew monitors start ACTIVE and immediately evaluate data. Initially disabled creation is not supported. Use update_metric_monitor to disable an existing monitor.\nworkflowIds optionally connect existing notification Alerts, including shared Alerts, without modifying their configuration. Create an Alert separately with create_alert_rule if needed.\nDataset access, quota, aggregate, window and historical-data requirements are enforced by Sentry. Dynamic detection requires sufficient history and Seer availability.\nCreation can fail after persisting a monitor, especially during Dynamic setup. After an error or timeout, use find_metric_monitors with the name and project before retrying; do not assume rollback or blindly repeat creation.\ncreate_metric_monitor(organizationSlug='my-org', projectSlug='backend', name='High error count', query={dataset:'events', query:'level:error', aggregate:'count()', eventTypes:['error'], timeWindowSeconds:300}, config={detectionType:'static'}, conditionGroup={conditions:[{type:'gt', comparison:100, conditionResult:75}, {type:'lte', comparison:50, conditionResult:0}]})",
+        "requiredScopes": ["org:read", "project:read", "alerts:write"]
       },
       {
         "name": "create_project",

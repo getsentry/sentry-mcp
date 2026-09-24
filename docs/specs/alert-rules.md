@@ -154,6 +154,23 @@ Percent thresholds use absolute percentages: 110 means 10% higher, 80 means 20%
 lower. Dynamic comparisons retain sensitivity, seasonality and threshold type.
 Condition results are native priorities: 75 critical, 50 warning and 0 resolved.
 
+### Creating Metric Monitors
+
+`create_metric_monitor` creates a native Metric Monitor in a required project.
+It is a catalog-only `project-management` operation with `org:read`,
+`project:read` and `alerts:write` scopes. Supply a name, complete query,
+detection config and condition group using the same units and threshold meanings
+as detail reads. Static, Percent and Dynamic detection are supported; Percent
+requires a comparison window and Dynamic requires sufficient historical data.
+
+Monitors are created active: creation does not accept `status` or `enabled`.
+Use `update_metric_monitor` to disable a saved monitor. Optional `workflowIds`
+connect existing Alerts; omitting them leaves the monitor without notification
+routing. The response contains the saved `monitor` and guidance when no Alerts
+are connected. Use `create_alert_rule` or `update_alert_rule` to configure
+notification actions. POST is not automatically retried; after an uncertain
+creation result, search for the monitor before retrying.
+
 ### Editing and deleting Metric Monitors
 
 `update_metric_monitor` and `delete_metric_monitor` are catalog-only
