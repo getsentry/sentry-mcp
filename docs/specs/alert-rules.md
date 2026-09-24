@@ -1,9 +1,10 @@
-# Alert inspection and configuration options
+# Alert inspection and editing
 
 `find_alert_rules` and `get_alert_rule` inspect Alerts through the searchable
 catalog (`search_sentry_tools` and `execute_sentry_tool`). `get_alert_options`
-discovers available configuration choices through the same catalog. No new direct
-tools or write scopes are required.
+discovers configuration choices and `update_alert_rule` edits existing Alerts.
+These operations add no direct tools. Reads require `org:read` and `project:read`;
+updates also require `alerts:write`.
 
 The `issue` selector reads Sentry Alerts: notification workflows that can be
 shared across projects and monitors, cover all projects, or have no connected
@@ -44,7 +45,7 @@ sources are marked `outside_project_constraint`, and scope includes
 The real all-projects flag remains visible without guessing a project count.
 Detached or unrelated Alerts are rejected for constrained sessions.
 
-## Configuration options
+## Options and editing
 
 `get_alert_options` returns one paginated section per call:
 
@@ -60,6 +61,40 @@ Detached or unrelated Alerts are rejected for constrained sessions.
 Reuse cursors with the same section and filters. Discovery does not enumerate
 every channel, member, or dynamic Sentry App choice; destinations and dynamic
 settings may require explicit values. It never invents IDs.
+
+`update_alert_rule` accepts a workflow ID or exact name. Digit-only references
+are IDs, with no name fallback. Omitted fields retain their values; explicit null
+clears owner or environment. The current enabled state is always sent because
+Sentry otherwise defaults it to true during updates.
+
+Triggers replace the trigger group and `actionFilters` replaces all action groups.
+Read the complete configuration first, retain component IDs, and edit only the
+intended values. All notification providers retain their native config/data.
+Slack and Teams accept channel names in `config.targetDisplay` and an integration
+ID. A copied old Slack target ID is cleared when its channel or workspace changes;
+an explicit new ID is preserved. Other providers use their service, channel,
+recipient, or app-specific fields. A saved Slack action with an unresolved channel
+returns an explicit error explaining that the Alert was already saved.
+
+Connection changes are additive/subtractive: `addProjectSlugs` and
+`removeProjectSlugs` resolve existing `issue_stream` detectors, while
+`addDetectorIds` and `removeDetectorIds` address individual monitors. Unmentioned
+connections remain intact. Removing a project's issue stream does not disconnect
+its other monitors. Missing or ambiguous issue streams fail before the PUT;
+MCP does not create a detector or substitute another type.
+
+Project-constrained writes require the Alert to belong exclusively to that
+project before and after the edit. Shared, all-project, and detached Alerts cannot
+be edited through such a session. Unrestricted sessions can edit these Alerts
+subject to backend permissions. All-project connections additionally require the
+Sentry feature and `org:write`; OAuth does not request that scope automatically.
+Existing OAuth tokens without `alerts:write` require reconnection.
+
+Successful updates return the saved Alert's configuration and detector IDs.
+Use `get_alert_rule` for enriched source details and scope. The backend PUT is
+transactional, but the preceding read has no compare-and-swap protection against
+concurrent edits. This operation does not create/delete Alerts or edit monitor
+detection queries and thresholds.
 
 ## Legacy metrics and interpretation
 
