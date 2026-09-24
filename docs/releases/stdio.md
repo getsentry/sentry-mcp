@@ -82,56 +82,24 @@ git tag v1.2.3
 git push origin v1.2.3
 ```
 
-## MCP Registry Publication
+## MCP Registry
 
-The official MCP Registry listing `io.github.getsentry/sentry-mcp` is separate
-from npm. Publishing npm alone does not update the listing.
+The **Publish MCP Registry** workflow publishes `server.json` on stable GitHub
+releases using GitHub Actions OIDC; no registry secret is needed. It reads the
+manifest from `main` and sets both versions from the release, so there is no
+extra version bump to maintain. The listing includes npm and the hosted endpoint.
 
-`.github/workflows/mcp-registry.yml` runs when a stable GitHub release is
-published. Craft publishes the GitHub target before npm, so the workflow waits
-up to 10 minutes for that exact npm version and verifies its `mcpName` before
-publishing registry metadata. If npm publishing fails or takes longer, the
-registry workflow fails without advertising an unavailable package.
-
-The workflow uses `server.json` on `main` as its metadata template. It replaces
-the listing and npm package versions with the selected release version in a
-temporary file; the checked-in versions are examples, not a second version to
-bump during release preparation. Both local npm installation and the hosted
-`https://mcp.sentry.dev/mcp` endpoint are advertised.
-
-Authentication uses GitHub Actions OIDC (`id-token: write`), not a saved token
-or the original publisher's account. The registry grants publishing rights for
-the GitHub owner's namespace. Keep this job restricted to trusted release
-workflows: never execute pull request code with these publishing permissions.
-Manual dispatch is restricted to `main`, and the job always checks out `main`
-without persisted Git credentials.
-
-### Backfill or Retry
-
-After the workflow is merged to `main`, publish an already-released version:
+Craft publishes GitHub before npm. The workflow waits for the npm package before
+publishing the listing. Check this Actions run separately from the Craft release.
+To retry or publish an existing release after merging the workflow:
 
 ```bash
 gh workflow run mcp-registry.yml --repo getsentry/sentry-mcp --ref main -f version=0.40.0
 ```
 
-Check the **Publish MCP Registry** Actions run independently of the Craft
-publishing run. Registry failures do not undo the npm release or reopen the
-Craft publish issue. Once npm is available, rerun the failed job or dispatch it
-with the same version. No new npm release is required for a missing listing.
-
-Matching active registry records are skipped safely on retry. An existing
-version with different metadata fails: registry versions are immutable, so do
-not try to overwrite them. Publish the metadata change with the next stable
-release instead. Verification checks the exact version, not `latest`, so
-backfilling an older release does not report a false failure when a newer
-release is already listed. Downstream directories may take time to refresh.
-
-The publisher binary is pinned by version and SHA-256 in the workflow. Update
-both when upgrading it. The registry tooling regression tests run in `test.yml`:
-
-```bash
-node --test .github/tests/mcp-registry.test.mjs
-```
+An identical active listing is safe to rerun. Different metadata for an existing
+version fails verification because registry versions are immutable; publish those
+changes with the next release. Registry failures do not undo the npm release.
 
 ## User Installation
 

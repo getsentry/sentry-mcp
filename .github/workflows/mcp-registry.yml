@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Existing stable GitHub/npm release to publish (e.g. 0.40.0)
+        description: Existing stable release (e.g. 0.40.0)
         required: true
         type: string
 
@@ -35,33 +35,45 @@ jobs:
     env:
       VERSION: ${{ inputs.version || github.event.release.tag_name }}
     steps:
-      # Use maintained release tooling, including for tags predating this workflow.
-      # Never execute the selected release's code in this OIDC-enabled job.
+      # Use the maintained manifest on main, including for older releases.
       - uses: actions/checkout@v4
         with:
           ref: main
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Check stable GitHub release
+      - name: Prepare metadata
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          node --input-type=module -e 'import {createManifest} from "./scripts/mcp-registry.mjs"; createManifest({packages: []}, process.env.VERSION)'
-          gh release view "$VERSION" --repo getsentry/sentry-mcp --json tagName,isDraft,isPrerelease \
-            | jq -e --arg version "$VERSION" '.tagName == $version and (.isDraft | not) and (.isPrerelease | not)'
+          [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          gh release view "$VERSION" --repo getsentry/sentry-mcp --json isDraft,isPrerelease \
+            | jq -e '(.isDraft | not) and (.isPrerelease | not)'
+          jq --arg version "$VERSION" '.version = $version | .packages[0].version = $version' \
+            server.json > "$RUNNER_TEMP/server.json"
 
-      # Craft's GitHub target precedes npm. Do not publish metadata until the
-      # exact npm version exists and its mcpName matches. Bounded wait: 10 min.
-      - name: Wait for npm and prepare registry metadata
-        id: prepare
-        run: node scripts/mcp-registry.mjs prepare "$VERSION" "$RUNNER_TEMP/server.json"
+          # Craft publishes the GitHub release before npm. Wait for the exact package.
+          curl --fail --silent --show-error --retry 40 --retry-all-errors \
+            --retry-delay 15 --retry-max-time 600 --max-time 15 \
+            "https://registry.npmjs.org/@sentry%2Fmcp-server/$VERSION" \
+            -o "$RUNNER_TEMP/npm.json"
+          jq -e --arg version "$VERSION" --slurpfile manifest "$RUNNER_TEMP/server.json" \
+            '.name == "@sentry/mcp-server" and .version == $version and .mcpName == $manifest[0].name' \
+            "$RUNNER_TEMP/npm.json"
 
-      - name: Install pinned MCP publisher
-        if: steps.prepare.outputs.publish == 'true'
+      - name: Check for an existing listing
+        id: existing
+        run: |
+          url="https://registry.modelcontextprotocol.io/v0.1/servers/io.github.getsentry%2Fsentry-mcp/versions/$VERSION"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          status=$(curl --silent --show-error --max-time 30 -o "$RUNNER_TEMP/existing.json" -w '%{http_code}' "$url")
+          case "$status" in
+            404) echo 'publish=true' >> "$GITHUB_OUTPUT" ;;
+            200) ;; # Verify the existing record below instead of republishing it.
+            *) echo "Registry lookup failed: HTTP $status" >&2; exit 1 ;;
+          esac
+
+      - name: Install MCP publisher
+        if: steps.existing.outputs.publish == 'true'
         working-directory: ${{ runner.temp }}
         run: |
           curl --fail --silent --show-error --location --retry 3 \
@@ -70,12 +82,20 @@ jobs:
           echo 'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  mcp-publisher.tar.gz' | sha256sum --check
           tar xzf mcp-publisher.tar.gz mcp-publisher
 
-      - name: Publish registry metadata
-        if: steps.prepare.outputs.publish == 'true'
+      - name: Publish metadata
+        if: steps.existing.outputs.publish == 'true'
         working-directory: ${{ runner.temp }}
         run: |
           ./mcp-publisher login github-oidc
           ./mcp-publisher publish
 
-      - name: Verify published registry metadata
-        run: node scripts/mcp-registry.mjs verify "$VERSION"
+      - name: Verify listing
+        env:
+          REGISTRY_URL: ${{ steps.existing.outputs.url }}
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 10 --max-time 15 \
+            "$REGISTRY_URL" -o "$RUNNER_TEMP/published.json"
+          jq -e --slurpfile expected "$RUNNER_TEMP/server.json" \
+            '(.server | del(.["$schema"])) == ($expected[0] | del(.["$schema"])) and
+             ._meta["io.modelcontextprotocol.registry/official"].status == "active"' \
+            "$RUNNER_TEMP/published.json"
