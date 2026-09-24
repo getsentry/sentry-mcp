@@ -8,6 +8,20 @@ import {
 } from "./detector-details";
 
 const metricConditionSchema = conditionGroupSchema.shape.conditions.element;
+const thresholdCondition = metricConditionSchema.extend({
+  type: z.enum(["gt", "lt", "gte", "lte"]),
+  comparison: z.number(),
+  conditionResult: z.union([z.literal(75), z.literal(50), z.literal(0)]),
+});
+const anomalyCondition = metricConditionSchema.extend({
+  type: z.literal("anomaly_detection"),
+  comparison: z.object({
+    sensitivity: z.enum(["low", "medium", "high"]),
+    seasonality: z.literal("auto"),
+    thresholdType: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  }),
+  conditionResult: z.union([z.literal(75), z.literal(50)]),
+});
 
 const metricMonitorQuerySchema = metricQueryDetailsSchema.extend({
   dataset: z.enum([
@@ -28,28 +42,7 @@ const metricMonitorDetectionConfigSchema = z.object({
 
 const metricMonitorConditionGroupSchema = conditionGroupSchema.extend({
   conditions: z
-    .array(
-      z.discriminatedUnion("type", [
-        metricConditionSchema.extend({
-          type: z.enum(["gt", "lt", "gte", "lte"]),
-          comparison: z.number(),
-          conditionResult: z.union([
-            z.literal(75),
-            z.literal(50),
-            z.literal(0),
-          ]),
-        }),
-        metricConditionSchema.extend({
-          type: z.literal("anomaly_detection"),
-          comparison: z.object({
-            sensitivity: z.enum(["low", "medium", "high"]),
-            seasonality: z.literal("auto"),
-            thresholdType: z.union([z.literal(0), z.literal(1), z.literal(2)]),
-          }),
-          conditionResult: z.union([z.literal(75), z.literal(50)]),
-        }),
-      ]),
-    )
+    .array(z.discriminatedUnion("type", [thresholdCondition, anomalyCondition]))
     .min(1)
     .max(3),
 });
@@ -97,15 +90,14 @@ export const metricMonitorConfigFields = {
     ),
 };
 
-const [thresholdCondition, anomalyCondition] =
-  metricMonitorConditionGroupSchema.shape.conditions.element.options;
-
 export const metricMonitorCreateFields = {
   name: metricMonitorConfigFields.name.unwrap(),
   description: metricMonitorConfigFields.description,
   owner: metricMonitorConfigFields.owner,
   query: metricMonitorQuerySchema
-    .extend({ environment: z.string().nullable().default(null) })
+    .extend({
+      environment: metricMonitorQuerySchema.shape.environment.default(null),
+    })
     .describe(
       "Complete query: dataset, aggregate, filter, eventTypes and timeWindowSeconds. metrics is crash-free Releases; events_analytics_platform supports spans, logs and application metrics via eventTypes. Omitted environment means all environments.",
     ),

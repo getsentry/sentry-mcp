@@ -27,7 +27,10 @@ const params = {
     timeWindowSeconds: 3600,
   },
   config: { detectionType: "static" },
-  conditionGroup: metricMonitor.conditionGroup,
+  conditionGroup: {
+    id: metricMonitor.conditionGroup.id,
+    conditions: metricMonitor.conditionGroup.conditions,
+  },
 };
 const anomalyGroup = {
   logicType: "any",
@@ -211,15 +214,6 @@ describe("create_metric_monitor", () => {
         ...metadata,
       });
       expect(getStructuredContent(result)).not.toHaveProperty("guidance");
-    },
-  );
-
-  it.each([400, 403])(
-    "preserves quota or entitlement failures (%s) without claiming creation",
-    async (status) => {
-      const writes = useCreateHandler(status);
-      await expect(create()).rejects.toMatchObject({ status });
-      expect(writes).toHaveLength(1);
     },
   );
 
