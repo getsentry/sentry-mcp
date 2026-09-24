@@ -5949,6 +5949,506 @@
     "surface": "direct"
   },
   {
+    "name": "update_alert_rule",
+    "description": "Update a Sentry Alert (workflow), including notification actions and connections.\nUse get_alert_rule with kind='issue' first to inspect the complete triggers and actionFilters configuration.\nUse get_alert_options to discover notification actions, integrations, conditions, and available sources.\nOmit fields to leave them unchanged. Pass null to clear owner or environment.\ntriggers replaces the trigger conditions. actionFilters replaces ALL action groups: copy the complete configuration, retain existing IDs, and change only the intended values. Omitted groups, conditions, and actions are removed.\nFor Slack or Microsoft Teams, change config.targetDisplay to the channel name and use integrationId for the workspace or team. Sentry resolves the channel ID. Slack also accepts an explicit new targetIdentifier; a copied old ID is cleared when the name or workspace changes.\nOther actions use their provider's config and data. For Discord, PagerDuty, Opsgenie, and email, update targetIdentifier to the channel, service, team, or recipient ID; changing only its display name does not change the destination.\nUse addProjectSlugs/removeProjectSlugs to connect/disconnect a project's issue stream. Other monitors in that project remain connected. Use addDetectorIds/removeDetectorIds for individual monitors. Unmentioned connections are preserved.\nMetric Monitor detection queries and thresholds are separate operations.\nAll-project connections require Sentry's all-project feature and an API token with org:write in addition to alerts:write.\nA project-constrained session can only edit alerts affecting that project exclusively.\nRequires alerts:write; reconnect OAuth if the existing token lacks it.\n<examples>\nupdate_alert_rule(organizationSlug='my-org', ruleIdOrName='12345', status='disabled')\nupdate_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='Notify backend team', frequencyMinutes=30)\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ruleIdOrName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Workflow ID or exact alert name. Digit-only values are treated as IDs. Use IDs from get_alert_rule(kind='issue')."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "disabled"]
+        },
+        "frequencyMinutes": {
+          "description": "Minimum interval between notifications, in minutes.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner": {
+          "description": "Owner actor user:ID or team:ID. Pass null to clear.",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(user|team):\\d+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "triggers": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "logicType": {
+              "type": "string",
+              "enum": ["all", "any", "any-short", "none"]
+            },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "comparison": {},
+                  "conditionResult": {}
+                },
+                "required": ["type", "comparison", "conditionResult"]
+              }
+            }
+          },
+          "required": ["logicType", "conditions"],
+          "description": "The complete trigger group. Preserve existing condition IDs when editing; omitted conditions are removed. Use the configuration returned by get_alert_rule."
+        },
+        "actionFilters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "logicType": {
+                "type": "string",
+                "enum": ["all", "any", "any-short", "none"]
+              },
+              "conditions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ]
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "comparison": {},
+                    "conditionResult": {}
+                  },
+                  "required": ["type", "comparison", "conditionResult"]
+                }
+              },
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ]
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "integrationId": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "config": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["type", "data", "config"]
+                }
+              }
+            },
+            "required": ["logicType", "conditions", "actions"]
+          },
+          "description": "The complete list of action groups, conditions, and notification actions. Preserve their IDs and all unchanged groups and actions; omitted entries are removed. Slack and Microsoft Teams resolve config.targetDisplay as a channel name within integrationId. Other providers use their native config.targetIdentifier and data fields."
+        },
+        "addProjectSlugs": {
+          "description": "Projects whose existing issue streams should be connected.",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+          }
+        },
+        "removeProjectSlugs": {
+          "description": "Projects whose issue streams should be disconnected; other monitor connections are retained.",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+          }
+        },
+        "addDetectorIds": {
+          "description": "Existing detector IDs to connect, from get_alert_options(section='sources').",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          }
+        },
+        "removeDetectorIds": {
+          "description": "Detector IDs to disconnect. Other connections are retained.",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          }
+        }
+      },
+      "required": ["organizationSlug", "ruleIdOrName"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "alertRule": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "config": {
+              "type": "object",
+              "properties": {
+                "frequency": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "environment": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "owner": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "triggers": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ]
+                    },
+                    "logicType": {
+                      "type": "string",
+                      "enum": ["all", "any", "any-short", "none"]
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "comparison": {},
+                          "conditionResult": {}
+                        },
+                        "required": ["type", "comparison", "conditionResult"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["logicType", "conditions"],
+                  "additionalProperties": false,
+                  "description": "The complete trigger group. Preserve existing condition IDs when editing; omitted conditions are removed. Use the configuration returned by get_alert_rule."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "actionFilters": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      "logicType": {
+                        "type": "string",
+                        "enum": ["all", "any", "any-short", "none"]
+                      },
+                      "conditions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                }
+                              ]
+                            },
+                            "type": {
+                              "type": "string"
+                            },
+                            "comparison": {},
+                            "conditionResult": {}
+                          },
+                          "required": ["type", "comparison", "conditionResult"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "actions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                }
+                              ]
+                            },
+                            "type": {
+                              "type": "string"
+                            },
+                            "integrationId": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "data": {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {}
+                            },
+                            "config": {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {}
+                            },
+                            "status": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["type", "data", "config"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["logicType", "conditions", "actions"],
+                    "additionalProperties": false
+                  },
+                  "description": "The complete list of action groups, conditions, and notification actions. Preserve their IDs and all unchanged groups and actions; omitted entries are removed. Slack and Microsoft Teams resolve config.targetDisplay as a channel name within integrationId. Other providers use their native config.targetIdentifier and data fields."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "detectorIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "webUrl": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "required": ["id", "name", "detectorIds", "webUrl"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["alertRule"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["org:read", "project:read", "alerts:write"],
+    "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
     "name": "update_dsn",
     "description": "Update settings for an existing DSN (client key) in a project, such as name, active status, rate limit, and loader script options.\n\nUSE THIS TOOL WHEN:\n- Deactivating or activating a DSN/client key\n- Setting or removing DSN rate limits ('set rate limit of 1000 per hour on DSN X')\n- Renaming a DSN ('rename DSN X to Production')\n- Configuring Javascript SDK loader script options (session replay, performance, debug, feedback, etc.)\n\nBe careful when using this tool!\n\n<examples>\n### Rename DSN and set rate limit\n```\nupdate_dsn(organizationSlug='my-organization', projectSlug='my-project', keyId='d20df0a1ab5031c7f3c7edca9c02814d', name='Production Key', rateLimitWindow=3600, rateLimitCount=500)\n```\n\n### Deactivate a DSN\n```\nupdate_dsn(organizationSlug='my-organization', projectSlug='my-project', keyId='d20df0a1ab5031c7f3c7edca9c02814d', isActive=false)\n```\n\n### Disable rate limit entirely\n```\nupdate_dsn(organizationSlug='my-organization', projectSlug='my-project', keyId='d20df0a1ab5031c7f3c7edca9c02814d', disableRateLimit=true)\n```\n</examples>\n\n<hints>\n- Use `find_dsns()` first to find the `keyId` for the DSN you want to update.\n- Both `rateLimitWindow` (seconds) and `rateLimitCount` (error cap) must be provided together to set a rate limit.\n</hints>",
     "inputSchema": {

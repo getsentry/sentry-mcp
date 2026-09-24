@@ -148,6 +148,16 @@ export type AlertActionOption = z.infer<typeof AlertActionOptionSchema>;
 export type AlertConditionOption = z.infer<typeof AlertConditionOptionSchema>;
 export type AlertRuleProjectScope = z.infer<typeof AlertRuleProjectScopeSchema>;
 export type Detector = z.infer<typeof DetectorSchema>;
+export type AlertRuleUpdate = {
+  name: string;
+  enabled: boolean;
+  config?: Record<string, unknown>;
+  environment?: string | null;
+  owner?: string | null;
+  triggers?: NonNullable<IssueAlertRule["triggers"]>;
+  actionFilters?: NonNullable<IssueAlertRule["actionFilters"]>;
+  detectorIds?: string[];
+};
 export type MetricAlertRule = z.infer<typeof MetricAlertRuleSchema>;
 export type ClientKey = z.infer<typeof ClientKeySchema>;
 export type Release = z.infer<typeof ReleaseSchema>;

@@ -113,6 +113,7 @@ import type {
   AlertActionOption,
   AlertConditionOption,
   AlertRuleProjectScope,
+  AlertRuleUpdate,
   AutofixRun,
   AutofixRunState,
   ClientKey,
@@ -2256,6 +2257,29 @@ export class SentryApiService {
         .parse(await this.parseJsonResponse(response)),
       nextCursor: getNextCursor(response.headers.get("link")),
     };
+  }
+
+  async updateAlertRule(
+    {
+      organizationSlug,
+      ruleId,
+      body,
+    }: {
+      organizationSlug: string;
+      ruleId: string | number;
+      body: AlertRuleUpdate;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const response = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      },
+      opts,
+    );
+    return IssueAlertRuleSchema.parse(response);
   }
 
   async listMetricAlertRules(

@@ -414,6 +414,28 @@ describe("getEventsExplorerUrl", () => {
   });
 });
 
+describe("alert rule workflow endpoints", () => {
+  it("rejects a project scope response missing its all-projects flag", async () => {
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/workflows/123/project-scope/",
+        () => HttpResponse.json({ projectIds: [] }),
+      ),
+    );
+
+    await expect(
+      apiService.getAlertRuleProjectScope({
+        organizationSlug: "my-org",
+        ruleId: "123",
+      }),
+    ).rejects.toThrow("includesAllProjects");
+  });
+});
+
 describe("monitor time parameters", () => {
   it("defaults blank monitor statsPeriod values to a 24h window", async () => {
     const requestUrls: URL[] = [];
