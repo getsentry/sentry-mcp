@@ -3920,6 +3920,13 @@ export class SentryApiService {
         eventId: bodyObj.id,
         validationError: parseResult.error.message,
         validationIssues: parseResult.error.issues,
+        // Log the container type, not user-provided extra data.
+        contextType:
+          bodyObj.context === null
+            ? "null"
+            : Array.isArray(bodyObj.context)
+              ? "array"
+              : typeof bodyObj.context,
       },
     });
 

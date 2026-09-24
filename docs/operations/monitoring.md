@@ -16,6 +16,9 @@ Different Sentry SDKs for different environments:
 
 See `logIssue` in `packages/mcp-server/src/telem/logging.ts` (documented in [Logging Reference](logging.md)) for the canonical way to create an Issue and structured log entry.
 
+For event schema failures, see [Event Validation Diagnostics](../../TELEMETRY.md#event-validation-diagnostics)
+for the `contextType` diagnostic and its privacy constraints.
+
 ### Tracing Pattern
 
 ```typescript
