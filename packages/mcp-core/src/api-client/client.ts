@@ -1630,8 +1630,9 @@ export class SentryApiService {
     const path = `/organizations/?${queryString}`;
 
     let host = undefined;
-    // For SaaS, always use the main sentry.io host, not regional hosts
-    if (this.isSaas()) {
+    // Public SaaS lists across regions on sentry.io; single-tenant instances
+    // must keep organization discovery on their configured host.
+    if (this.isSaas() && !this.host.endsWith(".my.sentry.io")) {
       host = "sentry.io";
     }
 
