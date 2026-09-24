@@ -1,12 +1,19 @@
 packages:
+  - apps/*
   - packages/*
+
+patchedDependencies:
+  "@ai-sdk/provider-utils@2.2.8": patches/@ai-sdk__provider-utils@2.2.8.patch
+  "@cloudflare/workers-oauth-provider@0.10.3": patches/@cloudflare__workers-oauth-provider@0.10.3.patch
+  "@sentry/core@10.63.0": packages/cli/patches/@sentry%2Fcore@10.63.0.patch
+  "@sentry/node-core@10.63.0": packages/cli/patches/@sentry%2Fnode-core@10.63.0.patch
+  "@stricli/core@1.2.8": packages/cli/patches/@stricli%2Fcore@1.2.8.patch
 
 allowBuilds:
   "@ast-grep/cli": true
   "@biomejs/biome": true
   "@sentry/cli": false
   "@tailwindcss/oxide": false
-  better-sqlite3: true
   core-js: false
   core-js-pure: false
   esbuild: true
@@ -19,6 +26,7 @@ allowBuilds:
 overrides:
   "@modelcontextprotocol/sdk": 1.30.0
   fast-xml-parser: 5.7.2
+  "picomatch@2.3.1": 2.3.2
   seroval: ^1.5.4
   sharp: ^0.35.4
   undici: ^7.24.4
@@ -52,7 +60,6 @@ catalog:
   "@vitest/coverage-v8": ^4.1.10
   agents: 0.20.1
   ai: ^6.0.64
-  better-sqlite3: ^11.10.0
   chalk: ^5.4.1
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1
@@ -74,7 +81,6 @@ catalog:
   tailwindcss: ^4.3.3
   tsdown: ^0.12.9
   tsx: ^4.20.3
-  turbo: ^2.10.7
   tw-animate-css: ^1.3.4
   typescript: ^5.8.3
   valibot: ^1.4.2
@@ -104,6 +110,3 @@ minimumReleaseAgeExclude:
   - '@sentry/replay@11.0.0-rc.0'
   - '@sentry/server-runtime-injection@11.0.0-rc.0'
   - '@sentry/server-utils@11.0.0-rc.0'
-
-patchedDependencies:
-  '@cloudflare/workers-oauth-provider@0.10.3': patches/@cloudflare__workers-oauth-provider@0.10.3.patch

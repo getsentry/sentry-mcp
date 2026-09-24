@@ -51,7 +51,7 @@ jobs:
 
       # === BUILD AND DEPLOY CANARY WORKER ===
       - name: Build
-        run: pnpm -w run build
+        run: pnpm --filter '@sentry/mcp-cloudflare...' run build
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
