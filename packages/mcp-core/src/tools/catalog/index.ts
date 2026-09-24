@@ -20,6 +20,8 @@ import findAlertRules from "./find-alert-rules";
 import getAlertRule from "./get-alert-rule";
 import getAlertOptions from "./get-alert-options";
 import updateAlertRule from "./update-alert-rule";
+import createAlertRule from "./create-alert-rule";
+import deleteAlertRule from "./delete-alert-rule";
 import getIssueDetails from "./get-issue-details";
 import getEventStacktrace from "./get-event-stacktrace";
 import getIssueActivity from "./get-issue-activity";
@@ -110,6 +112,8 @@ const catalogTools = {
   get_alert_rule: getAlertRule,
   get_alert_options: getAlertOptions,
   update_alert_rule: updateAlertRule,
+  create_alert_rule: createAlertRule,
+  delete_alert_rule: deleteAlertRule,
   get_issue_details: getIssueDetails,
   get_event_stacktrace: getEventStacktrace,
   get_issue_activity: getIssueActivity,

@@ -158,6 +158,7 @@ export type AlertRuleUpdate = {
   actionFilters?: NonNullable<IssueAlertRule["actionFilters"]>;
   detectorIds?: string[];
 };
+export type AlertRuleCreate = AlertRuleUpdate & { detectorIds: string[] };
 export type MetricAlertRule = z.infer<typeof MetricAlertRuleSchema>;
 export type ClientKey = z.infer<typeof ClientKeySchema>;
 export type Release = z.infer<typeof ReleaseSchema>;

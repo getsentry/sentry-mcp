@@ -431,12 +431,17 @@
     "description": "Create and modify projects, teams, DSNs, uptime monitors, and alert rules",
     "defaultEnabled": false,
     "order": 5,
-    "toolCount": 17,
+    "toolCount": 19,
     "tools": [
       {
         "name": "add_team_to_project",
         "description": "Grant a team access to an existing Sentry project.\n\nUse this tool when you need to:\n- Add another team to a project\n- Grant a team access without changing project metadata\n- Check whether a team already has project access before adding it\n\n<examples>\nadd_team_to_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='my-team')\n</examples>\n\n<hints>\n- Team access changes are separate from project metadata updates.\n- If the team is already assigned, this tool returns the current team list without making another change.\n</hints>",
         "requiredScopes": ["project:write", "team:read", "org:read"]
+      },
+      {
+        "name": "create_alert_rule",
+        "description": "Create a Sentry Alert (workflow) with notification actions and explicit sources.\nUse get_alert_options for available actions, integrations, conditions, and sources. All notification providers use their native config and data fields.\nTo copy an Alert, read get_alert_rule(kind='issue') and pass its configuration here; component IDs are discarded while integration and destination IDs are retained. New trigger groups require logicType='any-short'.\nTo reuse an existing Alert across projects, use update_alert_rule instead.\nSupply projectSlugs for project issue streams and/or detectorIds for individual monitors. Pass detectorIds=[] explicitly to create an Alert without sources; it will not send notifications until connected.\nNew Alerts default to active with a 30-minute notification interval. Use status='disabled' to configure one before enabling it.\nProject-constrained sessions require sources exclusively within that project. All-project sources require Sentry's feature and org:write in addition to alerts:write.\nAfter a timeout or error, search for the Alert before retrying: creation may already have succeeded.\n<examples>\ncreate_alert_rule(organizationSlug='my-org', name='Backend notifications', status='disabled', detectorIds=[], actionFilters=[])\n</examples>",
+        "requiredScopes": ["org:read", "project:read", "alerts:write"]
       },
       {
         "name": "create_dsn",
@@ -457,6 +462,11 @@
         "name": "create_uptime_monitor",
         "description": "Create a Sentry HTTP uptime monitor.\n\nUse this tool when you need to:\n- Start monitoring a URL for availability\n- Create a new uptime check with interval and timeout\n\nBe careful when using this tool!\n\nRequired fields match Sentry's uptime API: name, url, intervalSeconds, timeoutMs.\nAdvanced response assertions are not supported in this MVP; configure them in the Sentry UI if needed.\n\n<examples>\ncreate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='API Health', url='https://api.example.com/health', intervalSeconds=60, timeoutMs=5000)\ncreate_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', name='Checkout', url='https://example.com/checkout', intervalSeconds=300, timeoutMs=10000, method='GET', environment='production')\n</examples>",
         "requiredScopes": ["project:write"]
+      },
+      {
+        "name": "delete_alert_rule",
+        "description": "Permanently delete a Sentry Alert (workflow), preserving its connected monitors.\nUse get_alert_rule(kind='issue') to inspect the Alert and obtain its workflow ID before deletion. Metric Monitor IDs and legacy metric alert IDs are not workflow IDs.\nDeleting a shared Alert removes its notifications for every connected project and monitor. Use update_alert_rule to disconnect individual sources or disable it instead.\nA project-constrained session can only delete Alerts affecting that project exclusively.\nSentry removes the Alert from normal reads immediately and completes internal deletion in the background.\n<examples>\ndelete_alert_rule(organizationSlug='my-org', ruleId='12345')\n</examples>",
+        "requiredScopes": ["org:read", "project:read", "alerts:write"]
       },
       {
         "name": "delete_uptime_monitor",

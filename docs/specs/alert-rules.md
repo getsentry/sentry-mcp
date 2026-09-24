@@ -1,10 +1,11 @@
-# Alert and Metric Monitor inspection and editing
+# Alerts and Metric Monitors
 
 `find_alert_rules` and `get_alert_rule` inspect Alerts through the searchable
 catalog (`search_sentry_tools` and `execute_sentry_tool`). `get_alert_options`
-discovers configuration choices and `update_alert_rule` edits existing Alerts.
+discovers configuration choices. `create_alert_rule`, `update_alert_rule`, and
+`delete_alert_rule` manage the Alert lifecycle.
 These operations add no direct tools. Reads require `org:read` and `project:read`;
-updates also require `alerts:write`.
+writes also require `alerts:write`.
 
 The `issue` selector reads Sentry Alerts: notification workflows that can be
 shared across projects and monitors, cover all projects, or have no connected
@@ -97,6 +98,39 @@ Use `get_alert_rule` for enriched source details and scope. The backend PUT is
 transactional, but the preceding read has no compare-and-swap protection against
 concurrent edits. This operation does not create/delete Alerts or edit monitor
 detection queries and thresholds.
+
+## Creating and deleting Alerts
+
+`create_alert_rule` creates a notification workflow. Its default status is active
+and its notification interval defaults explicitly to 30 minutes; use
+`status='disabled'` to prepare configuration before enabling it. `actionFilters`
+is required, including an explicit empty array when no actions are wanted.
+Notification providers use the same native config/data as editing and discovery.
+
+Supply `projectSlugs` for existing project issue streams, `detectorIds` for
+individual monitors, or both. At least one source array must be explicit.
+`detectorIds=[]` creates a detached Alert in an organization-wide session; its
+response states that it cannot send notifications until connected. No sources
+are implicitly added from session constraints. Project sessions only allow
+sources within their project, with at least one connection.
+
+To copy an Alert, read its configuration and pass the desired fields to create.
+Copied IDs on trigger/action groups, conditions, and actions are stripped;
+integration IDs and provider-specific destination/configuration IDs are retained.
+The original Alert is not modified. New trigger conditions require
+`logicType='any-short'`; legacy trigger logic is not silently converted.
+Use `update_alert_rule` to reuse an existing Alert instead of creating a copy.
+
+Creation returns the saved configuration and IDs; use `get_alert_rule` to inspect
+its scope and sources. POST requests are not automatically retried. An error or
+timeout can occur after persistence: search/read before attempting creation again.
+
+`delete_alert_rule` takes an explicit numeric workflow `ruleId`. A shared Alert's
+notifications are removed for all connected sources, while its monitors remain.
+Project sessions require the same exclusive project scope as editing. Successful
+deletion returns `{success: true, ruleId}` after Sentry's 204 response: normal
+reads no longer find the Alert, although internal cleanup runs asynchronously.
+API errors, including missing workflows, remain errors.
 
 ## Metric Monitors
 

@@ -1243,6 +1243,8 @@ describe("buildServer", () => {
         ["create_team", ["project-management"]],
         ["update_project", ["project-management"]],
         ["update_alert_rule", ["project-management"]],
+        ["create_alert_rule", ["project-management"]],
+        ["delete_alert_rule", ["project-management"]],
         ["add_team_to_project", ["project-management"]],
         ["remove_team_from_project", ["project-management"]],
         ["create_dsn", ["project-management"]],
@@ -1581,6 +1583,70 @@ describe("buildServer", () => {
       expect(getStructuredContent(result)).toMatchObject({
         alertRule: { id: "123", name: rule.name, enabled: false },
       });
+    });
+
+    it("discovers and dispatches the Alert lifecycle with constrained organization", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["project-management"]),
+          constraints: { organizationSlug: "sentry-mcp-evals" },
+        },
+      });
+      const endpoint =
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/";
+      const writes: string[] = [];
+      mswServer.use(
+        http.post(endpoint, () => {
+          writes.push("POST");
+          return HttpResponse.json(
+            {
+              id: "123",
+              name: "Prepared Alert",
+              enabled: false,
+              detectorIds: [],
+            },
+            { status: 201 },
+          );
+        }),
+        http.delete(`${endpoint}123/`, () => {
+          writes.push("DELETE");
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      for (const [name, args, expected] of [
+        [
+          "create_alert_rule",
+          {
+            name: "Prepared Alert",
+            status: "disabled",
+            detectorIds: [],
+            actionFilters: [],
+          },
+          { alertRule: { id: "123", enabled: false, detectorIds: [] } },
+        ],
+        [
+          "delete_alert_rule",
+          { ruleId: "123" },
+          { success: true, ruleId: "123" },
+        ],
+      ] as const) {
+        expect(getRegisteredToolNames(server)).not.toContain(name);
+        const search = await callRegisteredTool(server, "search_sentry_tools", {
+          query: name,
+          limit: 1,
+        });
+        expect(getStructuredContent(search)).toMatchObject({
+          results: [{ name, inputSchema: { properties: expect.any(Object) } }],
+        });
+        const result = await callRegisteredTool(server, "execute_sentry_tool", {
+          name,
+          arguments: { organizationSlug: "other-org", ...args },
+        });
+        expect(result.isError).not.toBe(true);
+        expect(getStructuredContent(result)).toMatchObject(expected);
+      }
+      expect(writes).toEqual(["POST", "DELETE"]);
     });
 
     it("discovers and dispatches alert options with injected project constraints", async () => {

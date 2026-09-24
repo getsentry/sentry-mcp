@@ -1,6 +1,57 @@
 import type { SentryApiService } from "../../api-client";
 import { UserInputError } from "../../errors";
-import { assertProjectConstraintEvidence } from "../catalog/support/project-constraints";
+import {
+  assertProjectConstraintEvidence,
+  assertProjectRefWithinConstraint,
+} from "../catalog/support/project-constraints";
+
+/** Shared Alerts can only be mutated from a session covering their entire scope. */
+export async function validateAlertRuleProjectScope(
+  api: SentryApiService,
+  params: {
+    organizationSlug: string;
+    ruleId: string;
+    projectSlug?: string | null;
+    scopedProjectSlug?: string | null;
+  },
+): Promise<{ id: string; slug: string } | undefined> {
+  if (params.projectSlug) {
+    assertProjectRefWithinConstraint({
+      resourceLabel: "Alert rule",
+      scopedProjectSlug: params.scopedProjectSlug,
+      project: { slug: params.projectSlug },
+    });
+  }
+  const projectSlug = params.scopedProjectSlug ?? params.projectSlug;
+  if (!projectSlug) return undefined;
+  const [project, scope] = await Promise.all([
+    api.getProject({
+      organizationSlug: params.organizationSlug,
+      projectSlugOrId: projectSlug,
+    }),
+    api.getAlertRuleProjectScope({
+      organizationSlug: params.organizationSlug,
+      ruleId: params.ruleId,
+    }),
+  ]);
+  assertProjectConstraintEvidence({
+    resourceLabel: "Alert rule",
+    scopedProjectSlug: params.scopedProjectSlug,
+    hasEvidence:
+      !scope.includesAllProjects &&
+      scope.projectIds.length > 0 &&
+      scope.projectIds.every((id) => id === String(project.id)),
+  });
+  if (
+    !scope.includesAllProjects &&
+    !scope.projectIds.includes(String(project.id))
+  ) {
+    throw new UserInputError(`Alert rule is outside project "${projectSlug}".`);
+  }
+  return params.scopedProjectSlug
+    ? { id: String(project.id), slug: project.slug }
+    : undefined;
+}
 
 /** Apply connection changes after the caller has authorized the workflow's current scope. */
 export async function resolveAlertRuleConnections(
