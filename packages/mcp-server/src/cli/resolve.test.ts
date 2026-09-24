@@ -226,6 +226,71 @@ describe("cli/finalize", () => {
     expect(cfg.finalSkills.has("preprod")).toBe(false);
   });
 
+  // Self-hosted defaults
+  it("keeps seer in the default set for regional sentry.io hosts", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      host: "us.sentry.io",
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills.has("seer")).toBe(true);
+  });
+
+  it("excludes seer from the default set on self-hosted hosts", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      host: "sentry.example.com",
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills.has("seer")).toBe(false);
+    expect(cfg.finalSkills.has("inspect")).toBe(true);
+    expect(cfg.finalSkills.has("triage")).toBe(true);
+    expect(cfg.finalSkills.has("project-management")).toBe(true);
+    expect(cfg.finalSkills.size).toBe(3);
+  });
+
+  it("excludes seer from the default set when self-hosted host comes from --url", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      url: "https://sentry.example.com",
+      unknownArgs: [],
+    });
+    expect(cfg.sentryHost).toBe("sentry.example.com");
+    expect(cfg.finalSkills.has("seer")).toBe(false);
+  });
+
+  it("grants seer on self-hosted hosts when requested with --skills", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      host: "sentry.example.com",
+      skills: "inspect,seer",
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills).toEqual(new Set(["inspect", "seer"]));
+  });
+
+  it("grants seer on self-hosted hosts with --all-skills", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      host: "sentry.example.com",
+      allSkills: true,
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills.has("seer")).toBe(true);
+    expect(cfg.finalSkills.size).toBe(4);
+  });
+
+  it("does not fail when --disable-skills=seer is used on a self-hosted host", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      host: "sentry.example.com",
+      disableSkills: "seer",
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills.has("seer")).toBe(false);
+    expect(cfg.finalSkills.size).toBe(3);
+  });
+
   it("rejects combining --all-skills with --skills", () => {
     expect(() =>
       finalize({
