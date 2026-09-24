@@ -75,11 +75,16 @@ jobs:
       - name: Install MCP publisher
         if: steps.existing.outputs.publish == 'true'
         working-directory: ${{ runner.temp }}
+        env:
+          # Update both from https://github.com/modelcontextprotocol/registry/releases
+          # Use the mcp-publisher_linux_amd64.tar.gz entry in registry_<version>_checksums.txt.
+          MCP_PUBLISHER_VERSION: "1.8.1"
+          MCP_PUBLISHER_SHA256: "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc"
         run: |
           curl --fail --silent --show-error --location --retry 3 \
-            https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" \
             -o mcp-publisher.tar.gz
-          echo 'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  mcp-publisher.tar.gz' | sha256sum --check
+          echo "$MCP_PUBLISHER_SHA256  mcp-publisher.tar.gz" | sha256sum --check
           tar xzf mcp-publisher.tar.gz mcp-publisher
 
       - name: Publish metadata
