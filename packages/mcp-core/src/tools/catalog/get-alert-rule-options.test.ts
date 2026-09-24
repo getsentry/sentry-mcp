@@ -70,10 +70,8 @@ describe("get_alert_rule_options", () => {
       cursor: "previous",
       limit: 5,
     });
-    expect(
-      getAlertRuleOptionsOutputSchema.safeParse(getStructuredContent(result))
-        .success,
-    ).toBe(true);
+    const content = getStructuredContent(result);
+    expect(getAlertRuleOptionsOutputSchema.parse(content)).toEqual(content);
     expect(result).toMatchInlineSnapshot(`
       {
         "structuredContent": {
@@ -360,7 +358,10 @@ describe("get_alert_rule_options", () => {
           section,
           conditionGroup: section === "conditions" ? "workflow_trigger" : null,
         }),
-      ).rejects.toThrow("Options unavailable");
+      ).rejects.toMatchObject({
+        status,
+        message: expect.stringContaining("Options unavailable"),
+      });
     },
   );
 });
