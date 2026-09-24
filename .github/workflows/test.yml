@@ -55,6 +55,9 @@ jobs:
       - name: Run linter
         run: pnpm lint
 
+      - name: Test MCP registry release tooling
+        run: node --test .github/tests/mcp-registry.test.mjs
+
       - name: Run tests
         run: pnpm test:ci
 
