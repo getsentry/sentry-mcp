@@ -3,16 +3,12 @@ import { z } from "zod";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { structuredResult } from "../../internal/tool-helpers/results";
-import {
-  ParamOrganizationSlug,
-  ParamProjectSlug,
-  ParamRegionUrl,
-} from "../../schema";
 import { setOrganizationContext } from "../../telem/organization";
 import type { ServerContext } from "../../types";
 import {
   getMetricMonitor,
   metricMonitorDetailsSchema,
+  metricMonitorReferenceFields,
   toMetricMonitorDetails,
 } from "../support/metric-monitors";
 import { assertProjectRefWithinConstraint } from "./support/project-constraints";
@@ -32,16 +28,7 @@ export default defineTool({
     "workflowIds identify notification Alerts; inspect their actions with get_alert_rule(kind='issue').",
     "get_metric_monitor_details(organizationSlug='my-org', monitorId='12345')",
   ].join("\n"),
-  inputSchema: {
-    organizationSlug: ParamOrganizationSlug,
-    regionUrl: ParamRegionUrl.nullable().default(null),
-    projectSlug: ParamProjectSlug.optional(),
-    monitorId: z
-      .string()
-      .trim()
-      .regex(/^\d+$/)
-      .describe("Native Metric Monitor ID from find_metric_monitors."),
-  },
+  inputSchema: metricMonitorReferenceFields,
   outputSchema: getMetricMonitorDetailsOutputSchema,
   annotations: {
     readOnlyHint: true,

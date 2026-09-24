@@ -1245,6 +1245,8 @@ describe("buildServer", () => {
         ["update_alert_rule", ["project-management"]],
         ["create_alert_rule", ["project-management"]],
         ["delete_alert_rule", ["project-management"]],
+        ["update_metric_monitor", ["project-management"]],
+        ["delete_metric_monitor", ["project-management"]],
         ["add_team_to_project", ["project-management"]],
         ["remove_team_from_project", ["project-management"]],
         ["create_dsn", ["project-management"]],
@@ -1296,6 +1298,14 @@ describe("buildServer", () => {
       {
         name: "update_alert_rule",
         arguments: { ruleIdOrName: "123", status: "disabled" },
+      },
+      {
+        name: "update_metric_monitor",
+        arguments: { monitorId: "123", status: "disabled" },
+      },
+      {
+        name: "delete_metric_monitor",
+        arguments: { monitorId: "123" },
       },
     ])("execute_sentry_tool rejects unavailable $name", async (call) => {
       const server = buildServer({
@@ -1542,6 +1552,69 @@ describe("buildServer", () => {
         );
       },
     );
+
+    it("discovers and dispatches Metric Monitor writes with injected constraints", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set(["project-management"]),
+          constraints: {
+            organizationSlug: "sentry-mcp-evals",
+            projectSlug: "cloudflare-mcp",
+          },
+        },
+      });
+      const monitor = {
+        ...metricMonitor,
+        projectId: String(projectFixture.id),
+      };
+      const endpoint =
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/detectors/123/";
+      const writes: string[] = [];
+      mswServer.use(
+        http.get(endpoint, () => HttpResponse.json(monitor)),
+        http.put(endpoint, async ({ request }) => {
+          writes.push("PUT");
+          expect(await request.json()).toMatchObject({ enabled: true });
+          return HttpResponse.json({ ...monitor, enabled: true });
+        }),
+        http.delete(endpoint, () => {
+          writes.push("DELETE");
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      for (const [name, args, expected] of [
+        [
+          "update_metric_monitor",
+          { status: "active" },
+          {
+            monitor: { id: "123", enabled: true, projectId: monitor.projectId },
+          },
+        ],
+        ["delete_metric_monitor", {}, { success: true, monitorId: "123" }],
+      ] as const) {
+        expect(getRegisteredToolNames(server)).not.toContain(name);
+        const search = await callRegisteredTool(server, "search_sentry_tools", {
+          query: name,
+          limit: 1,
+        });
+        expect(getStructuredContent(search)).toMatchObject({
+          results: [{ name }],
+        });
+        const result = await callRegisteredTool(server, "execute_sentry_tool", {
+          name,
+          arguments: {
+            organizationSlug: "other-org",
+            projectSlug: "other-project",
+            monitorId: "123",
+            ...args,
+          },
+        });
+        expect(result.isError).not.toBe(true);
+        expect(getStructuredContent(result)).toMatchObject(expected);
+      }
+      expect(writes).toEqual(["PUT", "DELETE"]);
+    });
 
     it("execute_sentry_tool dispatches a catalog-only alert update with constrained organization", async () => {
       const server = buildServer({

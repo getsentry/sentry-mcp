@@ -1023,6 +1023,58 @@
     "surface": "catalog"
   },
   {
+    "name": "delete_metric_monitor",
+    "description": "Permanently delete a Sentry Metric Monitor, preserving its connected Alerts and their other monitors.\nUse get_metric_monitor_details to inspect the monitor and obtain its native monitorId. Legacy metric alert IDs are not monitor IDs.\nUse update_metric_monitor(status='disabled') to pause detection instead. Deletion also removes an associated legacy metric alert and its incident history when present.\nSentry hides the monitor from normal reads immediately and completes deletion in the background.\ndelete_metric_monitor(organizationSlug='my-org', monitorId='12345')",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "monitorId": {
+          "type": "string",
+          "pattern": "^\\d+$",
+          "description": "Native Metric Monitor ID from find_metric_monitors."
+        }
+      },
+      "required": ["organizationSlug", "monitorId"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "const": true
+        },
+        "monitorId": {
+          "type": "string"
+        }
+      },
+      "required": ["success", "monitorId"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["org:read", "project:read", "alerts:write"],
+    "skills": ["project-management"],
+    "surface": "catalog"
+  },
+  {
     "name": "delete_uptime_monitor",
     "description": "Delete a Sentry HTTP uptime monitor.\n\nUse this tool when you need to permanently remove an uptime monitor.\n\nBe careful when using this tool! Deletion cannot be undone.\n\n<examples>\ndelete_uptime_monitor(organizationSlug='my-organization', projectSlug='backend', uptimeMonitorId='12345')\n</examples>",
     "inputSchema": {
@@ -7509,6 +7561,523 @@
     "requiredScopes": ["event:write"],
     "skills": ["triage"],
     "surface": "direct"
+  },
+  {
+    "name": "update_metric_monitor",
+    "description": "Update a Sentry Metric Monitor's query, detection conditions, metadata, status or connected Alerts.\nUse get_metric_monitor_details first and its native monitorId, not a legacy metric alert ID. projectSlug identifies scope; it does not move the monitor.\nOmit fields to preserve them. query and config accept partial changes. conditionGroup and workflowIds replace their complete configuration; preserve IDs and entries you want to retain.\nStatic, Percent and Dynamic detection are supported. Windows and comparison deltas are in seconds. Percent thresholds are absolute (110 means 10% higher), not percentage changes.\nDynamic changes may require sufficient historical data. Dataset access, query and window constraints are enforced by Sentry.\nworkflowIds connect existing Alerts, including shared Alerts, without editing their actions or other monitors. Use update_alert_rule for notification configuration.\nRequires alerts:write; reconnect OAuth if the existing token lacks it.\nupdate_metric_monitor(organizationSlug='my-org', monitorId='12345', status='disabled')\nupdate_metric_monitor(organizationSlug='my-org', monitorId='12345', query={query:'level:error', timeWindowSeconds:300})",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+        },
+        "monitorId": {
+          "type": "string",
+          "pattern": "^\\d+$",
+          "description": "Native Metric Monitor ID from find_metric_monitors."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "disabled"]
+        },
+        "owner": {
+          "description": "Owner actor, e.g. team:123 or user:123. Pass null to clear.",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(user|team):\\d+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "query": {
+          "description": "Partial query changes. Omitted fields are preserved; environment:null clears its filter. metrics is crash-free Releases; events_analytics_platform supports spans, logs and application metrics via eventTypes. Dataset changes must include compatible aggregate and eventTypes.",
+          "type": "object",
+          "properties": {
+            "dataset": {
+              "type": "string",
+              "enum": [
+                "events",
+                "transactions",
+                "generic_metrics",
+                "metrics",
+                "events_analytics_platform"
+              ]
+            },
+            "query": {
+              "type": "string"
+            },
+            "aggregate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "eventTypes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "extrapolationMode": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timeWindowSeconds": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        "config": {
+          "description": "Partial detection config. Percent mode requires comparisonDeltaSeconds. Selecting Static or Dynamic clears the comparison delta. Changing detectionType also requires compatible conditionGroup.",
+          "type": "object",
+          "properties": {
+            "detectionType": {
+              "type": "string",
+              "enum": ["static", "percent", "dynamic"]
+            },
+            "comparisonDeltaSeconds": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "conditionGroup": {
+          "description": "Replaces ALL detection conditions; preserve existing IDs. Static/Percent use numeric comparisons, results 75 critical, 50 warning, 0 resolved, including a resolution condition. Percent 110 means 10% higher. Dynamic uses anomaly_detection with sensitivity, seasonality:auto and thresholdType 0 above, 1 below, 2 both.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "logicType": {
+              "type": "string"
+            },
+            "conditions": {
+              "minItems": 1,
+              "maxItems": 3,
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": ["gt", "lt", "gte", "lte"]
+                      },
+                      "comparison": {
+                        "type": "number"
+                      },
+                      "conditionResult": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "const": 75
+                          },
+                          {
+                            "type": "number",
+                            "const": 50
+                          },
+                          {
+                            "type": "number",
+                            "const": 0
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["type", "comparison", "conditionResult"]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      "type": {
+                        "type": "string",
+                        "const": "anomaly_detection"
+                      },
+                      "comparison": {
+                        "type": "object",
+                        "properties": {
+                          "sensitivity": {
+                            "type": "string",
+                            "enum": ["low", "medium", "high"]
+                          },
+                          "seasonality": {
+                            "type": "string",
+                            "const": "auto"
+                          },
+                          "thresholdType": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "const": 0
+                              },
+                              {
+                                "type": "number",
+                                "const": 1
+                              },
+                              {
+                                "type": "number",
+                                "const": 2
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "sensitivity",
+                          "seasonality",
+                          "thresholdType"
+                        ]
+                      },
+                      "conditionResult": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "const": 75
+                          },
+                          {
+                            "type": "number",
+                            "const": 50
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["type", "comparison", "conditionResult"]
+                  }
+                ]
+              }
+            }
+          },
+          "required": ["logicType", "conditions"]
+        },
+        "workflowIds": {
+          "description": "Replaces this monitor's Alert connections. Copy all IDs to retain from get_metric_monitor_details; [] disconnects all. Does not edit the Alerts themselves.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          }
+        }
+      },
+      "required": ["organizationSlug", "monitorId"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "monitor": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "projectId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "owner": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "workflowIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "webUrl": {
+              "type": "string"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "config": {
+              "type": "object",
+              "properties": {
+                "detectionType": {
+                  "type": "string"
+                },
+                "comparisonDeltaSeconds": {
+                  "type": "number"
+                }
+              },
+              "required": ["detectionType"],
+              "additionalProperties": false
+            },
+            "conditionGroup": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ]
+                    },
+                    "logicType": {
+                      "type": "string"
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "comparison": {},
+                          "conditionResult": {}
+                        },
+                        "required": ["type", "comparison", "conditionResult"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["logicType", "conditions"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Native detection conditions, including resolution. Results: 75 critical, 50 warning, 0 resolved. Percent comparisons are absolute percentages (110 means 10% higher). Dynamic comparisons contain sensitivity, seasonality and thresholdType."
+            },
+            "dataSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "query": {
+                    "type": "object",
+                    "properties": {
+                      "dataset": {
+                        "type": "string"
+                      },
+                      "query": {
+                        "type": "string"
+                      },
+                      "aggregate": {
+                        "type": "string"
+                      },
+                      "environment": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "eventTypes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "extrapolationMode": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "timeWindowSeconds": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "dataset",
+                      "query",
+                      "aggregate",
+                      "environment",
+                      "eventTypes",
+                      "timeWindowSeconds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "unavailableReason": {
+                    "type": "string"
+                  }
+                },
+                "required": ["type"],
+                "additionalProperties": false
+              }
+            },
+            "dateCreated": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dateUpdated": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "projectId",
+            "enabled",
+            "owner",
+            "workflowIds",
+            "webUrl",
+            "description",
+            "config",
+            "conditionGroup",
+            "dataSources",
+            "dateCreated",
+            "dateUpdated"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["monitor"],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["org:read", "project:read", "alerts:write"],
+    "skills": ["project-management"],
+    "surface": "catalog"
   },
   {
     "name": "update_project",

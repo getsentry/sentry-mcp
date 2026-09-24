@@ -148,6 +148,33 @@ export type AlertActionOption = z.infer<typeof AlertActionOptionSchema>;
 export type AlertConditionOption = z.infer<typeof AlertConditionOptionSchema>;
 export type AlertRuleProjectScope = z.infer<typeof AlertRuleProjectScopeSchema>;
 export type Detector = z.infer<typeof DetectorSchema>;
+export type MetricMonitorUpdate = {
+  name?: string;
+  description?: string | null;
+  enabled?: boolean;
+  owner?: string | null;
+  workflowIds?: string[];
+  config?: Record<string, unknown>;
+  conditionGroup?: {
+    id?: string | number;
+    logicType: string;
+    conditions: Array<{
+      id?: string | number;
+      type: string;
+      comparison: unknown;
+      conditionResult: unknown;
+    }>;
+  };
+  dataSources?: Array<{
+    dataset: string;
+    query: string;
+    aggregate: string;
+    timeWindow: number;
+    environment: string | null;
+    eventTypes: string[];
+    extrapolationMode?: string | null;
+  }>;
+};
 export type AlertRuleUpdate = {
   name: string;
   enabled: boolean;

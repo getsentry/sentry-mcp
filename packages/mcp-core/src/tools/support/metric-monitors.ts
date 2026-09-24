@@ -2,6 +2,11 @@ import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
 import type { Detector } from "../../api-client/types";
 import { UserInputError } from "../../errors";
+import {
+  ParamOrganizationSlug,
+  ParamProjectSlug,
+  ParamRegionUrl,
+} from "../../schema";
 import { formatActor, formatDate } from "../catalog/support/api-formatting";
 import { assertProjectConstraintEvidence } from "../catalog/support/project-constraints";
 import {
@@ -9,6 +14,17 @@ import {
   getMetricQuery,
   metricQueryDetailsSchema,
 } from "./detector-details";
+
+export const metricMonitorReferenceFields = {
+  organizationSlug: ParamOrganizationSlug,
+  regionUrl: ParamRegionUrl.nullable().default(null),
+  projectSlug: ParamProjectSlug.optional(),
+  monitorId: z
+    .string()
+    .trim()
+    .regex(/^\d+$/)
+    .describe("Native Metric Monitor ID from find_metric_monitors."),
+};
 
 export const metricMonitorSummarySchema = z.object({
   id: z.string(),
