@@ -20,7 +20,7 @@ const sectionSchema = z.enum(["actions", "conditions", "sources"]);
 const conditionGroupSchema = z.enum(["workflow_trigger", "action_filter"]);
 
 // Owns paginated Alert discovery; source results must respect the session's project.
-export const getAlertRuleOptionsOutputSchema = z.object({
+export const getAlertOptionsOutputSchema = z.object({
   section: sectionSchema,
   actions: z.array(AlertActionOptionSchema).optional(),
   conditions: z.array(AlertConditionOptionSchema).optional(),
@@ -49,7 +49,7 @@ export const getAlertRuleOptionsOutputSchema = z.object({
 });
 
 export default defineTool({
-  name: "get_alert_rule_options",
+  name: "get_alert_options",
   skills: ["inspect"],
   requiredScopes: ["org:read", "project:read"],
   description: [
@@ -62,9 +62,9 @@ export default defineTool({
     "Slack and Teams accept channel names; Discord needs a channel ID or URL. Dynamic Sentry App fields require explicit values; this tool does not enumerate their external choices.",
     "",
     "<examples>",
-    "get_alert_rule_options(organizationSlug='my-org', section='actions', actionTypes=['slack', 'msteams'])",
-    "get_alert_rule_options(organizationSlug='my-org', section='conditions', conditionGroup='action_filter')",
-    "get_alert_rule_options(organizationSlug='my-org', section='sources', projectSlug='backend', sourceTypes=['issue_stream'])",
+    "get_alert_options(organizationSlug='my-org', section='actions', actionTypes=['slack', 'msteams'])",
+    "get_alert_options(organizationSlug='my-org', section='conditions', conditionGroup='action_filter')",
+    "get_alert_options(organizationSlug='my-org', section='sources', projectSlug='backend', sourceTypes=['issue_stream'])",
     "</examples>",
   ].join("\n"),
   inputSchema: {
@@ -116,7 +116,7 @@ export default defineTool({
       .default(25)
       .describe("Maximum options to return in this page."),
   },
-  outputSchema: getAlertRuleOptionsOutputSchema,
+  outputSchema: getAlertOptionsOutputSchema,
   annotations: {
     readOnlyHint: true,
     destructiveHint: false,

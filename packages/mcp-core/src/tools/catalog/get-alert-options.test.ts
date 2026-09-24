@@ -3,9 +3,9 @@ import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { getStructuredContent } from "../../test-utils/structured-content";
-import getAlertRuleOptions, {
-  getAlertRuleOptionsOutputSchema,
-} from "./get-alert-rule-options";
+import getAlertOptions, {
+  getAlertOptionsOutputSchema,
+} from "./get-alert-options";
 
 const context = {
   accessToken: "access-token",
@@ -39,11 +39,11 @@ const nextPage = {
 };
 
 function getOptions(
-  params: Partial<Parameters<typeof getAlertRuleOptions.handler>[0]> = {},
-  toolContext: Parameters<typeof getAlertRuleOptions.handler>[1] = context,
+  params: Partial<Parameters<typeof getAlertOptions.handler>[0]> = {},
+  toolContext: Parameters<typeof getAlertOptions.handler>[1] = context,
 ) {
-  return getAlertRuleOptions.handler(
-    z.object(getAlertRuleOptions.inputSchema).parse({
+  return getAlertOptions.handler(
+    z.object(getAlertOptions.inputSchema).parse({
       organizationSlug: "test-org",
       section: "actions",
       ...params,
@@ -52,7 +52,7 @@ function getOptions(
   );
 }
 
-describe("get_alert_rule_options", () => {
+describe("get_alert_options", () => {
   it("returns paginated comparison schemas for the requested condition group", async () => {
     mswServer.use(
       http.get(`${orgUrl}/data-conditions/`, ({ request }) => {
@@ -71,7 +71,7 @@ describe("get_alert_rule_options", () => {
       limit: 5,
     });
     const content = getStructuredContent(result);
-    expect(getAlertRuleOptionsOutputSchema.parse(content)).toEqual(content);
+    expect(getAlertOptionsOutputSchema.parse(content)).toEqual(content);
     expect(result).toMatchInlineSnapshot(`
       {
         "structuredContent": {

@@ -1,7 +1,7 @@
 # Alert inspection and configuration options
 
 `find_alert_rules` and `get_alert_rule` inspect Alerts through the searchable
-catalog (`search_sentry_tools` and `execute_sentry_tool`). `get_alert_rule_options`
+catalog (`search_sentry_tools` and `execute_sentry_tool`). `get_alert_options`
 discovers available configuration choices through the same catalog. No new direct
 tools or write scopes are required.
 
@@ -46,7 +46,7 @@ Detached or unrelated Alerts are rejected for constrained sessions.
 
 ## Configuration options
 
-`get_alert_rule_options` returns one paginated section per call:
+`get_alert_options` returns one paginated section per call:
 
 - `actions`: action types, installed integrations and services, native config/data
   schemas, and Sentry App settings. `inputGuide` maps internal config field names

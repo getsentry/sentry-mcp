@@ -1486,18 +1486,16 @@ describe("buildServer", () => {
           },
         ),
       );
-      expect(getRegisteredToolNames(server)).not.toContain(
-        "get_alert_rule_options",
-      );
+      expect(getRegisteredToolNames(server)).not.toContain("get_alert_options");
       const search = await callRegisteredTool(server, "search_sentry_tools", {
-        query: "get_alert_rule_options",
+        query: "get_alert_options",
         limit: 1,
       });
       expect(getStructuredContent(search)).toMatchObject({
-        results: [{ name: "get_alert_rule_options" }],
+        results: [{ name: "get_alert_options" }],
       });
       const result = await callRegisteredTool(server, "execute_sentry_tool", {
-        name: "get_alert_rule_options",
+        name: "get_alert_options",
         arguments: { section: "sources", projectSlug: "other-project" },
       });
       expect(requestedProject).toBe("4509109104082945");

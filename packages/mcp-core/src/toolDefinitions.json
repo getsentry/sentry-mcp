@@ -3067,60 +3067,8 @@
     "surface": "catalog"
   },
   {
-    "name": "get_alert_rule",
-    "description": "Get details for a Sentry alert rule.\n\nUse this tool when you need to inspect an alert rule's exact conditions, query, triggers, and actions before explaining or planning changes.\n\n<examples>\nget_alert_rule(organizationSlug='my-org', kind='metric', ruleIdOrName='12345')\nget_alert_rule(organizationSlug='my-org', kind='issue', projectSlug='backend', ruleIdOrName='Notify backend team')\nget_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='P95 latency')\n</examples>\n\n<hints>\n- Use `kind='issue'` or `kind='metric'` for numeric IDs because issue and metric alerts use separate endpoints.\n- With `kind='all'`, a digit-only `ruleIdOrName` is treated as an exact alert rule name.\n- Issue Alerts are notification workflows and may cover multiple projects or have no connected sources. Omit projectSlug to inspect organization-wide.\n- Issue details include complete conditions, notification actions, connected monitors and project scope. Inaccessible or session-restricted sources are marked explicitly.\n</hints>",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "organizationSlug": {
-          "type": "string",
-          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
-        },
-        "regionUrl": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "kind": {
-          "default": "all",
-          "type": "string",
-          "enum": ["all", "issue", "metric"],
-          "description": "Which alert rule family to inspect. Use `issue` or `metric` for numeric IDs; `all` treats the value as an exact-name lookup."
-        },
-        "projectSlug": {
-          "default": null,
-          "anyOf": [
-            {
-              "type": "string",
-              "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug."
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "ruleIdOrName": {
-          "type": "string",
-          "minLength": 1,
-          "description": "The alert rule's numeric ID, or an exact alert rule name."
-        }
-      },
-      "required": ["organizationSlug", "ruleIdOrName"]
-    },
-    "requiredScopes": ["org:read", "project:read"],
-    "skills": ["inspect"],
-    "surface": "catalog"
-  },
-  {
-    "name": "get_alert_rule_options",
-    "description": "Discover available actions, conditions, or sources for a Sentry Alert (notification workflow).\n\nChoose one section per call; reuse its cursor with the same section and filters.\n- actions: installed integrations, notification services, native config/data schemas and Sentry App settings. These schemas use Sentry's internal field names and target enums; inputGuide explains the update format.\n- conditions: condition types and comparison schemas for workflow triggers or action filters.\n- sources: accessible monitors and project issue streams. Use an issue_stream source to connect all issues from its project; a source with projectId=null covers all projects.\nSlack and Teams accept channel names; Discord needs a channel ID or URL. Dynamic Sentry App fields require explicit values; this tool does not enumerate their external choices.\n\n<examples>\nget_alert_rule_options(organizationSlug='my-org', section='actions', actionTypes=['slack', 'msteams'])\nget_alert_rule_options(organizationSlug='my-org', section='conditions', conditionGroup='action_filter')\nget_alert_rule_options(organizationSlug='my-org', section='sources', projectSlug='backend', sourceTypes=['issue_stream'])\n</examples>",
+    "name": "get_alert_options",
+    "description": "Discover available actions, conditions, or sources for a Sentry Alert (notification workflow).\n\nChoose one section per call; reuse its cursor with the same section and filters.\n- actions: installed integrations, notification services, native config/data schemas and Sentry App settings. These schemas use Sentry's internal field names and target enums; inputGuide explains the update format.\n- conditions: condition types and comparison schemas for workflow triggers or action filters.\n- sources: accessible monitors and project issue streams. Use an issue_stream source to connect all issues from its project; a source with projectId=null covers all projects.\nSlack and Teams accept channel names; Discord needs a channel ID or URL. Dynamic Sentry App fields require explicit values; this tool does not enumerate their external choices.\n\n<examples>\nget_alert_options(organizationSlug='my-org', section='actions', actionTypes=['slack', 'msteams'])\nget_alert_options(organizationSlug='my-org', section='conditions', conditionGroup='action_filter')\nget_alert_options(organizationSlug='my-org', section='sources', projectSlug='backend', sourceTypes=['issue_stream'])\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3484,6 +3432,58 @@
       },
       "required": ["section", "nextCursor"],
       "additionalProperties": false
+    },
+    "requiredScopes": ["org:read", "project:read"],
+    "skills": ["inspect"],
+    "surface": "catalog"
+  },
+  {
+    "name": "get_alert_rule",
+    "description": "Get details for a Sentry alert rule.\n\nUse this tool when you need to inspect an alert rule's exact conditions, query, triggers, and actions before explaining or planning changes.\n\n<examples>\nget_alert_rule(organizationSlug='my-org', kind='metric', ruleIdOrName='12345')\nget_alert_rule(organizationSlug='my-org', kind='issue', projectSlug='backend', ruleIdOrName='Notify backend team')\nget_alert_rule(organizationSlug='my-org', projectSlug='backend', ruleIdOrName='P95 latency')\n</examples>\n\n<hints>\n- Use `kind='issue'` or `kind='metric'` for numeric IDs because issue and metric alerts use separate endpoints.\n- With `kind='all'`, a digit-only `ruleIdOrName` is treated as an exact alert rule name.\n- Issue Alerts are notification workflows and may cover multiple projects or have no connected sources. Omit projectSlug to inspect organization-wide.\n- Issue details include complete conditions, notification actions, connected monitors and project scope. Inaccessible or session-restricted sources are marked explicitly.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "default": "all",
+          "type": "string",
+          "enum": ["all", "issue", "metric"],
+          "description": "Which alert rule family to inspect. Use `issue` or `metric` for numeric IDs; `all` treats the value as an exact-name lookup."
+        },
+        "projectSlug": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ruleIdOrName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The alert rule's numeric ID, or an exact alert rule name."
+        }
+      },
+      "required": ["organizationSlug", "ruleIdOrName"]
     },
     "requiredScopes": ["org:read", "project:read"],
     "skills": ["inspect"],
