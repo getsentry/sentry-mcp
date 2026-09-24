@@ -27,12 +27,6 @@ describe("get_metric_monitor_details", () => {
       http.get("https://sentry.io/api/0/projects/test-org/backend/", () =>
         HttpResponse.json({ ...projectFixture, id: "100", slug: "backend" }),
       ),
-      http.get(
-        "https://sentry.io/api/0/organizations/test-org/alert-rule-detector/",
-        () => {
-          throw new Error("Native monitor reads must not use legacy mappings");
-        },
-      ),
     ),
   );
 

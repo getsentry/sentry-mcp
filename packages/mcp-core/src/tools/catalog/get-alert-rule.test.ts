@@ -254,7 +254,7 @@ describe("get_alert_rule", () => {
     `);
   });
 
-  it.each(["456", "9000000789", "detector:789"])(
+  it.each(["456", "10000000789", "detector:789"])(
     "resolves compatibility reference %s without confusing detector IDs",
     async (ruleIdOrName) => {
       const reads: string[] = [];
@@ -292,17 +292,22 @@ describe("get_alert_rule", () => {
     },
   );
 
-  it.each(["456", "detector:789"])(
-    "checks the resolved monitor project for %s",
-    async (ruleIdOrName) => {
+  it.each([
+    { kind: "metric", ruleIdOrName: "456" },
+    { kind: "metric", ruleIdOrName: "detector:789" },
+    { kind: "all", ruleIdOrName: detector.name },
+  ] as const)(
+    "checks the resolved monitor project for $ruleIdOrName (kind=$kind)",
+    async (params) => {
       mswServer.use(
+        http.get(`${organizationApi}/workflows/`, () => HttpResponse.json([])),
         http.get("*/detectors/789/", () =>
           HttpResponse.json({ ...detector, projectId: "other-project" }),
         ),
       );
-      await expect(
-        getRule({ kind: "metric", ruleIdOrName }, projectConstrainedContext),
-      ).rejects.toThrow(/outside the active project constraint/i);
+      await expect(getRule(params, projectConstrainedContext)).rejects.toThrow(
+        /outside the active project constraint/i,
+      );
     },
   );
 
@@ -458,21 +463,6 @@ describe("get_alert_rule", () => {
     ).toMatchObject({
       metricMonitor: { id: "789", name: "123" },
     });
-  });
-
-  it("checks the project again after resolving a metric name", async () => {
-    mswServer.use(
-      http.get(`${organizationApi}/workflows/`, () => HttpResponse.json([])),
-      http.get(`${organizationApi}/detectors/789/`, () =>
-        HttpResponse.json({ ...detector, projectId: "other-project" }),
-      ),
-    );
-    await expect(
-      getRule(
-        { kind: "all", ruleIdOrName: detector.name },
-        projectConstrainedContext,
-      ),
-    ).rejects.toThrow(/outside the active project constraint/i);
   });
 
   it.each(["all", "metric"] as const)(
@@ -730,32 +720,19 @@ describe("get_alert_rule", () => {
     });
   });
 
-  it.each(["issue", "all"] as const)(
-    "rejects incomplete name searches with kind %s",
-    async (kind) => {
+  it.each([
+    { kind: "issue", endpoint: "workflows" },
+    { kind: "all", endpoint: "workflows" },
+    { kind: "metric", endpoint: "detectors" },
+    { kind: "all", endpoint: "detectors" },
+  ] as const)(
+    "rejects incomplete $endpoint name searches with kind $kind",
+    async ({ kind, endpoint }) => {
       mswServer.use(
-        http.get("*/workflows/", () =>
-          HttpResponse.json([issueAlertRule], {
+        http.get(`${organizationApi}/${endpoint}/`, () =>
+          HttpResponse.json(endpoint === "workflows" ? [issueAlertRule] : [], {
             headers: {
-              Link: '<https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/?cursor=next>; rel="next"; results="true"; cursor="next"',
-            },
-          }),
-        ),
-      );
-      await expect(
-        getRule({ kind, ruleIdOrName: issueAlertRule.name }),
-      ).rejects.toThrow("name search is incomplete");
-    },
-  );
-
-  it.each(["all", "metric"] as const)(
-    "rejects incomplete metric name searches with kind %s",
-    async (kind) => {
-      mswServer.use(
-        http.get(`${organizationApi}/detectors/`, () =>
-          HttpResponse.json([], {
-            headers: {
-              Link: `<${organizationApi}/detectors/?cursor=next>; rel="next"; results="true"; cursor="next"`,
+              Link: `<${organizationApi}/${endpoint}/?cursor=next>; rel="next"; results="true"; cursor="next"`,
             },
           }),
         ),
