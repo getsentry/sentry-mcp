@@ -154,6 +154,37 @@ Percent thresholds use absolute percentages: 110 means 10% higher, 80 means 20%
 lower. Dynamic comparisons retain sensitivity, seasonality and threshold type.
 Condition results are native priorities: 75 critical, 50 warning and 0 resolved.
 
+### Editing and deleting Metric Monitors
+
+`update_metric_monitor` and `delete_metric_monitor` are catalog-only
+`project-management` operations requiring `alerts:write` alongside the read
+scopes. Both accept an explicit native `monitorId`; read the monitor first with
+`get_metric_monitor_details`. They verify the monitor type and project scope
+before writing.
+
+Updates support name, active/disabled status, owner, description, query,
+detection configuration, conditions and connected Alerts. Omitted fields remain
+unchanged; null clears owner or description. `query` and `config` accept partial
+changes using the same units as detail reads. `conditionGroup` replaces the
+complete group, and `workflowIds` replaces all connections; an empty array
+disconnects every Alert. Read and preserve the conditions and connections that
+should remain. Updating connections does not edit notification destinations;
+use `update_alert_rule` for those changes.
+
+Changing detection mode requires compatible conditions. Dynamic uses exactly one
+anomaly condition; Static and Percent include numeric thresholds and resolution.
+Selecting Static or Dynamic clears the percentage comparison delta so the
+backend stops percentage evaluation. Query edits preserve extrapolation mode;
+Sentry may require an explicit supported mode when editing a legacy query.
+
+Updates return the saved `monitor` detail. Deletion returns
+`{success: true, monitorId}` after Sentry's successful response. Deleting a
+monitor removes its detection configuration and connections; connected Alerts
+remain available for other sources. For migrated monitors, deletion also removes
+the legacy metric alert and its incident history. Normal reads stop returning
+the monitor while Sentry completes cleanup asynchronously. API failures remain
+errors.
+
 ## Legacy metric references and interpretation
 
 `find_alert_rules(kind='metric'|'all')` now searches Detectors instead of the

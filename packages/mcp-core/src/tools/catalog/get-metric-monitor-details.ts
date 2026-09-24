@@ -3,19 +3,14 @@ import { z } from "zod";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { structuredResult } from "../../internal/tool-helpers/results";
-import {
-  ParamOrganizationSlug,
-  ParamProjectSlug,
-  ParamRegionUrl,
-} from "../../schema";
 import { setOrganizationContext } from "../../telem/organization";
 import type { ServerContext } from "../../types";
 import {
   getMetricMonitor,
   metricMonitorDetailsSchema,
+  metricMonitorReferenceFields,
   toMetricMonitorDetails,
 } from "../support/metric-monitors";
-import { assertProjectRefWithinConstraint } from "./support/project-constraints";
 
 export const getMetricMonitorDetailsOutputSchema = z.object({
   monitor: metricMonitorDetailsSchema,
@@ -32,16 +27,7 @@ export default defineTool({
     "workflowIds identify notification Alerts; inspect their actions with get_alert_rule(kind='issue').",
     "get_metric_monitor_details(organizationSlug='my-org', monitorId='12345')",
   ].join("\n"),
-  inputSchema: {
-    organizationSlug: ParamOrganizationSlug,
-    regionUrl: ParamRegionUrl.nullable().default(null),
-    projectSlug: ParamProjectSlug.optional(),
-    monitorId: z
-      .string()
-      .trim()
-      .regex(/^\d+$/)
-      .describe("Native Metric Monitor ID from find_metric_monitors."),
-  },
+  inputSchema: metricMonitorReferenceFields,
   outputSchema: getMetricMonitorDetailsOutputSchema,
   annotations: {
     readOnlyHint: true,
@@ -49,20 +35,16 @@ export default defineTool({
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
-    if (params.projectSlug) {
-      assertProjectRefWithinConstraint({
-        resourceLabel: "Metric Monitor",
-        scopedProjectSlug: context.constraints.projectSlug,
-        project: { slug: params.projectSlug },
-      });
-    }
     const projectSlug = context.constraints.projectSlug ?? params.projectSlug;
     setOrganizationContext(params.organizationSlug);
     if (projectSlug) setTag("project.slug", projectSlug);
     const api = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
     });
-    const detector = await getMetricMonitor(api, { ...params, projectSlug });
+    const detector = await getMetricMonitor(api, {
+      ...params,
+      scopedProjectSlug: context.constraints.projectSlug,
+    });
     return structuredResult({
       monitor: toMetricMonitorDetails(api, params.organizationSlug, detector),
     });
