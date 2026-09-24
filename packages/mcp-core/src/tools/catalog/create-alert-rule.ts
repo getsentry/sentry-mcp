@@ -101,9 +101,9 @@ export default defineTool({
         environment: params.environment,
         owner: params.owner,
         triggers: params.triggers?.conditions.length
-          ? ParamNewAlertTriggers.parse(params.triggers)
+          ? params.triggers
           : undefined,
-        actionFilters: ParamNewAlertActionFilters.parse(params.actionFilters),
+        actionFilters: params.actionFilters,
         detectorIds,
       },
     });

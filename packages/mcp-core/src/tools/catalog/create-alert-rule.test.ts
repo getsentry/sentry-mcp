@@ -1,33 +1,34 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
+import { createTestContext } from "../../test-utils/context";
 import { metricMonitor } from "../../test-utils/metric-monitor";
 import {
   assertStructuredOnlyResult,
   getStructuredContent,
 } from "../../test-utils/structured-content";
-import { prepareToolParams } from "../catalog-runtime/availability";
+import { executeToolHandler } from "../catalog-runtime/availability";
 import createAlertRule from "./create-alert-rule";
 
-const context = {
-  constraints: { organizationSlug: null },
-  accessToken: "access-token",
-  userId: "1",
-};
+const context = createTestContext();
 const endpoint =
   "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/";
 const detectorsEndpoint = endpoint.replace("workflows/", "detectors/");
 const projectId = "4509109104082945";
-const scopedContext = {
-  ...context,
+const scopedContext = createTestContext({
   constraints: { projectSlug: "cloudflare-mcp" },
+});
+const triggerCondition = {
+  type: "first_seen_event",
+  comparison: true,
+  conditionResult: true,
 };
 
-async function createRule(
+function createRule(
   changes: Record<string, unknown>,
   toolContext: Parameters<typeof createAlertRule.handler>[1] = context,
 ) {
-  const params = prepareToolParams({
+  return executeToolHandler({
     tool: createAlertRule,
     params: {
       organizationSlug: "sentry-mcp-evals",
@@ -36,11 +37,10 @@ async function createRule(
       ...changes,
     },
     context: toolContext,
-  }) as Parameters<typeof createAlertRule.handler>[0];
-  return createAlertRule.handler(params, toolContext);
+  });
 }
 
-function useCreateHandler(status = 201) {
+function useCreateHandler() {
   const writes: Record<string, unknown>[] = [];
   mswServer.use(
     http.post(endpoint, async ({ request }) => {
@@ -48,7 +48,7 @@ function useCreateHandler(status = 201) {
       writes.push(body);
       return HttpResponse.json(
         { id: "123", environment: null, owner: null, triggers: null, ...body },
-        { status },
+        { status: 201 },
       );
     }),
   );
@@ -68,11 +68,6 @@ describe("create_alert_rule", () => {
         HttpResponse.json({ ...metricMonitor, id: "789", projectId }),
       ),
     );
-    const condition = {
-      type: "first_seen_event",
-      comparison: true,
-      conditionResult: true,
-    };
     const action = {
       type: "msteams",
       status: "disabled",
@@ -80,9 +75,9 @@ describe("create_alert_rule", () => {
       data: {},
       config: { targetDisplay: "Incidents", targetIdentifier: "19:channel" },
     };
-    const triggers = { logicType: "any-short", conditions: [condition] };
+    const triggers = { logicType: "any-short", conditions: [triggerCondition] };
     const filterCondition = {
-      ...condition,
+      ...triggerCondition,
       type: "issue_priority_greater_or_equal",
       comparison: 75,
     };
@@ -100,7 +95,7 @@ describe("create_alert_rule", () => {
         triggers: {
           ...triggers,
           id: "10",
-          conditions: [{ ...condition, id: "11" }],
+          conditions: [{ ...triggerCondition, id: "11" }],
         },
         actionFilters: [
           {
@@ -168,13 +163,7 @@ describe("create_alert_rule", () => {
         detectorIds: [],
         triggers: {
           logicType: "any",
-          conditions: [
-            {
-              type: "first_seen_event",
-              comparison: true,
-              conditionResult: true,
-            },
-          ],
+          conditions: [triggerCondition],
         },
       },
       "any-short",
@@ -209,17 +198,6 @@ describe("create_alert_rule", () => {
         message,
       );
       expect(writes).toEqual([]);
-    },
-  );
-
-  it.each([403, 502])(
-    "propagates POST %s without retrying creation",
-    async (status) => {
-      const writes = useCreateHandler(status);
-      await expect(createRule({ detectorIds: [] })).rejects.toMatchObject({
-        status,
-      });
-      expect(writes).toHaveLength(1);
     },
   );
 

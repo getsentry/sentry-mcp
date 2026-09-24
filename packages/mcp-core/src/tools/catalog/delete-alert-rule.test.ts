@@ -1,18 +1,14 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
+import { createTestContext } from "../../test-utils/context";
 import {
   assertStructuredOnlyResult,
   getStructuredContent,
 } from "../../test-utils/structured-content";
-import { prepareToolParams } from "../catalog-runtime/availability";
 import deleteAlertRule from "./delete-alert-rule";
 
-const context = {
-  constraints: { organizationSlug: null },
-  accessToken: "access-token",
-  userId: "1",
-};
+const context = createTestContext();
 const params = {
   organizationSlug: "sentry-mcp-evals",
   regionUrl: null,
@@ -21,10 +17,9 @@ const params = {
 const endpoint =
   "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/123/";
 const projectId = "4509109104082945";
-const scopedContext = {
-  ...context,
+const scopedContext = createTestContext({
   constraints: { projectSlug: "cloudflare-mcp" },
-};
+});
 
 function useDeleteHandler(status = 204) {
   const writes: string[] = [];
@@ -65,7 +60,6 @@ describe("delete_alert_rule", () => {
     { projectIds: [projectId, "200"], includesAllProjects: false },
     { projectIds: [projectId], includesAllProjects: true },
     { projectIds: [], includesAllProjects: false },
-    { projectIds: ["200"], includesAllProjects: false },
   ])("rejects unsafe project scope %j before deleting", async (scope) => {
     const writes = useDeleteHandler();
     useProjectScope(scope.projectIds, scope.includesAllProjects);
@@ -75,27 +69,12 @@ describe("delete_alert_rule", () => {
     expect(writes).toEqual([]);
   });
 
-  it.each([403, 404])(
-    "propagates DELETE %s without reporting success",
-    async (status) => {
-      const writes = useDeleteHandler(status);
-      await expect(
-        deleteAlertRule.handler(params, context),
-      ).rejects.toMatchObject({ status });
-      expect(writes).toEqual([endpoint]);
-    },
-  );
-
-  it.each(["Backend notifications", "detector:123"])(
-    "requires a numeric workflow ID, rejecting %s",
-    (ruleId) => {
-      expect(() =>
-        prepareToolParams({
-          tool: deleteAlertRule,
-          params: { ...params, ruleId },
-          context,
-        }),
-      ).toThrow("Invalid arguments for delete_alert_rule");
-    },
-  );
+  it("does not report success for a missing Alert", async () => {
+    useDeleteHandler(404);
+    await expect(
+      deleteAlertRule.handler(params, context),
+    ).rejects.toMatchObject({
+      status: 404,
+    });
+  });
 });

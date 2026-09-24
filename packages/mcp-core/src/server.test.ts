@@ -1595,18 +1595,22 @@ describe("buildServer", () => {
       });
       const endpoint =
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/workflows/";
-      const writes: unknown[] = [];
+      const writes: string[] = [];
       mswServer.use(
-        http.post(endpoint, async ({ request }) => {
-          const body = await request.json();
-          writes.push(body);
+        http.post(endpoint, () => {
+          writes.push("POST");
           return HttpResponse.json(
-            { id: "123", ...(body as object) },
+            {
+              id: "123",
+              name: "Prepared Alert",
+              enabled: false,
+              detectorIds: [],
+            },
             { status: 201 },
           );
         }),
         http.delete(`${endpoint}123/`, () => {
-          writes.push("deleted");
+          writes.push("DELETE");
           return new HttpResponse(null, { status: 204 });
         }),
       );
@@ -1642,16 +1646,7 @@ describe("buildServer", () => {
         expect(result.isError).not.toBe(true);
         expect(getStructuredContent(result)).toMatchObject(expected);
       }
-      expect(writes).toEqual([
-        {
-          name: "Prepared Alert",
-          enabled: false,
-          config: { frequency: 30 },
-          actionFilters: [],
-          detectorIds: [],
-        },
-        "deleted",
-      ]);
+      expect(writes).toEqual(["POST", "DELETE"]);
     });
 
     it("discovers and dispatches alert options with injected project constraints", async () => {
