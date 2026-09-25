@@ -2467,6 +2467,59 @@ describe("structuredContent", () => {
     expect(payload.replays).toBeNull();
   });
 
+  it("surfaces the suspect commit from the first committer's first commit", async () => {
+    mockLatestEventWithFormatted({ format: "json", content: FORMATTER_JSON });
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/CLOUDFLARE-MCP/events/abc123def456/committers/",
+        () =>
+          HttpResponse.json({
+            committers: [
+              {
+                author: { name: "Jane Developer", email: "jane@example.com" },
+                commits: [
+                  {
+                    id: "2ce6a2700fec4913a2cde8e2d41dee36",
+                    message: "Fix duplicate tool registration",
+                    suspectCommitType: "via commit metadata",
+                  },
+                ],
+              },
+            ],
+          }),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(payload.suspectCommit).toEqual({
+      id: "2ce6a2700fec4913a2cde8e2d41dee36",
+      message: "Fix duplicate tool registration",
+      author: "Jane Developer",
+      suspectCommitType: "via commit metadata",
+    });
+  });
+
+  it("reports no suspect commit when the project has no commit tracking", async () => {
+    mockLatestEventWithFormatted({ format: "json", content: FORMATTER_JSON });
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/CLOUDFLARE-MCP/events/abc123def456/committers/",
+        () => HttpResponse.json({ detail: "Not found" }, { status: 404 }),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+    const payload = (result as { structuredContent: Record<string, any> })
+      .structuredContent;
+
+    expect(payload.suspectCommit).toBeNull();
+  });
+
   it("maps external issues field by field so upstream extras cannot leak", async () => {
     // structuredContent is a product contract, not a view of the api response: several
     // upstream schemas are passthrough, so anything not mapped must not appear
