@@ -13,7 +13,11 @@ import {
 } from "../../lib/api-client.js";
 import { spansFlag } from "../../lib/arg-parsing.js";
 import { buildCommand } from "../../lib/command.js";
-import { ContextError, ValidationError } from "../../lib/errors.js";
+import {
+  ContextError,
+  ResolutionError,
+  ValidationError,
+} from "../../lib/errors.js";
 import {
   type FoundSpan,
   findSpanById,
@@ -430,11 +434,10 @@ export const viewCommand = buildCommand({
     const spans = await getDetailedTrace(org, traceId);
 
     if (spans.length === 0) {
-      throw new ValidationError(
-        `No trace found with ID "${traceId}".\n\n` +
-          "The ID format is valid but no matching trace exists in this project. " +
-          "Check that you are querying the right org/project, or the trace may be past your plan's retention window."
-      );
+      throw new ResolutionError(`Trace "${traceId}"`, "not found", USAGE_HINT, [
+        "The ID format is valid but no matching trace exists in this project",
+        "Check that you are querying the right org/project, or the trace may be past your plan's retention window",
+      ]);
     }
 
     // Find each requested span
@@ -455,11 +458,19 @@ export const viewCommand = buildCommand({
     }
 
     if (results.length === 0) {
+      if (spanIds.length === 1) {
+        throw new ResolutionError(
+          `Span "${spanIds[0]}" in trace ${traceId}`,
+          "not found",
+          USAGE_HINT
+        );
+      }
       const idList = formatIdList(spanIds);
-      throw new ValidationError(
-        spanIds.length === 1
-          ? `No span found with ID "${spanIds[0]}" in trace ${traceId}.`
-          : `No spans found with any of the following IDs in trace ${traceId}:\n${idList}`
+      throw new ResolutionError(
+        `Spans in trace ${traceId}`,
+        "none of the requested IDs were found",
+        USAGE_HINT,
+        [`Requested IDs:\n${idList}`]
       );
     }
 

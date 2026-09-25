@@ -26,7 +26,11 @@ vi.mock("../../../src/lib/api-client.js", async (importOriginal) => {
 import * as apiClient from "../../../src/lib/api-client.js";
 import { DEFAULT_SENTRY_URL } from "../../../src/lib/constants.js";
 import { setOrgRegion } from "../../../src/lib/db/regions.js";
-import { ContextError, ValidationError } from "../../../src/lib/errors.js";
+import {
+  ContextError,
+  ResolutionError,
+  ValidationError,
+} from "../../../src/lib/errors.js";
 import { validateSpanId } from "../../../src/lib/hex-id.js";
 
 vi.mock("../../../src/lib/resolve-target.js", async (importOriginal) => {
@@ -414,7 +418,7 @@ describe("viewCommand.func", () => {
     expect(output).toContain("http.server");
   });
 
-  test("throws ValidationError when trace has no spans", async () => {
+  test("throws ResolutionError when trace has no spans", async () => {
     getDetailedTraceSpy.mockResolvedValue([]);
 
     const { context } = createContext();
@@ -429,10 +433,10 @@ describe("viewCommand.func", () => {
         VALID_TRACE_ID,
         VALID_SPAN_ID
       )
-    ).rejects.toThrow(ValidationError);
+    ).rejects.toThrow(ResolutionError);
   });
 
-  test("throws ValidationError when span ID not found in trace", async () => {
+  test("throws ResolutionError when span ID not found in trace", async () => {
     getDetailedTraceSpy.mockResolvedValue([makeTraceSpan("0000000000000000")]);
 
     const { context } = createContext();
@@ -447,7 +451,7 @@ describe("viewCommand.func", () => {
         VALID_TRACE_ID,
         VALID_SPAN_ID
       )
-    ).rejects.toThrow(ValidationError);
+    ).rejects.toThrow(ResolutionError);
   });
 
   test("uses explicit org/project from slash-separated arg", async () => {
@@ -545,7 +549,7 @@ describe("viewCommand.func", () => {
     ).rejects.toThrow(ContextError);
   });
 
-  test("throws ValidationError for multiple missing span IDs", async () => {
+  test("throws ResolutionError for multiple missing span IDs", async () => {
     getDetailedTraceSpy.mockResolvedValue([makeTraceSpan("0000000000000000")]);
 
     const { context } = createContext();
@@ -558,6 +562,6 @@ describe("viewCommand.func", () => {
         VALID_SPAN_ID,
         VALID_SPAN_ID_2
       )
-    ).rejects.toThrow(ValidationError);
+    ).rejects.toThrow(ResolutionError);
   });
 });
