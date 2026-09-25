@@ -6,8 +6,55 @@ import {
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigurationError } from "../errors";
+import { parseSentryUrl } from "../internal/url-helpers";
 import { SentryApiService } from "./client";
 import { ApiNotFoundError, ApiServerError } from "./errors";
+
+describe("single-tenant web URLs", () => {
+  const api = new SentryApiService({ host: "tenant.my.sentry.io" });
+  const baseUrl = "https://tenant.my.sentry.io/organizations/product-org";
+
+  it("keeps the tenant host and the organization from the path", () => {
+    const issueUrl = api.getIssueUrl("product-org", "WEB-123");
+    expect(issueUrl).toBe(`${baseUrl}/issues/WEB-123`);
+    expect(parseSentryUrl(issueUrl)).toEqual({
+      type: "issue",
+      organizationSlug: "product-org",
+      issueId: "WEB-123",
+    });
+    expect(api.getDashboardUrl("product-org", "42")).toBe(
+      `${baseUrl}/dashboard/42/`,
+    );
+  });
+
+  it("keeps alert links on the tenant", () => {
+    expect(api.getIssueAlertRuleUrl("product-org", "42")).toBe(
+      `${baseUrl}/monitors/alerts/42/`,
+    );
+    expect(api.getMetricAlertRuleUrl("product-org", "42")).toBe(
+      `${baseUrl}/issues/alerts/rules/details/42/`,
+    );
+  });
+
+  it.each([
+    ["errors", "discover/homepage", "query"],
+    ["spans", "traces", "query"],
+    ["logs", "logs", "logsQuery"],
+  ] as const)(
+    "keeps %s explorer links and filters on the tenant",
+    (dataset, page, queryParam) => {
+      const url = new URL(
+        api.getEventsExplorerUrl("product-org", "level:error", "123", dataset),
+      );
+      expect(`${url.origin}${url.pathname}`).toBe(
+        `${baseUrl}/explore/${page}/`,
+      );
+      expect(url.searchParams.get(queryParam)).toBe("level:error");
+      expect(url.searchParams.get("project")).toBe("123");
+      expect(url.searchParams.get("statsPeriod")).toBe("24h");
+    },
+  );
+});
 
 describe("getIssueUrl", () => {
   it("should work with sentry.io", () => {
@@ -65,6 +112,12 @@ describe("getIssueUrl", () => {
     const result = apiService.getIssueUrl("myorg", "PROJECT-456");
     // Should use sentry.io, not eu.sentry.io for web UI
     expect(result).toEqual("https://myorg.sentry.io/issues/PROJECT-456");
+  });
+  it("keeps public organization hosts with multiple labels on public web URLs", () => {
+    const apiService = new SentryApiService({ host: "example.us.sentry.io" });
+    expect(apiService.getIssueUrl("product-org", "WEB-123")).toBe(
+      "https://product-org.sentry.io/issues/WEB-123",
+    );
   });
 });
 

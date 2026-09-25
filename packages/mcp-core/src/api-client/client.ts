@@ -28,7 +28,7 @@ import {
   getTraceMetricsExploreUrl,
   getTraceUrl as getTraceUrlUtil,
   getUptimeMonitorUrl as getUptimeMonitorUrlUtil,
-  isSentryHost,
+  isPublicSentryHost,
   type TraceMetricIdentifier,
 } from "../utils/url-utils";
 import { USER_AGENT } from "../version";
@@ -592,15 +592,10 @@ export class SentryApiService {
   }
 
   /**
-   * Checks if the current host is Sentry SaaS (sentry.io).
-   *
-   * Used to determine API endpoint availability and URL formats.
-   * Self-hosted instances may not have all endpoints available.
-   *
-   * @returns True if using Sentry SaaS, false for self-hosted instances
+   * Whether API control requests and web URLs use public SaaS routing.
    */
-  private isSaas(): boolean {
-    return isSentryHost(this.host);
+  private isPublicSaas(): boolean {
+    return isPublicSentryHost(this.host);
   }
 
   /**
@@ -1187,7 +1182,7 @@ export class SentryApiService {
     ruleId: string | number,
   ): string {
     const encodedRuleId = encodeURIComponent(String(ruleId));
-    if (this.isSaas()) {
+    if (this.isPublicSaas()) {
       return `${this.protocol}://${organizationSlug}.sentry.io/monitors/alerts/${encodedRuleId}/`;
     }
     return `${this.protocol}://${this.host}/organizations/${organizationSlug}/monitors/alerts/${encodedRuleId}/`;
@@ -1198,7 +1193,7 @@ export class SentryApiService {
     ruleId: string | number,
   ): string {
     const encodedRuleId = encodeURIComponent(String(ruleId));
-    if (this.isSaas()) {
+    if (this.isPublicSaas()) {
       return `${this.protocol}://${organizationSlug}.sentry.io/issues/alerts/rules/details/${encodedRuleId}/`;
     }
     return `${this.protocol}://${this.host}/organizations/${organizationSlug}/issues/alerts/rules/details/${encodedRuleId}/`;
@@ -1289,10 +1284,10 @@ export class SentryApiService {
       urlParams.set("yAxis", "count()");
     }
 
-    // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+    // Public SaaS uses sentry.io for web UI URLs regardless of region.
     // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
-    const webHost = this.isSaas() ? "sentry.io" : this.host;
-    const path = this.isSaas()
+    const webHost = this.isPublicSaas() ? "sentry.io" : this.host;
+    const path = this.isPublicSaas()
       ? `${this.protocol}://${organizationSlug}.${webHost}/explore/discover/homepage/`
       : `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
 
@@ -1373,9 +1368,9 @@ export class SentryApiService {
     organizationSlug: string,
     page: "logs" | "traces",
   ): string {
-    // For SaaS instances, always use sentry.io for web UI URLs regardless of region.
+    // Public SaaS uses sentry.io for web UI URLs regardless of region.
     // Regional subdomains (e.g., us.sentry.io) are only for API endpoints.
-    if (this.isSaas()) {
+    if (this.isPublicSaas()) {
       return `${this.protocol}://${organizationSlug}.sentry.io/explore/${page}/`;
     }
     return `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/${page}/`;
@@ -1589,15 +1584,13 @@ export class SentryApiService {
    * @throws {ApiError} If authentication fails or user not found
    */
   async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
-    // Auth endpoints only exist on the main API server, never on regional endpoints
+    // User identity belongs to the deployment's control host.
     let authHost: string | undefined;
 
-    if (this.isSaas()) {
-      // For SaaS, always use the main sentry.io host, not regional hosts
-      // This handles cases like us.sentry.io, eu.sentry.io, etc.
+    if (this.isPublicSaas()) {
       authHost = "sentry.io";
     }
-    // For self-hosted, use the configured host (authHost remains undefined)
+    // Single-tenant and self-hosted deployments keep their configured host.
 
     const body = await this.requestJSON("/auth/", undefined, {
       ...opts,
@@ -1643,7 +1636,7 @@ export class SentryApiService {
     let host = undefined;
     // Public SaaS lists across regions on sentry.io; single-tenant instances
     // must keep organization discovery on their configured host.
-    if (this.isSaas() && !this.host.endsWith(".my.sentry.io")) {
+    if (this.isPublicSaas()) {
       host = "sentry.io";
     }
 
