@@ -421,7 +421,7 @@ export default defineTool({
       .enum(SEARCH_EVENTS_DATASETS)
       .optional()
       .describe(
-        "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured. Pass it so Seer can translate natural language queries when the organization has Seer enabled.",
+        "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. Always pass it, including for natural language queries. The agent may correct it when configured.",
       ),
     query: z
       .string()

@@ -7034,7 +7034,7 @@
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
         "dataset": {
-          "description": "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured. Pass it so Seer can translate natural language queries when the organization has Seer enabled.",
+          "description": "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. Always pass it, including for natural language queries. The agent may correct it when configured.",
           "type": "string",
           "enum": ["spans", "errors", "logs", "metrics", "profiles", "replays"]
         },
