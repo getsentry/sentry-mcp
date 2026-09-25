@@ -123,16 +123,19 @@ describe("cli/finalize", () => {
     ).toThrow(/cannot be used with --url or SENTRY_URL/);
   });
 
-  it("throws when --insecure-http targets sentry.io", () => {
-    expect(() =>
-      finalize({
-        accessToken: "tok",
-        host: "sentry.io",
-        insecureHttp: true,
-        unknownArgs: [],
-      }),
-    ).toThrow(/only supported for self-hosted Sentry hosts/);
-  });
+  it.each(["sentry.io", "example.my.sentry.io"])(
+    "throws when --insecure-http targets %s",
+    (host) => {
+      expect(() =>
+        finalize({
+          accessToken: "tok",
+          host,
+          insecureHttp: true,
+          unknownArgs: [],
+        }),
+      ).toThrow(/only supported for self-hosted Sentry hosts/);
+    },
+  );
 
   // Skills tests
   it("throws on invalid skills", () => {
