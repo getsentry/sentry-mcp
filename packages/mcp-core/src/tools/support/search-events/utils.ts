@@ -177,10 +177,7 @@ function normalizeFilterValue(rawValue: string): string {
  * Read one filter value starting at `valueStart` in the original query.
  * Quoted values keep interior whitespace; unquoted values stop at whitespace.
  */
-function readRawFilterValue(
-  query: string,
-  valueStart: number,
-): string | undefined {
+function readRawFilterValue(query: string, valueStart: number): string | undefined {
   if (valueStart >= query.length) {
     return undefined;
   }
@@ -244,7 +241,9 @@ function searchFilterOccurrences(query: string): SearchFilterOccurrence[] {
   return occurrences;
 }
 
-function structuredFilterOccurrences(query: string): SearchFilterOccurrence[] {
+function structuredFilterOccurrences(
+  query: string,
+): SearchFilterOccurrence[] {
   return searchFilterOccurrences(query).filter(
     (occurrence) => !FULL_TEXT_SEARCH_KEYS.has(occurrence.key),
   );
@@ -285,7 +284,9 @@ function containsAsWholeToken(haystack: string, needle: string): boolean {
 }
 
 function isRelatedFilterValue(left: string, right: string): boolean {
-  return containsAsWholeToken(left, right) || containsAsWholeToken(right, left);
+  return (
+    containsAsWholeToken(left, right) || containsAsWholeToken(right, left)
+  );
 }
 
 /**
