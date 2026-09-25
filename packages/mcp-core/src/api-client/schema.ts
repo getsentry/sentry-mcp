@@ -323,7 +323,7 @@ export const AlertActionOptionSchema = z.object({
       name: z.string(),
       installationId: z.string(),
       installationUuid: z.string(),
-      status: z.number(),
+      status: z.string(),
       settings: z.record(z.string(), z.unknown()).optional(),
       title: z.string().optional(),
     })

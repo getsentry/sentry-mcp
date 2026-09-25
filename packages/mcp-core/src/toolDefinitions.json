@@ -4438,7 +4438,7 @@
                     "type": "string"
                   },
                   "status": {
-                    "type": "number"
+                    "type": "string"
                   },
                   "settings": {
                     "type": "object",
