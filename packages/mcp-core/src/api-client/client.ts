@@ -4878,7 +4878,7 @@ export class SentryApiService {
       query: string;
       yAxis: string;
       interval?: string;
-      projectId?: string;
+      projectId?: ProjectIdParam;
       dataset?: EventsDataset;
       statsPeriod?: string;
       start?: string;
@@ -4895,9 +4895,7 @@ export class SentryApiService {
       queryParams.set("interval", interval);
     }
     this.applyTimeParams(queryParams, statsPeriod, start, end);
-    if (projectId) {
-      queryParams.set("project", projectId);
-    }
+    appendProjectParams(queryParams, projectId);
     // partial=1 keeps the current (in-progress) bucket, matching Sentry's charts.
     queryParams.set("partial", "1");
     queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);

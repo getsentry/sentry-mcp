@@ -610,6 +610,7 @@ export default defineTool({
         ? { statsPeriod: params.period }
         : seerTranslation.timeParams;
       explanation = seerTranslation.explanation;
+      timeSeries = seerTranslation.timeSeries;
     } else if (willRunAgent) {
       const parsed = await withProviderFallback<SearchEventsAgentResult>({
         operation: "search_events.rewrite",
@@ -795,6 +796,8 @@ export default defineTool({
       return withEnvironmentNote(replayOutput);
     }
 
+    const eventsProjectId = seerTranslation?.projectIds ?? projectId;
+
     if (timeSeries) {
       const timeSeriesQuery = applyEnvironmentToEventsQuery(
         dataset,
@@ -810,14 +813,14 @@ export default defineTool({
         query: timeSeriesQuery,
         yAxis: timeSeries.yAxis,
         interval: timeSeries.interval ?? undefined,
-        projectId,
+        projectId: eventsProjectId,
         dataset,
         ...timeParams,
       });
       const statsUrl = apiService.getEventsExplorerUrl(
         organizationSlug,
         timeSeriesQuery,
-        projectId,
+        eventsProjectId,
         dataset,
         [timeSeries.yAxis],
         `-${timeSeries.yAxis}`,
@@ -853,7 +856,6 @@ export default defineTool({
     //
     // Note: fields and sortParam use the same function syntax sent to the API.
     fields = augmentFieldsWithSort(fields, sortParam);
-    const eventsProjectId = seerTranslation?.projectIds ?? projectId;
 
     const requestFields = buildRequestFields(dataset, fields);
 

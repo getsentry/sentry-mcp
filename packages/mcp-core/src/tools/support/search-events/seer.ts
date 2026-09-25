@@ -41,6 +41,7 @@ export interface SeerSearchTranslation {
   fields: string[];
   sort: string;
   timeParams: { statsPeriod?: string; start?: string; end?: string };
+  timeSeries: { yAxis: string; interval: string } | null;
   // Set only when Seer broadened the search beyond the requested project.
   projectIds?: string[];
   explanation: string;
@@ -93,6 +94,23 @@ function toSearchTranslation(
     sort = defaultSort;
   }
 
+  // Seer always returns a chart for aggregates since Explore shows one, but only
+  // sets an interval when the user asks for time buckets, e.g. "per day". The
+  // time series endpoint can't group, so grouped queries stay a table.
+  const chartWithInterval = result.visualization.find(
+    (chart) => chart.interval && chart.y_axes[0],
+  );
+  const timeSeries =
+    result.mode === "aggregates" &&
+    result.group_by.length === 0 &&
+    chartWithInterval?.interval &&
+    chartWithInterval.y_axes[0]
+      ? {
+          yAxis: chartWithInterval.y_axes[0],
+          interval: chartWithInterval.interval,
+        }
+      : null;
+
   let timeParams: SeerSearchTranslation["timeParams"];
   if (result.stats_period) {
     timeParams = { statsPeriod: result.stats_period };
@@ -121,6 +139,7 @@ function toSearchTranslation(
     fields,
     sort,
     timeParams,
+    timeSeries,
     projectIds: expandedProjectIds?.map(String),
     explanation,
   };

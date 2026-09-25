@@ -3456,6 +3456,84 @@ describe("search_events", () => {
       expect(result).toContain("Translated by Seer's search agent.");
     });
 
+    it("should return a time series when Seer sets an interval", async () => {
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        mockSeerState({
+          status: "completed",
+          final_response: {
+            responses: [
+              {
+                ...seerQuery,
+                query: "",
+                group_by: [],
+                visualization: [
+                  { chart_type: 1, y_axes: ["count()"], interval: "1d" },
+                ],
+                sort: "-count()",
+                stats_period: "7d",
+              },
+            ],
+            unsupported_reason: null,
+          },
+        }),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events-stats/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            expect(url.searchParams.get("yAxis")).toBe("count()");
+            expect(url.searchParams.get("interval")).toBe("1d");
+            expect(url.searchParams.get("dataset")).toBe("spans");
+            expect(url.searchParams.get("statsPeriod")).toBe("7d");
+            return HttpResponse.json({
+              data: [
+                [1757548800, [{ count: 5 }]],
+                [1757635200, [{ count: 8 }]],
+              ],
+            });
+          },
+        ),
+      );
+
+      const result = await searchEvents.handler(seerParams, context);
+
+      expect(mockSeerStart).toHaveBeenCalled();
+      expect(mockGenerateText).not.toHaveBeenCalled();
+      expect(result).toContain("## count() over time");
+      expect(result).toContain("- **Total**: 13");
+    });
+
+    it("should keep a grouped Seer query with an interval as a table", async () => {
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        mockSeerState({
+          status: "completed",
+          final_response: {
+            responses: [
+              {
+                ...seerQuery,
+                visualization: [
+                  {
+                    chart_type: 1,
+                    y_axes: ["p95(span.duration)"],
+                    interval: "1h",
+                  },
+                ],
+              },
+            ],
+            unsupported_reason: null,
+          },
+        }),
+        http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+          HttpResponse.json({ data: [] }),
+        ),
+      );
+
+      const result = await searchEvents.handler(seerParams, context);
+
+      expect(result).not.toContain("over time");
+    });
+
     it("should add an explicit environment to Seer's query", async () => {
       mswServer.use(
         mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
