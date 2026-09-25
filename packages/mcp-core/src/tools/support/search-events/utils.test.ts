@@ -313,10 +313,12 @@ describe("search query helpers", () => {
 
     // Bare substring matches are not enough — short values must not false-hit
     // inside unrelated full-text (e.g. "1" inside "401").
-    expect(isSemanticFilterDowngrade("id:1", 'message:"error 401"')).toBe(
-      false,
-    );
-    expect(isSemanticFilterDowngrade("id:1", 'message:"error 1"')).toBe(true);
+    expect(
+      isSemanticFilterDowngrade("id:1", 'message:"error 401"'),
+    ).toBe(false);
+    expect(
+      isSemanticFilterDowngrade("id:1", 'message:"error 1"'),
+    ).toBe(true);
   });
 });
 

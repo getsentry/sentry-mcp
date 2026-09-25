@@ -312,7 +312,8 @@ export function recordResponseMetric(
   }
 
   if (options?.oauthErrorReason) {
-    responseAttributes[OAUTH_ERROR_REASON_ATTRIBUTE] = options.oauthErrorReason;
+    responseAttributes[OAUTH_ERROR_REASON_ATTRIBUTE] =
+      options.oauthErrorReason;
   }
 
   if (options?.oauthBearerShape) {
