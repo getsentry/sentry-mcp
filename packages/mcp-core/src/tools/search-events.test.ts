@@ -1629,4 +1629,181 @@ describe("search_events", () => {
     expect(mockGenerateText).not.toHaveBeenCalled();
     expect(result).toContain("Database Error");
   });
+
+  describe("with Seer", () => {
+    const seerParams = {
+      organizationSlug: "test-org",
+      regionUrl: null,
+      projectSlug: "test-project",
+      dataset: "spans" as const,
+      query: "slowest http requests in the last day",
+      fields: null,
+      sort: null,
+      statsPeriod: undefined,
+      limit: 10,
+      includeExplanation: true,
+    };
+    const context = {
+      constraints: {
+        organizationSlug: null,
+        regionUrl: null,
+        projectSlug: null,
+      },
+      accessToken: "test-token",
+      userId: "1",
+    };
+    const seerQuery = {
+      query: "span.op:http.client",
+      group_by: ["span.description"],
+      visualization: [
+        { chart_type: 1, y_axes: ["p95(span.duration)"], interval: null },
+      ],
+      sort: "-p95(span.duration)",
+      stats_period: "24h",
+      start: null,
+      end: null,
+      mode: "aggregates",
+      result_count: 1,
+      span_query: null,
+      log_query: null,
+      metric_query: null,
+    };
+
+    const mockOrganization = (features: string[]) =>
+      http.get("https://sentry.io/api/0/organizations/test-org/", () =>
+        HttpResponse.json({
+          id: "1",
+          slug: "test-org",
+          name: "Test Org",
+          features,
+          hideAiFeatures: false,
+        }),
+      );
+    const mockProject = http.get(
+      "https://sentry.io/api/0/projects/test-org/test-project/",
+      () => HttpResponse.json({ id: "42", slug: "test-project", name: "Test" }),
+    );
+    const mockSeerStart = vi.fn(async ({ request }: { request: Request }) => {
+      expect(await request.json()).toEqual({
+        project_ids: [42],
+        natural_language_query: "slowest http requests in the last day",
+        strategy: "Traces",
+      });
+      return HttpResponse.json({ run_id: 1, sentry_run_id: "run-uuid" });
+    });
+    const mockSeerState = (session: Record<string, unknown>) =>
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/search-agent/state/run-uuid/",
+        () => HttpResponse.json({ session, sentry_run_id: "run-uuid" }),
+      );
+
+    beforeEach(() => {
+      mockSeerStart.mockClear();
+      mswServer.use(
+        mockProject,
+        http.post(
+          "https://sentry.io/api/0/organizations/test-org/search-agent/start/",
+          mockSeerStart,
+        ),
+      );
+    });
+
+    it("should translate natural language queries with Seer", async () => {
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        mockSeerState({
+          status: "completed",
+          final_response: { responses: [seerQuery], unsupported_reason: null },
+        }),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            expect(url.searchParams.get("dataset")).toBe("spans");
+            expect(url.searchParams.get("query")).toBe("span.op:http.client");
+            expect(url.searchParams.getAll("field")).toEqual([
+              "span.description",
+              "p95(span.duration)",
+            ]);
+            expect(url.searchParams.get("sort")).toBe("-p95_span_duration");
+            expect(url.searchParams.get("statsPeriod")).toBe("24h");
+            return HttpResponse.json({
+              data: [
+                {
+                  "span.description": "GET /api/users",
+                  "p95(span.duration)": 1200,
+                },
+              ],
+            });
+          },
+        ),
+      );
+
+      const result = await searchEvents.handler(seerParams, context);
+
+      expect(mockSeerStart).toHaveBeenCalled();
+      expect(mockGenerateText).not.toHaveBeenCalled();
+      expect(result).toContain("GET /api/users");
+      expect(result).toContain("Translated by Seer's search agent.");
+    });
+
+    it("should fall back to the agent when Seer is not enabled", async () => {
+      mockGenerateText.mockResolvedValueOnce(
+        mockAIResponse("spans", "span.op:http.client"),
+      );
+      mswServer.use(
+        mockOrganization(["gen-ai-features"]),
+        http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+          HttpResponse.json({ data: [] }),
+        ),
+      );
+
+      await searchEvents.handler(seerParams, context);
+
+      expect(mockSeerStart).not.toHaveBeenCalled();
+      expect(mockGenerateText).toHaveBeenCalled();
+    });
+
+    it("should fall back to the agent when Seer cannot translate", async () => {
+      mockGenerateText.mockResolvedValueOnce(
+        mockAIResponse("spans", "span.op:http.client"),
+      );
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        mockSeerState({ status: "error", unsupported_reason: "Unsupported" }),
+        http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+          HttpResponse.json({ data: [] }),
+        ),
+      );
+
+      await searchEvents.handler(seerParams, context);
+
+      expect(mockSeerStart).toHaveBeenCalled();
+      expect(mockGenerateText).toHaveBeenCalled();
+    });
+
+    it("should fall back to the agent when Seer returns 403", async () => {
+      mockGenerateText.mockResolvedValueOnce(
+        mockAIResponse("spans", "span.op:http.client"),
+      );
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        http.post(
+          "https://sentry.io/api/0/organizations/test-org/search-agent/start/",
+          () =>
+            HttpResponse.json(
+              { detail: "Feature flag not enabled" },
+              { status: 403 },
+            ),
+        ),
+        http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+          HttpResponse.json({ data: [] }),
+        ),
+      );
+
+      await searchEvents.handler(seerParams, context);
+
+      expect(mockGenerateText).toHaveBeenCalled();
+    });
+  });
 });

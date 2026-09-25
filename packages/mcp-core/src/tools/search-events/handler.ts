@@ -29,6 +29,7 @@ import {
   type PublicEventsDataset,
 } from "../../utils/events-datasets";
 import { isAggregateQuery } from "./utils";
+import { isSeerSearchDataset, translateWithSeer } from "./seer";
 import {
   DEFAULT_REPLAY_SORT,
   DEFAULT_REPLAY_STATS_PERIOD,
@@ -116,7 +117,7 @@ export default defineTool({
       .enum(SEARCH_EVENTS_DATASETS)
       .optional()
       .describe(
-        "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured.",
+        "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured. Pass it with projectSlug so Seer can translate natural language queries when the organization has Seer enabled.",
       ),
     query: z
       .string()
@@ -209,7 +210,30 @@ export default defineTool({
     let explanation: string | undefined;
     let environment: string | string[] | null | undefined = params.environment;
 
-    if (hasAgentProvider()) {
+    // Seer only translates into the dataset it is given and needs a project to
+    // search in, so it runs only when both are explicit.
+    const seerTranslation =
+      params.query &&
+      projectId &&
+      isSeerSearchDataset(params.dataset) &&
+      !params.environment
+        ? await translateWithSeer({
+            apiService,
+            organizationSlug,
+            projectId,
+            dataset: params.dataset,
+            query: params.query,
+          })
+        : null;
+
+    if (seerTranslation) {
+      dataset = inputDataset;
+      sentryQuery = seerTranslation.query;
+      fields = seerTranslation.fields;
+      sortParam = seerTranslation.sort;
+      timeParams = seerTranslation.timeParams;
+      explanation = seerTranslation.explanation;
+    } else if (hasAgentProvider()) {
       const agentResult = await searchEventsAgent({
         query: buildSearchRepairPrompt({
           query: params.query,

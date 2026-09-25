@@ -93,6 +93,9 @@ export const OrganizationSchema = z
         organizationUrl: z.string().url(),
       })
       .optional(),
+    // Only returned by the organization details endpoint, not the list endpoint.
+    features: z.array(z.string()).optional(),
+    hideAiFeatures: z.boolean().optional(),
   })
   .passthrough();
 
@@ -873,6 +876,70 @@ export const AutofixRunStateSchema = z.object({
     .passthrough()
     .nullable(),
 });
+
+/**
+ * Schemas for Seer's search agent, which translates natural language into
+ * Sentry search queries.
+ *
+ * Upstream source of truth in getsentry/sentry:
+ * - `src/sentry/seer/endpoints/search_agent_start.py`
+ * - `src/sentry/seer/endpoints/search_agent_state.py`
+ * - `src/sentry/seer/endpoints/search_agent_types.py`
+ */
+export const SearchAgentStartSchema = z
+  .object({
+    // Null until Seer has picked up the run; poll with sentry_run_id instead.
+    run_id: z.number().nullable(),
+    sentry_run_id: z.string(),
+  })
+  .passthrough();
+
+export const SearchAgentQuerySchema = z
+  .object({
+    query: z.string(),
+    group_by: z.array(z.string()).default([]),
+    visualization: z
+      .array(
+        z
+          .object({
+            y_axes: z.array(z.string()).default([]),
+          })
+          .passthrough(),
+      )
+      .default([]),
+    sort: z.string().default(""),
+    // Empty when an absolute start/end range is used instead.
+    stats_period: z.string().default(""),
+    start: z.string().nullable().optional(),
+    end: z.string().nullable().optional(),
+    mode: z.string(),
+    // Cross-event filters, only set for the Traces strategy.
+    span_query: z.string().nullable().optional(),
+    log_query: z.string().nullable().optional(),
+    metric_query: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const SearchAgentTranslateSchema = z
+  .object({
+    responses: z.array(SearchAgentQuerySchema),
+    unsupported_reason: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const SearchAgentStateSchema = z
+  .object({
+    session: z
+      .object({
+        // Only `status` is set while the run is still being created in Seer.
+        status: z.string(),
+        final_response: SearchAgentTranslateSchema.nullable().optional(),
+        unsupported_reason: z.string().nullable().optional(),
+      })
+      .passthrough()
+      .nullable(),
+  })
+  .passthrough();
 
 export const EventAttachmentSchema = z.object({
   id: z.string(),

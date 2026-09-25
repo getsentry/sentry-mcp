@@ -42,6 +42,8 @@ import {
   ClientKeyListSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
+  SearchAgentStartSchema,
+  SearchAgentStateSchema,
   TraceMetaSchema,
   TraceSchema,
   UserSchema,
@@ -61,6 +63,8 @@ import type { SentryProtocol } from "../types";
 import type {
   AutofixRun,
   AutofixRunState,
+  SearchAgentStart,
+  SearchAgentState,
   ClientKey,
   ClientKeyList,
   Event,
@@ -2612,6 +2616,55 @@ export class SentryApiService {
       opts,
     );
     return AutofixRunStateSchema.parse(body);
+  }
+
+  // POST https://us.sentry.io/api/0/organizations/my-org/search-agent/start/
+  async startSearchAgent(
+    {
+      organizationSlug,
+      projectIds,
+      naturalLanguageQuery,
+      strategy,
+    }: {
+      organizationSlug: string;
+      projectIds: number[];
+      naturalLanguageQuery: string;
+      strategy: "Traces" | "Issues" | "Logs" | "Errors" | "Metrics";
+    },
+    opts?: RequestOptions,
+  ): Promise<SearchAgentStart> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/search-agent/start/`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          project_ids: projectIds,
+          natural_language_query: naturalLanguageQuery,
+          strategy,
+        }),
+      },
+      opts,
+    );
+    return SearchAgentStartSchema.parse(body);
+  }
+
+  // GET https://us.sentry.io/api/0/organizations/my-org/search-agent/state/f47ac10b-58cc-4372-a567-0e02b2c3d479/
+  async getSearchAgentState(
+    {
+      organizationSlug,
+      runId,
+    }: {
+      organizationSlug: string;
+      runId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<SearchAgentState> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/search-agent/state/${encodeURIComponent(runId)}/`,
+      undefined,
+      opts,
+    );
+    return SearchAgentStateSchema.parse(body);
   }
 
   /**

@@ -783,7 +783,7 @@
         "dataset": {
           "type": "string",
           "enum": ["spans", "errors", "logs", "metrics", "profiles", "replays"],
-          "description": "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured."
+          "description": "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured. Pass it with projectSlug so Seer can translate natural language queries when the organization has Seer enabled."
         },
         "query": {
           "type": "string",
