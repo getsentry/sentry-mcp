@@ -1394,6 +1394,7 @@ describe("buildServer", () => {
           },
         ],
         hasMore: false,
+        nextCursor: null,
       });
       expect(getTextContent(result)).toBe(
         getGeneratedTextFromStructuredContent(result),

@@ -14,7 +14,7 @@ describe("find_teams", () => {
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/teams/",
         ({ request }) => {
-          expect(new URL(request.url).searchParams.get("per_page")).toBe("26");
+          expect(new URL(request.url).searchParams.get("per_page")).toBe("100");
           return HttpResponse.json([
             {
               id: 4509106740854784,
@@ -31,6 +31,7 @@ describe("find_teams", () => {
         organizationSlug: "sentry-mcp-evals",
         query: null,
         regionUrl: null,
+        cursor: null,
       },
       getServerContext(),
     );
@@ -42,6 +43,7 @@ describe("find_teams", () => {
     expect(structuredContent).toMatchInlineSnapshot(`
       {
         "hasMore": false,
+        "nextCursor": null,
         "teams": [
           {
             "id": "4509106740854784",
@@ -52,18 +54,23 @@ describe("find_teams", () => {
     `);
   });
 
-  it("reports more results and returns only the first 25 teams", async () => {
+  it("returns up to 100 teams per call and reports a cursor when there are more", async () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/teams/",
         ({ request }) => {
-          expect(new URL(request.url).searchParams.get("per_page")).toBe("26");
+          expect(new URL(request.url).searchParams.get("per_page")).toBe("100");
           return HttpResponse.json(
-            Array.from({ length: 26 }, (_, index) => ({
+            Array.from({ length: 100 }, (_, index) => ({
               id: index + 1,
-              slug: `team-${String(index + 1).padStart(2, "0")}`,
+              slug: `team-${String(index + 1).padStart(3, "0")}`,
               name: `Team ${index + 1}`,
             })),
+            {
+              headers: {
+                Link: '<https://sentry.io/api/0/organizations/sentry-mcp-evals/teams/?cursor=page-2>; rel="next"; results="true"; cursor="page-2"',
+              },
+            },
           );
         },
       ),
@@ -74,17 +81,19 @@ describe("find_teams", () => {
         organizationSlug: "sentry-mcp-evals",
         query: null,
         regionUrl: null,
+        cursor: null,
       },
       getServerContext(),
     );
 
     assertStructuredOnlyResult(result);
     expect(getStructuredContent(result)).toEqual({
-      teams: Array.from({ length: 25 }, (_, index) => ({
-        slug: `team-${String(index + 1).padStart(2, "0")}`,
+      teams: Array.from({ length: 100 }, (_, index) => ({
+        slug: `team-${String(index + 1).padStart(3, "0")}`,
         id: String(index + 1),
       })),
       hasMore: true,
+      nextCursor: "page-2",
     });
   });
 });
