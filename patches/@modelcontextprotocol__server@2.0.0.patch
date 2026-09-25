@@ -1,0 +1,72 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 2c5dfa28fc4f0260084f7f5e02c5b397eaf141ff..e4b76725199e0f1b353be76ba92de18728c58eed 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -1237,6 +1237,7 @@ function createMcpHandler(factory, options = {}) {
+ 		}
+ 		const stdHeaderRejection = require_src.validateStandardRequestHeaders({
+ 			httpMethod: request.method,
++			protocolVersionHeader: request.headers.get("mcp-protocol-version") ?? void 0,
+ 			mcpMethodHeader: request.headers.get("mcp-method") ?? void 0,
+ 			mcpNameHeader: request.headers.get("mcp-name") ?? void 0
+ 		}, route);
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 3fd82114d539353e1f130f011d31da21c1b93f7d..866494ea5960dac793f2085fd946642325f94bd5 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -1235,6 +1235,7 @@ function createMcpHandler(factory, options = {}) {
+ 		}
+ 		const stdHeaderRejection = validateStandardRequestHeaders({
+ 			httpMethod: request.method,
++			protocolVersionHeader: request.headers.get("mcp-protocol-version") ?? void 0,
+ 			mcpMethodHeader: request.headers.get("mcp-method") ?? void 0,
+ 			mcpNameHeader: request.headers.get("mcp-name") ?? void 0
+ 		}, route);
+diff --git a/dist/src-CX2iR2pK.mjs b/dist/src-CX2iR2pK.mjs
+index a84104122fd3fdc6ae8865c10c65221c76f71ee3..f1abdb743610ded20ff24f23918eccfa98d00f0a 100644
+--- a/dist/src-CX2iR2pK.mjs
++++ b/dist/src-CX2iR2pK.mjs
+@@ -5041,6 +5041,10 @@ function stripHttpOws(value) {
+ function validateStandardRequestHeaders(request, route) {
+ 	if (route.messageKind !== "request") return;
+ 	const method = route.message.method;
++	if (request.protocolVersionHeader === void 0) {
++		const claimed = route.classification.revision;
++		return crossCheckMismatch("version-header-missing", "(missing)", claimed === void 0 ? "the body carries a modern per-request envelope but the required MCP-Protocol-Version header is absent" : `the body envelope names protocol version ${claimed} but the required MCP-Protocol-Version header is absent`, "standard-header-validation");
++	}
+ 	if (request.mcpMethodHeader === void 0) return crossCheckMismatch("method-header-missing", "(missing)", `the body names method ${method} but the required Mcp-Method header is absent`, "standard-header-validation");
+ 	const sourceField = Object.hasOwn(MCP_NAME_HEADER_SOURCE, method) ? MCP_NAME_HEADER_SOURCE[method] : void 0;
+ 	if (sourceField === void 0) return;
+@@ -6761,7 +6765,7 @@ var Protocol = class {
+ 				if (!outcome.ok && outcome.reason === "not-in-era") outcome = dispatchCodec.validateInputRequest(method, request);
+ 				if (!outcome.ok) {
+ 					if (outcome.reason === "not-in-era") throw new ProtocolError(ProtocolErrorCode.InternalError, `No wire schema for ${method} in the resolved era`);
+-					throw new Error(outcome.message);
++					throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Invalid params for ${method}: ${outcome.message}`);
+ 				}
+ 				return Promise.resolve(schemasOrHandler(outcome.value, ctx));
+ 			};
+diff --git a/dist/src-STyD_Vvf.cjs b/dist/src-STyD_Vvf.cjs
+index cf5cbacc42becea62c32f3aa83a5748aebcb33c0..728ce8bddb2dacb0468e942f39a16de2cf50600c 100644
+--- a/dist/src-STyD_Vvf.cjs
++++ b/dist/src-STyD_Vvf.cjs
+@@ -5042,6 +5042,10 @@ function stripHttpOws(value) {
+ function validateStandardRequestHeaders(request, route) {
+ 	if (route.messageKind !== "request") return;
+ 	const method = route.message.method;
++	if (request.protocolVersionHeader === void 0) {
++		const claimed = route.classification.revision;
++		return crossCheckMismatch("version-header-missing", "(missing)", claimed === void 0 ? "the body carries a modern per-request envelope but the required MCP-Protocol-Version header is absent" : `the body envelope names protocol version ${claimed} but the required MCP-Protocol-Version header is absent`, "standard-header-validation");
++	}
+ 	if (request.mcpMethodHeader === void 0) return crossCheckMismatch("method-header-missing", "(missing)", `the body names method ${method} but the required Mcp-Method header is absent`, "standard-header-validation");
+ 	const sourceField = Object.hasOwn(MCP_NAME_HEADER_SOURCE, method) ? MCP_NAME_HEADER_SOURCE[method] : void 0;
+ 	if (sourceField === void 0) return;
+@@ -6762,7 +6766,7 @@ var Protocol = class {
+ 				if (!outcome.ok && outcome.reason === "not-in-era") outcome = dispatchCodec.validateInputRequest(method, request);
+ 				if (!outcome.ok) {
+ 					if (outcome.reason === "not-in-era") throw new ProtocolError(ProtocolErrorCode.InternalError, `No wire schema for ${method} in the resolved era`);
+-					throw new Error(outcome.message);
++					throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Invalid params for ${method}: ${outcome.message}`);
+ 				}
+ 				return Promise.resolve(schemasOrHandler(outcome.value, ctx));
+ 			};
