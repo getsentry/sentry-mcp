@@ -915,6 +915,7 @@ export default defineTool({
       projectId,
       dataset,
       sort: sortParam,
+      crossEventQueries: seerTranslation?.crossEventQueries,
       ...timeParams,
     });
 

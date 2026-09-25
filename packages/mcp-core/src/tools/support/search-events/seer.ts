@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { SentryApiService } from "../../../api-client";
+import type { CrossEventQueries, SentryApiService } from "../../../api-client";
 import {
   ApiAuthenticationError,
   type SearchAgentQuerySchema,
@@ -42,6 +42,7 @@ export interface SeerSearchTranslation {
   sort: string;
   timeParams: { statsPeriod?: string; start?: string; end?: string };
   timeSeries: { yAxis: string; interval: string } | null;
+  crossEventQueries: CrossEventQueries;
   // Other projects Seer suggested searching beyond the requested one.
   suggestedProjectIds: number[];
   explanation: string;
@@ -120,14 +121,26 @@ function toSearchTranslation(
     timeParams = { statsPeriod: "14d" };
   }
 
+  // Filters on other events in the same trace, only returned for spans.
+  const crossEventQueries: CrossEventQueries = {
+    spanQuery: result.span_query || undefined,
+    logQuery: result.log_query || undefined,
+    metricQuery: result.metric_query || undefined,
+  };
+  const crossEventFilters = [
+    ["spans", crossEventQueries.spanQuery],
+    ["logs", crossEventQueries.logQuery],
+    ["metrics", crossEventQueries.metricQuery],
+  ]
+    .filter(([, query]) => query)
+    .map(([type, query]) => `${type} \`${query}\``);
+
   let explanation = "Translated by Seer's search agent.";
-  const crossEventQueries = [
-    result.span_query,
-    result.log_query,
-    result.metric_query,
-  ].filter(Boolean);
-  if (crossEventQueries.length > 0) {
-    explanation += ` Seer also suggested cross-event filters (${crossEventQueries.join(", ")}), which search_events does not apply.`;
+  if (crossEventFilters.length > 0) {
+    // The time series endpoint doesn't support cross-event filters.
+    explanation += timeSeries
+      ? ` Seer also suggested cross-event filters (${crossEventFilters.join(", ")}), which time series results do not apply.`
+      : ` Only includes results whose trace also has matching ${crossEventFilters.join(", ")}.`;
   }
 
   return {
@@ -136,6 +149,7 @@ function toSearchTranslation(
     sort,
     timeParams,
     timeSeries,
+    crossEventQueries,
     suggestedProjectIds,
     explanation,
   };

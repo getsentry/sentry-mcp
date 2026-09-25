@@ -3503,6 +3503,78 @@ describe("search_events", () => {
       expect(result).toContain("- **Total**: 13");
     });
 
+    it("should apply Seer's cross-event filters", async () => {
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        mockSeerState({
+          status: "completed",
+          final_response: {
+            responses: [
+              {
+                ...seerQuery,
+                span_query: "span.op:db",
+                log_query: "severity:error",
+              },
+            ],
+            unsupported_reason: null,
+          },
+        }),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            expect(url.searchParams.get("spanQuery")).toBe("span.op:db");
+            expect(url.searchParams.get("logQuery")).toBe("severity:error");
+            expect(url.searchParams.has("metricQuery")).toBe(false);
+            return HttpResponse.json({ data: [] });
+          },
+        ),
+      );
+
+      const result = await searchEvents.handler(seerParams, context);
+
+      expect(result).toContain(
+        "Only includes results whose trace also has matching spans `span.op:db`, logs `severity:error`.",
+      );
+    });
+
+    it("should note Seer's cross-event filters for a time series", async () => {
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        mockSeerState({
+          status: "completed",
+          final_response: {
+            responses: [
+              {
+                ...seerQuery,
+                group_by: [],
+                visualization: [
+                  { chart_type: 1, y_axes: ["count()"], interval: "1h" },
+                ],
+                sort: "-count()",
+                log_query: "severity:error",
+              },
+            ],
+            unsupported_reason: null,
+          },
+        }),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events-stats/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            expect(url.searchParams.has("logQuery")).toBe(false);
+            return HttpResponse.json({ data: [] });
+          },
+        ),
+      );
+
+      const result = await searchEvents.handler(seerParams, context);
+
+      expect(result).toContain(
+        "Seer also suggested cross-event filters (logs `severity:error`), which time series results do not apply.",
+      );
+    });
+
     it("should keep a grouped Seer query with an interval as a table", async () => {
       mswServer.use(
         mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),

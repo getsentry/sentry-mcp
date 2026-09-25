@@ -179,6 +179,16 @@ import type {
 
 const SENTRY_MCP_SEARCH_EVENTS_REFERRER = "api.mcp.search-events";
 
+/**
+ * Filters on other events in the same trace, e.g. spans whose trace also has a
+ * matching log. Only the spans and logs datasets support them.
+ */
+export type CrossEventQueries = {
+  spanQuery?: string;
+  logQuery?: string;
+  metricQuery?: string;
+};
+
 type ExplorerAggregateParams = {
   fields?: string[];
   aggregateFunctions?: string[];
@@ -4752,6 +4762,7 @@ export class SentryApiService {
     start?: string;
     end?: string;
     sort: string;
+    crossEventQueries?: CrossEventQueries;
   }): URLSearchParams {
     const queryParams = new URLSearchParams();
 
@@ -4775,6 +4786,11 @@ export class SentryApiService {
     if (params.dataset === "spans") {
       queryParams.set("sampling", "NORMAL");
     }
+
+    const { spanQuery, logQuery, metricQuery } = params.crossEventQueries ?? {};
+    if (spanQuery) queryParams.set("spanQuery", spanQuery);
+    if (logQuery) queryParams.set("logQuery", logQuery);
+    if (metricQuery) queryParams.set("metricQuery", metricQuery);
 
     queryParams.set("sort", params.sort);
 
@@ -4808,6 +4824,7 @@ export class SentryApiService {
       start,
       end,
       sort = "-timestamp",
+      crossEventQueries,
     }: {
       organizationSlug: string;
       query: string;
@@ -4819,6 +4836,7 @@ export class SentryApiService {
       start?: string;
       end?: string;
       sort?: string;
+      crossEventQueries?: CrossEventQueries;
     },
     opts?: RequestOptions,
   ) {
@@ -4854,6 +4872,7 @@ export class SentryApiService {
         start,
         end,
         sort,
+        crossEventQueries,
       });
     }
 
