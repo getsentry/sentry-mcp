@@ -852,6 +852,7 @@ export default defineTool({
     //
     // Note: fields and sortParam use the same function syntax sent to the API.
     fields = augmentFieldsWithSort(fields, sortParam);
+    const eventsProjectId = seerTranslation?.projectIds ?? projectId;
 
     const requestFields = buildRequestFields(dataset, fields);
 
@@ -868,7 +869,7 @@ export default defineTool({
       fields: requestFields,
       query: sentryQuery,
       sort: sortParam,
-      projectId,
+      projectId: eventsProjectId,
       environment: environment ?? undefined,
       ...timeParams,
     });
@@ -898,7 +899,7 @@ export default defineTool({
       query: sentryQuery,
       fields: finalRequestFields,
       limit: params.limit,
-      projectId,
+      projectId: eventsProjectId,
       dataset,
       sort: sortParam,
       ...timeParams,
@@ -946,7 +947,7 @@ export default defineTool({
       : apiService.getEventsExplorerUrl(
           organizationSlug,
           sentryQuery,
-          projectId,
+          eventsProjectId,
           dataset,
           fields,
           sortParam,

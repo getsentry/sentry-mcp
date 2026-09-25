@@ -17,6 +17,18 @@ export function isPublicSentryHost(host: string): boolean {
   return isSentryHost(host) && !host.endsWith(".my.sentry.io");
 }
 
+/** One project ID, or several when a search spans multiple projects. */
+export type ProjectIdParam = string | string[];
+
+export function appendProjectParams(
+  params: URLSearchParams,
+  projectId: ProjectIdParam | undefined,
+): void {
+  for (const id of projectId === undefined ? [] : [projectId].flat()) {
+    params.append("project", id);
+  }
+}
+
 export interface TraceMetricIdentifier {
   name: string;
   type: string;
@@ -25,7 +37,7 @@ export interface TraceMetricIdentifier {
 
 export interface TraceMetricsExplorerUrlOptions {
   query: string;
-  projectId?: string;
+  projectId?: ProjectIdParam;
   statsPeriod?: string;
   start?: string;
   end?: string;
@@ -37,7 +49,7 @@ export interface TraceMetricsExplorerUrlOptions {
 
 export interface ProfilesExplorerUrlOptions {
   query: string;
-  projectId?: string;
+  projectId?: ProjectIdParam;
   statsPeriod?: string;
   start?: string;
   end?: string;
@@ -195,9 +207,7 @@ export function getTraceMetricsExploreUrl(
 
   const urlParams = new URLSearchParams();
 
-  if (projectId) {
-    urlParams.set("project", projectId);
-  }
+  appendProjectParams(urlParams, projectId);
 
   if (start && end) {
     urlParams.set("start", start);
@@ -305,9 +315,7 @@ export function getProfilingExplorerUrl(
   if (query) {
     urlParams.set("query", query);
   }
-  if (projectId) {
-    urlParams.set("project", projectId);
-  }
+  appendProjectParams(urlParams, projectId);
   if (sort) {
     urlParams.set("sort", sort);
   }

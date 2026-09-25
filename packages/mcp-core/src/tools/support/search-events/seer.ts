@@ -41,6 +41,8 @@ export interface SeerSearchTranslation {
   fields: string[];
   sort: string;
   timeParams: { statsPeriod?: string; start?: string; end?: string };
+  // Set only when Seer broadened the search beyond the requested project.
+  projectIds?: string[];
   explanation: string;
 }
 
@@ -63,6 +65,7 @@ async function hasSeerSearchAgentAccess(
 function toSearchTranslation(
   result: z.output<typeof SearchAgentQuerySchema>,
   dataset: SeerSearchDataset,
+  expandedProjectIds: number[] | undefined,
 ): SeerSearchTranslation {
   const aggregates = result.visualization.flatMap((chart) => chart.y_axes);
   const fields =
@@ -109,7 +112,18 @@ function toSearchTranslation(
     explanation += ` Seer also suggested cross-event filters (${crossEventQueries.join(", ")}), which search_events does not apply.`;
   }
 
-  return { query: result.query, fields, sort, timeParams, explanation };
+  if (expandedProjectIds) {
+    explanation += ` Seer broadened the search to ${expandedProjectIds.length} projects.`;
+  }
+
+  return {
+    query: result.query,
+    fields,
+    sort,
+    timeParams,
+    projectIds: expandedProjectIds?.map(String),
+    explanation,
+  };
 }
 
 /**
@@ -153,7 +167,17 @@ export async function translateWithSeer({
 
       if (session?.status === "completed") {
         const result = session.final_response?.responses[0];
-        return result ? toSearchTranslation(result, dataset) : null;
+        if (!result) {
+          return null;
+        }
+        // Seer can broaden a project-scoped search, e.g. to other services in
+        // the same trace. With all projects requested there is nothing to add.
+        const returnedProjectIds = session.final_response?.project_ids ?? [];
+        const expandedProjectIds =
+          projectId && returnedProjectIds.some((id) => id !== Number(projectId))
+            ? returnedProjectIds
+            : undefined;
+        return toSearchTranslation(result, dataset, expandedProjectIds);
       }
       if (session?.status === "error") {
         return null;

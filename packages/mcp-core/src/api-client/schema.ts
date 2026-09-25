@@ -1452,6 +1452,9 @@ export const SearchAgentTranslateSchema = z
   .object({
     responses: z.array(SearchAgentQuerySchema),
     unsupported_reason: z.string().nullable().optional(),
+    // Projects Seer scoped the query to, a superset of the requested projects
+    // when it broadens scope. Absent when there's no expansion.
+    project_ids: z.array(z.number()).nullable().optional(),
   })
   .passthrough();
 

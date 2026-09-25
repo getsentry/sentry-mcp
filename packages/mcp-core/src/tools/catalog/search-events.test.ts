@@ -3456,6 +3456,60 @@ describe("search_events", () => {
       expect(result).toContain("Translated by Seer's search agent.");
     });
 
+    it("should search the projects Seer broadened the query to", async () => {
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        mockSeerState({
+          status: "completed",
+          final_response: {
+            responses: [seerQuery],
+            unsupported_reason: null,
+            project_ids: [42, 43],
+          },
+        }),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            expect(url.searchParams.getAll("project")).toEqual(["42", "43"]);
+            return HttpResponse.json({ data: [] });
+          },
+        ),
+      );
+
+      const result = await searchEvents.handler(seerParams, context);
+
+      expect(mockSeerStart).toHaveBeenCalled();
+      expect(result).toContain("Seer broadened the search to 2 projects.");
+    });
+
+    it("should keep the requested project when Seer does not broaden it", async () => {
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        mockSeerState({
+          status: "completed",
+          final_response: {
+            responses: [seerQuery],
+            unsupported_reason: null,
+            project_ids: [42],
+          },
+        }),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            expect(url.searchParams.getAll("project")).toEqual(["42"]);
+            return HttpResponse.json({ data: [] });
+          },
+        ),
+      );
+
+      const result = await searchEvents.handler(seerParams, context);
+
+      expect(mockSeerStart).toHaveBeenCalled();
+      expect(result).not.toContain("Seer broadened the search");
+    });
+
     it("should search all accessible projects without a projectSlug", async () => {
       const mockAllProjectsStart = vi.fn(
         async ({ request }: { request: Request }) => {

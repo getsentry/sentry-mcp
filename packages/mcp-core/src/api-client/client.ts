@@ -28,7 +28,9 @@ import {
   getTraceMetricsExploreUrl,
   getTraceUrl as getTraceUrlUtil,
   getUptimeMonitorUrl as getUptimeMonitorUrlUtil,
+  appendProjectParams,
   isPublicSentryHost,
+  type ProjectIdParam,
   type TraceMetricIdentifier,
 } from "../utils/url-utils";
 import { USER_AGENT } from "../version";
@@ -188,7 +190,7 @@ type ExplorerAggregateParams = {
 type ExplorerUrlParams = ExplorerAggregateParams & {
   organizationSlug: string;
   query: string;
-  projectId?: string;
+  projectId?: ProjectIdParam;
   sort?: string;
   statsPeriod?: string;
   start?: string;
@@ -1220,7 +1222,7 @@ export class SentryApiService {
   private buildDiscoverUrl(params: {
     organizationSlug: string;
     query: string;
-    projectId?: string;
+    projectId?: ProjectIdParam;
     fields?: string[];
     sort?: string;
     statsPeriod?: string;
@@ -1249,9 +1251,7 @@ export class SentryApiService {
     urlParams.set("queryDataset", "error-events");
     urlParams.set("query", query);
 
-    if (projectId) {
-      urlParams.set("project", projectId);
-    }
+    appendProjectParams(urlParams, projectId);
 
     // Discover API includes aggregate functions directly in field list
     if (fields && fields.length > 0) {
@@ -1387,9 +1387,7 @@ export class SentryApiService {
     const urlParams = new URLSearchParams();
     urlParams.set("query", query);
 
-    if (projectId) {
-      urlParams.set("project", projectId);
-    }
+    appendProjectParams(urlParams, projectId);
 
     const isAggregateQuery = this.isAggregateExplorerQuery(params);
 
@@ -1423,7 +1421,7 @@ export class SentryApiService {
     const urlParams = new URLSearchParams();
 
     urlParams.set("logsQuery", query);
-    urlParams.set("project", projectId ?? "-1");
+    appendProjectParams(urlParams, projectId ?? "-1");
 
     const isAggregateQuery = this.isAggregateExplorerQuery(params);
     if (isAggregateQuery) {
@@ -1497,7 +1495,7 @@ export class SentryApiService {
   getEventsExplorerUrl(
     organizationSlug: string,
     query: string,
-    projectId?: string,
+    projectId?: ProjectIdParam,
     dataset: EventsDataset = "spans",
     fields?: string[],
     sort?: string,
@@ -3672,7 +3670,7 @@ export class SentryApiService {
       fields?: string[];
       query?: string;
       orderby?: string[];
-      project?: string;
+      project?: ProjectIdParam;
       environment?: string | string[];
       statsPeriod?: string;
       start?: string;
@@ -3682,9 +3680,7 @@ export class SentryApiService {
   ): Promise<EventsValidationResult> {
     const queryParams = new URLSearchParams();
     queryParams.set("dataset", normalizeEventsDataset(dataset));
-    if (project) {
-      queryParams.set("project", project);
-    }
+    appendProjectParams(queryParams, project);
     if (query) {
       queryParams.set("query", query);
     }
@@ -4700,7 +4696,7 @@ export class SentryApiService {
     query: string;
     fields: string[];
     limit: number;
-    projectId?: string;
+    projectId?: ProjectIdParam;
     dataset?: "errors" | "tracemetrics" | "profiles";
     statsPeriod?: string;
     start?: string;
@@ -4721,9 +4717,7 @@ export class SentryApiService {
       params.end,
     );
 
-    if (params.projectId) {
-      queryParams.set("project", params.projectId);
-    }
+    appendProjectParams(queryParams, params.projectId);
 
     queryParams.set("sort", params.sort);
 
@@ -4746,7 +4740,7 @@ export class SentryApiService {
     query: string;
     fields: string[];
     limit: number;
-    projectId?: string;
+    projectId?: ProjectIdParam;
     dataset: "spans" | "logs";
     statsPeriod?: string;
     start?: string;
@@ -4767,9 +4761,7 @@ export class SentryApiService {
       params.end,
     );
 
-    if (params.projectId) {
-      queryParams.set("project", params.projectId);
-    }
+    appendProjectParams(queryParams, params.projectId);
 
     // Dataset-specific parameters
     if (params.dataset === "spans") {
@@ -4813,7 +4805,7 @@ export class SentryApiService {
       query: string;
       fields: string[];
       limit?: number;
-      projectId?: string;
+      projectId?: ProjectIdParam;
       dataset?: EventsDataset;
       statsPeriod?: string;
       start?: string;
