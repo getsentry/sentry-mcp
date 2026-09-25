@@ -2648,7 +2648,7 @@ export class SentryApiService {
     return SearchAgentStartSchema.parse(body);
   }
 
-  // GET https://us.sentry.io/api/0/organizations/my-org/search-agent/state/f47ac10b-58cc-4372-a567-0e02b2c3d479/
+  // GET https://us.sentry.io/api/0/organizations/my-org/search-agent/state/{runId}/
   async getSearchAgentState(
     {
       organizationSlug,
