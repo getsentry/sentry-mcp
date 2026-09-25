@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { setOrganizationContext } from "../../telem/organization";
 import type { SentryApiService } from "../../api-client";
-import { ApiNotFoundError } from "../../api-client";
+import { ApiClientError, ApiNotFoundError } from "../../api-client";
 import type {
   AutofixRunState,
   CommitterList,
@@ -13,7 +13,7 @@ import type {
   Trace,
   TransactionEvent,
 } from "../../api-client/types";
-import { UserInputError } from "../../errors";
+import { ConfigurationError, UserInputError } from "../../errors";
 import type { CodeLocation } from "../../internal/code-location";
 import type { AIConversationReference } from "../../internal/tool-helpers/ai-conversation-actions";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
@@ -25,6 +25,7 @@ import {
   getReplayIdFromEvent,
   isPerformanceIssueType,
   getSeerActionabilityLabel,
+  getSuspectCommit,
   usesSharedFormatterBody,
 } from "../../internal/formatting";
 import {
@@ -43,7 +44,7 @@ import {
   ParamOrganizationSlug,
   ParamRegionUrl,
 } from "../../schema";
-import { logError } from "../../telem/logging";
+import { logError, logIssue } from "../../telem/logging";
 import type { ServerContext } from "../../types";
 import { resolveCodeLocation } from "../support/code-location";
 
@@ -107,7 +108,6 @@ export const getIssueDetailsOutputSchema = z.object({
       url: z.string(),
     })
     .nullish(),
-  // the first commit from the first committer, matching what the issue page leads with
   suspectCommit: z
     .object({
       id: z.string(),
@@ -211,28 +211,6 @@ function buildReplays(
   };
 }
 
-/**
- * The issue page leads with a single suspect commit: the first committer's first commit.
- * Committers is already the smaller of the two collections that could carry this, so no
- * separate cap is needed the way replays needs one.
- */
-function buildSuspectCommit(
-  committers: CommitterList | undefined,
-): GetIssueDetailsPayload["suspectCommit"] {
-  // the author lives on the committer, not the individual commit
-  const committer = committers?.[0];
-  const commit = committer?.commits?.[0];
-  if (!commit) {
-    return null;
-  }
-  return {
-    id: String(commit.id),
-    message: commit.message,
-    author: committer?.author?.name ?? committer?.author?.email,
-    suspectCommitType: commit.suspectCommitType,
-  };
-}
-
 function buildIssueDetailsPayload({
   organizationSlug,
   issue,
@@ -316,7 +294,7 @@ function buildIssueDetailsPayload({
         }
       : null,
     replays: buildReplays(event, relatedReplayIds),
-    suspectCommit: buildSuspectCommit(committers),
+    suspectCommit: getSuspectCommit(committers),
     // mapped field by field, not handed through: several upstream schemas are passthrough, and
     // structuredContent is a product contract rather than a view of the api response
     externalIssues: externalIssues?.length
@@ -348,6 +326,7 @@ export default defineTool({
     "- Provide a specific issue ID (e.g., 'CLOUDFLARE-MCP-41', 'PROJECT-123')",
     "- Ask to 'explain [ISSUE-ID]', 'tell me about [ISSUE-ID]'",
     "- Want details/stacktrace/analysis for a known issue",
+    "- Want the suspect commit's SHA, message, author, and source when available",
     "- Provide a Sentry issue URL",
     "",
     "DO NOT USE for:",
@@ -504,6 +483,7 @@ export default defineTool({
         relatedReplayIds,
         aiConversations,
         codeLocation,
+        committers,
         experimentalMode: context.experimentalMode,
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
@@ -611,6 +591,7 @@ export default defineTool({
       relatedReplayIds,
       aiConversations,
       codeLocation,
+      committers,
       experimentalMode: context.experimentalMode,
       availableToolNames: context.availableToolNames,
       directToolNames: context.directToolNames,
@@ -663,10 +644,7 @@ async function fetchEventEnrichment({
   return { performanceTrace, aiConversations, codeLocation, committers };
 }
 
-/**
- * Not every project has commit tracking configured, so a 404 here is routine rather than
- * exceptional -- silently caught the same way the other optional enrichments are.
- */
+/** Keeps issue details available when optional commit lookup fails, reporting unexpected failures. */
 async function maybeFetchCommitters({
   apiService,
   organizationSlug,
@@ -678,9 +656,26 @@ async function maybeFetchCommitters({
   projectSlug: string;
   event: Event;
 }): Promise<CommitterList | undefined> {
-  return apiService
-    .getEventCommitters({ organizationSlug, projectSlug, eventId: event.id })
-    .catch(() => undefined);
+  try {
+    return await apiService.getEventCommitters({
+      organizationSlug,
+      projectSlug,
+      eventId: event.id,
+    });
+  } catch (error) {
+    if (
+      !(error instanceof ApiClientError) &&
+      !(error instanceof ConfigurationError)
+    ) {
+      logIssue(error, {
+        loggerScope: ["tools", "get-issue-details", "committers"],
+        contexts: {
+          request: { organizationSlug, projectSlug, eventId: event.id },
+        },
+      });
+    }
+    return undefined;
+  }
 }
 
 /**
