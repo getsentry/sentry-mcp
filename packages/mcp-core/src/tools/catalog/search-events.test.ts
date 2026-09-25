@@ -3507,6 +3507,27 @@ describe("search_events", () => {
       expect(mockSeerStart).toHaveBeenCalled();
     });
 
+    it.each([
+      ["a structured query", { query: "span.op:http.client" }],
+      ["explicit fields", { fields: ["span.description", "count()"] }],
+      ["an explicit sort", { sort: "-count()" }],
+    ])("should skip Seer for %s", async (_, overrides) => {
+      mockGenerateText.mockResolvedValueOnce(
+        mockAIResponse("spans", "span.op:http.client"),
+      );
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+          HttpResponse.json({ data: [] }),
+        ),
+      );
+
+      await searchEvents.handler({ ...seerParams, ...overrides }, context);
+
+      expect(mockSeerStart).not.toHaveBeenCalled();
+      expect(mockGenerateText).toHaveBeenCalled();
+    });
+
     it("should fall back to the agent when Seer is not enabled", async () => {
       mockGenerateText.mockResolvedValueOnce(
         mockAIResponse("spans", "span.op:http.client"),

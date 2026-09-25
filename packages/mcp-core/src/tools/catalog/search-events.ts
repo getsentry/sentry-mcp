@@ -563,13 +563,17 @@ export default defineTool({
     // only when nothing references an environment — including a structured query
     // that skips the agent but puts `environment:` in the query string.
     // Seer only translates into the dataset it is given and needs a project to
-    // search in, so it runs only when both are explicit.
+    // search in, so it runs only when both are explicit. It only sees the
+    // natural language query, so skip it for structured queries and explicit
+    // fields or sort, which the embedded agent preserves.
     const seerTranslation =
       params.query &&
       projectId &&
       isSeerSearchDataset(params.dataset) &&
       !params.environment &&
-      !canRunWithoutAgent
+      !hasStructuredQuery &&
+      !hasExplicitFields &&
+      !hasExplicitSort
         ? await translateWithSeer({
             apiService,
             organizationSlug,
