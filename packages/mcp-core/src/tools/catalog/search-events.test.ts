@@ -3456,6 +3456,34 @@ describe("search_events", () => {
       expect(result).toContain("Translated by Seer's search agent.");
     });
 
+    it("should search all accessible projects without a projectSlug", async () => {
+      const mockAllProjectsStart = vi.fn(
+        async ({ request }: { request: Request }) => {
+          expect(await request.json()).toMatchObject({ project_ids: [-1] });
+          return HttpResponse.json({ run_id: 1, sentry_run_id: "run-uuid" });
+        },
+      );
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        http.post(
+          "https://sentry.io/api/0/organizations/test-org/search-agent/start/",
+          mockAllProjectsStart,
+        ),
+        mockSeerState({
+          status: "completed",
+          final_response: { responses: [seerQuery], unsupported_reason: null },
+        }),
+        http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+          HttpResponse.json({ data: [] }),
+        ),
+      );
+
+      await searchEvents.handler({ ...seerParams, projectSlug: null }, context);
+
+      expect(mockAllProjectsStart).toHaveBeenCalled();
+      expect(mockGenerateText).not.toHaveBeenCalled();
+    });
+
     it("should prefer an explicit period over Seer's time range", async () => {
       mswServer.use(
         mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),

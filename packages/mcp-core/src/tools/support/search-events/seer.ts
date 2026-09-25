@@ -14,6 +14,9 @@ import { RECOMMENDED_FIELDS } from "./config";
 export const SEER_SEARCH_AGENT_POLLING_INTERVAL = 1000; // 1 second
 export const SEER_SEARCH_AGENT_TIMEOUT = 60 * 1000; // 1 minute
 
+// Sentry's sentinel for all projects the user can access.
+const ALL_ACCESSIBLE_PROJECTS = -1;
+
 // Organization features the search agent endpoints require. `hideAiFeatures`
 // is checked separately.
 const REQUIRED_FEATURES = ["gen-ai-features", "gen-ai-search-agent-translate"];
@@ -125,7 +128,7 @@ export async function translateWithSeer({
 }: {
   apiService: SentryApiService;
   organizationSlug: string;
-  projectId: string;
+  projectId?: string;
   dataset: SeerSearchDataset;
   query: string;
 }): Promise<SeerSearchTranslation | null> {
@@ -136,7 +139,7 @@ export async function translateWithSeer({
 
     const run = await apiService.startSearchAgent({
       organizationSlug,
-      projectIds: [Number(projectId)],
+      projectIds: [projectId ? Number(projectId) : ALL_ACCESSIBLE_PROJECTS],
       naturalLanguageQuery: query,
       strategy: SEER_STRATEGIES[dataset],
     });

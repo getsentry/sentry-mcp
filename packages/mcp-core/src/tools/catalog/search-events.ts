@@ -421,7 +421,7 @@ export default defineTool({
       .enum(SEARCH_EVENTS_DATASETS)
       .optional()
       .describe(
-        "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured. Pass it with projectSlug so Seer can translate natural language queries when the organization has Seer enabled.",
+        "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured. Pass it so Seer can translate natural language queries when the organization has Seer enabled.",
       ),
     query: z
       .string()
@@ -562,13 +562,12 @@ export default defineTool({
     // (below) and to flag any requested environment that doesn't exist. Skipped
     // only when nothing references an environment — including a structured query
     // that skips the agent but puts `environment:` in the query string.
-    // Seer only translates into the dataset it is given and needs a project to
-    // search in, so it runs only when both are explicit. It only sees the
-    // natural language query, so skip it for structured queries and explicit
-    // fields or sort, which the embedded agent preserves.
+    // Seer only translates into the dataset it is given, so it runs only when
+    // one is explicit. It only sees the natural language query, so skip it for
+    // structured queries and explicit fields or sort, which the embedded agent
+    // preserves.
     const seerTranslation =
       params.query &&
-      projectId &&
       isSeerSearchDataset(params.dataset) &&
       !params.environment &&
       !hasStructuredQuery &&
