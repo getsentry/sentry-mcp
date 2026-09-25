@@ -45,7 +45,11 @@ async function hasSeerSearchAgentAccess(
   apiService: SentryApiService,
   organizationSlug: string,
 ): Promise<boolean> {
-  const organization = await apiService.getOrganization(organizationSlug);
+  // Sentry omits `features` unless explicitly requested.
+  const organization = await apiService.getOrganization(organizationSlug, {
+    includeFeatureFlags: true,
+    detailed: false,
+  });
   if (organization.hideAiFeatures) {
     return false;
   }

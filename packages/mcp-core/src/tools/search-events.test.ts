@@ -1670,14 +1670,21 @@ describe("search_events", () => {
     };
 
     const mockOrganization = (features: string[]) =>
-      http.get("https://sentry.io/api/0/organizations/test-org/", () =>
-        HttpResponse.json({
-          id: "1",
-          slug: "test-org",
-          name: "Test Org",
-          features,
-          hideAiFeatures: false,
-        }),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/",
+        ({ request }) =>
+          HttpResponse.json({
+            id: "1",
+            slug: "test-org",
+            name: "Test Org",
+            // Sentry only serializes features when explicitly requested.
+            ...(new URL(request.url).searchParams.get(
+              "include_feature_flags",
+            ) === "1"
+              ? { features }
+              : {}),
+            hideAiFeatures: false,
+          }),
       );
     const mockProject = http.get(
       "https://sentry.io/api/0/projects/test-org/test-project/",

@@ -1092,12 +1092,27 @@ export class SentryApiService {
    * Gets a single organization by slug.
    *
    * @param organizationSlug Organization identifier
+   * @param params Query parameters
+   * @param params.includeFeatureFlags Include `features` in the response (omitted by Sentry otherwise)
+   * @param params.detailed Include projects and teams (Sentry defaults to true)
    * @param opts Request options including host override
    * @returns Organization data
    */
-  async getOrganization(organizationSlug: string, opts?: RequestOptions) {
+  async getOrganization(
+    organizationSlug: string,
+    params?: { includeFeatureFlags?: boolean; detailed?: boolean },
+    opts?: RequestOptions,
+  ) {
+    const queryParams = new URLSearchParams();
+    if (params?.includeFeatureFlags) {
+      queryParams.set("include_feature_flags", "1");
+    }
+    if (params?.detailed === false) {
+      queryParams.set("detailed", "0");
+    }
+    const queryString = queryParams.toString();
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/`,
+      `/organizations/${organizationSlug}/${queryString ? `?${queryString}` : ""}`,
       undefined,
       opts,
     );
