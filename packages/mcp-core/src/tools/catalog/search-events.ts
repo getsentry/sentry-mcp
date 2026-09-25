@@ -513,17 +513,6 @@ export default defineTool({
       isTraceItemDataset(inputDataset) &&
       hasStructuredQuery;
 
-    if (
-      !hasAgentProvider() &&
-      inputDataset !== "replays" &&
-      params.environment &&
-      !canApplyEnvironmentFilter
-    ) {
-      throw new UserInputError(
-        "The `environment` parameter is only supported for dataset='replays'. For other datasets, include environment filtering in the query string instead.",
-      );
-    }
-
     let projectId: string | undefined;
     if (params.projectSlug) {
       const project = await apiService.getProject({
@@ -565,11 +554,11 @@ export default defineTool({
     // Seer only translates into the dataset it is given, so it runs only when
     // one is explicit. It only sees the natural language query, so skip it for
     // structured queries and explicit fields or sort, which the embedded agent
-    // preserves.
+    // preserves. Like the UI, an explicit environment is added to Seer's query
+    // afterwards.
     const seerTranslation =
       params.query &&
       isSeerSearchDataset(params.dataset) &&
-      !params.environment &&
       !hasStructuredQuery &&
       !hasExplicitFields &&
       !hasExplicitSort
@@ -581,6 +570,18 @@ export default defineTool({
             query: params.query,
           })
         : null;
+
+    if (
+      !hasAgentProvider() &&
+      inputDataset !== "replays" &&
+      params.environment &&
+      !canApplyEnvironmentFilter &&
+      !seerTranslation
+    ) {
+      throw new UserInputError(
+        "The `environment` parameter is only supported for dataset='replays'. For other datasets, include environment filtering in the query string instead.",
+      );
+    }
 
     const willRunAgent =
       hasAgentProvider() && !canRunWithoutAgent && !seerTranslation;

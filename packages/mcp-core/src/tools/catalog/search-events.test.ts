@@ -3456,6 +3456,38 @@ describe("search_events", () => {
       expect(result).toContain("Translated by Seer's search agent.");
     });
 
+    it("should add an explicit environment to Seer's query", async () => {
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        mockSeerState({
+          status: "completed",
+          final_response: { responses: [seerQuery], unsupported_reason: null },
+        }),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/environments/",
+          () => HttpResponse.json([{ id: "1", name: "production" }]),
+        ),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            expect(url.searchParams.get("query")).toBe(
+              "span.op:http.client environment:production",
+            );
+            return HttpResponse.json({ data: [] });
+          },
+        ),
+      );
+
+      await searchEvents.handler(
+        { ...seerParams, environment: "production" },
+        context,
+      );
+
+      expect(mockSeerStart).toHaveBeenCalled();
+      expect(mockGenerateText).not.toHaveBeenCalled();
+    });
+
     it("should search the projects Seer broadened the query to", async () => {
       mswServer.use(
         mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
