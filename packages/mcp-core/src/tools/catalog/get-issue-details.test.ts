@@ -12,8 +12,9 @@ import {
   mswServer,
 } from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Skill } from "../../skills";
+import * as logging from "../../telem/logging";
 import { getTextContent } from "../../test-utils/structured-content";
 import getIssueDetails, {
   getIssueDetailsOutputSchema,
@@ -2656,4 +2657,211 @@ describe("structuredContent", () => {
     expect(payload.replays.relatedCount).toBe(51);
     expect(payload.replays.related).toHaveLength(5);
   });
+});
+
+describe("suspect commits", () => {
+  const sha = "2ce6a2700fec4913a2cde8e2d41dee362ce6a270";
+  const params = {
+    organizationSlug: "sentry-mcp-evals",
+    issueId: "CLOUDFLARE-MCP-41",
+    eventId: undefined,
+    issueUrl: undefined,
+    regionUrl: null,
+  };
+  const formatted = {
+    format: "json",
+    content: JSON.stringify({ title: { text: "Example error" } }),
+  };
+  const committersUrl =
+    "https://sentry.io/api/0/projects/sentry-mcp-evals/CLOUDFLARE-MCP/events/abc123def456/committers/";
+
+  function mockEvent(options: { type?: string; formatted?: unknown } = {}) {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/:eventId/",
+        () => HttpResponse.json({ ...createDefaultEvent(), ...options }),
+      ),
+    );
+  }
+
+  beforeEach(() => mswServer.resetHandlers());
+  afterEach(() => {
+    mswServer.resetHandlers();
+    vi.restoreAllMocks();
+  });
+
+  describe.each([
+    { mode: "structured JSON", type: "error", formatted, structured: true },
+    {
+      mode: "Markdown without the formatter rollout",
+      type: "error",
+      formatted: undefined,
+      structured: false,
+    },
+    {
+      mode: "Markdown for transactions",
+      type: "transaction",
+      formatted,
+      structured: false,
+    },
+  ])("$mode", ({ type, formatted, structured }) => {
+    it.each([
+      { selection: "latest event", eventId: undefined },
+      {
+        selection: "explicit event ID",
+        eventId: "7ca573c0f4814912aaa9bdc77d1a7d51",
+      },
+    ])(
+      "includes the suspect commit for the $selection",
+      async ({ eventId }) => {
+        mockEvent({ type, formatted });
+        mswServer.use(
+          http.get(committersUrl, () => {
+            return HttpResponse.json({
+              committers: [
+                {
+                  author: { name: "Jane Developer", email: "jane@example.com" },
+                  commits: [
+                    {
+                      id: sha,
+                      message: "Fix duplicate tool registration",
+                      suspectCommitType: "via SCM integration",
+                    },
+                  ],
+                },
+              ],
+            });
+          }),
+        );
+
+        const result = await getIssueDetails.handler(
+          { ...params, eventId },
+          baseContext,
+        );
+
+        if (structured) {
+          const payload = getIssueDetailsOutputSchema.parse(
+            (result as { structuredContent: unknown }).structuredContent,
+          );
+          expect(payload.suspectCommit).toEqual({
+            id: sha,
+            message: "Fix duplicate tool registration",
+            author: "Jane Developer",
+            suspectCommitType: "via SCM integration",
+          });
+        } else {
+          expect(result).toContain(`## Suspect Commit
+
+**SHA**: \`${sha}\`
+**Message**: Fix duplicate tool registration
+**Author**: Jane Developer
+**Source**: via SCM integration
+
+## Event Details`);
+        }
+      },
+    );
+  });
+
+  it("omits unavailable optional commit fields from Markdown", async () => {
+    mockEvent({ formatted: undefined });
+    mswServer.use(
+      http.get(committersUrl, () =>
+        HttpResponse.json({
+          committers: [{ author: null, commits: [{ id: sha, message: null }] }],
+        }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+
+    expect(result).toContain(`## Suspect Commit
+
+**SHA**: \`${sha}\`
+
+## Event Details`);
+  });
+
+  it.each([
+    { mode: "structured JSON", formatted, structured: true },
+    { mode: "Markdown", formatted: undefined, structured: false },
+  ])(
+    "omits an absent suspect commit in $mode",
+    async ({ formatted, structured }) => {
+      mockEvent({ formatted });
+
+      const result = await getIssueDetails.handler(params, baseContext);
+
+      if (structured) {
+        const payload = getIssueDetailsOutputSchema.parse(
+          (result as { structuredContent: unknown }).structuredContent,
+        );
+        expect(payload.suspectCommit).toBeNull();
+      } else {
+        expect(result).not.toContain("## Suspect Commit");
+        expect(result).toContain("## Event Details");
+      }
+    },
+  );
+
+  it.each([403, 404])(
+    "preserves issue details without reporting expected HTTP %s failures",
+    async (status) => {
+      mockEvent({ formatted });
+      const logIssue = vi.spyOn(logging, "logIssue").mockReturnValue(undefined);
+      mswServer.use(
+        http.get(committersUrl, () =>
+          HttpResponse.json(
+            { detail: "Commit tracking unavailable" },
+            { status },
+          ),
+        ),
+      );
+
+      const result = await getIssueDetails.handler(params, baseContext);
+      const payload = getIssueDetailsOutputSchema.parse(
+        (result as { structuredContent: unknown }).structuredContent,
+      );
+
+      expect(payload.issue.shortId).toBe("CLOUDFLARE-MCP-41");
+      expect(payload.suspectCommit).toBeNull();
+      expect(logIssue).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    {
+      failure: "server failure",
+      status: 500,
+      body: { detail: "Internal error" },
+    },
+    {
+      failure: "invalid response schema",
+      status: 200,
+      body: { committers: [{ commits: [{ message: "Missing commit ID" }] }] },
+    },
+  ])(
+    "reports a $failure while preserving issue details",
+    async ({ status, body }) => {
+      mockEvent({ formatted });
+      const logIssue = vi.spyOn(logging, "logIssue").mockReturnValue(undefined);
+      mswServer.use(
+        http.get(committersUrl, () => HttpResponse.json(body, { status })),
+      );
+
+      const result = await getIssueDetails.handler(params, baseContext);
+      const payload = getIssueDetailsOutputSchema.parse(
+        (result as { structuredContent: unknown }).structuredContent,
+      );
+
+      expect(payload.issue.shortId).toBe("CLOUDFLARE-MCP-41");
+      expect(payload.suspectCommit).toBeNull();
+      expect(logIssue).toHaveBeenCalledExactlyOnceWith(
+        expect.any(Error),
+        expect.objectContaining({
+          loggerScope: ["tools", "get-issue-details", "committers"],
+        }),
+      );
+    },
+  );
 });
