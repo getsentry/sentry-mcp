@@ -57,7 +57,6 @@ describe("buildStdioServerLaunchConfig", () => {
         accessToken: "token-123",
         host: "us.sentry.io",
         sentryDsn: "https://dsn.example/1",
-        useAgentEndpoint: true,
         useExperimental: true,
       },
       {
@@ -69,7 +68,6 @@ describe("buildStdioServerLaunchConfig", () => {
       "--access-token=token-123",
       "--host=us.sentry.io",
       "--sentry-dsn=https://dsn.example/1",
-      "--agent",
       "--experimental",
     ]);
     expect(launchConfig.env).toEqual({

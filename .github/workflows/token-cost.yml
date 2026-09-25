@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       # pnpm/action-setup@v4
       - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
@@ -89,7 +89,7 @@ jobs:
 
           ---
 
-          **Note:** This measures the static overhead of tool definitions sent to LLM clients with every request. Lower is better. The \`use_sentry\` tool is excluded as it's only available in agent mode.
+          **Note:** This measures the static overhead of tool definitions sent to LLM clients with every request. Lower is better.
           REPORT_EOF
 
           # Display report

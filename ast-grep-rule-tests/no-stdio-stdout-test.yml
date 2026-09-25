@@ -1,0 +1,15 @@
+id: no-stdio-stdout
+valid:
+  - |
+    logInfo("MCP server started", {
+      loggerScope: ["server", "lifecycle"],
+    });
+  - |
+    console.error("Error: Invalid argument");
+invalid:
+  - |
+    console.log("MCP server started");
+  - |
+    console.info("transport connected");
+  - |
+    console.debug("raw frame", frame);

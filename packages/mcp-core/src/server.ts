@@ -1,4 +1,4 @@
-import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer as LegacyMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 /**
  * MCP Server Configuration and Request Handling Infrastructure.
  *
@@ -19,35 +19,89 @@ import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
  * });
  * ```
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
-import type {
-  ServerNotification,
-  ServerRequest,
-} from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import {
   getActiveSpan,
+  type SpanAttributeValue,
   setTag,
   setUser,
-  wrapMcpServerWithSentry,
 } from "@sentry/core";
+import { wrapMcpServerWithSentry } from "@sentry/core/server";
 import { isApiAuthenticationErrorDeep } from "./api-client";
 import { MCP_SERVER_NAME } from "./constants";
 import {
-  getConstraintKeysToFilter,
-  getConstraintParametersToInject,
-} from "./internal/constraint-helpers";
-import { formatErrorForUser } from "./internal/error-handling";
-import { type Skill, isEnabledBySkills } from "./skills";
+  formatErrorForUser,
+  isExpectedToolError,
+  recordToolFailure,
+} from "./internal/error-handling";
+import type { Skill } from "./skills";
 import { type LogIssueOptions, logIssue } from "./telem/logging";
-import tools from "./tools/index";
 import {
-  type ToolConfig,
-  isToolVisibleInMode,
-  resolveDescription,
-} from "./tools/types";
-import type { ProjectCapabilities, ServerContext } from "./types";
+  executeToolHandler,
+  getAvailableTools,
+  getFilteredInputSchema,
+  injectConstraintParams,
+  resolveToolDescription,
+  type ToolRegistry,
+} from "./tools/catalog-runtime/availability";
+import tools from "./tools/index";
+import type { StructuredToolOutput } from "./tools/types";
+import type { ServerContext } from "./types";
 import { LIB_VERSION } from "./version";
+
+function getSkillGrantedAttributeName(skill: Skill): string {
+  return `app.consent.skill.${skill.replaceAll("-", "_")}.granted`;
+}
+
+function isCallToolResult(output: unknown): output is CallToolResult {
+  return (
+    !!output &&
+    typeof output === "object" &&
+    !Array.isArray(output) &&
+    Array.isArray((output as { content?: unknown }).content)
+  );
+}
+
+/**
+ * Detects structured-only tool output. Full CallToolResult objects are excluded
+ * so compatibility text generation stays centralized in server.ts.
+ */
+function isStructuredToolOutput(
+  output: unknown,
+): output is StructuredToolOutput {
+  return (
+    !!output &&
+    typeof output === "object" &&
+    !Array.isArray(output) &&
+    "structuredContent" in output &&
+    !("content" in output) &&
+    !!(output as { structuredContent?: unknown }).structuredContent &&
+    typeof (output as { structuredContent?: unknown }).structuredContent ===
+      "object" &&
+    !Array.isArray(
+      (output as { structuredContent?: unknown }).structuredContent,
+    )
+  );
+}
+
+/**
+ * Wraps structured-only output in an MCP CallToolResult with generated JSON
+ * text for clients that do not read structuredContent yet.
+ */
+function structuredOutputToCallToolResult(
+  output: StructuredToolOutput,
+): CallToolResult {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify(output.structuredContent, null, 2),
+      },
+    ],
+    structuredContent: output.structuredContent,
+  };
+}
 
 /**
  * Creates and configures a complete MCP server with Sentry instrumentation.
@@ -72,64 +126,60 @@ import { LIB_VERSION } from "./version";
  * await startStdio(server, context);
  * ```
  *
- * @example Usage with Cloudflare Workers
- * ```typescript
- * import { buildServer } from "@sentry/mcp-core/server";
- * import { createMcpHandler } from "agents/mcp";
- * import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
- *
- * const serverContext = buildContextFromOAuth();
- * // Context is captured in closures during buildServer()
- * // Use CfWorkerJsonSchemaValidator for Cloudflare Workers (ajv is not compatible)
- * const server = buildServer({
- *   context: serverContext,
- *   jsonSchemaValidator: new CfWorkerJsonSchemaValidator(),
- * });
- *
- * // Context already available to tool handlers via closures
- * return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
- * ```
  */
+type McpServer = LegacyMcpServer | ModernMcpServer;
+
+type BuildServerOptions = {
+  context: ServerContext;
+  experimentalMode?: boolean;
+  tools?: ToolRegistry;
+};
+
+export function buildServer(
+  options: BuildServerOptions & { sdkVersion: "v2" },
+): ModernMcpServer;
+export function buildServer(options: BuildServerOptions): LegacyMcpServer;
 export function buildServer({
   context,
-  agentMode = false,
   experimentalMode = false,
   tools: customTools,
-  jsonSchemaValidator,
-}: {
-  context: ServerContext;
-  agentMode?: boolean;
-  experimentalMode?: boolean;
-  tools?: Record<string, ToolConfig<any>>;
-  /**
-   * JSON Schema validator for MCP protocol validation.
-   *
-   * By default, uses AjvJsonSchemaValidator which requires Node.js.
-   * For Cloudflare Workers or other edge runtimes, use CfWorkerJsonSchemaValidator:
-   *
-   * ```typescript
-   * import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
-   * buildServer({ context, jsonSchemaValidator: new CfWorkerJsonSchemaValidator() });
-   * ```
-   */
-  jsonSchemaValidator?: ServerOptions["jsonSchemaValidator"];
+  sdkVersion = "v1",
+}: BuildServerOptions & {
+  sdkVersion?: "v1" | "v2";
 }): McpServer {
-  const server = new McpServer(
-    {
-      name: MCP_SERVER_NAME,
-      version: LIB_VERSION,
-    },
-    { jsonSchemaValidator },
-  );
+  const contextWithModes: ServerContext = {
+    ...context,
+    experimentalMode,
+  };
+  const serverInfo = {
+    name: MCP_SERVER_NAME,
+    version: LIB_VERSION,
+  };
 
-  configureServer({
+  if (sdkVersion === "v2") {
+    const server = new ModernMcpServer(serverInfo);
+    const registrations = configureServer({
+      server,
+      context: contextWithModes,
+      experimentalMode,
+      tools: customTools,
+    });
+    for (const { name, config, handler } of registrations) {
+      server.registerTool(name, config, handler);
+    }
+    return wrapMcpServerWithSentry(server);
+  }
+
+  const server = new LegacyMcpServer(serverInfo);
+  const registrations = configureServer({
     server,
-    context,
-    agentMode,
+    context: contextWithModes,
     experimentalMode,
     tools: customTools,
   });
-
+  for (const { name, config, handler } of registrations) {
+    server.registerTool(name, config, handler);
+  }
   return wrapMcpServerWithSentry(server);
 }
 
@@ -139,45 +189,44 @@ export function buildServer({
  * Internal function used by buildServer(). Use buildServer() instead for most cases.
  * Tools are filtered at registration time based on grantedSkills, and context is
  * captured in closures for tool handler execution.
- *
- * In agent mode, only the use_sentry tool is registered, bypassing authorization checks.
  */
 function configureServer({
   server,
   context,
-  agentMode = false,
   experimentalMode = false,
   tools: customTools,
 }: {
   server: McpServer;
   context: ServerContext;
-  agentMode?: boolean;
   experimentalMode?: boolean;
-  tools?: Record<string, ToolConfig<any>>;
+  tools?: ToolRegistry;
 }) {
-  // Determine which tools to register:
-  // - Agent mode: only use_sentry
-  // - Custom tools provided: use those
-  // - Default: all standard tools
-  let toolsToRegister = agentMode
-    ? { use_sentry: tools.use_sentry }
-    : (customTools ?? tools);
-
-  // Filter tools based on public visibility and experimental mode
-  // (applies to all tools, including custom)
-  // Skip in agent mode (use_sentry handles filtering internally)
-  if (!agentMode) {
-    toolsToRegister = Object.fromEntries(
-      Object.entries(toolsToRegister).filter(([, tool]) =>
-        isToolVisibleInMode(tool, experimentalMode),
-      ),
-    ) as typeof toolsToRegister;
-  }
+  const registrations = [];
+  const registry: ToolRegistry = customTools ?? tools;
 
   // Get granted skills from context for tool filtering
   const grantedSkills: Set<Skill> | undefined = context.grantedSkills
     ? new Set<Skill>(context.grantedSkills)
     : undefined;
+  const grantedSkillIds = grantedSkills
+    ? Array.from(grantedSkills).sort()
+    : undefined;
+  const availableTools = getAvailableTools({
+    tools: registry,
+    context,
+    experimentalMode,
+    useDefaultSurfacePolicy: !customTools,
+  });
+  const toolsToRegister = availableTools.filter(({ isTopLevel }) => isTopLevel);
+  const contextWithToolAvailability: ServerContext = {
+    ...context,
+    availableToolNames: new Set(
+      availableTools.flatMap(({ key, tool }) => [key, tool.name]),
+    ),
+    directToolNames: new Set(
+      toolsToRegister.flatMap(({ key, tool }) => [key, tool.name]),
+    ),
+  };
 
   server.server.onerror = (error) => {
     const transportLogOptions: LogIssueOptions = {
@@ -192,221 +241,206 @@ function configureServer({
     logIssue(error, transportLogOptions);
   };
 
-  for (const [toolKey, tool] of Object.entries(toolsToRegister)) {
-    /**
-     * Skills-Based Authorization
-     * ==========================
-     *
-     * Tools are filtered at registration time based on grantedSkills.
-     * Tool must have non-empty `skills` array to be exposed.
-     * Empty `skills: []` means intentionally excluded from skills system.
-     *
-     * In agent mode, authorization is skipped - use_sentry handles it internally.
-     *
-     * ## Examples:
-     *    ```typescript
-     *    // Tool belongs to "triage" skill only:
-     *    { skills: ["triage"] }
-     *
-     *    // Tool belongs to ALL skills (foundational tool like whoami):
-     *    { skills: ALL_SKILLS }
-     *
-     *    // Tool excluded from skills system (like use_sentry in agent mode):
-     *    { skills: [] }
-     *    ```
-     */
-    let allowed = false;
-
-    // In agent mode, skip authorization - use_sentry handles it internally
-    if (agentMode) {
-      allowed = true;
-    }
-    // Skills system: tool must have non-empty skills to be exposed
-    else if (grantedSkills) {
-      if (tool.skills && tool.skills.length > 0) {
-        allowed = isEnabledBySkills(grantedSkills, tool.skills);
-      }
-      // Empty skills means NOT exposed via skills system
-    }
-
-    // Skip tool if not allowed by active authorization system
-    if (!allowed) {
-      continue;
-    }
-
-    // Skip list tools when context is constrained to a specific tenant/project
-    // When organizationSlug is constrained, find_organizations is not useful
-    // When projectSlug is constrained, find_projects is not useful
-    if (
-      (toolKey === "find_organizations" &&
-        context.constraints.organizationSlug) ||
-      (toolKey === "find_projects" && context.constraints.projectSlug)
-    ) {
-      continue;
-    }
-
-    // Skip tools when project lacks required capabilities (experimental)
-    // Fail-open: if capabilities are unknown, show all tools
-    if (
-      experimentalMode &&
-      context.constraints.projectSlug &&
-      context.constraints.projectCapabilities &&
-      tool.requiredCapabilities?.length
-    ) {
-      const caps = context.constraints.projectCapabilities;
-      const hasAllCapabilities = tool.requiredCapabilities.every(
-        (cap: keyof ProjectCapabilities) => caps[cap] === true,
-      );
-      if (!hasAllCapabilities) {
-        continue;
-      }
-    }
-
-    // Filter out constraint parameters from schema that will be auto-injected
-    // Only filter parameters that are ACTUALLY constrained in the current context
-    // to avoid breaking tools when constraints are not set
-    const constraintKeysToFilter = new Set(
-      getConstraintKeysToFilter(context.constraints, tool.inputSchema),
+  for (const { tool } of toolsToRegister) {
+    const filteredInputSchema = getFilteredInputSchema(
+      tool,
+      contextWithToolAvailability,
     );
-    const filteredInputSchema = Object.fromEntries(
-      Object.entries(tool.inputSchema).filter(
-        ([key]) => !constraintKeysToFilter.has(key),
-      ),
-    ) as typeof tool.inputSchema;
-
-    // Resolve dynamic descriptions based on server context
-    const resolvedDescription = resolveDescription(tool.description, {
+    const resolvedDescription = resolveToolDescription(tool, {
       experimentalMode,
+      availableToolNames: contextWithToolAvailability.availableToolNames,
+      directToolNames: contextWithToolAvailability.directToolNames,
     });
 
-    server.tool(
-      tool.name,
-      resolvedDescription,
-      filteredInputSchema,
-      tool.annotations,
-      async (
-        params: any,
-        extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
-      ) => {
-        // Get the active MCP server span and attach request-scoped attributes.
-        const activeSpan = getActiveSpan();
+    const toolRegistration = {
+      description: resolvedDescription,
+      inputSchema: filteredInputSchema,
+      outputSchema: tool.outputSchema,
+      annotations: tool.annotations,
+    };
+    const handleToolCall = async (params: unknown): Promise<CallToolResult> => {
+      // Get the active MCP server span and attach request-scoped attributes.
+      const activeSpan = getActiveSpan();
+
+      if (activeSpan) {
+        activeSpan.setAttribute(
+          "app.server.mode.experimental",
+          experimentalMode,
+        );
+        if (context.transport) {
+          activeSpan.setAttribute("app.transport", context.transport);
+        }
+        if (context.clientFamily) {
+          activeSpan.setAttribute("app.client.family", context.clientFamily);
+        }
+        if (context.constraints.organizationSlug) {
+          activeSpan.setAttribute(
+            "app.constraint.organization_slug",
+            context.constraints.organizationSlug,
+          );
+        }
+        if (context.constraints.projectSlug) {
+          activeSpan.setAttribute(
+            "app.constraint.project_slug",
+            context.constraints.projectSlug,
+          );
+        }
+        if (grantedSkillIds?.length) {
+          for (const skill of grantedSkillIds) {
+            activeSpan.setAttribute(getSkillGrantedAttributeName(skill), true);
+          }
+        }
+      }
+
+      if (context.userId) {
+        const user = {
+          id: context.userId,
+          ...(context.userIpAddress
+            ? { ip_address: context.userIpAddress }
+            : {}),
+        };
+        setUser(user);
+      }
+      if (context.clientId) {
+        setTag("client.id", context.clientId);
+      }
+      if (context.clientFamily) {
+        setTag("app.client.family", context.clientFamily);
+      }
+      if (context.transport) {
+        setTag("app.transport", context.transport);
+      }
+      setTag("app.server.mode.experimental", experimentalMode);
+
+      // Hoisted so both the handler path and the catch (onError) share one
+      // narrowing instead of re-casting `params`.
+      const rawParams =
+        params && typeof params === "object" && !Array.isArray(params)
+          ? (params as Record<string, unknown>)
+          : {};
+
+      try {
+        // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
+        const paramsWithConstraints = injectConstraintParams(
+          rawParams,
+          tool,
+          contextWithToolAvailability,
+        );
 
         if (activeSpan) {
-          if (context.constraints.organizationSlug) {
+          // Intentional GenAI semconv extension: per-key attrs like http.request.header.<key>.
+          for (const [key, value] of Object.entries(paramsWithConstraints)) {
+            const attributeValue =
+              value == null || typeof value === "object"
+                ? JSON.stringify(value)
+                : value;
             activeSpan.setAttribute(
-              "app.constraint.organization_slug",
-              context.constraints.organizationSlug,
+              `gen_ai.tool.call.arguments.${key}`,
+              attributeValue as SpanAttributeValue | undefined,
             );
           }
-          if (context.constraints.projectSlug) {
-            activeSpan.setAttribute(
-              "app.constraint.project_slug",
-              context.constraints.projectSlug,
-            );
-          }
         }
 
-        if (context.userId) {
-          const user = {
-            id: context.userId,
-            ...(context.userIpAddress
-              ? { ip_address: context.userIpAddress }
-              : {}),
-          };
-          setUser(user);
+        const output = await executeToolHandler({
+          tool,
+          params: rawParams,
+          context: contextWithToolAvailability,
+        });
+
+        if (activeSpan) {
+          activeSpan.setStatus({
+            code: 1, // ok
+          });
         }
-        if (context.clientId) {
-          setTag("client.id", context.clientId);
-        }
-        setTag("mode.agent", agentMode);
-        setTag("mode.experimental", experimentalMode);
 
-        try {
-          // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
-          const applicableConstraints = getConstraintParametersToInject(
-            context.constraints,
-            tool.inputSchema,
-          );
-
-          // Constraints override raw tool arguments. String constraint fields are
-          // also removed from tool schemas and re-injected (see getConstraintKeysToFilter).
-          const paramsWithConstraints = {
-            ...params,
-            ...applicableConstraints,
-          };
-
-          const output = await tool.handler(paramsWithConstraints, context);
-
-          if (activeSpan) {
-            activeSpan.setStatus({
-              code: 1, // ok
-            });
-          }
-
-          // if the tool returns a string, assume it's a message
-          if (typeof output === "string") {
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: output,
-                },
-              ],
-            };
-          }
-          // if the tool returns a list, assume it's a content list
-          if (Array.isArray(output)) {
-            return {
-              content: output,
-            };
-          }
-          throw new Error(`Invalid tool output: ${output}`);
-        } catch (error) {
-          if (activeSpan) {
-            activeSpan.setStatus({
-              code: 2, // error
-            });
-            activeSpan.recordException(error);
-          }
-
-          // Upstream 401 during a tool call — route via the transport so it
-          // can revoke the MCP grant; swallow callback errors since the
-          // formatted tool response still needs to land.
-          if (
-            isApiAuthenticationErrorDeep(error) &&
-            context.onUpstreamUnauthorized
-          ) {
-            try {
-              await context.onUpstreamUnauthorized();
-            } catch {}
-          }
-
-          // CRITICAL: Tool errors MUST be returned as formatted text responses,
-          // NOT thrown as exceptions. This ensures consistent error handling
-          // and prevents the MCP client from receiving raw error objects.
-          //
-          // The formatErrorForUser function provides user-friendly error messages
-          // with appropriate formatting for different error types:
-          // - UserInputError: Clear guidance for fixing input problems
-          // - ConfigurationError: Clear guidance for fixing configuration issues
-          // - LLMProviderError: Clear messaging for AI provider availability issues
-          // - ApiError: HTTP status context with helpful messaging
-          // - System errors: Sentry event IDs for debugging
-          //
-          // DO NOT change this to throw error - it breaks error handling!
+        // if the tool returns a string, assume it's a message
+        if (typeof output === "string") {
           return {
             content: [
               {
                 type: "text" as const,
-                text: await formatErrorForUser(error, {
-                  transport: context.transport,
-                }),
+                text: output,
               },
             ],
-            isError: true,
           };
         }
-      },
-    );
+        // if the tool returns a list, assume it's a content list
+        if (Array.isArray(output)) {
+          return {
+            content: output,
+          };
+        }
+        // Some tools return a full MCP CallToolResult for custom content
+        // payloads such as images or resources.
+        if (isCallToolResult(output)) {
+          return output;
+        }
+        if (isStructuredToolOutput(output)) {
+          return structuredOutputToCallToolResult(output);
+        }
+        throw new Error(`Invalid tool output: ${output}`);
+      } catch (error) {
+        if (activeSpan) {
+          activeSpan.setStatus({
+            code: 2, // error
+          });
+          // Expected tool failures (bad input, AI provider outages, auth expiry)
+          // still mark the span as failed, but do not record exceptions so a
+          // provider budget/outage does not flood Sentry with per-request noise.
+          if (!isExpectedToolError(error)) {
+            activeSpan.recordException(error);
+          }
+        }
+
+        // Upstream 401 during a tool call — route via the transport so it
+        // can revoke the MCP grant; swallow callback errors since the
+        // formatted tool response still needs to land.
+        if (
+          isApiAuthenticationErrorDeep(error) &&
+          context.onUpstreamUnauthorized
+        ) {
+          try {
+            await context.onUpstreamUnauthorized();
+          } catch {}
+        }
+
+        // Let the tool record its own failure telemetry (e.g. search_events
+        // logs the failing query).
+        recordToolFailure(tool, error, rawParams, contextWithToolAvailability);
+
+        // CRITICAL: Tool errors MUST be returned as formatted text responses,
+        // NOT thrown as exceptions. This ensures consistent error handling
+        // and prevents the MCP client from receiving raw error objects.
+        //
+        // The formatErrorForUser function provides user-friendly error messages
+        // with appropriate formatting for different error types:
+        // - UserInputError: Clear guidance for fixing input problems
+        // - ConfigurationError: Clear guidance for fixing configuration issues
+        // - LLMProviderError / AI provider outages: graceful availability message
+        // - ApiError: HTTP status context with helpful messaging
+        // - System errors: Sentry event IDs for debugging
+        //
+        // DO NOT change this to throw error - it breaks error handling!
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: await formatErrorForUser(error, {
+                transport: context.transport,
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+    };
+
+    registrations.push({
+      name: tool.name,
+      config: toolRegistration,
+      handler: handleToolCall,
+    });
   }
+
+  return registrations;
 }

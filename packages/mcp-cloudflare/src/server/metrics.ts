@@ -1,6 +1,17 @@
 import * as Sentry from "@sentry/cloudflare";
+import {
+  UTM_SOURCE_ATTRIBUTE,
+  resolveUtmSourceFromRequest,
+} from "./lib/attribution";
+import { resolveClientFamily } from "./lib/client-family";
+import {
+  OAUTH_ERROR_ATTRIBUTE,
+  OAUTH_ERROR_REASON_ATTRIBUTE,
+  OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE,
+  type OAuthErrorTelemetry,
+} from "./oauth/telemetry";
 
-export type RateLimitScope = "ip" | "user";
+export type RateLimitScope = "ip" | "user" | "sentry_access";
 type ResponseReason = "local_rate_limit";
 
 type TrackedRoute = {
@@ -15,7 +26,7 @@ const RATE_LIMIT_SCOPE_HEADER = "x-sentry-rate-limit-scope";
 type ResponseMetricOptions = {
   rateLimitScope?: RateLimitScope;
   responseReason?: ResponseReason;
-};
+} & OAuthErrorTelemetry;
 
 function isRoutePrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
@@ -76,6 +87,26 @@ function getStatusClass(status: number): string {
   return `${Math.floor(status / 100)}xx`;
 }
 
+function getBooleanAttribute(value: boolean): string {
+  return value ? "true" : "false";
+}
+
+function getMcpRequestAttributes(request: Request, url: URL) {
+  return {
+    clientFamily: resolveClientFamily(request.headers.get("user-agent")),
+    experimentalMode: url.searchParams.get("experimental") === "1",
+    utmSource: resolveUtmSourceFromRequest(request, url),
+  };
+}
+
+function shouldAttachClientFamily(trackedRoute: TrackedRoute): boolean {
+  return (
+    trackedRoute.group === "mcp" ||
+    trackedRoute.route === "/oauth/token" ||
+    trackedRoute.route === "/oauth/register"
+  );
+}
+
 function getMetricAttributes(
   request: Request,
 ): Record<string, string | number> | null {
@@ -83,17 +114,114 @@ function getMetricAttributes(
     return null;
   }
 
-  const trackedRoute = classifyTrackedRoute(new URL(request.url).pathname);
+  const url = new URL(request.url);
+  const trackedRoute = classifyTrackedRoute(url.pathname);
 
   if (!trackedRoute) {
     return null;
   }
 
-  return {
+  const attributes: Record<string, string | number> = {
     "http.request.method": request.method,
     "http.route": trackedRoute.route,
     "app.route.group": trackedRoute.group,
   };
+
+  if (shouldAttachClientFamily(trackedRoute)) {
+    attributes["app.client.family"] = resolveClientFamily(
+      request.headers.get("user-agent"),
+    );
+  }
+
+  if (trackedRoute.group === "mcp") {
+    const mcpAttributes = getMcpRequestAttributes(request, url);
+    attributes["app.server.mode.experimental"] = getBooleanAttribute(
+      mcpAttributes.experimentalMode,
+    );
+    if (mcpAttributes.utmSource) {
+      attributes[UTM_SOURCE_ATTRIBUTE] = mcpAttributes.utmSource;
+    }
+  }
+
+  return attributes;
+}
+
+/**
+ * Annotates the active Sentry span with the same route/response attributes
+ * used by `app.server.response` metrics.
+ */
+export function annotateTrackedRequestSpan(
+  request: Request,
+  url: URL,
+  response: Response,
+  options?: ResponseMetricOptions,
+): void {
+  if (request.method === "OPTIONS") {
+    return;
+  }
+
+  const trackedRoute = classifyTrackedRoute(url.pathname);
+  if (!trackedRoute) {
+    return;
+  }
+
+  const activeSpan = Sentry.getActiveSpan();
+  if (!activeSpan) {
+    return;
+  }
+
+  activeSpan.setAttribute("http.route", trackedRoute.route);
+  activeSpan.setAttribute("app.route.group", trackedRoute.group);
+  activeSpan.setAttribute("http.response.status_code", response.status);
+  activeSpan.setAttribute(
+    "app.response.status_class",
+    getStatusClass(response.status),
+  );
+
+  if (shouldAttachClientFamily(trackedRoute)) {
+    activeSpan.setAttribute(
+      "app.client.family",
+      resolveClientFamily(request.headers.get("user-agent")),
+    );
+  }
+
+  if (trackedRoute.group === "mcp") {
+    const mcpAttributes = getMcpRequestAttributes(request, url);
+    activeSpan.setAttribute("app.transport", "http");
+    activeSpan.setAttribute(
+      "app.server.mode.experimental",
+      mcpAttributes.experimentalMode,
+    );
+    if (mcpAttributes.utmSource) {
+      activeSpan.setAttribute(UTM_SOURCE_ATTRIBUTE, mcpAttributes.utmSource);
+    }
+  }
+
+  if (options?.responseReason) {
+    activeSpan.setAttribute("app.response.reason", options.responseReason);
+  }
+
+  if (options?.rateLimitScope) {
+    activeSpan.setAttribute("app.rate_limit.scope", options.rateLimitScope);
+  }
+
+  if (options?.oauthError) {
+    activeSpan.setAttribute(OAUTH_ERROR_ATTRIBUTE, options.oauthError);
+  }
+
+  if (options?.oauthErrorReason) {
+    activeSpan.setAttribute(
+      OAUTH_ERROR_REASON_ATTRIBUTE,
+      options.oauthErrorReason,
+    );
+  }
+
+  if (options?.oauthBearerShape) {
+    activeSpan.setAttribute(
+      OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE,
+      options.oauthBearerShape,
+    );
+  }
 }
 
 export function annotateResponseMetric(
@@ -133,7 +261,9 @@ export function extractResponseMetricOptions(
     responseReason:
       responseReason === "local_rate_limit" ? responseReason : undefined,
     rateLimitScope:
-      rateLimitScope === "ip" || rateLimitScope === "user"
+      rateLimitScope === "ip" ||
+      rateLimitScope === "user" ||
+      rateLimitScope === "sentry_access"
         ? rateLimitScope
         : undefined,
   };
@@ -175,6 +305,19 @@ export function recordResponseMetric(
 
   if (options?.rateLimitScope) {
     responseAttributes["app.rate_limit.scope"] = options.rateLimitScope;
+  }
+
+  if (options?.oauthError) {
+    responseAttributes[OAUTH_ERROR_ATTRIBUTE] = options.oauthError;
+  }
+
+  if (options?.oauthErrorReason) {
+    responseAttributes[OAUTH_ERROR_REASON_ATTRIBUTE] = options.oauthErrorReason;
+  }
+
+  if (options?.oauthBearerShape) {
+    responseAttributes[OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE] =
+      options.oauthBearerShape;
   }
 
   Sentry.metrics.count(RESPONSE_METRIC_NAME, 1, {

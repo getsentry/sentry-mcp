@@ -1,10 +1,10 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../../api-client";
-import { agentTool } from "./utils";
 import {
-  PUBLIC_EVENTS_DATASETS,
   type EventsDataset,
+  PUBLIC_EVENTS_DATASETS,
 } from "../../../utils/events-datasets";
+import { agentTool, recordAgentToolResultCount } from "./utils";
 
 // Import all JSON files directly
 import android from "./data/android.json";
@@ -213,6 +213,7 @@ export async function lookupOtelSemantics(
 
   // Get all attributes
   const attributes = Object.entries(data.attributes);
+  recordAgentToolResultCount(attributes.length);
 
   response += `## Attributes (${attributes.length} total)\n\n`;
 

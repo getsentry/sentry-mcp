@@ -1,1 +1,1 @@
-export { default } from "./handler";
+export { default } from "../catalog/search-issue-events";

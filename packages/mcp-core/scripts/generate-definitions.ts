@@ -8,15 +8,16 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
-import { z, type ZodTypeAny } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { type ZodTypeAny, z } from "zod";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Lazy imports of server modules to avoid type bleed
 const toolsModule = await import("../src/tools/index.ts");
+const surfacesModule = await import("../src/tools/surfaces.ts");
 const skillsModule = await import("../src/skills.ts");
+const toolTypesModule = await import("../src/tools/types.ts");
 
 function writeJson(file: string, data: unknown) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
@@ -31,18 +32,31 @@ function zodFieldMapToJsonSchema(
 ): unknown {
   if (!fieldMap || Object.keys(fieldMap).length === 0) return {};
   const obj = z.object(fieldMap);
-  return zodToJsonSchema(obj, { $refStrategy: "none" });
+  const { $schema: _, ...jsonSchema } = z.toJSONSchema(obj, {
+    io: "input",
+    target: "draft-7",
+    unrepresentable: "any",
+  });
+  return jsonSchema;
 }
 
 // Plugin variants whose agent frontmatter gets synced by this script.
 // Add new entries here when creating a new plugin variant.
-const PLUGIN_AGENT_DIRS = ["sentry-mcp", "sentry-mcp-experimental"];
+const PLUGIN_AGENT_CONFIGS = [
+  { dir: "sentry-mcp", experimentalMode: false },
+  { dir: "sentry-mcp-experimental", experimentalMode: true },
+] as const;
 const PLUGINS_DIR = path.join(__dirname, "../../../plugins");
 
+function agentConfigs() {
+  return PLUGIN_AGENT_CONFIGS.map((config) => ({
+    ...config,
+    path: path.join(PLUGINS_DIR, config.dir, "agents/sentry-mcp.md"),
+  }));
+}
+
 function agentPaths(): string[] {
-  return PLUGIN_AGENT_DIRS.map((dir) =>
-    path.join(PLUGINS_DIR, dir, "agents/sentry-mcp.md"),
-  );
+  return agentConfigs().map((config) => config.path);
 }
 
 function byName<T extends { name: string }>(a: T, b: T) {
@@ -53,8 +67,53 @@ function isNonNull<T>(value: T | null): value is T {
   return value !== null;
 }
 
+type DefinitionTool = {
+  name: string;
+  description:
+    | string
+    | ((context: {
+        experimentalMode: boolean;
+        availableToolNames?: ReadonlySet<string>;
+        directToolNames?: ReadonlySet<string>;
+      }) => string);
+  inputSchema: Record<string, ZodTypeAny>;
+  outputSchema?: ZodTypeAny;
+  skills: string[];
+  includeInSkillDefinitions?: boolean;
+  requiredScopes: string[];
+  experimental?: boolean;
+  hideInExperimentalMode?: boolean;
+};
+
+type ToolSurface = "direct" | "catalog";
+
+function isEnabledByDefaultSkills(tool: { skills: string[] }): boolean {
+  const defaultSkills = skillsModule.DEFAULT_SKILLS as readonly string[];
+  return (
+    Array.isArray(tool.skills) &&
+    tool.skills.some((skill) => defaultSkills.includes(skill))
+  );
+}
+
+function isSkillDefinitionTool(tool: DefinitionTool): boolean {
+  return (
+    !surfacesModule.isWrapperToolName(tool.name) &&
+    !surfacesModule.isCatalogInfrastructureToolName(tool.name)
+  );
+}
+
+function toolNamesFromEntries(
+  entries: Array<[string, DefinitionTool]>,
+): ReadonlySet<string> {
+  return new Set(entries.flatMap(([toolKey, tool]) => [toolKey, tool.name]));
+}
+
 // Tools
-function generateToolDefinitions() {
+function generateToolDefinitions({
+  experimentalMode,
+}: {
+  experimentalMode: boolean;
+}) {
   const toolsDefault = toolsModule.default as
     | Record<string, unknown>
     | undefined;
@@ -62,30 +121,64 @@ function generateToolDefinitions() {
     throw new Error("Failed to import tools from src/tools/index.ts");
   }
 
-  const defs = Object.entries(toolsDefault).map(([key, tool]) => {
-    if (!tool || typeof tool !== "object")
-      throw new Error(`Invalid tool: ${key}`);
-    const t = tool as {
-      name: string;
-      description: string;
-      inputSchema: Record<string, ZodTypeAny>;
-      requiredScopes: string[]; // must exist on all tools (can be empty)
-      internalOnly?: boolean;
-    };
-    if (t.internalOnly) {
+  const visibleEntries = Object.entries(toolsDefault).flatMap(
+    ([key, tool]): Array<[string, DefinitionTool]> => {
+      if (!tool || typeof tool !== "object") {
+        throw new Error(`Invalid tool: ${key}`);
+      }
+      const t = tool as DefinitionTool;
+      if (
+        surfacesModule.isWrapperToolName(t.name) ||
+        !toolTypesModule.isToolVisibleInMode(t, experimentalMode)
+      ) {
+        return [];
+      }
+      return [[key, t]];
+    },
+  );
+  const directEntries = visibleEntries.filter(([, tool]) =>
+    surfacesModule.isTopLevelToolName(tool.name, experimentalMode),
+  );
+  const availableToolNames = toolNamesFromEntries(visibleEntries);
+  const directToolNames = toolNamesFromEntries(directEntries);
+
+  const defs = visibleEntries.map(([, t]) => {
+    const isDirect = directToolNames.has(t.name);
+    const isCatalog =
+      isSkillDefinitionTool(t) &&
+      Array.isArray(t.skills) &&
+      t.skills.length > 0;
+    if (!isDirect && !isCatalog) {
       return null;
     }
     if (!Array.isArray(t.requiredScopes)) {
       throw new Error(`Tool '${t.name}' is missing requiredScopes array`);
     }
     const jsonSchema = zodFieldMapToJsonSchema(t.inputSchema || {});
+    const surface: ToolSurface = isDirect ? "direct" : "catalog";
     return {
       name: t.name,
-      description: t.description,
+      description: toolTypesModule.resolveDescription(t.description, {
+        experimentalMode,
+        availableToolNames,
+        directToolNames,
+      }),
       // Export full JSON Schema under inputSchema for external docs
       inputSchema: jsonSchema,
+      outputSchema: t.outputSchema
+        ? (({ $schema: _, ...jsonSchema }) => jsonSchema)(
+            z.toJSONSchema(t.outputSchema, {
+              io: "output",
+              target: "draft-7",
+              unrepresentable: "any",
+            }),
+          )
+        : undefined,
       // Preserve tool access requirements for UIs/docs
       requiredScopes: t.requiredScopes,
+      // Preserve skill catalog membership and call surface for UIs/docs.
+      skills: t.skills,
+      surface,
     };
   });
   return defs.filter(isNonNull).sort(byName);
@@ -100,6 +193,7 @@ async function generateSkillDefinitions() {
         name: string;
         description: string;
         defaultEnabled: boolean;
+        deprecated?: boolean;
         order: number;
         toolCount?: number;
       }>
@@ -121,6 +215,29 @@ async function generateSkillDefinitions() {
     throw new Error("Failed to import tools from src/tools/index.ts");
   }
 
+  const defaultVisibleEntries = Object.entries(toolsDefault).flatMap(
+    ([key, tool]): Array<[string, DefinitionTool]> => {
+      if (!tool || typeof tool !== "object") {
+        throw new Error(`Invalid tool: ${key}`);
+      }
+
+      const t = tool as DefinitionTool;
+      if (
+        surfacesModule.isWrapperToolName(t.name) ||
+        !toolTypesModule.isToolVisibleInMode(t, false)
+      ) {
+        return [];
+      }
+
+      return [[key, t]];
+    },
+  );
+  const defaultDirectToolNames = toolNamesFromEntries(
+    defaultVisibleEntries.filter(([, tool]) =>
+      surfacesModule.isTopLevelToolName(tool.name, false),
+    ),
+  );
+
   // Build tools array for each skill
   const skillsWithTools = skills.map((skill) => {
     const skillTools: Array<{
@@ -129,33 +246,41 @@ async function generateSkillDefinitions() {
       requiredScopes: string[];
     }> = [];
 
-    for (const [toolName, tool] of Object.entries(toolsDefault)) {
+    const skillToolEntries = Object.entries(toolsDefault).filter(([, tool]) => {
       if (!tool || typeof tool !== "object") {
-        continue;
+        return false;
       }
 
-      const t = tool as {
-        name: string;
-        description: string;
-        skills: string[];
-        requiredScopes: string[];
-        internalOnly?: boolean;
-      };
+      const t = tool as DefinitionTool;
+      return (
+        isSkillDefinitionTool(t) &&
+        t.includeInSkillDefinitions !== false &&
+        Array.isArray(t.skills) &&
+        t.skills.includes(skill.id)
+      );
+    });
+    const skillToolNames = new Set(
+      skillToolEntries.flatMap(([toolKey, tool]) => {
+        const t = tool as DefinitionTool;
+        return [toolKey, t.name];
+      }),
+    );
+    const availableToolNames = new Set([
+      ...skillToolNames,
+      ...defaultDirectToolNames,
+    ]);
 
-      if (t.internalOnly) {
-        continue;
-      }
-
-      // Check if this tool is enabled by this skill
-      if (Array.isArray(t.skills) && t.skills.includes(skill.id)) {
-        skillTools.push({
-          name: t.name,
-          description: t.description,
-          requiredScopes: Array.isArray(t.requiredScopes)
-            ? t.requiredScopes
-            : [],
-        });
-      }
+    for (const [, tool] of skillToolEntries) {
+      const t = tool as DefinitionTool;
+      skillTools.push({
+        name: t.name,
+        description: toolTypesModule.resolveDescription(t.description, {
+          experimentalMode: false,
+          availableToolNames,
+          directToolNames: defaultDirectToolNames,
+        }),
+        requiredScopes: Array.isArray(t.requiredScopes) ? t.requiredScopes : [],
+      });
     }
 
     // Sort tools alphabetically by name
@@ -222,6 +347,12 @@ function isUpToDate(outDir: string): boolean {
   // Check other input files
   const otherInputs = [
     path.join(__dirname, "../src/skills.ts"),
+    path.join(__dirname, "../src/tools/surfaces.ts"),
+    path.join(__dirname, "../src/tools/types.ts"),
+    path.join(
+      __dirname,
+      "../src/internal/tool-helpers/tool-call-formatting.ts",
+    ),
     path.join(__dirname, "generate-definitions.ts"),
   ];
   for (const inputPath of otherInputs) {
@@ -267,38 +398,43 @@ async function main() {
 
     console.log("Generating tool and skill definitions...");
 
-    const tools = generateToolDefinitions();
+    const tools = generateToolDefinitions({ experimentalMode: false });
+    const experimentalTools = generateToolDefinitions({
+      experimentalMode: true,
+    });
     const skills = await generateSkillDefinitions();
 
     writeJson(path.join(outDir, "toolDefinitions.json"), tools);
     writeJson(path.join(outDir, "skillDefinitions.json"), skills);
 
-    // Sync allowedTools in agent frontmatter
-    // Exclude agent-only tools (e.g., use_sentry) since plugins don't use agent mode
-    const agentOnlyToolNames = new Set(
-      Object.values(
-        toolsModule.default as Record<
-          string,
-          { name: string; agentOnly?: boolean; internalOnly?: boolean }
-        >,
-      )
-        .filter((t) => t.agentOnly || t.internalOnly)
-        .map((t) => t.name),
+    // Sync allowedTools in agent frontmatter with the direct MCP surface that
+    // is available under the default OAuth grant. Optional-skill tools remain
+    // available through search_sentry_tools/execute_sentry_tool when the user grants them,
+    // without advertising direct calls that many sessions cannot execute.
+    const directTools = tools.filter((tool) => tool.surface === "direct");
+    const experimentalDirectTools = experimentalTools.filter(
+      (tool) => tool.surface === "direct",
     );
-    const toolNames = tools
-      .map((t) => t.name)
-      .filter((name) => !agentOnlyToolNames.has(name));
+    const toolNames = directTools
+      .filter(isEnabledByDefaultSkills)
+      .map((t) => t.name);
+    const experimentalToolNames = experimentalDirectTools
+      .filter(isEnabledByDefaultSkills)
+      .map((t) => t.name);
 
     let agentsSynced = 0;
-    for (const agentPath of agentPaths()) {
-      if (fs.existsSync(agentPath)) {
-        syncAgentFrontmatter(agentPath, toolNames);
+    for (const agentConfig of agentConfigs()) {
+      if (fs.existsSync(agentConfig.path)) {
+        syncAgentFrontmatter(
+          agentConfig.path,
+          agentConfig.experimentalMode ? experimentalToolNames : toolNames,
+        );
         agentsSynced++;
       }
     }
 
     console.log(
-      `✅ Generated: tools(${tools.length}), skills(${skills.length}), agents(${agentsSynced})`,
+      `✅ Generated: tools(${tools.length}), directTools(${directTools.length}), experimentalTools(${experimentalTools.length}), experimentalDirectTools(${experimentalDirectTools.length}), skills(${skills.length}), agents(${agentsSynced})`,
     );
   } catch (error) {
     const err = error as Error;

@@ -23,7 +23,7 @@ describe("/.mcp discovery routes", () => {
     });
   });
 
-  it("GET /.mcp/tools.json should return tool definitions", async () => {
+  it("GET /.mcp/tools.json should return direct and catalog tool definitions", async () => {
     const res = await app.request(
       "/.mcp/tools.json",
       {
@@ -37,16 +37,39 @@ describe("/.mcp discovery routes", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("application/json");
 
-    const json = (await res.json()) as Array<{ name: string }>;
+    const json = (await res.json()) as Array<{
+      name: string;
+      inputSchema: unknown;
+      skills: string[];
+      surface: "direct" | "catalog";
+    }>;
     expect(Array.isArray(json)).toBe(true);
     expect(json.length).toBeGreaterThan(0);
 
-    // Verify tool structure
-    const toolNames = json.map((t) => t.name);
-    expect(toolNames).toContain("find_organizations");
-    expect(toolNames).toContain("get_sentry_resource");
-    expect(toolNames).not.toContain("get_issue_details");
-    expect(toolNames).not.toContain("get_trace_details");
-    expect(toolNames).toContain("search_events");
+    const toolsByName = new Map(json.map((tool) => [tool.name, tool]));
+    expect(toolsByName.get("find_organizations")).toEqual(
+      expect.objectContaining({
+        inputSchema: expect.any(Object),
+        surface: "direct",
+      }),
+    );
+    expect(toolsByName.get("search_events")).toEqual(
+      expect.objectContaining({
+        surface: "direct",
+      }),
+    );
+    expect(toolsByName.get("get_issue_details")).toEqual(
+      expect.objectContaining({
+        inputSchema: expect.any(Object),
+        skills: expect.arrayContaining(["inspect"]),
+        surface: "catalog",
+      }),
+    );
+    expect(toolsByName.get("get_trace_details")).toEqual(
+      expect.objectContaining({
+        skills: expect.arrayContaining(["inspect"]),
+        surface: "catalog",
+      }),
+    );
   });
 });

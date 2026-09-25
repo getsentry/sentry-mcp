@@ -12,11 +12,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { type Tiktoken, encoding_for_model } from "tiktoken";
-import { z, type ZodTypeAny } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { type ZodTypeAny, z } from "zod";
 
 // Lazy imports to avoid type bleed
 const toolsModule = await import("../src/tools/index.ts");
+const surfacesModule = await import("../src/tools/surfaces.ts");
+const toolTypesModule = await import("../src/tools/types.ts");
 
 /**
  * Parse CLI arguments
@@ -54,8 +55,10 @@ Examples:
 
 type ToolDefinition = {
   name: string;
-  description: string;
+  description: string | ((context: { experimentalMode: boolean }) => string);
   inputSchema: Record<string, ZodTypeAny>;
+  experimental?: boolean;
+  hideInExperimentalMode?: boolean;
   annotations?: {
     readOnlyHint?: boolean;
     destructiveHint?: boolean;
@@ -76,14 +79,16 @@ function formatToolsForMCP(tools: Record<string, ToolDefinition>) {
         ? z.object(inputSchema)
         : z.object({});
     // Use the same options as the MCP SDK to match actual payload
-    const jsonSchema = zodToJsonSchema(zodObject, {
-      strictUnions: true,
-      pipeStrategy: "input",
+    const jsonSchema = z.toJSONSchema(zodObject, {
+      io: "input",
+      unrepresentable: "any",
     });
 
     return {
       name: tool.name,
-      description: tool.description,
+      description: toolTypesModule.resolveDescription(tool.description, {
+        experimentalMode: false,
+      }),
       inputSchema: jsonSchema,
       ...(tool.annotations && { annotations: tool.annotations }),
     };
@@ -154,9 +159,13 @@ async function main() {
       throw new Error("Failed to import tools from src/tools/index.ts");
     }
 
-    // Filter out use_sentry - it's agent-mode only, not part of normal MCP server
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { use_sentry, ...toolsToMeasure } = toolsDefault;
+    const toolsToMeasure = Object.fromEntries(
+      Object.entries(toolsDefault).filter(
+        ([, tool]) =>
+          surfacesModule.isTopLevelToolName(tool.name, false) &&
+          toolTypesModule.isToolVisibleInMode(tool, false),
+      ),
+    );
 
     // Format as MCP would send them (as a complete tools array)
     const mcpTools = formatToolsForMCP(toolsToMeasure);

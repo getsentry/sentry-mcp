@@ -1,0 +1,53 @@
+[
+  {
+    "id": "101",
+    "title": "Errors Overview",
+    "dateCreated": "2025-04-14T10:15:00.000Z",
+    "createdBy": {
+      "id": "1",
+      "name": "Jane Developer",
+      "email": "jane@example.com"
+    },
+    "environment": ["production"],
+    "filters": {},
+    "lastVisited": "2025-04-15T12:00:00.000Z",
+    "widgetDisplay": ["line", "table"],
+    "widgetPreview": [
+      {
+        "displayType": "line",
+        "layout": { "x": 0, "y": 0, "w": 6, "h": 2 }
+      },
+      {
+        "displayType": "table",
+        "layout": { "x": 0, "y": 2, "w": 6, "h": 3 }
+      }
+    ],
+    "permissions": {
+      "isEditableByEveryone": true,
+      "teamsWithEditAccess": []
+    },
+    "isFavorited": true,
+    "projects": [4509106749636608],
+    "prebuiltId": null
+  },
+  {
+    "id": "102",
+    "title": "Errors Overview Copy",
+    "dateCreated": "2025-04-16T09:00:00.000Z",
+    "createdBy": null,
+    "environment": [],
+    "filters": {},
+    "lastVisited": null,
+    "widgetDisplay": ["big_number"],
+    "widgetPreview": [
+      {
+        "displayType": "big_number",
+        "layout": { "x": 0, "y": 0, "w": 2, "h": 1 }
+      }
+    ],
+    "permissions": null,
+    "isFavorited": false,
+    "projects": [],
+    "prebuiltId": null
+  }
+]

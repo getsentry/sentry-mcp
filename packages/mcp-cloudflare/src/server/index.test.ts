@@ -5,8 +5,11 @@ import type { Env } from "./types";
 const {
   MockOAuthProvider,
   mockOAuthProviderFetch,
+  mockHandleSentryBearerMcpRequest,
   mockGetClientIp,
   mockCheckRateLimit,
+  mockActiveSpan,
+  mockMetricsCount,
 } = vi.hoisted(() => {
   const mockOAuthProviderFetch = vi.fn();
   const MockOAuthProvider = vi.fn(function MockOAuthProvider() {
@@ -19,13 +22,27 @@ const {
   return {
     MockOAuthProvider,
     mockOAuthProviderFetch,
+    mockHandleSentryBearerMcpRequest: vi.fn(),
     mockGetClientIp,
     mockCheckRateLimit: vi.fn(),
+    mockActiveSpan: {
+      setAttribute: vi.fn(),
+    },
+    mockMetricsCount: vi.fn(),
   };
 });
 
 vi.mock("@cloudflare/workers-oauth-provider", () => ({
   default: MockOAuthProvider,
+}));
+
+vi.mock("@sentry/cloudflare", () => ({
+  getActiveSpan: vi.fn(() => mockActiveSpan),
+  metrics: {
+    count: mockMetricsCount,
+  },
+  setUser: vi.fn(),
+  withSentry: vi.fn((_config, handler) => handler),
 }));
 
 vi.mock("./app", () => ({
@@ -34,6 +51,7 @@ vi.mock("./app", () => ({
 
 vi.mock("./lib/mcp-handler", () => ({
   default: { fetch: vi.fn() },
+  handleSentryBearerMcpRequest: mockHandleSentryBearerMcpRequest,
 }));
 
 vi.mock("./oauth", () => ({
@@ -55,6 +73,11 @@ vi.mock("./utils/rate-limiter", () => ({
 }));
 
 import handler from "./index";
+import {
+  OAUTH_ERROR_ATTRIBUTE,
+  OAUTH_ERROR_REASON_ATTRIBUTE,
+  OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE,
+} from "./oauth/telemetry";
 
 describe("worker entrypoint", () => {
   const env = {
@@ -107,6 +130,32 @@ describe("worker entrypoint", () => {
     expect(MockOAuthProvider).not.toHaveBeenCalled();
   });
 
+  it("serves path-scoped protected resource metadata before the oauth provider", async () => {
+    const response = await handler.fetch!(
+      new Request(
+        "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry/mcp-server?experimental=1",
+      ),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      resource: "https://mcp.sentry.dev/mcp/sentry/mcp-server?experimental=1",
+      authorization_servers: ["https://mcp.sentry.dev"],
+      scopes_supported: [
+        "org:read",
+        "project:write",
+        "team:write",
+        "event:write",
+        "alerts:write",
+      ],
+      bearer_methods_supported: ["header"],
+    });
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(MockOAuthProvider).not.toHaveBeenCalled();
+  });
+
   it("strips CORS headers from non-public OAuth endpoints", async () => {
     mockOAuthProviderFetch.mockResolvedValueOnce(
       new Response("ok", {
@@ -132,6 +181,75 @@ describe("worker entrypoint", () => {
     expect(response.headers.has("Access-Control-Allow-Headers")).toBe(false);
     expect(response.headers.has("Access-Control-Max-Age")).toBe(false);
     expect(response.headers.has("Access-Control-Expose-Headers")).toBe(false);
+  });
+
+  it("enables Client ID Metadata Documents on the oauth provider", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(new Response("ok"));
+
+    await handler.fetch!(
+      new Request("https://mcp.sentry.dev/oauth/token"),
+      env,
+      ctx,
+    );
+
+    expect(MockOAuthProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientIdMetadataDocumentEnabled: true,
+        clientRegistrationEndpoint: "/oauth/register",
+      }),
+    );
+  });
+
+  it("does not advertise RFC 9207 iss support on root authorization server metadata", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          issuer: "https://mcp.sentry.dev",
+          authorization_endpoint: "https://mcp.sentry.dev/oauth/authorize",
+          token_endpoint: "https://mcp.sentry.dev/oauth/token",
+          client_id_metadata_document_supported: true,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const response = await handler.fetch!(
+      new Request(
+        "https://mcp.sentry.dev/.well-known/oauth-authorization-server",
+      ),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      issuer: "https://mcp.sentry.dev",
+      authorization_endpoint: "https://mcp.sentry.dev/oauth/authorize",
+      token_endpoint: "https://mcp.sentry.dev/oauth/token",
+      client_id_metadata_document_supported: true,
+    });
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  });
+
+  it("leaves non-metadata provider responses unchanged when patching root AS metadata", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("ok", {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/oauth/token"),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("ok");
   });
 
   it("patches MCP 401 responses with protected resource metadata", async () => {
@@ -168,6 +286,68 @@ describe("worker entrypoint", () => {
     );
 
     expect(response.status).toBe(200);
+  });
+
+  it("routes Sentry-Bearer MCP requests directly without OAuth", async () => {
+    mockHandleSentryBearerMcpRequest.mockResolvedValueOnce(new Response("ok"));
+
+    const request = new Request("https://mcp.sentry.dev/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: "Sentry-Bearer sntryu_test-token",
+        "User-Agent": "Claude-Code/1.0",
+      },
+    });
+
+    const response = await handler.fetch!(request, env, ctx);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("ok");
+    expect(mockHandleSentryBearerMcpRequest).toHaveBeenCalledWith(
+      request,
+      env,
+      ctx,
+      "sntryu_test-token",
+    );
+    expect(MockOAuthProvider).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed Sentry-Bearer MCP authorization without OAuth", async () => {
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp", {
+        method: "POST",
+        headers: {
+          Authorization: "Sentry-Bearer",
+        },
+      }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.text()).toContain("Missing or invalid");
+    expect(response.headers.get("WWW-Authenticate")).toContain("Sentry-Bearer");
+    expect(mockHandleSentryBearerMcpRequest).not.toHaveBeenCalled();
+    expect(MockOAuthProvider).not.toHaveBeenCalled();
+  });
+
+  it("rejects Sentry-Bearer MCP authorization with extra credentials without OAuth", async () => {
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp", {
+        method: "POST",
+        headers: {
+          Authorization: "Sentry-Bearer sntryu_test-token extra",
+        },
+      }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.text()).toContain("Missing or invalid");
+    expect(response.headers.get("WWW-Authenticate")).toContain("Sentry-Bearer");
+    expect(mockHandleSentryBearerMcpRequest).not.toHaveBeenCalled();
+    expect(MockOAuthProvider).not.toHaveBeenCalled();
   });
 
   it("returns 429 when MCP/OAuth IP limiting blocks the request", async () => {
@@ -207,6 +387,30 @@ describe("worker entrypoint", () => {
     expect(response.status).toBe(401);
     expect(response.headers.get("WWW-Authenticate")).toBe(
       'Bearer error="invalid_token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry/mcp-server?experimental=1"',
+    );
+  });
+
+  // Regression: unauthenticated plugin MCP URLs must challenge with PRM that
+  // preserves ?utm_source=plugin so OAuth discovery keeps the same resource.
+  it("patches plugin utm_source MCP 401 responses with query-preserving protected resource metadata", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": 'Bearer error="invalid_token"',
+        },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp?utm_source=plugin"),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("WWW-Authenticate")).toBe(
+      'Bearer error="invalid_token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp?utm_source=plugin"',
     );
   });
 
@@ -287,6 +491,50 @@ describe("worker entrypoint", () => {
     expect(header.match(/resource_metadata\s*=/gi)?.length).toBe(1);
   });
 
+  it("rejects client registration with a userinfo-spoofed redirect URI", async () => {
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/oauth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_name: "Sentry MCP",
+          redirect_uris: ["https://mcp.sentry.dev@example.io/callback"],
+        }),
+      }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("invalid_redirect_uri");
+    expect(mockOAuthProviderFetch).not.toHaveBeenCalled();
+  });
+
+  it("allows client registration with legitimate redirect URIs", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ client_id: "abc" }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/oauth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_name: "Test Client",
+          redirect_uris: ["https://example.com/callback"],
+        }),
+      }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(201);
+    expect(mockOAuthProviderFetch).toHaveBeenCalled();
+  });
+
   it("ignores commas inside quoted error_description values when parsing the challenge", async () => {
     mockOAuthProviderFetch.mockResolvedValueOnce(
       new Response("unauthorized", {
@@ -310,5 +558,52 @@ describe("worker entrypoint", () => {
       'Bearer realm="OAuth", error="invalid_token", error_description="Missing, invalid, or expired access token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp"',
     );
     expect(header.match(/resource_metadata\s*=/gi)?.length).toBe(1);
+  });
+
+  it("annotates OAuth provider invalid-token responses without logging token values", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate":
+            'Bearer realm="OAuth", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource", error="invalid_token", error_description="Missing or invalid access token"',
+        },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer user-id:grant-id:secret",
+          "User-Agent": "Claude-Code/1.0",
+        },
+      }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
+      OAUTH_ERROR_ATTRIBUTE,
+      "invalid_access",
+    );
+    expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
+      OAUTH_ERROR_REASON_ATTRIBUTE,
+      "missing_or_invalid_access",
+    );
+    expect(mockActiveSpan.setAttribute).toHaveBeenCalledWith(
+      OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE,
+      "wrapper",
+    );
+    expect(mockMetricsCount).toHaveBeenCalledWith("app.server.response", 1, {
+      attributes: expect.objectContaining({
+        "app.client.family": "claude-code",
+        [OAUTH_ERROR_ATTRIBUTE]: "invalid_access",
+        [OAUTH_ERROR_REASON_ATTRIBUTE]: "missing_or_invalid_access",
+        [OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE]: "wrapper",
+        "http.response.status_code": 401,
+      }),
+    });
   });
 });

@@ -1,11 +1,11 @@
 {
   "name": "@sentry/mcp-server",
   "mcpName": "io.github.getsentry/sentry-mcp",
-  "version": "0.33.0",
+  "version": "0.42.0",
   "type": "module",
-  "packageManager": "pnpm@10.8.1",
+  "packageManager": "pnpm@11.8.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "publishConfig": {
     "access": "public"
@@ -33,11 +33,11 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
     "./transports/stdio": {
-      "types": "./dist/transports/stdio.ts",
+      "types": "./dist/transports/stdio.d.ts",
       "default": "./dist/transports/stdio.js"
     }
   },

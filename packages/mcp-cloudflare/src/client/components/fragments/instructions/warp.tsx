@@ -1,5 +1,4 @@
 import CodeSnippet from "../../ui/code-snippet";
-import { NPM_REMOTE_NAME } from "../../../../constants";
 
 interface WarpInstructionsProps {
   transport: "cloud" | "stdio";
@@ -9,8 +8,7 @@ export function WarpInstructions({ transport }: WarpInstructionsProps) {
   if (transport === "cloud") {
     const endpoint = new URL("/mcp", window.location.href).href;
     const coreConfig = {
-      command: "npx",
-      args: ["-y", `${NPM_REMOTE_NAME}@latest`, endpoint],
+      url: endpoint,
     };
 
     return (
@@ -35,8 +33,7 @@ export function WarpInstructions({ transport }: WarpInstructionsProps) {
                 <strong>Open MCP Servers</strong>
               </li>
               <li>
-                From Settings:{" "}
-                <strong>Settings → AI → Manage MCP servers</strong>
+                From Settings: <strong>Settings → Agents → MCP servers</strong>
               </li>
             </ul>
           </li>
@@ -44,7 +41,7 @@ export function WarpInstructions({ transport }: WarpInstructionsProps) {
             Click <strong>+ Add</strong> button.
           </li>
           <li>
-            Select <strong>CLI Server (Command)</strong> option.
+            Select <strong>Streamable HTTP or SSE Server (URL)</strong>.
           </li>
           <li>
             <CodeSnippet
@@ -53,8 +50,7 @@ export function WarpInstructions({ transport }: WarpInstructionsProps) {
                 {
                   Sentry: {
                     ...coreConfig,
-                    env: {},
-                    working_directory: null,
+                    headers: {},
                   },
                 },
                 undefined,
@@ -67,7 +63,7 @@ export function WarpInstructions({ transport }: WarpInstructionsProps) {
           <small>
             For more details, see the{" "}
             <a
-              href="https://docs.warp.dev/knowledge-and-collaboration/mcp"
+              href="https://docs.warp.dev/agent-platform/capabilities/mcp/"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -108,7 +104,7 @@ export function WarpInstructions({ transport }: WarpInstructionsProps) {
               From Command Palette: search for <strong>Open MCP Servers</strong>
             </li>
             <li>
-              From Settings: <strong>Settings → AI → Manage MCP servers</strong>
+              From Settings: <strong>Settings → Agents → MCP servers</strong>
             </li>
           </ul>
         </li>
@@ -141,7 +137,7 @@ export function WarpInstructions({ transport }: WarpInstructionsProps) {
         <small>
           For more details, see the{" "}
           <a
-            href="https://docs.warp.dev/knowledge-and-collaboration/mcp"
+            href="https://docs.warp.dev/agent-platform/capabilities/mcp/"
             target="_blank"
             rel="noopener noreferrer"
           >

@@ -28,18 +28,17 @@ describe("mcp-url helpers", () => {
     ).toBe("https://mcp.sentry.dev/");
   });
 
-  it("applies agent and experimental flags without dropping existing query params", () => {
+  it("applies the experimental flag without dropping existing query params", () => {
     const protectedResourceUrl = resolveProtectedResourceUrl(
       "https://mcp.sentry.dev/mcp/sentry/javascript?foo=bar",
     );
 
     expect(
       applyProtectedResourceFlags(protectedResourceUrl, {
-        useAgentEndpoint: true,
         useExperimental: true,
       }).href,
     ).toBe(
-      "https://mcp.sentry.dev/mcp/sentry/javascript?foo=bar&agent=1&experimental=1",
+      "https://mcp.sentry.dev/mcp/sentry/javascript?foo=bar&experimental=1",
     );
   });
 });

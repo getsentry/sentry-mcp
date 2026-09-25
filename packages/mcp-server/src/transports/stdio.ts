@@ -1,3 +1,4 @@
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 /**
  * Standard I/O Transport for MCP Server.
  *
@@ -19,10 +20,35 @@
  * ```
  */
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "@sentry/mcp-core/version";
-import type { ServerContext } from "@sentry/mcp-core/types";
+import * as Sentry from "@sentry/node";
+
+export type StdioServerContext = {
+  sentryHost?: string;
+  mcpUrl?: string;
+  experimentalMode?: boolean;
+};
+
+function getStdioSpanAttributes(
+  context: StdioServerContext,
+): Record<string, string | boolean> {
+  const attributes: Record<string, string | boolean> = {
+    "app.transport": "stdio",
+    "app.server.version": LIB_VERSION,
+    "app.server.mode.experimental": context.experimentalMode ?? false,
+    "network.transport": "pipe",
+    "service.version": LIB_VERSION,
+  };
+
+  if (context.sentryHost) {
+    attributes["app.upstream.host"] = context.sentryHost;
+  }
+  if (context.mcpUrl) {
+    attributes["app.url.full"] = context.mcpUrl;
+  }
+
+  return attributes;
+}
 
 /**
  * Starts the MCP server with stdio transport and telemetry.
@@ -32,7 +58,7 @@ import type { ServerContext } from "@sentry/mcp-core/types";
  * All operations are wrapped in Sentry tracing for observability.
  *
  * @param server - Configured and instrumented MCP server instance (with context in closures)
- * @param context - Server context with authentication and configuration (for telemetry attributes)
+ * @param context - Context values used for telemetry attributes
  *
  * @example CLI Integration
  * ```typescript
@@ -51,16 +77,15 @@ import type { ServerContext } from "@sentry/mcp-core/types";
  * await startStdio(server, context);
  * ```
  */
-export async function startStdio(server: McpServer, context: ServerContext) {
+export async function startStdio<Context extends StdioServerContext>(
+  server: McpServer,
+  context: Context,
+) {
   await Sentry.startNewTrace(async () => {
     return await Sentry.startSpan(
       {
         name: "mcp.server/stdio",
-        attributes: {
-          "app.transport": "stdio",
-          "network.transport": "pipe",
-          "service.version": LIB_VERSION,
-        },
+        attributes: getStdioSpanAttributes(context),
       },
       async () => {
         // Context already captured in tool handler closures during buildServer()

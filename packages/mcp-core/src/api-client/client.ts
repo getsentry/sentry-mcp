@@ -1,99 +1,199 @@
 import { z } from "zod";
+import { DEFAULT_SEARCH_ISSUES_PERIOD } from "../constants";
+import { ConfigurationError } from "../errors";
+import { retryWithBackoff } from "../internal/fetch-utils";
+import { logIssue, logWarn } from "../telem/logging";
+import type { SentryProtocol } from "../types";
 import {
-  getContinuousProfileUrl as getContinuousProfileUrlUtil,
-  getIssueUrl as getIssueUrlUtil,
-  getMonitorUrl as getMonitorUrlUtil,
-  getProfileUrl as getProfileUrlUtil,
-  getProfilingExplorerUrl,
-  getReleaseUrl as getReleaseUrlUtil,
-  getReplayUrl as getReplayUrlUtil,
-  getReplaysSearchUrl as getReplaysSearchUrlUtil,
-  getTraceMetricsExploreUrl,
-  getTraceUrl as getTraceUrlUtil,
-  isSentryHost,
-  type TraceMetricIdentifier,
-} from "../utils/url-utils";
-import {
+  type EventsDataset,
   isMetricsDataset,
   isProfilesDataset,
   normalizeEventsDataset,
-  type EventsDataset,
 } from "../utils/events-datasets";
-import { logIssue, logWarn } from "../telem/logging";
+import { isNumericId } from "../utils/slug-validation";
 import {
-  OrganizationListSchema,
-  OrganizationSchema,
+  type DashboardUrlOptions,
+  getAIConversationsUrl as getAIConversationsUrlUtil,
+  getAIConversationUrl as getAIConversationUrlUtil,
+  getContinuousProfileUrl as getContinuousProfileUrlUtil,
+  getDashboardUrl as getDashboardUrlUtil,
+  getIssueUrl as getIssueUrlUtil,
+  getMonitorUrl as getMonitorUrlUtil,
+  getPreprodSnapshotUrl as getPreprodSnapshotUrlUtil,
+  getProfileUrl as getProfileUrlUtil,
+  getProfilingExplorerUrl,
+  getReleaseUrl as getReleaseUrlUtil,
+  getReplaysSearchUrl as getReplaysSearchUrlUtil,
+  getReplayUrl as getReplayUrlUtil,
+  getTraceMetricsExploreUrl,
+  getTraceUrl as getTraceUrlUtil,
+  getUptimeMonitorUrl as getUptimeMonitorUrlUtil,
+  isPublicSentryHost,
+  type TraceMetricIdentifier,
+} from "../utils/url-utils";
+import { USER_AGENT } from "../version";
+import { apiPath } from "./api-path";
+import {
+  ApiNotFoundError,
+  ApiServerError,
+  ApiValidationError,
+  createApiError,
+} from "./errors";
+import {
+  AgenticOnboardingRunSchema,
+  AIConversationDetailsResponseSchema,
+  AIConversationSummaryListSchema,
+  AlertActionOptionSchema,
+  AlertConditionOptionSchema,
+  AlertRuleProjectScopeSchema,
+  ApiErrorSchema,
+  AutofixRunSchema,
+  AutofixRunStateSchema,
+  ClientKeyListSchema,
   ClientKeySchema,
-  TeamListSchema,
-  TeamSchema,
-  ProjectListSchema,
-  ProjectSchema,
-  ReleaseListSchema,
+  CommitListSchema,
+  DashboardListSchema,
+  DashboardSchema,
+  DeployListSchema,
+  DetectorSchema,
+  ErrorsSearchResponseSchema,
+  EventAttachmentListSchema,
+  EventSchema,
+  EventsStatsResponseSchema,
+  ExternalIssueListSchema,
+  FlamegraphSchema,
+  IssueActivityListResponseSchema,
+  IssueAlertRuleListSchema,
+  IssueAlertRuleSchema,
+  IssueCommentListSchema,
+  IssueCommentSchema,
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
-  ExternalIssueListSchema,
-  EventSchema,
-  EventAttachmentListSchema,
-  ErrorsSearchResponseSchema,
-  SpansSearchResponseSchema,
-  TagListSchema,
-  ApiErrorSchema,
-  ClientKeyListSchema,
-  AutofixRunSchema,
-  AutofixRunStateSchema,
+  MetricAlertRuleListSchema,
+  MetricAlertRuleSchema,
+  MonitorCheckInListSchema,
+  MonitorListSchema,
+  MonitorSchema,
+  MonitorStatsSchema,
+  OrganizationEnvironmentListSchema,
+  OrganizationListSchema,
+  OrganizationSchema,
+  ProfileChunkResponseSchema,
+  ProjectListSchema,
+  ProjectRepositoryMappingSchema,
+  ProjectSchema,
+  ReleaseDetailsSchema,
+  ReleaseListSchema,
+  ReplayDetailsSchema,
+  ReplayIdsByResourceSchema,
+  ReplayListResponseSchema,
+  ReplayRecordingSegmentsSchema,
+  RepositoryListSchema,
   SearchAgentStartSchema,
   SearchAgentStateSchema,
+  SpansSearchResponseSchema,
+  StacktraceLinkSchema,
+  TagListSchema,
+  TeamListSchema,
+  TeamSchema,
   TraceMetaSchema,
   TraceSchema,
-  UserSchema,
-  UserRegionsSchema,
-  FlamegraphSchema,
-  ProfileChunkResponseSchema,
   TransactionProfileSchema,
-  ReplayDetailsSchema,
-  ReplayListResponseSchema,
-  ReplayIdsByResourceSchema,
-  ReplayRecordingSegmentsSchema,
+  UptimeCheckListSchema,
+  UptimeMonitorListSchema,
+  UptimeMonitorSchema,
+  UserReportListSchema,
+  UserSchema,
 } from "./schema";
-import { ConfigurationError } from "../errors";
-import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
-import { USER_AGENT } from "../version";
-import type { SentryProtocol } from "../types";
 import type {
+  AgenticOnboardingRun,
+  AgenticOnboardingStatusUpdate,
+  AIConversationDetails,
+  AIConversationSpanList,
+  AIConversationSummary,
+  AlertActionOption,
+  AlertConditionOption,
+  AlertRuleCreate,
+  AlertRuleProjectScope,
+  AlertRuleUpdate,
   AutofixRun,
   AutofixRunState,
   SearchAgentStart,
   SearchAgentState,
   ClientKey,
   ClientKeyList,
+  CommitList,
+  Dashboard,
+  DashboardListItem,
+  DeployList,
+  Detector,
   Event,
   EventAttachment,
   EventAttachmentList,
+  ExternalIssueList,
+  Flamegraph,
   Issue,
+  IssueActivityList,
+  IssueAlertRule,
+  IssueAlertRuleList,
+  IssueComment,
+  IssueCommentList,
   IssueList,
   IssueTagValues,
-  ExternalIssueList,
+  MetricAlertRule,
+  MetricAlertRuleList,
+  MetricMonitorCreate,
+  MetricMonitorUpdate,
+  Monitor,
+  MonitorCheckInList,
+  MonitorList,
+  MonitorStats,
+  OrganizationEnvironmentList,
   OrganizationList,
+  ProfileChunk,
   Project,
   ProjectList,
+  ReleaseDetails,
   ReleaseList,
+  ReplayDetails,
+  ReplayList,
+  ReplayRecordingSegments,
+  StacktraceLink,
   TagList,
   Team,
   TeamList,
   Trace,
   TraceMeta,
-  User,
-  Flamegraph,
-  ProfileChunk,
   TransactionProfile,
-  ReplayDetails,
-  ReplayList,
-  ReplayRecordingSegments,
+  UptimeCheckList,
+  UptimeMonitor,
+  UptimeMonitorList,
+  User,
+  UserReportList,
 } from "./types";
+
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
 // import { logger } from "@sentry/node";
+
+const SENTRY_MCP_SEARCH_EVENTS_REFERRER = "api.mcp.search-events";
+
+type ExplorerAggregateParams = {
+  fields?: string[];
+  aggregateFunctions?: string[];
+  groupByFields?: string[];
+};
+
+type ExplorerUrlParams = ExplorerAggregateParams & {
+  organizationSlug: string;
+  query: string;
+  projectId?: string;
+  sort?: string;
+  statsPeriod?: string;
+  start?: string;
+  end?: string;
+};
 
 /**
  * Mapping of common network error codes to user-friendly messages.
@@ -106,6 +206,51 @@ const NETWORK_ERROR_MESSAGES: Record<string, string> = {
   ETIMEDOUT: "Connection timed out. Check network connectivity.",
   ECONNRESET: "Connection reset. Try again in a moment.",
 };
+
+function normalizeStatsPeriod(statsPeriod?: string): string | undefined {
+  const normalized = statsPeriod?.trim();
+  return normalized || undefined;
+}
+
+function formatWorkflowNameQuery(query: string): string {
+  const escapedQuery = query.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `name:"*${escapedQuery}*"`;
+}
+
+function parseStatsPeriod(statsPeriod: string): {
+  amount: number;
+  unit: string;
+} {
+  const match = /^(\d+)([smhdw])$/.exec(statsPeriod);
+  if (!match) {
+    throw new ApiValidationError(
+      "statsPeriod must use a supported relative time format, such as `24h`, `7d`, or `2w`.",
+    );
+  }
+  return {
+    amount: Number(match[1]),
+    unit: match[2],
+  };
+}
+
+function getNextCursor(linkHeader: string | null): string | null {
+  if (!linkHeader) {
+    return null;
+  }
+
+  for (const link of linkHeader.split(",")) {
+    if (!link.includes('rel="next"') || !link.includes('results="true"')) {
+      continue;
+    }
+
+    const cursorMatch = link.match(/cursor="([^"]+)"/);
+    if (cursorMatch?.[1]) {
+      return cursorMatch[1];
+    }
+  }
+
+  return null;
+}
 
 /**
  * Custom error class for Sentry API responses.
@@ -127,7 +272,221 @@ const NETWORK_ERROR_MESSAGES: Record<string, string> = {
 
 type RequestOptions = {
   host?: string;
+  allowStatuses?: number[];
 };
+
+/**
+ * Automatic retry policy for transient upstream gateway failures (502/503/504).
+ *
+ * Sentry's edge intermittently returns short-lived gateway errors (e.g.
+ * "upstream connect error or disconnect/reset before headers") that clear on a
+ * retry. We retry only idempotent GET requests so an automatic retry can never
+ * replay a mutation, and keep the budget small so a still-failing tool call
+ * resolves quickly under the Cloudflare Workers request lifetime.
+ */
+const RETRYABLE_REQUEST_MAX_RETRIES = 2;
+const RETRYABLE_REQUEST_INITIAL_DELAY_MS = 250;
+
+/**
+ * Default cap for returning attachment bytes inline over the MCP transport.
+ * A 30 MB attachment takes ~80 MB in memory once base64-encoded and serialized,
+ * which fits the Cloudflare Worker's 128 MB isolate with room for the rest of the
+ * request; above it, getEventAttachment returns a reference instead of the bytes.
+ */
+export const DEFAULT_MAX_INLINE_ATTACHMENT_BYTES = 30 * 1024 * 1024;
+
+export type TraceItemType = "spans" | "logs" | "tracemetrics";
+
+type ClientKeyRateLimit = {
+  window: number;
+  count: number;
+};
+
+type ClientKeyDynamicSdkLoaderOptions = {
+  hasReplay?: boolean;
+  hasPerformance?: boolean;
+  hasDebug?: boolean;
+  hasFeedback?: boolean;
+  hasLogsAndMetrics?: boolean;
+};
+
+type CreateProjectRequest = {
+  name: string;
+  slug?: string;
+  platform?: string;
+};
+
+type UpdateProjectRequest = {
+  name?: string;
+  slug?: string;
+  platform?: string;
+};
+
+type UpdateClientKeyRequest = {
+  name?: string;
+  isActive?: boolean;
+  rateLimit?: ClientKeyRateLimit | null;
+  browserSdkVersion?: string;
+  dynamicSdkLoaderOptions?: ClientKeyDynamicSdkLoaderOptions;
+};
+export type TraceItemAttributeType = "string" | "number" | "boolean";
+export type TraceItemAttributeSourceType = "sentry" | "user";
+
+export type TraceItemAttributeSource = {
+  source_type: TraceItemAttributeSourceType;
+  is_transformed_alias?: boolean;
+};
+
+export type TraceItemAttribute = {
+  key: string;
+  name: string;
+  type: TraceItemAttributeType;
+  attributeSource: TraceItemAttributeSource;
+  secondaryAliases?: string[];
+};
+
+export type TraceItemAttributeValidationResult = {
+  valid: boolean;
+  type?: TraceItemAttributeType;
+  error?: string;
+};
+
+export type EventsValidationIssue = {
+  valid: boolean;
+  error?: string;
+};
+
+export type EventsNamedValidationIssue = {
+  name: string;
+  valid: boolean;
+  error?: string;
+};
+
+export type EventsAttributeValidationResult = {
+  name: string;
+  valid: boolean;
+  type?: TraceItemAttributeType;
+  error?: string;
+};
+
+export type EventsQueryValidation = {
+  valid: boolean;
+  error?: string;
+  fields: EventsAttributeValidationResult[];
+};
+
+export type EventsValidationResult = {
+  valid: boolean;
+  projects: EventsValidationIssue[];
+  dataset: EventsNamedValidationIssue[];
+  environment: EventsValidationIssue[];
+  field: EventsAttributeValidationResult[];
+  query: EventsQueryValidation;
+  orderby: EventsAttributeValidationResult[];
+};
+
+const TraceItemAttributeTypeSchema = z.enum(["string", "number", "boolean"]);
+const TraceItemAttributeSourceSchema = z.object({
+  source_type: z.enum(["sentry", "user"]),
+  is_transformed_alias: z.boolean().optional(),
+});
+
+const ValidationErrorSchema = z.string().nullable();
+
+const EventsValidationIssueSchema = z
+  .object({
+    valid: z.boolean(),
+    error: ValidationErrorSchema,
+  })
+  .transform(
+    ({ valid, error }): EventsValidationIssue => ({
+      valid,
+      ...(error ? { error } : {}),
+    }),
+  );
+
+const EventsNamedValidationIssueSchema = z
+  .object({
+    name: z.string(),
+    valid: z.boolean(),
+    error: ValidationErrorSchema,
+  })
+  .transform(
+    ({ name, valid, error }): EventsNamedValidationIssue => ({
+      name,
+      valid,
+      ...(error ? { error } : {}),
+    }),
+  );
+
+const EventsAttributeValidationSchema = z
+  .object({
+    name: z.string(),
+    valid: z.boolean(),
+    attrType: TraceItemAttributeTypeSchema.nullable(),
+    error: ValidationErrorSchema,
+  })
+  .transform(
+    ({ name, valid, attrType, error }): EventsAttributeValidationResult => ({
+      name,
+      valid,
+      ...(attrType ? { type: attrType } : {}),
+      ...(error ? { error } : {}),
+    }),
+  );
+
+const EventsValidationIssueListSchema = z.array(EventsValidationIssueSchema);
+const EventsNamedValidationIssueListSchema = z.array(
+  EventsNamedValidationIssueSchema,
+);
+const EventsAttributeValidationListSchema = z.array(
+  EventsAttributeValidationSchema,
+);
+const EventsQueryValidationSchema = z
+  .object({
+    valid: z.boolean(),
+    error: ValidationErrorSchema,
+    fields: EventsAttributeValidationListSchema,
+  })
+  .transform(
+    ({ valid, error, fields }): EventsQueryValidation => ({
+      valid,
+      fields,
+      ...(error ? { error } : {}),
+    }),
+  );
+
+const EventsValidationResponseSchema = z
+  .object({
+    valid: z.boolean(),
+    projects: EventsValidationIssueListSchema,
+    dataset: EventsNamedValidationIssueListSchema,
+    environment: EventsValidationIssueListSchema,
+    field: EventsAttributeValidationListSchema,
+    query: EventsQueryValidationSchema,
+    orderby: EventsAttributeValidationListSchema,
+  })
+  .transform((result): EventsValidationResult => result);
+
+const TraceItemAttributeSchema = z
+  .object({
+    key: z.string(),
+    name: z.string(),
+    attributeType: TraceItemAttributeTypeSchema,
+    attributeSource: TraceItemAttributeSourceSchema,
+    secondaryAliases: z.array(z.string()).optional(),
+  })
+  .transform(
+    ({ key, name, attributeType, attributeSource, secondaryAliases }) => ({
+      key,
+      name,
+      type: attributeType,
+      attributeSource,
+      ...(secondaryAliases ? { secondaryAliases } : {}),
+    }),
+  );
+
+const TraceItemAttributeListSchema = z.array(TraceItemAttributeSchema);
 
 /**
  * Sentry API client service for interacting with Sentry's REST API.
@@ -175,6 +534,10 @@ type RequestOptions = {
  */
 export class SentryApiService {
   private accessToken: string | null;
+  private clientId: string | null;
+  private clientName: string | null;
+  private clientFamily: string | null;
+  private utmSource: string | null;
   protected host: string;
   protected protocol: SentryProtocol;
   protected apiPrefix: string;
@@ -187,17 +550,33 @@ export class SentryApiService {
    * @param config Configuration object
    * @param config.accessToken OAuth access token for authentication (optional for some endpoints)
    * @param config.host Sentry hostname (e.g. "sentry.io", "sentry.example.com")
+   * @param config.clientId DCR-registered OAuth client ID
+   * @param config.clientName DCR-registered OAuth client name
+   * @param config.clientFamily Bucketed client family (e.g. "claude-code", "cursor")
+   * @param config.utmSource Sanitized MCP request attribution source
    */
   constructor({
     accessToken = null,
     host = "sentry.io",
     protocol = "https",
+    clientId = null,
+    clientName = null,
+    clientFamily = null,
+    utmSource = null,
   }: {
     accessToken?: string | null;
     host?: string;
     protocol?: SentryProtocol;
+    clientId?: string | null;
+    clientName?: string | null;
+    clientFamily?: string | null;
+    utmSource?: string | null;
   }) {
     this.accessToken = accessToken;
+    this.clientId = clientId;
+    this.clientName = clientName;
+    this.clientFamily = clientFamily;
+    this.utmSource = utmSource;
     this.host = host;
     this.protocol = protocol;
     this.apiPrefix = `${protocol}://${host}/api/0`;
@@ -217,15 +596,10 @@ export class SentryApiService {
   }
 
   /**
-   * Checks if the current host is Sentry SaaS (sentry.io).
-   *
-   * Used to determine API endpoint availability and URL formats.
-   * Self-hosted instances may not have all endpoints available.
-   *
-   * @returns True if using Sentry SaaS, false for self-hosted instances
+   * Whether API control requests and web URLs use public SaaS routing.
    */
-  private isSaas(): boolean {
-    return isSentryHost(this.host);
+  private isPublicSaas(): boolean {
+    return isPublicSentryHost(this.host);
   }
 
   /**
@@ -264,6 +638,109 @@ export class SentryApiService {
     }
   }
 
+  private applyStatsMixinTimeParams(
+    queryParams: URLSearchParams,
+    statsPeriod?: string,
+    start?: string,
+    end?: string,
+    resolutionSeconds?: number,
+  ): void {
+    if (statsPeriod && (start || end)) {
+      throw new ApiValidationError(
+        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
+      );
+    }
+    if ((start && !end) || (!start && end)) {
+      throw new ApiValidationError(
+        "Both start and end parameters must be provided together for absolute time ranges.",
+      );
+    }
+
+    let since: number;
+    let until: number;
+
+    if (start && end) {
+      const startMs = Date.parse(start);
+      const endMs = Date.parse(end);
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+        throw new ApiValidationError(
+          "start and end parameters must be valid ISO 8601 date strings.",
+        );
+      }
+      since = Math.floor(startMs / 1000);
+      until = Math.floor(endMs / 1000);
+    } else {
+      const period = statsPeriod ?? "24h";
+      const { amount, unit } = parseStatsPeriod(period);
+      let unitSeconds: number;
+      switch (unit) {
+        case "s":
+          unitSeconds = 1;
+          break;
+        case "m":
+          unitSeconds = 60;
+          break;
+        case "h":
+          unitSeconds = 60 * 60;
+          break;
+        case "d":
+          unitSeconds = 60 * 60 * 24;
+          break;
+        case "w":
+          unitSeconds = 60 * 60 * 24 * 7;
+          break;
+        default:
+          throw new ApiValidationError(
+            "statsPeriod must use a supported relative time format, such as `24h`, `7d`, or `2w`.",
+          );
+      }
+      until = Math.floor(Date.now() / 1000);
+      since = until - amount * unitSeconds;
+    }
+
+    queryParams.set("since", String(since));
+    queryParams.set("until", String(until));
+    if (resolutionSeconds !== undefined) {
+      queryParams.set("resolution", `${resolutionSeconds}s`);
+    }
+  }
+
+  /**
+   * Makes an authenticated request to the Sentry API, transparently retrying
+   * transient upstream gateway failures (502/503/504).
+   *
+   * Retries are limited to idempotent GET requests so an automatic retry can
+   * never replay a mutation, and are gated on `ApiServerError.isGatewayError()`
+   * so persistent 500s, 4xx client errors, and network/configuration errors
+   * fail fast without waiting. Callers that opt a 5xx into `allowStatuses`
+   * receive the raw response from `requestOnce` and are never retried.
+   *
+   * @param path API endpoint path (without /api/0 prefix)
+   * @param options Fetch options
+   * @param requestOptions Additional request configuration
+   * @returns Promise resolving to Response object
+   * @throws {ApiError} Enhanced API errors with user-friendly messages
+   * @throws {Error} Network or parsing errors
+   */
+  private async request(
+    path: string,
+    options: RequestInit = {},
+    requestOptions: { host?: string; allowStatuses?: number[] } = {},
+  ): Promise<Response> {
+    const method = (options.method ?? "GET").toUpperCase();
+    const isIdempotent = method === "GET";
+
+    return retryWithBackoff(
+      () => this.requestOnce(path, options, requestOptions),
+      {
+        maxRetries: isIdempotent ? RETRYABLE_REQUEST_MAX_RETRIES : 0,
+        initialDelay: RETRYABLE_REQUEST_INITIAL_DELAY_MS,
+        shouldRetry: (error) =>
+          error instanceof ApiServerError && error.isGatewayError(),
+      },
+    );
+  }
+
   /**
    * Internal method for making authenticated requests to Sentry API.
    *
@@ -280,10 +757,10 @@ export class SentryApiService {
    * @throws {ApiError} Enhanced API errors with user-friendly messages
    * @throws {Error} Network or parsing errors
    */
-  private async request(
+  private async requestOnce(
     path: string,
     options: RequestInit = {},
-    { host }: { host?: string } = {},
+    { host, allowStatuses }: { host?: string; allowStatuses?: number[] } = {},
   ): Promise<Response> {
     const url = host
       ? `${this.protocol}://${host}/api/0${path}`
@@ -295,6 +772,18 @@ export class SentryApiService {
     };
     if (this.accessToken) {
       headers.Authorization = `Bearer ${this.accessToken}`;
+    }
+    if (this.clientId) {
+      headers["X-Sentry-MCP-Client-Id"] = this.clientId;
+    }
+    if (this.clientName) {
+      headers["X-Sentry-MCP-Client-Name"] = this.clientName;
+    }
+    if (this.clientFamily) {
+      headers["X-Sentry-MCP-Client-Family"] = this.clientFamily;
+    }
+    if (this.utmSource) {
+      headers["X-Sentry-MCP-Utm-Source"] = this.utmSource;
     }
 
     // Check if fetch is available, otherwise provide a helpful error message
@@ -350,6 +839,9 @@ export class SentryApiService {
 
     // Handle error responses generically
     if (!response.ok) {
+      if (allowStatuses?.includes(response.status)) {
+        return response;
+      }
       const errorText = await response.text();
       let parsed: unknown | undefined;
       try {
@@ -557,6 +1049,38 @@ export class SentryApiService {
     );
   }
 
+  getAIConversationUrl(
+    organizationSlug: string,
+    conversationId: string,
+  ): string {
+    return getAIConversationUrlUtil(
+      this.host,
+      organizationSlug,
+      conversationId,
+      this.protocol,
+    );
+  }
+
+  /** Builds the Sentry UI URL for the AI Conversations list with optional filters. */
+  getAIConversationsUrl(
+    organizationSlug: string,
+    options?: {
+      query?: string;
+      project?: string[];
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+    },
+  ): string {
+    return getAIConversationsUrlUtil(
+      this.host,
+      organizationSlug,
+      options,
+      this.protocol,
+    );
+  }
+
   getProfileUrl(
     organizationSlug: string,
     projectSlug: string,
@@ -601,11 +1125,35 @@ export class SentryApiService {
     );
   }
 
-  getMonitorUrl(organizationSlug: string, monitorSlug: string): string {
+  getMonitorUrl(
+    organizationSlug: string,
+    monitorSlug: string,
+    projectSlug?: string,
+  ): string {
     return getMonitorUrlUtil(
       this.host,
       organizationSlug,
       monitorSlug,
+      this.protocol,
+      projectSlug,
+    );
+  }
+
+  getUptimeMonitorUrl(
+    organizationSlug: string,
+    uptimeMonitorId: string | number,
+  ): string {
+    return this.getDetectorUrl(organizationSlug, uptimeMonitorId);
+  }
+
+  getDetectorUrl(
+    organizationSlug: string,
+    detectorId: string | number,
+  ): string {
+    return getUptimeMonitorUrlUtil(
+      this.host,
+      organizationSlug,
+      detectorId,
       this.protocol,
     );
   }
@@ -617,6 +1165,42 @@ export class SentryApiService {
       releaseVersion,
       this.protocol,
     );
+  }
+
+  getDashboardUrl(
+    organizationSlug: string,
+    dashboardId: string,
+    options: DashboardUrlOptions = {},
+  ): string {
+    return getDashboardUrlUtil(
+      this.host,
+      organizationSlug,
+      dashboardId,
+      options,
+      this.protocol,
+    );
+  }
+
+  getIssueAlertRuleUrl(
+    organizationSlug: string,
+    ruleId: string | number,
+  ): string {
+    const encodedRuleId = encodeURIComponent(String(ruleId));
+    if (this.isPublicSaas()) {
+      return `${this.protocol}://${organizationSlug}.sentry.io/monitors/alerts/${encodedRuleId}/`;
+    }
+    return `${this.protocol}://${this.host}/organizations/${organizationSlug}/monitors/alerts/${encodedRuleId}/`;
+  }
+
+  getMetricAlertRuleUrl(
+    organizationSlug: string,
+    ruleId: string | number,
+  ): string {
+    const encodedRuleId = encodeURIComponent(String(ruleId));
+    if (this.isPublicSaas()) {
+      return `${this.protocol}://${organizationSlug}.sentry.io/issues/alerts/rules/details/${encodedRuleId}/`;
+    }
+    return `${this.protocol}://${this.host}/organizations/${organizationSlug}/issues/alerts/rules/details/${encodedRuleId}/`;
   }
 
   // ================================================================================
@@ -704,52 +1288,101 @@ export class SentryApiService {
       urlParams.set("yAxis", "count()");
     }
 
-    // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+    // Public SaaS uses sentry.io for web UI URLs regardless of region.
     // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
-    const webHost = this.isSaas() ? "sentry.io" : this.host;
-    const path = this.isSaas()
+    const webHost = this.isPublicSaas() ? "sentry.io" : this.host;
+    const path = this.isPublicSaas()
       ? `${this.protocol}://${organizationSlug}.${webHost}/explore/discover/homepage/`
       : `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
 
     return `${path}?${urlParams.toString()}`;
   }
 
+  private isAggregateExplorerQuery(params: ExplorerAggregateParams): boolean {
+    return Boolean(
+      params.aggregateFunctions?.length ||
+        params.fields?.some(
+          (field) => field.includes("(") && field.includes(")"),
+        ),
+    );
+  }
+
   /**
-   * Builds a URL for the modern EAP (Event Analytics Platform) API used by spans/logs.
-   *
-   * The EAP API uses structured aggregate queries with separate aggregateField
-   * parameters containing JSON objects for groupBy and yAxes.
+   * Adds the structured aggregate fields shared by the Spans and Logs Explorer
+   * URL formats. Each group-by and collection of y-axes is encoded as a
+   * separate JSON-valued `aggregateField` parameter.
    *
    * @example
-   * // URL format: /explore/traces/?aggregateField={"groupBy":"span.op"}&aggregateField={"yAxes":["count()"]}
-   * buildEapUrl("my-org", "span.op:db", "123", ["span.op", "count()"], "-count()", ["count()"], ["span.op"])
+   * aggregateField={"groupBy":"span.op"}&aggregateField={"yAxes":["count()"]}
    */
-  private buildEapUrl(params: {
-    organizationSlug: string;
-    query: string;
-    dataset: "spans" | "logs";
-    projectId?: string;
-    fields?: string[];
-    sort?: string;
-    statsPeriod?: string;
-    start?: string;
-    end?: string;
-    aggregateFunctions?: string[];
-    groupByFields?: string[];
-  }): string {
-    const {
-      organizationSlug,
-      query,
-      dataset,
-      projectId,
-      fields,
-      sort,
-      statsPeriod,
-      start,
-      end,
-      aggregateFunctions,
-      groupByFields,
-    } = params;
+  private appendAggregateFields(
+    urlParams: URLSearchParams,
+    params: ExplorerAggregateParams,
+  ): void {
+    const { fields, aggregateFunctions, groupByFields } = params;
+
+    if (aggregateFunctions?.length || groupByFields?.length) {
+      // Prefer the structured aggregate metadata returned by search_events.
+      for (const field of groupByFields ?? []) {
+        urlParams.append("aggregateField", JSON.stringify({ groupBy: field }));
+      }
+
+      if (aggregateFunctions?.length) {
+        urlParams.append(
+          "aggregateField",
+          JSON.stringify({ yAxes: aggregateFunctions }),
+        );
+      }
+      return;
+    }
+
+    // Fall back to deriving aggregate metadata from the selected fields.
+    const parsedGroupByFields =
+      fields?.filter((field) => !field.includes("(") && !field.includes(")")) ??
+      [];
+    const parsedAggregateFunctions =
+      fields?.filter((field) => field.includes("(") && field.includes(")")) ??
+      [];
+
+    for (const field of parsedGroupByFields) {
+      urlParams.append("aggregateField", JSON.stringify({ groupBy: field }));
+    }
+
+    if (parsedAggregateFunctions.length > 0) {
+      urlParams.append(
+        "aggregateField",
+        JSON.stringify({ yAxes: parsedAggregateFunctions }),
+      );
+    }
+  }
+
+  private appendExplorerTimeParams(
+    urlParams: URLSearchParams,
+    params: { statsPeriod?: string; start?: string; end?: string },
+  ): void {
+    if (params.start && params.end) {
+      urlParams.set("start", params.start);
+      urlParams.set("end", params.end);
+    } else {
+      urlParams.set("statsPeriod", params.statsPeriod || "24h");
+    }
+  }
+
+  private buildExplorePath(
+    organizationSlug: string,
+    page: "logs" | "traces",
+  ): string {
+    // Public SaaS uses sentry.io for web UI URLs regardless of region.
+    // Regional subdomains (e.g., us.sentry.io) are only for API endpoints.
+    if (this.isPublicSaas()) {
+      return `${this.protocol}://${organizationSlug}.sentry.io/explore/${page}/`;
+    }
+    return `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/${page}/`;
+  }
+
+  /** Builds a Spans Explorer URL using its `query`, `field`, and `sort` contract. */
+  private buildSpansExplorerUrl(params: ExplorerUrlParams): string {
+    const { organizationSlug, query, projectId, fields, sort } = params;
 
     const urlParams = new URLSearchParams();
     urlParams.set("query", query);
@@ -758,68 +1391,14 @@ export class SentryApiService {
       urlParams.set("project", projectId);
     }
 
-    // Determine if this is an aggregate query
-    const isAggregateQuery =
-      (aggregateFunctions?.length ?? 0) > 0 ||
-      fields?.some((field) => field.includes("(") && field.includes(")")) ||
-      false;
+    const isAggregateQuery = this.isAggregateExplorerQuery(params);
 
     if (isAggregateQuery) {
-      // EAP API uses structured aggregate parameters
-      if (
-        (aggregateFunctions?.length ?? 0) > 0 ||
-        (groupByFields?.length ?? 0) > 0
-      ) {
-        // Add each groupBy field as a separate aggregateField parameter
-        if (groupByFields && groupByFields.length > 0) {
-          for (const field of groupByFields) {
-            urlParams.append(
-              "aggregateField",
-              JSON.stringify({ groupBy: field }),
-            );
-          }
-        }
-
-        // Add aggregate functions (yAxes)
-        if (aggregateFunctions && aggregateFunctions.length > 0) {
-          urlParams.append(
-            "aggregateField",
-            JSON.stringify({ yAxes: aggregateFunctions }),
-          );
-        }
-      } else {
-        // Fallback: parse fields to extract aggregate info
-        const parsedGroupByFields =
-          fields?.filter(
-            (field) => !field.includes("(") && !field.includes(")"),
-          ) || [];
-        const parsedAggregateFunctions =
-          fields?.filter(
-            (field) => field.includes("(") && field.includes(")"),
-          ) || [];
-
-        for (const field of parsedGroupByFields) {
-          urlParams.append(
-            "aggregateField",
-            JSON.stringify({ groupBy: field }),
-          );
-        }
-
-        if (parsedAggregateFunctions.length > 0) {
-          urlParams.append(
-            "aggregateField",
-            JSON.stringify({ yAxes: parsedAggregateFunctions }),
-          );
-        }
-      }
-
+      this.appendAggregateFields(urlParams, params);
       urlParams.set("mode", "aggregate");
     } else {
-      // Non-aggregate query, add individual fields
-      if (fields && fields.length > 0) {
-        for (const field of fields) {
-          urlParams.append("field", field);
-        }
+      for (const field of fields ?? []) {
+        urlParams.append("field", field);
       }
     }
 
@@ -828,28 +1407,43 @@ export class SentryApiService {
       urlParams.set("sort", sort);
     }
 
-    // Add time parameters - either statsPeriod or start/end
-    if (start && end) {
-      urlParams.set("start", start);
-      urlParams.set("end", end);
+    this.appendExplorerTimeParams(urlParams, params);
+    urlParams.set("table", "span");
+
+    return `${this.buildExplorePath(organizationSlug, "traces")}?${urlParams.toString()}`;
+  }
+
+  /**
+   * Builds a Logs Explorer URL using its logs-specific page parameters.
+   * Sample and aggregate views use distinct field and sort parameters, and an
+   * omitted project is represented by `project=-1` to preserve all-project scope.
+   */
+  private buildLogsExplorerUrl(params: ExplorerUrlParams): string {
+    const { organizationSlug, query, projectId, fields, sort } = params;
+    const urlParams = new URLSearchParams();
+
+    urlParams.set("logsQuery", query);
+    urlParams.set("project", projectId ?? "-1");
+
+    const isAggregateQuery = this.isAggregateExplorerQuery(params);
+    if (isAggregateQuery) {
+      this.appendAggregateFields(urlParams, params);
     } else {
-      urlParams.set("statsPeriod", statsPeriod || "24h");
+      for (const field of fields ?? []) {
+        urlParams.append("logsFields", field);
+      }
     }
 
-    // Add table parameter for spans dataset (required for UI)
-    if (dataset === "spans") {
-      urlParams.set("table", "span");
+    urlParams.set("mode", isAggregateQuery ? "aggregate" : "samples");
+    if (sort) {
+      urlParams.set(
+        isAggregateQuery ? "logsAggregateSortBys" : "logsSortBys",
+        sort,
+      );
     }
 
-    const basePath = dataset === "logs" ? "logs" : "traces";
-    // For SaaS instances, always use sentry.io for web UI URLs regardless of region
-    // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
-    const webHost = this.isSaas() ? "sentry.io" : this.host;
-    const path = this.isSaas()
-      ? `${this.protocol}://${organizationSlug}.${webHost}/explore/${basePath}/`
-      : `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/${basePath}/`;
-
-    return `${path}?${urlParams.toString()}`;
+    this.appendExplorerTimeParams(urlParams, params);
+    return `${this.buildExplorePath(organizationSlug, "logs")}?${urlParams.toString()}`;
   }
 
   private extractTraceMetricsFromResults(
@@ -968,11 +1562,9 @@ export class SentryApiService {
       );
     }
 
-    // Route to modern EAP API (spans and logs)
-    return this.buildEapUrl({
+    const explorerParams = {
       organizationSlug,
       query,
-      dataset,
       projectId,
       fields,
       sort,
@@ -981,7 +1573,11 @@ export class SentryApiService {
       end,
       aggregateFunctions,
       groupByFields,
-    });
+    };
+
+    return dataset === "logs"
+      ? this.buildLogsExplorerUrl(explorerParams)
+      : this.buildSpansExplorerUrl(explorerParams);
   }
 
   /**
@@ -992,15 +1588,13 @@ export class SentryApiService {
    * @throws {ApiError} If authentication fails or user not found
    */
   async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
-    // Auth endpoints only exist on the main API server, never on regional endpoints
+    // User identity belongs to the deployment's control host.
     let authHost: string | undefined;
 
-    if (this.isSaas()) {
-      // For SaaS, always use the main sentry.io host, not regional hosts
-      // This handles cases like us.sentry.io, eu.sentry.io, etc.
+    if (this.isPublicSaas()) {
       authHost = "sentry.io";
     }
-    // For self-hosted, use the configured host (authHost remains undefined)
+    // Single-tenant and self-hosted deployments keep their configured host.
 
     const body = await this.requestJSON("/auth/", undefined, {
       ...opts,
@@ -1012,13 +1606,12 @@ export class SentryApiService {
   /**
    * Lists all organizations accessible to the authenticated user.
    *
-   * Automatically handles multi-region queries by fetching from all
-   * available regions and combining results.
+   * Queries the `/organizations/` endpoint on the root host.
    *
    * @param params Query parameters
    * @param params.query Search query to filter organizations by name/slug
-   * @param opts Request options
-   * @returns Array of organizations across all accessible regions (limited to 25 results)
+   * @param params.limit Maximum number of organizations to return (defaults to 25)
+   * @returns Array of organizations across all accessible regions
    *
    * @example
    * ```typescript
@@ -1029,63 +1622,30 @@ export class SentryApiService {
    * });
    * ```
    */
-  async listOrganizations(
-    params?: { query?: string },
-    opts?: RequestOptions,
-  ): Promise<OrganizationList> {
+  async listOrganizations(params?: {
+    query?: string;
+    limit?: number;
+  }): Promise<OrganizationList> {
+    const limit = params?.limit ?? 25;
+
     // Build query parameters
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "25");
+    queryParams.set("per_page", String(limit));
     if (params?.query) {
       queryParams.set("query", params.query);
     }
     const queryString = queryParams.toString();
     const path = `/organizations/?${queryString}`;
 
-    // For self-hosted instances, the regions endpoint doesn't exist
-    if (!this.isSaas()) {
-      const body = await this.requestJSON(path, undefined, opts);
-      return OrganizationListSchema.parse(body);
+    let host = undefined;
+    // Public SaaS lists across regions on sentry.io; single-tenant instances
+    // must keep organization discovery on their configured host.
+    if (this.isPublicSaas()) {
+      host = "sentry.io";
     }
 
-    // For SaaS, try to use regions endpoint first
-    try {
-      // TODO: Sentry is currently not returning all orgs without hitting region endpoints
-      // The regions endpoint only exists on the main API server, not on regional endpoints
-      const regionsBody = await this.requestJSON(
-        "/users/me/regions/",
-        undefined,
-        {}, // Don't pass opts to ensure we use the main host
-      );
-      const regionData = UserRegionsSchema.parse(regionsBody);
-
-      const allOrganizations = (
-        await Promise.all(
-          regionData.regions.map(async (region) =>
-            this.requestJSON(path, undefined, {
-              ...opts,
-              host: new URL(region.url).host,
-            }),
-          ),
-        )
-      )
-        .map((data) => OrganizationListSchema.parse(data))
-        .reduce((acc, curr) => acc.concat(curr), []);
-
-      // Apply the limit after combining results from all regions
-      return allOrganizations.slice(0, 25);
-    } catch (error) {
-      // If regions endpoint fails (e.g., older self-hosted versions identifying as sentry.io),
-      // fall back to direct organizations endpoint
-      if (error instanceof ApiNotFoundError) {
-        // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
-        const body = await this.requestJSON(path, undefined, opts);
-        return OrganizationListSchema.parse(body);
-      }
-
-      // Re-throw other errors
-      throw error;
-    }
+    const body = await this.requestJSON(path, undefined, { host });
+    return OrganizationListSchema.parse(body);
   }
 
   /**
@@ -1111,8 +1671,9 @@ export class SentryApiService {
       queryParams.set("detailed", "0");
     }
     const queryString = queryParams.toString();
+    const organizationPath = apiPath`/organizations/${organizationSlug}/`;
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/${queryString ? `?${queryString}` : ""}`,
+      `${organizationPath}${queryString ? `?${queryString}` : ""}`,
       undefined,
       opts,
     );
@@ -1125,21 +1686,23 @@ export class SentryApiService {
    * @param organizationSlug Organization identifier
    * @param params Query parameters
    * @param params.query Search query to filter teams by name/slug
+   * @param params.limit Maximum number of teams to return
    * @param opts Request options including host override
-   * @returns Array of teams in the organization (limited to 25 results)
+   * @returns Array of teams in the organization
    */
   async listTeams(
     organizationSlug: string,
-    params?: { query?: string },
+    params?: { query?: string; limit?: number },
     opts?: RequestOptions,
   ): Promise<TeamList> {
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "25");
+    queryParams.set("per_page", String(params?.limit ?? 25));
     if (params?.query) {
       queryParams.set("query", params.query);
     }
     const queryString = queryParams.toString();
-    const path = `/organizations/${organizationSlug}/teams/?${queryString}`;
+    const teamsPath = apiPath`/organizations/${organizationSlug}/teams/`;
+    const path = `${teamsPath}?${queryString}`;
 
     const body = await this.requestJSON(path, undefined, opts);
     return TeamListSchema.parse(body);
@@ -1166,7 +1729,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Team> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/teams/`,
+      apiPath`/organizations/${organizationSlug}/teams/`,
       {
         method: "POST",
         body: JSON.stringify({ name }),
@@ -1182,24 +1745,86 @@ export class SentryApiService {
    * @param organizationSlug Organization identifier
    * @param params Query parameters
    * @param params.query Search query to filter projects by name/slug
+   * @param params.limit Maximum number of projects to return
    * @param opts Request options
-   * @returns Array of projects in the organization (limited to 25 results)
+   * @returns Array of projects in the organization
    */
   async listProjects(
     organizationSlug: string,
-    params?: { query?: string },
+    params?: { query?: string; limit?: number },
     opts?: RequestOptions,
   ): Promise<ProjectList> {
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "25");
+    queryParams.set("per_page", String(params?.limit ?? 25));
     if (params?.query) {
       queryParams.set("query", params.query);
     }
     const queryString = queryParams.toString();
-    const path = `/organizations/${organizationSlug}/projects/?${queryString}`;
+    const projectsPath = apiPath`/organizations/${organizationSlug}/projects/`;
+    const path = `${projectsPath}?${queryString}`;
 
     const body = await this.requestJSON(path, undefined, opts);
     return ProjectListSchema.parse(body);
+  }
+
+  async listDashboards(
+    {
+      organizationSlug,
+      query,
+      sortBy,
+      limit = 10,
+      cursor,
+    }: {
+      organizationSlug: string;
+      query?: string | null;
+      sortBy?: "title" | "-title" | "dateCreated" | "-dateCreated";
+      limit?: number;
+      cursor?: string | null;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ dashboards: DashboardListItem[]; nextCursor: string | null }> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("per_page", String(limit));
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (sortBy) {
+      queryParams.set("sort", sortBy);
+    }
+    if (cursor) {
+      queryParams.set("cursor", cursor);
+    }
+
+    const response = await this.request(
+      apiPath`/organizations/${organizationSlug}/dashboards/` +
+        `?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+
+    return {
+      dashboards: DashboardListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async getDashboard(
+    {
+      organizationSlug,
+      dashboardId,
+    }: {
+      organizationSlug: string;
+      dashboardId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Dashboard> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/dashboards/${dashboardId}/`,
+      undefined,
+      opts,
+    );
+    return DashboardSchema.parse(body);
   }
 
   /**
@@ -1222,7 +1847,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Project> {
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlugOrId}/`,
+      apiPath`/projects/${organizationSlug}/${projectSlugOrId}/`,
       undefined,
       opts,
     );
@@ -1236,6 +1861,7 @@ export class SentryApiService {
    * @param params.organizationSlug Organization identifier
    * @param params.teamSlug Team identifier
    * @param params.name Project name
+   * @param params.slug Optional project slug
    * @param params.platform Platform identifier (e.g., "javascript", "python")
    * @param opts Request options
    * @returns Created project data
@@ -1245,23 +1871,28 @@ export class SentryApiService {
       organizationSlug,
       teamSlug,
       name,
+      slug,
       platform,
     }: {
       organizationSlug: string;
       teamSlug: string;
       name: string;
+      slug?: string | null;
       platform?: string | null;
     },
     opts?: RequestOptions,
   ): Promise<Project> {
-    const createData: Record<string, any> = { name };
-    // Only include platform if it has a meaningful value (not null, undefined, or empty)
+    const createData: CreateProjectRequest = { name };
+    // Only include optional fields when they have meaningful values.
+    if (slug) {
+      createData.slug = slug;
+    }
     if (platform) {
       createData.platform = platform;
     }
 
     const body = await this.requestJSON(
-      `/teams/${organizationSlug}/${teamSlug}/projects/`,
+      apiPath`/teams/${organizationSlug}/${teamSlug}/projects/`,
       {
         method: "POST",
         body: JSON.stringify(createData),
@@ -1283,6 +1914,28 @@ export class SentryApiService {
    * @param opts Request options
    * @returns Updated project data
    */
+  async updateAgenticOnboardingStatus(
+    {
+      organizationSlug,
+      update,
+    }: {
+      organizationSlug: string;
+      update: AgenticOnboardingStatusUpdate;
+    },
+    opts?: RequestOptions,
+  ): Promise<AgenticOnboardingRun> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/onboarding/agent/status/`,
+      {
+        method: "POST",
+        body: JSON.stringify(update),
+      },
+      opts,
+    );
+
+    return AgenticOnboardingRunSchema.parse(body);
+  }
+
   async updateProject(
     {
       organizationSlug,
@@ -1299,14 +1952,14 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Project> {
-    const updateData: Record<string, any> = {};
+    const updateData: UpdateProjectRequest = {};
     // Only include fields that have meaningful values (truthy strings)
     if (name) updateData.name = name;
     if (slug) updateData.slug = slug;
     if (platform) updateData.platform = platform;
 
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/`,
       {
         method: "PUT",
         body: JSON.stringify(updateData),
@@ -1314,6 +1967,646 @@ export class SentryApiService {
       opts,
     );
     return ProjectSchema.parse(body);
+  }
+
+  async listRepos(
+    {
+      organizationSlug,
+      query,
+    }: {
+      organizationSlug: string;
+      query?: string;
+    },
+    opts?: RequestOptions,
+  ) {
+    let cursor: string | null = null;
+    const repos: z.infer<typeof RepositoryListSchema> = [];
+
+    do {
+      const params = new URLSearchParams();
+      params.set("per_page", "100");
+      if (query) {
+        params.set("query", query);
+      }
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
+
+      const response = await this.request(
+        apiPath`/organizations/${organizationSlug}/repos/` +
+          `?${params.toString()}`,
+        { method: "GET" },
+        opts,
+      );
+      const body = await this.parseJsonResponse(response);
+      repos.push(...RepositoryListSchema.parse(body));
+      cursor = getNextCursor(response.headers.get("link"));
+    } while (cursor);
+
+    return repos;
+  }
+
+  async linkProjectRepository(
+    {
+      organizationSlug,
+      projectSlug,
+      repository,
+      provider,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      repository: string;
+      provider?: string | null;
+    },
+    opts?: RequestOptions,
+  ) {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/code-mappings/bulk/`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          project: projectSlug,
+          repository,
+          provider,
+          mappings: [
+            {
+              stackRoot: "",
+              sourceRoot: "",
+            },
+          ],
+        }),
+      },
+      opts,
+    );
+    return ProjectRepositoryMappingSchema.parse(body);
+  }
+
+  async listIssueAlertRules(
+    params: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRuleList> {
+    const page = await this.listIssueAlertRulesPage(params, opts);
+    return page.rules;
+  }
+
+  async listIssueAlertRulesPage(
+    {
+      organizationSlug,
+      projectSlug,
+      query,
+      cursor,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ rules: IssueAlertRuleList; nextCursor: string | null }> {
+    const searchQuery = new URLSearchParams({ sortBy: "-id" });
+    if (projectSlug) {
+      searchQuery.set("projectSlug", projectSlug);
+    }
+    if (query) {
+      searchQuery.set("query", formatWorkflowNameQuery(query));
+    }
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const response = await this.request(
+      apiPath`/organizations/${organizationSlug}/workflows/` +
+        `?${searchQuery.toString()}`,
+      undefined,
+      opts,
+    );
+    const rules = IssueAlertRuleListSchema.parse(
+      await this.parseJsonResponse(response),
+    );
+    const targetLimit = limit ?? 100;
+    return {
+      rules: rules.slice(0, targetLimit),
+      nextCursor:
+        rules.length > targetLimit
+          ? null
+          : getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async getIssueAlertRule(
+    {
+      organizationSlug,
+      projectSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      ruleId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    // Workflow list ID filters override project filters. Verify the association explicitly.
+    if (projectSlug) {
+      const [project, scope] = await Promise.all([
+        this.getProject(
+          { organizationSlug, projectSlugOrId: projectSlug },
+          opts,
+        ),
+        this.getAlertRuleProjectScope({ organizationSlug, ruleId }, opts),
+      ]);
+      if (
+        !scope.includesAllProjects &&
+        !scope.projectIds.includes(String(project.id))
+      ) {
+        throw new ApiNotFoundError(
+          "Workflow not found in this project",
+          undefined,
+          undefined,
+          "workflow",
+          String(ruleId),
+        );
+      }
+    }
+
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/`,
+      undefined,
+      opts,
+    );
+    return IssueAlertRuleSchema.parse(body);
+  }
+
+  /** Private Sentry endpoint: keep the complete association check separate from filtered lists. */
+  async getAlertRuleProjectScope(
+    {
+      organizationSlug,
+      ruleId,
+    }: { organizationSlug: string; ruleId: string | number },
+    opts?: RequestOptions,
+  ): Promise<AlertRuleProjectScope> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/project-scope/`,
+      undefined,
+      opts,
+    );
+    return AlertRuleProjectScopeSchema.parse(body);
+  }
+
+  async getDetectorForAlertRule(
+    {
+      organizationSlug,
+      alertRuleId,
+    }: { organizationSlug: string; alertRuleId: string | number },
+    opts?: RequestOptions,
+  ): Promise<string> {
+    const query = new URLSearchParams({ alert_rule_id: String(alertRuleId) });
+    const body = await this.requestJSON(
+      `${apiPath`/organizations/${organizationSlug}/alert-rule-detector/`}?${query}`,
+      undefined,
+      opts,
+    );
+    return z.object({ detectorId: z.string() }).parse(body).detectorId;
+  }
+
+  async getDetector(
+    {
+      organizationSlug,
+      detectorId,
+    }: { organizationSlug: string; detectorId: string | number },
+    opts?: RequestOptions,
+  ): Promise<Detector> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/detectors/${detectorId}/`,
+      undefined,
+      opts,
+    );
+    return DetectorSchema.parse(body);
+  }
+
+  async createMetricMonitor(
+    {
+      organizationSlug,
+      projectSlug,
+      body,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      body: MetricMonitorCreate;
+    },
+    opts?: RequestOptions,
+  ): Promise<Detector> {
+    const response = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/projects/${projectSlug}/detectors/`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      opts,
+    );
+    return DetectorSchema.parse(response);
+  }
+
+  async updateMetricMonitor(
+    {
+      organizationSlug,
+      monitorId,
+      body,
+    }: {
+      organizationSlug: string;
+      monitorId: string | number;
+      body: MetricMonitorUpdate;
+    },
+    opts?: RequestOptions,
+  ): Promise<Detector> {
+    const response = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/detectors/${monitorId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      },
+      opts,
+    );
+    return DetectorSchema.parse(response);
+  }
+
+  async deleteMetricMonitor(
+    {
+      organizationSlug,
+      monitorId,
+    }: {
+      organizationSlug: string;
+      monitorId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.request(
+      apiPath`/organizations/${organizationSlug}/detectors/${monitorId}/`,
+      { method: "DELETE" },
+      opts,
+    );
+  }
+
+  async listDetectorsPage(
+    {
+      organizationSlug,
+      projectId,
+      types,
+      query,
+      cursor,
+      limit = 25,
+    }: {
+      organizationSlug: string;
+      projectId?: string;
+      types?: string[];
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ detectors: Detector[]; nextCursor: string | null }> {
+    const search = new URLSearchParams({
+      project: projectId ?? "-1",
+      per_page: String(limit),
+    });
+    for (const type of types ?? []) {
+      search.append("type", type);
+    }
+    if (query) search.set("query", query);
+    if (cursor) search.set("cursor", cursor);
+    const response = await this.request(
+      `${apiPath`/organizations/${organizationSlug}/detectors/`}?${search}`,
+      undefined,
+      opts,
+    );
+    return {
+      detectors: z
+        .array(DetectorSchema)
+        .parse(await this.parseJsonResponse(response)),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async listAvailableAlertActionsPage(
+    {
+      organizationSlug,
+      types,
+      cursor,
+      limit = 25,
+    }: {
+      organizationSlug: string;
+      types?: string[];
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ actions: AlertActionOption[]; nextCursor: string | null }> {
+    const search = new URLSearchParams({ per_page: String(limit) });
+    for (const type of types ?? []) {
+      search.append("type", type);
+    }
+    if (cursor) search.set("cursor", cursor);
+    const response = await this.request(
+      `${apiPath`/organizations/${organizationSlug}/available-actions/`}?${search}`,
+      undefined,
+      opts,
+    );
+    return {
+      actions: z
+        .array(AlertActionOptionSchema)
+        .parse(await this.parseJsonResponse(response)),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async listAlertConditionsPage(
+    {
+      organizationSlug,
+      group,
+      cursor,
+      limit = 25,
+    }: {
+      organizationSlug: string;
+      group: "workflow_trigger" | "action_filter";
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{
+    conditions: AlertConditionOption[];
+    nextCursor: string | null;
+  }> {
+    const search = new URLSearchParams({ group, per_page: String(limit) });
+    if (cursor) search.set("cursor", cursor);
+    const response = await this.request(
+      `${apiPath`/organizations/${organizationSlug}/data-conditions/`}?${search}`,
+      undefined,
+      opts,
+    );
+    return {
+      conditions: z
+        .array(AlertConditionOptionSchema)
+        .parse(await this.parseJsonResponse(response)),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async createAlertRule(
+    {
+      organizationSlug,
+      body,
+    }: {
+      organizationSlug: string;
+      body: AlertRuleCreate;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const response = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      opts,
+    );
+    return IssueAlertRuleSchema.parse(response);
+  }
+
+  async updateAlertRule(
+    {
+      organizationSlug,
+      ruleId,
+      body,
+    }: {
+      organizationSlug: string;
+      ruleId: string | number;
+      body: AlertRuleUpdate;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const response = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      },
+      opts,
+    );
+    return IssueAlertRuleSchema.parse(response);
+  }
+
+  async deleteAlertRule(
+    {
+      organizationSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      ruleId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.request(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/`,
+      { method: "DELETE" },
+      opts,
+    );
+  }
+
+  async listMetricAlertRules(
+    params: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MetricAlertRuleList> {
+    const page = await this.listMetricAlertRulesPage(params, opts);
+    return page.rules;
+  }
+
+  async listMetricAlertRulesPage(
+    {
+      organizationSlug,
+      projectSlug,
+      query,
+      cursor,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ rules: MetricAlertRuleList; nextCursor: string | null }> {
+    const project = projectSlug
+      ? await this.getProject(
+          {
+            organizationSlug,
+            projectSlugOrId: projectSlug,
+          },
+          opts,
+        )
+      : undefined;
+
+    if (query) {
+      const body = await this.listCombinedAlertRules(
+        {
+          organizationSlug,
+          name: query,
+          alertType: "alert_rule",
+          projectId: project?.id,
+          cursor,
+          limit,
+        },
+        opts,
+      );
+      return {
+        rules: MetricAlertRuleListSchema.parse(body.data),
+        nextCursor: body.nextCursor,
+      };
+    }
+
+    const searchQuery = new URLSearchParams();
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+    if (project) {
+      searchQuery.set("project", String(project.id));
+    }
+
+    const queryString = searchQuery.toString();
+    const path = apiPath`/organizations/${organizationSlug}/alert-rules/`;
+    const response = await this.request(
+      `${path}${queryString ? `?${queryString}` : ""}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+    return {
+      rules: MetricAlertRuleListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async getMetricAlertRule(
+    {
+      organizationSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      ruleId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MetricAlertRule> {
+    const path = apiPath`/organizations/${organizationSlug}/alert-rules/${ruleId}/`;
+    const body = await this.requestJSON(path, undefined, opts);
+    return MetricAlertRuleSchema.parse(body);
+  }
+
+  /**
+   * Uses Sentry's combined-rules endpoint for metric alert name search.
+   */
+  private async listCombinedAlertRules(
+    {
+      organizationSlug,
+      name,
+      alertType,
+      projectId,
+      cursor,
+      limit,
+    }: {
+      organizationSlug: string;
+      name: string;
+      alertType: "alert_rule";
+      projectId?: string | number;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ data: unknown; nextCursor: string | null }> {
+    const searchQuery = new URLSearchParams();
+    searchQuery.set("name", name);
+    searchQuery.append("alertType", alertType);
+    if (projectId !== undefined) {
+      searchQuery.append("project", String(projectId));
+    }
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const response = await this.request(
+      apiPath`/organizations/${organizationSlug}/combined-rules/` +
+        `?${searchQuery.toString()}`,
+      undefined,
+      opts,
+    );
+    return {
+      data: await this.parseJsonResponse(response),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  /**
+   * Lists teams assigned to a project.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param opts Request options
+   * @returns Array of teams assigned to the project
+   */
+  async listProjectTeams(
+    {
+      organizationSlug,
+      projectSlug,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<TeamList> {
+    const teams: TeamList = [];
+    let cursor: string | null = null;
+
+    do {
+      const queryParams = new URLSearchParams();
+      queryParams.set("per_page", "100");
+      if (cursor) {
+        queryParams.set("cursor", cursor);
+      }
+
+      const response = await this.request(
+        apiPath`/projects/${organizationSlug}/${projectSlug}/teams/` +
+          `?${queryParams.toString()}`,
+        undefined,
+        opts,
+      );
+      const body = await this.parseJsonResponse(response);
+      teams.push(...TeamListSchema.parse(body));
+      cursor = getNextCursor(response.headers.get("link"));
+    } while (cursor);
+
+    return teams;
   }
 
   /**
@@ -1338,10 +2631,40 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<void> {
     await this.request(
-      `/projects/${organizationSlug}/${projectSlug}/teams/${teamSlug}/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/teams/${teamSlug}/`,
       {
         method: "POST",
         body: JSON.stringify({}),
+      },
+      opts,
+    );
+  }
+
+  /**
+   * Removes a team from a project.
+   *
+   * @param params Assignment parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.teamSlug Team identifier to remove
+   * @param opts Request options
+   */
+  async removeTeamFromProject(
+    {
+      organizationSlug,
+      projectSlug,
+      teamSlug,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      teamSlug: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.request(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/teams/${teamSlug}/`,
+      {
+        method: "DELETE",
       },
       opts,
     );
@@ -1382,12 +2705,72 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<ClientKey> {
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/keys/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/keys/`,
       {
         method: "POST",
         body: JSON.stringify({
           name,
         }),
+      },
+      opts,
+    );
+    return ClientKeySchema.parse(body);
+  }
+
+  /**
+   * Updates a client key (DSN) for a project.
+   *
+   * @param params Key update parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.keyId The ID of the key to update
+   * @param params.name Human-readable name for the key (optional)
+   * @param params.isActive Activate or deactivate the client key (optional)
+   * @param params.rateLimit Applies a rate limit to cap the number of errors accepted during a given time window (optional, null to disable)
+   * @param params.browserSdkVersion Sentry Javascript SDK version to use (optional)
+   * @param params.dynamicSdkLoaderOptions Configures options for the Javascript Loader Script (optional)
+   * @param opts Request options
+   * @returns Updated client key with DSN information
+   */
+  async updateClientKey(
+    {
+      organizationSlug,
+      projectSlug,
+      keyId,
+      name,
+      isActive,
+      rateLimit,
+      browserSdkVersion,
+      dynamicSdkLoaderOptions,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      keyId: string | number;
+    } & UpdateClientKeyRequest,
+    opts?: RequestOptions,
+  ): Promise<ClientKey> {
+    const updateData: UpdateClientKeyRequest = {};
+    if (name !== undefined) {
+      updateData.name = name;
+    }
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
+    }
+    if (rateLimit !== undefined) {
+      updateData.rateLimit = rateLimit;
+    }
+    if (browserSdkVersion !== undefined) {
+      updateData.browserSdkVersion = browserSdkVersion;
+    }
+    if (dynamicSdkLoaderOptions !== undefined) {
+      updateData.dynamicSdkLoaderOptions = dynamicSdkLoaderOptions;
+    }
+
+    const body = await this.requestJSON(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/keys/${keyId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
       },
       opts,
     );
@@ -1414,7 +2797,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<ClientKeyList> {
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/keys/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/keys/`,
       undefined,
       opts,
     );
@@ -1450,10 +2833,12 @@ export class SentryApiService {
       organizationSlug,
       projectSlug,
       query,
+      limit,
     }: {
       organizationSlug: string;
       projectSlug?: string;
       query?: string;
+      limit?: number;
     },
     opts?: RequestOptions,
   ): Promise<ReleaseList> {
@@ -1461,10 +2846,13 @@ export class SentryApiService {
     if (query) {
       searchQuery.set("query", query);
     }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
 
     const path = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/releases/`
-      : `/organizations/${organizationSlug}/releases/`;
+      ? apiPath`/projects/${organizationSlug}/${projectSlug}/releases/`
+      : apiPath`/organizations/${organizationSlug}/releases/`;
 
     const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
@@ -1472,6 +2860,597 @@ export class SentryApiService {
       opts,
     );
     return ReleaseListSchema.parse(body);
+  }
+
+  async getReleaseDetails(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlugOrId,
+      includeHealth,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlugOrId?: string;
+      includeHealth?: boolean;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReleaseDetails> {
+    const searchQuery = new URLSearchParams();
+    if (includeHealth) {
+      searchQuery.set("health", "1");
+    }
+
+    const path = projectSlugOrId
+      ? apiPath`/projects/${organizationSlug}/${projectSlugOrId}/releases/${releaseVersion}/`
+      : apiPath`/organizations/${organizationSlug}/releases/${releaseVersion}/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return ReleaseDetailsSchema.parse(body);
+  }
+
+  async listReleaseDeploys(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlugOrId,
+      limit,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlugOrId?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<DeployList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlugOrId) {
+      searchQuery.set(
+        isNumericId(projectSlugOrId) ? "project" : "projectSlug",
+        projectSlugOrId,
+      );
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const path = apiPath`/organizations/${organizationSlug}/releases/${releaseVersion}/deploys/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return DeployListSchema.parse(body);
+  }
+
+  async listReleaseCommits(
+    {
+      organizationSlug,
+      releaseVersion,
+      projectSlugOrId,
+      limit,
+    }: {
+      organizationSlug: string;
+      releaseVersion: string;
+      projectSlugOrId?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<CommitList> {
+    const searchQuery = new URLSearchParams();
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const path = projectSlugOrId
+      ? apiPath`/projects/${organizationSlug}/${projectSlugOrId}/releases/${releaseVersion}/commits/`
+      : apiPath`/organizations/${organizationSlug}/releases/${releaseVersion}/commits/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return CommitListSchema.parse(body);
+  }
+
+  async listMonitors(
+    {
+      organizationSlug,
+      projectSlug,
+      environment,
+      owner,
+      query,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      environment?: string;
+      owner?: string;
+      query?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MonitorList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlug) {
+      searchQuery.append("projectSlug", projectSlug);
+    }
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    if (owner) {
+      searchQuery.append("owner", owner);
+    }
+    if (query) {
+      searchQuery.set("query", query);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const body = await this.requestJSON(
+      searchQuery.toString()
+        ? apiPath`/organizations/${organizationSlug}/monitors/` +
+            `?${searchQuery.toString()}`
+        : apiPath`/organizations/${organizationSlug}/monitors/`,
+      undefined,
+      opts,
+    );
+    return MonitorListSchema.parse(body);
+  }
+
+  async getMonitorDetails(
+    {
+      organizationSlug,
+      projectSlug,
+      monitorSlug,
+      environment,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      monitorSlug: string;
+      environment?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Monitor> {
+    const searchQuery = new URLSearchParams();
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+
+    const path = projectSlug
+      ? apiPath`/projects/${organizationSlug}/${projectSlug}/monitors/${monitorSlug}/`
+      : apiPath`/organizations/${organizationSlug}/monitors/${monitorSlug}/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return MonitorSchema.parse(body);
+  }
+
+  async listMonitorCheckIns(
+    {
+      organizationSlug,
+      projectSlug,
+      monitorSlug,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      monitorSlug: string;
+      environment?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MonitorCheckInList> {
+    const searchQuery = new URLSearchParams();
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+    const normalizedStatsPeriod = normalizeStatsPeriod(statsPeriod);
+    const effectiveStatsPeriod =
+      start || end ? normalizedStatsPeriod : (normalizedStatsPeriod ?? "24h");
+    if (effectiveStatsPeriod) {
+      parseStatsPeriod(effectiveStatsPeriod);
+    }
+    this.applyTimeParams(searchQuery, effectiveStatsPeriod, start, end);
+
+    const path = projectSlug
+      ? apiPath`/projects/${organizationSlug}/${projectSlug}/monitors/${monitorSlug}/checkins/`
+      : apiPath`/organizations/${organizationSlug}/monitors/${monitorSlug}/checkins/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return MonitorCheckInListSchema.parse(body);
+  }
+
+  async getMonitorStats(
+    {
+      organizationSlug,
+      projectSlug,
+      monitorSlug,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      rollup,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      monitorSlug: string;
+      environment?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      rollup?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<MonitorStats> {
+    const searchQuery = new URLSearchParams();
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    const normalizedStatsPeriod = normalizeStatsPeriod(statsPeriod);
+    const effectiveStatsPeriod =
+      start || end ? normalizedStatsPeriod : (normalizedStatsPeriod ?? "24h");
+    this.applyStatsMixinTimeParams(
+      searchQuery,
+      effectiveStatsPeriod,
+      start,
+      end,
+      rollup,
+    );
+
+    const path = projectSlug
+      ? apiPath`/projects/${organizationSlug}/${projectSlug}/monitors/${monitorSlug}/stats/`
+      : apiPath`/organizations/${organizationSlug}/monitors/${monitorSlug}/stats/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return MonitorStatsSchema.parse(body);
+  }
+
+  /**
+   * List uptime monitors for an organization.
+   *
+   * GET /organizations/{org}/uptime/
+   * Source: src/sentry/uptime/endpoints/organiation_uptime_alert_index.py
+   */
+  async listUptimeMonitors(
+    {
+      organizationSlug,
+      projectSlug,
+      environment,
+      owner,
+      query,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      environment?: string;
+      owner?: string;
+      query?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<UptimeMonitorList> {
+    const searchQuery = new URLSearchParams();
+    if (projectSlug) {
+      // OrganizationEndpoint filter params accept project IDs via `project`.
+      const project = await this.getProject(
+        {
+          organizationSlug,
+          projectSlugOrId: projectSlug,
+        },
+        opts,
+      );
+      searchQuery.append("project", String(project.id));
+    }
+    if (environment) {
+      searchQuery.append("environment", environment);
+    }
+    if (owner) {
+      searchQuery.append("owner", owner);
+    }
+    if (query) {
+      searchQuery.set("query", query);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const path = apiPath`/organizations/${organizationSlug}/uptime/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return UptimeMonitorListSchema.parse(body);
+  }
+
+  /**
+   * Get a single uptime monitor.
+   *
+   * GET /projects/{org}/{project}/uptime/{id}/
+   * Source: src/sentry/uptime/endpoints/project_uptime_alert_details.py
+   */
+  async getUptimeMonitorDetails(
+    {
+      organizationSlug,
+      projectSlug,
+      uptimeMonitorId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      uptimeMonitorId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<UptimeMonitor> {
+    const body = await this.requestJSON(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/uptime/${uptimeMonitorId}/`,
+      undefined,
+      opts,
+    );
+    return UptimeMonitorSchema.parse(body);
+  }
+
+  /**
+   * List recent uptime checks for a monitor.
+   *
+   * GET /projects/{org}/{project}/uptime/{id}/checks/
+   * Source: src/sentry/uptime/endpoints/project_uptime_alert_checks_index.py
+   */
+  async listUptimeMonitorChecks(
+    {
+      organizationSlug,
+      projectSlug,
+      uptimeMonitorId,
+      statsPeriod,
+      start,
+      end,
+      limit,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      uptimeMonitorId: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<UptimeCheckList> {
+    const searchQuery = new URLSearchParams();
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+    const normalizedStatsPeriod = normalizeStatsPeriod(statsPeriod);
+    const effectiveStatsPeriod =
+      start || end ? normalizedStatsPeriod : (normalizedStatsPeriod ?? "24h");
+    if (effectiveStatsPeriod) {
+      parseStatsPeriod(effectiveStatsPeriod);
+    }
+    this.applyTimeParams(searchQuery, effectiveStatsPeriod, start, end);
+
+    const path = apiPath`/projects/${organizationSlug}/${projectSlug}/uptime/${uptimeMonitorId}/checks/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return UptimeCheckListSchema.parse(body);
+  }
+
+  /**
+   * Create an uptime monitor.
+   *
+   * POST /projects/{org}/{project}/uptime/
+   * Source: src/sentry/uptime/endpoints/project_uptime_alert_index.py
+   * Body fields verified from UptimeMonitorValidator (camelCase via CamelSnakeSerializer).
+   */
+  async createUptimeMonitor(
+    {
+      organizationSlug,
+      projectSlug,
+      name,
+      url,
+      intervalSeconds,
+      timeoutMs,
+      method,
+      headers,
+      body,
+      assertion,
+      status,
+      owner,
+      environment,
+      traceSampling,
+      responseCaptureEnabled,
+      recoveryThreshold,
+      downtimeThreshold,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      name: string;
+      url: string;
+      intervalSeconds: number;
+      timeoutMs: number;
+      method?: string;
+      headers?: Array<[string, string]>;
+      body?: string | null;
+      assertion?: unknown | null;
+      status?: "active" | "disabled";
+      owner?: string | null;
+      environment?: string | null;
+      traceSampling?: boolean;
+      responseCaptureEnabled?: boolean;
+      recoveryThreshold?: number;
+      downtimeThreshold?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<UptimeMonitor> {
+    const payload: Record<string, unknown> = {
+      name,
+      url,
+      intervalSeconds,
+      timeoutMs,
+    };
+    if (method !== undefined) payload.method = method;
+    if (headers !== undefined) payload.headers = headers;
+    if (body !== undefined) payload.body = body;
+    if (assertion !== undefined) payload.assertion = assertion;
+    if (status !== undefined) payload.status = status;
+    if (owner !== undefined) payload.owner = owner;
+    if (environment !== undefined) payload.environment = environment;
+    if (traceSampling !== undefined) payload.traceSampling = traceSampling;
+    if (responseCaptureEnabled !== undefined) {
+      payload.responseCaptureEnabled = responseCaptureEnabled;
+    }
+    if (recoveryThreshold !== undefined) {
+      payload.recoveryThreshold = recoveryThreshold;
+    }
+    if (downtimeThreshold !== undefined) {
+      payload.downtimeThreshold = downtimeThreshold;
+    }
+
+    const responseBody = await this.requestJSON(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/uptime/`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      opts,
+    );
+    return UptimeMonitorSchema.parse(responseBody);
+  }
+
+  /**
+   * Update an uptime monitor.
+   *
+   * PUT /projects/{org}/{project}/uptime/{id}/
+   * Source: src/sentry/uptime/endpoints/project_uptime_alert_details.py
+   */
+  async updateUptimeMonitor(
+    {
+      organizationSlug,
+      projectSlug,
+      uptimeMonitorId,
+      name,
+      url,
+      intervalSeconds,
+      timeoutMs,
+      method,
+      headers,
+      body,
+      assertion,
+      status,
+      owner,
+      environment,
+      traceSampling,
+      responseCaptureEnabled,
+      recoveryThreshold,
+      downtimeThreshold,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      uptimeMonitorId: string;
+      name?: string;
+      url?: string;
+      intervalSeconds?: number;
+      timeoutMs?: number;
+      method?: string;
+      headers?: Array<[string, string]>;
+      body?: string | null;
+      assertion?: unknown | null;
+      status?: "active" | "disabled";
+      owner?: string | null;
+      environment?: string | null;
+      traceSampling?: boolean;
+      responseCaptureEnabled?: boolean;
+      recoveryThreshold?: number;
+      downtimeThreshold?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<UptimeMonitor> {
+    const payload: Record<string, unknown> = {};
+    if (name !== undefined) payload.name = name;
+    if (url !== undefined) payload.url = url;
+    if (intervalSeconds !== undefined)
+      payload.intervalSeconds = intervalSeconds;
+    if (timeoutMs !== undefined) payload.timeoutMs = timeoutMs;
+    if (method !== undefined) payload.method = method;
+    if (headers !== undefined) payload.headers = headers;
+    if (body !== undefined) payload.body = body;
+    if (assertion !== undefined) payload.assertion = assertion;
+    if (status !== undefined) payload.status = status;
+    if (owner !== undefined) payload.owner = owner;
+    if (environment !== undefined) payload.environment = environment;
+    if (traceSampling !== undefined) payload.traceSampling = traceSampling;
+    if (responseCaptureEnabled !== undefined) {
+      payload.responseCaptureEnabled = responseCaptureEnabled;
+    }
+    if (recoveryThreshold !== undefined) {
+      payload.recoveryThreshold = recoveryThreshold;
+    }
+    if (downtimeThreshold !== undefined) {
+      payload.downtimeThreshold = downtimeThreshold;
+    }
+
+    const responseBody = await this.requestJSON(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/uptime/${uptimeMonitorId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      },
+      opts,
+    );
+    return UptimeMonitorSchema.parse(responseBody);
+  }
+
+  /**
+   * Delete an uptime monitor.
+   *
+   * DELETE /projects/{org}/{project}/uptime/{id}/
+   * Source: src/sentry/uptime/endpoints/project_uptime_alert_details.py
+   * Returns 202 with empty body.
+   */
+  async deleteUptimeMonitor(
+    {
+      organizationSlug,
+      projectSlug,
+      uptimeMonitorId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      uptimeMonitorId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    // Treat 404 as success so repeated deletes are idempotent.
+    await this.request(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/uptime/${uptimeMonitorId}/`,
+      {
+        method: "DELETE",
+      },
+      { ...opts, allowStatuses: [404] },
+    );
   }
 
   /**
@@ -1540,8 +3519,9 @@ export class SentryApiService {
 
     const body = await this.requestJSON(
       searchQuery.toString()
-        ? `/organizations/${organizationSlug}/tags/?${searchQuery.toString()}`
-        : `/organizations/${organizationSlug}/tags/`,
+        ? apiPath`/organizations/${organizationSlug}/tags/` +
+            `?${searchQuery.toString()}`
+        : apiPath`/organizations/${organizationSlug}/tags/`,
       undefined,
       opts,
     );
@@ -1605,8 +3585,9 @@ export class SentryApiService {
 
     const body = await this.requestJSON(
       searchQuery.toString()
-        ? `/organizations/${organizationSlug}/replays/?${searchQuery.toString()}`
-        : `/organizations/${organizationSlug}/replays/`,
+        ? apiPath`/organizations/${organizationSlug}/replays/` +
+            `?${searchQuery.toString()}`
+        : apiPath`/organizations/${organizationSlug}/replays/`,
       undefined,
       opts,
     );
@@ -1625,6 +3606,7 @@ export class SentryApiService {
    * @param params.itemType Item type to query attributes for ("spans", "logs", or "tracemetrics")
    * @param params.project Numeric project ID to filter attributes
    * @param params.statsPeriod Time range for attribute statistics (e.g., "24h", "7d")
+   * @param params.attributeTypes Optional attribute types to keep in the response
    * @param opts Request options
    * @returns Array of available attributes with metadata including type
    */
@@ -1636,90 +3618,163 @@ export class SentryApiService {
       statsPeriod,
       start,
       end,
+      attributeTypes,
+      substringMatch,
+      query,
     }: {
       organizationSlug: string;
-      itemType?: "spans" | "logs" | "tracemetrics";
+      itemType?: TraceItemType;
       project?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      attributeTypes?: TraceItemAttributeType[];
+      substringMatch?: string;
+      query?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<TraceItemAttribute[]> {
+    const attributes = await this.fetchTraceItemAttributes(
+      organizationSlug,
+      itemType,
+      project,
+      statsPeriod,
+      start,
+      end,
+      substringMatch,
+      query,
+      opts,
+    );
+
+    if (!attributeTypes || attributeTypes.length === 0) {
+      return attributes;
+    }
+
+    const allowedTypes = new Set(attributeTypes);
+    return attributes.filter((attribute) => allowedTypes.has(attribute.type));
+  }
+
+  async validateEvents(
+    {
+      organizationSlug,
+      dataset = "spans",
+      fields,
+      query,
+      orderby,
+      project,
+      environment,
+      statsPeriod,
+      start,
+      end,
+    }: {
+      organizationSlug: string;
+      dataset?: EventsDataset;
+      fields?: string[];
+      query?: string;
+      orderby?: string[];
+      project?: string;
+      environment?: string | string[];
       statsPeriod?: string;
       start?: string;
       end?: string;
     },
     opts?: RequestOptions,
-  ): Promise<Array<{ key: string; name: string; type: "string" | "number" }>> {
-    // Fetch both string and number attributes
-    const [stringAttributes, numberAttributes] = await Promise.all([
-      this.fetchTraceItemAttributesByType(
-        organizationSlug,
-        itemType,
-        "string",
-        project,
-        statsPeriod,
-        start,
-        end,
-        opts,
-      ),
-      this.fetchTraceItemAttributesByType(
-        organizationSlug,
-        itemType,
-        "number",
-        project,
-        statsPeriod,
-        start,
-        end,
-        opts,
-      ),
-    ]);
-
-    // Combine attributes with explicit type information
-    const allAttributes: Array<{
-      key: string;
-      name: string;
-      type: "string" | "number";
-    }> = [];
-
-    // Add string attributes
-    for (const attr of stringAttributes) {
-      allAttributes.push({
-        key: attr.key,
-        name: attr.name || attr.key,
-        type: "string",
-      });
+  ): Promise<EventsValidationResult> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("dataset", normalizeEventsDataset(dataset));
+    if (project) {
+      queryParams.set("project", project);
+    }
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (environment) {
+      const environments = Array.isArray(environment)
+        ? environment
+        : [environment];
+      for (const value of environments) {
+        queryParams.append("environment", value);
+      }
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
+    for (const field of fields ?? []) {
+      queryParams.append("field", field);
+    }
+    for (const value of orderby ?? []) {
+      queryParams.append("orderby", value);
     }
 
-    // Add number attributes
-    for (const attr of numberAttributes) {
-      allAttributes.push({
-        key: attr.key,
-        name: attr.name || attr.key,
-        type: "number",
-      });
-    }
-
-    return allAttributes;
+    const response = await this.request(
+      apiPath`/organizations/${organizationSlug}/events/validate/` +
+        `?${queryParams.toString()}`,
+      undefined,
+      { ...opts, allowStatuses: [400] },
+    );
+    const body = await this.parseJsonResponse(response);
+    return EventsValidationResponseSchema.parse(body);
   }
 
-  private async fetchTraceItemAttributesByType(
+  /**
+   * List the organization's visible environments, optionally scoped to a
+   * project. The endpoint (`GET /organizations/{org}/environments/`) already
+   * filters to visible environments and excludes the empty-name "No Environment"
+   * pseudo-env; passing `project` narrows the list (verified against
+   * getsentry/sentry `OrganizationEnvironmentsEndpoint`).
+   */
+  async listEnvironments(
+    {
+      organizationSlug,
+      projectId,
+    }: {
+      organizationSlug: string;
+      projectId?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<OrganizationEnvironmentList> {
+    const queryParams = new URLSearchParams();
+    if (projectId) {
+      queryParams.set("project", projectId);
+    }
+    const suffix = queryParams.toString();
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/environments/` +
+        (suffix ? `?${suffix}` : ""),
+      undefined,
+      opts,
+    );
+    return OrganizationEnvironmentListSchema.parse(body);
+  }
+
+  private async fetchTraceItemAttributes(
     organizationSlug: string,
-    itemType: "spans" | "logs" | "tracemetrics",
-    attributeType: "string" | "number",
+    itemType: TraceItemType,
     project?: string,
     statsPeriod?: string,
     start?: string,
     end?: string,
+    substringMatch?: string,
+    query?: string,
     opts?: RequestOptions,
-  ): Promise<any> {
+  ): Promise<TraceItemAttribute[]> {
     const queryParams = new URLSearchParams();
     queryParams.set("itemType", itemType);
-    queryParams.set("attributeType", attributeType);
     if (project) {
       queryParams.set("project", project);
     }
+    if (substringMatch) {
+      queryParams.set("substringMatch", substringMatch);
+    }
+    if (query) {
+      queryParams.set("query", query);
+    }
     this.applyTimeParams(queryParams, statsPeriod, start, end);
 
-    const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
+    const url =
+      apiPath`/organizations/${organizationSlug}/trace-items/attributes/` +
+      `?${queryParams.toString()}`;
 
     const body = await this.requestJSON(url, undefined, opts);
-    return Array.isArray(body) ? body : [];
+    return TraceItemAttributeListSchema.parse(body);
   }
 
   /**
@@ -1732,7 +3787,7 @@ export class SentryApiService {
    * @param params.organizationSlug Organization identifier
    * @param params.projectSlug Project identifier (optional, scopes to specific project)
    * @param params.query Sentry search query (e.g., "is:unresolved browser:chrome")
-   * @param params.sortBy Sort order ("user", "freq", "date", "new")
+   * @param params.sortBy Sort order ("user", "freq", "date", "new", "recommended")
    * @param opts Request options
    * @returns Array of issues with metadata and statistics
    *
@@ -1748,7 +3803,7 @@ export class SentryApiService {
    * // High-frequency errors in specific project
    * const critical = await apiService.listIssues({
    *   organizationSlug: "my-org",
-   *   projectSlug: "backend",
+   *   projectId: "123456",
    *   query: "level:error",
    *   sortBy: "freq"
    * });
@@ -1757,16 +3812,24 @@ export class SentryApiService {
   async listIssues(
     {
       organizationSlug,
-      projectSlug,
+      projectId,
       query,
       sortBy,
       limit = 10,
+      statsPeriod = DEFAULT_SEARCH_ISSUES_PERIOD,
     }: {
       organizationSlug: string;
-      projectSlug?: string;
+      projectId?: string;
       query?: string | null;
-      sortBy?: "user" | "freq" | "date" | "new";
+      sortBy?: "user" | "freq" | "date" | "new" | "recommended";
       limit?: number;
+      /**
+       * Controls the search time window - which issues are included in results.
+       * Note: this is NOT the sparkline/stats period (that would be groupStatsPeriod).
+       * The Sentry API accepts any Nh/Nd/Nw format and defaults to 90d when omitted,
+       * but large windows risk timeouts on busy orgs.
+       */
+      statsPeriod?: string;
     },
     opts?: RequestOptions,
   ): Promise<IssueList> {
@@ -1776,16 +3839,19 @@ export class SentryApiService {
     }
 
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", String(limit));
+    queryParams.set("limit", String(limit));
     if (sortBy) queryParams.set("sort", sortBy);
-    queryParams.set("statsPeriod", "24h");
+    queryParams.set("statsPeriod", statsPeriod ?? DEFAULT_SEARCH_ISSUES_PERIOD);
     queryParams.set("query", sentryQuery.join(" "));
 
+    if (projectId) {
+      queryParams.append("project", projectId);
+    }
     queryParams.append("collapse", "unhandled");
 
-    const apiUrl = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/issues/?${queryParams.toString()}`
-      : `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/issues/` +
+      `?${queryParams.toString()}`;
 
     const body = await this.requestJSON(apiUrl, undefined, opts);
     return IssueListSchema.parse(body);
@@ -1802,7 +3868,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Issue> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/`,
       undefined,
       opts,
     );
@@ -1847,7 +3913,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<IssueTagValues> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/tags/${tagKey}/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/tags/${tagKey}/`,
       undefined,
       opts,
     );
@@ -1877,11 +3943,49 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<ExternalIssueList> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/external-issues/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/external-issues/`,
       undefined,
       opts,
     );
     return ExternalIssueListSchema.parse(body);
+  }
+
+  /**
+   * Retrieves issue user reports and returns the next Sentry cursor when another page exists.
+   */
+  async getIssueUserReports(
+    {
+      organizationSlug,
+      issueId,
+      cursor,
+      limit,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      cursor?: string | null;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ reports: UserReportList; nextCursor: string | null }> {
+    const searchQuery = new URLSearchParams();
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const path = apiPath`/organizations/${organizationSlug}/issues/${issueId}/user-reports/`;
+    const response = await this.request(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+    return {
+      reports: UserReportListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   async getEventForIssue(
@@ -1897,7 +4001,8 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Event> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/events/${eventId}/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/events/${eventId}/` +
+        `?llmFormat=json`,
       undefined,
       opts,
     );
@@ -1954,7 +4059,14 @@ export class SentryApiService {
         eventType,
         eventId: bodyObj.id,
         validationError: parseResult.error.message,
-        validationIssues: parseResult.error.errors,
+        validationIssues: parseResult.error.issues,
+        // Log the container type, not user-provided extra data.
+        contextType:
+          bodyObj.context === null
+            ? "null"
+            : Array.isArray(bodyObj.context)
+              ? "array"
+              : typeof bodyObj.context,
       },
     });
 
@@ -1985,6 +4097,59 @@ export class SentryApiService {
       },
       opts,
     );
+  }
+
+  /**
+   * Resolves a stack frame through the project's configured source code mapping.
+   * The upstream endpoint verifies the mapped path with the SCM integration.
+   */
+  async getStacktraceLink(
+    {
+      organizationSlug,
+      projectSlug,
+      file,
+      platform,
+      lineNo,
+      absPath,
+      module,
+      package: framePackage,
+      commitId,
+      groupId,
+      sdkName,
+      signal,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      file: string;
+      platform?: string;
+      lineNo?: number;
+      absPath?: string;
+      module?: string;
+      package?: string;
+      commitId?: string;
+      groupId?: string;
+      sdkName?: string;
+      signal?: AbortSignal;
+    },
+    opts?: RequestOptions,
+  ): Promise<StacktraceLink> {
+    const query = new URLSearchParams({ file });
+    if (platform) query.set("platform", platform);
+    if (lineNo !== undefined) query.set("lineNo", String(lineNo));
+    if (absPath) query.set("absPath", absPath);
+    if (module) query.set("module", module);
+    if (framePackage) query.set("package", framePackage);
+    if (commitId) query.set("commitId", commitId);
+    if (groupId) query.set("groupId", groupId);
+    if (sdkName) query.set("sdkName", sdkName);
+
+    const body = await this.requestJSON(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/stacktrace-link/` +
+        `?${query.toString()}`,
+      { signal },
+      opts,
+    );
+    return StacktraceLinkSchema.parse(body);
   }
 
   /**
@@ -2040,7 +4205,9 @@ export class SentryApiService {
       params.append("full", "true");
     }
 
-    const apiUrl = `/organizations/${organizationSlug}/issues/${issueId}/events/?${params.toString()}`;
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/events/` +
+      `?${params.toString()}`;
     return await this.requestJSON(apiUrl, undefined, opts);
   }
 
@@ -2057,7 +4224,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<EventAttachmentList> {
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
       undefined,
       opts,
     );
@@ -2070,22 +4237,37 @@ export class SentryApiService {
       projectSlug,
       eventId,
       attachmentId,
+      maxInlineBytes = DEFAULT_MAX_INLINE_ATTACHMENT_BYTES,
     }: {
       organizationSlug: string;
       projectSlug: string;
       eventId: string;
       attachmentId: string;
+      /**
+       * Attachments larger than this (by metadata `size`) skip download —
+       * `getEventAttachment` returns `bytes: null`. Defaults to
+       * {@link DEFAULT_MAX_INLINE_ATTACHMENT_BYTES}.
+       */
+      maxInlineBytes?: number;
     },
     opts?: RequestOptions,
   ): Promise<{
     attachment: EventAttachment;
+    /** Authenticated API download URL (requires credentials). */
     downloadUrl: string;
+    /**
+     * Presigned URL that downloads the file directly without credentials, or
+     * `null` when unavailable. Only set on the skipped-download path.
+     */
+    directDownloadUrl: string | null;
     filename: string;
-    blob: Blob;
+    /** Raw file bytes, or `null` when the download was skipped. */
+    bytes: Uint8Array | null;
+    contentType: string;
   }> {
     // Get the attachment metadata first
     const attachmentsData = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
+      apiPath`/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
       undefined,
       opts,
     );
@@ -2099,25 +4281,82 @@ export class SentryApiService {
       );
     }
 
+    const downloadPath =
+      apiPath`/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/${attachmentId}/` +
+      `?download=1`;
+
+    // Skip the download for oversized attachments — buffering and base64
+    // encoding them can exhaust the worker's memory. Decide from the metadata
+    // size so we never issue the request.
+    if (attachment.size > maxInlineBytes) {
+      const directDownloadUrl = await this.resolveDirectDownloadUrl(
+        downloadPath,
+        opts,
+      );
+      return {
+        attachment,
+        downloadUrl: `${this.apiPrefix}${downloadPath}`,
+        directDownloadUrl,
+        filename: attachment.name,
+        bytes: null,
+        contentType: attachment.mimetype || "application/octet-stream",
+      };
+    }
+
     // Download the actual file content
-    const downloadUrl = `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/${attachmentId}/?download=1`;
     const downloadResponse = await this.request(
-      downloadUrl,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/octet-stream",
-        },
-      },
+      downloadPath,
+      { method: "GET" },
       opts,
     );
+
+    // Prefer Content-Type from the download response over the metadata mimetype:
+    // the two share the same DB source but the download header reflects any
+    // server-side correction (getsentry/sentry#115977) applied at request time.
+    const contentType =
+      downloadResponse.headers.get("content-type")?.split(";")[0].trim() ||
+      attachment.mimetype ||
+      "application/octet-stream";
+
+    // Read the body once as bytes; arrayBuffer() avoids the extra copy that
+    // blob() + blob.arrayBuffer() would hold at the same time.
+    const bytes = new Uint8Array(await downloadResponse.arrayBuffer());
 
     return {
       attachment,
       downloadUrl: downloadResponse.url,
+      directDownloadUrl: null,
       filename: attachment.name,
-      blob: await downloadResponse.blob(),
+      bytes,
+      contentType,
     };
+  }
+
+  /**
+   * Probe the download endpoint for a presigned URL without buffering the file.
+   *
+   * Objectstore attachments redirect to a presigned URL (returned here); legacy
+   * ones stream a 200 with no redirect, so there is no direct URL. The body is
+   * discarded either way — we only need the URL.
+   */
+  private async resolveDirectDownloadUrl(
+    downloadPath: string,
+    opts?: RequestOptions,
+  ): Promise<string | null> {
+    try {
+      const response = await this.request(
+        downloadPath,
+        { method: "GET" },
+        opts,
+      );
+      const directUrl = response.redirected ? response.url : null;
+      // Don't await cancel(): we already have the URL, and awaiting it can
+      // stall on some runtimes.
+      void response.body?.cancel().catch(() => {});
+      return directUrl;
+    } catch {
+      return null;
+    }
   }
 
   async getReplayDetails(
@@ -2131,7 +4370,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<ReplayDetails> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/replays/${replayId}/`,
+      apiPath`/organizations/${organizationSlug}/replays/${replayId}/`,
       undefined,
       opts,
     );
@@ -2159,7 +4398,8 @@ export class SentryApiService {
     queryParams.append("project", "-1");
 
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/replay-count/?${queryParams.toString()}`,
+      apiPath`/organizations/${organizationSlug}/replay-count/` +
+        `?${queryParams.toString()}`,
       undefined,
       opts,
     );
@@ -2181,7 +4421,8 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<ReplayRecordingSegments> {
     const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlugOrId}/replays/${replayId}/recording-segments/?download=true`,
+      apiPath`/projects/${organizationSlug}/${projectSlugOrId}/replays/${replayId}/recording-segments/` +
+        `?download=true`,
       undefined,
       opts,
     );
@@ -2204,7 +4445,7 @@ export class SentryApiService {
       organizationSlug: string;
       issueId: string;
       status?: string;
-      assignedTo?: string;
+      assignedTo?: string | null;
       substatus?: string;
       ignoreDuration?: number;
       ignoreCount?: number;
@@ -2225,7 +4466,7 @@ export class SentryApiService {
       ignoreUserWindow?: number;
     } = {};
     if (status !== undefined) updateData.status = status;
-    if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
+    if (assignedTo !== undefined) updateData.assignedTo = assignedTo ?? "";
     if (substatus !== undefined) updateData.substatus = substatus;
     if (ignoreDuration !== undefined)
       updateData.ignoreDuration = ignoreDuration;
@@ -2239,7 +4480,7 @@ export class SentryApiService {
     }
 
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/`,
       {
         method: "PUT",
         body: JSON.stringify(updateData),
@@ -2247,6 +4488,73 @@ export class SentryApiService {
       opts,
     );
     return IssueSchema.parse(body);
+  }
+
+  async createIssueComment(
+    {
+      organizationSlug,
+      issueId,
+      text,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      text: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueComment> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/notes/`,
+      {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      },
+      opts,
+    );
+    return IssueCommentSchema.parse(body);
+  }
+
+  async getIssueActivity(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueActivityList> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/activities/`,
+      undefined,
+      opts,
+    );
+    return IssueActivityListResponseSchema.parse(body).activity;
+  }
+
+  async listIssueComments(
+    {
+      organizationSlug,
+      issueId,
+      limit,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueCommentList> {
+    const searchQuery = new URLSearchParams();
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const path = apiPath`/organizations/${organizationSlug}/issues/${issueId}/notes/`;
+    const body = await this.requestJSON(
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+      undefined,
+      opts,
+    );
+    return IssueCommentListSchema.parse(body);
   }
 
   // TODO: Sentry is not yet exposing a reasonable API to fetch trace data
@@ -2313,7 +4621,9 @@ export class SentryApiService {
     queryParams.set("query", sentryQuery.join(" "));
     // if (projectSlug) queryParams.set("project", projectSlug);
 
-    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/events/` +
+      `?${queryParams.toString()}`;
 
     const body = await this.requestJSON(apiUrl, undefined, opts);
     // TODO(dcramer): If you're using an older version of Sentry this API had a breaking change
@@ -2368,7 +4678,9 @@ export class SentryApiService {
     queryParams.set("query", sentryQuery.join(" "));
     // if (projectSlug) queryParams.set("project", projectSlug);
 
-    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/events/` +
+      `?${queryParams.toString()}`;
 
     const body = await this.requestJSON(apiUrl, undefined, opts);
     return SpansSearchResponseSchema.parse(body).data;
@@ -2413,34 +4725,14 @@ export class SentryApiService {
       queryParams.set("project", params.projectId);
     }
 
-    // Sort parameter transformation for API compatibility
-    let apiSort = params.sort;
-    // Skip transformation for equation fields - they should be passed as-is
-    if (
-      params.dataset !== "tracemetrics" &&
-      params.sort?.includes("(") &&
-      !params.sort?.includes("equation|")
-    ) {
-      // Transform: count(field) -> count_field, count() -> count
-      // Use safer string manipulation to avoid ReDoS
-      const parenStart = params.sort.indexOf("(");
-      const parenEnd = params.sort.indexOf(")", parenStart);
-      if (parenStart !== -1 && parenEnd !== -1) {
-        const beforeParen = params.sort.substring(0, parenStart);
-        const insideParen = params.sort.substring(parenStart + 1, parenEnd);
-        const afterParen = params.sort.substring(parenEnd + 1);
-        const transformedInside = insideParen
-          ? `_${insideParen.replace(/\./g, "_")}`
-          : "";
-        apiSort = beforeParen + transformedInside + afterParen;
-      }
-    }
-    queryParams.set("sort", apiSort);
+    queryParams.set("sort", params.sort);
 
     // Add fields
     for (const field of params.fields) {
       queryParams.append("field", field);
     }
+
+    queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);
 
     return queryParams;
   }
@@ -2484,30 +4776,14 @@ export class SentryApiService {
       queryParams.set("sampling", "NORMAL");
     }
 
-    // Sort parameter transformation for API compatibility
-    let apiSort = params.sort;
-    // Skip transformation for equation fields - they should be passed as-is
-    if (params.sort?.includes("(") && !params.sort?.includes("equation|")) {
-      // Transform: count(field) -> count_field, count() -> count
-      // Use safer string manipulation to avoid ReDoS
-      const parenStart = params.sort.indexOf("(");
-      const parenEnd = params.sort.indexOf(")", parenStart);
-      if (parenStart !== -1 && parenEnd !== -1) {
-        const beforeParen = params.sort.substring(0, parenStart);
-        const insideParen = params.sort.substring(parenStart + 1, parenEnd);
-        const afterParen = params.sort.substring(parenEnd + 1);
-        const transformedInside = insideParen
-          ? `_${insideParen.replace(/\./g, "_")}`
-          : "";
-        apiSort = beforeParen + transformedInside + afterParen;
-      }
-    }
-    queryParams.set("sort", apiSort);
+    queryParams.set("sort", params.sort);
 
     // Add fields
     for (const field of params.fields) {
       queryParams.append("field", field);
     }
+
+    queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);
 
     return queryParams;
   }
@@ -2581,8 +4857,64 @@ export class SentryApiService {
       });
     }
 
-    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/events/` +
+      `?${queryParams.toString()}`;
     return await this.requestJSON(apiUrl, undefined, opts);
+  }
+
+  /**
+   * Fetch a timeseries (events-stats) for a single yAxis, bucketed over time.
+   *
+   * `interval` is optional: omit it to let Sentry pick a sensible bucket size
+   * for the range (mirrors get_interval_from_range in the Sentry source).
+   * Environment and other filters travel in `query`, same as searchEvents.
+   */
+  async getEventsTimeSeries(
+    {
+      organizationSlug,
+      query,
+      yAxis,
+      interval,
+      projectId,
+      dataset = "errors",
+      statsPeriod,
+      start,
+      end,
+    }: {
+      organizationSlug: string;
+      query: string;
+      yAxis: string;
+      interval?: string;
+      projectId?: string;
+      dataset?: EventsDataset;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+    },
+    opts?: RequestOptions,
+  ) {
+    const queryParams = new URLSearchParams();
+    queryParams.set("dataset", normalizeEventsDataset(dataset));
+    queryParams.set("query", query);
+    queryParams.set("yAxis", yAxis);
+    // Omit interval to let Sentry pick a sensible bucket size for the range.
+    if (interval) {
+      queryParams.set("interval", interval);
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
+    if (projectId) {
+      queryParams.set("project", projectId);
+    }
+    // partial=1 keeps the current (in-progress) bucket, matching Sentry's charts.
+    queryParams.set("partial", "1");
+    queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);
+
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/events-stats/` +
+      `?${queryParams.toString()}`;
+    const body = await this.requestJSON(apiUrl, undefined, opts);
+    return EventsStatsResponseSchema.parse(body);
   }
 
   // POST https://us.sentry.io/api/0/issues/5485083130/autofix/
@@ -2601,7 +4933,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<AutofixRun> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
       {
         method: "POST",
         body: JSON.stringify({
@@ -2626,7 +4958,8 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<AutofixRunState> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/autofix/` +
+        `?llmFormat=markdown`,
       undefined,
       opts,
     );
@@ -2649,7 +4982,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<SearchAgentStart> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/search-agent/start/`,
+      apiPath`/organizations/${organizationSlug}/search-agent/start/`,
       {
         method: "POST",
         body: JSON.stringify({
@@ -2675,7 +5008,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<SearchAgentState> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/search-agent/state/${encodeURIComponent(runId)}/`,
+      apiPath`/organizations/${organizationSlug}/search-agent/state/${runId}/`,
       undefined,
       opts,
     );
@@ -2720,7 +5053,8 @@ export class SentryApiService {
     queryParams.set("statsPeriod", statsPeriod);
 
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/trace-meta/${traceId}/?${queryParams.toString()}`,
+      apiPath`/organizations/${organizationSlug}/trace-meta/${traceId}/` +
+        `?${queryParams.toString()}`,
       undefined,
       opts,
     );
@@ -2776,11 +5110,154 @@ export class SentryApiService {
     queryParams.set("statsPeriod", statsPeriod);
 
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/trace/${traceId}/?${queryParams.toString()}`,
+      apiPath`/organizations/${organizationSlug}/trace/${traceId}/` +
+        `?${queryParams.toString()}`,
       undefined,
       opts,
     );
     return TraceSchema.parse(body);
+  }
+
+  /**
+   * Fetches all spans for one AI conversation within a relative or absolute time window.
+   */
+  async getAIConversation(
+    {
+      organizationSlug,
+      conversationId,
+      project = "-1",
+      statsPeriod = "30d",
+      start,
+      end,
+      perPage = 1000,
+      maxPages = 10,
+    }: {
+      organizationSlug: string;
+      conversationId: string;
+      project?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      perPage?: number;
+      maxPages?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<AIConversationDetails> {
+    const spans: AIConversationSpanList = [];
+    let title: string | null = null;
+    let cursor: string | null = null;
+
+    for (let page = 0; page < maxPages; page++) {
+      const queryParams = new URLSearchParams();
+      queryParams.set("per_page", String(perPage));
+      this.applyTimeParams(
+        queryParams,
+        start || end ? undefined : statsPeriod,
+        start,
+        end,
+      );
+      const projects = Array.isArray(project) ? project : [project];
+      for (const projectId of projects) {
+        queryParams.append("project", projectId);
+      }
+      if (cursor) {
+        queryParams.set("cursor", cursor);
+      }
+
+      const response = await this.request(
+        apiPath`/organizations/${organizationSlug}/agents/conversations/${conversationId}/` +
+          `?${queryParams.toString()}`,
+        undefined,
+        opts,
+      );
+      const body = await this.parseJsonResponse(response);
+      const details = AIConversationDetailsResponseSchema.parse(body);
+      // Pages repeat the same conversation-scoped title.
+      title = details.title;
+      spans.push(...details.spans);
+
+      cursor = getNextCursor(response.headers.get("link"));
+      if (!cursor) {
+        break;
+      }
+    }
+
+    return {
+      conversationId,
+      title,
+      spans,
+    };
+  }
+
+  /**
+   * Searches Sentry AI Conversations using the conversation list endpoint and
+   * returns the current page plus cursor metadata from the response headers.
+   */
+  async searchAIConversations(
+    {
+      organizationSlug,
+      query,
+      project,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      limit,
+      cursor,
+    }: {
+      organizationSlug: string;
+      query?: string;
+      project?: string | string[];
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+      cursor?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<{
+    conversations: AIConversationSummary[];
+    nextCursor: string | null;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (query) {
+      queryParams.set("query", query);
+    }
+    if (project) {
+      const projects = Array.isArray(project) ? project : [project];
+      for (const projectId of projects) {
+        queryParams.append("project", projectId);
+      }
+    }
+    if (environment) {
+      const environments = Array.isArray(environment)
+        ? environment
+        : [environment];
+      for (const environmentName of environments) {
+        queryParams.append("environment", environmentName);
+      }
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
+    if (limit !== undefined) {
+      queryParams.set("per_page", String(limit));
+    }
+    if (cursor) {
+      queryParams.set("cursor", cursor);
+    }
+
+    const response = await this.request(
+      apiPath`/organizations/${organizationSlug}/agents/conversations/` +
+        `?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    const body = await this.parseJsonResponse(response);
+
+    return {
+      conversations: AIConversationSummaryListSchema.parse(body),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
   }
 
   /**
@@ -2839,7 +5316,9 @@ export class SentryApiService {
     );
     queryParams.set("statsPeriod", statsPeriod);
 
-    const path = `/organizations/${organizationSlug}/profiling/flamegraph/?${queryParams.toString()}`;
+    const path =
+      apiPath`/organizations/${organizationSlug}/profiling/flamegraph/` +
+      `?${queryParams.toString()}`;
     const body = await this.requestJSON(path, undefined, opts);
     return FlamegraphSchema.parse(body);
   }
@@ -2856,7 +5335,7 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<TransactionProfile> {
-    const path = `/projects/${organizationSlug}/${projectSlugOrId}/profiling/profiles/${profileId}/`;
+    const path = apiPath`/projects/${organizationSlug}/${projectSlugOrId}/profiling/profiles/${profileId}/`;
     const body = await this.requestJSON(path, undefined, opts);
     return TransactionProfileSchema.parse(body);
   }
@@ -2918,12 +5397,14 @@ export class SentryApiService {
     queryParams.set("start", start);
     queryParams.set("end", end);
 
-    const path = `/organizations/${organizationSlug}/profiling/chunks/?${queryParams.toString()}`;
+    const path =
+      apiPath`/organizations/${organizationSlug}/profiling/chunks/` +
+      `?${queryParams.toString()}`;
     const body = await this.requestJSON(path, undefined, opts);
 
-    // Response wraps chunks in {chunks: []}
+    // Normalize the Sentry {chunk: ...} wrapper to the internal chunks array.
     const response = ProfileChunkResponseSchema.parse(body);
-    if (!response.chunks || response.chunks.length === 0) {
+    if (response.chunks.length === 0) {
       throw new ApiNotFoundError(
         `No profile chunk found for profiler_id ${profilerId}`,
         undefined,
@@ -2931,6 +5412,103 @@ export class SentryApiService {
       );
     }
 
-    return response.chunks[0];
+    return {
+      ...response.chunks[0],
+      // Sentry's frontend does the same query-param backfill for continuous
+      // profile chunks because profiling-service may omit profiler_id.
+      profiler_id: response.chunks[0].profiler_id ?? profilerId,
+    };
+  }
+
+  getPreprodSnapshotUrl(organizationSlug: string, snapshotId: string): string {
+    return getPreprodSnapshotUrlUtil(
+      this.host,
+      organizationSlug,
+      snapshotId,
+      this.protocol,
+    );
+  }
+
+  async getSnapshotDetails({
+    organizationSlug,
+    snapshotId,
+    compactMetadata = true,
+  }: {
+    organizationSlug: string;
+    snapshotId: string;
+    compactMetadata?: boolean;
+  }): Promise<unknown> {
+    const params = new URLSearchParams();
+    if (compactMetadata) {
+      params.set("compact_metadata", "true");
+    }
+    const path =
+      apiPath`/organizations/${organizationSlug}/preprodartifacts/snapshots/${snapshotId}/` +
+      `?${params.toString()}`;
+    return this.requestJSON(path);
+  }
+
+  async getSnapshotImageDetail({
+    organizationSlug,
+    snapshotId,
+    imageIdentifier,
+  }: {
+    organizationSlug: string;
+    snapshotId: string;
+    imageIdentifier: string;
+  }): Promise<unknown> {
+    const path = apiPath`/organizations/${organizationSlug}/preprodartifacts/snapshots/${snapshotId}/images/${imageIdentifier}/`;
+    return this.requestJSON(path);
+  }
+
+  async fetchImageByUrl(
+    imageUrl: string,
+  ): Promise<{ blob: Blob; contentType: string }> {
+    const response = imageUrl.startsWith("https://")
+      ? await fetch(imageUrl)
+      : await this.request(
+          imageUrl.startsWith("/api/0")
+            ? imageUrl.slice("/api/0".length)
+            : imageUrl,
+        );
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch image: ${response.status} ${response.statusText}`,
+      );
+    }
+    const blob = await response.blob();
+    let contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("image/")) {
+      const { detectImageMimeType } = await import("../internal/blob-utils.js");
+      contentType = (await detectImageMimeType(blob)) ?? contentType;
+    }
+    return { blob, contentType };
+  }
+
+  async getLatestBaseSnapshot({
+    organizationSlug,
+    appId,
+    branch,
+    project,
+    projectSlug,
+    compactMetadata = true,
+  }: {
+    organizationSlug: string;
+    appId: string;
+    branch?: string;
+    project?: string;
+    projectSlug?: string;
+    compactMetadata?: boolean;
+  }): Promise<unknown> {
+    const params = new URLSearchParams();
+    params.set("app_id", appId);
+    if (branch) params.set("branch", branch);
+    if (project) params.set("project", project);
+    if (projectSlug) params.set("projectSlug", projectSlug);
+    if (compactMetadata) params.set("compact_metadata", "true");
+    const path =
+      apiPath`/organizations/${organizationSlug}/preprodartifacts/snapshots/latest-base/` +
+      `?${params.toString()}`;
+    return this.requestJSON(path);
   }
 }

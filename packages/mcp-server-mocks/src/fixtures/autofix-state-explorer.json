@@ -1,22 +1,35 @@
 {
   "autofix": {
     "run_id": 21831,
-    "status": "IN_PROGRESS",
-    "blocks": [
-      {
-        "type": "root_cause",
-        "title": "Investigate failing request",
-        "status": "COMPLETED"
-      },
-      {
-        "type": "solution",
-        "title": "Draft fix plan",
-        "status": "IN_PROGRESS"
-      }
-    ],
+    "status": "processing",
     "updated_at": "2026-04-22T12:00:00Z",
+    "owner_user_id": null,
     "pending_user_input": null,
     "repo_pr_states": {},
-    "coding_agents": {}
+    "coding_agents": {},
+    "blocks": [
+      {
+        "id": "block-1",
+        "message": {
+          "role": "assistant",
+          "content": "Investigating the failing request.",
+          "thinking_content": null,
+          "tool_calls": null,
+          "metadata": null
+        },
+        "timestamp": "2026-04-22T11:59:00Z",
+        "loading": true,
+        "artifacts": [],
+        "file_patches": null,
+        "merged_file_patches": null,
+        "pr_commit_shas": null,
+        "todos": [
+          { "content": "Investigate failing request", "status": "completed" },
+          { "content": "Draft fix plan", "status": "in_progress" }
+        ],
+        "tool_links": null,
+        "tool_results": null
+      }
+    ]
   }
 }

@@ -3,12 +3,13 @@ import { getOAuthApi } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SCOPES } from "../../constants";
+import { PKCE_CODE_CHALLENGE, PKCE_CODE_VERIFIER } from "../../test-utils/pkce";
 import app from "../app";
 import handler from "../index";
 import mcpHandler from "../lib/mcp-handler";
 import type { Env } from "../types";
 import oauthRoute from "./index";
-import { signState, type OAuthState } from "./state";
+import { type OAuthState, signState } from "./state";
 
 const { exchangeCodeForAccessToken, logError, logIssue, logWarn } = vi.hoisted(
   () => ({
@@ -87,14 +88,18 @@ async function createClient(testEnv: Env, name = "Test Client") {
 async function createSignedCallbackState(
   clientId: string,
   resource?: string,
+  skills: string[] = ["inspect"],
 ): Promise<string> {
   const now = Date.now();
   const payload: OAuthState = {
     req: {
       clientId,
       redirectUri: REDIRECT_URI,
+      responseType: "code",
       scope: ["org:read"],
-      skills: ["inspect"],
+      skills,
+      codeChallenge: PKCE_CODE_CHALLENGE,
+      codeChallengeMethod: "S256",
       ...(resource ? { resource } : {}),
     },
     iat: now,
@@ -116,6 +121,7 @@ async function approveClient(
         oauthReqInfo: {
           clientId,
           redirectUri: REDIRECT_URI,
+          responseType: "code",
           scope: ["org:read"],
           ...(resource ? { resource } : {}),
         },
@@ -185,6 +191,7 @@ function createTokenExchangeRequest(clientId: string, code: string) {
       client_id: clientId,
       code,
       redirect_uri: REDIRECT_URI,
+      code_verifier: PKCE_CODE_VERIFIER,
     }).toString(),
   });
 }
@@ -197,6 +204,7 @@ function createMcpInitializeRequest(accessToken: string, path = "/mcp") {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
       "CF-Connecting-IP": "192.0.2.1",
+      Host: "localhost",
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
@@ -254,6 +262,74 @@ describe("oauth callback routes", () => {
 
       expect(response.status).toBe(400);
       expect(await response.text()).toBe("Invalid state");
+    });
+
+    it("accepts an ephemeral loopback port against a portless CIMD registration", async () => {
+      const loopbackRedirectUri = "http://localhost:3118/callback";
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await testEnv.OAUTH_PROVIDER.createClient({
+        clientName: "Claude Code",
+        redirectUris: [
+          "http://localhost/callback",
+          "http://127.0.0.1/callback",
+        ],
+        tokenEndpointAuthMethod: "none",
+      });
+
+      const approvalState = await signState(
+        {
+          req: {
+            oauthReqInfo: {
+              clientId: client.clientId,
+              redirectUri: loopbackRedirectUri,
+              responseType: "code",
+              scope: ["org:read"],
+            },
+          },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        COOKIE_SECRET,
+      );
+      const formData = new FormData();
+      formData.append("state", approvalState);
+      formData.append("skill", "inspect");
+      const approval = await oauthApp.fetch(
+        new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        }),
+        testEnv,
+      );
+      expect(approval.status).toBe(302);
+      const cookie = approval.headers.get("Set-Cookie")?.split(";")[0];
+
+      const now = Date.now();
+      const state = await signState(
+        {
+          req: {
+            clientId: client.clientId,
+            redirectUri: loopbackRedirectUri,
+            responseType: "code",
+            scope: ["org:read"],
+            skills: ["inspect"],
+            codeChallenge: PKCE_CODE_CHALLENGE,
+            codeChallengeMethod: "S256",
+          },
+          iat: now,
+          exp: now + 10 * 60 * 1000,
+        } as unknown as OAuthState,
+        COOKIE_SECRET,
+      );
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        cookie,
+        code: "test-code",
+      });
+
+      expect(response.status).toBe(302);
     });
 
     it("renders a safe upstream oauth error page and skips token exchange", async () => {
@@ -427,6 +503,29 @@ describe("oauth callback routes", () => {
       );
     });
 
+    it("rejects callback with legacy preprod skill selection", async () => {
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const cookie = await approveClient(oauthApp, testEnv, client.clientId);
+      const state = await createSignedCallbackState(
+        client.clientId,
+        undefined,
+        ["preprod"],
+      );
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        code: "test-code",
+        cookie,
+      });
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toContain(
+        "You must select at least one valid permission",
+      );
+    });
+
     it("rejects callback with cookie for different client", async () => {
       const testEnv = createTestEnv();
       const oauthApp = createTestApp();
@@ -498,6 +597,9 @@ describe("oauth callback routes", () => {
       expect(response.status).toBe(302);
       expect(response.headers.get("location")).toContain(REDIRECT_URI);
       expect(response.headers.get("location")).toContain("code=");
+      expect(
+        new URL(response.headers.get("location")!).searchParams.get("iss"),
+      ).toBe("http://localhost");
     });
 
     it("completes callback, exchanges the code, and uses the resulting token at /mcp", async () => {
@@ -527,6 +629,7 @@ describe("oauth callback routes", () => {
       const authorizationCode = redirectUrl.searchParams.get("code");
 
       expect(authorizationCode).toBeTruthy();
+      expect(redirectUrl.searchParams.get("iss")).toBe("http://localhost");
 
       const tokenCtx = createExecutionContext();
       const tokenResponse = await handler.fetch!(
@@ -590,6 +693,7 @@ describe("oauth callback routes", () => {
       const authorizationCode = redirectUrl.searchParams.get("code");
 
       expect(authorizationCode).toBeTruthy();
+      expect(redirectUrl.searchParams.get("iss")).toBe("http://localhost");
 
       const tokenCtx = createExecutionContext();
       const tokenResponse = await handler.fetch!(

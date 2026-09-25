@@ -85,7 +85,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       return c.json(
         {
           error: "Invalid request",
-          details: validationResult.error.errors,
+          details: validationResult.error.issues,
         },
         400,
       );

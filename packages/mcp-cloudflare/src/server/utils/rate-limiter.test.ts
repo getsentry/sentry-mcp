@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { checkRateLimit } from "./rate-limiter";
 import type { RateLimit } from "@cloudflare/workers-types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { checkRateLimit } from "./rate-limiter";
 
 describe("checkRateLimit", () => {
   let mockRateLimiter: RateLimit;
@@ -139,10 +140,6 @@ describe("checkRateLimit", () => {
   });
 
   it("allows request when rate limiter throws error", async () => {
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
-
     mockRateLimiter = {
       limit: vi.fn().mockRejectedValue(new Error("Rate limiter service error")),
     } as unknown as RateLimit;
@@ -155,13 +152,5 @@ describe("checkRateLimit", () => {
     // Should allow request to proceed even if rate limiter fails
     expect(result.allowed).toBe(true);
     expect(result.errorMessage).toBeUndefined();
-
-    // Should log the error
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "Rate limiter error:",
-      expect.any(Error),
-    );
-
-    consoleErrorSpy.mockRestore();
   });
 });

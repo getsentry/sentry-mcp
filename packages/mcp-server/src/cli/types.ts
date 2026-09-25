@@ -14,8 +14,8 @@ export type CliArgs = {
   anthropicModel?: string;
   agentProvider?: string;
   skills?: string;
+  allSkills?: boolean;
   disableSkills?: string;
-  agent?: boolean;
   experimental?: boolean;
   organizationSlug?: string;
   projectSlug?: string;
@@ -52,8 +52,8 @@ export type MergedArgs = {
   agentProvider?: string;
   clientId?: string; // env-only, carried from EnvArgs
   skills?: string;
+  allSkills?: boolean;
   disableSkills?: string;
-  agent?: boolean;
   experimental?: boolean;
   organizationSlug?: string;
   projectSlug?: string;
@@ -61,6 +61,12 @@ export type MergedArgs = {
   version?: boolean;
   unknownArgs: string[];
 };
+
+export type CliAgentProvider =
+  | "openai"
+  | "azure-openai"
+  | "anthropic"
+  | "openrouter";
 
 /**
  * Partially resolved config — accessToken may not yet be available
@@ -77,7 +83,7 @@ export type PartiallyResolvedConfig = {
   openaiModel?: string;
   anthropicBaseUrl?: string;
   anthropicModel?: string;
-  agentProvider?: "openai" | "azure-openai" | "anthropic";
+  agentProvider?: CliAgentProvider;
   /** Skills granted for this session (always populated by finalize()) */
   finalSkills: Set<Skill>;
   organizationSlug?: string;

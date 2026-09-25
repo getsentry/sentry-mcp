@@ -1,6 +1,6 @@
 {
   "name": "@sentry/mcp-cloudflare",
-  "version": "0.33.0",
+  "version": "0.42.0",
   "private": true,
   "type": "module",
   "license": "FSL-1.1-ALv2",
@@ -9,7 +9,7 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
   },
@@ -48,17 +48,17 @@
   },
   "dependencies": {
     "@ai-sdk/mcp": "catalog:",
-    "@ai-sdk/openai": "catalog:",
     "@ai-sdk/react": "catalog:",
     "@cloudflare/workers-oauth-provider": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
     "@radix-ui/react-accordion": "catalog:",
     "@radix-ui/react-slot": "catalog:",
     "@sentry/cloudflare": "catalog:",
     "@sentry/react": "catalog:",
     "agents": "catalog:",
     "ai": "catalog:",
-    "asciinema-player": "^3.10.0",
+    "asciinema-player": "^3.17.0",
     "better-sqlite3": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
@@ -67,7 +67,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-markdown": "catalog:",
-    "react-router-dom": "^7.11.0",
+    "react-router-dom": "^7.18.1",
     "react-scroll-to-bottom": "^4.2.0",
     "remark-gfm": "catalog:",
     "tailwind-merge": "catalog:",

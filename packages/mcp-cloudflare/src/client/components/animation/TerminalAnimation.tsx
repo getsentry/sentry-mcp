@@ -318,7 +318,6 @@ export default function TerminalAnimation() {
       >
         {Array.from({ length: 24 }).map((_, i) => (
           <DataWire
-            // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
             key={i}
             active={
               currentIndex === 1 || currentIndex === 2 || currentIndex === 4

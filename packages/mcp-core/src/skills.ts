@@ -19,6 +19,7 @@ export interface SkillDefinition {
   name: string;
   description: string;
   defaultEnabled: boolean;
+  deprecated?: boolean;
   order: number;
   toolCount?: number; // Number of tools enabled by this skill (calculated dynamically)
 }
@@ -27,7 +28,8 @@ export const SKILLS: Record<Skill, SkillDefinition> = {
   inspect: {
     id: "inspect",
     name: "Inspect Issues & Events",
-    description: "Search for errors, analyze traces, and explore event details",
+    description:
+      "Read-only access to core Sentry data: issues, events, traces, replays, releases, cron monitors, uptime monitors, metric monitors, profiles, documentation, and project metadata",
     defaultEnabled: true,
     order: 1,
   },
@@ -42,8 +44,10 @@ export const SKILLS: Record<Skill, SkillDefinition> = {
   docs: {
     id: "docs",
     name: "Documentation",
-    description: "Search and read Sentry SDK documentation",
+    description:
+      "Deprecated legacy docs-only grant. Documentation tools are now available through Inspect Issues & Events.",
     defaultEnabled: false,
+    deprecated: true,
     order: 3,
   },
   triage: {
@@ -56,7 +60,8 @@ export const SKILLS: Record<Skill, SkillDefinition> = {
   "project-management": {
     id: "project-management",
     name: "Manage Projects & Teams",
-    description: "Create and modify projects, teams, and DSNs",
+    description:
+      "Create and modify projects, teams, DSNs, uptime monitors, metric monitors, and alert rules",
     defaultEnabled: false,
     order: 5,
   },
@@ -71,7 +76,11 @@ export const SKILLS_ARRAY: SkillDefinition[] = Object.values(SKILLS).sort(
 export async function getSkillsArrayWithCounts(): Promise<SkillDefinition[]> {
   // Dynamically import to avoid circular dependency
   const toolsModule = await import("./tools");
+  const surfacesModule = await import("./tools/surfaces");
   const tools = toolsModule.default;
+  const isCatalogInfrastructureTool =
+    surfacesModule.isCatalogInfrastructureToolName;
+  const isWrapperTool = surfacesModule.isWrapperToolName;
 
   const counts = new Map<Skill, number>();
 
@@ -81,8 +90,11 @@ export async function getSkillsArrayWithCounts(): Promise<SkillDefinition[]> {
   }
 
   // Count tools for each skill
-  for (const tool of Object.values(tools)) {
-    if (tool.internalOnly) {
+  for (const [toolName, tool] of Object.entries(tools)) {
+    if (isWrapperTool(toolName) || isCatalogInfrastructureTool(toolName)) {
+      continue;
+    }
+    if (tool.includeInSkillDefinitions === false) {
       continue;
     }
     if (Array.isArray(tool.skills)) {
@@ -101,6 +113,11 @@ export async function getSkillsArrayWithCounts(): Promise<SkillDefinition[]> {
 // All skills (for foundational tools that should be available to all skills)
 export const ALL_SKILLS: Skill[] = Object.keys(SKILLS) as Skill[];
 
+// Active skills (for default grants that should exclude deprecated legacy skills)
+export const ACTIVE_SKILLS: Skill[] = SKILLS_ARRAY.filter(
+  (s) => !s.deprecated,
+).map((s) => s.id);
+
 // Default skills
 export const DEFAULT_SKILLS: Skill[] = SKILLS_ARRAY.filter(
   (s) => s.defaultEnabled,
@@ -108,7 +125,7 @@ export const DEFAULT_SKILLS: Skill[] = SKILLS_ARRAY.filter(
 
 // Validation
 export function isValidSkill(skill: string): skill is Skill {
-  return skill in SKILLS;
+  return Object.hasOwn(SKILLS, skill);
 }
 
 // Check if tool is enabled by granted skills (ANY match = enabled)
@@ -157,13 +174,17 @@ export async function getScopesForSkills(
   // Import here to avoid circular dependency at module load time
   const { DEFAULT_SCOPES } = await import("./constants.js");
   const toolsModule = await import("./tools/index.js");
+  const surfacesModule = await import("./tools/surfaces.js");
   const tools = toolsModule.default;
+  const isCatalogInfrastructureTool =
+    surfacesModule.isCatalogInfrastructureToolName;
+  const isWrapperTool = surfacesModule.isWrapperToolName;
 
   const scopes = new Set<string>(DEFAULT_SCOPES);
 
   // Iterate through all tools and collect required scopes for tools enabled by granted skills
-  for (const tool of Object.values(tools)) {
-    if (tool.internalOnly) {
+  for (const [toolName, tool] of Object.entries(tools)) {
+    if (isWrapperTool(toolName) || isCatalogInfrastructureTool(toolName)) {
       continue;
     }
     // Check if any of the tool's skills are granted

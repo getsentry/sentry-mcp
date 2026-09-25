@@ -1,0 +1,10 @@
+[
+  {
+    "id": "98765",
+    "environment": "production",
+    "name": "prod deploy",
+    "url": "https://deploys.example.com/98765",
+    "dateStarted": "2025-04-13T20:00:00.000Z",
+    "dateFinished": "2025-04-13T20:05:30.000Z"
+  }
+]

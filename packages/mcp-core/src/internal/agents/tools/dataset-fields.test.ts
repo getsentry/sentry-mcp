@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
+import { http, HttpResponse } from "msw";
+import { beforeEach, describe, expect, it } from "vitest";
+import { SentryApiService } from "../../../api-client";
 import {
   discoverDatasetFields,
-  getFieldExamples,
   getCommonPatterns,
+  getFieldExamples,
 } from "./dataset-fields";
-import { SentryApiService } from "../../../api-client";
 
 // Test the core logic functions directly without AI SDK complexity
 
@@ -14,7 +14,6 @@ describe("dataset-fields agent tool", () => {
   let apiService: SentryApiService;
 
   beforeEach(() => {
-    vi.clearAllMocks();
     apiService = new SentryApiService({
       accessToken: "test-token",
     });
@@ -255,7 +254,11 @@ describe("dataset-fields agent tool", () => {
           "https://sentry.io/api/0/organizations/sentry-mcp-evals/tags/",
           () =>
             HttpResponse.json([
-              { key: "assignedOrSuggested", name: "Assigned", totalValues: 5 },
+              {
+                key: "assigned_or_suggested",
+                name: "Assigned",
+                totalValues: 5,
+              },
               { key: "is", name: "Status", totalValues: 3 },
             ]),
         ),
@@ -276,6 +279,10 @@ describe("dataset-fields agent tool", () => {
         "unresolved",
         "resolved",
         "ignored",
+        "for_review",
+        "new",
+        "regressed",
+        "escalating",
       ]);
 
       // Test events examples
@@ -397,15 +404,17 @@ describe("dataset-fields agent tool", () => {
 
   describe("getFieldExamples", () => {
     it("should return examples for search_issues fields", () => {
-      expect(getFieldExamples("assignedOrSuggested", "search_issues")).toEqual([
-        "email@example.com",
-        "team-slug",
-        "me",
-      ]);
+      expect(
+        getFieldExamples("assigned_or_suggested", "search_issues"),
+      ).toEqual(["email@example.com", "team-slug", "me"]);
       expect(getFieldExamples("is", "search_issues")).toEqual([
         "unresolved",
         "resolved",
         "ignored",
+        "for_review",
+        "new",
+        "regressed",
+        "escalating",
       ]);
     });
 

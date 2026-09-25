@@ -36,4 +36,35 @@ describe("logging", () => {
       },
     });
   });
+
+  it("preserves issue contexts, attachments, and logger scope", async () => {
+    vi.resetModules();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { logIssue } = await import("./logging");
+
+    logIssue(new Error("issue failed"), {
+      contexts: {
+        request: { requestId: "request-123" },
+      },
+      attachments: {
+        "details.txt": "details",
+      },
+      loggerScope: ["tests", "issues"],
+    });
+
+    expect(error).toHaveBeenCalledTimes(1);
+    const [payload] = error.mock.calls[0];
+    expect(JSON.parse(payload as string)).toMatchObject({
+      level: "ERROR",
+      message: "issue failed",
+      logger: "sentry.mcp.tests.issues",
+      properties: {
+        attachments: ["details.txt"],
+        sentryContexts: {
+          request: { requestId: "request-123" },
+        },
+      },
+    });
+  });
 });

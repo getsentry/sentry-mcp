@@ -5,12 +5,19 @@ import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { Hono } from "hono";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import { resolveClientFamilyFromName } from "../../lib/client-family";
+import {
+  CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+  getClientRegistrationMethodTelemetry,
+} from "../telemetry";
+import { isRegisteredRedirectUri } from "../../lib/redirect-uri";
 import type { Env, WorkerProps } from "../../types";
 import { setSentryUserFromRequest } from "../../utils/sentry-user";
 import { SENTRY_TOKEN_URL } from "../constants";
 import {
+  appendAuthorizationResponseIss,
   createOAuthFailureResponse,
   exchangeCodeForAccessToken,
+  getAuthorizationServerIssuer,
   getOAuthCallbackFailureDetails,
   validateResourceParameter,
 } from "../helpers";
@@ -180,9 +187,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       oauthReqInfo.clientId,
     );
     registeredClientName = client?.clientName;
-    const uriIsAllowed =
-      Array.isArray(client?.redirectUris) &&
-      client.redirectUris.includes(oauthReqInfo.redirectUri);
+    const uriIsAllowed = isRegisteredRedirectUri(
+      oauthReqInfo.redirectUri,
+      client?.redirectUris,
+    );
     if (!uriIsAllowed) {
       logWarn("Redirect URI not registered for client on callback", {
         loggerScope: ["cloudflare", "oauth", "callback"],
@@ -279,6 +287,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
   // Return back to the MCP client a new token
   const accessTokenExpiresAt = getUpstreamTokenExpiryTimestamp(payload);
+  const sessionStartedAt = Date.now();
   const userLabel = getUpstreamUserLabel(payload);
 
   const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
@@ -306,7 +315,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       // Cache upstream expiry so future refresh grants can avoid
       // unnecessary upstream refresh calls when still valid
       accessTokenExpiresAt,
+      sessionStartedAt,
+      upstreamExpiresAt: accessTokenExpiresAt,
       clientId: oauthReqInfo.clientId,
+      clientName: registeredClientName,
       scope: oauthReqInfo.scope.join(" "),
       // Scopes derived from skills - for backward compatibility with old MCP clients
       // that don't support grantedSkills and only understand grantedScopes
@@ -324,12 +336,33 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   // /oauth/callback is browser-navigated, so the User-Agent is the user's
   // browser, not the MCP client. Derive client family from the DCR-registered
   // client_name (resolved above).
+  const clientFamily = resolveClientFamilyFromName(registeredClientName);
+  const registrationMethodTelemetry = getClientRegistrationMethodTelemetry(
+    oauthReqInfo.clientId,
+  );
+  Sentry.getActiveSpan()?.setAttribute(
+    CLIENT_REGISTRATION_METHOD_ATTRIBUTE,
+    registrationMethodTelemetry[CLIENT_REGISTRATION_METHOD_ATTRIBUTE],
+  );
   Sentry.metrics.count("app.oauth.callback_completed", 1, {
     attributes: {
-      "app.client.family": resolveClientFamilyFromName(registeredClientName),
+      "app.client.family": clientFamily,
+      ...registrationMethodTelemetry,
     },
   });
+  for (const skill of grantedSkills) {
+    Sentry.metrics.count("app.consent.skill_granted", 1, {
+      attributes: {
+        "app.consent.skill": skill,
+        "app.client.family": clientFamily,
+      },
+    });
+  }
 
+  // RFC 9207: workers-oauth-provider does not emit `iss` on authorization
+  // responses. Append the canonical origin-level issuer so clients that
+  // validate `iss` against PRM/root AS metadata can mix-up-protect the code.
+  const issuer = getAuthorizationServerIssuer(c.req.url);
   // Use manual redirect instead of Response.redirect() to allow middleware to add headers
-  return c.redirect(redirectTo);
+  return c.redirect(appendAuthorizationResponseIss(redirectTo, issuer));
 });

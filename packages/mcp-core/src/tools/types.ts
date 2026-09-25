@@ -1,12 +1,38 @@
+import type {
+  CallToolResult,
+  EmbeddedResource,
+  ImageContent,
+  TextContent,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
-import type { ServerContext, ProjectCapabilities } from "../types";
 import type { Scope } from "../permissions";
 import type { Skill } from "../skills";
-import type {
-  TextContent,
-  ImageContent,
-  EmbeddedResource,
-} from "@modelcontextprotocol/sdk/types.js";
+import type { ProjectCapabilities, ServerContext } from "../types";
+
+export type ToolContent = TextContent | ImageContent | EmbeddedResource;
+export interface StructuredToolOutput<
+  TStructuredContent extends Record<string, unknown> = Record<string, unknown>,
+> {
+  structuredContent: TStructuredContent;
+}
+export type ToolOutput =
+  | string
+  | ToolContent[]
+  | CallToolResult
+  | StructuredToolOutput;
+/**
+ * Keeps schema-inferred handler params at tool definition sites while allowing
+ * heterogeneous tool registries to store many concrete handler signatures.
+ */
+export type ToolHandler<
+  TSchema extends Record<string, z.ZodType>,
+  TOutput extends ToolOutput = ToolOutput,
+> = {
+  handler(
+    params: z.infer<z.ZodObject<TSchema>>,
+    context: ServerContext,
+  ): Promise<TOutput>;
+}["handler"];
 
 /**
  * Context passed to dynamic description functions.
@@ -14,6 +40,8 @@ import type {
  */
 export interface DescriptionContext {
   experimentalMode: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
 }
 
 /**
@@ -36,20 +64,15 @@ export function resolveDescription(
 }
 
 /**
- * Determines if a tool should be externally visible through MCP surfaces.
- * - Tools with `internalOnly: true` are never exposed through server registration
- * - Tools with `experimental: true` are only visible when experimentalMode is true
- * - Tools with `hideInExperimentalMode: true` are hidden when experimentalMode is true
+ * Determines if a tool is enabled for the current release mode.
  */
 export function isToolVisibleInMode(
   tool: {
     experimental?: boolean;
     hideInExperimentalMode?: boolean;
-    internalOnly?: boolean;
   },
   experimentalMode: boolean,
 ): boolean {
-  if (tool.internalOnly) return false;
   if (tool.experimental && !experimentalMode) return false;
   if (tool.hideInExperimentalMode && experimentalMode) return false;
   return true;
@@ -62,22 +85,33 @@ export interface ToolConfig<
   description: ToolDescription;
   inputSchema: TSchema;
   skills: Skill[]; // Which skill categories this tool belongs to
+  includeInSkillDefinitions?: boolean; // Whether generated skill prompts advertise this tool
   requiredScopes: Scope[]; // LEGACY: Which API scopes needed (deprecated, for backward compatibility)
   experimental?: boolean; // Mark tool as experimental (only shown in experimental mode)
   hideInExperimentalMode?: boolean; // Hide tool when experimental mode is active (for tools replaced by unified tools)
-  agentOnly?: boolean; // Tool is only available in agent mode (excluded from plugin allowedTools)
-  internalOnly?: boolean; // Tool is retained as an implementation detail and never exposed as an MCP tool
   requiredCapabilities?: (keyof ProjectCapabilities)[]; // Project capabilities required for this tool
+  outputSchema?: z.ZodType;
   annotations: {
-    readOnlyHint?: boolean;
-    destructiveHint?: boolean;
+    // readOnlyHint, destructiveHint, and openWorldHint are required so every
+    // tool declares its safety posture explicitly. Filters and confirmation
+    // gates rely on these; an undefined hint is a silent gap. Enforced further
+    // by tools.test.ts (see "complete MCP safety annotations").
+    readOnlyHint: boolean;
+    destructiveHint: boolean;
     idempotentHint?: boolean;
-    openWorldHint?: boolean;
+    openWorldHint: boolean;
   };
-  handler: (
-    params: z.infer<z.ZodObject<TSchema>>,
+  handler: ToolHandler<TSchema>;
+  /**
+   * Optional hook invoked when the handler throws, for tool-specific failure
+   * telemetry (e.g. logging the failing query). The error is still formatted
+   * and returned to the client afterward; this must not throw.
+   */
+  onError?(
+    error: unknown,
+    params: Record<string, unknown>,
     context: ServerContext,
-  ) => Promise<string | (TextContent | ImageContent | EmbeddedResource)[]>;
+  ): void;
 }
 
 /**

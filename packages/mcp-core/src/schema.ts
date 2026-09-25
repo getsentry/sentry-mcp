@@ -2,16 +2,17 @@
  * Reusable Zod parameter schemas for MCP tools.
  *
  * Shared validation schemas used across tool definitions to ensure consistent
- * parameter handling and validation. Each schema includes transformation
- * (e.g., toLowerCase, trim) and LLM-friendly descriptions.
+ * parameter handling and validation. Schemas apply minimal normalization
+ * (e.g., trim) and LLM-friendly descriptions.
  */
 import { z } from "zod";
 import { SENTRY_GUIDES } from "./constants";
-import { validateSlug } from "./utils/slug-validation";
+import { validateResourceId, validateSlug } from "./utils/slug-validation";
 
+// Sentry slug lookups can be exact and case-sensitive on legacy instances.
+// Preserve caller casing for resource slugs; only trim and validate shape.
 export const ParamOrganizationSlug = z
   .string()
-  .toLowerCase()
   .trim()
   .superRefine(validateSlug)
   .describe(
@@ -20,16 +21,14 @@ export const ParamOrganizationSlug = z
 
 export const ParamTeamSlug = z
   .string()
-  .toLowerCase()
   .trim()
   .superRefine(validateSlug)
   .describe(
-    "The team's slug. You can find a list of existing teams in an organization using the `find_teams()` tool.",
+    "The team's slug. You can find a list of existing teams in an organization with the Sentry tool `find_teams`.",
   );
 
 export const ParamProjectSlug = z
   .string()
-  .toLowerCase()
   .trim()
   .superRefine(validateSlug)
   .describe(
@@ -38,11 +37,10 @@ export const ParamProjectSlug = z
 
 export const ParamProjectSlugOrAll = z
   .string()
-  .toLowerCase()
   .trim()
   .superRefine(validateSlug)
   .describe(
-    "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible.",
+    "The project's slug, or exact lowercase `all` when a tool supports all-projects scope. Other casing is treated as a project slug.",
   );
 
 export const ParamSearchQuery = z
@@ -69,6 +67,7 @@ export const ParamIssueUrl = z
 export const ParamReplayId = z
   .string()
   .trim()
+  .superRefine(validateResourceId)
   .describe("The replay ID. e.g. `7e07485f-12f9-416b-8b14-26260799b51f`");
 
 export const ParamReplayUrl = z
@@ -117,6 +116,26 @@ export const ParamQuery = z
   );
 
 /**
+ * Relative time window parameter for Sentry API queries.
+ *
+ * Maps to the `statsPeriod` URL parameter in Sentry's API, which controls the
+ * search time window (i.e., which records are returned). This is distinct from
+ * `groupStatsPeriod`, which only affects sparkline data in the serializer.
+ *
+ * Tools apply their own `.default()`, `.optional()`, or `.nullable()` on top.
+ */
+export const ParamPeriod = z
+  .string()
+  .trim()
+  .regex(
+    /^\d+[hdw]$/,
+    "Period must be a relative time window like `24h`, `7d`, `14d`, `30d`, or `90d`.",
+  )
+  .describe(
+    "Relative time window, such as `24h`, `7d`, `14d`, `30d`, or `90d`. Controls which records fall within the search window.",
+  );
+
+/**
  * Region URL parameter for Sentry API requests.
  *
  * Handles region-specific URLs for Sentry's Cloud Service while gracefully
@@ -158,8 +177,10 @@ export const ParamIssueIgnoreMode = z
 export const ParamAssignedTo = z
   .string()
   .trim()
+  .min(1)
+  .nullable()
   .describe(
-    "The assignee in format 'user:ID' or 'team:ID_OR_SLUG' where ID is numeric. Example: 'user:123456', 'team:789', or 'team:my-team-slug'. Use the whoami tool to find your user ID.",
+    "The assignee in format 'user:ID' or 'team:ID_OR_SLUG' where ID is numeric. Pass null to unassign the issue. Example: 'user:123456', 'team:789', or 'team:my-team-slug'. Use `execute_sentry_tool(name='whoami', arguments={})` to find your user ID.",
   );
 
 export const ParamIgnoreDurationMinutes = z
@@ -204,6 +225,15 @@ export const ParamIgnoreUserWindowMinutes = z
     "Optional time window in minutes for ignoreUserCount. If omitted, Sentry counts all future affected users.",
   );
 
+export const ParamReason = z
+  .string()
+  .overwrite((s) => s.replace(/\0/g, ""))
+  .trim()
+  .min(1)
+  .describe(
+    "Optional reason for taking this action. When provided, it will be posted as a comment on the issue's activity feed.",
+  );
+
 export const ParamSentryGuide = z
   .enum(SENTRY_GUIDES)
   .describe(
@@ -211,9 +241,26 @@ export const ParamSentryGuide = z
       "Use either a platform (e.g., 'javascript', 'python') or platform/guide combination (e.g., 'javascript/nextjs', 'python/django').",
   );
 
-export const ParamEventId = z.string().trim().describe("The ID of the event.");
+export const ParamEventId = z
+  .string()
+  .trim()
+  .regex(
+    /^[0-9a-fA-F]{32}$/,
+    "Event ID must be a 32-character hexadecimal string",
+  )
+  .describe("The ID of the event. e.g. `c49541c747cb4d8aa3efb70ca5aba243`");
+
+/**
+ * Issue-scoped event selector used by tools that can target either a concrete
+ * event or the issue's latest event.
+ */
+export const ParamEventIdOrLatest = z
+  .union([z.literal("latest"), ParamEventId])
+  .default("latest")
+  .describe("The event ID for the issue, or `latest`. Defaults to `latest`.");
 
 export const ParamAttachmentId = z
   .string()
   .trim()
+  .superRefine(validateResourceId)
   .describe("The ID of the attachment to download.");

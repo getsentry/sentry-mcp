@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import pkg from "../package.json";
 
 const PREVIEW_URL = process.env.PREVIEW_URL;
-// All endpoints should respond quickly - 1 second is plenty for 401/200 responses
-const DEFAULT_TIMEOUT_MS = 1000;
+// Leave enough headroom for transient Cloudflare edge latency. Response-time
+// expectations are enforced separately by the performance smoke test below.
+const DEFAULT_TIMEOUT_MS = 5000;
 const IS_LOCAL_DEV =
   PREVIEW_URL?.includes("localhost") || PREVIEW_URL?.includes("127.0.0.1");
 
@@ -200,12 +201,14 @@ describeIfPreviewUrl(
 
       expect(response.status).toBe(401);
 
-      // Should return auth error, not 404 - this proves the constrained MCP endpoint exists
+      // Should return auth error, not 404 - this proves the constrained MCP endpoint exists.
+      // workers-oauth-provider returns a bare RFC 6750 challenge (no body) when the
+      // Authorization header is missing entirely, so only assert body content when present.
       const data = (response as any).testData;
-      if (typeof data === "object") {
+      if (data && typeof data === "object") {
         expect(data).toHaveProperty("error");
         expect(data.error).toMatch(/invalid_token|unauthorized/i);
-      } else {
+      } else if (data) {
         expect(data).toMatch(/invalid_token|unauthorized/i);
       }
     });
@@ -253,12 +256,14 @@ describeIfPreviewUrl(
 
       expect(response.status).toBe(401);
 
-      // Should return auth error, not 404 - this proves the fully constrained MCP endpoint exists
+      // Should return auth error, not 404 - this proves the fully constrained MCP endpoint exists.
+      // workers-oauth-provider returns a bare RFC 6750 challenge (no body) when the
+      // Authorization header is missing entirely, so only assert body content when present.
       const data = (response as any).testData;
-      if (typeof data === "object") {
+      if (data && typeof data === "object") {
         expect(data).toHaveProperty("error");
         expect(data.error).toMatch(/invalid_token|unauthorized/i);
-      } else {
+      } else if (data) {
         expect(data).toMatch(/invalid_token|unauthorized/i);
       }
     });

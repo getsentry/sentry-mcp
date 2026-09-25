@@ -1,0 +1,17 @@
+id: no-stdio-stdout
+language: TypeScript
+severity: error
+message: Do not write to stdout from MCP stdio-reachable runtime code.
+note: stdout is reserved for MCP JSON-RPC frames. Use logging helpers that route to stderr, or keep output in explicit CLI-only code.
+rule:
+  any:
+    - pattern: console.log($$$ARGS)
+    - pattern: console.info($$$ARGS)
+    - pattern: console.debug($$$ARGS)
+files:
+  - packages/mcp-core/src/**/*.ts
+  - packages/mcp-server/src/**/*.ts
+ignores:
+  - packages/mcp-server/src/cli/**
+  - "**/*.test.ts"
+  - "**/*.d.ts"

@@ -7,7 +7,7 @@ This package is primarily for running the `stdio` MCP server. If you do not know
 <https://mcp.sentry.dev>
 
 **Note:** Some tools require additional configuration:
-- **AI-powered search tools** (`search_events` and `search_issues`): These tools use OpenAI to translate natural language queries into Sentry's query syntax. They require an `OPENAI_API_KEY` environment variable. Without this key, these specific tools will be unavailable, but all other tools will function normally.
+- **AI-powered search tools** (`search_events` and `search_issues`): These tools use a configured LLM provider to translate natural language queries into Sentry's query syntax. Set one provider key, such as `OPENAI_API_KEY` or `OPENROUTER_API_KEY`. Without a provider key, these specific tools will be unavailable, but all other tools will function normally.
 
 ## Authorization
 
@@ -15,24 +15,28 @@ The MCP server uses a **skills-based authorization system** that maps user-frien
 
 ### Available Skills
 
-By default (no `--skills` flag), the MCP server grants **ALL skills** for non-interactive convenience:
+By default (no `--skills` flag), the MCP server grants active, non-deprecated skills for non-interactive convenience:
 
 - **`inspect`** (default) - View organizations, projects, teams, issues, traces, and search for errors
-- **`docs`** (default) - Search and read Sentry SDK documentation
 - **`seer`** (default) - Use Seer to analyze issues and generate fix recommendations
 - **`triage`** - Resolve, assign, and update issues
 - **`project-management`** - Create and modify projects, teams, and DSNs
+
+Documentation tools are available through the `inspect` skill via the catalog: use `search_sentry_tools` to find documentation tools, then call `search_docs` or `get_doc` through `execute_sentry_tool`. The legacy `docs` skill can still be requested explicitly for docs-only catalog access, but it is not granted by default.
 
 ### Customizing Skills
 
 You can limit which skills are granted using the `--skills` flag:
 
 ```shell
-# Default: ALL skills (inspect, docs, seer, triage, project-management)
+# Default: active skills (inspect, seer, triage, project-management)
 npx @sentry/mcp-server@latest --access-token=sentry-user-token
 
 # Limit to specific skills only
 npx @sentry/mcp-server@latest --access-token=TOKEN --skills=inspect,docs
+
+# Grant all active, non-deprecated skills, overriding MCP_SKILLS
+npx @sentry/mcp-server@latest --access-token=TOKEN --all-skills
 
 # Self-hosted Sentry
 npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.example.com
@@ -55,10 +59,11 @@ as an opaque model identifier.
 
 ### Constraint-Based Tool Exclusion
 
-When a session is scoped to a specific organization or project (tenant-bound context), certain list tools are automatically excluded since they cannot query other resources:
+When a session is scoped to a specific organization or project (tenant-bound context), certain tools are automatically excluded when they would escape or duplicate that scope:
 
 - **`find_organizations`** is hidden when the session is constrained to a specific organization (`organizationSlug` constraint)
 - **`find_projects`** is hidden when the session is constrained to a specific project (`projectSlug` constraint)
+- **`create_project`** is hidden when the session is constrained to a specific project (`projectSlug` constraint)
 
 This ensures that only relevant tools are available in constrained contexts. When constraints are not set, all tools are available based on your granted skills.
 
@@ -74,9 +79,12 @@ MCP_SKILLS=inspect,docs,triage         # Limit to specific skills
 MCP_SCOPES=org:read,event:read         # Override default scopes (replaces defaults) - DEPRECATED, use MCP_SKILLS
 MCP_ADD_SCOPES=event:write             # Add to default scopes (keeps defaults) - DEPRECATED, use MCP_SKILLS
 
-# OpenAI configuration for AI-powered search tools
-OPENAI_API_KEY=your-openai-key         # Required for AI-powered search tools (search_events, search_issues)
+# LLM provider configuration for AI-powered search tools
+OPENAI_API_KEY=your-openai-key         # Use OpenAI for AI-powered search tools
 OPENAI_MODEL=gpt-5                     # OpenAI model to use (default: "gpt-5")
+OPENROUTER_API_KEY=your-openrouter-key # Or use OpenRouter for AI-powered search tools
+OPENROUTER_MODEL=openai/gpt-5.6-luna   # OpenRouter model to use (default: "openai/gpt-5.6-luna")
+OPENROUTER_REASONING_EFFORT=high       # OpenRouter reasoning effort: "none", "minimal", "low", "medium", "high", "xhigh" ("max" aliases xhigh), or "" to omit (default: "high")
 OPENAI_REASONING_EFFORT=low            # Reasoning effort for o1 models: "low", "medium", "high", or "" to disable (default: "low")
 
 # No environment variable exists for the OpenAI base URL override; use --openai-base-url instead.

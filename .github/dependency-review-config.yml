@@ -1,0 +1,4 @@
+# React Router's advisory only affects applications using its unstable RSC APIs.
+# This application uses the stable browser router and has no RSC integration.
+allow-ghsas:
+  - GHSA-qwww-vcr4-c8h2

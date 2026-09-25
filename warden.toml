@@ -2,13 +2,25 @@ version = 1
 
 [defaults]
 failOn = "high"
-reportOn = "medium"
+reportOn = "low"
+
+[defaults.ignore]
+paths = [
+  # Generated artifacts intentionally committed to the repository.
+  "pnpm-lock.yaml",
+  "packages/mcp-core/src/*Definitions.json",
+  "plugins/sentry-mcp*/agents/sentry-mcp.md",
+  "packages/mcp-cloudflare/worker-configuration.d.ts",
+  "packages/mcp-core/src/internal/agents/tools/data/*.json",
+  "!packages/mcp-core/src/internal/agents/tools/data/app.json",
+]
 
 [[skills]]
 name = "mcp-audit"
 paths = [
-  "docs/adding-tools.md",
-  "docs/stdio-auth.md",
+  "docs/contributing/adding-tools.md",
+  "docs/contributing/tool-responses.md",
+  "docs/operations/stdio-auth.md",
   "packages/mcp-core/src/server.ts",
   "packages/mcp-core/src/server.test.ts",
   "packages/mcp-core/src/skillDefinitions.json",

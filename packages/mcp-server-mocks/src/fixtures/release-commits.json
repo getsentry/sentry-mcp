@@ -1,0 +1,16 @@
+[
+  {
+    "id": "2ce6a2700fec4913a2cde8e2d41dee36",
+    "message": "Fix duplicate tool registration",
+    "dateCreated": "2025-04-13T19:40:00.000Z",
+    "pullRequest": null,
+    "suspectCommitType": "",
+    "author": {
+      "name": "Jane Developer",
+      "email": "jane@example.com"
+    },
+    "repository": {
+      "name": "getsentry/sentry-mcp"
+    }
+  }
+]

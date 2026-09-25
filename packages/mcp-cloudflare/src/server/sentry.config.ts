@@ -1,17 +1,15 @@
-import type { Env } from "./types";
-import { LIB_VERSION } from "@sentry/mcp-core/version";
 import * as Sentry from "@sentry/cloudflare";
+import type { CloudflareOptions } from "@sentry/cloudflare";
 import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
+import { LIB_VERSION } from "@sentry/mcp-core/version";
+import type { Env } from "./types";
 
-type SentryConfig = ReturnType<Parameters<typeof Sentry.withSentry>[0]>;
-
-export default function getSentryConfig(env: Env): SentryConfig {
+export default function getSentryConfig(env: Env): CloudflareOptions {
   const versionId = env.CF_VERSION_METADATA?.id;
 
   return {
     dsn: env.SENTRY_DSN,
-    tracesSampleRate: 1,
-    sendDefaultPii: true,
+    tracesSampleRate: 0.3,
     beforeSend: sentryBeforeSend,
     initialScope: {
       tags: {
@@ -23,17 +21,11 @@ export default function getSentryConfig(env: Env): SentryConfig {
     environment:
       env.SENTRY_ENVIRONMENT ??
       (process.env.NODE_ENV !== "production" ? "development" : "production"),
-    enableLogs: true,
-    enableMetrics: true,
-    integrations: [
-      Sentry.consoleLoggingIntegration(),
-      Sentry.zodErrorsIntegration(),
-      Sentry.vercelAIIntegration(),
-    ],
+    integrations: [Sentry.zodErrorsIntegration()],
   };
 }
 
-getSentryConfig.partial = (config: Partial<SentryConfig>) => {
+getSentryConfig.partial = (config: Partial<CloudflareOptions>) => {
   return (env: Env) => {
     const defaultConfig = getSentryConfig(env);
     return {

@@ -1,4 +1,9 @@
-import { ALL_SKILLS, parseSkills, type Skill } from "@sentry/mcp-core/skills";
+import {
+  ACTIVE_SKILLS,
+  ALL_SKILLS,
+  parseSkills,
+  type Skill,
+} from "@sentry/mcp-core/skills";
 import {
   isSentryHost,
   validateAndParseSentryUrlThrows,
@@ -51,10 +56,10 @@ export function finalize(input: MergedArgs): PartiallyResolvedConfig {
 
   // Skills resolution
   //
-  // IMPORTANT: stdio (CLI) intentionally defaults to ALL skills when no --skills flag is provided
+  // IMPORTANT: stdio (CLI) intentionally defaults to all active skills when no --skills flag is provided
   //
   // This differs from the OAuth flow, which requires explicit user selection:
-  // - stdio/CLI: Non-interactive, defaults to ALL skills (inspect, docs, seer, triage, project-management)
+  // - stdio/CLI: Non-interactive, defaults to all non-deprecated skills
   // - OAuth: Interactive, requires user to explicitly select skills (with sensible defaults pre-checked)
   //
   // Rationale:
@@ -67,7 +72,13 @@ export function finalize(input: MergedArgs): PartiallyResolvedConfig {
   // packages/mcp-cloudflare/src/server/oauth/routes/callback.ts (lines 234-248)
   //
   let finalSkills: Set<Skill>;
-  if (input.skills) {
+  if (input.skills && input.allSkills) {
+    throw new Error("Error: --all-skills cannot be combined with --skills.");
+  }
+
+  if (input.allSkills) {
+    finalSkills = new Set<Skill>(ACTIVE_SKILLS);
+  } else if (input.skills) {
     // Override: use only the specified skills
     const { valid, invalid } = parseSkills(input.skills);
     if (invalid.length > 0) {
@@ -78,8 +89,18 @@ export function finalize(input: MergedArgs): PartiallyResolvedConfig {
     }
     finalSkills = valid;
   } else {
-    // Default: grant ALL skills when no flag is provided (see comment block above for rationale)
-    finalSkills = new Set<Skill>(ALL_SKILLS);
+    // Default: grant all active skills when no flag is provided (see comment block above for rationale)
+    finalSkills = new Set<Skill>(ACTIVE_SKILLS);
+
+    // Seer is a sentry.io service. Self-hosted Sentry ships without it, and its
+    // autofix endpoints answer 500 when the Seer backend is not configured, so
+    // every `get_issue_details` call (which fetches autofix state) and every
+    // `analyze_issue_with_seer` poll loop would just generate server errors.
+    // Leave Seer out of the implicit default on self-hosted hosts; users who
+    // do run Seer can still opt in with --skills=seer or --all-skills.
+    if (!isSentryHost(sentryHost)) {
+      finalSkills.delete("seer");
+    }
   }
 
   // Disable-skills: remove specific skills from the active set
@@ -110,17 +131,22 @@ export function finalize(input: MergedArgs): PartiallyResolvedConfig {
     : undefined;
 
   // Validate agent provider if explicitly set
-  let agentProvider: "openai" | "azure-openai" | "anthropic" | undefined =
-    undefined;
+  let agentProvider:
+    | "openai"
+    | "azure-openai"
+    | "anthropic"
+    | "openrouter"
+    | undefined = undefined;
   if (input.agentProvider) {
     const provider = input.agentProvider.toLowerCase();
     if (
       provider !== "openai" &&
       provider !== "azure-openai" &&
-      provider !== "anthropic"
+      provider !== "anthropic" &&
+      provider !== "openrouter"
     ) {
       throw new Error(
-        `Error: Invalid agent provider "${input.agentProvider}". Must be "openai", "azure-openai", or "anthropic".`,
+        `Error: Invalid agent provider "${input.agentProvider}". Must be "openai", "azure-openai", "anthropic", or "openrouter".`,
       );
     }
     agentProvider = provider;

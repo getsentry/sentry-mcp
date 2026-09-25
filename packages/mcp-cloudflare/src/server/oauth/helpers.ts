@@ -14,6 +14,14 @@ import type { z } from "zod";
 import type { WorkerProps } from "../types";
 import { setSentryUserFromRequest } from "../utils/sentry-user";
 import { TokenResponseSchema } from "./constants";
+import {
+  getClientRegistrationMethodTelemetry,
+  getOAuthGrantLifecycleTelemetry,
+  OAUTH_GRANT_SHAPE_ATTRIBUTE,
+  OAUTH_PROBE_REASON_ATTRIBUTE,
+  OAUTH_PROBE_STATUS_CODE_ATTRIBUTE,
+  OAUTH_REFRESH_OUTCOME_ATTRIBUTE,
+} from "./telemetry";
 
 function escapeHtml(value: string): string {
   return value
@@ -450,7 +458,7 @@ function recordTokenExchangeOutcome(
 ): void {
   Sentry.metrics.count("app.oauth.token_exchange", 1, {
     attributes: {
-      "app.oauth.token_exchange.outcome": outcome,
+      [OAUTH_REFRESH_OUTCOME_ATTRIBUTE]: outcome,
       ...attributes,
     },
   });
@@ -588,8 +596,10 @@ export async function tokenExchangeCallback(
     const remainingMs = expiresAt - Date.now();
     if (remainingMs > SAFE_WINDOW_MS) {
       recordTokenExchangeOutcome("cached_valid_local", {
-        "app.oauth.grant.shape": "refreshable",
+        [OAUTH_GRANT_SHAPE_ATTRIBUTE]: "refreshable",
         "app.client.family": clientFamily,
+        ...getClientRegistrationMethodTelemetry(props.clientId),
+        ...getOAuthGrantLifecycleTelemetry(props),
       });
       return buildSuccessfulTokenExchangeResult(
         props,
@@ -609,14 +619,16 @@ export async function tokenExchangeCallback(
   // Metric attribute (not span attribute): Sentry.getActiveSpan() is
   // undefined inside tokenExchangeCallback.
   const outcomeAttributes: Record<string, string> = {
-    "app.oauth.grant.shape": "refreshable",
+    [OAUTH_GRANT_SHAPE_ATTRIBUTE]: "refreshable",
     "app.client.family": clientFamily,
+    ...getClientRegistrationMethodTelemetry(props.clientId),
+    ...getOAuthGrantLifecycleTelemetry(props),
   };
   if (typeof status === "number") {
-    outcomeAttributes["app.oauth.probe.status_code"] = String(status);
+    outcomeAttributes[OAUTH_PROBE_STATUS_CODE_ATTRIBUTE] = String(status);
   }
   if (reason) {
-    outcomeAttributes["app.oauth.probe.reason"] = reason;
+    outcomeAttributes[OAUTH_PROBE_REASON_ATTRIBUTE] = reason;
   }
   switch (outcome) {
     case "cached_valid_probed": {
@@ -710,22 +722,66 @@ export function validateResourceParameter(
 }
 
 /**
- * Creates RFC 8707 error response for invalid resource parameter.
+ * Canonical MCP authorization-server issuer (RFC 8414).
+ *
+ * Matches workers-oauth-provider root metadata (`issuer = token endpoint
+ * origin`) and PRM `authorization_servers` (also origin). Path-scoped AS
+ * metadata is a compatibility shim only — clients that follow RFC 9728 PRM
+ * discover this origin-level issuer.
  */
-export function createResourceValidationError(
+export function getAuthorizationServerIssuer(requestUrl: string | URL): string {
+  return new URL(requestUrl).origin;
+}
+
+/**
+ * RFC 9207: append `iss` to an authorization response redirect URL.
+ *
+ * Adds the parameter to the query string (response_mode=query) or fragment
+ * (response_mode=fragment / implicit). Any existing value is replaced because
+ * RFC 9207 requires the response value to equal this server's issuer exactly.
+ */
+export function appendAuthorizationResponseIss(
+  redirectTo: string,
+  issuer: string,
+): string {
+  const hashIndex = redirectTo.indexOf("#");
+  if (hashIndex === -1) {
+    const url = new URL(redirectTo);
+    url.searchParams.set("iss", issuer);
+    return url.href;
+  }
+
+  const beforeHash = redirectTo.slice(0, hashIndex);
+  const fragment = redirectTo.slice(hashIndex + 1);
+  const params = new URLSearchParams(fragment);
+  params.set("iss", issuer);
+  // URLSearchParams encodes spaces as `+`; OAuth fragments typically use `%20`.
+  // Our issuer/code/state values don't contain spaces, so this is fine.
+  return `${beforeHash}#${params.toString()}`;
+}
+
+/**
+ * Redirects an OAuth authorization error to a validated client redirect URI
+ * per RFC 6749 §4.1.2.1. Includes RFC 9207 `iss` when known.
+ */
+export function createAuthorizationErrorRedirect(
   redirectUri: string,
-  state?: string,
+  code: string,
+  description: string,
+  state: string | undefined,
+  issuer: string | undefined,
 ): Response {
   const redirectUrl = new URL(redirectUri);
 
-  redirectUrl.searchParams.set("error", "invalid_target");
-  redirectUrl.searchParams.set(
-    "error_description",
-    "The resource parameter does not match this authorization server",
-  );
+  redirectUrl.searchParams.set("error", code);
+  redirectUrl.searchParams.set("error_description", description);
 
   if (state) {
     redirectUrl.searchParams.set("state", state);
+  }
+
+  if (issuer) {
+    redirectUrl.searchParams.set("iss", issuer);
   }
 
   return new Response(null, {
@@ -734,4 +790,22 @@ export function createResourceValidationError(
       Location: redirectUrl.href,
     },
   });
+}
+
+/**
+ * Creates RFC 8707 error response for invalid resource parameter.
+ * Includes RFC 9207 `iss` so clients can mix-up-protect error responses too.
+ */
+export function createResourceValidationError(
+  redirectUri: string,
+  state: string | undefined,
+  requestUrl: string,
+): Response {
+  return createAuthorizationErrorRedirect(
+    redirectUri,
+    "invalid_target",
+    "The resource parameter does not match this authorization server",
+    state,
+    getAuthorizationServerIssuer(requestUrl),
+  );
 }

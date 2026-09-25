@@ -170,7 +170,7 @@ describe("parseSentryUrl", () => {
           "organizationSlug": "my-org",
           "profileId": "cfe78a5c892d4a64a962d837673398d2",
           "profilerId": undefined,
-          "projectSlug": "my-project",
+          "projectSlugOrId": "my-project",
           "start": undefined,
           "type": "profile",
         }
@@ -188,7 +188,7 @@ describe("parseSentryUrl", () => {
           "organizationSlug": "my-org",
           "profileId": undefined,
           "profilerId": "abc123",
-          "projectSlug": "seer",
+          "projectSlugOrId": "seer",
           "start": undefined,
           "type": "profile",
         }
@@ -206,7 +206,7 @@ describe("parseSentryUrl", () => {
           "organizationSlug": "my-org",
           "profileId": undefined,
           "profilerId": "xyz789",
-          "projectSlug": "backend",
+          "projectSlugOrId": "backend",
           "start": "2024-01-01",
           "type": "profile",
         }
@@ -224,11 +224,74 @@ describe("parseSentryUrl", () => {
           "organizationSlug": "my-org",
           "profileId": "cfe78a5c892d4a64a962d837673398d2",
           "profilerId": undefined,
-          "projectSlug": "my-project",
+          "projectSlugOrId": "my-project",
           "start": undefined,
           "type": "profile",
         }
       `);
+    });
+  });
+
+  describe("AI conversation URLs", () => {
+    it("parses AI conversation URL with subdomain", () => {
+      expect(
+        parseSentryUrl(
+          "https://my-org.sentry.io/explore/conversations/conv-123/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "conversationId": "conv-123",
+          "end": undefined,
+          "organizationSlug": "my-org",
+          "projectSlugOrId": undefined,
+          "spanId": undefined,
+          "start": undefined,
+          "type": "ai_conversation",
+        }
+      `);
+    });
+
+    it("parses AI conversation URL with organizations path", () => {
+      expect(
+        parseSentryUrl(
+          "https://sentry.io/organizations/my-org/explore/conversations/conv-123/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "conversationId": "conv-123",
+          "end": undefined,
+          "organizationSlug": "my-org",
+          "projectSlugOrId": undefined,
+          "spanId": undefined,
+          "start": undefined,
+          "type": "ai_conversation",
+        }
+      `);
+    });
+
+    it("parses AI conversation URL with query params", () => {
+      expect(
+        parseSentryUrl(
+          "https://sentry.sentry.io/explore/conversations/slack%3AC07P2KGJGG0%3A1779498759.814569/?start=2026-05-23T00:23:27.667Z&end=2026-05-23T02:34:56.137Z&project=4510944073809921&spanId=459a11ae308afc7b",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "conversationId": "slack:C07P2KGJGG0:1779498759.814569",
+          "end": "2026-05-23T02:34:56.137Z",
+          "organizationSlug": "sentry",
+          "projectSlugOrId": "4510944073809921",
+          "spanId": "459a11ae308afc7b",
+          "start": "2026-05-23T00:23:27.667Z",
+          "type": "ai_conversation",
+        }
+      `);
+    });
+
+    it("does not parse unrelated conversations path segments", () => {
+      const result = parseSentryUrl(
+        "https://sentry.io/organizations/my-org/settings/projects/conversations/keys/",
+      );
+      expect(result.type).toBe("unknown");
     });
   });
 
@@ -313,7 +376,7 @@ describe("parseSentryUrl", () => {
         {
           "monitorSlug": "my-monitor",
           "organizationSlug": "my-org",
-          "projectSlug": "my-project",
+          "projectSlugOrId": "my-project",
           "type": "monitor",
         }
       `);
@@ -395,6 +458,86 @@ describe("parseSentryUrl", () => {
     it("does not parse releases redirect URLs", () => {
       const result = parseSentryUrl(
         "https://my-org.sentry.io/releases/new-events/",
+      );
+      expect(result.type).toBe("unknown");
+    });
+  });
+
+  describe("snapshot URLs", () => {
+    it("parses snapshot URL with subdomain", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/preprod/snapshots/231949/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "selectedSnapshot": undefined,
+          "snapshotId": "231949",
+          "type": "snapshot",
+        }
+      `);
+    });
+
+    it("parses snapshot URL with selectedSnapshot query param", () => {
+      expect(
+        parseSentryUrl(
+          "https://my-org.sentry.io/preprod/snapshots/231949/?selectedSnapshot=login_screen.png",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "selectedSnapshot": "login_screen.png",
+          "snapshotId": "231949",
+          "type": "snapshot",
+        }
+      `);
+    });
+
+    it("parses snapshot URL with encoded selectedSnapshot", () => {
+      expect(
+        parseSentryUrl(
+          "https://my-org.sentry.io/preprod/snapshots/241539/?selectedSnapshot=static%2Fapp%2Fcomponents%2Fcore%2Falert.png",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "selectedSnapshot": "static/app/components/core/alert.png",
+          "snapshotId": "241539",
+          "type": "snapshot",
+        }
+      `);
+    });
+
+    it("parses snapshot URL with organizations path", () => {
+      expect(
+        parseSentryUrl(
+          "https://sentry.io/organizations/my-org/preprod/snapshots/12345/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "selectedSnapshot": undefined,
+          "snapshotId": "12345",
+          "type": "snapshot",
+        }
+      `);
+    });
+
+    it("parses snapshot URL without trailing slash", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/preprod/snapshots/99999"),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "selectedSnapshot": undefined,
+          "snapshotId": "99999",
+          "type": "snapshot",
+        }
+      `);
+    });
+
+    it("returns unknown for /preprod/ without snapshots path", () => {
+      const result = parseSentryUrl(
+        "https://my-org.sentry.io/preprod/something-else/",
       );
       expect(result.type).toBe("unknown");
     });

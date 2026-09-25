@@ -1,7 +1,12 @@
-import { tool, APICallError } from "ai";
+import { getActiveSpan } from "@sentry/core";
+import { APICallError, RetryError, tool } from "ai";
 import { z } from "zod";
-import { UserInputError, LLMProviderError } from "../../../errors";
 import { ApiClientError, ApiServerError } from "../../../api-client";
+import {
+  AgentExecutionError,
+  LLMProviderError,
+  UserInputError,
+} from "../../../errors";
 import { logIssue, logWarn } from "../../../telem/logging";
 
 /**
@@ -20,6 +25,29 @@ export type AgentToolResponse<T = unknown> = {
   error?: string;
   result?: T;
 };
+
+export function recordAgentToolResultCount(count: number | undefined) {
+  if (typeof count !== "number" || !Number.isFinite(count)) {
+    return;
+  }
+
+  try {
+    getActiveSpan()?.setAttribute("gen_ai.tool.call.result.count", count);
+  } catch {}
+}
+
+function recordExtractedAgentToolResultCount<TResult>(
+  result: TResult,
+  getResultCount?: (result: TResult) => number | undefined,
+) {
+  if (!getResultCount) {
+    return;
+  }
+
+  try {
+    recordAgentToolResultCount(getResultCount(result));
+  } catch {}
+}
 
 /**
  * Handles errors from agent tool execution and returns appropriate error messages.
@@ -58,30 +86,36 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
     };
   }
 
-  // Handle AI SDK APICallError that wasn't converted to LLMProviderError
-  // This is a defensive layer - ideally callEmbeddedAgent converts these
-  if (APICallError.isInstance(error)) {
-    const statusCode = error.statusCode;
-    // 4xx errors are user-facing (account issues, rate limits, invalid keys)
-    if (statusCode && statusCode >= 400 && statusCode < 500) {
-      logWarn(error, {
-        loggerScope: ["agent-tools", "api-call"],
-        contexts: {
-          agentTool: {
-            errorType: "APICallError",
-            statusCode,
-          },
-        },
-      });
-      return {
-        error: `AI Provider Error: ${error.message}. This may be a configuration or account issue.`,
-      };
-    }
-    // 5xx errors - log to Sentry
-    const eventId = logIssue(error);
-    const eventIdPart = eventId ? ` Event ID: ${eventId}.` : "";
+  if (error instanceof AgentExecutionError) {
+    // Issue already filed at the embedded-agent boundary. Return a structured
+    // error so the parent agent/tool can continue without a second Sentry issue.
+    const eventIdPart = error.eventId ? ` Event ID: ${error.eventId}.` : "";
     return {
-      error: `AI Provider Error: An unexpected error occurred with the AI provider.${eventIdPart} This is a system error that cannot be resolved by retrying.`,
+      error: `AI Processing Error: the embedded agent failed unexpectedly.${eventIdPart} This is a system error that cannot be resolved by retrying the same agent step.`,
+    };
+  }
+
+  // Handle AI SDK APICallError / RetryError that weren't converted to
+  // LLMProviderError. Defensive layer: all provider API failures are
+  // availability issues and must not create per-request Sentry issues during
+  // an outage. RetryError is what the AI SDK throws after exhausting retries.
+  if (APICallError.isInstance(error) || RetryError.isInstance(error)) {
+    const statusCode = APICallError.isInstance(error)
+      ? error.statusCode
+      : undefined;
+    logWarn(error, {
+      loggerScope: ["agent-tools", "api-call"],
+      contexts: {
+        agentTool: {
+          errorType: APICallError.isInstance(error)
+            ? "APICallError"
+            : "RetryError",
+          statusCode: statusCode ?? null,
+        },
+      },
+    });
+    return {
+      error: `AI Provider Error: ${error.message}. This is a service availability issue with the upstream AI provider. Other non-AI tools should still work.`,
     };
   }
 
@@ -149,6 +183,7 @@ export function agentTool<TParameters, TResult>(config: {
   description: string;
   parameters: z.ZodSchema<TParameters>;
   execute: (params: TParameters) => Promise<TResult>;
+  getResultCount?: (result: TResult) => number | undefined;
 }) {
   // Infer the result type from the execute function's return type
   type InferredResult = Awaited<ReturnType<typeof config.execute>>;
@@ -161,6 +196,7 @@ export function agentTool<TParameters, TResult>(config: {
     ): Promise<AgentToolResponse<InferredResult>> => {
       try {
         const result = await config.execute(input);
+        recordExtractedAgentToolResultCount(result, config.getResultCount);
         return { result };
       } catch (error) {
         return handleAgentToolError<InferredResult>(error);

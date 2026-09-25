@@ -15,10 +15,12 @@ export type SentryResourceType =
   | "issue"
   | "trace"
   | "profile"
+  | "ai_conversation"
   | "event"
   | "replay"
   | "monitor"
   | "release"
+  | "snapshot"
   | "unknown";
 
 /**
@@ -34,12 +36,14 @@ export interface ParsedSentryUrl {
   issueId?: string;
   /** Trace ID (for trace URLs) */
   traceId?: string;
+  /** AI conversation ID (for Explore conversation URLs) */
+  conversationId?: string;
   /** Span ID (for trace URLs with span focus, from query param) */
   spanId?: string;
   /** Event ID (for event URLs) */
   eventId?: string;
-  /** Project slug (for profile, monitor URLs) */
-  projectSlug?: string;
+  /** Project slug or numeric ID (for profile, monitor, and AI conversation URLs) */
+  projectSlugOrId?: string;
   /** Transaction profile ID from profile flamegraph URLs */
   profileId?: string;
   /** Profiler ID (for profile URLs, from query param) */
@@ -56,6 +60,10 @@ export interface ParsedSentryUrl {
   releaseVersion?: string;
   /** Transaction name (from query param in performance URLs) */
   transaction?: string;
+  /** Snapshot ID (for preprod snapshot URLs) */
+  snapshotId?: string;
+  /** Selected snapshot image name (from ?selectedSnapshot= query param) */
+  selectedSnapshot?: string;
 }
 
 /**
@@ -67,6 +75,7 @@ export interface ParsedSentryUrl {
  * - Trace: `/explore/traces/trace/{traceId}` or `/performance/trace/{traceId}`
  * - Profile: `/explore/profiling/profile/{project}/{profileId}/flamegraph/`
  * - Continuous profile: `/explore/profiling/profile/{project}/flamegraph/` with query params
+ * - AI conversation: `/explore/conversations/{conversationId}/`
  * - Replay: `/explore/replays/{replayId}/` or `/replays/{replayId}/`
  * - Monitor: `/crons/{monitorSlug}/` or `/monitors/{monitorSlug}/`
  * - Release: `/releases/{version}/`
@@ -158,6 +167,7 @@ function extractOrganizationSlug(parsedUrl: URL, pathParts: string[]): string {
     "dashboards",
     "discover",
     "insights",
+    "preprod",
   ];
   if (
     pathParts.length > 1 &&
@@ -181,6 +191,28 @@ function extractOrganizationSlug(parsedUrl: URL, pathParts: string[]): string {
   throw new UserInputError(
     "Invalid Sentry URL. Could not determine organization from URL.",
   );
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractPathGroup(
+  pathParts: string[],
+  patterns: RegExp[],
+  groupName: string,
+): string | undefined {
+  const path = pathParts.join("/");
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(path);
+    const value = match?.groups?.[groupName];
+    if (value) {
+      return value;
+    }
+  }
+
+  return undefined;
 }
 
 /**
@@ -208,9 +240,38 @@ function identifyResource(
     return {
       type: "profile",
       organizationSlug,
-      projectSlug,
+      projectSlugOrId: projectSlug,
       profileId,
       profilerId,
+      start,
+      end,
+    };
+  }
+
+  // AI conversation URL: /explore/conversations/{conversationId}/
+  const conversationId = extractPathGroup(
+    pathParts,
+    [
+      /^explore\/conversations\/(?<conversationId>[^/]+)$/,
+      /^organizations\/[^/]+\/explore\/conversations\/(?<conversationId>[^/]+)$/,
+      new RegExp(
+        `^${escapeRegex(organizationSlug)}\\/explore\\/conversations\\/(?<conversationId>[^/]+)$`,
+      ),
+    ],
+    "conversationId",
+  );
+  if (conversationId) {
+    const project = parsedUrl.searchParams.get("project") || undefined;
+    const spanId = parsedUrl.searchParams.get("spanId") || undefined;
+    const start = parsedUrl.searchParams.get("start") || undefined;
+    const end = parsedUrl.searchParams.get("end") || undefined;
+
+    return {
+      type: "ai_conversation",
+      organizationSlug,
+      conversationId: decodeURIComponent(conversationId),
+      projectSlugOrId: project,
+      spanId,
       start,
       end,
     };
@@ -245,7 +306,7 @@ function identifyResource(
         return {
           type: "monitor",
           organizationSlug,
-          projectSlug: nextPart,
+          projectSlugOrId: nextPart,
           monitorSlug: afterNext,
         };
       }
@@ -333,6 +394,22 @@ function identifyResource(
         type: "issue",
         organizationSlug,
         issueId,
+      };
+    }
+  }
+
+  // Snapshot URL: /preprod/snapshots/{snapshotId}/
+  const preprodIndex = pathParts.indexOf("preprod");
+  if (preprodIndex !== -1 && pathParts[preprodIndex + 1] === "snapshots") {
+    const snapshotId = pathParts[preprodIndex + 2];
+    if (snapshotId) {
+      const selectedSnapshot =
+        parsedUrl.searchParams.get("selectedSnapshot") || undefined;
+      return {
+        type: "snapshot",
+        organizationSlug,
+        snapshotId,
+        selectedSnapshot,
       };
     }
   }

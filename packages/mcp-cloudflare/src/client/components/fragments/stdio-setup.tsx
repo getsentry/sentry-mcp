@@ -1,12 +1,14 @@
-import CodeSnippet from "../ui/code-snippet";
 import skillDefinitions from "@sentry/mcp-core/skillDefinitions";
 import { NPM_PACKAGE_NAME, SCOPES } from "../../../constants";
-import { Prose } from "../ui/prose";
 import { Link } from "../ui/base";
+import CodeSnippet from "../ui/code-snippet";
+import { Prose } from "../ui/prose";
 import InstallTabs, { Tab } from "./install-tabs";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
-const orderedSkills = [...skillDefinitions].sort((a, b) => a.order - b.order);
+const orderedSkills = [...skillDefinitions]
+  .filter((skill) => !skill.deprecated)
+  .sort((a, b) => a.order - b.order);
 
 export default function StdioSetup() {
   const mcpStdioSnippet = `npx ${NPM_PACKAGE_NAME}@latest`;
@@ -178,16 +180,16 @@ export default function StdioSetup() {
   );
 }
 
+import { AmpInstructions } from "./instructions/amp";
 // Import IDE instruction components
 import { ClaudeCodeInstructions } from "./instructions/claude-code";
-import { CursorInstructions } from "./instructions/cursor";
-import { VSCodeInstructions } from "./instructions/vscode";
 import { CodexCLIInstructions } from "./instructions/codex-cli";
-import { AmpInstructions } from "./instructions/amp";
+import { CursorInstructions } from "./instructions/cursor";
+import { FxInstructions } from "./instructions/fx";
 import { GeminiInstructions } from "./instructions/gemini";
 import { OpenCodeInstructions } from "./instructions/opencode";
+import { VSCodeInstructions } from "./instructions/vscode";
 import { WarpInstructions } from "./instructions/warp";
-import { WindsurfInstructions } from "./instructions/windsurf";
 import { ZedInstructions } from "./instructions/zed";
 
 interface StdioSetupTabsProps {
@@ -201,24 +203,25 @@ export function StdioSetupTabs({
 }: StdioSetupTabsProps) {
   return (
     <InstallTabs selectedTab={selectedIde} onTabChange={onIdeChange}>
+      {/* Keep the primary IDEs first, then alphabetize within each group. */}
       <Tab id="claude-code" title="Claude Code">
         <ClaudeCodeInstructions transport="stdio" />
-      </Tab>
-
-      <Tab id="cursor" title="Cursor">
-        <CursorInstructions transport="stdio" />
-      </Tab>
-
-      <Tab id="vscode" title="VSCode">
-        <VSCodeInstructions transport="stdio" />
       </Tab>
 
       <Tab id="codex-cli" title="Codex">
         <CodexCLIInstructions transport="stdio" />
       </Tab>
 
+      <Tab id="cursor" title="Cursor">
+        <CursorInstructions transport="stdio" />
+      </Tab>
+
       <Tab id="amp" title="Amp">
         <AmpInstructions transport="stdio" />
+      </Tab>
+
+      <Tab id="fx" title="fx">
+        <FxInstructions transport="stdio" />
       </Tab>
 
       <Tab id="gemini" title="Gemini CLI">
@@ -229,12 +232,12 @@ export function StdioSetupTabs({
         <OpenCodeInstructions transport="stdio" />
       </Tab>
 
-      <Tab id="warp" title="Warp">
-        <WarpInstructions transport="stdio" />
+      <Tab id="vscode" title="VSCode">
+        <VSCodeInstructions transport="stdio" />
       </Tab>
 
-      <Tab id="windsurf" title="Windsurf">
-        <WindsurfInstructions transport="stdio" />
+      <Tab id="warp" title="Warp">
+        <WarpInstructions transport="stdio" />
       </Tab>
 
       <Tab id="zed" title="Zed">

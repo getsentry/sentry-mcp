@@ -6,7 +6,7 @@ import { isSentryHost } from "@sentry/mcp-core/utils/url-utils";
  * No client secret — device code grant is a public client flow.
  * The Cloudflare transport uses a separate OAuth app with a secret.
  * Override via SENTRY_CLIENT_ID environment variable.
- * See docs/stdio-auth.md for the full credential architecture.
+ * See docs/operations/stdio-auth.md for the full credential architecture.
  */
 export const DEFAULT_SENTRY_CLIENT_ID =
   "0acbeba7d07d58076dd7dbde8cea2fed8ab525ce3713bda604988009ab35d765";

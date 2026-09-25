@@ -73,14 +73,23 @@ describe("cli/finalize", () => {
     expect(cfg.agentProvider).toBe("azure-openai");
   });
 
+  it("accepts openrouter as a valid explicit provider", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      agentProvider: "openrouter",
+      unknownArgs: [],
+    });
+    expect(cfg.agentProvider).toBe("openrouter");
+  });
+
   it("rejects invalid explicit provider values", () => {
     expect(() =>
       finalize({
         accessToken: "tok",
-        agentProvider: "openrouter",
+        agentProvider: "bad-provider",
         unknownArgs: [],
       }),
-    ).toThrow(/Must be "openai", "azure-openai", or "anthropic"/);
+    ).toThrow(/Must be "openai", "azure-openai", "anthropic", or "openrouter"/);
   });
 
   it("throws on non-https URL", () => {
@@ -114,16 +123,19 @@ describe("cli/finalize", () => {
     ).toThrow(/cannot be used with --url or SENTRY_URL/);
   });
 
-  it("throws when --insecure-http targets sentry.io", () => {
-    expect(() =>
-      finalize({
-        accessToken: "tok",
-        host: "sentry.io",
-        insecureHttp: true,
-        unknownArgs: [],
-      }),
-    ).toThrow(/only supported for self-hosted Sentry hosts/);
-  });
+  it.each(["sentry.io", "example.my.sentry.io"])(
+    "throws when --insecure-http targets %s",
+    (host) => {
+      expect(() =>
+        finalize({
+          accessToken: "tok",
+          host,
+          insecureHttp: true,
+          unknownArgs: [],
+        }),
+      ).toThrow(/only supported for self-hosted Sentry hosts/);
+    },
+  );
 
   // Skills tests
   it("throws on invalid skills", () => {
@@ -159,6 +171,25 @@ describe("cli/finalize", () => {
     expect(cfg.finalSkills.has("docs")).toBe(false);
   });
 
+  it("allows explicit legacy docs skill grants", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      skills: "docs",
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills).toEqual(new Set(["docs"]));
+  });
+
+  it("throws on legacy preprod skill in stdio", () => {
+    expect(() =>
+      finalize({
+        accessToken: "tok",
+        skills: "preprod",
+        unknownArgs: [],
+      }),
+    ).toThrow(/Invalid skills provided: preprod/);
+  });
+
   it("throws on empty skills after validation", () => {
     expect(() =>
       finalize({
@@ -169,32 +200,125 @@ describe("cli/finalize", () => {
     ).toThrow(/Invalid skills provided/);
   });
 
-  it("grants all skills when no skills specified", () => {
+  it("grants all active skills when no skills specified", () => {
     const cfg = finalize({
       accessToken: "tok",
       unknownArgs: [],
     });
-    expect(cfg.finalSkills.size).toBe(5); // All skills: inspect, triage, project-management, seer, docs
+    expect(cfg.finalSkills.size).toBe(4);
     expect(cfg.finalSkills.has("inspect")).toBe(true);
     expect(cfg.finalSkills.has("triage")).toBe(true);
     expect(cfg.finalSkills.has("project-management")).toBe(true);
     expect(cfg.finalSkills.has("seer")).toBe(true);
-    expect(cfg.finalSkills.has("docs")).toBe(true);
+    expect(cfg.finalSkills.has("docs")).toBe(false);
+    expect(cfg.finalSkills.has("preprod")).toBe(false);
+  });
+
+  it("grants all active skills with --all-skills", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      allSkills: true,
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills.size).toBe(4);
+    expect(cfg.finalSkills.has("inspect")).toBe(true);
+    expect(cfg.finalSkills.has("triage")).toBe(true);
+    expect(cfg.finalSkills.has("project-management")).toBe(true);
+    expect(cfg.finalSkills.has("seer")).toBe(true);
+    expect(cfg.finalSkills.has("docs")).toBe(false);
+    expect(cfg.finalSkills.has("preprod")).toBe(false);
+  });
+
+  // Self-hosted defaults
+  it("keeps seer in the default set for regional sentry.io hosts", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      host: "us.sentry.io",
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills.has("seer")).toBe(true);
+  });
+
+  it("excludes seer from the default set on self-hosted hosts", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      host: "sentry.example.com",
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills.has("seer")).toBe(false);
+    expect(cfg.finalSkills.has("inspect")).toBe(true);
+    expect(cfg.finalSkills.has("triage")).toBe(true);
+    expect(cfg.finalSkills.has("project-management")).toBe(true);
+    expect(cfg.finalSkills.size).toBe(3);
+  });
+
+  it("excludes seer from the default set when self-hosted host comes from --url", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      url: "https://sentry.example.com",
+      unknownArgs: [],
+    });
+    expect(cfg.sentryHost).toBe("sentry.example.com");
+    expect(cfg.finalSkills.has("seer")).toBe(false);
+  });
+
+  it("grants seer on self-hosted hosts when requested with --skills", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      host: "sentry.example.com",
+      skills: "inspect,seer",
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills).toEqual(new Set(["inspect", "seer"]));
+  });
+
+  it("grants seer on self-hosted hosts with --all-skills", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      host: "sentry.example.com",
+      allSkills: true,
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills.has("seer")).toBe(true);
+    expect(cfg.finalSkills.size).toBe(4);
+  });
+
+  it("does not fail when --disable-skills=seer is used on a self-hosted host", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      host: "sentry.example.com",
+      disableSkills: "seer",
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills.has("seer")).toBe(false);
+    expect(cfg.finalSkills.size).toBe(3);
+  });
+
+  it("rejects combining --all-skills with --skills", () => {
+    expect(() =>
+      finalize({
+        accessToken: "tok",
+        allSkills: true,
+        skills: "inspect",
+        unknownArgs: [],
+      }),
+    ).toThrow(/--all-skills cannot be combined with --skills/);
   });
 
   // --disable-skills tests
-  it("removes disabled skills from default all-skills set", () => {
+  it("removes disabled skills from default active-skills set", () => {
     const cfg = finalize({
       accessToken: "tok",
       disableSkills: "seer",
       unknownArgs: [],
     });
     expect(cfg.finalSkills.has("seer")).toBe(false);
-    expect(cfg.finalSkills.size).toBe(4);
+    expect(cfg.finalSkills.size).toBe(3);
     expect(cfg.finalSkills.has("inspect")).toBe(true);
     expect(cfg.finalSkills.has("triage")).toBe(true);
     expect(cfg.finalSkills.has("project-management")).toBe(true);
-    expect(cfg.finalSkills.has("docs")).toBe(true);
+    expect(cfg.finalSkills.has("docs")).toBe(false);
+    expect(cfg.finalSkills.has("preprod")).toBe(false);
   });
 
   it("removes disabled skills when combined with --skills", () => {

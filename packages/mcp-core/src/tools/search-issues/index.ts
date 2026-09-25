@@ -1,5 +1,2 @@
-// Export the search-issues handler
-export { default } from "./handler";
-
-// Export the agent for testing
-export { searchIssuesAgent } from "./agent";
+export { default } from "../catalog/search-issues";
+export { searchIssuesAgent } from "../support/search-issues/agent";

@@ -46,6 +46,12 @@ export type ServerContext = {
   sentryProtocol?: SentryProtocol;
   mcpUrl?: string;
   accessToken: string;
+  /** DCR-registered client name (freeform, as provided during Dynamic Client Registration) */
+  clientName?: string | null;
+  /** Bucketed client family (e.g. "claude-code", "cursor") resolved from User-Agent */
+  clientFamily?: string | null;
+  /** Sanitized MCP request attribution source forwarded to Sentry API requests */
+  utmSource?: string | null;
   openaiBaseUrl?: string;
   userId?: string | null;
   userIpAddress?: string | null;
@@ -54,10 +60,12 @@ export type ServerContext = {
   grantedSkills?: Set<Skill> | ReadonlySet<Skill>;
   // URL-based session constraints
   constraints: Constraints;
-  /** Whether agent mode is enabled (only use_sentry tool exposed) */
-  agentMode?: boolean;
   /** Whether experimental tools are enabled */
   experimentalMode?: boolean;
+  /** Tool names available after mode, skill, constraint, and capability filters */
+  availableToolNames?: ReadonlySet<string>;
+  /** Tool names registered directly in the current MCP tools/list surface */
+  directToolNames?: ReadonlySet<string>;
   /** Transport type - affects error message formatting */
   transport?: TransportType;
   /**

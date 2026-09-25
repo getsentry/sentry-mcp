@@ -86,6 +86,7 @@ sequenceDiagram
 | **MCP Refresh Token** | MCP OAuth Provider | MCP Clients | Grant reference | Refresh MCP access tokens |
 | **Sentry Access Token** | Sentry OAuth | MCP Server | User credentials | Call Sentry API |
 | **Sentry Refresh Token** | Sentry OAuth | MCP OAuth Provider | Refresh credentials | Refresh Sentry tokens |
+| **Explicit Sentry API Token** | External client or provider | MCP Server | Opaque Sentry API token | Direct remote auth with `Sentry-Bearer` |
 
 ### Not a Simple Proxy
 
@@ -104,7 +105,7 @@ The MCP OAuth Provider is built with `@cloudflare/workers-oauth-provider` and pr
 1. **Dynamic client registration** - MCP clients can register on-demand
 2. **PKCE support** - Secure authorization code flow
 3. **Token management** - Issues and validates MCP tokens
-4. **Consent UI** - Custom approval screen for permissions
+4. **Consent UI** - Custom approval screen for permissions. Cancel redirects the MCP client to its registered `redirect_uri` with `error=access_denied` (RFC 6749 §4.1.2.1).
 5. **Token encryption** - Stores Sentry tokens encrypted in MCP token props
 
 ### Sentry OAuth Integration
@@ -166,9 +167,49 @@ const oAuthProvider = new OAuthProvider({
   authorizeEndpoint: "/oauth/authorize",
   tokenEndpoint: "/oauth/token", 
   clientRegistrationEndpoint: "/oauth/register",
+  clientIdMetadataDocumentEnabled: true,
+  clientIdMetadataDocuments: CLIENT_ID_METADATA_DOCUMENTS,
   scopesSupported: Object.keys(SCOPES),
 });
 ```
+
+#### Operator-managed client metadata
+
+URL-based clients normally use Client ID Metadata Documents (CIMD). The provider
+fetches and validates the document during authorization, code exchange, and
+refresh. A failed fetch can block these operations; requests using an existing
+valid MCP access token do not need that lookup.
+
+The exact Codex client ID, `https://chatgpt.com/oauth/codex/client.json`, is
+registered in
+[`client-metadata.ts`](../../packages/mcp-cloudflare/src/server/oauth/client-metadata.ts)
+using its official metadata. This registration takes precedence over remote
+fetches and their cache, so an upstream `403` cannot block this client's OAuth
+flow. Other URL-based clients still use CIMD, and dynamic client registration
+is unchanged. Query-string variants of the Codex client ID are distinct clients
+and are not covered by this registration.
+
+The provider's existing metadata and client ID validation still applies. The
+registration allows only the official loopback callback URIs (with the existing
+native-client port matching), requires S256 PKCE, and does not skip user consent
+or Sentry authentication.
+
+MCP maintainers own this registration. Changes to the official document,
+including removal of a redirect URI or retirement of the client, must be reviewed
+and reflected here; they are not adopted automatically. To resume remote lookup,
+remove the entry after verifying fetches from a deployed Worker. Do not populate
+registrations from incoming requests or use a failed fetch to restore previously
+removed metadata.
+
+The `clientIdMetadataDocuments` option is provided by the version-specific pnpm
+patch in [`patches/`](../../patches/@cloudflare__workers-oauth-provider@0.10.3.patch), because provider 0.10.3 has no supported
+registration override while CIMD is enabled. It resolves registrations in the
+provider's common client lookup, covering authorization helpers and the token
+endpoint. When upgrading the provider, port the patch or adopt an equivalent
+upstream option, and run
+`pnpm --filter @sentry/mcp-cloudflare exec vitest run src/server/oauth/client-metadata.integration.test.ts`.
+The regression exercises the production provider with blocked metadata, token
+exchange and refresh, and checks that OAuth validation remains enforced.
 
 ### 2. API Handler
 
@@ -190,7 +231,9 @@ interface WorkerProps {
   id: string;                    // Sentry user ID
   accessToken: string;            // Sentry access token
   refreshToken?: string;          // Sentry refresh token
-  accessTokenExpiresAt?: number;  // Sentry token expiry timestamp
+  accessTokenExpiresAt?: number;  // Cached validity deadline; extended after probes
+  sessionStartedAt?: number;      // MCP grant creation timestamp
+  upstreamExpiresAt?: number;     // Original Sentry expiry timestamp
   clientId: string;               // MCP client ID
   scope: string;                  // MCP permissions granted
   grantedSkills?: string[];       // Skills granted (primary authorization)
@@ -241,6 +284,8 @@ const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
     accessToken: payload.access_token,       // Sentry's access token
     refreshToken: payload.refresh_token,     // Sentry's refresh token
     accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
+    sessionStartedAt: Date.now(),
+    upstreamExpiresAt: Date.now() + payload.expires_in * 1000,
     clientId: oauthReqInfo.clientId,         // MCP client ID
     scope: oauthReqInfo.scope.join(" "),     // MCP scopes
     grantedSkills: Array.from(validSkills),  // Skills granted (primary authorization)
@@ -366,6 +411,29 @@ When a constrained OAuth request includes `resource=/mcp/{org}` or
 user as a "Session scope" banner before permissions are granted.
 
 Note: These describe the MCP OAuth server, not Sentry's OAuth endpoints.
+
+## Direct Sentry-Bearer Mode
+
+Cloudflare `/mcp` also supports an explicit upstream Sentry API token:
+
+```http
+Authorization: Sentry-Bearer <sentry_api_token>
+```
+
+This is not part of the dual OAuth flow. The worker handles the request before
+the MCP OAuth provider, builds `ServerContext` with the provided token, and uses
+the same Sentry API client calls as OAuth-backed sessions.
+
+Direct mode intentionally does not:
+
+- validate the token before initializing the MCP server
+- store the token in KV
+- mint or refresh MCP OAuth tokens
+- refresh upstream Sentry tokens
+- revoke MCP grants when Sentry rejects the upstream token
+
+The caller owns token lifetime and refresh. `Authorization: Bearer ...` remains
+reserved for MCP OAuth access tokens.
 
 ## Integration Between MCP OAuth and MCP Server
 

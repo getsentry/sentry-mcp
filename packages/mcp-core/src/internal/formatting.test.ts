@@ -1,21 +1,21 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { SentryApiService } from "../api-client";
+import type { AutofixRunState, Event, Issue } from "../api-client/types";
 import {
   formatEventOutput,
   formatFrameHeader,
   formatIssueOutput,
   getSeerActionabilityLabel,
 } from "./formatting";
-import type { SentryApiService } from "../api-client";
-import type { AutofixRunState, Event, Issue } from "../api-client/types";
 import {
   EventBuilder,
-  createFrame,
-  frameFactories,
-  createStackTrace,
   createExceptionValue,
-  createThread,
-  testEvents,
+  createFrame,
   createFrameWithContext,
+  createStackTrace,
+  createThread,
+  frameFactories,
+  testEvents,
 } from "./test-fixtures";
 
 // Helper functions to reduce duplication in event creation
@@ -99,6 +99,33 @@ describe("getSeerActionabilityLabel", () => {
 });
 
 describe("formatIssueOutput", () => {
+  it("uses the issue URL for commit references when shortId is unavailable", () => {
+    const output = formatIssueOutput({
+      organizationSlug: "sentry-mcp-evals",
+      issue: {
+        id: "123456",
+        shortId: "123456",
+        title: "Retry job failed",
+        count: "1",
+        userCount: 1,
+        status: "unresolved",
+        project: {
+          name: "cloudflare-mcp",
+          slug: "cloudflare-mcp",
+        },
+      } as Issue,
+      event: new EventBuilder("javascript").withId("event-1").build(),
+      apiService: {
+        getIssueUrl: () => "https://sentry.example/issues/123456",
+      } as unknown as SentryApiService,
+    });
+
+    expect(output).toContain(
+      "`Fixes https://sentry.example/issues/123456` automatically closes the issue",
+    );
+    expect(output).not.toContain("`Fixes 123456`");
+  });
+
   it("does not use Seer provenance tags as fallback summary text", () => {
     const output = formatIssueOutput({
       organizationSlug: "sentry-mcp-evals",
@@ -120,28 +147,25 @@ describe("formatIssueOutput", () => {
       autofixState: {
         autofix: {
           run_id: 42,
-          request: {},
-          status: "COMPLETED",
+          status: "completed",
           updated_at: "2025-04-09T22:39:50.778146",
-          steps: [
+          blocks: [
             {
-              type: "solution",
-              key: "solution_step_with_a_name_long_enough_to_match_summary_filter",
-              index: 0,
-              status: "COMPLETED",
-              title: "Proposed Solution",
-              output_stream: null,
-              progress: [],
-              description: "",
-              solution: [
+              artifacts: [
                 {
-                  code_snippet_and_analysis:
-                    "Use the canonical issue identifier before retrying the analysis request so the summary remains readable.",
-                  is_active: true,
-                  is_most_important_event: true,
-                  relevant_code_file: null,
-                  timeline_item_type: "internal_code",
-                  title: "Normalize the issue identifier",
+                  key: "solution",
+                  reason: "Solution plan completed",
+                  data: {
+                    one_line_summary:
+                      "Use the canonical issue identifier before retrying the analysis request so the summary remains readable.",
+                    steps: [
+                      {
+                        title: "Normalize the issue identifier",
+                        description:
+                          "Use the canonical issue identifier before retrying.",
+                      },
+                    ],
+                  },
                 },
               ],
             },
@@ -155,6 +179,52 @@ describe("formatIssueOutput", () => {
       "Use the canonical issue identifier before retrying the analysis request so the summary remains readable.",
     );
     expect(output).not.toContain("<seer_analysis");
+  });
+
+  it("does not show trace search tool calls when search_events is unavailable", () => {
+    const output = formatIssueOutput({
+      organizationSlug: "sentry-mcp-evals",
+      issue: {
+        shortId: "CLOUDFLARE-MCP-42",
+        title: "Retry job failed",
+        count: "1",
+        userCount: 1,
+        status: "unresolved",
+        project: {
+          name: "cloudflare-mcp",
+          slug: "cloudflare-mcp",
+        },
+      } as Issue,
+      event: new EventBuilder("javascript")
+        .withId("event-1")
+        .withContexts({
+          trace: {
+            trace_id: "3032af8bcdfe4423b937fc5c041d5d82",
+          },
+        })
+        .build(),
+      apiService: {
+        getIssueUrl: () => "https://sentry.example/issues/CLOUDFLARE-MCP-42",
+      } as unknown as SentryApiService,
+      experimentalMode: true,
+      availableToolNames: new Set([
+        "get_sentry_resource",
+        "get_issue_breadcrumbs",
+        "search_issue_events",
+      ]),
+      directToolNames: new Set(["get_sentry_resource", "search_issue_events"]),
+    });
+
+    expect(output).toContain(
+      "- Full distributed trace and span tree: Use the Sentry tool `get_sentry_resource`",
+    );
+    expect(output).toContain(
+      "- Related span search: Related span search is not available in this session",
+    );
+    expect(output).toContain(
+      "- Related log search: Related log search is not available in this session",
+    );
+    expect(output).not.toContain("search_events(");
   });
 });
 
@@ -1955,10 +2025,10 @@ describe("formatEventOutput", () => {
         ### Span Tree (Limited to 10 spans)
 
         \`\`\`
-        GET /users [parent12 · http.server · 250ms]
-           ├─ SELECT * FROM users WHERE id = 1 [span1 · db.query · 3ms] [N+1]
-           ├─ SELECT * FROM users WHERE id = 2 [span2 · db.query · 4ms] [N+1]
-           └─ SELECT * FROM users WHERE id = 3 [span3 · db.query · 8ms] [N+1]
+        GET /users [http.server · 250ms · parent123]
+           ├─ SELECT * FROM users WHERE id = 1 [db.query · 3ms · span1] [N+1]
+           ├─ SELECT * FROM users WHERE id = 2 [db.query · 4ms · span2] [N+1]
+           └─ SELECT * FROM users WHERE id = 3 [db.query · 8ms · span3] [N+1]
         \`\`\`
 
         "
@@ -2022,9 +2092,9 @@ describe("formatEventOutput", () => {
         ### Span Tree (Limited to 10 spans)
 
         \`\`\`
-        GET /durations [parentDu · http.server · 1250ms]
-           ├─ SELECT * FROM durations WHERE bucket = 'fast' [spanA · db.query · 1ms] [N+1]
-           └─ SELECT * FROM durations WHERE bucket = 'slow' [spanB · db.query · 1500ms] [N+1]
+        GET /durations [http.server · 1250ms · parentDur]
+           ├─ SELECT * FROM durations WHERE bucket = 'fast' [db.query · 1ms · spanA] [N+1]
+           └─ SELECT * FROM durations WHERE bucket = 'slow' [db.query · 1500ms · spanB] [N+1]
         \`\`\`
 
         "
@@ -2081,5 +2151,230 @@ describe("formatEventOutput", () => {
         "
       `);
     });
+  });
+});
+
+describe("formatEventOutput metric alert details", () => {
+  it("includes alert rule query context for metric_issue events", () => {
+    const event = {
+      id: "metric-event-1",
+      type: "generic",
+      title: "High error count",
+      message: null,
+      platform: "other",
+      dateCreated: "2026-06-01T00:00:00.000Z",
+      entries: [],
+      tags: [{ key: "level", value: "error" }],
+      occurrence: {
+        id: "occ-1",
+        projectId: 1,
+        eventId: "metric-event-1",
+        fingerprint: ["abc"],
+        issueTitle: "High error count",
+        subtitle: "Critical: Number of events in the last minute above 100",
+        type: 8001,
+        culprit: "",
+        evidenceData: {
+          value: 150,
+          alert_id: 42,
+          conditions: [{ type: "gt", comparison: 100 }],
+          data_sources: [
+            {
+              query_obj: {
+                snuba_query: {
+                  dataset: "events",
+                  query: "process_shard OR OutboxFlushError",
+                  aggregate: "count()",
+                  time_window: 60,
+                  environment: "production",
+                },
+              },
+            },
+          ],
+        },
+        evidenceDisplay: [],
+      },
+    } as Event;
+
+    const output = formatEventOutput(event);
+
+    expect(output).toMatchInlineSnapshot(`
+      "### Metric Alert Details
+
+      **Dataset**: events
+      **Aggregate**: count()
+      **Query**: \`process_shard OR OutboxFlushError\`
+      **Interval**: 60 second(s)
+      **Environment**: production
+
+      **Evaluated Value**: 150
+      **Threshold**: above 100
+      **Alert Rule ID**: 42
+
+      ### Tags
+
+      **level**: error
+
+      "
+    `);
+  });
+
+  it("keeps performance regression formatting for regression evidence", () => {
+    const event = {
+      id: "regression-event-1",
+      type: "generic",
+      title: "Endpoint Regression",
+      message: null,
+      platform: "python",
+      dateCreated: "2025-11-18T06:01:20.000Z",
+      entries: [],
+      occurrence: {
+        id: "occ-2",
+        projectId: 1,
+        eventId: "regression-event-1",
+        fingerprint: ["def"],
+        issueTitle: "Endpoint Regression",
+        type: 1018,
+        culprit: "POST /oauth/token",
+        evidenceData: {
+          change: "regression",
+          transaction: "POST /oauth/token",
+        },
+        evidenceDisplay: [
+          {
+            name: "Regression",
+            value:
+              "POST /oauth/token duration increased from 909.77ms to 1711.36ms (P95)",
+            important: true,
+          },
+        ],
+      },
+    } as Event;
+
+    const output = formatEventOutput(event);
+
+    expect(output).toContain("### Performance Regression Details");
+    expect(output).not.toContain("### Metric Alert Details");
+    expect(output).toContain("POST /oauth/token duration increased");
+  });
+
+  it("formats below-threshold conditions using workflow-engine type strings", () => {
+    const event = {
+      id: "metric-event-2",
+      type: "generic",
+      title: "Low throughput",
+      message: null,
+      platform: "other",
+      dateCreated: "2026-06-01T00:00:00.000Z",
+      entries: [],
+      occurrence: {
+        id: "occ-3",
+        projectId: 1,
+        eventId: "metric-event-2",
+        fingerprint: ["ghi"],
+        issueTitle: "Low throughput",
+        type: 8001,
+        culprit: "",
+        evidenceData: {
+          value: 5,
+          alert_id: 99,
+          conditions: [{ type: "lt", comparison: 10 }],
+          data_sources: [
+            {
+              query_obj: {
+                snuba_query: {
+                  dataset: "events",
+                  query: "",
+                  aggregate: "count()",
+                  time_window: 300,
+                },
+              },
+            },
+          ],
+        },
+      },
+    } as Event;
+
+    const output = formatEventOutput(event);
+
+    expect(output).toContain("**Threshold**: below 10");
+    expect(output).not.toContain("**Environment**:");
+  });
+
+  it("supports alert_id-only metric alert evidence without data_sources", () => {
+    const event = {
+      id: "metric-event-3",
+      type: "generic",
+      title: "Alert triggered",
+      message: null,
+      platform: "other",
+      dateCreated: "2026-06-01T00:00:00.000Z",
+      entries: [],
+      occurrence: {
+        id: "occ-4",
+        projectId: 1,
+        eventId: "metric-event-3",
+        fingerprint: ["jkl"],
+        issueTitle: "Alert triggered",
+        type: 8001,
+        culprit: "",
+        evidenceData: {
+          value: 42,
+          alert_id: 7,
+          conditions: [
+            { type: "gte", comparison: 40 },
+            { type: "lte", comparison: 50 },
+          ],
+        },
+      },
+    } as Event;
+
+    const output = formatEventOutput(event);
+
+    expect(output).toContain("**Evaluated Value**: 42");
+    expect(output).toContain("**Alert Rule ID**: 7");
+    expect(output).toContain("**Threshold**: at or above 40, at or below 50");
+    expect(output).not.toContain("**Dataset**:");
+  });
+
+  it("formats dynamic alert values without object placeholders", () => {
+    const event = {
+      id: "metric-event-4",
+      type: "generic",
+      title: "Dynamic throughput alert",
+      message: null,
+      platform: "other",
+      dateCreated: "2026-06-01T00:00:00.000Z",
+      entries: [],
+      occurrence: {
+        id: "occ-5",
+        projectId: 1,
+        eventId: "metric-event-4",
+        fingerprint: ["mno"],
+        issueTitle: "Dynamic throughput alert",
+        type: 8001,
+        culprit: "",
+        evidenceData: {
+          value: { value: 12.5, source_id: "123", timestamp: 1780272000 },
+          alert_id: 11,
+          conditions: [
+            {
+              type: "anomaly_detection",
+              comparison: {
+                sensitivity: "medium",
+                seasonality: "auto",
+                threshold_type: 0,
+              },
+            },
+          ],
+        },
+      },
+    } as Event;
+
+    const output = formatEventOutput(event);
+
+    expect(output).toContain("**Evaluated Value**: 12.5");
+    expect(output).not.toContain("[object Object]");
+    expect(output).not.toContain("**Threshold**:");
   });
 });

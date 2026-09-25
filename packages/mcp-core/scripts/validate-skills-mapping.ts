@@ -12,6 +12,11 @@
 import { SKILLS, getScopesForSkills, type Skill } from "../src/skills.js";
 import type { Scope } from "../src/permissions.js";
 import tools from "../src/tools/index.js";
+import {
+  isCatalogInfrastructureToolName,
+  isWrapperToolName,
+  WRAPPER_TOOL_NAMES,
+} from "../src/tools/surfaces.js";
 
 // Color codes for terminal output
 const colors = {
@@ -36,6 +41,12 @@ function getToolsForSkill(skill: Skill): string[] {
   const enabledTools: string[] = [];
 
   for (const [toolName, tool] of Object.entries(tools)) {
+    if (
+      isWrapperToolName(toolName) ||
+      isCatalogInfrastructureToolName(toolName)
+    ) {
+      continue;
+    }
     if (tool.skills.includes(skill)) {
       enabledTools.push(toolName);
     }
@@ -66,20 +77,20 @@ async function validateMapping(): Promise<ValidationResult[]> {
 
 /**
  * Check for tools that are not accessible by any skill
- * Excludes tools that are intentionally agent-mode only or foundational
+ * Excludes tools that are intentionally wrapper/infrastructure tools or foundational
  */
 function findOrphanedTools(): string[] {
-  // Tools that are intentionally not accessible via standard skills
-  const AGENT_MODE_ONLY_TOOLS = ["use_sentry"];
-
   // Foundational tools that are always available (no skill requirement)
   const FOUNDATIONAL_TOOLS = ["find_organizations", "find_projects", "whoami"];
 
   const orphanedTools: string[] = [];
 
   for (const [toolName, tool] of Object.entries(tools)) {
-    // Skip agent-mode-only tools
-    if (AGENT_MODE_ONLY_TOOLS.includes(toolName)) {
+    // Skip special surfaces that are intentionally outside skill capability reports
+    if (
+      isWrapperToolName(toolName) ||
+      isCatalogInfrastructureToolName(toolName)
+    ) {
       continue;
     }
 
@@ -159,8 +170,11 @@ function displayOrphanedTools(orphanedTools: string[]): void {
  */
 function displaySummary(results: ValidationResult[]): void {
   // Special categories of tools
-  const AGENT_MODE_ONLY_TOOLS = ["use_sentry"];
+  const wrapperTools = [...WRAPPER_TOOL_NAMES];
   const FOUNDATIONAL_TOOLS = ["find_organizations", "find_projects", "whoami"];
+  const specialSurfaceTools = Object.keys(tools).filter((toolName) =>
+    isCatalogInfrastructureToolName(toolName),
+  );
 
   const totalTools = Object.keys(tools).length;
   const toolsWithSkills = new Set<string>();
@@ -175,7 +189,8 @@ function displaySummary(results: ValidationResult[]): void {
   const allAccessibleTools = new Set<string>([
     ...toolsWithSkills,
     ...FOUNDATIONAL_TOOLS,
-    ...AGENT_MODE_ONLY_TOOLS,
+    ...wrapperTools,
+    ...specialSurfaceTools,
   ]);
   const totalAccessibleTools = allAccessibleTools.size;
 
@@ -195,7 +210,7 @@ function displaySummary(results: ValidationResult[]): void {
   console.log(
     `  Foundational Tools: ${FOUNDATIONAL_TOOLS.length} (always available)`,
   );
-  console.log(`  Agent-mode-only Tools: ${AGENT_MODE_ONLY_TOOLS.length}`);
+  console.log(`  Wrapper Tools: ${wrapperTools.length}`);
   console.log(`  Orphaned Tools: ${totalTools - totalAccessibleTools}`);
 
   if (totalAccessibleTools === totalTools) {

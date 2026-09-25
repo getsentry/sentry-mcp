@@ -1,0 +1,55 @@
+[
+  {
+    "id": "11974227",
+    "eventID": "957c1ee8f31e4e68a57b637dad557b32",
+    "name": "Example Reporter",
+    "email": "reporter@example.com",
+    "comments": "i am currently testing it",
+    "dateCreated": "2026-06-22T02:37:27.878947Z",
+    "user": {
+      "id": "user-123",
+      "username": "example-reporter",
+      "email": "reporter@example.com",
+      "name": "Example Reporter",
+      "ipAddress": "203.0.113.10",
+      "avatarUrl": "https://example.com/avatar.png"
+    },
+    "event": {
+      "id": "957c1ee8f31e4e68a57b637dad557b32",
+      "eventID": "957c1ee8f31e4e68a57b637dad557b32"
+    }
+  },
+  {
+    "id": "11974228",
+    "eventID": "057c1ee8f31e4e68a57b637dad557b33",
+    "name": "",
+    "email": "",
+    "comments": "anonymous report with no event user",
+    "dateCreated": "2026-06-22T03:10:11.123456Z",
+    "user": null,
+    "event": {
+      "id": "057c1ee8f31e4e68a57b637dad557b33",
+      "eventID": "057c1ee8f31e4e68a57b637dad557b33"
+    }
+  },
+  {
+    "id": "11974229",
+    "eventID": "157c1ee8f31e4e68a57b637dad557b34",
+    "name": "",
+    "email": "",
+    "comments": "event user shell without identity",
+    "dateCreated": "2026-06-22T03:45:12.456789Z",
+    "user": {
+      "id": "None",
+      "username": null,
+      "email": null,
+      "name": null,
+      "ipAddress": null,
+      "avatarUrl": null
+    },
+    "event": {
+      "id": "157c1ee8f31e4e68a57b637dad557b34",
+      "eventID": "157c1ee8f31e4e68a57b637dad557b34"
+    }
+  }
+]
