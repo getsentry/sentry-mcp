@@ -3456,6 +3456,57 @@ describe("search_events", () => {
       expect(result).toContain("Translated by Seer's search agent.");
     });
 
+    it("should prefer an explicit period over Seer's time range", async () => {
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        mockSeerState({
+          status: "completed",
+          final_response: { responses: [seerQuery], unsupported_reason: null },
+        }),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            expect(url.searchParams.get("statsPeriod")).toBe("7d");
+            return HttpResponse.json({ data: [] });
+          },
+        ),
+      );
+
+      await searchEvents.handler({ ...seerParams, period: "7d" }, context);
+
+      expect(mockSeerStart).toHaveBeenCalled();
+    });
+
+    it("should not group by a non-aggregate Seer sort", async () => {
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        mockSeerState({
+          status: "completed",
+          final_response: {
+            responses: [{ ...seerQuery, sort: "-timestamp" }],
+            unsupported_reason: null,
+          },
+        }),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            expect(url.searchParams.getAll("field")).toEqual([
+              "span.description",
+              "p95(span.duration)",
+            ]);
+            expect(url.searchParams.get("sort")).toBe("-p95(span.duration)");
+            return HttpResponse.json({ data: [] });
+          },
+        ),
+      );
+
+      await searchEvents.handler(seerParams, context);
+
+      expect(mockSeerStart).toHaveBeenCalled();
+    });
+
     it("should fall back to the agent when Seer is not enabled", async () => {
       mockGenerateText.mockResolvedValueOnce(
         mockAIResponse("spans", "span.op:http.client"),

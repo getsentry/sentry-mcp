@@ -70,15 +70,21 @@ function toSearchTranslation(
     fields.push(...RECOMMENDED_FIELDS[normalizeEventsDataset(dataset)].basic);
   }
 
-  const sort =
-    result.sort.trim() ||
-    (result.mode === "aggregates" && aggregates[0]
+  const defaultSort =
+    result.mode === "aggregates" && aggregates[0]
       ? `-${aggregates[0]}`
-      : "-timestamp");
-  // Sentry requires the sort field to be selected.
+      : "-timestamp";
+  let sort = result.sort.trim() || defaultSort;
+  // The handler adds the sort field to the selected fields, except for a
+  // non-aggregate sort in an aggregate query since that would change the
+  // grouping. Fall back to the default sort instead of letting Sentry reject it.
   const sortField = sort.startsWith("-") ? sort.slice(1) : sort;
-  if (!fields.includes(sortField)) {
-    fields.push(sortField);
+  if (
+    result.mode === "aggregates" &&
+    !sortField.includes("(") &&
+    !fields.includes(sortField)
+  ) {
+    sort = defaultSort;
   }
 
   let timeParams: SeerSearchTranslation["timeParams"];

@@ -601,7 +601,10 @@ export default defineTool({
       sentryQuery = seerTranslation.query;
       fields = seerTranslation.fields;
       sortParam = seerTranslation.sort;
-      timeParams = seerTranslation.timeParams;
+      // Seer never sees `period`, so an explicit one wins over its time range.
+      timeParams = hasExplicitPeriod
+        ? { statsPeriod: params.period }
+        : seerTranslation.timeParams;
       explanation = seerTranslation.explanation;
     } else if (willRunAgent) {
       const parsed = await withProviderFallback<SearchEventsAgentResult>({
