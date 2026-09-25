@@ -46,6 +46,10 @@ import {
   isValidReplaySort,
 } from "../support/search-events/replays";
 import {
+  isSeerSearchDataset,
+  translateWithSeer,
+} from "../support/search-events/seer";
+import {
   formatEventsValidationResults,
   isAggregateQuery,
   isSemanticFilterDowngrade,
@@ -398,9 +402,9 @@ export default defineTool({
     "NOT for grouped issue lists (use search_issues) or app screenshots/images (use get_latest_base_snapshot).",
     "",
     "<examples>",
-    "search_events(organizationSlug='my-org', query='how many errors today')",
+    "search_events(organizationSlug='my-org', dataset='errors', query='how many errors today')",
     "search_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')",
-    "search_events(organizationSlug='my-org', query='errors per hour last 24h')",
+    "search_events(organizationSlug='my-org', dataset='errors', query='errors per hour last 24h')",
     "search_events(organizationSlug='my-org', dataset='spans', query='span.op:db', sort='-span.duration')",
     "search_events(organizationSlug='my-org', dataset='replays', query='count_errors:>0', sort='-count_errors')",
     "</examples>",
@@ -417,7 +421,7 @@ export default defineTool({
       .enum(SEARCH_EVENTS_DATASETS)
       .optional()
       .describe(
-        "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured.",
+        "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. Always pass it, including for natural language queries. The agent may correct it when configured.",
       ),
     query: z
       .string()
@@ -509,17 +513,6 @@ export default defineTool({
       isTraceItemDataset(inputDataset) &&
       hasStructuredQuery;
 
-    if (
-      !hasAgentProvider() &&
-      inputDataset !== "replays" &&
-      params.environment &&
-      !canApplyEnvironmentFilter
-    ) {
-      throw new UserInputError(
-        "The `environment` parameter is only supported for dataset='replays'. For other datasets, include environment filtering in the query string instead.",
-      );
-    }
-
     let projectId: string | undefined;
     if (params.projectSlug) {
       const project = await apiService.getProject({
@@ -558,7 +551,40 @@ export default defineTool({
     // (below) and to flag any requested environment that doesn't exist. Skipped
     // only when nothing references an environment — including a structured query
     // that skips the agent but puts `environment:` in the query string.
-    const willRunAgent = hasAgentProvider() && !canRunWithoutAgent;
+    // Seer only translates into the dataset it is given, so it runs only when
+    // one is explicit. It only sees the natural language query, so skip it for
+    // structured queries and explicit fields or sort, which the embedded agent
+    // preserves. Like the UI, an explicit environment is added to Seer's query
+    // afterwards.
+    const seerTranslation =
+      params.query &&
+      isSeerSearchDataset(params.dataset) &&
+      !hasStructuredQuery &&
+      !hasExplicitFields &&
+      !hasExplicitSort
+        ? await translateWithSeer({
+            apiService,
+            organizationSlug,
+            projectId,
+            dataset: params.dataset,
+            query: params.query,
+          })
+        : null;
+
+    if (
+      !hasAgentProvider() &&
+      inputDataset !== "replays" &&
+      params.environment &&
+      !canApplyEnvironmentFilter &&
+      !seerTranslation
+    ) {
+      throw new UserInputError(
+        "The `environment` parameter is only supported for dataset='replays'. For other datasets, include environment filtering in the query string instead.",
+      );
+    }
+
+    const willRunAgent =
+      hasAgentProvider() && !canRunWithoutAgent && !seerTranslation;
     const inputReferencesEnvironment =
       params.environment != null ||
       collectRequestedEnvironments(null, params.query ?? "").length > 0;
@@ -574,7 +600,18 @@ export default defineTool({
       environmentNames.map((name) => name.toLowerCase()),
     );
 
-    if (willRunAgent) {
+    if (seerTranslation) {
+      dataset = inputDataset;
+      sentryQuery = seerTranslation.query;
+      fields = seerTranslation.fields;
+      sortParam = seerTranslation.sort;
+      // Seer never sees `period`, so an explicit one wins over its time range.
+      timeParams = hasExplicitPeriod
+        ? { statsPeriod: params.period }
+        : seerTranslation.timeParams;
+      explanation = seerTranslation.explanation;
+      timeSeries = seerTranslation.timeSeries;
+    } else if (willRunAgent) {
       const parsed = await withProviderFallback<SearchEventsAgentResult>({
         operation: "search_events.rewrite",
         fallback: () => ({
@@ -686,8 +723,20 @@ export default defineTool({
       unknownEnvironments.length > 0
         ? formatUnknownEnvironmentNote(unknownEnvironments, environmentNames)
         : "";
-    const withEnvironmentNote = (text: string): string =>
-      environmentNote ? `${environmentNote}\n\n${text}` : text;
+    // The caller chose the project (or the session is scoped to it), so Seer's
+    // wider scope is only suggested. Scoped sessions can't change the project.
+    const suggestedProjectIds = context.constraints.projectSlug
+      ? []
+      : (seerTranslation?.suggestedProjectIds ?? []);
+    const projectSuggestionNote =
+      suggestedProjectIds.length > 0
+        ? `**Note:** Seer suggested also searching project IDs ${suggestedProjectIds.join(", ")}, for example other services in the same trace. Omit \`projectSlug\` to search all accessible projects.`
+        : "";
+    const leadingNote = [environmentNote, projectSuggestionNote]
+      .filter(Boolean)
+      .join("\n\n");
+    const withLeadingNote = (text: string): string =>
+      leadingNote ? `${leadingNote}\n\n${text}` : text;
 
     if (dataset === "replays") {
       const replaySort = sortParam || DEFAULT_REPLAY_SORT;
@@ -756,7 +805,7 @@ export default defineTool({
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
       });
-      return withEnvironmentNote(replayOutput);
+      return withLeadingNote(replayOutput);
     }
 
     if (timeSeries) {
@@ -791,7 +840,7 @@ export default defineTool({
         timeParams.start,
         timeParams.end,
       );
-      return withEnvironmentNote(
+      return withLeadingNote(
         formatTimeSeriesResults({
           series,
           yAxis: timeSeries.yAxis,
@@ -866,6 +915,7 @@ export default defineTool({
       projectId,
       dataset,
       sort: sortParam,
+      crossEventQueries: seerTranslation?.crossEventQueries,
       ...timeParams,
     });
 
@@ -947,15 +997,15 @@ export default defineTool({
 
     switch (dataset) {
       case "errors":
-        return withEnvironmentNote(formatErrorResults(formatParams));
+        return withLeadingNote(formatErrorResults(formatParams));
       case "logs":
-        return withEnvironmentNote(formatLogResults(formatParams));
+        return withLeadingNote(formatLogResults(formatParams));
       case "spans":
-        return withEnvironmentNote(formatSpanResults(formatParams));
+        return withLeadingNote(formatSpanResults(formatParams));
       case "profiles":
-        return withEnvironmentNote(formatProfileResults(formatParams));
+        return withLeadingNote(formatProfileResults(formatParams));
       default:
-        return withEnvironmentNote(formatTraceMetricsResults(formatParams));
+        return withLeadingNote(formatTraceMetricsResults(formatParams));
     }
   },
 });
