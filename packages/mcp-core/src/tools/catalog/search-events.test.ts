@@ -3566,32 +3566,50 @@ describe("search_events", () => {
       expect(mockGenerateText).not.toHaveBeenCalled();
     });
 
-    it("should search the projects Seer broadened the query to", async () => {
-      mswServer.use(
-        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
-        mockSeerState({
-          status: "completed",
-          final_response: {
-            responses: [seerQuery],
-            unsupported_reason: null,
-            project_ids: [42, 43],
-          },
-        }),
-        http.get(
-          "https://sentry.io/api/0/organizations/test-org/events/",
-          ({ request }) => {
-            const url = new URL(request.url);
-            expect(url.searchParams.getAll("project")).toEqual(["42", "43"]);
-            return HttpResponse.json({ data: [] });
-          },
-        ),
-      );
+    it.each([
+      ["suggest", context, true],
+      [
+        "not suggest in a project-scoped session",
+        {
+          ...context,
+          constraints: { ...context.constraints, projectSlug: "test-project" },
+        },
+        false,
+      ],
+    ])(
+      "should keep the requested project and %s Seer's wider scope",
+      async (_, handlerContext, expectNote) => {
+        mswServer.use(
+          mockOrganization([
+            "gen-ai-features",
+            "gen-ai-search-agent-translate",
+          ]),
+          mockSeerState({
+            status: "completed",
+            final_response: {
+              responses: [seerQuery],
+              unsupported_reason: null,
+              project_ids: [42, 43],
+            },
+          }),
+          http.get(
+            "https://sentry.io/api/0/organizations/test-org/events/",
+            ({ request }) => {
+              const url = new URL(request.url);
+              expect(url.searchParams.getAll("project")).toEqual(["42"]);
+              return HttpResponse.json({ data: [] });
+            },
+          ),
+        );
 
-      const result = await searchEvents.handler(seerParams, context);
+        const result = await searchEvents.handler(seerParams, handlerContext);
 
-      expect(mockSeerStart).toHaveBeenCalled();
-      expect(result).toContain("Seer broadened the search to 2 projects.");
-    });
+        expect(mockSeerStart).toHaveBeenCalled();
+        expect(
+          result.includes("Seer suggested also searching project IDs 43"),
+        ).toBe(expectNote);
+      },
+    );
 
     it("should keep the requested project when Seer does not broaden it", async () => {
       mswServer.use(
@@ -3617,7 +3635,7 @@ describe("search_events", () => {
       const result = await searchEvents.handler(seerParams, context);
 
       expect(mockSeerStart).toHaveBeenCalled();
-      expect(result).not.toContain("Seer broadened the search");
+      expect(result).not.toContain("Seer suggested also searching");
     });
 
     it("should search all accessible projects without a projectSlug", async () => {

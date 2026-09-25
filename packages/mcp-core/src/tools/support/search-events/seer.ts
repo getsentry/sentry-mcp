@@ -42,8 +42,8 @@ export interface SeerSearchTranslation {
   sort: string;
   timeParams: { statsPeriod?: string; start?: string; end?: string };
   timeSeries: { yAxis: string; interval: string } | null;
-  // Set only when Seer broadened the search beyond the requested project.
-  projectIds?: string[];
+  // Other projects Seer suggested searching beyond the requested one.
+  suggestedProjectIds: number[];
   explanation: string;
 }
 
@@ -66,7 +66,7 @@ async function hasSeerSearchAgentAccess(
 function toSearchTranslation(
   result: z.output<typeof SearchAgentQuerySchema>,
   dataset: SeerSearchDataset,
-  expandedProjectIds: number[] | undefined,
+  suggestedProjectIds: number[],
 ): SeerSearchTranslation {
   const aggregates = result.visualization.flatMap((chart) => chart.y_axes);
   const fields =
@@ -130,17 +130,13 @@ function toSearchTranslation(
     explanation += ` Seer also suggested cross-event filters (${crossEventQueries.join(", ")}), which search_events does not apply.`;
   }
 
-  if (expandedProjectIds) {
-    explanation += ` Seer broadened the search to ${expandedProjectIds.length} projects.`;
-  }
-
   return {
     query: result.query,
     fields,
     sort,
     timeParams,
     timeSeries,
-    projectIds: expandedProjectIds?.map(String),
+    suggestedProjectIds,
     explanation,
   };
 }
@@ -189,14 +185,15 @@ export async function translateWithSeer({
         if (!result) {
           return null;
         }
-        // Seer can broaden a project-scoped search, e.g. to other services in
-        // the same trace. With all projects requested there is nothing to add.
-        const returnedProjectIds = session.final_response?.project_ids ?? [];
-        const expandedProjectIds =
-          projectId && returnedProjectIds.some((id) => id !== Number(projectId))
-            ? returnedProjectIds
-            : undefined;
-        return toSearchTranslation(result, dataset, expandedProjectIds);
+        // Seer can suggest broadening a project-scoped search, e.g. to other
+        // services in the same trace. With all projects requested there is
+        // nothing to add.
+        const suggestedProjectIds = projectId
+          ? (session.final_response?.project_ids ?? []).filter(
+              (id) => id !== Number(projectId),
+            )
+          : [];
+        return toSearchTranslation(result, dataset, suggestedProjectIds);
       }
       if (session?.status === "error") {
         return null;

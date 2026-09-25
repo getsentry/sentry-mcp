@@ -723,8 +723,20 @@ export default defineTool({
       unknownEnvironments.length > 0
         ? formatUnknownEnvironmentNote(unknownEnvironments, environmentNames)
         : "";
-    const withEnvironmentNote = (text: string): string =>
-      environmentNote ? `${environmentNote}\n\n${text}` : text;
+    // The caller chose the project (or the session is scoped to it), so Seer's
+    // wider scope is only suggested. Scoped sessions can't change the project.
+    const suggestedProjectIds = context.constraints.projectSlug
+      ? []
+      : (seerTranslation?.suggestedProjectIds ?? []);
+    const projectSuggestionNote =
+      suggestedProjectIds.length > 0
+        ? `**Note:** Seer suggested also searching project IDs ${suggestedProjectIds.join(", ")}, for example other services in the same trace. Omit \`projectSlug\` to search all accessible projects.`
+        : "";
+    const leadingNote = [environmentNote, projectSuggestionNote]
+      .filter(Boolean)
+      .join("\n\n");
+    const withLeadingNote = (text: string): string =>
+      leadingNote ? `${leadingNote}\n\n${text}` : text;
 
     if (dataset === "replays") {
       const replaySort = sortParam || DEFAULT_REPLAY_SORT;
@@ -793,10 +805,8 @@ export default defineTool({
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
       });
-      return withEnvironmentNote(replayOutput);
+      return withLeadingNote(replayOutput);
     }
-
-    const eventsProjectId = seerTranslation?.projectIds ?? projectId;
 
     if (timeSeries) {
       const timeSeriesQuery = applyEnvironmentToEventsQuery(
@@ -813,14 +823,14 @@ export default defineTool({
         query: timeSeriesQuery,
         yAxis: timeSeries.yAxis,
         interval: timeSeries.interval ?? undefined,
-        projectId: eventsProjectId,
+        projectId,
         dataset,
         ...timeParams,
       });
       const statsUrl = apiService.getEventsExplorerUrl(
         organizationSlug,
         timeSeriesQuery,
-        eventsProjectId,
+        projectId,
         dataset,
         [timeSeries.yAxis],
         `-${timeSeries.yAxis}`,
@@ -830,7 +840,7 @@ export default defineTool({
         timeParams.start,
         timeParams.end,
       );
-      return withEnvironmentNote(
+      return withLeadingNote(
         formatTimeSeriesResults({
           series,
           yAxis: timeSeries.yAxis,
@@ -872,7 +882,7 @@ export default defineTool({
       fields: requestFields,
       query: sentryQuery,
       sort: sortParam,
-      projectId: eventsProjectId,
+      projectId,
       environment: environment ?? undefined,
       ...timeParams,
     });
@@ -902,7 +912,7 @@ export default defineTool({
       query: sentryQuery,
       fields: finalRequestFields,
       limit: params.limit,
-      projectId: eventsProjectId,
+      projectId,
       dataset,
       sort: sortParam,
       ...timeParams,
@@ -950,7 +960,7 @@ export default defineTool({
       : apiService.getEventsExplorerUrl(
           organizationSlug,
           sentryQuery,
-          eventsProjectId,
+          projectId,
           dataset,
           fields,
           sortParam,
@@ -986,15 +996,15 @@ export default defineTool({
 
     switch (dataset) {
       case "errors":
-        return withEnvironmentNote(formatErrorResults(formatParams));
+        return withLeadingNote(formatErrorResults(formatParams));
       case "logs":
-        return withEnvironmentNote(formatLogResults(formatParams));
+        return withLeadingNote(formatLogResults(formatParams));
       case "spans":
-        return withEnvironmentNote(formatSpanResults(formatParams));
+        return withLeadingNote(formatSpanResults(formatParams));
       case "profiles":
-        return withEnvironmentNote(formatProfileResults(formatParams));
+        return withLeadingNote(formatProfileResults(formatParams));
       default:
-        return withEnvironmentNote(formatTraceMetricsResults(formatParams));
+        return withLeadingNote(formatTraceMetricsResults(formatParams));
     }
   },
 });

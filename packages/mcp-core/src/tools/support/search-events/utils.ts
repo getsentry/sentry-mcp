@@ -21,7 +21,6 @@ import {
   normalizeEventsDataset,
   PUBLIC_EVENTS_DATASETS,
 } from "../../../utils/events-datasets";
-import type { ProjectIdParam } from "../../../utils/url-utils";
 
 // Type for flexible event data that can contain any fields
 export type FlexibleEventData = Record<string, unknown>;
@@ -870,7 +869,7 @@ export async function validateEventsSearch(
     fields: string[];
     query: string;
     sort: string;
-    projectId?: ProjectIdParam;
+    projectId?: string;
     environment?: string | string[];
     statsPeriod?: string;
     start?: string;
@@ -910,7 +909,7 @@ export async function assertEventsSearchIsValid(
     fields: string[];
     query: string;
     sort: string;
-    projectId?: ProjectIdParam;
+    projectId?: string;
     environment?: string | string[];
     statsPeriod?: string;
     start?: string;
