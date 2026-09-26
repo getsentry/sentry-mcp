@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import type { DashboardListItem, SentryApiService } from "../../api-client";
 import { UserInputError } from "../../errors";
 import { defineTool } from "../../internal/tool-helpers/define";
@@ -284,7 +285,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationContext(organizationSlug);
 
     const scopedProject = await resolveDashboardProjectConstraint({
       apiService,

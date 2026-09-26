@@ -1,9 +1,8 @@
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { isTopLevelToolName } from "../../tools/surfaces";
 import {
   formatToolCall,
   isToolAvailableInSession,
 } from "./tool-call-formatting";
-import { isTopLevelToolName } from "../../tools/surfaces";
 
 const MAX_SUGGESTED_ACTIONS = 3;
 
@@ -140,43 +139,4 @@ export function formatAIConversationActionInstructions({
         }),
       )} to fetch the full transcript.`,
   );
-}
-
-/**
- * Adds concrete transcript follow-ups to otherwise markdown-first results.
- * The markdown remains the compatibility path for clients that do not read
- * structured content.
- */
-export function addAIConversationSuggestedActions({
-  markdown,
-  organizationSlug,
-  aiConversations,
-  experimentalMode,
-  availableToolNames,
-  directToolNames,
-}: {
-  markdown: string;
-  organizationSlug: string;
-  aiConversations: AIConversationReference[];
-  experimentalMode: boolean;
-  availableToolNames?: ReadonlySet<string>;
-  directToolNames?: ReadonlySet<string>;
-}): string | CallToolResult {
-  const suggestedActions = getAIConversationSuggestedActions({
-    organizationSlug,
-    aiConversations,
-    experimentalMode,
-    availableToolNames,
-    directToolNames,
-  });
-  if (suggestedActions.length === 0) {
-    return markdown;
-  }
-
-  return {
-    content: [{ type: "text", text: markdown }],
-    structuredContent: {
-      suggestedActions,
-    },
-  };
 }

@@ -20,6 +20,24 @@ Runs after tests pass on main branch:
 ### eval.yml
 Runs evaluation tests against the MCP server.
 
+### pr-risk-jev.yml
+Classifies PR risk with Jev and publishes one `risk: low`, `risk: medium`, or
+`risk: high` label. Runs when a non-draft PR is opened, updated with a push,
+reopened, marked ready for review, or edited. Manual dispatch accepts a PR number
+and also supports drafts.
+
+The pinned risk Action reads PR metadata and Git diffs without checking out or
+executing PR code. Labels are only published for the analyzed revision; unrelated
+labels are preserved. An unchanged classification makes no label changes.
+If a current-revision analysis fails, previous risk labels
+are cleared and the PR stays unclassified. Results are retained as workflow
+artifacts for 30 days.
+
+### pr-risk-labels-test.yml
+Runs the label publisher's regression tests when its workflow or tests change.
+Covers label replacement, stale revisions, failed classifications, and concurrent
+label creation.
+
 ## Required Secrets
 
 Repository secrets (no environment needed):
@@ -30,6 +48,7 @@ Repository secrets (no environment needed):
 - **`SENTRY_CLIENT_SECRET`** - Sentry OAuth client secret
 - **`COOKIE_SECRET`** - Session cookie encryption secret
 - **`OPENAI_API_KEY`** - For AI-powered search features
+- **`AI_GATEWAY_API_KEY`** - Vercel AI Gateway key for Jev PR risk classification
 
 ## Deployment Architecture
 

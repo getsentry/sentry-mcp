@@ -72,7 +72,6 @@ program
 
       Sentry.init({
         dsn: sentryDsn,
-        sendDefaultPii: true,
         tracesSampleRate: 1,
         beforeSend: sentryBeforeSend,
         initialScope: {

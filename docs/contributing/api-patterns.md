@@ -63,7 +63,27 @@ await api.issues.update({
 });
 ```
 
+### Resolved Issue IDs
+
+Use `String(issue.id)` for API requests after resolving an issue. Short IDs can
+fail to resolve for legacy mixed-case project slugs; keep them for display.
+
 ### Multi-Region Support
+
+Organization discovery uses a single `/api/0/organizations/` request. Public
+SaaS hosts use `sentry.io` to list organizations across regions. Single-tenant
+hosts under `*.my.sentry.io` and self-hosted instances keep their configured
+host for this request.
+
+User identity (`/api/0/auth/`, used by `whoami`) follows the same control-host
+routing. Organization-scoped requests continue to use the configured host or
+a validated `regionUrl`.
+
+Web links use `<organization>.sentry.io` for public SaaS. Single-tenant and
+self-hosted links keep the configured host and `/organizations/<organization>`
+path prefix. Use `isPublicSentryHost` for these routing decisions;
+`isSentryHost` also recognizes single-tenant deployments and remains the broader
+check for HTTPS enforcement and capabilities.
 
 Sentry uses region-specific URLs:
 
@@ -222,6 +242,21 @@ try {
 ```
 
 See error patterns in [common-patterns.md](common-patterns.md#error-handling).
+
+### Automatic Retries
+
+`SentryApiService.request()` transparently retries transient upstream gateway
+failures (`502`/`503`/`504`) using exponential backoff. Retries are:
+
+- **GET-only** — non-idempotent methods (`POST`/`PUT`/`DELETE`) are never
+  retried, so an automatic retry can never replay a mutation.
+- **Gateway-only** — gated on `ApiServerError.isGatewayError()`. Persistent
+  `500`s, `4xx` client errors, and network/configuration errors fail fast.
+- **Bypassed by `allowStatuses`** — a status the caller opts into is returned
+  as-is from `requestOnce`, never retried.
+
+Callers and tools need no changes: a retried request either resolves normally or
+throws the same `ApiServerError` it would have thrown without retries.
 
 ## Best Practices
 

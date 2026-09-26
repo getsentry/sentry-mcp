@@ -5,11 +5,11 @@ import { AmpInstructions } from "./instructions/amp";
 import { ClaudeCodeInstructions } from "./instructions/claude-code";
 import { CodexCLIInstructions } from "./instructions/codex-cli";
 import { CursorInstructions } from "./instructions/cursor";
+import { FxInstructions } from "./instructions/fx";
 import { GeminiInstructions } from "./instructions/gemini";
 import { OpenCodeInstructions } from "./instructions/opencode";
 import { VSCodeInstructions } from "./instructions/vscode";
 import { WarpInstructions } from "./instructions/warp";
-import { WindsurfInstructions } from "./instructions/windsurf";
 import { ZedInstructions } from "./instructions/zed";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
@@ -56,24 +56,25 @@ export function RemoteSetupTabs({
 }: RemoteSetupTabsProps) {
   return (
     <InstallTabs selectedTab={selectedIde} onTabChange={onIdeChange}>
+      {/* Keep the primary IDEs first, then alphabetize within each group. */}
       <Tab id="claude-code" title="Claude Code">
         <ClaudeCodeInstructions transport="cloud" />
-      </Tab>
-
-      <Tab id="cursor" title="Cursor">
-        <CursorInstructions transport="cloud" />
-      </Tab>
-
-      <Tab id="vscode" title="VSCode">
-        <VSCodeInstructions transport="cloud" />
       </Tab>
 
       <Tab id="codex-cli" title="Codex">
         <CodexCLIInstructions transport="cloud" />
       </Tab>
 
+      <Tab id="cursor" title="Cursor">
+        <CursorInstructions transport="cloud" />
+      </Tab>
+
       <Tab id="amp" title="Amp">
         <AmpInstructions transport="cloud" />
+      </Tab>
+
+      <Tab id="fx" title="fx">
+        <FxInstructions transport="cloud" />
       </Tab>
 
       <Tab id="gemini" title="Gemini CLI">
@@ -84,12 +85,12 @@ export function RemoteSetupTabs({
         <OpenCodeInstructions transport="cloud" />
       </Tab>
 
-      <Tab id="warp" title="Warp">
-        <WarpInstructions transport="cloud" />
+      <Tab id="vscode" title="VSCode">
+        <VSCodeInstructions transport="cloud" />
       </Tab>
 
-      <Tab id="windsurf" title="Windsurf">
-        <WindsurfInstructions transport="cloud" />
+      <Tab id="warp" title="Warp">
+        <WarpInstructions transport="cloud" />
       </Tab>
 
       <Tab id="zed" title="Zed">

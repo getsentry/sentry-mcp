@@ -1,12 +1,38 @@
-import { mswServer, teamFixture } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
+import {
+  mswServer,
+  projectFixture,
+  teamFixture,
+} from "@sentry/mcp-server-mocks";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigurationError } from "../errors";
+import { parseSentryUrl } from "../internal/url-helpers";
 import { SentryApiService } from "./client";
-import { ApiClientError, ApiValidationError } from "./errors";
+import {
+  ApiClientError,
+  ApiNotFoundError,
+  ApiServerError,
+  ApiValidationError,
+} from "./errors";
 
 describe("validateEvents non-JSON responses", () => {
   afterEach(() => mswServer.resetHandlers());
+
+  it("classifies the endpoint's empty feature-gate 400 as a client error", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        () => new HttpResponse(null, { status: 400 }),
+      ),
+    );
+    const api = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+    await expect(
+      api.validateEvents({ organizationSlug: "test-org" }),
+    ).rejects.toBeInstanceOf(ApiValidationError);
+  });
 
   it.each(["text/plain", "text/html"])(
     "classifies a 400 %s response as a client error",
@@ -52,6 +78,52 @@ describe("validateEvents non-JSON responses", () => {
     );
     await expect(result).rejects.not.toBeInstanceOf(ApiClientError);
   });
+});
+
+describe("single-tenant web URLs", () => {
+  const api = new SentryApiService({ host: "tenant.my.sentry.io" });
+  const baseUrl = "https://tenant.my.sentry.io/organizations/product-org";
+
+  it("keeps the tenant host and the organization from the path", () => {
+    const issueUrl = api.getIssueUrl("product-org", "WEB-123");
+    expect(issueUrl).toBe(`${baseUrl}/issues/WEB-123`);
+    expect(parseSentryUrl(issueUrl)).toEqual({
+      type: "issue",
+      organizationSlug: "product-org",
+      issueId: "WEB-123",
+    });
+    expect(api.getDashboardUrl("product-org", "42")).toBe(
+      `${baseUrl}/dashboard/42/`,
+    );
+  });
+
+  it("keeps alert links on the tenant", () => {
+    expect(api.getIssueAlertRuleUrl("product-org", "42")).toBe(
+      `${baseUrl}/monitors/alerts/42/`,
+    );
+    expect(api.getMetricAlertRuleUrl("product-org", "42")).toBe(
+      `${baseUrl}/issues/alerts/rules/details/42/`,
+    );
+  });
+
+  it.each([
+    ["errors", "discover/homepage", "query"],
+    ["spans", "traces", "query"],
+    ["logs", "logs", "logsQuery"],
+  ] as const)(
+    "keeps %s explorer links and filters on the tenant",
+    (dataset, page, queryParam) => {
+      const url = new URL(
+        api.getEventsExplorerUrl("product-org", "level:error", "123", dataset),
+      );
+      expect(`${url.origin}${url.pathname}`).toBe(
+        `${baseUrl}/explore/${page}/`,
+      );
+      expect(url.searchParams.get(queryParam)).toBe("level:error");
+      expect(url.searchParams.get("project")).toBe("123");
+      expect(url.searchParams.get("statsPeriod")).toBe("24h");
+    },
+  );
 });
 
 describe("getIssueUrl", () => {
@@ -110,6 +182,12 @@ describe("getIssueUrl", () => {
     const result = apiService.getIssueUrl("myorg", "PROJECT-456");
     // Should use sentry.io, not eu.sentry.io for web UI
     expect(result).toEqual("https://myorg.sentry.io/issues/PROJECT-456");
+  });
+  it("keeps public organization hosts with multiple labels on public web URLs", () => {
+    const apiService = new SentryApiService({ host: "example.us.sentry.io" });
+    expect(apiService.getIssueUrl("product-org", "WEB-123")).toBe(
+      "https://product-org.sentry.io/issues/WEB-123",
+    );
   });
 });
 
@@ -459,6 +537,28 @@ describe("getEventsExplorerUrl", () => {
   });
 });
 
+describe("alert rule workflow endpoints", () => {
+  it("rejects a project scope response missing its all-projects flag", async () => {
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/my-org/workflows/123/project-scope/",
+        () => HttpResponse.json({ projectIds: [] }),
+      ),
+    );
+
+    await expect(
+      apiService.getAlertRuleProjectScope({
+        organizationSlug: "my-org",
+        ruleId: "123",
+      }),
+    ).rejects.toThrow("includesAllProjects");
+  });
+});
+
 describe("monitor time parameters", () => {
   it("defaults blank monitor statsPeriod values to a 24h window", async () => {
     const requestUrls: URL[] = [];
@@ -622,6 +722,92 @@ describe("getIssue", () => {
   });
 });
 
+describe("Alert inspection endpoints", () => {
+  const api = new SentryApiService({
+    host: "sentry.io",
+    accessToken: "test-token",
+  });
+  const organizationSlug = "test-org";
+  const workflowUrl =
+    "https://sentry.io/api/0/organizations/test-org/workflows/";
+  const workflow = { id: "10", name: "Notify on new issues", detectorIds: [] };
+
+  it("keeps unattached workflows and returns the backend page cursor organization-wide", async () => {
+    mswServer.use(
+      http.get(workflowUrl, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        expect(params.get("projectSlug")).toBeNull();
+        expect(params.get("query")).toBe('name:"*new issues*"');
+        expect(params.get("cursor")).toBe("previous");
+        expect(params.get("per_page")).toBe("1");
+        return HttpResponse.json([workflow], {
+          headers: {
+            Link: `<${workflowUrl}?cursor=next>; rel="next"; results="true"; cursor="next"`,
+          },
+        });
+      }),
+    );
+    const params = {
+      organizationSlug,
+      query: "new issues",
+      cursor: "previous",
+      limit: 1,
+    };
+    const page = await api.listIssueAlertRulesPage(params);
+    expect(page.nextCursor).toBe("next");
+    expect(page.rules).toMatchObject([workflow]);
+    expect(await api.listIssueAlertRules(params)).toEqual(page.rules);
+  });
+
+  it.each([
+    {
+      scope: {
+        projectIds: [String(projectFixture.id), "99"],
+        includesAllProjects: false,
+      },
+      allowed: true,
+    },
+    { scope: { projectIds: [], includesAllProjects: true }, allowed: true },
+    {
+      scope: { projectIds: ["99"], includesAllProjects: false },
+      allowed: false,
+    },
+    { scope: { projectIds: [], includesAllProjects: false }, allowed: false },
+    { scope: null, allowed: false },
+  ])(
+    "checks explicit project membership before returning a workflow: $scope",
+    async ({ scope, allowed }) => {
+      let detailReads = 0;
+      const attachedWorkflow = { ...workflow, detectorIds: ["20"] };
+      mswServer.use(
+        http.get("https://sentry.io/api/0/projects/test-org/backend/", () =>
+          HttpResponse.json(projectFixture),
+        ),
+        http.get(`${workflowUrl}10/project-scope/`, () =>
+          scope
+            ? HttpResponse.json(scope)
+            : HttpResponse.json({ detail: "Not found" }, { status: 404 }),
+        ),
+        http.get(`${workflowUrl}10/`, () => {
+          detailReads++;
+          return HttpResponse.json(attachedWorkflow);
+        }),
+      );
+      const result = api.getIssueAlertRule({
+        organizationSlug,
+        projectSlug: "backend",
+        ruleId: "10",
+      });
+      if (allowed) {
+        expect(await result).toMatchObject(attachedWorkflow);
+      } else {
+        await expect(result).rejects.toBeInstanceOf(ApiNotFoundError);
+      }
+      expect(detailReads).toBe(allowed ? 1 : 0);
+    },
+  );
+});
+
 describe("network error handling", () => {
   let originalFetch: typeof globalThis.fetch;
 
@@ -779,6 +965,144 @@ describe("network error handling", () => {
     await expect(apiService.getAuthenticatedUser()).rejects.toThrow(
       ConfigurationError,
     );
+  });
+});
+
+describe("transient 5xx retry", () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  // A transient gateway failure like the ones Sentry's edge returns
+  // ("upstream connect error ... reset before headers"), reported as 503.
+  const serviceUnavailable = () =>
+    new Response(
+      "upstream connect error or disconnect/reset before headers. reset reason: connection termination",
+      { status: 503, statusText: "Service Unavailable" },
+    );
+
+  const internalError = () =>
+    new Response(JSON.stringify({ detail: "Internal Error" }), {
+      status: 500,
+      statusText: "Internal Server Error",
+      headers: { "Content-Type": "application/json" },
+    });
+
+  const authOk = () =>
+    new Response(
+      JSON.stringify({ id: "1", name: "Test User", email: "test@example.com" }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.useRealTimers();
+  });
+
+  it("retries a transient gateway error on a GET and succeeds", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(serviceUnavailable())
+      .mockResolvedValueOnce(serviceUnavailable())
+      .mockResolvedValueOnce(authOk());
+    globalThis.fetch = fetchMock;
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const promise = apiService.getAuthenticatedUser();
+    await vi.runAllTimersAsync();
+    const user = await promise;
+
+    expect(user.id).toBe("1");
+    // Initial attempt + 2 retries, succeeding on the last one.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("gives up after exhausting the retry budget on a persistent gateway error", async () => {
+    // A fresh Response per attempt — a Response body can only be read once.
+    const fetchMock = vi.fn().mockImplementation(() => serviceUnavailable());
+    globalThis.fetch = fetchMock;
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const promise = apiService.getAuthenticatedUser();
+    // Attach a catch synchronously so the rejection is never unhandled while
+    // fake timers advance through the backoff waits.
+    promise.catch(() => {});
+    await vi.runAllTimersAsync();
+
+    await expect(promise).rejects.toBeInstanceOf(ApiServerError);
+    // Initial attempt + 2 retries, all failing.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry a non-gateway 500", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(internalError());
+    globalThis.fetch = fetchMock;
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await expect(apiService.getAuthenticatedUser()).rejects.toBeInstanceOf(
+      ApiServerError,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a non-idempotent (POST) request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(serviceUnavailable());
+    globalThis.fetch = fetchMock;
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const promise = apiService.createTeam({
+      organizationSlug: "my-org",
+      name: "My Team",
+    });
+    promise.catch(() => {});
+    await vi.runAllTimersAsync();
+
+    await expect(promise).rejects.toBeInstanceOf(ApiServerError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a 5xx that the caller opted into via allowStatuses", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(serviceUnavailable());
+    globalThis.fetch = fetchMock;
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    // getEventAttachment passes allowStatuses so the caller can inspect the raw
+    // response; such requests must be returned as-is, never retried.
+    const response = await (
+      apiService as unknown as {
+        request: (
+          path: string,
+          options?: RequestInit,
+          requestOptions?: { host?: string; allowStatuses?: number[] },
+        ) => Promise<Response>;
+      }
+    ).request("/auth/", undefined, { allowStatuses: [503] });
+
+    expect(response.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

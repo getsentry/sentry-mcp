@@ -7,10 +7,7 @@ import {
   traceFixture,
   traceMixedFixture,
 } from "@sentry/mcp-server-mocks";
-import {
-  getStructuredContent,
-  getTextContent,
-} from "../../test-utils/structured-content";
+import { getTextContent } from "../../test-utils/structured-content";
 import getTraceDetails from "./get-trace-details.js";
 
 const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
@@ -703,32 +700,10 @@ describe("get_trace_details", () => {
       },
     );
 
-    const text = getTextContent(result);
+    const text = typeof result === "string" ? result : getTextContent(result);
     expect(
-      getStructuredContent<{
-        suggestedActions: Array<{
-          type: string;
-          toolName: string;
-          arguments: Record<string, unknown>;
-          reason: string;
-        }>;
-      }>(result),
-    ).toEqual({
-      suggestedActions: [
-        {
-          type: "tool_call",
-          toolName: "execute_sentry_tool",
-          arguments: {
-            name: "get_agent_conversation_details",
-            arguments: {
-              organizationSlug: "sentry-mcp-evals",
-              conversationId: "conv-trace-snapshot",
-            },
-          },
-          reason: "Fetch the full transcript for this agent conversation.",
-        },
-      ],
-    });
+      (result as { structuredContent?: unknown }).structuredContent,
+    ).toBeUndefined();
     expect(text).toMatchInlineSnapshot(`
       "# Trace \`c4d1aae7216b47ff8117cf4e09ce9d0c\` in **sentry-mcp-evals**
 
@@ -1160,7 +1135,7 @@ describe("get_trace_details", () => {
       },
     );
 
-    const text = getTextContent(result);
+    const text = typeof result === "string" ? result : getTextContent(result);
     expect(text).toContain(
       "POST /api/internal/turn-resume [http.server · 201 · 3ms · 1111111111111111]",
     );

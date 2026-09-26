@@ -1,4 +1,5 @@
-import { setTag } from "@sentry/core";
+import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import type { SentryApiService } from "../../api-client";
 import { ApiNotFoundError } from "../../api-client";
 import type {
@@ -13,13 +14,22 @@ import type {
 } from "../../api-client/types";
 import { UserInputError } from "../../errors";
 import type { CodeLocation } from "../../internal/code-location";
-import {
-  type AIConversationReference,
-  addAIConversationSuggestedActions,
-} from "../../internal/tool-helpers/ai-conversation-actions";
+import type { AIConversationReference } from "../../internal/tool-helpers/ai-conversation-actions";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { enhanceNotFoundError } from "../../internal/tool-helpers/enhance-error";
+import { structuredResult } from "../../internal/tool-helpers/results";
+import {
+  dedupeReplayIds,
+  getReplayIdFromEvent,
+  isPerformanceIssueType,
+  getSeerActionabilityLabel,
+  usesSharedFormatterBody,
+} from "../../internal/formatting";
+import {
+  getAutofixArtifactSummaries,
+  getStatusDisplayName,
+} from "../../internal/tool-helpers/seer";
 import {
   assertIssueWithinProjectConstraint,
   formatIssueOutput,
@@ -36,9 +46,261 @@ import { logError } from "../../telem/logging";
 import type { ServerContext } from "../../types";
 import { resolveCodeLocation } from "../support/code-location";
 
+// mirrors MAX_DISPLAY_REPLAYS in the markdown output
+const MAX_RELATED_REPLAYS = 5;
 const MAX_AI_CONVERSATION_MATCHES = 3;
 const AI_CONVERSATION_LOOKUP_WINDOW_MS = 24 * 60 * 60 * 1000;
 const TRACE_ID_PATTERN = /^[0-9a-fA-F]{32}$/;
+
+/**
+ * The issue payload as `structuredContent`.
+ *
+ * Every field is mapped explicitly rather than spread from an api response, so a passthrough
+ * upstream schema cannot leak backend-only fields into the public interface.
+ *
+ * `event.body` is the one open record: it is whatever Sentry's shared formatter emits
+ * for `?llmFormat=json`, and its sections are decided there. Enumerating them here would make
+ * this schema a second declaration of that contract, needing a bump every time a section is
+ * added on the Sentry side.
+ */
+export const getIssueDetailsOutputSchema = z.object({
+  issue: z.object({
+    shortId: z.string(),
+    title: z.string(),
+    culprit: z.string().nullish(),
+    firstSeen: z.string().nullish(),
+    lastSeen: z.string().nullish(),
+    occurrences: z.number().nullish(),
+    usersImpacted: z.number().nullish(),
+    status: z.string().nullish(),
+    substatus: z.string().nullish(),
+    assignedTo: z.string().nullish(),
+    issueType: z.string().nullish(),
+    issueCategory: z.string().nullish(),
+    seerActionability: z.string().nullish(),
+    platform: z.string().nullish(),
+    project: z.string().nullish(),
+    url: z.string(),
+    // metadata fields the markdown surfaces for specific issue types
+    location: z.string().nullish(),
+    queryPattern: z.string().nullish(),
+  }),
+  event: z.object({
+    id: z.string(),
+    type: z.string().nullish(),
+    occurredAt: z.string().nullish(),
+    body: z.record(z.string(), z.unknown()),
+  }),
+  seer: z
+    .object({
+      status: z.string().nullish(),
+      rootCause: z.string().nullish(),
+      solution: z.string().nullish(),
+    })
+    .nullish(),
+  codeLocation: z
+    .object({
+      repository: z.string().nullish(),
+      path: z.string().nullish(),
+      line: z.number().nullish(),
+      url: z.string(),
+    })
+    .nullish(),
+  replays: z
+    .object({
+      attached: z.string().nullish(),
+      related: z.array(z.string()),
+      // the full count, since `related` is capped
+      relatedCount: z.number(),
+    })
+    .nullish(),
+  externalIssues: z
+    .array(
+      z.object({
+        id: z.string(),
+        issueId: z.string(),
+        serviceType: z.string(),
+        displayName: z.string(),
+        webUrl: z.string(),
+      }),
+    )
+    .nullish(),
+  aiConversations: z
+    .array(
+      z.object({
+        conversationId: z.string(),
+        spanId: z.string().nullish(),
+      }),
+    )
+    .nullish(),
+});
+
+export type GetIssueDetailsPayload = z.infer<
+  typeof getIssueDetailsOutputSchema
+>;
+
+/**
+ * Parses the shared formatter's json body. Returns undefined when the caller's org is not on
+ * the rollout yet, which is the signal to keep returning markdown: a structured result has to
+ * carry the whole answer, and without the body it would not.
+ */
+function parseFormattedBody(event: Event): Record<string, unknown> | undefined {
+  // the same event-type gate the markdown path applies: a transaction still needs the local
+  // rendering, which carries the fetched performance trace that the shared body does not
+  if (!usesSharedFormatterBody(event)) {
+    return undefined;
+  }
+  const content = event.formatted?.content;
+  if (!content) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(content);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The attached replay plus the related ones, derived the way the markdown output derives them.
+ * The attached id lives on the event rather than in the related list, so passing that list
+ * through alone loses the replay for an issue whose only one is attached.
+ */
+/**
+ * ``dateCreated`` sits on the shared-formatter event types rather than the base union, and
+ * the markdown path normalizes it to ISO. Read it the same way and tolerate a bad value.
+ */
+function eventOccurredAt(event: Event): string | null {
+  const raw = "dateCreated" in event ? event.dateCreated : null;
+  if (typeof raw !== "string") {
+    return null;
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function buildReplays(
+  event: Event,
+  relatedReplayIds?: string[],
+): GetIssueDetailsPayload["replays"] {
+  const attached = getReplayIdFromEvent(event);
+  const related = dedupeReplayIds(relatedReplayIds ?? []).filter(
+    (replayId) => replayId !== attached,
+  );
+  if (!attached && related.length === 0) {
+    return null;
+  }
+  // markdown shows a count plus the first few, not every id
+  return {
+    attached,
+    related: related.slice(0, MAX_RELATED_REPLAYS),
+    relatedCount: related.length,
+  };
+}
+
+function buildIssueDetailsPayload({
+  organizationSlug,
+  issue,
+  event,
+  body,
+  apiService,
+  autofixState,
+  externalIssues,
+  relatedReplayIds,
+  aiConversations,
+  codeLocation,
+}: {
+  organizationSlug: string;
+  issue: Issue;
+  event: Event;
+  body: Record<string, unknown>;
+  apiService: SentryApiService;
+  autofixState?: AutofixRunState;
+  externalIssues?: ExternalIssueList;
+  relatedReplayIds?: string[];
+  aiConversations?: AIConversationReference[];
+  codeLocation?: CodeLocation;
+}): GetIssueDetailsPayload {
+  const autofix = autofixState?.autofix;
+  // the run's own artifacts, not the whole state: an AutofixRunState carries every step and
+  // would dwarf the rest of the payload
+  const summaries = autofix ? getAutofixArtifactSummaries(autofix) : undefined;
+  const isPerf = isPerformanceIssueType(issue) && !!issue.metadata;
+
+  return {
+    issue: {
+      shortId: issue.shortId,
+      // a performance issue's metadata carries the better title, as the markdown path prefers
+      title: (isPerf ? issue.metadata?.title : null) || issue.title,
+      culprit: issue.culprit,
+      firstSeen: issue.firstSeen,
+      lastSeen: issue.lastSeen,
+      occurrences: issue.count == null ? null : Number(issue.count),
+      usersImpacted: issue.userCount == null ? null : Number(issue.userCount),
+      status: issue.status,
+      substatus: issue.substatus,
+      assignedTo:
+        typeof issue.assignedTo === "string"
+          ? issue.assignedTo
+          : issue.assignedTo?.name,
+      issueType: issue.issueType,
+      issueCategory: issue.issueCategory,
+      seerActionability:
+        issue.seerFixabilityScore == null
+          ? null
+          : getSeerActionabilityLabel(issue.seerFixabilityScore),
+      platform: issue.platform,
+      project: issue.project?.name,
+      url: apiService.getIssueUrl(organizationSlug, issue.shortId),
+      // metadata.value is a query pattern only for a performance issue; on an error it is the
+      // exception message, so reading it unconditionally would misname the error text
+      location: isPerf ? issue.metadata?.location : null,
+      queryPattern: isPerf ? issue.metadata?.value : null,
+    },
+    event: {
+      id: event.id,
+      type: typeof event.type === "string" ? event.type : null,
+      occurredAt: eventOccurredAt(event),
+      body,
+    },
+    seer: autofix
+      ? {
+          status: getStatusDisplayName(autofix.status),
+          rootCause: summaries?.rootCause,
+          solution: summaries?.solution,
+        }
+      : null,
+    codeLocation: codeLocation
+      ? {
+          repository: codeLocation.repository,
+          path: codeLocation.path,
+          line: codeLocation.line,
+          url: codeLocation.url,
+        }
+      : null,
+    replays: buildReplays(event, relatedReplayIds),
+    // mapped field by field, not handed through: several upstream schemas are passthrough, and
+    // structuredContent is a product contract rather than a view of the api response
+    externalIssues: externalIssues?.length
+      ? externalIssues.map((issue) => ({
+          id: String(issue.id),
+          issueId: String(issue.issueId),
+          serviceType: issue.serviceType,
+          displayName: issue.displayName,
+          webUrl: issue.webUrl,
+        }))
+      : null,
+    aiConversations: aiConversations?.length
+      ? aiConversations.map((conversation) => ({
+          conversationId: conversation.conversationId,
+          spanId: conversation.spanId,
+        }))
+      : null,
+  };
+}
 
 export default defineTool({
   name: "get_issue_details",
@@ -91,6 +353,10 @@ export default defineTool({
     eventId: ParamEventId.optional(),
     issueUrl: ParamIssueUrl.optional(),
   },
+  // outputSchema is deliberately not declared yet. tools/list would export it immediately,
+  // while an org that is not on sentry's formatter rollout still gets a markdown result with
+  // no structuredContent -- advertising a schema that some success paths cannot satisfy. Wire
+  // it up once the rollout guarantees a json body on every event.
   annotations: {
     readOnlyHint: true,
     destructiveHint: false,
@@ -110,7 +376,7 @@ export default defineTool({
         );
       }
 
-      setTag("organization.slug", orgSlug);
+      setOrganizationContext(orgSlug);
       // Use issueId directly if provided (e.g., from URL parsing), otherwise search by eventId
       let issue: Awaited<ReturnType<typeof apiService.getIssue>>;
       if (params.issueId) {
@@ -124,7 +390,7 @@ export default defineTool({
           query: eventId,
         });
         if (!found) {
-          return `# Event Not Found\n\nNo issue found for Event ID: ${eventId}`;
+          throw new UserInputError(`No issue found for Event ID: ${eventId}`);
         }
         issue = found;
       }
@@ -140,7 +406,7 @@ export default defineTool({
         apiService
           .getEventForIssue({
             organizationSlug: orgSlug,
-            issueId: issue.shortId,
+            issueId: String(issue.id),
             eventId,
           })
           // Optionally enhance 404 errors with parameter context
@@ -148,7 +414,7 @@ export default defineTool({
             if (error instanceof ApiNotFoundError) {
               throw enhanceNotFoundError(error, {
                 organizationSlug: orgSlug,
-                issueId: issue.shortId,
+                issueId: String(issue.id),
                 eventId,
               });
             }
@@ -171,25 +437,38 @@ export default defineTool({
         }),
       ]);
 
-      return addAIConversationSuggestedActions({
-        markdown: formatIssueOutput({
-          organizationSlug: orgSlug,
-          issue,
-          event,
-          apiService,
-          autofixState,
-          performanceTrace,
-          externalIssues,
-          relatedReplayIds,
-          aiConversations,
-          codeLocation,
-          experimentalMode: context.experimentalMode,
-          availableToolNames: context.availableToolNames,
-          directToolNames: context.directToolNames,
-        }),
+      const body = parseFormattedBody(event);
+      if (body) {
+        return structuredResult(
+          buildIssueDetailsPayload({
+            organizationSlug: orgSlug,
+            issue,
+            event,
+            body,
+            apiService,
+            autofixState,
+            externalIssues,
+            relatedReplayIds,
+            aiConversations,
+            codeLocation,
+          }),
+        );
+      }
+
+      // no shared-formatter body for this org yet: keep returning markdown rather than a
+      // structured result that is missing the event itself
+      return formatIssueOutput({
         organizationSlug: orgSlug,
+        issue,
+        event,
+        apiService,
+        autofixState,
+        performanceTrace,
+        externalIssues,
+        relatedReplayIds,
         aiConversations,
-        experimentalMode: context.experimentalMode ?? false,
+        codeLocation,
+        experimentalMode: context.experimentalMode,
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
       });
@@ -215,7 +494,7 @@ export default defineTool({
         issueUrl: params.issueUrl,
       });
 
-    setTag("organization.slug", orgSlug);
+    setOrganizationContext(orgSlug);
 
     // For the main issue lookup, provide parameter context on 404
     let issue: Awaited<ReturnType<typeof apiService.getIssue>>;
@@ -245,7 +524,7 @@ export default defineTool({
       apiService
         .getLatestEventForIssue({
           organizationSlug: orgSlug,
-          issueId: issue.shortId,
+          issueId: String(issue.id),
         })
         .then(async (event) => ({
           event,
@@ -264,25 +543,38 @@ export default defineTool({
       }),
     ]);
 
-    return addAIConversationSuggestedActions({
-      markdown: formatIssueOutput({
-        organizationSlug: orgSlug,
-        issue,
-        event,
-        apiService,
-        autofixState,
-        performanceTrace,
-        externalIssues,
-        relatedReplayIds,
-        aiConversations,
-        codeLocation,
-        experimentalMode: context.experimentalMode,
-        availableToolNames: context.availableToolNames,
-        directToolNames: context.directToolNames,
-      }),
+    const body = parseFormattedBody(event);
+    if (body) {
+      return structuredResult(
+        buildIssueDetailsPayload({
+          organizationSlug: orgSlug,
+          issue,
+          event,
+          body,
+          apiService,
+          autofixState,
+          externalIssues,
+          relatedReplayIds,
+          aiConversations,
+          codeLocation,
+        }),
+      );
+    }
+
+    // no shared-formatter body for this org yet: keep returning markdown rather than a
+    // structured result that is missing the event itself
+    return formatIssueOutput({
       organizationSlug: orgSlug,
+      issue,
+      event,
+      apiService,
+      autofixState,
+      performanceTrace,
+      externalIssues,
+      relatedReplayIds,
       aiConversations,
-      experimentalMode: context.experimentalMode ?? false,
+      codeLocation,
+      experimentalMode: context.experimentalMode,
       availableToolNames: context.availableToolNames,
       directToolNames: context.directToolNames,
     });
@@ -356,7 +648,7 @@ async function fetchIssueEnrichmentData({
       seerEnabled,
     }),
     apiService
-      .getIssueExternalLinks({ organizationSlug, issueId: issue.shortId })
+      .getIssueExternalLinks({ organizationSlug, issueId })
       .catch(() => undefined),
     apiService
       .listReplayIdsForIssue({
@@ -399,7 +691,7 @@ async function maybeFetchAutofixState({
   }
 
   return apiService
-    .getAutofixState({ organizationSlug, issueId: issue.shortId })
+    .getAutofixState({ organizationSlug, issueId: String(issue.id) })
     .catch(() => undefined);
 }
 

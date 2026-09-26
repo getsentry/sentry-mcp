@@ -1,5 +1,5 @@
-import { setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import {
   AgenticOnboardingRunTokenSchema,
   AgenticOnboardingRunStatusUpdateSchema,
@@ -130,7 +130,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? context.constraints.regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationContext(params.organizationSlug);
 
     const update = AgenticOnboardingStatusUpdateSchema.parse({
       schemaVersion: 1,

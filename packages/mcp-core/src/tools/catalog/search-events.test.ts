@@ -176,6 +176,135 @@ describe("search_events", () => {
     expect(result).toContain("No results found");
   });
 
+  it("renders a timeseries when the agent returns timeSeries (per-hour)", async () => {
+    const output = {
+      dataset: "errors" as const,
+      query: "",
+      fields: [] as string[],
+      sort: "-timestamp",
+      environment: null,
+      timeSeries: { yAxis: "count()", interval: "1h" },
+      timeRange: { statsPeriod: "24h" },
+      explanation: "Bucketed errors hourly",
+    };
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify(output),
+      experimental_output: output,
+      finishReason: "stop" as const,
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      warnings: [] as const,
+    } as any);
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events-stats/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("yAxis")).toBe("count()");
+          expect(url.searchParams.get("interval")).toBe("1h");
+          expect(url.searchParams.get("dataset")).toBe("errors");
+          return HttpResponse.json({
+            data: [
+              [1757548800, [{ count: 5 }]],
+              [1757552400, [{ count: 8 }]],
+              [1757556000, [{ count: 3 }]],
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "errors",
+        query: "errors per hour",
+        fields: null,
+        sort: null,
+        period: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        accessToken: "test-token",
+        userId: "user-123",
+        clientId: "client-123",
+        grantedSkills: new Set(),
+        constraints: {},
+        sentryHost: "sentry.io",
+      },
+    );
+
+    expect(result).toContain("count() over time");
+    expect(result).toContain("**Interval**: `1h`");
+    expect(result).toContain("**Total**: 16");
+    expect(result).toContain("**Peak**: 8");
+    expect(result).toContain("| Time (UTC) | Value |");
+  });
+
+  it("omits Total for non-additive timeseries aggregates", async () => {
+    const output = {
+      dataset: "errors" as const,
+      query: "",
+      fields: [] as string[],
+      sort: "-timestamp",
+      environment: null,
+      timeSeries: { yAxis: "count_unique(user)", interval: "1h" },
+      timeRange: { statsPeriod: "24h" },
+      explanation: "",
+    };
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify(output),
+      experimental_output: output,
+      finishReason: "stop" as const,
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      warnings: [] as const,
+    } as any);
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events-stats/",
+        () =>
+          HttpResponse.json({
+            data: [
+              [1757548800, [{ count: 5 }]],
+              [1757552400, [{ count: 8 }]],
+            ],
+          }),
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "errors",
+        query: "unique users per hour",
+        fields: null,
+        sort: null,
+        period: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        accessToken: "test-token",
+        userId: "user-123",
+        clientId: "client-123",
+        grantedSkills: new Set(),
+        constraints: {},
+        sentryHost: "sentry.io",
+      },
+    );
+
+    expect(result).toContain("count_unique(user) over time");
+    expect(result).not.toContain("**Total**");
+    // Peak (the max bucket) is still meaningful for non-additive aggregates.
+    expect(result).toContain("**Peak**: 8");
+  });
+
   it("should handle spans dataset queries", async () => {
     // Mock AI response for spans dataset
     mockGenerateText.mockResolvedValueOnce(
@@ -305,6 +434,53 @@ describe("search_events", () => {
     expect(result).toContain(
       "- Fields: `tags[type]`, `tags[sequence]`, `span.status`, `tags[reason]`, `count()`",
     );
+  });
+
+  it("flags an unknown environment even on the structured (non-agent) path", async () => {
+    const query = 'transaction:"checkout" environment:nonexistent-xyz';
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/environments/",
+        () =>
+          HttpResponse.json([
+            { id: "1", name: "production" },
+            { id: "2", name: "development" },
+          ]),
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+        HttpResponse.json({ data: [] }),
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query,
+        dataset: "spans",
+        fields: ["id", "timestamp"],
+        sort: "-timestamp",
+        period: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    // No agent runs, but the env typo in the query is still caught + surfaced.
+    expect(mockGenerateText).not.toHaveBeenCalled();
+    expect(result).toContain("not found in this organization");
+    expect(result).toContain("nonexistent-xyz");
+    expect(result).toContain("`production`");
   });
 
   it("should link directly to AI conversation details for a single conversation id filter", async () => {

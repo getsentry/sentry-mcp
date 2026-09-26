@@ -15,12 +15,12 @@ import type { WorkerProps } from "../types";
 import { setSentryUserFromRequest } from "../utils/sentry-user";
 import { TokenResponseSchema } from "./constants";
 import {
+  getClientRegistrationMethodTelemetry,
+  getOAuthGrantLifecycleTelemetry,
   OAUTH_GRANT_SHAPE_ATTRIBUTE,
   OAUTH_PROBE_REASON_ATTRIBUTE,
   OAUTH_PROBE_STATUS_CODE_ATTRIBUTE,
   OAUTH_REFRESH_OUTCOME_ATTRIBUTE,
-  getClientRegistrationMethodTelemetry,
-  getOAuthGrantLifecycleTelemetry,
 } from "./telemetry";
 
 function escapeHtml(value: string): string {
@@ -761,6 +761,38 @@ export function appendAuthorizationResponseIss(
 }
 
 /**
+ * Redirects an OAuth authorization error to a validated client redirect URI
+ * per RFC 6749 §4.1.2.1. Includes RFC 9207 `iss` when known.
+ */
+export function createAuthorizationErrorRedirect(
+  redirectUri: string,
+  code: string,
+  description: string,
+  state: string | undefined,
+  issuer: string | undefined,
+): Response {
+  const redirectUrl = new URL(redirectUri);
+
+  redirectUrl.searchParams.set("error", code);
+  redirectUrl.searchParams.set("error_description", description);
+
+  if (state) {
+    redirectUrl.searchParams.set("state", state);
+  }
+
+  if (issuer) {
+    redirectUrl.searchParams.set("iss", issuer);
+  }
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: redirectUrl.href,
+    },
+  });
+}
+
+/**
  * Creates RFC 8707 error response for invalid resource parameter.
  * Includes RFC 9207 `iss` so clients can mix-up-protect error responses too.
  */
@@ -769,24 +801,11 @@ export function createResourceValidationError(
   state: string | undefined,
   requestUrl: string,
 ): Response {
-  const redirectUrl = new URL(redirectUri);
-
-  redirectUrl.searchParams.set("error", "invalid_target");
-  redirectUrl.searchParams.set(
-    "error_description",
+  return createAuthorizationErrorRedirect(
+    redirectUri,
+    "invalid_target",
     "The resource parameter does not match this authorization server",
+    state,
+    getAuthorizationServerIssuer(requestUrl),
   );
-
-  if (state) {
-    redirectUrl.searchParams.set("state", state);
-  }
-
-  redirectUrl.searchParams.set("iss", getAuthorizationServerIssuer(requestUrl));
-
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: redirectUrl.href,
-    },
-  });
 }
