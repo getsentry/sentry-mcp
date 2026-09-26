@@ -2,6 +2,7 @@ import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { cloudflare } from "@cloudflare/vite-plugin";
+import { sentryCloudflareVitePlugin } from "@sentry/cloudflare/vite";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 import { generateHomepageFallbackHtml } from "./src/homepage-content";
@@ -37,6 +38,7 @@ export default defineConfig({
     cloudflare(),
     tailwindcss(),
     homepageFallbackHtmlPlugin(),
+    sentryCloudflareVitePlugin(),
     sentryVitePlugin({
       org: "sentry",
       project: "mcp-server",

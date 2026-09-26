@@ -10,10 +10,10 @@ const actionParams = {
   experimentalMode: false,
 };
 
-describe("AI conversation suggested actions", () => {
+describe("agent conversation suggested actions", () => {
   it("uses the public catalog gateway consistently in markdown and structured content", () => {
     const availableToolNames = new Set([
-      "get_ai_conversation_details",
+      "get_agent_conversation_details",
       "execute_sentry_tool",
     ]);
     const directToolNames = new Set(["execute_sentry_tool"]);
@@ -29,13 +29,13 @@ describe("AI conversation suggested actions", () => {
         type: "tool_call",
         toolName: "execute_sentry_tool",
         arguments: {
-          name: "get_ai_conversation_details",
+          name: "get_agent_conversation_details",
           arguments: {
             organizationSlug: "test-org",
             conversationId: "conversation-123",
           },
         },
-        reason: "Fetch the full transcript for this AI conversation.",
+        reason: "Fetch the full transcript for this agent conversation.",
       },
     ]);
     expect(
@@ -45,13 +45,13 @@ describe("AI conversation suggested actions", () => {
         directToolNames,
       }),
     ).toEqual([
-      'Use the Sentry tool `execute_sentry_tool(name=\'get_ai_conversation_details\', arguments={"organizationSlug":"test-org","conversationId":"conversation-123"})` to fetch the full transcript.',
+      'Use the Sentry tool `execute_sentry_tool(name=\'get_agent_conversation_details\', arguments={"organizationSlug":"test-org","conversationId":"conversation-123"})` to fetch the full transcript.',
     ]);
   });
 
   it("omits the action when no direct execution route is available", () => {
     const availableToolNames = new Set([
-      "get_ai_conversation_details",
+      "get_agent_conversation_details",
       "execute_sentry_tool",
     ]);
     const directToolNames = new Set<string>();
@@ -70,13 +70,13 @@ describe("AI conversation suggested actions", () => {
         directToolNames,
       }),
     ).toEqual([
-      "AI conversation detail lookup is not available in this session.",
+      "Agent conversation detail lookup is not available in this session.",
     ]);
   });
 
   it("uses the conversation tool directly when it is exposed through tools/list", () => {
-    const availableToolNames = new Set(["get_ai_conversation_details"]);
-    const directToolNames = new Set(["get_ai_conversation_details"]);
+    const availableToolNames = new Set(["get_agent_conversation_details"]);
+    const directToolNames = new Set(["get_agent_conversation_details"]);
 
     expect(
       getAIConversationSuggestedActions({
@@ -86,7 +86,7 @@ describe("AI conversation suggested actions", () => {
       }),
     ).toMatchObject([
       {
-        toolName: "get_ai_conversation_details",
+        toolName: "get_agent_conversation_details",
         arguments: {
           organizationSlug: "test-org",
           conversationId: "conversation-123",
@@ -100,7 +100,7 @@ describe("AI conversation suggested actions", () => {
         directToolNames,
       }),
     ).toEqual([
-      "Use the Sentry tool `get_ai_conversation_details(organizationSlug='test-org', conversationId='conversation-123')` to fetch the full transcript.",
+      "Use the Sentry tool `get_agent_conversation_details(organizationSlug='test-org', conversationId='conversation-123')` to fetch the full transcript.",
     ]);
   });
 });

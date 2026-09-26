@@ -6,6 +6,18 @@ export async function blobToBase64(blob: Blob): Promise<string> {
   return Buffer.from(await blob.arrayBuffer()).toString("base64");
 }
 
+/**
+ * Base64-encode raw bytes without an intermediate copy.
+ *
+ * `Buffer.from(bytes.buffer, …)` views the existing memory instead of copying
+ * it. Prefer this over a `Blob` round-trip when you already hold a `Uint8Array`.
+ */
+export function bytesToBase64(bytes: Uint8Array): string {
+  return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString(
+    "base64",
+  );
+}
+
 export interface ImagePreviewOptions {
   maxDimension?: number;
   jpegQuality?: number;

@@ -1,7 +1,7 @@
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import searchAIConversations from "./search-ai-conversations";
+import searchAIConversations from "./search-agent-conversations";
 import { getServerContext } from "../../test-setup";
 import {
   assertStructuredOnlyResult,
@@ -16,7 +16,7 @@ const baseConversation = {
   llmCalls: 2,
   toolCalls: 1,
   totalTokens: 1200,
-  totalCost: 0.012,
+  totalCost: 0.6260719999999997,
   startTimestamp: 1713805400000,
   endTimestamp: 1713805415000,
   traceCount: 1,
@@ -48,11 +48,11 @@ const longConversation = {
   lastOutput: `${"The worker timed out while calling inventory. ".repeat(20)}Next step.`,
 };
 
-describe("search_ai_conversations", () => {
+describe("search_agent_conversations", () => {
   it("returns conversation-shaped search results", async () => {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+        "https://sentry.io/api/0/organizations/test-org/agents/conversations/",
         ({ request }) => {
           const url = new URL(request.url);
           expect(url.searchParams.get("query")).toBe("checkout");
@@ -113,7 +113,7 @@ describe("search_ai_conversations", () => {
             "toolNames": [
               "search_events",
             ],
-            "totalCost": 0.012,
+            "totalCost": "$0.626",
             "totalTokens": 1200,
             "traceCount": 1,
             "url": "https://test-org.sentry.io/explore/conversations/conv-123/",
@@ -139,10 +139,46 @@ describe("search_ai_conversations", () => {
     );
   });
 
+  it("uses the Agent Monitoring display rules for small and missing costs", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/agents/conversations/",
+        () =>
+          HttpResponse.json([
+            {
+              ...baseConversation,
+              conversationId: "sub-cent",
+              totalCost: 0.00333,
+            },
+            { ...baseConversation, conversationId: "missing", totalCost: 0 },
+          ]),
+      ),
+    );
+
+    const result = await searchAIConversations.handler(
+      {
+        organizationSlug: "test-org",
+        period: "30d",
+        limit: 10,
+      },
+      getServerContext(),
+    );
+
+    const structuredContent = getStructuredContent<{
+      conversations: Array<{ totalCost: string }>;
+    }>(result);
+
+    expect(
+      structuredContent.conversations.map(
+        (conversation) => conversation.totalCost,
+      ),
+    ).toEqual(["<$0.01", "—"]);
+  });
+
   it("keeps search results concise for large conversations", async () => {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+        "https://sentry.io/api/0/organizations/test-org/agents/conversations/",
         () => HttpResponse.json([longConversation]),
       ),
     );
@@ -179,7 +215,7 @@ describe("search_ai_conversations", () => {
   it("defaults searches to the same 30d window as detail lookups", async () => {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+        "https://sentry.io/api/0/organizations/test-org/agents/conversations/",
         ({ request }) => {
           const url = new URL(request.url);
           expect(url.searchParams.get("statsPeriod")).toBe("30d");
@@ -213,7 +249,7 @@ describe("search_ai_conversations", () => {
   it("defaults to the configured search window when period is omitted", async () => {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+        "https://sentry.io/api/0/organizations/test-org/agents/conversations/",
         ({ request }) => {
           const url = new URL(request.url);
           expect(url.searchParams.get("statsPeriod")).toBe("30d");
@@ -252,12 +288,12 @@ describe("search_ai_conversations", () => {
         }),
       ),
       http.get(
-        "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+        "https://sentry.io/api/0/organizations/test-org/agents/conversations/",
         ({ request }) => {
           requestUrls.push(request.url);
           return HttpResponse.json([], {
             headers: {
-              Link: '<https://sentry.io/api/0/organizations/test-org/ai-conversations/?cursor=page-2>; rel="next"; results="true"; cursor="page-2"',
+              Link: '<https://sentry.io/api/0/organizations/test-org/agents/conversations/?cursor=page-2>; rel="next"; results="true"; cursor="page-2"',
             },
           });
         },
@@ -307,7 +343,7 @@ describe("search_ai_conversations", () => {
     let requestUrl: string | undefined;
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/test-org/ai-conversations/",
+        "https://sentry.io/api/0/organizations/test-org/agents/conversations/",
         ({ request }) => {
           requestUrl = request.url;
           return HttpResponse.json([]);

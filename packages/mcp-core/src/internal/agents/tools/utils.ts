@@ -2,7 +2,11 @@ import { getActiveSpan } from "@sentry/core";
 import { APICallError, RetryError, tool } from "ai";
 import { z } from "zod";
 import { ApiClientError, ApiServerError } from "../../../api-client";
-import { LLMProviderError, UserInputError } from "../../../errors";
+import {
+  AgentExecutionError,
+  LLMProviderError,
+  UserInputError,
+} from "../../../errors";
 import { logIssue, logWarn } from "../../../telem/logging";
 
 /**
@@ -79,6 +83,15 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
     });
     return {
       error: `AI Provider Error: ${error.message}. This is a service availability issue that cannot be resolved by retrying.`,
+    };
+  }
+
+  if (error instanceof AgentExecutionError) {
+    // Issue already filed at the embedded-agent boundary. Return a structured
+    // error so the parent agent/tool can continue without a second Sentry issue.
+    const eventIdPart = error.eventId ? ` Event ID: ${error.eventId}.` : "";
+    return {
+      error: `AI Processing Error: the embedded agent failed unexpectedly.${eventIdPart} This is a system error that cannot be resolved by retrying the same agent step.`,
     };
   }
 

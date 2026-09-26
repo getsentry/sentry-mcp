@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { LLMProviderError } from "../../errors";
+import { AgentExecutionError, LLMProviderError } from "../../errors";
 import { logWarn } from "../../telem/logging";
 import { withProviderFallback } from "./provider-fallback";
 
@@ -50,7 +50,36 @@ describe("withProviderFallback", () => {
     );
   });
 
-  it("rethrows unexpected errors", async () => {
+  it("falls back for unexpected agent failures without filing another issue", async () => {
+    const error = new AgentExecutionError("agent failed", {
+      eventId: "evt-123",
+    });
+
+    const result = await withProviderFallback({
+      operation: "search_events.rewrite",
+      fallback: () => "direct",
+      run: async () => {
+        throw error;
+      },
+    });
+
+    expect(result).toBe("direct");
+    expect(logWarn).toHaveBeenCalledWith(
+      error,
+      expect.objectContaining({
+        loggerScope: ["agents", "provider-fallback"],
+        contexts: {
+          aiProviderFallback: {
+            operation: "search_events.rewrite",
+            unexpectedAgentFailure: true,
+            eventId: "evt-123",
+          },
+        },
+      }),
+    );
+  });
+
+  it("rethrows unexpected non-agent errors", async () => {
     await expect(
       withProviderFallback({
         operation: "test.op",

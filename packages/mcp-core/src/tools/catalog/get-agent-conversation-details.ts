@@ -1,8 +1,9 @@
-// Catalog-only AI conversation detail lookup. This owns the MCP-facing
+// Catalog-only agent conversation detail lookup. This owns the MCP-facing
 // transcript projection and keeps detail output chronological and debugger
 // oriented instead of mirroring every raw span attribute.
 import { z } from "zod";
 import { setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { structuredResult } from "../../internal/tool-helpers/results";
@@ -659,14 +660,14 @@ function buildConversationArtifact(
 }
 
 export default defineTool({
-  name: "get_ai_conversation_details",
+  name: "get_agent_conversation_details",
   skills: ["inspect", "triage", "seer"],
   requiredScopes: ["event:read", "project:read"],
 
   description: [
-    "Fetch the chronological transcript and debugging details for one AI conversation.",
+    "Fetch the chronological transcript and debugging details for one agent conversation, formerly called an AI conversation.",
     "",
-    "Returns a timeline of user messages, assistant messages, and tool calls, with trace/span IDs for deeper debugging. To discover or list conversations, use search_ai_conversations.",
+    "Returns a timeline of user messages, assistant messages, and tool calls, with trace/span IDs for deeper debugging. To discover or list conversations, use search_agent_conversations.",
   ].join("\n"),
 
   inputSchema: {
@@ -674,7 +675,7 @@ export default defineTool({
     conversationId: z
       .string()
       .trim()
-      .describe("The AI conversation ID from gen_ai.conversation.id."),
+      .describe("The agent conversation ID from gen_ai.conversation.id."),
     project: z
       .string()
       .trim()
@@ -703,7 +704,7 @@ export default defineTool({
   outputSchema: aiConversationDetailsOutputSchema,
 
   async handler(params, context: ServerContext) {
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationContext(params.organizationSlug);
     setTag("ai_conversation.id", params.conversationId);
 
     if ((params.start && !params.end) || (!params.start && params.end)) {

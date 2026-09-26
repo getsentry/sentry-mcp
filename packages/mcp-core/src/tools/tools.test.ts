@@ -24,6 +24,10 @@ const DESCRIPTION_MAX_LENGTH = 2048;
 const PUBLIC_TOOL_HARD_LIMIT = 25;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CATALOG_DIR = path.join(__dirname, "catalog");
+const CATALOG_TOOL_SOURCE_FILE_ALIASES = {
+  get_ai_conversation_details: "get_agent_conversation_details",
+  search_ai_conversations: "search_agent_conversations",
+} as const satisfies Record<string, string>;
 
 function getCatalogToolSourceFiles(): string[] {
   return fs
@@ -150,7 +154,11 @@ test("direct tool input schemas ban root and nested JSON Schema unions", () => {
 });
 
 test("catalog tools have colocated inline snapshot baseline tests", () => {
-  const expectedSourceFiles = Object.values(catalogTools)
+  const aliasToolNames = new Set(Object.keys(CATALOG_TOOL_SOURCE_FILE_ALIASES));
+  const canonicalTools = Object.values(catalogTools).filter(
+    (tool) => !aliasToolNames.has(tool.name),
+  );
+  const expectedSourceFiles = canonicalTools
     .map((tool) => getCatalogToolSourceFileName(tool.name))
     .sort();
 
@@ -160,7 +168,7 @@ test("catalog tools have colocated inline snapshot baseline tests", () => {
     "catalog tool source files must match the catalog registry",
   );
 
-  for (const tool of Object.values(catalogTools)) {
+  for (const tool of canonicalTools) {
     const sourceFile = getCatalogToolSourceFileName(tool.name);
     const testFile = sourceFile.replace(/\.ts$/, ".test.ts");
     const testPath = path.join(CATALOG_DIR, testFile);
@@ -174,6 +182,23 @@ test("catalog tools have colocated inline snapshot baseline tests", () => {
     assert(
       testContents.includes("toMatchInlineSnapshot("),
       `catalog tool '${tool.name}' must include a baseline inline snapshot test in ${testFile}`,
+    );
+  }
+});
+
+test("catalog aliases reference existing canonical tools", () => {
+  const catalogToolNames = new Set(Object.keys(catalogTools));
+
+  for (const [toolName, canonicalToolName] of Object.entries(
+    CATALOG_TOOL_SOURCE_FILE_ALIASES,
+  )) {
+    assert(
+      catalogToolNames.has(toolName),
+      `catalog alias '${toolName}' must exist`,
+    );
+    assert(
+      catalogToolNames.has(canonicalToolName),
+      `catalog alias '${toolName}' must reference an existing canonical tool`,
     );
   }
 });

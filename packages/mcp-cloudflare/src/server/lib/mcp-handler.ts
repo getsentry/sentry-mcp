@@ -318,7 +318,6 @@ async function handleAuthenticatedMcpRequest(
   const organizationSlug = groups?.org || null;
   const projectSlug = groups?.project || null;
 
-
   // Check for experimental mode query parameter
   const isExperimentalMode = url.searchParams.get("experimental") === "1";
 
@@ -460,7 +459,7 @@ async function handleAuthenticatedMcpRequest(
     () =>
       buildServer({
         context: serverContext,
-            experimentalMode: isExperimentalMode,
+        experimentalMode: isExperimentalMode,
         sdkVersion: "v2",
       }),
     {

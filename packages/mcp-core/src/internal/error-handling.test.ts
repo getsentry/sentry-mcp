@@ -4,6 +4,7 @@ import {
   isExpectedToolError,
 } from "./error-handling";
 import {
+  AgentExecutionError,
   UserInputError,
   ConfigurationError,
   LLMProviderError,
@@ -23,6 +24,11 @@ describe("isExpectedToolError", () => {
       true,
     );
     expect(isExpectedToolError(new UserInputError("bad input"))).toBe(true);
+    expect(
+      isExpectedToolError(
+        new AgentExecutionError("agent failed", { eventId: "evt-1" }),
+      ),
+    ).toBe(true);
     expect(
       isExpectedToolError(
         new APICallError({
@@ -222,6 +228,22 @@ describe("formatErrorForUser", () => {
       expect(result).toContain("Invalid issue ID format");
       expect(result).toContain("**Input Error**");
       expect(logIssue).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("AgentExecutionError", () => {
+    const error = new AgentExecutionError(
+      "The AI agent failed to complete this request: No output generated.",
+      { eventId: "evt-abc" },
+    );
+
+    it("returns a graceful AI processing error without creating another issue", async () => {
+      const result = await formatErrorForUser(error, { transport: "http" });
+      expect(result).toContain("**AI Processing Error**");
+      expect(result).toContain("failed to complete this request");
+      expect(result).toContain("**Event ID**: evt-abc");
+      expect(logIssue).not.toHaveBeenCalled();
+      expect(logWarn).not.toHaveBeenCalled();
     });
   });
 });

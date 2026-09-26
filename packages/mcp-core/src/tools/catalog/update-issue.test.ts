@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { issueFixture, mswServer } from "@sentry/mcp-server-mocks";
+import { prepareToolParams } from "../catalog-runtime/availability.js";
 import updateIssue from "./update-issue.js";
 
 type MockIssue = typeof issueFixture;
@@ -94,6 +95,44 @@ describe("update_issue", () => {
       - Full issue details: \`get_sentry_resource(resourceType="issue", organizationSlug="sentry-mcp-evals", resourceId="CLOUDFLARE-MCP-41")\`
       "
     `);
+  });
+
+  it("unassigns an issue", async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    const currentIssue = createIssue();
+    const updatedIssue = createIssue({ assignedTo: null });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        async ({ request }) => {
+          requestBody = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(updatedIssue);
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: undefined,
+        assignedTo: null,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(requestBody).toEqual({ assignedTo: "" });
+    expect(result).toContain(
+      "**Assigned To**: Jane Developer → **Unassigned**",
+    );
+    expect(result).toContain("**Assigned To**: Unassigned");
   });
 
   it("skips status updates when the requested status is already set", async () => {
@@ -985,4 +1024,36 @@ describe("update_issue", () => {
     // Comment failure should be reported gracefully, not thrown
     expect(result).toContain("**Comment not posted**");
   });
+
+  it("strips null bytes from reason before posting as a comment", () => {
+    // prepareToolParams runs the Zod schema (including transforms) the same
+    // way the MCP server does at runtime, so this exercises the full parse path.
+    const prepared = prepareToolParams({
+      tool: updateIssue,
+      params: {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        reason: "\0 Resolved\0because\0fix deployed \0",
+      },
+      context: serverContext,
+    });
+    expect(prepared.reason).toBe("Resolvedbecausefix deployed");
+  });
+
+  it.each(["\0", " \0 \0 "])(
+    "rejects a reason that is empty after removing null bytes: %j",
+    (reason) => {
+      expect(() =>
+        prepareToolParams({
+          tool: updateIssue,
+          params: {
+            organizationSlug: "sentry-mcp-evals",
+            issueId: "CLOUDFLARE-MCP-41",
+            reason,
+          },
+          context: serverContext,
+        }),
+      ).toThrow();
+    },
+  );
 });

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { UserInputError, ConfigurationError, LLMProviderError } from "./errors";
+import {
+  AgentExecutionError,
+  UserInputError,
+  ConfigurationError,
+  LLMProviderError,
+} from "./errors";
 
 describe("UserInputError", () => {
   it("should create a UserInputError with the correct message and name", () => {
@@ -87,5 +92,40 @@ describe("LLMProviderError", () => {
     const error = new LLMProviderError("Region not supported", { cause });
 
     expect(error.cause).toBe(cause);
+  });
+});
+
+describe("AgentExecutionError", () => {
+  it("should create an AgentExecutionError with the correct message and name", () => {
+    const message = "The AI agent failed to complete this request";
+    const error = new AgentExecutionError(message);
+
+    expect(error.message).toBe(message);
+    expect(error.name).toBe("AgentExecutionError");
+    expect(error instanceof Error).toBe(true);
+    expect(error instanceof AgentExecutionError).toBe(true);
+  });
+
+  it("should be distinguishable from other error types", () => {
+    const agentError = new AgentExecutionError("agent failed");
+    const llmError = new LLMProviderError("provider failed");
+    const userInputError = new UserInputError("bad input");
+    const regularError = new Error("regular");
+
+    expect(agentError instanceof AgentExecutionError).toBe(true);
+    expect(llmError instanceof AgentExecutionError).toBe(false);
+    expect(userInputError instanceof AgentExecutionError).toBe(false);
+    expect(regularError instanceof AgentExecutionError).toBe(false);
+  });
+
+  it("should support error cause and eventId", () => {
+    const cause = new Error("No output generated.");
+    const error = new AgentExecutionError("agent failed", {
+      cause,
+      eventId: "abc123",
+    });
+
+    expect(error.cause).toBe(cause);
+    expect(error.eventId).toBe("abc123");
   });
 });

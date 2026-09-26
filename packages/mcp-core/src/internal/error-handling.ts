@@ -1,4 +1,5 @@
 import {
+  AgentExecutionError,
   UserInputError,
   ConfigurationError,
   LLMProviderError,
@@ -11,7 +12,8 @@ import {
 } from "../api-client";
 import { logIssue, logWarn } from "../telem/logging";
 import { APICallError, NoObjectGeneratedError, RetryError } from "ai";
-import type { TransportType } from "../types";
+import type { ToolConfig } from "../tools/types";
+import type { ServerContext, TransportType } from "../types";
 
 /**
  * Type guard to identify user input validation errors.
@@ -34,6 +36,16 @@ export function isConfigurationError(
  */
 export function isLLMProviderError(error: unknown): error is LLMProviderError {
   return error instanceof LLMProviderError;
+}
+
+/**
+ * Type guard for unexpected embedded-agent failures that already created a
+ * Sentry issue at the agent boundary.
+ */
+export function isAgentExecutionError(
+  error: unknown,
+): error is AgentExecutionError {
+  return error instanceof AgentExecutionError;
 }
 
 /**
@@ -88,6 +100,8 @@ export function isExpectedToolError(error: unknown): boolean {
     isUserInputError(error) ||
     isConfigurationError(error) ||
     isLLMProviderError(error) ||
+    // Already reported once in callEmbeddedAgent; do not record again on the span.
+    isAgentExecutionError(error) ||
     isApiClientError(error) ||
     isApiAuthenticationErrorDeep(error)
   ) {
@@ -205,6 +219,20 @@ export async function formatErrorForUser(
     );
   }
 
+  // Unexpected agent failure already filed a Sentry issue in callEmbeddedAgent.
+  // Return a graceful tool error without creating a second issue.
+  if (isAgentExecutionError(error)) {
+    const parts = [
+      "**AI Processing Error**",
+      "The AI agent failed to complete this request.",
+      "The service operator has been notified. Please try again, or rephrase your request.",
+    ];
+    if (error.eventId) {
+      parts.push(`**Event ID**: ${error.eventId}`);
+    }
+    return parts.join("\n\n");
+  }
+
   // Handle AI SDK APICallError / RetryError that weren't converted to
   // LLMProviderError. This is a defensive layer - ideally callEmbeddedAgent
   // converts these. Treat all provider API failures as availability issues so
@@ -309,4 +337,20 @@ export async function formatErrorForUser(
     }
   }
   return parts.join("\n\n");
+}
+
+/**
+ * Invoke a tool's onError hook for failure telemetry, isolated so a misbehaving
+ * hook can't disrupt the surrounding error handling. Call this at every point
+ * where a tool handler is run and may throw.
+ */
+export function recordToolFailure(
+  tool: Pick<ToolConfig, "onError">,
+  error: unknown,
+  params: Record<string, unknown>,
+  context: ServerContext,
+): void {
+  try {
+    tool.onError?.(error, params, context);
+  } catch {}
 }

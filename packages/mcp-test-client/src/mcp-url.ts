@@ -40,7 +40,6 @@ export function applyProtectedResourceFlags(
     useExperimental?: boolean;
   },
 ): URL {
-
   if (options.useExperimental) {
     protectedResourceUrl.searchParams.set("experimental", "1");
   }

@@ -1,13 +1,13 @@
-import { z } from "zod";
 import { getActiveSpan } from "@sentry/core";
-import { UserInputError } from "../../../errors";
+import { z } from "zod";
 import type {
-  SentryApiService,
-  TraceItemAttributeType,
   EventsQueryValidation,
   EventsValidationResult,
+  SentryApiService,
+  TraceItemAttributeType,
   TraceItemType,
 } from "../../../api-client";
+import { UserInputError } from "../../../errors";
 import {
   agentTool,
   recordAgentToolResultCount,
@@ -18,8 +18,8 @@ import {
 } from "../../../internal/user-formatting";
 import {
   type EventsDataset,
-  PUBLIC_EVENTS_DATASETS,
   normalizeEventsDataset,
+  PUBLIC_EVENTS_DATASETS,
 } from "../../../utils/events-datasets";
 
 // Type for flexible event data that can contain any fields
@@ -114,6 +114,251 @@ export function looksLikeSentrySearchSyntax(query?: string): boolean {
   }
 
   return false;
+}
+
+const FULL_TEXT_SEARCH_KEYS = new Set(["message", "log.body"]);
+
+/**
+ * Replace quoted regions with same-length placeholders so colons inside quotes
+ * are not treated as filter-key separators (e.g. transaction:"handle message:hello").
+ * Length is preserved so offsets still map back to the original query.
+ */
+function maskQuotedRegions(query: string): string {
+  let out = "";
+  let quote: '"' | "'" | null = null;
+  let escaped = false;
+
+  for (const char of query) {
+    if (escaped) {
+      escaped = false;
+      out += quote ? "x" : char;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      out += quote ? "x" : char;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+        out += char;
+      } else {
+        // Keep length; neutralize token separators inside quotes.
+        out += char === ":" || /\s/.test(char) ? "x" : char;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      out += char;
+      continue;
+    }
+    out += char;
+  }
+
+  return out;
+}
+
+type SearchFilterOccurrence = {
+  key: string;
+  value: string;
+};
+
+function normalizeFilterValue(rawValue: string): string {
+  return rawValue
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/^\*+|\*+$/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Read one filter value starting at `valueStart` in the original query.
+ * Quoted values keep interior whitespace; unquoted values stop at whitespace.
+ */
+function readRawFilterValue(query: string, valueStart: number): string | undefined {
+  if (valueStart >= query.length) {
+    return undefined;
+  }
+
+  const first = query[valueStart];
+  if (first === '"' || first === "'") {
+    let escaped = false;
+    for (let i = valueStart + 1; i < query.length; i += 1) {
+      const char = query[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === first) {
+        return query.slice(valueStart, i + 1);
+      }
+    }
+    // Unclosed quote: take the remainder so comparison still sees later words.
+    return query.slice(valueStart);
+  }
+
+  const valueMatch = query.slice(valueStart).match(/^\S+/);
+  return valueMatch?.[0];
+}
+
+/**
+ * Extract every field:value occurrence while preserving multiplicity and quote
+ * boundaries. Values are normalized for comparison (strip wrapping quotes and
+ * leading/trailing wildcards).
+ */
+function searchFilterOccurrences(query: string): SearchFilterOccurrence[] {
+  const occurrences: SearchFilterOccurrence[] = [];
+  const masked = maskQuotedRegions(query);
+
+  for (const match of masked.matchAll(SENTRY_SEARCH_TOKEN_PATTERN)) {
+    const key = match[2]?.toLowerCase();
+    if (!key || match.index === undefined) {
+      continue;
+    }
+
+    // Read the real value from the original query at the same offset so quotes
+    // and multi-word quoted values are preserved before normalization.
+    const valueStart = match.index + match[0].indexOf(":") + 1;
+    const rawValue = readRawFilterValue(query, valueStart);
+    if (!rawValue) {
+      continue;
+    }
+
+    const value = normalizeFilterValue(rawValue);
+    if (!value) {
+      continue;
+    }
+
+    occurrences.push({ key, value });
+  }
+
+  return occurrences;
+}
+
+function structuredFilterOccurrences(
+  query: string,
+): SearchFilterOccurrence[] {
+  return searchFilterOccurrences(query).filter(
+    (occurrence) => !FULL_TEXT_SEARCH_KEYS.has(occurrence.key),
+  );
+}
+
+function fullTextFilterValues(query: string): string[] {
+  return searchFilterOccurrences(query)
+    .filter((occurrence) => FULL_TEXT_SEARCH_KEYS.has(occurrence.key))
+    .map((occurrence) => occurrence.value);
+}
+
+function filterOccurrenceIdentity(occurrence: SearchFilterOccurrence): string {
+  return `${occurrence.key}\0${occurrence.value}`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * True when `needle` appears in `haystack` as a whole token, not a bare
+ * substring. Prevents `id:1` from matching inside `message:"error 401"`.
+ */
+function containsAsWholeToken(haystack: string, needle: string): boolean {
+  if (!haystack || !needle) {
+    return false;
+  }
+  if (haystack === needle) {
+    return true;
+  }
+
+  const escaped = escapeRegExp(needle);
+  // Token edges are start/end or a non-alphanumeric/underscore char so short
+  // numeric fragments cannot match inside longer numbers.
+  return new RegExp(`(?:^|[^A-Za-z0-9_])${escaped}(?:$|[^A-Za-z0-9_])`).test(
+    haystack,
+  );
+}
+
+function isRelatedFilterValue(left: string, right: string): boolean {
+  return (
+    containsAsWholeToken(left, right) || containsAsWholeToken(right, left)
+  );
+}
+
+/**
+ * Structured filters present in `original` that are not covered by multiset
+ * cardinality in `repaired` (same key+value pair counts).
+ */
+function unmatchedStructuredFilters(
+  original: SearchFilterOccurrence[],
+  repaired: SearchFilterOccurrence[],
+): SearchFilterOccurrence[] {
+  const remaining = new Map<string, number>();
+  for (const occurrence of repaired) {
+    const identity = filterOccurrenceIdentity(occurrence);
+    remaining.set(identity, (remaining.get(identity) ?? 0) + 1);
+  }
+
+  const unmatched: SearchFilterOccurrence[] = [];
+  for (const occurrence of original) {
+    const identity = filterOccurrenceIdentity(occurrence);
+    const count = remaining.get(identity) ?? 0;
+    if (count > 0) {
+      remaining.set(identity, count - 1);
+      continue;
+    }
+    unmatched.push(occurrence);
+  }
+
+  return unmatched;
+}
+
+/**
+ * True when a structured field:value filter was replaced with message/log.body
+ * full-text matching (false-success path). Allows real attribute renames.
+ *
+ * Uses multiset key+value matching so dropping one of several identical keys
+ * (e.g. `custom:foo custom:bar` → `custom:bar message:"*foo*"`) is still caught.
+ * Value comparison is whole-token, not bare substring, so unrelated full-text
+ * (e.g. `id:1` vs `message:"error 401"`) is not treated as a downgrade.
+ */
+export function isSemanticFilterDowngrade(
+  originalQuery: string,
+  repairedQuery: string,
+): boolean {
+  if (!looksLikeSentrySearchSyntax(originalQuery)) {
+    return false;
+  }
+
+  const originalFilters = structuredFilterOccurrences(originalQuery);
+  if (originalFilters.length === 0) {
+    return false;
+  }
+
+  const repairedFilters = structuredFilterOccurrences(repairedQuery);
+  const droppedFilters = unmatchedStructuredFilters(
+    originalFilters,
+    repairedFilters,
+  );
+  if (droppedFilters.length === 0) {
+    return false;
+  }
+
+  const repairedFullTextValues = fullTextFilterValues(repairedQuery);
+  if (repairedFullTextValues.length === 0) {
+    // Renames keep values on non-full-text attributes and do not need this guard.
+    return false;
+  }
+
+  return droppedFilters.some((filter) =>
+    repairedFullTextValues.some((fullTextValue) =>
+      isRelatedFilterValue(filter.value, fullTextValue),
+    ),
+  );
 }
 
 function isPrimitive(
@@ -606,8 +851,6 @@ export function recordEventsSearchValidationTelemetry({
   }
 }
 
-export const MAX_EVENTS_VALIDATION_ATTEMPTS = 3;
-
 export async function validateEventsSearch(
   apiService: SentryApiService,
   {
@@ -816,6 +1059,93 @@ ${DATASET_EXAMPLES[normalizedDataset]
   .join("\n\n")}
 
 Use these examples as patterns for constructing your query.`;
+    },
+  });
+}
+
+/**
+ * Create a tool for the agent to validate a candidate events search before returning.
+ * Prefer this over external try/fail/retry orchestration in the tool handler.
+ */
+export function createValidateEventsSearchTool(options: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  projectId?: string;
+}) {
+  const { apiService, organizationSlug, projectId } = options;
+
+  return agentTool({
+    description:
+      "Validate a candidate Sentry events search before returning it. Call this after constructing dataset/query/fields/sort. If invalid, fix the request and validate again. Never replace a structured field:value filter with message/log.body full-text matching.",
+    parameters: z.object({
+      dataset: z
+        .enum(PUBLIC_EVENTS_DATASETS)
+        .describe("Dataset for the candidate search"),
+      query: z
+        .string()
+        .describe("Candidate Sentry search query string (may be empty)"),
+      fields: z
+        .array(z.string())
+        .min(1)
+        .describe(
+          "Candidate fields, including any aggregate functions and sort field",
+        ),
+      sort: z.string().min(1).describe("Candidate sort parameter"),
+      statsPeriod: z
+        .string()
+        .optional()
+        .describe("Optional relative time period like 1h, 24h, 7d"),
+      start: z.string().optional().describe("Optional ISO 8601 start time"),
+      end: z.string().optional().describe("Optional ISO 8601 end time"),
+      environment: z
+        .union([z.string().min(1), z.array(z.string().min(1)).min(1)])
+        .optional()
+        .describe(
+          "Optional environment filter. Prefer query filters for non-replay datasets.",
+        ),
+    }),
+    execute: async ({
+      dataset,
+      query,
+      fields,
+      sort,
+      statsPeriod,
+      start,
+      end,
+      environment,
+    }) => {
+      const validation = await validateEventsSearch(apiService, {
+        organizationSlug,
+        dataset,
+        fields,
+        query,
+        sort,
+        projectId,
+        environment,
+        statsPeriod,
+        start,
+        end,
+      });
+
+      recordEventsSearchValidationTelemetry({
+        attempt: 0,
+        validation,
+      });
+
+      if (validation.valid) {
+        return {
+          valid: true,
+          message: "Search validation passed.",
+        };
+      }
+
+      const formatted = formatEventsValidationResults(validation);
+      return {
+        valid: false,
+        message: formatted
+          ? `Search validation failed:\n${formatted}`
+          : "Search validation failed.",
+      };
     },
   });
 }

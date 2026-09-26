@@ -11,12 +11,7 @@ import findOrganizations from "./find-organizations.js";
 
 function mockOrganizations(organizations: unknown[]) {
   mswServer.use(
-    http.get("https://sentry.io/api/0/users/me/regions/", () =>
-      HttpResponse.json({
-        regions: [{ name: "us", url: "https://us.sentry.io" }],
-      }),
-    ),
-    http.get("https://us.sentry.io/api/0/organizations/", ({ request }) => {
+    http.get("https://sentry.io/api/0/organizations/", ({ request }) => {
       expect(new URL(request.url).searchParams.get("per_page")).toBe("26");
       return HttpResponse.json(organizations);
     }),
@@ -26,6 +21,44 @@ function mockOrganizations(organizations: unknown[]) {
 describe("find_organizations", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it.each([
+    ["sentry.io", "sentry.io"],
+    ["us.sentry.io", "sentry.io"],
+    ["de.sentry.io", "sentry.io"],
+    ["example.sentry.io", "sentry.io"],
+    ["example.my.sentry.io", "example.my.sentry.io"],
+    ["sentry.example.com", "sentry.example.com"],
+  ])("lists organizations from %s through %s", async (host, expectedHost) => {
+    const requests: { url: string; authorization: string | null }[] = [];
+    mswServer.use(
+      http.get("*", ({ request }) => {
+        requests.push({
+          url: request.url,
+          authorization: request.headers.get("authorization"),
+        });
+        return HttpResponse.json([
+          { id: "1", slug: "example", name: "Example" },
+        ]);
+      }),
+    );
+
+    const result = await findOrganizations.handler(
+      { query: "example" },
+      getServerContext({ sentryHost: host, accessToken: "test-token" }),
+    );
+
+    expect(requests).toEqual([
+      {
+        url: `https://${expectedHost}/api/0/organizations/?per_page=26&query=example`,
+        authorization: "Bearer test-token",
+      },
+    ]);
+    expect(getStructuredContent(result)).toEqual({
+      organizations: [{ slug: "example", webUrl: null, regionUrl: null }],
+      hasMore: false,
+    });
   });
 
   it("returns only the structured organization payload", async () => {

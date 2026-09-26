@@ -1,4 +1,5 @@
 import whoami from "./whoami";
+import getSentryMcpInfo from "./get-sentry-mcp-info";
 import findOrganizations from "./find-organizations";
 import findTeams from "./find-teams";
 import findProjects from "./find-projects";
@@ -10,11 +11,20 @@ import findMonitors from "./find-monitors";
 import getMonitorDetails from "./get-monitor-details";
 import findUptimeMonitors from "./find-uptime-monitors";
 import getUptimeMonitorDetails from "./get-uptime-monitor-details";
+import findMetricMonitors from "./find-metric-monitors";
+import getMetricMonitorDetails from "./get-metric-monitor-details";
+import createMetricMonitor from "./create-metric-monitor";
+import updateMetricMonitor from "./update-metric-monitor";
+import deleteMetricMonitor from "./delete-metric-monitor";
 import createUptimeMonitor from "./create-uptime-monitor";
 import updateUptimeMonitor from "./update-uptime-monitor";
 import deleteUptimeMonitor from "./delete-uptime-monitor";
 import findAlertRules from "./find-alert-rules";
 import getAlertRule from "./get-alert-rule";
+import getAlertOptions from "./get-alert-options";
+import updateAlertRule from "./update-alert-rule";
+import createAlertRule from "./create-alert-rule";
+import deleteAlertRule from "./delete-alert-rule";
 import getIssueDetails from "./get-issue-details";
 import getEventStacktrace from "./get-event-stacktrace";
 import getIssueActivity from "./get-issue-activity";
@@ -46,11 +56,33 @@ import getSentryResource from "./get-sentry-resource";
 import getSnapshot from "./get-snapshot";
 import getSnapshotImage from "./get-snapshot-image";
 import getLatestBaseSnapshot from "./get-latest-base-snapshot";
-import getAIConversationDetails from "./get-ai-conversation-details";
-import searchAIConversations from "./search-ai-conversations";
+import getAgentConversationDetails from "./get-agent-conversation-details";
+import searchAgentConversations from "./search-agent-conversations";
 import addIssueNote from "./add-issue-note";
 import onboardingStatusUpdate from "./onboarding-status-update";
 import type { ToolConfig } from "../types";
+
+const legacyGetAIConversationDetails = {
+  ...getAgentConversationDetails,
+  name: "get_ai_conversation_details",
+  includeInSkillDefinitions: false,
+  description: [
+    "Deprecated alias for get_agent_conversation_details.",
+    "",
+    "Use get_agent_conversation_details for new integrations. This alias is kept for backward compatibility.",
+  ].join("\n"),
+} satisfies ToolConfig<any>;
+
+const legacySearchAIConversations = {
+  ...searchAgentConversations,
+  name: "search_ai_conversations",
+  includeInSkillDefinitions: false,
+  description: [
+    "Deprecated alias for search_agent_conversations.",
+    "",
+    "Use search_agent_conversations for new integrations. This alias is kept for backward compatibility.",
+  ].join("\n"),
+} satisfies ToolConfig<any>;
 
 /**
  * Catalog of ordinary Sentry MCP operations.
@@ -74,11 +106,20 @@ const catalogTools = {
   get_monitor_details: getMonitorDetails,
   find_uptime_monitors: findUptimeMonitors,
   get_uptime_monitor_details: getUptimeMonitorDetails,
+  find_metric_monitors: findMetricMonitors,
+  get_metric_monitor_details: getMetricMonitorDetails,
+  create_metric_monitor: createMetricMonitor,
+  update_metric_monitor: updateMetricMonitor,
+  delete_metric_monitor: deleteMetricMonitor,
   create_uptime_monitor: createUptimeMonitor,
   update_uptime_monitor: updateUptimeMonitor,
   delete_uptime_monitor: deleteUptimeMonitor,
   find_alert_rules: findAlertRules,
   get_alert_rule: getAlertRule,
+  get_alert_options: getAlertOptions,
+  update_alert_rule: updateAlertRule,
+  create_alert_rule: createAlertRule,
+  delete_alert_rule: deleteAlertRule,
   get_issue_details: getIssueDetails,
   get_event_stacktrace: getEventStacktrace,
   get_issue_activity: getIssueActivity,
@@ -106,12 +147,15 @@ const catalogTools = {
   search_issue_events: searchIssueEvents,
   get_profile: getProfile,
   get_profile_details: getProfileDetails,
+  get_sentry_mcp_info: getSentryMcpInfo,
   get_sentry_resource: getSentryResource,
   get_snapshot: getSnapshot,
   get_snapshot_image: getSnapshotImage,
   get_latest_base_snapshot: getLatestBaseSnapshot,
-  get_ai_conversation_details: getAIConversationDetails,
-  search_ai_conversations: searchAIConversations,
+  get_agent_conversation_details: getAgentConversationDetails,
+  get_ai_conversation_details: legacyGetAIConversationDetails,
+  search_agent_conversations: searchAgentConversations,
+  search_ai_conversations: legacySearchAIConversations,
   add_issue_note: addIssueNote,
   onboarding_status_update: onboardingStatusUpdate,
 } as const satisfies Record<string, ToolConfig<any>>;

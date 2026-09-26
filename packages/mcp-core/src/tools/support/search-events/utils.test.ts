@@ -1,15 +1,16 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import {
-  fetchCustomAttributes,
-  formatEventValue,
-  formatEventsValidationResults,
-  formatKnownUserValue,
-  looksLikeSentrySearchSyntax,
-} from "./utils";
+import { HttpResponse, http } from "msw";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SentryApiService } from "../../../api-client";
 import * as logging from "../../../telem/logging";
+import {
+  fetchCustomAttributes,
+  formatEventsValidationResults,
+  formatEventValue,
+  formatKnownUserValue,
+  isSemanticFilterDowngrade,
+  looksLikeSentrySearchSyntax,
+} from "./utils";
 
 describe("formatEventValue", () => {
   describe("primitives", () => {
@@ -220,6 +221,104 @@ describe("search query helpers", () => {
     expect(looksLikeSentrySearchSyntax("started at 10:30")).toBe(false);
     expect(looksLikeSentrySearchSyntax("Note: show slow spans")).toBe(false);
     expect(looksLikeSentrySearchSyntax("ERROR: service is down")).toBe(false);
+  });
+
+  it("detects message full-text downgrades but allows real field renames", () => {
+    expect(
+      isSemanticFilterDowngrade("conv_id:ZYGC-86ZR", 'message:"*ZYGC-86ZR*"'),
+    ).toBe(true);
+    expect(
+      isSemanticFilterDowngrade(
+        "conv_id:ZYGC-86ZR",
+        "message:*ZYGC-86ZR* environment:prod",
+      ),
+    ).toBe(true);
+
+    // Legitimate typo/rename repairs must not be treated as downgrades.
+    expect(
+      isSemanticFilterDowngrade(
+        "spon.duration:>100 span.op:db",
+        "span.duration:>100 span.op:db",
+      ),
+    ).toBe(false);
+    expect(
+      isSemanticFilterDowngrade(
+        "tags[type]:Unified",
+        "tags[type]:Unified has:span.status",
+      ),
+    ).toBe(false);
+    expect(isSemanticFilterDowngrade("span.op:db AND", "span.op:db")).toBe(
+      false,
+    );
+
+    // Natural language input is not a structured-filter downgrade case.
+    expect(
+      isSemanticFilterDowngrade(
+        "errors mentioning ZYGC-86ZR",
+        'message:"*ZYGC-86ZR*"',
+      ),
+    ).toBe(false);
+
+    // message: inside a quoted value is not a full-text filter.
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:hello",
+        'transaction:"handle message:hello"',
+      ),
+    ).toBe(false);
+
+    // Duplicate structured keys must still catch a partial full-text downgrade.
+    // Set-based key comparison would miss this because "custom" remains present.
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:foo custom:bar",
+        'custom:bar message:"*foo*"',
+      ),
+    ).toBe(true);
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:foo custom:foo",
+        'custom:foo message:"*foo*"',
+      ),
+    ).toBe(true);
+
+    // Keeping both structured values (or renaming one) is not a downgrade.
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:foo custom:bar",
+        "custom:foo custom:bar environment:prod",
+      ),
+    ).toBe(false);
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:foo custom:bar",
+        "tags[custom]:foo custom:bar",
+      ),
+    ).toBe(false);
+
+    // Quoted multi-word values must keep later words for downgrade detection.
+    // Truncating at the first space would miss message rewrites of "world".
+    expect(
+      isSemanticFilterDowngrade(
+        'transaction:"hello world"',
+        'message:"*world*"',
+      ),
+    ).toBe(true);
+    expect(
+      isSemanticFilterDowngrade(
+        "transaction:'hello world'",
+        'log.body:"*hello world*"',
+      ),
+    ).toBe(true);
+
+    // Bare substring matches are not enough — short values must not false-hit
+    // inside unrelated full-text (e.g. "1" inside "401").
+    expect(
+      isSemanticFilterDowngrade("id:1", 'message:"error 401"'),
+    ).toBe(false);
+    expect(
+      isSemanticFilterDowngrade("id:1", 'message:"error 1"'),
+    ).toBe(true);
   });
 });
 

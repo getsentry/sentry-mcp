@@ -1,9 +1,8 @@
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { isTopLevelToolName } from "../../tools/surfaces";
 import {
   formatToolCall,
   isToolAvailableInSession,
 } from "./tool-call-formatting";
-import { isTopLevelToolName } from "../../tools/surfaces";
 
 const MAX_SUGGESTED_ACTIONS = 3;
 
@@ -55,14 +54,17 @@ export function getAIConversationSuggestedActions({
 }): SuggestedToolAction[] {
   if (
     aiConversations.length === 0 ||
-    !isToolAvailableInSession("get_ai_conversation_details", availableToolNames)
+    !isToolAvailableInSession(
+      "get_agent_conversation_details",
+      availableToolNames,
+    )
   ) {
     return [];
   }
 
   const targetIsDirect = directToolNames
-    ? directToolNames.has("get_ai_conversation_details")
-    : isTopLevelToolName("get_ai_conversation_details", experimentalMode);
+    ? directToolNames.has("get_agent_conversation_details")
+    : isTopLevelToolName("get_agent_conversation_details", experimentalMode);
   const executeToolIsDirect = directToolNames
     ? directToolNames.has("execute_sentry_tool")
     : isTopLevelToolName("execute_sentry_tool", experimentalMode);
@@ -84,18 +86,18 @@ export function getAIConversationSuggestedActions({
     return targetIsDirect
       ? {
           type: "tool_call",
-          toolName: "get_ai_conversation_details",
+          toolName: "get_agent_conversation_details",
           arguments: targetArguments,
-          reason: "Fetch the full transcript for this AI conversation.",
+          reason: "Fetch the full transcript for this agent conversation.",
         }
       : {
           type: "tool_call",
           toolName: "execute_sentry_tool",
           arguments: {
-            name: "get_ai_conversation_details",
+            name: "get_agent_conversation_details",
             arguments: targetArguments,
           },
-          reason: "Fetch the full transcript for this AI conversation.",
+          reason: "Fetch the full transcript for this agent conversation.",
         };
   });
 }
@@ -123,7 +125,9 @@ export function formatAIConversationActionInstructions({
   });
 
   if (actions.length === 0) {
-    return ["AI conversation detail lookup is not available in this session."];
+    return [
+      "Agent conversation detail lookup is not available in this session.",
+    ];
   }
 
   return actions.map(
@@ -135,43 +139,4 @@ export function formatAIConversationActionInstructions({
         }),
       )} to fetch the full transcript.`,
   );
-}
-
-/**
- * Adds concrete transcript follow-ups to otherwise markdown-first results.
- * The markdown remains the compatibility path for clients that do not read
- * structured content.
- */
-export function addAIConversationSuggestedActions({
-  markdown,
-  organizationSlug,
-  aiConversations,
-  experimentalMode,
-  availableToolNames,
-  directToolNames,
-}: {
-  markdown: string;
-  organizationSlug: string;
-  aiConversations: AIConversationReference[];
-  experimentalMode: boolean;
-  availableToolNames?: ReadonlySet<string>;
-  directToolNames?: ReadonlySet<string>;
-}): string | CallToolResult {
-  const suggestedActions = getAIConversationSuggestedActions({
-    organizationSlug,
-    aiConversations,
-    experimentalMode,
-    availableToolNames,
-    directToolNames,
-  });
-  if (suggestedActions.length === 0) {
-    return markdown;
-  }
-
-  return {
-    content: [{ type: "text", text: markdown }],
-    structuredContent: {
-      suggestedActions,
-    },
-  };
 }
