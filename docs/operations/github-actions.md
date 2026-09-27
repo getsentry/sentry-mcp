@@ -69,8 +69,8 @@ Bootstrap the store once after this workflow reaches `main`:
 
 1. Create an active branch ruleset for `refs/heads/cloudflare-deployment-journal` with the `deletion` and `non_fast_forward` rules. Do not add a rule that blocks ordinary fast-forward updates from GitHub Actions.
 2. Let the first trusted post-merge deployment fail with `The durable Cloudflare journal branch is not initialized`. This failure happens before build, upload, or traffic mutation.
-3. Check out that exact trusted `main` revision locally and set `GH_TOKEN` to a token with repository contents write access and `GITHUB_REPOSITORY=getsentry/sentry-mcp`.
-4. Run `node scripts/cloudflare-journal-store.mjs bootstrap <trusted-main-sha> <failed-deploy-run-id> <run-attempt>`.
+3. Check out that exact trusted `main` revision locally and set `GH_TOKEN` to a token with repository contents write and Actions read access, plus `GITHUB_REPOSITORY=getsentry/sentry-mcp`.
+4. Run `node scripts/cloudflare-journal-store.mjs bootstrap <failed-deploy-run-id> <run-attempt>`. The command derives the trusted SHA from fresh GitHub API data. It requires the canonical deployment attempt to be the current default-branch head, to have failed at the pre-mutation journal gate, and to have skipped every later workflow step.
 5. Verify `node scripts/cloudflare-journal-store.mjs state <new-output-file>` reports `initialized`. The output path must not already exist.
 6. Rerun the failed deployment. Its new attempt will see an initialized empty store, append the first journal before traffic changes, and proceed.
 

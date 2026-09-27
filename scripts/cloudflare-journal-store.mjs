@@ -13,6 +13,13 @@ const BOOTSTRAP_PATH = `${JOURNAL_DIRECTORY}/bootstrap.json`;
 const LATEST_PATH = `${JOURNAL_DIRECTORY}/latest.json`;
 const RECONCILIATION_PATH = `${JOURNAL_DIRECTORY}/reconciliation.json`;
 const RECONCILIATION_DIRECTORY = "reconciliations";
+const DEPLOY_WORKFLOW_FILE = "deploy.yml";
+const DEPLOY_WORKFLOW_PATH = `.github/workflows/${DEPLOY_WORKFLOW_FILE}`;
+const DEPLOY_JOB_NAME = "Deploy production";
+const BOOTSTRAP_VALIDATION_STEP = "Validate trusted Test revision";
+const BOOTSTRAP_GATE_STEP = "Reconcile the newest durable deployment journal";
+const BOOTSTRAP_FIRST_LATER_STEP = "Build production artifact once";
+const BOOTSTRAP_FINAL_LATER_STEP = "Reconcile Cloudflare state";
 const MAX_RESPONSE_BYTES = 256 * 1024;
 const MAX_BLOB_BYTES = 64 * 1024;
 const GIT_SHA = /^[0-9a-f]{40}$/;
@@ -101,6 +108,24 @@ function parseGitSha(value, name) {
     throw new JournalStoreError(
       `${name} must be a lowercase 40-character Git SHA`,
     );
+  }
+  return value;
+}
+
+function parseDefaultBranch(value) {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 255 ||
+    !/^[A-Za-z0-9._/-]+$/.test(value) ||
+    value.startsWith("/") ||
+    value.endsWith("/") ||
+    value.endsWith(".") ||
+    value.includes("..") ||
+    value.includes("//") ||
+    value.includes("@{")
+  ) {
+    throw new JournalStoreError("GitHub repository default branch is invalid");
   }
   return value;
 }
@@ -832,7 +857,7 @@ function summarizeState(state) {
  *   append: (journal: unknown, expectedBranchHeadSha: string) => Promise<{branchHeadSha: string, journal: DeploymentJournal}>,
  *   claim: (claim: unknown, expectedBranchHeadSha: string) => Promise<{branchHeadSha: string, reconciliation: object}>,
  *   complete: (completion: unknown, expectedBranchHeadSha: string) => Promise<{branchHeadSha: string, reconciliation: object}>,
- *   bootstrap: (trustedSha: string, runId: number, runAttempt: number) => Promise<{branchHeadSha: string, bootstrap: BootstrapMarker}>
+ *   bootstrap: (runId: number, runAttempt: number) => Promise<{branchHeadSha: string, bootstrap: BootstrapMarker}>
  * }}
  */
 export function createCloudflareJournalStore(options) {
@@ -1177,6 +1202,269 @@ export function createCloudflareJournalStore(options) {
     );
   }
 
+  async function getDefaultBranchHeadSha(defaultBranch, operation) {
+    const currentCommit = requireObject(
+      await api.requestJson(
+        "GET",
+        `/commits/${encodeURIComponent(defaultBranch)}`,
+        undefined,
+        200,
+        operation,
+        false,
+      ),
+      "GitHub default branch commit response",
+    );
+    return parseGitSha(currentCommit.sha, "GitHub default branch head SHA");
+  }
+
+  async function deriveBootstrapProvenance(runId, runAttempt) {
+    const repositoryResponse = requireObject(
+      await api.requestJson(
+        "GET",
+        "",
+        undefined,
+        200,
+        "read repository metadata for bootstrap",
+        false,
+      ),
+      "GitHub repository response",
+    );
+    if (repositoryResponse.full_name !== repository.fullName) {
+      throw new JournalStoreError(
+        "GitHub repository metadata does not match the configured repository",
+      );
+    }
+    const defaultBranch = parseDefaultBranch(repositoryResponse.default_branch);
+
+    const workflowResponse = requireObject(
+      await api.requestJson(
+        "GET",
+        `/actions/workflows/${DEPLOY_WORKFLOW_FILE}`,
+        undefined,
+        200,
+        "read deployment workflow for bootstrap",
+        false,
+      ),
+      "GitHub deployment workflow response",
+    );
+    const workflowId = parsePositiveInteger(
+      workflowResponse.id,
+      "GitHub deployment workflow ID",
+    );
+    if (
+      workflowResponse.path !== DEPLOY_WORKFLOW_PATH ||
+      workflowResponse.state !== "active"
+    ) {
+      throw new JournalStoreError(
+        "GitHub deployment workflow is not the active canonical workflow",
+      );
+    }
+
+    const run = await getWorkflowRun(
+      runId,
+      runAttempt,
+      "read failed deployment run for bootstrap",
+    );
+    const headRepository = requireObject(
+      run.head_repository,
+      "GitHub bootstrap run head repository",
+    );
+    const runRepository = requireObject(
+      run.repository,
+      "GitHub bootstrap run repository",
+    );
+    const trustedSha = parseGitSha(
+      run.head_sha,
+      "GitHub bootstrap run head SHA",
+    );
+    if (
+      run.id !== runId ||
+      run.run_attempt !== runAttempt ||
+      run.workflow_id !== workflowId ||
+      run.event !== "workflow_run" ||
+      run.status !== "completed" ||
+      run.conclusion !== "failure" ||
+      run.head_branch !== defaultBranch ||
+      headRepository.full_name !== repository.fullName ||
+      runRepository.full_name !== repository.fullName
+    ) {
+      throw new JournalStoreError(
+        "bootstrap requires the canonical failed deployment run at the default branch",
+      );
+    }
+
+    const latestRun = requireObject(
+      await api.requestJson(
+        "GET",
+        `/actions/runs/${runId}`,
+        undefined,
+        200,
+        "read latest deployment attempt for bootstrap",
+        false,
+      ),
+      "GitHub latest workflow run response",
+    );
+    const latestHeadRepository = requireObject(
+      latestRun.head_repository,
+      "GitHub latest bootstrap run head repository",
+    );
+    const latestRepository = requireObject(
+      latestRun.repository,
+      "GitHub latest bootstrap run repository",
+    );
+    for (const field of [
+      "id",
+      "run_attempt",
+      "workflow_id",
+      "head_sha",
+      "head_branch",
+      "event",
+      "status",
+      "conclusion",
+    ]) {
+      if (latestRun[field] !== run[field]) {
+        throw new JournalStoreError(
+          `failed deployment ${field} differs from its latest attempt`,
+        );
+      }
+    }
+    if (
+      latestHeadRepository.full_name !== repository.fullName ||
+      latestRepository.full_name !== repository.fullName
+    ) {
+      throw new JournalStoreError(
+        "latest deployment attempt does not belong to the configured repository",
+      );
+    }
+
+    if (
+      (await getDefaultBranchHeadSha(
+        defaultBranch,
+        "read default branch head for bootstrap",
+      )) !== trustedSha
+    ) {
+      throw new JournalStoreError(
+        "failed deployment run is not at the current default-branch head",
+      );
+    }
+
+    const jobsResponse = requireObject(
+      await api.requestJson(
+        "GET",
+        `/actions/runs/${runId}/attempts/${runAttempt}/jobs?per_page=100`,
+        undefined,
+        200,
+        "read failed deployment jobs for bootstrap",
+        false,
+      ),
+      "GitHub deployment jobs response",
+    );
+    if (
+      !Number.isSafeInteger(jobsResponse.total_count) ||
+      jobsResponse.total_count !== 1 ||
+      !Array.isArray(jobsResponse.jobs) ||
+      jobsResponse.jobs.length !== jobsResponse.total_count
+    ) {
+      throw new JournalStoreError(
+        "bootstrap deployment run must contain exactly one complete job",
+      );
+    }
+    const job = requireObject(jobsResponse.jobs[0], "GitHub deployment job");
+    if (
+      !Number.isSafeInteger(job.id) ||
+      job.id <= 0 ||
+      job.run_id !== runId ||
+      job.run_attempt !== runAttempt ||
+      job.head_sha !== trustedSha ||
+      job.name !== DEPLOY_JOB_NAME ||
+      job.status !== "completed" ||
+      job.conclusion !== "failure" ||
+      !Array.isArray(job.steps)
+    ) {
+      throw new JournalStoreError(
+        "bootstrap deployment job provenance is invalid",
+      );
+    }
+
+    const steps = job.steps.map((rawStep, index) => {
+      const step = requireObject(
+        rawStep,
+        `GitHub deployment job step ${index}`,
+      );
+      const number = parsePositiveInteger(
+        step.number,
+        `GitHub deployment job step ${index} number`,
+      );
+      const name = requireString(
+        step.name,
+        `GitHub deployment job step ${index} name`,
+      );
+      if (
+        step.status !== "completed" ||
+        !["failure", "skipped", "success"].includes(step.conclusion)
+      ) {
+        throw new JournalStoreError(
+          `GitHub deployment job step '${name}' is not terminal`,
+        );
+      }
+      return { number, name, conclusion: step.conclusion };
+    });
+    if (
+      steps.some(
+        (step, index) => index > 0 && step.number <= steps[index - 1].number,
+      )
+    ) {
+      throw new JournalStoreError(
+        "GitHub deployment job steps are not uniquely ordered",
+      );
+    }
+
+    const findUniqueStep = (name) => {
+      const matches = steps
+        .map((step, index) => ({ step, index }))
+        .filter(({ step }) => step.name === name);
+      if (matches.length !== 1) {
+        throw new JournalStoreError(
+          `GitHub deployment job must contain exactly one '${name}' step`,
+        );
+      }
+      return matches[0];
+    };
+    const validation = findUniqueStep(BOOTSTRAP_VALIDATION_STEP);
+    const gate = findUniqueStep(BOOTSTRAP_GATE_STEP);
+    const firstLater = findUniqueStep(BOOTSTRAP_FIRST_LATER_STEP);
+    const finalLater = findUniqueStep(BOOTSTRAP_FINAL_LATER_STEP);
+    if (
+      validation.step.conclusion !== "success" ||
+      gate.step.conclusion !== "failure" ||
+      validation.index >= gate.index ||
+      firstLater.index <= gate.index ||
+      finalLater.index <= firstLater.index
+    ) {
+      throw new JournalStoreError(
+        "deployment did not fail at the pre-mutation journal gate",
+      );
+    }
+    for (const step of steps.slice(0, gate.index)) {
+      if (step.conclusion !== "success") {
+        throw new JournalStoreError(
+          "deployment failed before the pre-mutation journal gate",
+        );
+      }
+    }
+    for (const step of steps.slice(gate.index + 1)) {
+      const isRunnerCleanup =
+        step.name === "Complete job" || step.name.startsWith("Post ");
+      if (!isRunnerCleanup && step.conclusion !== "skipped") {
+        throw new JournalStoreError(
+          `deployment ran later step '${step.name}' after the journal gate`,
+        );
+      }
+    }
+
+    return { trustedSha, defaultBranch, runId, runAttempt };
+  }
+
   function assertWorkflowRunIdentity(response, reconciliation, name) {
     const headRepository = requireObject(
       response.head_repository,
@@ -1506,13 +1794,17 @@ export function createCloudflareJournalStore(options) {
       return { branchHeadSha: commitSha, reconciliation };
     },
 
-    async bootstrap(trustedShaValue, runIdValue, runAttemptValue) {
-      const trustedSha = parseGitSha(trustedShaValue, "trusted SHA");
+    async bootstrap(runIdValue, runAttemptValue) {
       const runId = parsePositiveInteger(runIdValue, "run ID");
       const runAttempt = parsePositiveInteger(runAttemptValue, "run attempt");
       if ((await getReference()) !== null) {
         throw new JournalStoreError("journal branch already exists");
       }
+
+      const { trustedSha, defaultBranch } = await deriveBootstrapProvenance(
+        runId,
+        runAttempt,
+      );
 
       const trustedTree = await getStoreTree(trustedSha);
       if (trustedTree.entries !== null) {
@@ -1542,6 +1834,16 @@ export function createCloudflareJournalStore(options) {
         trustedSha,
         "create bootstrap commit",
       );
+      if (
+        (await getDefaultBranchHeadSha(
+          defaultBranch,
+          "revalidate default branch head before bootstrap",
+        )) !== trustedSha
+      ) {
+        throw new JournalStoreError(
+          "default branch changed while bootstrapping the journal store",
+        );
+      }
       await createReference(commitSha);
       return { branchHeadSha: commitSha, bootstrap };
     },
@@ -1709,15 +2011,14 @@ export async function runCli(args, options = {}) {
       return;
     }
     case "bootstrap": {
-      if (operands.length !== 3) {
+      if (operands.length !== 2) {
         throw new JournalStoreError(
-          "Usage: cloudflare-journal-store.mjs bootstrap <trusted-sha> <run-id> <attempt>",
+          "Usage: cloudflare-journal-store.mjs bootstrap <failed-deploy-run-id> <attempt>",
         );
       }
       const result = await store.bootstrap(
-        operands[0],
-        parsePositiveIntegerArgument(operands[1], "run ID"),
-        parsePositiveIntegerArgument(operands[2], "run attempt"),
+        parsePositiveIntegerArgument(operands[0], "run ID"),
+        parsePositiveIntegerArgument(operands[1], "run attempt"),
       );
       writeMachineOutput(stdout, {
         state: "initialized",

@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sentry-mcp-test",
   "main": "./src/server/index.ts",
-  "compatibility_date": "2026-09-27",
+  "compatibility_date": "2026-04-08",
   // Keep flags in sync with wrangler.jsonc for production parity
   "compatibility_flags": [
     "nodejs_compat",

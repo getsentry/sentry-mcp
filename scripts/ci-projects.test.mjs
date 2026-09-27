@@ -436,7 +436,7 @@ describe("CI workflow contracts", () => {
 
   it("uses the current Cloudflare compatibility date in production and tests", () => {
     for (const config of [productionWrangler, testWrangler]) {
-      assert.match(config, /"compatibility_date": "2026-09-27"/);
+      assert.match(config, /"compatibility_date": "2026-04-08"/);
     }
   });
 
@@ -719,6 +719,10 @@ describe("CI workflow contracts", () => {
   });
 
   it("uses a durable exact-version journal for cancellation-safe recovery", () => {
+    assert.match(
+      deployWorkflow,
+      /deploy-production:\n\s+name: Deploy production/,
+    );
     assert.match(
       deployWorkflow,
       /versions upload --experimental-auto-create=false --message/,

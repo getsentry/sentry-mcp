@@ -20,6 +20,30 @@ const PREVIOUS_VERSION = "11111111-1111-4111-8111-111111111111";
 const CANDIDATE_VERSION = "22222222-2222-4222-8222-222222222222";
 const ORIGINAL_DEPLOYMENT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const CLAIMANT_HEAD = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+const DEFAULT_BRANCH = "main";
+const DEPLOY_WORKFLOW_ID = 700;
+const DEPLOY_JOB_ID = 800;
+
+function makeBootstrapSteps(conclusionOverrides = {}) {
+  return [
+    ["Set up job", "success"],
+    ["Validate trusted Test revision", "success"],
+    ["Check out tested revision", "success"],
+    ["Setup Node.js", "success"],
+    ["Install dependencies", "success"],
+    ["Discover deployment projects", "success"],
+    ["Reconcile the newest durable deployment journal", "failure"],
+    ["Build production artifact once", "skipped"],
+    ["Reconcile Cloudflare state", "skipped"],
+    ["Post Setup Node.js", "success"],
+    ["Complete job", "success"],
+  ].map(([name, defaultConclusion], index) => ({
+    name,
+    number: index + 1,
+    status: "completed",
+    conclusion: conclusionOverrides[name] ?? defaultConclusion,
+  }));
+}
 
 function makeClaim(journal, overrides = {}) {
   return {
@@ -92,6 +116,11 @@ class FakeGitHubApi {
     this.branchHead = null;
     this.requests = [];
     this.workflowRuns = new Map();
+    this.latestWorkflowRuns = new Map();
+    this.workflowJobs = new Map();
+    this.defaultBranchHead = TRUSTED_SHA;
+    this.defaultBranchReadCount = 0;
+    this.moveDefaultBranchBeforeSecondRead = false;
     this.patchCount = 0;
     this.moveRefBeforeNextPatch = false;
 
@@ -105,6 +134,43 @@ class FakeGitHubApi {
       treeSha: rootTree,
       parents: [],
     });
+    this.setBootstrapRun();
+  }
+
+  setBootstrapRun(runId = 100, runAttempt = 1, options = {}) {
+    const headSha = options.headSha ?? TRUSTED_SHA;
+    const workflowId = options.workflowId ?? DEPLOY_WORKFLOW_ID;
+    const run = {
+      id: runId,
+      run_attempt: runAttempt,
+      workflow_id: workflowId,
+      head_sha: headSha,
+      head_branch: options.headBranch ?? DEFAULT_BRANCH,
+      head_repository: {
+        full_name: options.headRepository ?? REPOSITORY,
+      },
+      repository: { full_name: options.repository ?? REPOSITORY },
+      event: options.event ?? "workflow_run",
+      status: options.status ?? "completed",
+      conclusion: options.conclusion ?? "failure",
+    };
+    this.workflowRuns.set(`${runId}/${runAttempt}`, run);
+    this.latestWorkflowRuns.set(runId, {
+      ...run,
+      ...(options.latestRun ?? {}),
+    });
+    this.workflowJobs.set(`${runId}/${runAttempt}`, [
+      {
+        id: DEPLOY_JOB_ID,
+        run_id: runId,
+        run_attempt: runAttempt,
+        head_sha: headSha,
+        name: options.jobName ?? "Deploy production",
+        status: options.jobStatus ?? "completed",
+        conclusion: options.jobConclusion ?? "failure",
+        steps: makeBootstrapSteps(options.stepConclusions),
+      },
+    ]);
   }
 
   nextSha() {
@@ -204,6 +270,32 @@ class FakeGitHubApi {
     assert.equal(url.pathname.startsWith(prefix), true);
     const path = url.pathname.slice(prefix.length);
 
+    if (method === "GET" && path === "") {
+      return this.response(url.href, 200, {
+        full_name: REPOSITORY,
+        default_branch: DEFAULT_BRANCH,
+      });
+    }
+
+    if (method === "GET" && path === "/actions/workflows/deploy.yml") {
+      return this.response(url.href, 200, {
+        id: DEPLOY_WORKFLOW_ID,
+        path: ".github/workflows/deploy.yml",
+        state: "active",
+      });
+    }
+
+    if (method === "GET" && path === `/commits/${DEFAULT_BRANCH}`) {
+      this.defaultBranchReadCount += 1;
+      if (
+        this.moveDefaultBranchBeforeSecondRead &&
+        this.defaultBranchReadCount === 2
+      ) {
+        this.defaultBranchHead = EXTERNAL_SHA;
+      }
+      return this.response(url.href, 200, { sha: this.defaultBranchHead });
+    }
+
     if (
       method === "GET" &&
       path === "/git/ref/heads/cloudflare-deployment-journal"
@@ -264,6 +356,30 @@ class FakeGitHubApi {
       return run === undefined
         ? this.response(url.href, 404, { message: "Not Found" })
         : this.response(url.href, 200, run);
+    }
+
+    const latestRunMatch = /^\/actions\/runs\/([1-9][0-9]*)$/.exec(path);
+    if (method === "GET" && latestRunMatch !== null) {
+      const run = this.latestWorkflowRuns.get(Number(latestRunMatch[1]));
+      return run === undefined
+        ? this.response(url.href, 404, { message: "Not Found" })
+        : this.response(url.href, 200, run);
+    }
+
+    const jobsMatch =
+      /^\/actions\/runs\/([1-9][0-9]*)\/attempts\/([1-9][0-9]*)\/jobs$/.exec(
+        path,
+      );
+    if (method === "GET" && jobsMatch !== null) {
+      assert.equal(url.searchParams.get("per_page"), "100");
+      const key = `${jobsMatch[1]}/${jobsMatch[2]}`;
+      const jobs = this.workflowJobs.get(key);
+      return jobs === undefined
+        ? this.response(url.href, 404, { message: "Not Found" })
+        : this.response(url.href, 200, {
+            total_count: jobs.length,
+            jobs,
+          });
     }
 
     if (method === "POST" && path === "/git/blobs") {
@@ -364,7 +480,8 @@ function createStore(api, token = TOKEN) {
 }
 
 async function bootstrap(api, runId = 100, runAttempt = 1) {
-  return createStore(api).bootstrap(TRUSTED_SHA, runId, runAttempt);
+  api.setBootstrapRun(runId, runAttempt);
+  return createStore(api).bootstrap(runId, runAttempt);
 }
 
 describe("Cloudflare deployment journal store", () => {
@@ -385,7 +502,7 @@ describe("Cloudflare deployment journal store", () => {
     );
 
     api.branchHead = null;
-    const initialized = await store.bootstrap(TRUSTED_SHA, 100, 1);
+    const initialized = await store.bootstrap(100, 1);
     assert.deepEqual(await store.getState(), {
       state: "initialized",
       branchHeadSha: initialized.branchHeadSha,
@@ -398,7 +515,7 @@ describe("Cloudflare deployment journal store", () => {
       },
     });
     await assert.rejects(
-      store.bootstrap(TRUSTED_SHA, 100, 1),
+      store.bootstrap(100, 1),
       /journal branch already exists/,
     );
 
@@ -413,6 +530,71 @@ describe("Cloudflare deployment journal store", () => {
         sha: createTree.body.tree[0].sha,
       },
     ]);
+    const requestPaths = new Set(
+      api.requests
+        .filter(({ method }) => method === "GET")
+        .map(({ path }) => path),
+    );
+    for (const path of [
+      "/repos/acme/widgets",
+      "/repos/acme/widgets/actions/workflows/deploy.yml",
+      "/repos/acme/widgets/actions/runs/100/attempts/1",
+      "/repos/acme/widgets/actions/runs/100",
+      "/repos/acme/widgets/commits/main",
+      "/repos/acme/widgets/actions/runs/100/attempts/1/jobs",
+    ]) {
+      assert.equal(requestPaths.has(path), true, path);
+    }
+  });
+
+  it("rejects false or post-mutation bootstrap provenance", async () => {
+    const staleApi = new FakeGitHubApi();
+    staleApi.defaultBranchHead = EXTERNAL_SHA;
+    await assert.rejects(
+      createStore(staleApi).bootstrap(100, 1),
+      /not at the current default-branch head/,
+    );
+    assert.equal(staleApi.branchHead, null);
+
+    const staleAttemptApi = new FakeGitHubApi();
+    staleAttemptApi.setBootstrapRun(100, 1, {
+      latestRun: { run_attempt: 2 },
+    });
+    await assert.rejects(
+      createStore(staleAttemptApi).bootstrap(100, 1),
+      /run_attempt differs from its latest attempt/,
+    );
+    assert.equal(staleAttemptApi.branchHead, null);
+
+    const racedHeadApi = new FakeGitHubApi();
+    racedHeadApi.moveDefaultBranchBeforeSecondRead = true;
+    await assert.rejects(
+      createStore(racedHeadApi).bootstrap(100, 1),
+      /default branch changed while bootstrapping/,
+    );
+    assert.equal(racedHeadApi.branchHead, null);
+
+    const wrongGateApi = new FakeGitHubApi();
+    wrongGateApi.setBootstrapRun(100, 1, {
+      stepConclusions: {
+        "Reconcile the newest durable deployment journal": "success",
+      },
+    });
+    await assert.rejects(
+      createStore(wrongGateApi).bootstrap(100, 1),
+      /did not fail at the pre-mutation journal gate/,
+    );
+    assert.equal(wrongGateApi.branchHead, null);
+
+    const laterMutationApi = new FakeGitHubApi();
+    laterMutationApi.setBootstrapRun(100, 1, {
+      stepConclusions: { "Build production artifact once": "success" },
+    });
+    await assert.rejects(
+      createStore(laterMutationApi).bootstrap(100, 1),
+      /ran later step 'Build production artifact once'/,
+    );
+    assert.equal(laterMutationApi.branchHead, null);
   });
 
   it("appends immutable and latest paths in one commit and never overwrites a run", async () => {
@@ -814,7 +996,7 @@ describe("Cloudflare deployment journal store", () => {
     assert.equal(errorResponse.bodyUsed, true);
   });
 
-  it("validates repository names, identifiers, and trusted SHAs", async () => {
+  it("validates repository names and identifiers", async () => {
     assert.throws(
       () =>
         createCloudflareJournalStore({
@@ -841,12 +1023,12 @@ describe("Cloudflare deployment journal store", () => {
     const api = new FakeGitHubApi();
     const store = createStore(api);
     await assert.rejects(
-      store.bootstrap("A".repeat(40), 1, 1),
-      /trusted SHA must be a lowercase 40-character Git SHA/,
+      store.bootstrap(0, 1),
+      /run ID must be a positive safe integer/,
     );
     await assert.rejects(
-      store.bootstrap(TRUSTED_SHA, 0, 1),
-      /run ID must be a positive safe integer/,
+      store.bootstrap(1, 0),
+      /run attempt must be a positive safe integer/,
     );
   });
 
