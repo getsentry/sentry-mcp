@@ -1800,6 +1800,44 @@ describe("API query builders", () => {
       expect(params.get("attributeType")).toBeNull();
     });
 
+    it("should accept 'array' as a valid attributeType", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (key: string) =>
+            key === "content-type" ? "application/json" : null,
+        },
+        json: () =>
+          Promise.resolve([
+            {
+              key: "tags[items]",
+              name: "items",
+              attributeType: "array",
+              attributeSource: { source_type: "user" },
+            },
+          ]),
+      });
+
+      const result = await apiService.listTraceItemAttributes({
+        organizationSlug: "test-org",
+        itemType: "spans",
+      });
+
+      expect(result).toEqual([
+        {
+          key: "tags[items]",
+          name: "items",
+          type: "array",
+          attributeSource: { source_type: "user" },
+        },
+      ]);
+    });
+
     it("should validate events requests via the validate endpoint", async () => {
       const apiService = new SentryApiService({
         host: "sentry.io",
