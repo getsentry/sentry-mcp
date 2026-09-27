@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import app from "./app";
 
 // RFC 5737 TEST-NET-1 address; required by the IP-extraction middleware
@@ -78,6 +78,34 @@ describe("app", () => {
       expect(text).toContain("{projectSlug}");
       expect(text).toContain("claude mcp add");
       expect(text).toContain("?experimental=1");
+    });
+  });
+
+  describe("GET /_health/version", () => {
+    it("should return the active Cloudflare Worker version ID", async () => {
+      const res = await app.request(
+        "/_health/version",
+        { headers: TEST_HEADERS },
+        {
+          CF_VERSION_METADATA: {
+            id: "worker-version-123",
+            tag: "current",
+            timestamp: "2026-09-26T00:00:00.000Z",
+          },
+        },
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe('{"id":"worker-version-123"}');
+    });
+
+    it("should return null when version metadata is unavailable", async () => {
+      const res = await app.request("/_health/version", {
+        headers: TEST_HEADERS,
+      });
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe('{"id":null}');
     });
   });
 

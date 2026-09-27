@@ -1,0 +1,404 @@
+name: Publish Test Results
+
+on:
+  workflow_run:
+    workflows:
+      - Smoke Tests (Local)
+      - Test
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: publish-test-results-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate test artifacts
+    if: >-
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.actor.login != 'dependabot[bot]' &&
+      contains(fromJSON('["merge_group", "pull_request", "push"]'), github.event.workflow_run.event)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      coverage-artifacts: ${{ steps.artifacts.outputs.coverage-artifacts }}
+      coverage-count: ${{ steps.artifacts.outputs.coverage-count }}
+      head-sha: ${{ steps.run.outputs.head-sha }}
+      junit-artifacts: ${{ steps.artifacts.outputs.junit-artifacts }}
+      junit-count: ${{ steps.artifacts.outputs.junit-count }}
+      pr-number: ${{ steps.run.outputs.pr-number }}
+      run-attempt: ${{ steps.run.outputs.run-attempt }}
+      source: ${{ steps.run.outputs.source }}
+      trusted-commit: ${{ steps.run.outputs.trusted-commit }}
+    steps:
+      - name: Validate triggering workflow
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          repository_json="$RUNNER_TEMP/repository.json"
+          event_run_json="$RUNNER_TEMP/event-run.json"
+          run_json="$RUNNER_TEMP/run.json"
+          pull_request_json="$RUNNER_TEMP/pull-request.json"
+          validator="$RUNNER_TEMP/validate-workflow-run.mjs"
+          validation="$RUNNER_TEMP/validation.json"
+          gh api "repos/$REPOSITORY" > "$repository_json"
+          jq '.workflow_run' "$GITHUB_EVENT_PATH" > "$event_run_json"
+          trusted_commit="$WORKFLOW_SHA"
+          [[ "$trusted_commit" =~ ^[0-9a-f]{40}$ ]]
+          gh api -X GET "repos/$REPOSITORY/contents/scripts/validate-workflow-run.mjs" \
+            -f ref="$trusted_commit" --jq '.content' | base64 --decode > "$validator"
+          test -s "$validator"
+          gh api "repos/$REPOSITORY/actions/runs/$RUN_ID" > "$run_json"
+          source="$(jq -r '.name' "$run_json")"
+          case "$source" in
+            "Smoke Tests (Local)") workflow_file=smoke-tests.yml ;;
+            "Test") workflow_file=test.yml ;;
+            *) echo "Unexpected source workflow: $source" >&2; exit 1 ;;
+          esac
+          workflow_id="$(gh api "repos/$REPOSITORY/actions/workflows/$workflow_file" --jq '.id')"
+          validation_args=("$event_run_json" "$run_json" "$repository_json" "$RUN_ID" "$workflow_id")
+          if [[ "$(jq -r '.event' "$run_json")" == "pull_request" ]]; then
+            pr_number="$(jq -r '.pull_requests | if length == 1 then .[0].number else empty end' "$run_json")"
+            [[ "$pr_number" =~ ^[1-9][0-9]*$ ]]
+            gh api "repos/$REPOSITORY/pulls/$pr_number" > "$pull_request_json"
+            validation_args+=("$pull_request_json")
+          fi
+          node "$validator" "${validation_args[@]}" > "$validation"
+          {
+            echo "source=$(jq -r '.source' "$validation")"
+            echo "head-sha=$(jq -r '.headSha' "$validation")"
+            echo "pr-number=$(jq -r '.prNumber' "$validation")"
+            echo "run-attempt=$(jq -r '.runAttempt' "$validation")"
+            echo "trusted-commit=$trusted_commit"
+          } >> "$GITHUB_OUTPUT"
+      - name: Validate artifact metadata
+        id: artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ steps.run.outputs.run-attempt }}
+          SOURCE: ${{ steps.run.outputs.source }}
+        run: |
+          artifacts='[]'
+          for page in {1..8}; do
+            response="$(gh api -X GET "repos/$REPOSITORY/actions/runs/$RUN_ID/artifacts" -f per_page=100 -f page="$page")"
+            page_artifacts="$(jq -c '.artifacts' <<< "$response")"
+            artifacts="$(jq -c --argjson page "$page_artifacts" '. + $page' <<< "$artifacts")"
+            [[ "$(jq -r 'length' <<< "$artifacts")" -le 768 ]]
+            page_count="$(jq -r 'length' <<< "$page_artifacts")"
+            if [[ "$page_count" -lt 100 ]]; then
+              break
+            fi
+            [[ "$page" -lt 8 ]]
+          done
+          current_run="$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID")"
+          jq -e --argjson run_id "$RUN_ID" --argjson run_attempt "$RUN_ATTEMPT" '
+            .id == $run_id and
+            .run_attempt == $run_attempt and
+            .status == "completed"
+          ' <<< "$current_run" > /dev/null
+          jq -e '
+            length <= 768 and all(.id | type == "number" and . > 0) and
+            all(.expired == false) and
+            all(.size_in_bytes > 0 and .size_in_bytes < 52428800) and
+            all(.digest | test("^sha256:[0-9a-f]{64}$")) and
+            ([.[].name] | length == (unique | length))
+          ' <<< "$artifacts" > /dev/null
+          attempt_suffix="-attempt-$RUN_ATTEMPT"
+          if [[ "$SOURCE" == "Test" ]]; then
+            jq -e --argjson run_attempt "$RUN_ATTEMPT" '
+              all(
+                .[];
+                .name | test("^(npm-[a-zA-Z0-9-]+|(coverage|junit)-[a-zA-Z0-9-]+-attempt-[1-9][0-9]*)$")
+              ) and
+              all(
+                .[] | select(.name | test("^(coverage|junit)-"));
+                (
+                  .name
+                  | capture("-attempt-(?<attempt>[1-9][0-9]*)$")
+                  | .attempt
+                  | tonumber
+                ) <= $run_attempt
+              )
+            ' <<< "$artifacts" > /dev/null
+            expected_report_set="$(jq -c '
+              [
+                .[]
+                | select(.name | test("^(coverage|junit)-"))
+                | .name
+                | sub("-attempt-[1-9][0-9]*$"; "")
+              ]
+              | unique
+            ' <<< "$artifacts")"
+            current_report_set="$(jq -c --arg suffix "$attempt_suffix" '
+              [
+                .[]
+                | select(
+                    (.name | test("^(coverage|junit)-")) and
+                    (.name | endswith($suffix))
+                  )
+                | .name
+                | rtrimstr($suffix)
+              ]
+              | unique
+            ' <<< "$artifacts")"
+          else
+            jq -e --argjson run_attempt "$RUN_ATTEMPT" '
+              all(
+                .[];
+                .name | test("^smoke-junit-node-(20|22|24)-attempt-[1-9][0-9]*$")
+              ) and
+              all(
+                .[];
+                (
+                  .name
+                  | capture("-attempt-(?<attempt>[1-9][0-9]*)$")
+                  | .attempt
+                  | tonumber
+                ) <= $run_attempt
+              )
+            ' <<< "$artifacts" > /dev/null
+            expected_report_set='["smoke-junit-node-20","smoke-junit-node-22","smoke-junit-node-24"]'
+            current_report_set="$(jq -c --arg suffix "$attempt_suffix" '
+              [
+                .[]
+                | select(.name | endswith($suffix))
+                | .name
+                | rtrimstr($suffix)
+              ]
+              | sort
+            ' <<< "$artifacts")"
+          fi
+          # Partial reruns retain artifacts from earlier attempts. Publish only
+          # when this attempt reproduced every report name seen for the run.
+          [[ "$current_report_set" == "$expected_report_set" ]]
+          coverage_artifacts="$(jq -c --arg suffix "$attempt_suffix" '[.[] | select((.name | startswith("coverage-")) and (.name | endswith($suffix))) | {id, name, digest, size: .size_in_bytes}]' <<< "$artifacts")"
+          junit_artifacts="$(jq -c --arg suffix "$attempt_suffix" '[.[] | select((.name | test("^(junit-|smoke-junit-)")) and (.name | endswith($suffix))) | {id, name, digest, size: .size_in_bytes}]' <<< "$artifacts")"
+          jq -e 'length <= 256 and ((map(.size) | add) // 0) <= 104857600' <<< "$coverage_artifacts" > /dev/null
+          jq -e 'length <= 256 and ((map(.size) | add) // 0) <= 104857600' <<< "$junit_artifacts" > /dev/null
+          {
+            echo "coverage-artifacts=$coverage_artifacts"
+            echo "coverage-count=$(jq -r 'length' <<< "$coverage_artifacts")"
+            echo "junit-artifacts=$junit_artifacts"
+            echo "junit-count=$(jq -r 'length' <<< "$junit_artifacts")"
+          } >> "$GITHUB_OUTPUT"
+
+  junit:
+    name: Publish JUnit results
+    needs: validate
+    if: needs.validate.outputs.junit-count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      checks: write
+      contents: read
+    steps:
+      - name: Download trusted extraction helper
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TRUSTED_COMMIT: ${{ needs.validate.outputs.trusted-commit }}
+        run: |
+          gh api -X GET "repos/$REPOSITORY/contents/scripts/extract-ci-artifact.py" \
+            -f ref="$TRUSTED_COMMIT" --jq '.content' | base64 --decode > "$RUNNER_TEMP/extract-ci-artifact.py"
+          test -s "$RUNNER_TEMP/extract-ci-artifact.py"
+      - name: Download verified JUnit artifacts
+        env:
+          ARTIFACTS: ${{ needs.validate.outputs.junit-artifacts }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          mkdir -p archives test-results
+          downloaded_bytes=0
+          extracted_bytes=0
+          while IFS=$'\t' read -r artifact_id artifact_name expected_digest; do
+            archive="archives/$artifact_id.zip"
+            destination="test-results/$artifact_name"
+            remaining_bytes=$((104857600 - downloaded_bytes))
+            (( remaining_bytes > 0 ))
+            download_limit=52428800
+            if (( remaining_bytes < download_limit )); then
+              download_limit=$remaining_bytes
+            fi
+            if ! download_result="$(
+              set -o pipefail
+              gh api "repos/$REPOSITORY/actions/artifacts/$artifact_id/zip" |
+                python "$RUNNER_TEMP/extract-ci-artifact.py" --download "$archive" "$download_limit"
+            )"; then
+              rm -f "$archive"
+              exit 1
+            fi
+            IFS=$'\t' read -r artifact_bytes actual_digest extra <<< "$download_result"
+            [[ "$artifact_bytes" =~ ^[1-9][0-9]*$ ]]
+            [[ "$actual_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+            [[ -z "${extra:-}" ]]
+            [[ "$actual_digest" == "$expected_digest" ]]
+            downloaded_bytes=$((downloaded_bytes + artifact_bytes))
+            (( downloaded_bytes <= 104857600 ))
+            mkdir "$destination"
+            remaining_bytes=$((104857600 - extracted_bytes))
+            (( remaining_bytes > 0 ))
+            extraction_limit=10485760
+            if (( remaining_bytes < extraction_limit )); then
+              extraction_limit=$remaining_bytes
+            fi
+            artifact_bytes="$(python "$RUNNER_TEMP/extract-ci-artifact.py" "$archive" "$destination/tests.junit.xml" tests.junit.xml "$extraction_limit")"
+            [[ "$artifact_bytes" =~ ^[1-9][0-9]*$ ]]
+            extracted_bytes=$((extracted_bytes + artifact_bytes))
+            [[ "$extracted_bytes" -le 104857600 ]]
+          done < <(jq -r '.[] | [.id, .name, .digest] | @tsv' <<< "$ARTIFACTS")
+      - name: Check JUnit reports
+        run: |
+          shopt -s nullglob
+          reports=(test-results/*/tests.junit.xml)
+          [[ "${#reports[@]}" == "${{ needs.validate.outputs.junit-count }}" ]]
+          for report in "${reports[@]}"; do
+            test -s "$report"
+          done
+      - uses: mikepenz/action-junit-report@a83fd2b5d58d4fc702e690c1ea688d702d28d281 # v5.6.1
+        with:
+          check_name: ${{ needs.validate.outputs.source == 'Test' && 'Project Test Results' || 'Local Smoke Test Results' }}
+          commit: ${{ needs.validate.outputs.head-sha }}
+          fail_on_failure: true
+          fail_on_parse_error: true
+          report_paths: test-results/**/*.xml
+          require_tests: true
+
+  coverage:
+    name: Publish coverage
+    needs: validate
+    if: needs.validate.outputs.coverage-count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - name: Download trusted extraction helper
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TRUSTED_COMMIT: ${{ needs.validate.outputs.trusted-commit }}
+        run: |
+          gh api -X GET "repos/$REPOSITORY/contents/scripts/extract-ci-artifact.py" \
+            -f ref="$TRUSTED_COMMIT" --jq '.content' | base64 --decode > "$RUNNER_TEMP/extract-ci-artifact.py"
+          test -s "$RUNNER_TEMP/extract-ci-artifact.py"
+      - name: Download verified coverage artifacts
+        env:
+          ARTIFACTS: ${{ needs.validate.outputs.coverage-artifacts }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          mkdir -p archives coverage-results
+          downloaded_bytes=0
+          extracted_bytes=0
+          while IFS=$'\t' read -r artifact_id artifact_name expected_digest; do
+            archive="archives/$artifact_id.zip"
+            destination="coverage-results/$artifact_name"
+            remaining_bytes=$((104857600 - downloaded_bytes))
+            (( remaining_bytes > 0 ))
+            download_limit=52428800
+            if (( remaining_bytes < download_limit )); then
+              download_limit=$remaining_bytes
+            fi
+            if ! download_result="$(
+              set -o pipefail
+              gh api "repos/$REPOSITORY/actions/artifacts/$artifact_id/zip" |
+                python "$RUNNER_TEMP/extract-ci-artifact.py" --download "$archive" "$download_limit"
+            )"; then
+              rm -f "$archive"
+              exit 1
+            fi
+            IFS=$'\t' read -r artifact_bytes actual_digest extra <<< "$download_result"
+            [[ "$artifact_bytes" =~ ^[1-9][0-9]*$ ]]
+            [[ "$actual_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+            [[ -z "${extra:-}" ]]
+            [[ "$actual_digest" == "$expected_digest" ]]
+            downloaded_bytes=$((downloaded_bytes + artifact_bytes))
+            (( downloaded_bytes <= 104857600 ))
+            mkdir "$destination"
+            remaining_bytes=$((104857600 - extracted_bytes))
+            (( remaining_bytes > 0 ))
+            artifact_bytes="$(python "$RUNNER_TEMP/extract-ci-artifact.py" "$archive" "$destination/lcov.info" lcov.info "$remaining_bytes")"
+            [[ "$artifact_bytes" =~ ^[1-9][0-9]*$ ]]
+            extracted_bytes=$((extracted_bytes + artifact_bytes))
+            [[ "$extracted_bytes" -le 104857600 ]]
+          done < <(jq -r '.[] | [.id, .name, .digest] | @tsv' <<< "$ARTIFACTS")
+      - name: Check coverage reports
+        id: reports
+        run: |
+          shopt -s nullglob
+          reports=(coverage-results/*/lcov.info)
+          [[ "${#reports[@]}" == "${{ needs.validate.outputs.coverage-count }}" ]]
+          for report in "${reports[@]}"; do
+            test -s "$report"
+          done
+          files="$(IFS=,; echo "${reports[*]}")"
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+      - name: Download trusted Codecov configuration
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TRUSTED_COMMIT: ${{ needs.validate.outputs.trusted-commit }}
+        run: |
+          gh api -X GET "repos/$REPOSITORY/contents/codecov.yml" \
+            -f ref="$TRUSTED_COMMIT" --jq '.content' | base64 --decode > codecov.yml
+          test -s codecov.yml
+      - name: Download verified Codecov CLI
+        run: |
+          set -euo pipefail
+          readonly binary="$RUNNER_TEMP/codecov"
+          readonly expected_sha256="ca1d64196d2d34771084afe76ea657d581bf628e31d993ff8e52ea09cc88a56d"
+          readonly max_binary_bytes=$((16 * 1024 * 1024))
+          curl --fail --silent --show-error --location \
+            --proto '=https' \
+            --proto-redir '=https' \
+            --tlsv1.2 \
+            --connect-timeout 5 \
+            --max-filesize "$max_binary_bytes" \
+            --max-time 60 \
+            --retry 3 \
+            --retry-all-errors \
+            --retry-delay 1 \
+            --retry-max-time 30 \
+            --output "$binary" \
+            https://cli.codecov.io/v11.3.1/linux/codecov
+          printf '%s  %s\n' "$expected_sha256" "$binary" | sha256sum --check --strict
+          chmod 0755 "$binary"
+      - id: codecov
+        continue-on-error: true
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+        with:
+          binary: ${{ runner.temp }}/codecov
+          disable_search: true
+          fail_ci_if_error: true
+          files: ${{ steps.reports.outputs.files }}
+          override_build: ${{ github.event.workflow_run.id }}
+          override_commit: ${{ needs.validate.outputs.head-sha }}
+          override_pr: ${{ needs.validate.outputs.pr-number }}
+          slug: ${{ github.repository }}
+          use_oidc: true
+      - name: Summarize coverage upload
+        if: always()
+        env:
+          CODECOV_OUTCOME: ${{ steps.codecov.outcome }}
+          REPORT_COUNT: ${{ needs.validate.outputs.coverage-count }}
+        run: |
+          {
+            echo "## Coverage"
+            echo
+            echo "- Reports: \`$REPORT_COUNT\`"
+            echo "- Codecov upload: \`$CODECOV_OUTCOME\`"
+          } >> "$GITHUB_STEP_SUMMARY"

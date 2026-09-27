@@ -1,5 +1,6 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, test } from "vitest";
 import pkg from "../../package.json";
 
@@ -38,10 +39,19 @@ describe("package.json exports (dual ESM/CJS)", () => {
 
   // Only meaningful after a build; skipped in a clean checkout where dist/ is absent.
   const built = existsSync(resolve("dist/index.mjs"));
-  test.runIf(built)("built ESM entry exposes createSentrySDK", async () => {
-    const mod = await import(resolve("dist/index.mjs"));
-    expect(typeof mod.default).toBe("function");
-    expect(typeof mod.createSentrySDK).toBe("function");
+  test.runIf(built)("built ESM entry exposes createSentrySDK", () => {
+    const entry = JSON.stringify(pathToFileURL(resolve("dist/index.mjs")).href);
+    execFileSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        `const mod = await import(${entry});
+if (typeof mod.default !== "function") throw new Error("Missing default export");
+if (typeof mod.createSentrySDK !== "function") throw new Error("Missing createSentrySDK export");`,
+      ],
+      { stdio: "pipe", timeout: 10_000 }
+    );
   });
 
   test.runIf(built)("built CJS entry exposes createSentrySDK", () => {

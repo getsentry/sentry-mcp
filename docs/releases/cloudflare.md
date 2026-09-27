@@ -15,12 +15,13 @@ The deployment consists of:
 
 ```jsonc
 {
-  "name": "sentry-mcp-oauth",
+  "name": "sentry-mcp",
   "main": "./src/server/index.ts",
-  "compatibility_date": "2025-03-21",
+  "compatibility_date": "2026-09-27",
   "compatibility_flags": [
     "nodejs_compat",
-    "nodejs_compat_populate_process_env"
+    "nodejs_compat_populate_process_env",
+    "global_fetch_strictly_public"
   ],
   "keep_vars": true,
 
@@ -31,8 +32,10 @@ The deployment consists of:
   }],
 
   // SPA configuration
-  "site": {
-    "bucket": "./dist/client"
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
   }
 }
 ```
