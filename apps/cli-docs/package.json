@@ -5,8 +5,13 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "ci:build": "pnpm --filter sentry run generate:schema && pnpm --filter sentry run generate:docs && pnpm --filter sentry run generate:sdk && pnpm run build",
     "preview": "astro preview",
     "deploy": "wrangler deploy"
+  },
+  "sentryCi": {
+    "build": "ci:build",
+    "dependencies": ["sentry"]
   },
   "dependencies": {
     "@astrojs/starlight": "^0.41.5",

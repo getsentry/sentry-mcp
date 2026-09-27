@@ -3,6 +3,12 @@
   "version": "0.39.0",
   "private": true,
   "type": "module",
+  "sentryCi": {
+    "enabled": false,
+    "roles": [
+      "smoke"
+    ]
+  },
   "scripts": {
     "test": "vitest run",
     "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",

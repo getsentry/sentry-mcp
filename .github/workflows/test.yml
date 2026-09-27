@@ -1,176 +1,422 @@
 name: Test
 
 on:
+  merge_group:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
+
+concurrency:
+  group: test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  NODE_VERSION_20: 20.20.2
+  NODE_VERSION_22: 22.23.1
+  NODE_VERSION_24: 24.18.0
+  MAX_NPM_ARCHIVE_BYTES: 52428800
+  MAX_NPM_ARTIFACT_BYTES: 54525952
+  MAX_NPM_ENTRIES: 10000
+  MAX_NPM_UNPACKED_BYTES: 262144000
 
 jobs:
-  test:
+  install:
+    name: Install
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      pull-requests: write
-      statuses: write
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: "22"
-
-      # pnpm/action-setup@v4
-      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
-        name: Install pnpm
-        with:
-          run_install: false
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - uses: actions/cache@v4
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Check lockfile is up to date
+          node-version: ${{ env.NODE_VERSION_22 }}
+          cache: pnpm
+      - name: Verify lockfile
         run: |
           pnpm install --lockfile-only
-          git diff --exit-code pnpm-lock.yaml || (echo "pnpm-lock.yaml is out of sync with manifest files. Run 'pnpm install' and commit the result." && exit 1)
-
+          git diff --exit-code -- pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Determine package scope
-        id: scope
-        shell: bash
+  discover-projects:
+    name: Discover projects
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      count: ${{ steps.projects.outputs.count }}
+      matrix: ${{ steps.projects.outputs.matrix }}
+      runtime-count: ${{ steps.projects.outputs.runtime-count }}
+      runtime-job-matrix: ${{ steps.projects.outputs.runtime-job-matrix }}
+      runtime-matrix: ${{ steps.projects.outputs.runtime-matrix }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: ${{ env.NODE_VERSION_22 }}
+      - name: Build project matrix
+        id: projects
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+        run: |
+          matrix="$(node scripts/ci-projects.mjs --event "$GITHUB_EVENT_NAME" --base "$BASE_SHA" --head "$HEAD_SHA")"
+          count="$(node -e 'process.stdout.write(String(JSON.parse(process.argv[1]).include.length))' "$matrix")"
+          runtime_matrix="$(node -e 'const matrix = JSON.parse(process.argv[1]); matrix.include = matrix.include.filter((project) => project.npmRuntime !== ""); process.stdout.write(JSON.stringify(matrix))' "$matrix")"
+          runtime_count="$(node -e 'process.stdout.write(String(JSON.parse(process.argv[1]).include.length))' "$runtime_matrix")"
+          runtime_job_matrix="$(node --input-type=module -e 'import { buildRuntimeMatrix } from "./scripts/ci-projects.mjs"; process.stdout.write(JSON.stringify(buildRuntimeMatrix(JSON.parse(process.argv[1]), process.argv.slice(2))))' "$runtime_matrix" "$NODE_VERSION_20" "$NODE_VERSION_22" "$NODE_VERSION_24")"
+          {
+            echo "matrix=$matrix"
+            echo "count=$count"
+            echo "runtime-matrix=$runtime_matrix"
+            echo "runtime-count=$runtime_count"
+            echo "runtime-job-matrix=$runtime_job_matrix"
+          } >> "$GITHUB_OUTPUT"
+
+  quality:
+    name: Repository quality
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: ${{ env.NODE_VERSION_22 }}
+          cache: pnpm
+      - run: cp .env.example .env.local
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Test project discovery
+        run: pnpm run test:ci-projects
+      - name: Check generated MCP definitions
+        run: pnpm run check:generated
+      - name: Check documentation links
+        run: pnpm run docs:check
+      - name: Lint
+        run: pnpm run lint
+      - name: Check generated files
+        run: |
+          git diff --exit-code
+          [[ -z "$(git status --porcelain --untracked-files=all)" ]]
+
+  project:
+    name: ${{ matrix.name }}
+    needs:
+      - install
+      - discover-projects
+    if: needs.discover-projects.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.discover-projects.outputs.matrix) }}
+    env:
+      BRAINTRUST_API_KEY: ci-test-key
+      GITHUB_TOKEN: ci-test-token
+      HONEYCOMB_API_KEY: ci-test-key
+      SENTRY_CLIENT_ID: ${{ vars.SENTRY_CLIENT_ID || 'ci-fork-pr-dummy' }}
+      SENTRY_OAUTH_CLIENT_SECRET: ci-test-secret
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: ${{ env.NODE_VERSION_22 }}
+          cache: pnpm
+      - run: cp .env.example .env.local
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Build project dependencies
+        env:
+          PROJECT_NAME: ${{ matrix.name }}
+        run: pnpm --filter "${PROJECT_NAME}^..." --if-present run build
+      - name: Build project
+        if: matrix.build != ''
+        env:
+          CHECK_SCRIPT: ${{ matrix.build }}
+          PROJECT_NAME: ${{ matrix.name }}
+        run: pnpm --filter "$PROJECT_NAME" run "$CHECK_SCRIPT"
+      - name: Lint
+        if: matrix.lint != ''
+        env:
+          CHECK_SCRIPT: ${{ matrix.lint }}
+          PROJECT_NAME: ${{ matrix.name }}
+        run: pnpm --filter "$PROJECT_NAME" run "$CHECK_SCRIPT"
+      - name: Typecheck
+        if: matrix.typecheck != ''
+        env:
+          CHECK_SCRIPT: ${{ matrix.typecheck }}
+          PROJECT_NAME: ${{ matrix.name }}
+        run: pnpm --filter "$PROJECT_NAME" run "$CHECK_SCRIPT"
+      - name: Test
+        if: matrix.test != ''
+        env:
+          CHECK_SCRIPT: ${{ matrix.test }}
+          PROJECT_NAME: ${{ matrix.name }}
+        run: pnpm --filter "$PROJECT_NAME" run "$CHECK_SCRIPT"
+      - name: Check package policies
+        if: matrix.policy != ''
+        env:
+          CHECK_SCRIPT: ${{ matrix.policy }}
+          PROJECT_NAME: ${{ matrix.name }}
+        run: pnpm --filter "$PROJECT_NAME" run "$CHECK_SCRIPT"
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        if: matrix.e2e != ''
+        with:
+          node-version: ${{ env.NODE_VERSION_24 }}
+          cache: pnpm
+      - name: Run E2E tests on Node 24
+        if: matrix.e2e != ''
+        env:
+          CHECK_SCRIPT: ${{ matrix.e2e }}
+          PROJECT_NAME: ${{ matrix.name }}
+        run: pnpm --filter "$PROJECT_NAME" run "$CHECK_SCRIPT"
+      - name: Check generated files
+        run: |
+          git diff --exit-code
+          [[ -z "$(git status --porcelain --untracked-files=all)" ]]
+      - name: Normalize coverage paths
+        if: matrix.coverage != ''
+        env:
+          COVERAGE_FILE: ${{ matrix.coverage }}
+          PROJECT_PATH: ${{ matrix.path }}
+        run: node scripts/normalize-lcov.mjs "$PROJECT_PATH" "$COVERAGE_FILE"
+      - name: Check coverage report
+        if: matrix.coverage != ''
+        env:
+          COVERAGE_FILE: ${{ matrix.coverage }}
+        run: test -s "$COVERAGE_FILE"
+      - name: Check JUnit report
+        if: always() && matrix.junit != ''
+        env:
+          JUNIT_FILE: ${{ matrix.junit }}
+        run: test -s "$JUNIT_FILE"
+      - name: Upload coverage artifact
+        if: success() && matrix.coverage != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-${{ matrix.slug }}-attempt-${{ github.run_attempt }}
+          path: ${{ matrix.coverage }}
+          if-no-files-found: error
+      - name: Upload JUnit artifact
+        if: always() && matrix.junit != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: junit-${{ matrix.slug }}-attempt-${{ github.run_attempt }}
+          path: ${{ matrix.junit }}
+          if-no-files-found: error
+
+  npm-build:
+    name: NPM package (${{ matrix.name }})
+    needs:
+      - install
+      - discover-projects
+    if: needs.discover-projects.outputs.runtime-count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.discover-projects.outputs.runtime-matrix) }}
+    env:
+      SENTRY_CLIENT_ID: ${{ vars.SENTRY_CLIENT_ID || 'ci-fork-pr-dummy' }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: ${{ env.NODE_VERSION_22 }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Build package dependencies
+        env:
+          PROJECT_NAME: ${{ matrix.name }}
+        run: pnpm --filter "${PROJECT_NAME}^..." --if-present run build
+      - name: Build NPM package
+        env:
+          BUILD_SCRIPT: ${{ matrix.npmRuntime }}
+          PROJECT_NAME: ${{ matrix.name }}
+        run: pnpm --filter "$PROJECT_NAME" run "$BUILD_SCRIPT"
+      - name: Pack NPM package
+        env:
+          PROJECT_NAME: ${{ matrix.name }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/npm-package"
+          pnpm --filter "$PROJECT_NAME" pack --pack-destination "$RUNNER_TEMP/npm-package"
+          shopt -s nullglob
+          packages=("$RUNNER_TEMP/npm-package"/*.tgz)
+          [[ "${#packages[@]}" == "1" ]]
+          test -s "${packages[0]}"
+          mv "${packages[0]}" "$RUNNER_TEMP/npm-package/package.tgz"
+          python scripts/validate-npm-package.py \
+            "$RUNNER_TEMP/npm-package/package.tgz" \
+            "$MAX_NPM_ARCHIVE_BYTES" \
+            "$MAX_NPM_ENTRIES" \
+            "$MAX_NPM_UNPACKED_BYTES"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: npm-${{ matrix.slug }}
+          path: ${{ runner.temp }}/npm-package/package.tgz
+          if-no-files-found: error
+          compression-level: 0
+
+  npm-runtime:
+    name: ${{ matrix.project.name }} (Node ${{ matrix.node }})
+    needs:
+      - discover-projects
+      - npm-build
+    if: needs.npm-build.result == 'success' && needs.discover-projects.outputs.runtime-count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.discover-projects.outputs.runtime-job-matrix) }}
+    env:
+      SENTRY_CLI_NO_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Download validated package artifact
+        env:
+          ARTIFACT_NAME: npm-${{ matrix.project.slug }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-
-          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
-            echo "all=true" >> "$GITHUB_OUTPUT"
-            echo "cli=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "all=false" >> "$GITHUB_OUTPUT"
-          echo "base=$BASE_SHA" >> "$GITHUB_OUTPUT"
-          echo "cli=false" >> "$GITHUB_OUTPUT"
-          git diff --name-only "$BASE_SHA" HEAD > "$RUNNER_TEMP/changed-paths"
-          git diff --diff-filter=D --name-only "$BASE_SHA" HEAD > "$RUNNER_TEMP/deleted-paths"
-
-          if grep -q '^packages/cli/' "$RUNNER_TEMP/changed-paths"; then
-            echo "cli=true" >> "$GITHUB_OUTPUT"
-          fi
-
-          if grep -Eq '^(package.json|pnpm-lock.yaml|pnpm-workspace.yaml|\.github/workflows/test\.yml)$' "$RUNNER_TEMP/changed-paths"; then
-            echo "all=true" >> "$GITHUB_OUTPUT"
-          fi
-
-          if grep -Eq '^(apps|packages)/[^/]+/package.json$' "$RUNNER_TEMP/deleted-paths"; then
-            echo "all=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Run build
+          artifacts="$({
+            gh api --method GET \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+              -f name="$ARTIFACT_NAME" \
+              -f per_page=2
+          })"
+          artifact="$(jq -ce \
+            --arg name "$ARTIFACT_NAME" \
+            '[.artifacts[] | select(.name == $name)] | if length == 1 then .[0] else error("Expected exactly one package artifact") end' \
+            <<< "$artifacts")"
+          artifact_id="$(jq -er '.id | select(type == "number" and . > 0 and floor == .)' <<< "$artifact")"
+          artifact_size="$(jq -er '.size_in_bytes | select(type == "number" and . > 0 and . <= (env.MAX_NPM_ARTIFACT_BYTES | tonumber) and floor == .)' <<< "$artifact")"
+          artifact_digest="$(jq -er '.digest | select(type == "string" and test("^sha256:[0-9a-f]{64}$"))' <<< "$artifact")"
+          jq -e '.expired == false' <<< "$artifact" > /dev/null
+          mkdir -p "$RUNNER_TEMP/npm-package"
+          download_result="$({
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" |
+              python scripts/extract-ci-artifact.py \
+                --download \
+                "$RUNNER_TEMP/npm-package.zip" \
+                "$MAX_NPM_ARTIFACT_BYTES"
+          })"
+          [[ "$download_result" == "$artifact_size"$'\t'"$artifact_digest" ]]
+          python scripts/extract-ci-artifact.py \
+            "$RUNNER_TEMP/npm-package.zip" \
+            "$RUNNER_TEMP/npm-package/package.tgz" \
+            package.tgz \
+            "$MAX_NPM_ARCHIVE_BYTES"
+          python scripts/validate-npm-package.py \
+            "$RUNNER_TEMP/npm-package/package.tgz" \
+            "$MAX_NPM_ARCHIVE_BYTES" \
+            "$MAX_NPM_ENTRIES" \
+            "$MAX_NPM_UNPACKED_BYTES"
+      - name: Run packaged CLI
         env:
-          SENTRY_CLIENT_ID: ci-fork-pr-dummy
+          RUNTIME_BIN: ${{ matrix.project.runtimeBin }}
+          RUNTIME_PACKAGE: ${{ matrix.project.name }}
         run: |
-          if [[ "${{ steps.scope.outputs.all }}" == "true" ]]; then
-            pnpm build
-          else
-            pnpm --filter "...[${{ steps.scope.outputs.base }}]..." --if-present run build
-            if [[ "${{ steps.scope.outputs.cli }}" == "true" ]]; then
-              pnpm --filter sentry-cli-docs run build
-            fi
-          fi
+          package="$RUNNER_TEMP/npm-package/package.tgz"
+          test -s "$package"
+          npm install --ignore-scripts --no-audit --no-fund --prefix "$RUNNER_TEMP/runtime" "$package"
+          (
+            cd "$RUNNER_TEMP/runtime"
+            node --input-type=module --eval '
+              const packageName = process.env.RUNTIME_PACKAGE;
+              if (!packageName) throw new Error("Missing runtime package name");
+              const sdk = await import(packageName);
+              if (typeof sdk.default !== "function") throw new Error("Missing default ESM export");
+              if (typeof sdk.createSentrySDK !== "function") throw new Error("Missing createSentrySDK ESM export");
+            '
+            node --eval '
+              const packageName = process.env.RUNTIME_PACKAGE;
+              if (!packageName) throw new Error("Missing runtime package name");
+              const sdk = require(packageName);
+              if (typeof sdk.default !== "function") throw new Error("Missing default CommonJS export");
+              if (typeof sdk.createSentrySDK !== "function") throw new Error("Missing createSentrySDK CommonJS export");
+            '
+          )
+          binary="$RUNNER_TEMP/runtime/node_modules/.bin/$RUNTIME_BIN"
+          test -x "$binary"
+          "$binary" --version
+          "$binary" --help > /dev/null
+          mkdir "$RUNNER_TEMP/sentry-runtime-config"
+          set +e
+          auth_output="$(
+            SENTRY_AUTH_TOKEN='' \
+            SENTRY_CONFIG_DIR="$RUNNER_TEMP/sentry-runtime-config" \
+            SENTRY_FORCE_ENV_TOKEN='' \
+            SENTRY_TOKEN='' \
+              "$binary" auth status 2>&1
+          )"
+          auth_status=$?
+          set -e
+          [[ "$auth_status" == "10" ]]
+          grep -Fqi "not authenticated" <<<"$auth_output"
 
-      - name: Check generated definitions
-        run: pnpm run check:generated
-
-      - name: Run type checking
-        run: |
-          if [[ "${{ steps.scope.outputs.all }}" == "true" ]]; then
-            pnpm tsc
-          else
-            pnpm --filter "...[${{ steps.scope.outputs.base }}]" --if-present run tsc
-            pnpm --filter "...[${{ steps.scope.outputs.base }}]" --if-present run typecheck
-          fi
-
-      - name: Run linter
-        run: |
-          if [[ "${{ steps.scope.outputs.all }}" == "true" ]]; then
-            pnpm lint
-            pnpm -r --if-present run lint
-          else
-            if grep -Eq '^(biome.json|sgconfig.yml|ast-grep-rules/|ast-grep-rule-tests/|packages/mcp-)' "$RUNNER_TEMP/changed-paths"; then
-              pnpm lint
-            fi
-            pnpm --filter "...[${{ steps.scope.outputs.base }}]" --if-present run lint
-          fi
-
-      - name: Run tests
-        run: |
-          if [[ "${{ steps.scope.outputs.all }}" == "true" ]]; then
-            pnpm -r --filter '!@sentry/mcp-smoke-tests' --if-present run test:ci
-            pnpm --filter sentry run test
-          else
-            pnpm --filter "...[${{ steps.scope.outputs.base }}]" --filter '!@sentry/mcp-smoke-tests' --if-present run test:ci
-            if [[ "${{ steps.scope.outputs.cli }}" == "true" ]]; then
-              pnpm --filter sentry run test
-            fi
-          fi
-
-      - name: Verify CLI coverage report
-        if: ${{ steps.scope.outputs.all == 'true' || steps.scope.outputs.cli == 'true' }}
-        run: test -s packages/cli/coverage/lcov.info
-
-      - name: Publish CLI coverage report
-        if: ${{ steps.scope.outputs.all == 'true' || steps.scope.outputs.cli == 'true' }}
-        uses: getsentry/coverage-action@main
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          files: ./packages/cli/coverage/lcov.info
-          informational-patch: ${{ github.event_name == 'push' }}
-
-      - name: Run CLI policy checks
-        if: ${{ steps.scope.outputs.all == 'true' || steps.scope.outputs.cli == 'true' }}
-        run: |
-          pnpm --filter sentry run check:patches
-          pnpm --filter sentry run check:deps
-          pnpm --filter sentry run check:errors
-          pnpm --filter sentry run check:fragments
-          pnpm --filter sentry run check:docs-sections
-          pnpm --filter sentry run check:env-coverage
-          pnpm --filter sentry run check:stale-refs
-
-      - name: Setup Node.js for CLI E2E
-        if: ${{ steps.scope.outputs.all == 'true' || steps.scope.outputs.cli == 'true' }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24.18.0"
-
-      - name: Run CLI E2E tests
-        if: ${{ steps.scope.outputs.all == 'true' || steps.scope.outputs.cli == 'true' }}
+  test:
+    name: test
+    if: always()
+    needs:
+      - install
+      - discover-projects
+      - npm-build
+      - npm-runtime
+      - quality
+      - project
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify required jobs
         env:
-          SENTRY_CLI_BINARY: ${{ github.workspace }}/packages/cli/dist-bin/sentry-linux-x64
+          DISCOVER_RESULT: ${{ needs.discover-projects.result }}
+          INSTALL_RESULT: ${{ needs.install.result }}
+          NPM_BUILD_RESULT: ${{ needs.npm-build.result }}
+          NPM_RUNTIME_RESULT: ${{ needs.npm-runtime.result }}
+          PROJECT_COUNT: ${{ needs.discover-projects.outputs.count }}
+          PROJECT_RESULT: ${{ needs.project.result }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          RUNTIME_COUNT: ${{ needs.discover-projects.outputs.runtime-count }}
         run: |
-          pnpm --filter sentry run test:e2e
-
-      - name: Publish Test Report
-        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
-        if: ${{ !cancelled() && hashFiles('**/*.junit.xml') != '' }}
-        with:
-          report_paths: "**/*.junit.xml"
-          comment: false
+          [[ "$DISCOVER_RESULT" == "success" ]]
+          [[ "$INSTALL_RESULT" == "success" ]]
+          [[ "$QUALITY_RESULT" == "success" ]]
+          expected_project_result=success
+          if [[ "$PROJECT_COUNT" == "0" ]]; then
+            expected_project_result=skipped
+          fi
+          [[ "$PROJECT_RESULT" == "$expected_project_result" ]]
+          expected_runtime_result=success
+          if [[ "$RUNTIME_COUNT" == "0" ]]; then
+            expected_runtime_result=skipped
+          fi
+          [[ "$NPM_BUILD_RESULT" == "$expected_runtime_result" ]]
+          [[ "$NPM_RUNTIME_RESULT" == "$expected_runtime_result" ]]

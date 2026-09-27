@@ -43,6 +43,7 @@
     "cli": "pnpm run --filter ./packages/mcp-test-client start",
     "start:stdio": "pnpm --stream run --filter ./packages/mcp-server start",
     "test": "dotenv -e .env -e .env.local -- pnpm -r --filter '!@sentry/mcp-smoke-tests' --if-present run test",
+    "test:ci-projects": "node --test --test-concurrency=1 \"scripts/*.test.mjs\"",
     "test:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci",
     "test:watch": "dotenv -e .env -e .env.local -- pnpm -r --parallel --if-present run test:watch",
     "tsc": "pnpm -r --if-present run tsc && pnpm -r --if-present run typecheck"

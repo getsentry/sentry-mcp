@@ -1,7 +1,10 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import pkg from "../package.json";
 
 const PREVIEW_URL = process.env.PREVIEW_URL;
+const EXPECTED_VERSION_ID = process.env.EXPECTED_VERSION_ID;
+const CLOUDFLARE_VERSION_OVERRIDE = process.env.CLOUDFLARE_VERSION_OVERRIDE;
+const CLOUDFLARE_WORKER_NAME = process.env.CLOUDFLARE_WORKER_NAME;
 // Leave enough headroom for transient Cloudflare edge latency. Response-time
 // expectations are enforced separately by the performance smoke test below.
 const DEFAULT_TIMEOUT_MS = 5000;
@@ -10,6 +13,34 @@ const IS_LOCAL_DEV =
 
 // User-Agent for smoke tests - identifies these as automated smoke tests
 const SMOKE_TEST_USER_AGENT = `sentry-mcp-smoke-tests/${pkg.version}`;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const WORKER_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+
+function buildVersionOverrideHeaders(
+  workerName: string | undefined,
+  versionId: string | undefined,
+): Record<string, string> {
+  if (versionId === undefined) {
+    return {};
+  }
+  if (workerName === undefined || !WORKER_NAME_PATTERN.test(workerName)) {
+    throw new Error(
+      "CLOUDFLARE_WORKER_NAME is required with a valid version override",
+    );
+  }
+  if (!UUID_PATTERN.test(versionId)) {
+    throw new Error("CLOUDFLARE_VERSION_OVERRIDE must be a UUID");
+  }
+  return {
+    "Cloudflare-Workers-Version-Overrides": `${workerName}="${versionId}"`,
+  };
+}
+
+const VERSION_OVERRIDE_HEADERS = buildVersionOverrideHeaders(
+  CLOUDFLARE_WORKER_NAME,
+  CLOUDFLARE_VERSION_OVERRIDE,
+);
 
 // Skip all smoke tests if PREVIEW_URL is not set
 const describeIfPreviewUrl = PREVIEW_URL ? describe : describe.skip;
@@ -59,6 +90,7 @@ async function safeFetch(
       headers: {
         "User-Agent": SMOKE_TEST_USER_AGENT,
         ...fetchOptions.headers,
+        ...VERSION_OVERRIDE_HEADERS,
       },
       signal,
     });
@@ -95,6 +127,37 @@ async function safeFetch(
   return { response: response!, data };
 }
 
+describe("safeFetch", () => {
+  it("formats the exact Cloudflare Worker version override", () => {
+    expect(
+      buildVersionOverrideHeaders(
+        "sentry-mcp",
+        "11111111-1111-4111-8111-111111111111",
+      ),
+    ).toEqual({
+      "Cloudflare-Workers-Version-Overrides":
+        'sentry-mcp="11111111-1111-4111-8111-111111111111"',
+    });
+  });
+
+  it("cancels an unconsumed body without surfacing cancellation errors", async () => {
+    const cancel = vi.fn(() => {
+      throw new Error("cancel failed");
+    });
+    const response = new Response(new ReadableStream({ cancel }));
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+
+    try {
+      await expect(
+        safeFetch("https://example.invalid", { consumeBody: false }),
+      ).resolves.toEqual({ response, data: null });
+      expect(cancel).toHaveBeenCalledOnce();
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+});
+
 describeIfPreviewUrl(
   `Smoke Tests for ${PREVIEW_URL || "(no PREVIEW_URL set)"}`,
   () => {
@@ -105,6 +168,23 @@ describeIfPreviewUrl(
     it("should respond on root endpoint", async () => {
       const { response } = await safeFetch(PREVIEW_URL);
       expect(response.status).toBe(200);
+    });
+
+    it("should expose the active Cloudflare Worker version", async () => {
+      const { response, data } = await safeFetch(
+        `${PREVIEW_URL}/_health/version`,
+      );
+
+      expect(response.status).toBe(200);
+      if (IS_LOCAL_DEV) {
+        expect(data).toEqual({ id: null });
+      } else {
+        expect(data).toEqual({ id: expect.any(String) });
+        expect(data.id).not.toBe("");
+        if (EXPECTED_VERSION_ID) {
+          expect(data.id).toBe(EXPECTED_VERSION_ID);
+        }
+      }
     });
 
     it("should have MCP endpoint that returns server info (with auth error)", async () => {

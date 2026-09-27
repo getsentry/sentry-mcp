@@ -2,148 +2,166 @@ name: Smoke Tests (Local)
 
 permissions:
   contents: read
-  checks: write
+
+env:
+  NODE_VERSION_20: 20.20.2
+  NODE_VERSION_22: 22.23.1
+  NODE_VERSION_24: 24.18.0
 
 on:
   push:
     branches: [main]
   pull_request:
-    paths:
-      - ".github/workflows/smoke-tests.yml"
-      - "packages/mcp-cloudflare/**"
-      - "packages/mcp-core/**"
-      - "packages/mcp-server-mocks/**"
-      - "packages/mcp-server-tsconfig/**"
-      - "packages/smoke-tests/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
 
 jobs:
   smoke-tests:
-    name: Run Smoke Tests Against Local Server
+    name: Run Smoke Tests Against Local Server (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          node-version: "22"
-
-      # pnpm/action-setup@v4
-      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
-        name: Install pnpm
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+      - name: Setup CI Node runtime
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          run_install: false
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - uses: actions/cache@v4
-        name: Setup pnpm cache
+          node-version: ${{ env.NODE_VERSION_22 }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Discover smoke-test projects
+        id: projects
+        run: echo "roles=$(node scripts/ci-projects.mjs --roles cloudflare,smoke)" >> "$GITHUB_OUTPUT"
+      - name: Build Cloudflare worker
+        env:
+          CLOUDFLARE_PROJECT: ${{ fromJSON(steps.projects.outputs.roles).cloudflare.name }}
+        run: pnpm --filter "${CLOUDFLARE_PROJECT}..." run build
+      - name: Record Node 22 path
+        run: echo "NODE_22_BIN_DIR=$(dirname "$(command -v node)")" >> "$GITHUB_ENV"
+      - name: Setup smoke-test Node runtime
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm --filter '@sentry/mcp-cloudflare...' --if-present run build
-
-      - name: Start local dev server
-        working-directory: packages/mcp-cloudflare
-        run: |
-          # Start wrangler in background and capture output
-          pnpm exec wrangler dev --port 8788 --local > wrangler.log 2>&1 &
-          WRANGLER_PID=$!
-          echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
-          echo "Waiting for server to start (PID: $WRANGLER_PID)..."
-
-          # Wait for server to be ready (up to 2 minutes)
-          MAX_ATTEMPTS=24
-          ATTEMPT=0
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            # Check if wrangler process is still running
-            if ! kill -0 $WRANGLER_PID 2>/dev/null; then
-              echo "❌ Wrangler process died unexpectedly!"
-              echo "📋 Last 50 lines of wrangler.log:"
-              tail -50 wrangler.log
-              exit 1
-            fi
-            
-            if curl -s -f -o /dev/null http://localhost:8788/; then
-              echo "✅ Server is ready!"
-              echo "📋 Wrangler startup log:"
-              cat wrangler.log
-              break
-            else
-              echo "⏳ Waiting for server to start (attempt $((ATTEMPT+1))/$MAX_ATTEMPTS)..."
-              # Show partial log every 5 attempts
-              if [ $((ATTEMPT % 5)) -eq 0 ] && [ $ATTEMPT -gt 0 ]; then
-                echo "📋 Current wrangler.log output:"
-                tail -20 wrangler.log
-              fi
-            fi
-            
-            ATTEMPT=$((ATTEMPT+1))
-            sleep 5
-          done
-
-          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-            echo "❌ Server failed to start after $MAX_ATTEMPTS attempts"
-            echo "📋 Full wrangler.log:"
-            cat wrangler.log
-            exit 1
-          fi
-
+          node-version: ${{ matrix.node == 20 && env.NODE_VERSION_20 || matrix.node == 22 && env.NODE_VERSION_22 || env.NODE_VERSION_24 }}
       - name: Run smoke tests against local server
         env:
+          CLOUDFLARE_PROJECT_PATH: ${{ fromJSON(steps.projects.outputs.roles).cloudflare.path }}
           PREVIEW_URL: http://localhost:8788
-        working-directory: packages/smoke-tests
+          SMOKE_PROJECT_PATH: ${{ fromJSON(steps.projects.outputs.roles).smoke.path }}
         run: |
-          echo "🧪 Running smoke tests against local server at $PREVIEW_URL"
+          set -euo pipefail
+          wrangler_pid=""
+          wrangler_pgid=""
+          wrangler_starting=false
+          wrangler_launch_in_progress=false
+          wrangler_state_dir="$(mktemp -d)"
+          wrangler_pgid_file="$wrangler_state_dir/pgid"
+          WRANGLER_LOG="$PWD/$CLOUDFLARE_PROJECT_PATH/wrangler.log"
+          WRANGLER_BIN="$PWD/$CLOUDFLARE_PROJECT_PATH/node_modules/.bin/wrangler"
+          WRANGLER_PGID_FILE="$wrangler_pgid_file"
+          export WRANGLER_BIN WRANGLER_PGID_FILE
+          ready=false
+          source scripts/wrangler-cleanup.sh
+          trap cleanup_wrangler EXIT
+          trap 'force_wrangler_cleanup 129' HUP
+          trap 'force_wrangler_cleanup 130' INT
+          trap 'force_wrangler_cleanup 143' TERM
 
-          # Give server a bit more time to stabilize after startup
-          echo "⏳ Waiting 5 seconds for server to stabilize..."
-          sleep 5
-
-          # Verify server is still responding before running tests
-          if ! curl -s -f -o /dev/null http://localhost:8788/; then
-            echo "❌ Server is not responding before tests!"
-            echo "📋 Wrangler log:"
-            cat ../mcp-cloudflare/wrangler.log
+          wrangler_starting=true
+          wrangler_launch_in_progress=true
+          # shellcheck disable=SC2016
+          setsid bash -c '
+            set -euo pipefail
+            trap "" HUP INT TERM
+            umask 077
+            temporary_identity="${WRANGLER_PGID_FILE}.$$"
+            printf "%s\n" "$$" > "$temporary_identity"
+            mv "$temporary_identity" "$WRANGLER_PGID_FILE"
+            trap - HUP INT TERM
+            exec env PATH="$NODE_22_BIN_DIR:$PATH" "$WRANGLER_BIN" dev --port 8788 --local
+          ' > "$WRANGLER_LOG" 2>&1 &
+          wrangler_pid=$!
+          wrangler_launch_in_progress=false
+          if [[ -n "${wrangler_signal_status:-}" ]]; then
+            force_wrangler_cleanup "$wrangler_signal_status"
+          fi
+          for _attempt in {1..100}; do
+            if [[ -s "$wrangler_pgid_file" ]]; then
+              break
+            fi
+            kill -0 "$wrangler_pid" 2> /dev/null
+            sleep 0.01
+          done
+          wrangler_pgid="$(<"$wrangler_pgid_file")"
+          if [[ "$wrangler_pgid" != "$wrangler_pid" ]]; then
+            echo "Wrangler process-group identity does not match its launcher PID" >&2
             exit 1
           fi
+          wrangler_starting=false
+          ready_deadline=$((SECONDS + 120))
 
-          echo "✅ Server is responding, running tests..."
-          pnpm test:ci || TEST_EXIT_CODE=$?
+          while (( SECONDS < ready_deadline )); do
+            if ! kill -0 -- "-$wrangler_pgid" 2> /dev/null; then
+              break
+            fi
+            remaining=$((ready_deadline - SECONDS))
+            if (( remaining <= 0 )); then
+              break
+            fi
+            request_timeout=$remaining
+            if (( request_timeout > 5 )); then
+              request_timeout=5
+            fi
+            if curl --silent --fail --output /dev/null --connect-timeout 2 --max-time "$request_timeout" "$PREVIEW_URL/"; then
+              ready=true
+              break
+            fi
+            remaining=$((ready_deadline - SECONDS))
+            if (( remaining > 0 )); then
+              sleep_duration=$remaining
+              if (( sleep_duration > 5 )); then
+                sleep_duration=5
+              fi
+              sleep "$sleep_duration"
+            fi
+          done
 
-          # If tests failed, show server logs for debugging
-          if [ "${TEST_EXIT_CODE:-0}" -ne 0 ]; then
-            echo "❌ Tests failed with exit code ${TEST_EXIT_CODE}"
-            echo "📋 Wrangler log at time of failure:"
-            cat ../mcp-cloudflare/wrangler.log
-            exit ${TEST_EXIT_CODE}
+          if [[ "$ready" != "true" ]]; then
+            exit 1
+          else
+            (
+              cd "$SMOKE_PROJECT_PATH"
+              rm -f -- tests.junit.xml
+              node node_modules/vitest/vitest.mjs run --reporter=default --reporter=junit --outputFile=tests.junit.xml
+              test -s tests.junit.xml
+              python3 -c 'import sys; import xml.etree.ElementTree as ET; ET.parse(sys.argv[1])' tests.junit.xml
+            )
           fi
-
-      - name: Publish Smoke Test Report
-        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
+      - name: Upload test results for Node ${{ matrix.node }}
         if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          report_paths: "packages/smoke-tests/tests.junit.xml"
-          check_name: "Local Smoke Test Results"
-          fail_on_failure: true
+          name: smoke-junit-node-${{ matrix.node }}-attempt-${{ github.run_attempt }}
+          path: ${{ fromJSON(steps.projects.outputs.roles).smoke.path }}/tests.junit.xml
+          if-no-files-found: error
 
-      - name: Stop local server
-        if: always()
+  smoke-tests-status:
+    name: Run Smoke Tests Against Local Server
+    needs: smoke-tests
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    env:
+      SMOKE_RESULT: ${{ needs.smoke-tests.result }}
+    steps:
+      - name: Check smoke-test results
         run: |
-          if [ ! -z "$WRANGLER_PID" ]; then
-            kill $WRANGLER_PID || true
+          if [[ "$SMOKE_RESULT" != "success" ]]; then
+            echo "Smoke-test matrix result: $SMOKE_RESULT" >&2
+            exit 1
           fi

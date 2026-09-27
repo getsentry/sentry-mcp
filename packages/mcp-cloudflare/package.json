@@ -3,6 +3,11 @@
   "version": "0.39.0",
   "private": true,
   "type": "module",
+  "sentryCi": {
+    "roles": [
+      "cloudflare"
+    ]
+  },
   "license": "FSL-1.1-ALv2",
   "files": [
     "./dist/*"
