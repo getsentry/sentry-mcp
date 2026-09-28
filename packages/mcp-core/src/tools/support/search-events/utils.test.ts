@@ -1,9 +1,11 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { z } from "zod";
 import { SentryApiService } from "../../../api-client";
 import * as logging from "../../../telem/logging";
 import {
+  createValidateEventsSearchTool,
   fetchCustomAttributes,
   formatEventsValidationResults,
   formatEventValue,
@@ -11,6 +13,18 @@ import {
   isSemanticFilterDowngrade,
   looksLikeSentrySearchSyntax,
 } from "./utils";
+
+describe("validateSearch tool contract", () => {
+  it("does not expose a separate environment argument", () => {
+    const tool = createValidateEventsSearchTool({
+      apiService: new SentryApiService({ accessToken: "test-token" }),
+      organizationSlug: "test-org",
+    });
+
+    const schema = tool.inputSchema as z.ZodObject;
+    expect(Object.keys(schema.shape)).not.toContain("environment");
+  });
+});
 
 describe("formatEventValue", () => {
   describe("primitives", () => {
@@ -313,12 +327,10 @@ describe("search query helpers", () => {
 
     // Bare substring matches are not enough — short values must not false-hit
     // inside unrelated full-text (e.g. "1" inside "401").
-    expect(
-      isSemanticFilterDowngrade("id:1", 'message:"error 401"'),
-    ).toBe(false);
-    expect(
-      isSemanticFilterDowngrade("id:1", 'message:"error 1"'),
-    ).toBe(true);
+    expect(isSemanticFilterDowngrade("id:1", 'message:"error 401"')).toBe(
+      false,
+    );
+    expect(isSemanticFilterDowngrade("id:1", 'message:"error 1"')).toBe(true);
   });
 });
 

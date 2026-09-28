@@ -3133,6 +3133,7 @@ describe("search_events", () => {
 
   it("merges agent environment into the events search query for non-replay datasets", async () => {
     let eventsRequestUrl: URL | undefined;
+    let validationRequestUrl: URL | undefined;
 
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse(
@@ -3149,7 +3150,10 @@ describe("search_events", () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/validate/",
-        () => HttpResponse.json(validEventsValidationResponse),
+        ({ request }) => {
+          validationRequestUrl = new URL(request.url);
+          return HttpResponse.json(validEventsValidationResponse);
+        },
       ),
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/",
@@ -3189,6 +3193,9 @@ describe("search_events", () => {
     expect(eventsRequestUrl).toBeDefined();
     expect(eventsRequestUrl!.searchParams.get("query")).toContain(
       "environment:production",
+    );
+    expect(validationRequestUrl!.searchParams.get("environment")).toBe(
+      "production",
     );
   });
 
