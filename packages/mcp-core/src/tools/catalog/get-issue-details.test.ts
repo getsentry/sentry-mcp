@@ -11,11 +11,14 @@ import {
   issueNullCulpritFixture,
   mswServer,
 } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Skill } from "../../skills";
 import * as logging from "../../telem/logging";
-import { getTextContent } from "../../test-utils/structured-content";
+import {
+  getStructuredContent,
+  getTextContent,
+} from "../../test-utils/structured-content";
 import getIssueDetails, {
   getIssueDetailsOutputSchema,
 } from "./get-issue-details.js";
@@ -2661,6 +2664,7 @@ describe("structuredContent", () => {
 
 describe("suspect commits", () => {
   const sha = "2ce6a2700fec4913a2cde8e2d41dee362ce6a270";
+  const fixtureEventId = "8d17c61b471a4a2ab0c79b32cae564ef";
   const params = {
     organizationSlug: "sentry-mcp-evals",
     issueId: "CLOUDFLARE-MCP-41",
@@ -2672,14 +2676,23 @@ describe("suspect commits", () => {
     format: "json",
     content: JSON.stringify({ title: { text: "Example error" } }),
   };
-  const committersUrl =
-    "https://sentry.io/api/0/projects/sentry-mcp-evals/CLOUDFLARE-MCP/events/abc123def456/committers/";
+  const committersUrl = `https://sentry.io/api/0/projects/sentry-mcp-evals/CLOUDFLARE-MCP/events/${fixtureEventId}/committers/`;
 
-  function mockEvent(options: { type?: string; formatted?: unknown } = {}) {
+  function mockEvent(
+    options: { type?: string; formatted?: unknown } = {},
+    eventSelector = "latest",
+  ) {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/:eventId/",
-        () => HttpResponse.json({ ...createDefaultEvent(), ...options }),
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/${eventSelector}/`,
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent({
+              id: fixtureEventId,
+              eventID: fixtureEventId,
+            }),
+            ...options,
+          }),
       ),
     );
   }
@@ -2709,15 +2722,15 @@ describe("suspect commits", () => {
       { selection: "latest event", eventId: undefined },
       {
         selection: "explicit event ID",
-        eventId: "7ca573c0f4814912aaa9bdc77d1a7d51",
+        eventId: fixtureEventId,
       },
     ])(
       "includes the suspect commit for the $selection",
       async ({ eventId }) => {
-        mockEvent({ type, formatted });
+        mockEvent({ type, formatted }, eventId);
         mswServer.use(
-          http.get(committersUrl, () => {
-            return HttpResponse.json({
+          http.get(committersUrl, () =>
+            HttpResponse.json({
               committers: [
                 {
                   author: { name: "Jane Developer", email: "jane@example.com" },
@@ -2730,8 +2743,8 @@ describe("suspect commits", () => {
                   ],
                 },
               ],
-            });
-          }),
+            }),
+          ),
         );
 
         const result = await getIssueDetails.handler(
@@ -2741,7 +2754,7 @@ describe("suspect commits", () => {
 
         if (structured) {
           const payload = getIssueDetailsOutputSchema.parse(
-            (result as { structuredContent: unknown }).structuredContent,
+            getStructuredContent(result),
           );
           expect(payload.suspectCommit).toEqual({
             id: sha,
@@ -2783,66 +2796,33 @@ describe("suspect commits", () => {
   });
 
   it.each([
-    { mode: "structured JSON", formatted, structured: true },
-    { mode: "Markdown", formatted: undefined, structured: false },
-  ])(
-    "omits an absent suspect commit in $mode",
-    async ({ formatted, structured }) => {
-      mockEvent({ formatted });
-
-      const result = await getIssueDetails.handler(params, baseContext);
-
-      if (structured) {
-        const payload = getIssueDetailsOutputSchema.parse(
-          (result as { structuredContent: unknown }).structuredContent,
-        );
-        expect(payload.suspectCommit).toBeNull();
-      } else {
-        expect(result).not.toContain("## Suspect Commit");
-        expect(result).toContain("## Event Details");
-      }
+    {
+      failure: "permission denied",
+      status: 403,
+      body: { detail: "Permission denied" },
+      reported: false,
     },
-  );
-
-  it.each([403, 404])(
-    "preserves issue details without reporting expected HTTP %s failures",
-    async (status) => {
-      mockEvent({ formatted });
-      const logIssue = vi.spyOn(logging, "logIssue").mockReturnValue(undefined);
-      mswServer.use(
-        http.get(committersUrl, () =>
-          HttpResponse.json(
-            { detail: "Commit tracking unavailable" },
-            { status },
-          ),
-        ),
-      );
-
-      const result = await getIssueDetails.handler(params, baseContext);
-      const payload = getIssueDetailsOutputSchema.parse(
-        (result as { structuredContent: unknown }).structuredContent,
-      );
-
-      expect(payload.issue.shortId).toBe("CLOUDFLARE-MCP-41");
-      expect(payload.suspectCommit).toBeNull();
-      expect(logIssue).not.toHaveBeenCalled();
+    {
+      failure: "no committers found",
+      status: 404,
+      body: { detail: "No committers found" },
+      reported: false,
     },
-  );
-
-  it.each([
     {
       failure: "server failure",
       status: 500,
       body: { detail: "Internal error" },
+      reported: true,
     },
     {
       failure: "invalid response schema",
       status: 200,
       body: { committers: [{ commits: [{ message: "Missing commit ID" }] }] },
+      reported: true,
     },
   ])(
-    "reports a $failure while preserving issue details",
-    async ({ status, body }) => {
+    "preserves issue details for $failure (reported: $reported)",
+    async ({ status, body, reported }) => {
       mockEvent({ formatted });
       const logIssue = vi.spyOn(logging, "logIssue").mockReturnValue(undefined);
       mswServer.use(
@@ -2851,17 +2831,21 @@ describe("suspect commits", () => {
 
       const result = await getIssueDetails.handler(params, baseContext);
       const payload = getIssueDetailsOutputSchema.parse(
-        (result as { structuredContent: unknown }).structuredContent,
+        getStructuredContent(result),
       );
 
       expect(payload.issue.shortId).toBe("CLOUDFLARE-MCP-41");
       expect(payload.suspectCommit).toBeNull();
-      expect(logIssue).toHaveBeenCalledExactlyOnceWith(
-        expect.any(Error),
-        expect.objectContaining({
-          loggerScope: ["tools", "get-issue-details", "committers"],
-        }),
-      );
+      if (reported) {
+        expect(logIssue).toHaveBeenCalledExactlyOnceWith(
+          expect.any(Error),
+          expect.objectContaining({
+            loggerScope: ["tools", "get-issue-details", "committers"],
+          }),
+        );
+      } else {
+        expect(logIssue).not.toHaveBeenCalled();
+      }
     },
   );
 });

@@ -58,7 +58,6 @@ import type {
   ClientKeySchema,
   CommitListSchema,
   CommitSchema,
-  CommitterSchema,
   CommittersResponseSchema,
   DashboardListItemSchema,
   DashboardSchema,
@@ -156,7 +155,6 @@ export type Release = z.infer<typeof ReleaseSchema>;
 export type ReleaseDetails = z.infer<typeof ReleaseDetailsSchema>;
 export type Deploy = z.infer<typeof DeploySchema>;
 export type Commit = z.infer<typeof CommitSchema>;
-export type Committer = z.infer<typeof CommitterSchema>;
 export type Issue = z.infer<typeof IssueSchema>;
 export type IssueActivity = z.infer<typeof IssueActivitySchema>;
 export type IssueComment = z.infer<typeof IssueCommentSchema>;
@@ -203,7 +201,9 @@ export type MetricAlertRuleList = z.infer<typeof MetricAlertRuleListSchema>;
 export type ReleaseList = z.infer<typeof ReleaseListSchema>;
 export type DeployList = z.infer<typeof DeployListSchema>;
 export type CommitList = z.infer<typeof CommitListSchema>;
-export type CommitterList = z.infer<typeof CommittersResponseSchema>["committers"];
+export type CommitterList = z.infer<
+  typeof CommittersResponseSchema
+>["committers"];
 export type IssueList = z.infer<typeof IssueListSchema>;
 export type IssueActivityList = z.infer<
   typeof IssueActivityListResponseSchema
