@@ -557,6 +557,7 @@ export default defineTool({
     // preserves. Like the UI, an explicit environment is added to Seer's query
     // afterwards.
     const seerTranslation =
+      context.experimentalMode &&
       params.query &&
       isSeerSearchDataset(params.dataset) &&
       !hasStructuredQuery &&
