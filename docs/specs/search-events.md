@@ -95,6 +95,21 @@ The AI produces different query patterns based on the selected dataset:
 - **Logs dataset**: Focus on `message`, `severity`, `severity_number`, **NO timestamp filters** (uses statsPeriod instead)
 - **Tracemetrics dataset**: Focus on `metric.name`, `metric.type`, `metric.unit`, `value`, and metric-aware aggregates like `p95(value,http.request.duration,distribution,millisecond)`
 
+### Environment Filters
+
+The embedded agent receives known visible environment names as context. It must
+only add an environment filter when requested; a single available environment or
+grouping by environment does not imply a filter. These instructions also apply
+when discovery fails or the list is too large to include in the prompt.
+
+For non-replay datasets, environment filters belong in `query`; the agent leaves
+its separate `environment` output null. The internal `validateSearch` tool accepts
+the candidate query without a separate environment argument. Replays retain the
+separate environment parameter and do not use this validation tool.
+
+The discovered list is not an exhaustive allowlist: hidden environments can be
+absent. Existing final validation and unknown-environment notices remain in place.
+
 ### Time Series
 
 Requests for a metric over time ("per hour", "per day", "trend", "over time") return a bucketed series via the `events-stats` endpoint instead of failing.
