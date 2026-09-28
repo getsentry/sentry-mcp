@@ -570,6 +570,9 @@ export default defineTool({
             query: params.query,
           })
         : null;
+    if (seerTranslation && !projectId) {
+      projectId = "-1";
+    }
 
     if (
       !hasAgentProvider() &&

@@ -3727,15 +3727,81 @@ describe("search_events", () => {
           status: "completed",
           final_response: { responses: [seerQuery], unsupported_reason: null },
         }),
-        http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
-          HttpResponse.json({ data: [] }),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/environments/",
+          ({ request }) => {
+            expect(new URL(request.url).searchParams.get("project")).toBe("-1");
+            return HttpResponse.json([{ id: "1", name: "production" }]);
+          },
+          { once: true },
+        ),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/validate/",
+          ({ request }) => {
+            expect(new URL(request.url).searchParams.get("project")).toBe("-1");
+            return HttpResponse.json(validEventsValidationResponse);
+          },
+          { once: true },
+        ),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/",
+          ({ request }) => {
+            expect(new URL(request.url).searchParams.get("project")).toBe("-1");
+            return HttpResponse.json({ data: [] });
+          },
+          { once: true },
         ),
       );
 
-      await searchEvents.handler({ ...seerParams, projectSlug: null }, context);
+      const result = await searchEvents.handler(
+        { ...seerParams, projectSlug: null, environment: "production" },
+        context,
+      );
 
       expect(mockAllProjectsStart).toHaveBeenCalled();
       expect(mockGenerateText).not.toHaveBeenCalled();
+      expect(result).toContain("project=-1");
+    });
+
+    it("should keep Seer's all-project scope for time series", async () => {
+      mswServer.use(
+        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
+        http.post(
+          "https://sentry.io/api/0/organizations/test-org/search-agent/start/",
+          async ({ request }) => {
+            expect(await request.json()).toMatchObject({ project_ids: [-1] });
+            return HttpResponse.json({ run_id: 1, sentry_run_id: "run-uuid" });
+          },
+          { once: true },
+        ),
+        mockSeerState({
+          status: "completed",
+          final_response: {
+            responses: [
+              {
+                ...seerQuery,
+                group_by: [],
+                visualization: [{ y_axes: ["count()"], interval: "1d" }],
+              },
+            ],
+          },
+        }),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events-stats/",
+          ({ request }) => {
+            expect(new URL(request.url).searchParams.get("project")).toBe("-1");
+            return HttpResponse.json({ data: [] });
+          },
+          { once: true },
+        ),
+      );
+
+      const result = await searchEvents.handler(
+        { ...seerParams, projectSlug: null },
+        context,
+      );
+
+      expect(result).toContain("project=-1");
     });
 
     it("should prefer an explicit period over Seer's time range", async () => {
@@ -3816,12 +3882,39 @@ describe("search_events", () => {
       );
       mswServer.use(
         mockOrganization(["gen-ai-features"]),
-        http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
-          HttpResponse.json({ data: [] }),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/environments/",
+          ({ request }) => {
+            expect(new URL(request.url).searchParams.has("project")).toBe(
+              false,
+            );
+            return HttpResponse.json([]);
+          },
+          { once: true },
+        ),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/validate/",
+          ({ request }) => {
+            expect(new URL(request.url).searchParams.has("project")).toBe(
+              false,
+            );
+            return HttpResponse.json(validEventsValidationResponse);
+          },
+          { once: true },
+        ),
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/",
+          ({ request }) => {
+            expect(new URL(request.url).searchParams.has("project")).toBe(
+              false,
+            );
+            return HttpResponse.json({ data: [] });
+          },
+          { once: true },
         ),
       );
 
-      await searchEvents.handler(seerParams, context);
+      await searchEvents.handler({ ...seerParams, projectSlug: null }, context);
 
       expect(mockSeerStart).not.toHaveBeenCalled();
       expect(mockGenerateText).toHaveBeenCalled();
