@@ -52,6 +52,18 @@ const nativeCases = [
     storedUrl: "https://jira.example.com:8443/jira/browse/ENG-42",
   },
   {
+    provider: "jira",
+    domainName: "acme.atlassian.net",
+    url: "https://acme.atlassian.net/jira/software/projects/ENG/boards/1?selectedIssue=ENG-42",
+    storedUrl: "https://acme.atlassian.net/browse/ENG-42",
+  },
+  {
+    provider: "jira_server",
+    domainName: "jira.example.com",
+    url: "https://jira.example.com/jira/projects/ENG/issues/ENG-42",
+    storedUrl: "https://jira.example.com/jira/browse/ENG-42",
+  },
+  {
     provider: "gitlab",
     domainName: "gitlab.com/acme",
     url: "https://gitlab.com/acme/backend/repo/-/issues/42",
@@ -244,9 +256,9 @@ describe("linkExternalIssue", () => {
       url: "https://acme.visualstudio.com/_workitems/edit/42",
     },
     {
-      provider: "github",
+      provider: "unsupported",
       domainName: "github.com/acme",
-      url: "https://github.com/acme/repo/commit/abc123",
+      url: "https://github.com/acme/repo/issues/42",
     },
   ])(
     "rejects a mismatched $provider installation before PUT: $url",
@@ -289,19 +301,26 @@ describe("linkExternalIssue", () => {
     },
   );
 
-  it.each([403, 404, 409])(
-    "preserves backend HTTP %i instead of reporting success",
+  it.each([400, 403, 404, 409])(
+    "leaves URL validation and HTTP %i errors to the backend",
     async (status) => {
+      const externalIssueUrl =
+        status === 400
+          ? "https://github.com/acme/repo/commit/abc123"
+          : "https://github.com/acme/repo/issues/42";
       useIntegrations([integration()]);
       mswServer.use(
-        http.put(`${endpoint}1/`, () =>
-          HttpResponse.json({ detail: "Cannot link" }, { status }),
-        ),
+        http.put(`${endpoint}1/`, async ({ request }) => {
+          expect(await request.json()).toEqual({
+            externalIssue: externalIssueUrl,
+          });
+          return HttpResponse.json({ detail: "Cannot link" }, { status });
+        }),
       );
       await expect(
         linkExternalIssue(api, {
           ...params,
-          externalIssueUrl: "https://github.com/acme/repo/issues/42",
+          externalIssueUrl,
         }),
       ).rejects.toMatchObject({ status });
     },
@@ -324,6 +343,43 @@ describe("unlinkExternalIssue", () => {
         await unlinkExternalIssue(api, { ...params, externalIssueUrl: url }),
       ).toMatchObject({ url: storedUrl, provider, status: "not_linked" });
       expect(writes).toEqual([`${endpoint}1/?externalIssue=900`]);
+    },
+  );
+
+  it.each([
+    [
+      "https://jira.example.com/jira/browse/ENG-1?selectedIssue=invalid&selectedIssue=eng-2&selectedIssue=ENG-1",
+      "902",
+    ],
+    [
+      "https://jira.example.com/jira-archive/browse/ENG-2?selectedIssue=ENG-2",
+      null,
+    ],
+    ["https://other.example.com/jira/browse/ENG-2?selectedIssue=ENG-2", null],
+  ])(
+    "matches Jira's selectedIssue precedence and installation boundary: %s",
+    async (externalIssueUrl, expectedId) => {
+      useIntegrations([
+        integration({
+          provider: { key: "jira_server" },
+          domainName: "jira.example.com",
+          externalIssues: [1, 2].map((number) => ({
+            id: `90${number}`,
+            key: `ENG-${number}`,
+            url: `https://jira.example.com/jira/browse/ENG-${number}`,
+          })),
+        }),
+      ]);
+      const writes = useDelete();
+      const result = await unlinkExternalIssue(api, {
+        ...params,
+        integrationId: "1",
+        externalIssueUrl,
+      });
+      expect(result.status).toBe("not_linked");
+      expect(writes).toEqual(
+        expectedId ? [`${endpoint}1/?externalIssue=${expectedId}`] : [],
+      );
     },
   );
 

@@ -70,8 +70,12 @@ function azureAccount(url: URL): string | undefined {
   return undefined;
 }
 
-/** Compare references, not titles, query strings, or GitHub PR tabs. */
-function nativeIdentity(url: URL, provider: string): string | undefined {
+/** Compare references, ignoring presentation-only URL components. */
+function nativeIdentity(
+  url: URL,
+  provider: string,
+  linkedUrl: URL,
+): string | undefined {
   const path = pathOf(url);
   switch (provider) {
     case "github":
@@ -92,10 +96,33 @@ function nativeIdentity(url: URL, provider: string): string | undefined {
     }
     case "jira":
     case "jira_server": {
-      const match = path.match(/^(.*)\/browse\/([a-z][a-z\d_]*-\d+)$/i);
-      return match
-        ? `${url.origin}${match[1]}/${match[2]!.toUpperCase()}`
-        : undefined;
+      // Sentry returns canonical /browse/ URLs. Their prefix preserves the
+      // Jira Server context path, which integration.domainName can omit.
+      const basePath = linkedUrl.pathname.match(
+        /^(.*)\/browse\/[^/]+\/?$/,
+      )?.[1];
+      if (
+        basePath === undefined ||
+        url.origin !== linkedUrl.origin ||
+        (url.pathname !== basePath && !url.pathname.startsWith(`${basePath}/`))
+      ) {
+        return undefined;
+      }
+      const issueKey = /^[a-z][a-z\d]*-\d+$/i;
+      const segments = url.pathname
+        .slice(basePath.length)
+        .split("/")
+        .filter(Boolean);
+      // Keep selectedIssue precedence aligned with Sentry's parse_jira_issue_key.
+      const key =
+        url.searchParams
+          .getAll("selectedIssue")
+          .find((value) => issueKey.test(value)) ??
+        (["browse", "issues"].includes(segments.at(-2) ?? "") &&
+        issueKey.test(segments.at(-1) ?? "")
+          ? segments.at(-1)
+          : undefined);
+      return key ? `${url.origin}${basePath}/${key.toUpperCase()}` : undefined;
     }
     case "vsts": {
       const account = azureAccount(url);
@@ -116,7 +143,6 @@ function nativeIdentity(url: URL, provider: string): string | undefined {
 function matchesIntegration(url: URL, integration: IssueIntegration): boolean {
   if (integration.status && integration.status !== "active") return false;
   const provider = integration.provider.key;
-  if (!nativeIdentity(url, provider)) return false;
   const domain = integrationDomain(integration);
   const path = pathOf(url);
   const owner = path.split("/")[1];
@@ -155,11 +181,14 @@ function matchesIntegration(url: URL, integration: IssueIntegration): boolean {
       // backend validates its base URL; matching groups stay ambiguous.
       return !group || path.includes(`${group}/`);
     }
-    default: {
+    case "jira":
+    case "jira_server": {
       if (!domain || domain.host !== url.host) return false;
       const prefix = pathOf(domain);
-      return !prefix || path.startsWith(`${prefix}/`);
+      return !prefix || path === prefix || path.startsWith(`${prefix}/`);
     }
+    default:
+      return false;
   }
 }
 
@@ -266,15 +295,16 @@ export async function unlinkExternalIssue(
   const matches = candidates.flatMap((integration) =>
     integration.externalIssues.flatMap((issue) => {
       if (!issue.url) return [];
-      const identity = nativeIdentity(url, integration.provider.key);
-      if (!identity) return [];
       let existing: URL;
       try {
         existing = parseUrl(issue.url);
       } catch {
         return [];
       }
-      return nativeIdentity(existing, integration.provider.key) === identity
+      const identity = nativeIdentity(url, integration.provider.key, existing);
+      return identity &&
+        nativeIdentity(existing, integration.provider.key, existing) ===
+          identity
         ? [{ integration, issue }]
         : [];
     }),

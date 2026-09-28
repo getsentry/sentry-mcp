@@ -198,6 +198,53 @@ describe("linkAppIssue", () => {
     expect(searches).toEqual(["/teams", "/issues/search"]);
   });
 
+  it.each([
+    { source: "default", defaultValue: "", fields: undefined },
+    { source: "supplied value", defaultValue: "preset", fields: { note: "" } },
+  ])("omits an empty optional $source", async ({ defaultValue, fields }) => {
+    mockDiscovery({
+      form: {
+        uri: "/issues/link",
+        required_fields: [{ name: "issueId", type: "text" }],
+        optional_fields: [{ name: "note", type: "text", defaultValue }],
+      },
+    });
+    mswServer.use(
+      http.post(
+        `${base}/sentry-app-installations/installation/external-issue-actions/`,
+        async ({ request }) => {
+          expect(await request.json()).toEqual({
+            groupId: "123",
+            action: "link",
+            uri: "/issues/link",
+            issueId: "ENG-123",
+          });
+          return HttpResponse.json(association, { status: 201 });
+        },
+      ),
+    );
+    await expect(
+      linkAppIssue(api, { ...params, fields }),
+    ).resolves.toMatchObject({
+      status: "linked",
+    });
+  });
+
+  it("still requires an empty optional field when the target depends on it", async () => {
+    mockDiscovery({
+      form: {
+        uri: "/issues/link",
+        required_fields: [
+          { name: "issueId", type: "text", depends_on: ["team"] },
+        ],
+        optional_fields: [{ name: "team", type: "text", defaultValue: "" }],
+      },
+    });
+    await expect(linkAppIssue(api, params)).rejects.toThrow(
+      "Provide required App link field 'team' in fields.",
+    );
+  });
+
   it("guards a repeat with its stored canonical URL and prepares fields for a concurrent unlink", async () => {
     mockDiscovery({ links: [association] });
     let searches = 0;

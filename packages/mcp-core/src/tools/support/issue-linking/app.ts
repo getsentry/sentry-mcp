@@ -170,8 +170,8 @@ async function resolveFields(
   const pending = new Set(form.required_fields.map((field) => field.name));
   pending.add(target.name);
   for (const field of fields.values()) {
-    if (supplied[field.name] !== undefined || field.defaultValue != null)
-      pending.add(field.name);
+    const value = supplied[field.name] ?? field.defaultValue;
+    if (value != null && value !== "") pending.add(field.name);
   }
   // Resolve required dependencies too, even when the form marks them optional.
   for (const name of pending) {
