@@ -25,14 +25,13 @@ import {
 } from "@sentry/core";
 import type { SentryContext } from "../../context.js";
 import { buildCommand, numberParser } from "../../lib/command.js";
-import { detectDsn } from "../../lib/dsn/index.js";
 import {
   buildCheckIn,
   buildMonitorConfig,
   type CheckInConfigFlags,
 } from "../../lib/envelope/checkin-builder.js";
 import {
-  resolveDsn,
+  resolveIngestDsn,
   sendEnvelopeRequest,
 } from "../../lib/envelope/transport.js";
 import { CliError, ConfigError, ValidationError } from "../../lib/errors.js";
@@ -70,15 +69,9 @@ async function resolveCheckInDsn(
   flags: RunFlags,
   cwd: string
 ): Promise<string> {
-  const explicit = resolveDsn(flags);
-  if (explicit) {
-    return explicit;
-  }
-
-  const detected = await detectDsn(cwd);
-  if (detected) {
-    log.debug(`Using auto-detected DSN from ${detected.source}`);
-    return detected.raw;
+  const dsn = await resolveIngestDsn(flags, cwd);
+  if (dsn) {
+    return dsn;
   }
 
   throw new ConfigError(

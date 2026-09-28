@@ -652,10 +652,15 @@ export function resolveOrgDisplayName(
 /**
  * Get project keys (DSNs) for a project.
  * Uses region-aware routing for multi-region support.
+ *
+ * @param orgSlug - Organization slug
+ * @param projectSlug - Project slug
+ * @param options - Optional key status filter
  */
 export async function getProjectKeys(
   orgSlug: string,
-  projectSlug: string
+  projectSlug: string,
+  options: { status?: "active" | "inactive" } = {}
 ): Promise<ProjectKey[]> {
   const config = await getOrgSdkConfig(orgSlug);
 
@@ -665,6 +670,7 @@ export async function getProjectKeys(
       organization_id_or_slug: orgSlug,
       project_id_or_slug: projectSlug,
     },
+    ...(options.status ? { query: { status: options.status } } : {}),
   });
 
   return unwrapResult<ProjectKey[]>(result, "Failed to get project keys");

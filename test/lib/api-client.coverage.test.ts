@@ -881,13 +881,16 @@ describe("projects.ts", () => {
       globalThis.fetch = mockFetch(async (input, init) => {
         const req = new Request(input!, init);
         expect(req.url).toContain("/projects/test-org/test-project/keys/");
+        expect(new URL(req.url).searchParams.get("status")).toBe("active");
         return new Response(JSON.stringify(keys), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       });
 
-      const result = await getProjectKeys("test-org", "test-project");
+      const result = await getProjectKeys("test-org", "test-project", {
+        status: "active",
+      });
       expect(result).toHaveLength(1);
       expect(result[0]!.dsn.public).toBe("https://abc@sentry.io/1");
     });
