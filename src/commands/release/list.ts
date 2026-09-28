@@ -254,7 +254,6 @@ function buildReleaseListConfig(
 ): OrgListConfig<SentryRelease, ReleaseWithOrg> {
   return {
     paginationKey: PAGINATION_KEY,
-    entityName: "release",
     entityPlural: "releases",
     commandPrefix: "sentry release list",
     listForOrg: async (org) => {
@@ -724,7 +723,6 @@ export const listCommand = buildListCommand("release", {
       cwd,
       flags,
       parsed,
-      orgSlugMatchBehavior: "redirect",
       overrides: {
         "auto-detect": (ctx: HandlerContext<"auto-detect">) =>
           handleAutoDetectWithProject(resolvedExtra, ctx),

@@ -14,7 +14,7 @@ import { parseOrgProjectArg } from "../../../lib/arg-parsing.js";
 import { buildCommand, numberParser } from "../../../lib/command.js";
 import { ContextError, ValidationError } from "../../../lib/errors.js";
 import { CommandOutput } from "../../../lib/formatters/output.js";
-import { resolveTargetsFromParsedArg } from "../../../lib/resolve-target.js";
+import { resolveProjectBoundTargets } from "../../../lib/resolve-target.js";
 import {
   matchToLogicType,
   parseJsonObjectList,
@@ -260,7 +260,7 @@ export const editCommand = buildCommand({
 
     const { ref, targetArg } = parseIssueRuleArg(arg, USAGE_HINT);
     const parsed = parseOrgProjectArg(targetArg);
-    const { targets } = await resolveTargetsFromParsedArg(parsed, {
+    const { targets } = await resolveProjectBoundTargets(parsed, {
       cwd,
       usageHint: USAGE_HINT,
     });

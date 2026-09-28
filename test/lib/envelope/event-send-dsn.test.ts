@@ -146,7 +146,9 @@ describe("resolveEventSendDsn", () => {
   let detectSpy: ReturnType<typeof vi.spyOn>;
   let keysSpy: ReturnType<typeof vi.spyOn>;
   let authSpy: ReturnType<typeof vi.spyOn>;
-  const resolveProjectMock = vi.mocked(resolveTarget.resolveOrgProjectFromArg);
+  const resolveProjectMock = vi.mocked(
+    resolveTarget.resolveProjectBoundFromArg
+  );
 
   beforeEach(() => {
     detectSpy = vi.spyOn(dsnIndex, "detectDsn").mockResolvedValue(null);

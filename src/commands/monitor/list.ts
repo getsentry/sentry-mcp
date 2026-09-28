@@ -58,7 +58,6 @@ const MONITOR_COLUMNS: Column<MonitorWithOrg>[] = [
 /** Shared config that plugs into the org-list framework. */
 const monitorListConfig: OrgListConfig<SentryMonitor, MonitorWithOrg> = {
   paginationKey: PAGINATION_KEY,
-  entityName: "monitor",
   entityPlural: "monitors",
   commandPrefix: "sentry monitor list",
   listForOrg: (org) => listMonitors(org),

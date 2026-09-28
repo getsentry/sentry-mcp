@@ -197,10 +197,7 @@ describe("viewCommand.func", () => {
           },
         ],
       });
-    resolveTargetSpy = vi.spyOn(
-      resolveTarget,
-      "resolveOrgOptionalProjectFromArg"
-    );
+    resolveTargetSpy = vi.spyOn(resolveTarget, "resolveOrgOptionalFromArg");
     openInBrowserSpy = vi.spyOn(browser, "openInBrowser").mockResolvedValue();
   });
 

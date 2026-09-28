@@ -147,11 +147,8 @@ beforeEach(async () => {
     nextCursor: undefined,
   });
 
-  // Default: resolveOrgOptionalProjectFromArg returns org-only (auto-detect)
-  resolveTargetSpy = vi.spyOn(
-    resolveTarget,
-    "resolveOrgOptionalProjectFromArg"
-  );
+  // Default: resolveOrgOptionalFromArg returns org-only (auto-detect)
+  resolveTargetSpy = vi.spyOn(resolveTarget, "resolveOrgOptionalFromArg");
   resolveTargetSpy.mockResolvedValue({ org: "test-org" });
 
   resolveCursorSpy = vi.spyOn(paginationDb, "resolveCursor").mockReturnValue({

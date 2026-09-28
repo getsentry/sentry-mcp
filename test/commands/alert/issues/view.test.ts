@@ -64,7 +64,7 @@ describe("alert issues view", () => {
     getRuleSpy = vi.spyOn(apiClient, "getIssueAlertRule");
     listRulesSpy = vi.spyOn(apiClient, "listIssueAlertsPaginated");
     openInBrowserSpy = vi.spyOn(browser, "openInBrowser");
-    resolveSpy = vi.spyOn(resolveTarget, "resolveTargetsFromParsedArg");
+    resolveSpy = vi.spyOn(resolveTarget, "resolveProjectBoundTargets");
 
     openInBrowserSpy.mockResolvedValue(undefined);
   });

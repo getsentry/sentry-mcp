@@ -106,15 +106,15 @@ const sampleDashboard: DashboardDetail = {
 describe("dashboard widget add", () => {
   let getDashboardSpy: ReturnType<typeof spyOn>;
   let updateDashboardSpy: ReturnType<typeof spyOn>;
-  let resolveOrgSpy: ReturnType<typeof spyOn>;
+  let resolveOrgOnlyTargetSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     getDashboardSpy = vi.spyOn(apiClient, "getDashboard");
     updateDashboardSpy = vi.spyOn(apiClient, "updateDashboard");
-    resolveOrgSpy = vi.spyOn(resolveTarget, "resolveOrg");
+    resolveOrgOnlyTargetSpy = vi.spyOn(resolveTarget, "resolveOrgOnlyTarget");
 
     // Default mocks
-    resolveOrgSpy.mockResolvedValue({ org: "acme-corp" });
+    resolveOrgOnlyTargetSpy.mockResolvedValue("acme-corp");
     getDashboardSpy.mockResolvedValue(sampleDashboard);
     updateDashboardSpy.mockImplementation(async (_org, _id, body) => ({
       ...sampleDashboard,
@@ -125,7 +125,7 @@ describe("dashboard widget add", () => {
   afterEach(() => {
     getDashboardSpy.mockRestore();
     updateDashboardSpy.mockRestore();
-    resolveOrgSpy.mockRestore();
+    resolveOrgOnlyTargetSpy.mockRestore();
   });
 
   test("adds widget with correct API args (getDashboard then updateDashboard)", async () => {

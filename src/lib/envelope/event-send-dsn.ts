@@ -11,7 +11,7 @@ import { getProjectKeys } from "../api/projects.js";
 import { getAuthConfig } from "../db/auth.js";
 import { ConfigError } from "../errors.js";
 import { logger } from "../logger.js";
-import { resolveOrgProjectFromArg } from "../resolve-target.js";
+import { resolveProjectBoundFromArg } from "../resolve-target.js";
 import { resolveIngestDsn } from "./transport.js";
 
 const log = logger.withTag("event.send");
@@ -125,7 +125,7 @@ async function dsnFromProjectTarget(
       "sentry auth login"
     );
   }
-  const { org, project } = await resolveOrgProjectFromArg(
+  const { org, project } = await resolveProjectBoundFromArg(
     target,
     cwd,
     "event send"

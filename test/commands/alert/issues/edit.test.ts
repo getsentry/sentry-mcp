@@ -60,7 +60,7 @@ describe("alert issues edit", () => {
     getRuleSpy = vi.spyOn(apiClient, "getIssueAlertRule");
     getDocSpy = vi.spyOn(apiClient, "getIssueAlertWorkflowDocument");
     putSpy = vi.spyOn(apiClient, "updateIssueAlertRule");
-    resolveSpy = vi.spyOn(resolveTarget, "resolveTargetsFromParsedArg");
+    resolveSpy = vi.spyOn(resolveTarget, "resolveProjectBoundTargets");
   });
 
   afterEach(() => {

@@ -449,7 +449,7 @@ Manage Sentry alert rules
 - `sentry alert issues edit <org/project/rule-id-or-name>` — Edit an issue alert rule
 - `sentry alert metrics list <target>` — List metric alert rules
 - `sentry alert metrics view <org/rule-id-or-name>` — View a metric alert rule
-- `sentry alert metrics create <org>` — Create a metric alert rule
+- `sentry alert metrics create <target>` — Create a metric alert rule
 - `sentry alert metrics delete <org/rule-id-or-name>` — Delete a metric alert rule
 - `sentry alert metrics edit <org/rule-id-or-name>` — Edit a metric alert rule
 

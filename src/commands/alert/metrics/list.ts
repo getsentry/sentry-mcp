@@ -59,8 +59,10 @@ import {
 } from "../../../lib/org-list.js";
 import { withProgress } from "../../../lib/polling.js";
 import {
+  classifyProjectSearchTarget,
+  type ProjectSearchTargetResolution,
   type ResolvedTarget,
-  resolveTargetsFromParsedArg,
+  resolveProjectBoundTargets,
 } from "../../../lib/resolve-target.js";
 import { buildMetricAlertsUrl } from "../../../lib/sentry-urls.js";
 import type { Writer } from "../../../types/index.js";
@@ -126,7 +128,6 @@ type MetricAlertListResult = ListResult<MetricAlertRule> & {
 
 const metricAlertListMeta: ListCommandMeta = {
   paginationKey: PAGINATION_KEY,
-  entityName: "metric alert rule",
   entityPlural: "metric alert rules",
   commandPrefix: "sentry alert metrics list",
 };
@@ -193,6 +194,7 @@ type ResolvedOrgsOptions = {
   parsed: ReturnType<typeof parseOrgProjectArg>;
   flags: ListFlags;
   cwd: string;
+  projectSearchResolution?: ProjectSearchTargetResolution;
 };
 
 /**
@@ -205,14 +207,16 @@ type ResolvedOrgsOptions = {
  */
 async function resolveOrgs(
   parsed: ReturnType<typeof parseOrgProjectArg>,
-  cwd: string
+  cwd: string,
+  projectSearchResolution?: ProjectSearchTargetResolution
 ): Promise<{ orgs: string[]; footer?: string }> {
   if (parsed.type === "explicit" || parsed.type === "org-all") {
     return { orgs: [parsed.org] };
   }
-  const { targets, footer } = await resolveTargetsFromParsedArg(parsed, {
+  const { targets, footer } = await resolveProjectBoundTargets(parsed, {
     cwd,
     usageHint: USAGE_HINT,
+    projectSearchResolution,
   });
   return {
     orgs: [...new Set(targets.map((t: ResolvedTarget) => t.org))],
@@ -224,7 +228,23 @@ async function resolveWebUrl(
   parsed: ReturnType<typeof parseOrgProjectArg>,
   cwd: string
 ): Promise<string> {
-  const { orgs } = await resolveOrgs(parsed, cwd);
+  let projectSearchResolution: ProjectSearchTargetResolution | undefined;
+  if (
+    parsed.type === "project-search" &&
+    parsed.org === undefined &&
+    parsed.originalSlug === undefined
+  ) {
+    const resolution = await classifyProjectSearchTarget(parsed);
+    if (resolution.kind === "organization") {
+      logger.warn(
+        `'${parsed.projectSlug}' is an organization, not a project. Opening organization '${resolution.org}'.`
+      );
+      return buildMetricAlertsUrl(resolution.org);
+    }
+    projectSearchResolution = resolution;
+  }
+
+  const { orgs } = await resolveOrgs(parsed, cwd, projectSearchResolution);
   const uniqueOrgs = [...new Set(orgs)];
   if (uniqueOrgs.length === 0) {
     throw new ContextError("Organization", USAGE_HINT);
@@ -247,9 +267,13 @@ async function resolveWebUrl(
 async function handleResolvedOrgs(
   options: ResolvedOrgsOptions
 ): Promise<MetricAlertListResult> {
-  const { parsed, flags, cwd } = options;
+  const { parsed, flags, cwd, projectSearchResolution } = options;
 
-  const { orgs: resolved, footer } = await resolveOrgs(parsed, cwd);
+  const { orgs: resolved, footer } = await resolveOrgs(
+    parsed,
+    cwd,
+    projectSearchResolution
+  );
 
   if (resolved.length === 0) {
     throw new ContextError("Organization", USAGE_HINT);
@@ -574,7 +598,6 @@ export const listCommand = buildListCommand("alert metrics", {
       cwd,
       flags,
       parsed,
-      orgSlugMatchBehavior: "redirect",
       // All modes use per-org fetching with compound cursor support
       allowCursorInModes: [
         "auto-detect",

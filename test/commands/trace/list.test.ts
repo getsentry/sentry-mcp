@@ -116,10 +116,10 @@ describe("parseSort", () => {
 });
 
 // ============================================================================
-// resolveOrgProjectFromArg (via shared resolve-target.ts)
+// resolveProjectBoundFromArg (via shared resolve-target.ts)
 // ============================================================================
 
-describe("resolveOrgProjectFromArg", () => {
+describe("resolveProjectBoundFromArg", () => {
   let findProjectsBySlugSpy: ReturnType<typeof spyOn>;
   let resolveOrgAndProjectSpy: ReturnType<typeof spyOn>;
 
@@ -136,7 +136,7 @@ describe("resolveOrgProjectFromArg", () => {
   });
 
   test("returns explicit org/project directly", async () => {
-    const result = await resolveTarget.resolveOrgProjectFromArg(
+    const result = await resolveTarget.resolveProjectBoundFromArg(
       "my-org/my-project",
       "/tmp",
       "trace list"
@@ -148,13 +148,13 @@ describe("resolveOrgProjectFromArg", () => {
 
   test("throws for org-all target (org/ without project)", async () => {
     await expect(
-      resolveTarget.resolveOrgProjectFromArg("my-org/", "/tmp", "trace list")
+      resolveTarget.resolveProjectBoundFromArg("my-org/", "/tmp", "trace list")
     ).rejects.toThrow(ContextError);
   });
 
   test("throws ContextError with project hint for org-all", async () => {
     try {
-      await resolveTarget.resolveOrgProjectFromArg(
+      await resolveTarget.resolveProjectBoundFromArg(
         "my-org/",
         "/tmp",
         "trace list"
@@ -175,7 +175,7 @@ describe("resolveOrgProjectFromArg", () => {
       orgs: [],
     });
 
-    const result = await resolveTarget.resolveOrgProjectFromArg(
+    const result = await resolveTarget.resolveProjectBoundFromArg(
       "frontend",
       "/tmp",
       "trace list"
@@ -188,7 +188,7 @@ describe("resolveOrgProjectFromArg", () => {
     findProjectsBySlugSpy.mockResolvedValue({ projects: [], orgs: [] });
 
     await expect(
-      resolveTarget.resolveOrgProjectFromArg(
+      resolveTarget.resolveProjectBoundFromArg(
         "nonexistent",
         "/tmp",
         "trace list"
@@ -206,7 +206,7 @@ describe("resolveOrgProjectFromArg", () => {
     });
 
     try {
-      await resolveTarget.resolveOrgProjectFromArg(
+      await resolveTarget.resolveProjectBoundFromArg(
         "frontend",
         "/tmp",
         "trace list"
@@ -220,7 +220,7 @@ describe("resolveOrgProjectFromArg", () => {
     }
   });
 
-  // Skip: resolveOrgProjectFromArg calls resolveOrgAndProject internally
+  // Skip: resolveProjectBoundFromArg calls resolveOrgAndProject internally
   // (same-file call). vi.spyOn on the export doesn't intercept same-file
   // calls in vitest, so the mock has no effect and the real code runs.
   // biome-ignore lint/suspicious/noSkippedTests: vitest can't intercept same-file internal calls
@@ -230,7 +230,7 @@ describe("resolveOrgProjectFromArg", () => {
       project: "detected-project",
     });
 
-    const result = await resolveTarget.resolveOrgProjectFromArg(
+    const result = await resolveTarget.resolveProjectBoundFromArg(
       undefined,
       "/tmp",
       "trace list"
@@ -251,7 +251,7 @@ describe("resolveOrgProjectFromArg", () => {
     resolveOrgAndProjectSpy.mockResolvedValue(null);
 
     await expect(
-      resolveTarget.resolveOrgProjectFromArg(undefined, "/tmp", "trace list")
+      resolveTarget.resolveProjectBoundFromArg(undefined, "/tmp", "trace list")
     ).rejects.toThrow(ContextError);
   });
 });

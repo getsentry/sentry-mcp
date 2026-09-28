@@ -46,7 +46,7 @@ import { logger } from "../../lib/logger.js";
 import {
   resolveLogProjectId,
   resolveOrgAndProject,
-  resolveProjectBySlug,
+  resolveProjectBoundSlug,
 } from "../../lib/resolve-target.js";
 import { RETENTION_DAYS } from "../../lib/retention.js";
 import { buildLogsUrl } from "../../lib/sentry-urls.js";
@@ -263,7 +263,7 @@ async function resolveTarget(
       return { org: parsed.org, project: parsed.project };
 
     case "project-search": {
-      const result = await resolveProjectBySlug(
+      const result = await resolveProjectBoundSlug(
         parsed.projectSlug,
         USAGE_HINT,
         `sentry log view <org>/${parsed.projectSlug} ${rawLogIds.join(" ")}`,

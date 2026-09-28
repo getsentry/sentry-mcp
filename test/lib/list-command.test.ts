@@ -49,7 +49,6 @@ function makeFakeConfig(
 ): OrgListConfig<FakeEntity, FakeWithOrg> {
   return {
     paginationKey: "fake-list",
-    entityName: "widget",
     entityPlural: "widgets",
     commandPrefix: "sentry widget list",
     listForOrg: vi.fn(() => Promise.resolve([])),

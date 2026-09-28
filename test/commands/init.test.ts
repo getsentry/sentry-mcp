@@ -35,6 +35,7 @@ function mockProject(slug: string, orgSlug = "resolved-org") {
 let capturedArgs: Record<string, unknown> | undefined;
 let runWizardSpy: ReturnType<typeof spyOn>;
 let findProjectsSpy: ReturnType<typeof spyOn>;
+let listProjectsSpy: ReturnType<typeof spyOn>;
 let warmSpy: ReturnType<typeof spyOn>;
 let refreshTokenSpy: ReturnType<typeof spyOn>;
 
@@ -80,6 +81,7 @@ beforeEach(() => {
       projects: [mockProject(slug)],
       orgs: [MOCK_ORG],
     }));
+  listProjectsSpy = vi.spyOn(projectsApi, "listProjects").mockResolvedValue([]);
   // Spy on warmOrgDetection to verify it's called/skipped appropriately.
   // The mock prevents real DSN scans and API calls from the background.
   warmSpy = vi.spyOn(prefetchNs, "warmOrgDetection").mockImplementation(
@@ -94,6 +96,7 @@ beforeEach(() => {
 afterEach(() => {
   runWizardSpy.mockRestore();
   findProjectsSpy.mockRestore();
+  listProjectsSpy.mockRestore();
   warmSpy.mockRestore();
   refreshTokenSpy.mockRestore();
   resetPrefetch();
@@ -435,6 +438,23 @@ describe("init command func", () => {
       expect(capturedArgs?.org).toBeUndefined();
       expect(capturedArgs?.project).toBe("new-app");
       expect(capturedArgs?.directory).toBe("/projects/app");
+    });
+
+    test("bare slug miss stays a new project even when a fuzzy candidate exists", async () => {
+      findProjectsSpy.mockResolvedValue({
+        projects: [],
+        orgs: [MOCK_ORG],
+      });
+      listProjectsSpy.mockResolvedValue([
+        mockProject("new-application", MOCK_ORG.slug),
+      ]);
+      const ctx = makeContext("/projects/app");
+
+      await func.call(ctx, DEFAULT_FLAGS, "new-app");
+
+      expect(capturedArgs?.org).toBeUndefined();
+      expect(capturedArgs?.project).toBe("new-app");
+      expect(listProjectsSpy).not.toHaveBeenCalled();
     });
 
     test("bare slug matches org name → treated as org-only", async () => {

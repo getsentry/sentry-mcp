@@ -106,10 +106,7 @@ describe("listCommand.func", () => {
 
   beforeEach(() => {
     listReplaysSpy = vi.spyOn(apiClient, "listReplays");
-    resolveTargetSpy = vi.spyOn(
-      resolveTarget,
-      "resolveOrgOptionalProjectFromArg"
-    );
+    resolveTargetSpy = vi.spyOn(resolveTarget, "resolveOrgOptionalFromArg");
     resolveCursorSpy = vi.spyOn(paginationDb, "resolveCursor").mockReturnValue({
       cursor: undefined,
       direction: "next" as const,

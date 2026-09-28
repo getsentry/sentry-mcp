@@ -96,7 +96,7 @@ describe("viewCommand.func", () => {
   let getLogsSpy: ReturnType<typeof spyOn>;
   let getLogItemDetailSpy: ReturnType<typeof spyOn>;
   let resolveOrgAndProjectSpy: ReturnType<typeof spyOn>;
-  let resolveProjectBySlugSpy: ReturnType<typeof spyOn>;
+  let resolveProjectBoundSlugSpy: ReturnType<typeof spyOn>;
   let openInBrowserSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
@@ -108,7 +108,10 @@ describe("viewCommand.func", () => {
       attributes: [],
     });
     resolveOrgAndProjectSpy = vi.spyOn(resolveTarget, "resolveOrgAndProject");
-    resolveProjectBySlugSpy = vi.spyOn(resolveTarget, "resolveProjectBySlug");
+    resolveProjectBoundSlugSpy = vi.spyOn(
+      resolveTarget,
+      "resolveProjectBoundSlug"
+    );
     vi.spyOn(resolveTarget, "resolveLogProjectId").mockResolvedValue(1234);
     openInBrowserSpy = vi.spyOn(browser, "openInBrowser");
   });
@@ -117,7 +120,7 @@ describe("viewCommand.func", () => {
     getLogsSpy.mockRestore();
     getLogItemDetailSpy.mockRestore();
     resolveOrgAndProjectSpy.mockRestore();
-    resolveProjectBySlugSpy.mockRestore();
+    resolveProjectBoundSlugSpy.mockRestore();
     openInBrowserSpy.mockRestore();
   });
 
@@ -324,7 +327,7 @@ describe("viewCommand.func", () => {
 
   describe("target resolution", () => {
     test("project-search resolves and fetches logs", async () => {
-      resolveProjectBySlugSpy.mockResolvedValue({
+      resolveProjectBoundSlugSpy.mockResolvedValue({
         org: "resolved-org",
         project: "resolved-proj",
       });
@@ -334,7 +337,7 @@ describe("viewCommand.func", () => {
       const func = await viewCommand.loader();
       await func.call(context, { json: true, web: false }, "my-project", ID1);
 
-      expect(resolveProjectBySlugSpy).toHaveBeenCalled();
+      expect(resolveProjectBoundSlugSpy).toHaveBeenCalled();
       expect(getLogsSpy).toHaveBeenCalledWith(
         "resolved-org",
         "resolved-proj",

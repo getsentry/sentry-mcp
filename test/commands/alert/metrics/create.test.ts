@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createCommand } from "../../../../src/commands/alert/metrics/create.js";
 // biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
 import * as apiClient from "../../../../src/lib/api-client.js";
+import { DEFAULT_SENTRY_URL } from "../../../../src/lib/constants.js";
+import { setOrgRegion } from "../../../../src/lib/db/regions.js";
 import { ValidationError } from "../../../../src/lib/errors.js";
-// biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
-import * as resolveTarget from "../../../../src/lib/resolve-target.js";
 import { useTestConfigDir } from "../../../helpers.js";
 
 const getConfigDir = useTestConfigDir("test-alert-metrics-create-", {
@@ -36,16 +36,24 @@ function createContext() {
 }
 
 describe("alert metrics create", () => {
-  let resolveOrgSpy: ReturnType<typeof vi.spyOn>;
+  let findProjectsBySlugSpy: ReturnType<typeof vi.spyOn>;
   let createSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    resolveOrgSpy = vi.spyOn(resolveTarget, "resolveOrg");
+    findProjectsBySlugSpy = vi.spyOn(apiClient, "findProjectsBySlug");
+    findProjectsBySlugSpy.mockImplementation((slug: string) =>
+      Promise.resolve({
+        projects: [],
+        orgs: [{ slug, name: slug }],
+      })
+    );
     createSpy = vi.spyOn(apiClient, "createMetricAlertRule");
+    setOrgRegion("test-org", DEFAULT_SENTRY_URL);
+    setOrgRegion("my-org", DEFAULT_SENTRY_URL);
   });
 
   afterEach(() => {
-    resolveOrgSpy.mockRestore();
+    findProjectsBySlugSpy.mockRestore();
     createSpy.mockRestore();
   });
 
@@ -142,7 +150,6 @@ describe("alert metrics create", () => {
 
   test("dry run does not call create API", async () => {
     const context = createContext();
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
     const func = (await createCommand.loader()) as unknown as (
       this: unknown,
       flags: CreateFlags,
@@ -168,9 +175,23 @@ describe("alert metrics create", () => {
     expect(createSpy).not.toHaveBeenCalled();
   });
 
-  test("treats a bare metric create target as an organization slug", async () => {
+  test("prefers a project over an organization with the same bare slug", async () => {
+    findProjectsBySlugSpy.mockResolvedValue({
+      projects: [
+        {
+          id: "1",
+          slug: "shared",
+          name: "Shared Project",
+          orgSlug: "project-owner",
+        },
+      ],
+      orgs: [
+        { slug: "shared", name: "Shared Org" },
+        { slug: "project-owner", name: "Project Owner" },
+      ],
+    });
+    setOrgRegion("project-owner", DEFAULT_SENTRY_URL);
     const context = createContext();
-    resolveOrgSpy.mockResolvedValue({ org: "my-org" });
     const func = (await createCommand.loader()) as unknown as (
       this: unknown,
       flags: CreateFlags,
@@ -190,19 +211,17 @@ describe("alert metrics create", () => {
         "dry-run": true,
         json: true,
       },
-      "my-org"
+      "shared"
     );
 
-    expect(resolveOrgSpy).toHaveBeenCalledWith({
-      org: "my-org",
-      cwd: getConfigDir(),
-    });
-    expect(createSpy).not.toHaveBeenCalled();
+    const output = JSON.parse(
+      context.stdoutWrite.mock.calls.map((call) => call[0]).join("")
+    );
+    expect(output.org).toBe("project-owner");
   });
 
   test("ignores the project part for metric create org/project targets", async () => {
     const context = createContext();
-    resolveOrgSpy.mockResolvedValue({ org: "my-org" });
     const func = (await createCommand.loader()) as unknown as (
       this: unknown,
       flags: CreateFlags,
@@ -225,16 +244,12 @@ describe("alert metrics create", () => {
       "my-org/frontend"
     );
 
-    expect(resolveOrgSpy).toHaveBeenCalledWith({
-      org: "my-org",
-      cwd: getConfigDir(),
-    });
+    expect(findProjectsBySlugSpy).not.toHaveBeenCalled();
     expect(createSpy).not.toHaveBeenCalled();
   });
 
   test("dry run JSON includes normalized projects and optional fields", async () => {
     const context = createContext();
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
     const func = (await createCommand.loader()) as unknown as (
       this: unknown,
       flags: CreateFlags,
@@ -283,7 +298,6 @@ describe("alert metrics create", () => {
 
   test("calls create API with parsed trigger payload", async () => {
     const context = createContext();
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
     createSpy.mockResolvedValue({
       id: "77",
       name: "Metric Rule",
@@ -324,7 +338,6 @@ describe("alert metrics create", () => {
 
   test("routes --dataset transactions to spans with is_transaction:true and a tip", async () => {
     const context = createContext();
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
     createSpy.mockResolvedValue({
       id: "77",
       name: "Metric Rule",

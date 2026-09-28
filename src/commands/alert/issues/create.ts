@@ -14,7 +14,7 @@ import { buildCommand, numberParser } from "../../../lib/command.js";
 import { ContextError, ValidationError } from "../../../lib/errors.js";
 import { CommandOutput } from "../../../lib/formatters/output.js";
 import { DRY_RUN_ALIASES, DRY_RUN_FLAG } from "../../../lib/mutate-command.js";
-import { resolveTargetsFromParsedArg } from "../../../lib/resolve-target.js";
+import { resolveProjectBoundTargets } from "../../../lib/resolve-target.js";
 import {
   matchToLogicType,
   parseJsonObjectList,
@@ -185,7 +185,7 @@ export const createCommand = buildCommand({
     validateIssueRuleArrays(conditions, actions, "actions");
 
     const parsed = parseOrgProjectArg(arg);
-    const { targets } = await resolveTargetsFromParsedArg(parsed, {
+    const { targets } = await resolveProjectBoundTargets(parsed, {
       cwd,
       usageHint: USAGE_HINT,
     });

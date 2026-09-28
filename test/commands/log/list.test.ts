@@ -348,7 +348,10 @@ describe("listCommand.func — standard mode", () => {
 
   beforeEach(() => {
     listLogsSpy = vi.spyOn(apiClient, "listLogs");
-    resolveOrgProjectSpy = vi.spyOn(resolveTarget, "resolveOrgProjectFromArg");
+    resolveOrgProjectSpy = vi.spyOn(
+      resolveTarget,
+      "resolveProjectBoundFromArg"
+    );
     vi.spyOn(resolveTarget, "resolveLogProjectId").mockResolvedValue(undefined);
     withProgressSpy = vi
       .spyOn(polling, "withProgress")
@@ -757,7 +760,7 @@ describe("listCommand.func — positional disambiguation", () => {
       .spyOn(apiClient, "listTraceLogs")
       .mockResolvedValue([]);
     resolveOrgProjectSpy = vi
-      .spyOn(resolveTarget, "resolveOrgProjectFromArg")
+      .spyOn(resolveTarget, "resolveProjectBoundFromArg")
       .mockResolvedValue({ org: ORG, project: PROJECT });
     resolveTraceOrgSpy = vi
       .spyOn(traceTarget, "resolveTraceOrg")
@@ -1000,7 +1003,7 @@ describe("listCommand.func — flag validation", () => {
     // downstream resolution, not flag validation. Mock resolution to reject
     // with a non-ValidationError so we can verify flag validation passed.
     const resolveOrgProjectSpy = vi
-      .spyOn(resolveTarget, "resolveOrgProjectFromArg")
+      .spyOn(resolveTarget, "resolveProjectBoundFromArg")
       .mockRejectedValueOnce(
         new ContextError("Organization", "sentry log list")
       );
@@ -1032,7 +1035,10 @@ describe("listCommand.func — follow mode (standard)", () => {
   beforeEach(() => {
     sigint = interceptSigint();
     listLogsSpy = vi.spyOn(apiClient, "listLogs");
-    resolveOrgProjectSpy = vi.spyOn(resolveTarget, "resolveOrgProjectFromArg");
+    resolveOrgProjectSpy = vi.spyOn(
+      resolveTarget,
+      "resolveProjectBoundFromArg"
+    );
     vi.spyOn(resolveTarget, "resolveLogProjectId").mockResolvedValue(undefined);
     isPlainSpy = vi.spyOn(formatters, "isPlainOutput").mockReturnValue(true);
     updateNotifSpy = vi

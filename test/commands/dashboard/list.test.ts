@@ -45,6 +45,7 @@ vi.mock("../../../src/lib/browser.js", async (importOriginal) => {
 
 // biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
 import * as browser from "../../../src/lib/browser.js";
+import { ContextError } from "../../../src/lib/errors.js";
 
 vi.mock("../../../src/lib/db/pagination.js", async (importOriginal) => {
   const actual =
@@ -160,7 +161,7 @@ describe("dashboard list command", () => {
   const listDashboardsPaginatedSpy = vi.mocked(
     apiClient.listDashboardsPaginated
   );
-  const resolveOrgSpy = vi.mocked(resolveTarget.resolveOrg);
+  const resolveOrgSpy = vi.mocked(resolveTarget.resolveOrgOnlyTarget);
   const openInBrowserSpy = vi.mocked(browser.openInBrowser);
   const withProgressSpy = vi.mocked(polling.withProgress);
   const resolveCursorSpy = vi.mocked(paginationDb.resolveCursor);
@@ -200,7 +201,7 @@ describe("dashboard list command", () => {
   // -------------------------------------------------------------------------
 
   test("outputs JSON envelope with { data, hasMore } when --json", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [DASHBOARD_A, DASHBOARD_B],
       nextCursor: undefined,
@@ -221,7 +222,7 @@ describe("dashboard list command", () => {
   });
 
   test("outputs { data: [], hasMore: false } when no dashboards exist", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [],
       nextCursor: undefined,
@@ -241,7 +242,7 @@ describe("dashboard list command", () => {
   // -------------------------------------------------------------------------
 
   test("outputs human-readable table with column headers", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [DASHBOARD_A, DASHBOARD_B],
       nextCursor: undefined,
@@ -260,7 +261,7 @@ describe("dashboard list command", () => {
   });
 
   test("shows empty state message when no dashboards exist", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [],
       nextCursor: undefined,
@@ -279,7 +280,7 @@ describe("dashboard list command", () => {
   // -------------------------------------------------------------------------
 
   test("--web flag opens browser instead of listing", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
 
     const { context } = createMockContext();
     const func = await listCommand.loader();
@@ -294,7 +295,7 @@ describe("dashboard list command", () => {
   // -------------------------------------------------------------------------
 
   test("passes limit as perPage to API", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [DASHBOARD_A],
       nextCursor: undefined,
@@ -318,7 +319,7 @@ describe("dashboard list command", () => {
   // -------------------------------------------------------------------------
 
   test("hasMore is true in JSON when API returns nextCursor", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [DASHBOARD_A, DASHBOARD_B],
       nextCursor: "1735689600:0:0",
@@ -335,7 +336,7 @@ describe("dashboard list command", () => {
   });
 
   test("hint includes -c next when more pages available", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [DASHBOARD_A, DASHBOARD_B],
       nextCursor: "1735689600:0:0",
@@ -350,7 +351,7 @@ describe("dashboard list command", () => {
   });
 
   test("hasMore is false when API returns no nextCursor", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [DASHBOARD_A],
       nextCursor: undefined,
@@ -367,7 +368,7 @@ describe("dashboard list command", () => {
   });
 
   test("auto-pagination: --limit larger than page size fetches multiple pages", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
 
     // First page returns 2 items + nextCursor, second page returns 1 item
     listDashboardsPaginatedSpy
@@ -399,7 +400,7 @@ describe("dashboard list command", () => {
   // -------------------------------------------------------------------------
 
   test("single glob arg filters dashboards by title", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [DASHBOARD_A, DASHBOARD_B, DASHBOARD_C],
       nextCursor: undefined,
@@ -435,7 +436,7 @@ describe("dashboard list command", () => {
   });
 
   test("glob filter is case-insensitive", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [DASHBOARD_A, DASHBOARD_B, DASHBOARD_C],
       nextCursor: undefined,
@@ -453,7 +454,7 @@ describe("dashboard list command", () => {
   });
 
   test("glob filter with no matches shows filter-aware message", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [DASHBOARD_A, DASHBOARD_B, DASHBOARD_C],
       nextCursor: undefined,
@@ -468,7 +469,7 @@ describe("dashboard list command", () => {
   });
 
   test("glob filter with no matches shows fuzzy suggestions for close input", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [DASHBOARD_A, DASHBOARD_B, DASHBOARD_C],
       nextCursor: undefined,
@@ -507,7 +508,9 @@ describe("dashboard list command", () => {
   });
 
   test("throws ContextError when org cannot be resolved", async () => {
-    resolveOrgSpy.mockResolvedValue(null);
+    resolveOrgSpy.mockRejectedValue(
+      new ContextError("Organization", "sentry dashboard list")
+    );
 
     const { context } = createMockContext();
     const func = await listCommand.loader();
@@ -522,7 +525,7 @@ describe("dashboard list command", () => {
   // -------------------------------------------------------------------------
 
   test("handles dashboards with undefined title in human output", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [
         { id: "1", title: undefined as unknown as string, widgetDisplay: [] },
@@ -541,7 +544,7 @@ describe("dashboard list command", () => {
   });
 
   test("handles dashboards with undefined title in JSON output", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [
         { id: "1", title: undefined as unknown as string, widgetDisplay: [] },
@@ -559,7 +562,7 @@ describe("dashboard list command", () => {
   });
 
   test("glob filter does not crash on dashboards with undefined title", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "test-org" });
+    resolveOrgSpy.mockResolvedValue("test-org");
     listDashboardsPaginatedSpy.mockResolvedValue({
       data: [
         { id: "1", title: undefined as unknown as string, widgetDisplay: [] },

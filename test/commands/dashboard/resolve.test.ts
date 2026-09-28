@@ -473,11 +473,11 @@ describe("resolveDashboardId", () => {
 // ---------------------------------------------------------------------------
 
 describe("resolveOrgFromTarget", () => {
-  let resolveOrgSpy: ReturnType<typeof spyOn>;
+  let resolveOrgOnlyTargetSpy: ReturnType<typeof spyOn>;
   let resolveEffectiveOrgSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
-    resolveOrgSpy = vi.spyOn(resolveTarget, "resolveOrg");
+    resolveOrgOnlyTargetSpy = vi.spyOn(resolveTarget, "resolveOrgOnlyTarget");
     // Default: resolveEffectiveOrg returns the input unchanged
     resolveEffectiveOrgSpy = vi
       .spyOn(region, "resolveEffectiveOrg")
@@ -485,7 +485,7 @@ describe("resolveOrgFromTarget", () => {
   });
 
   afterEach(() => {
-    resolveOrgSpy.mockRestore();
+    resolveOrgOnlyTargetSpy.mockRestore();
     resolveEffectiveOrgSpy.mockRestore();
   });
 
@@ -498,7 +498,6 @@ describe("resolveOrgFromTarget", () => {
     );
     expect(org).toBe("my-org");
     expect(resolveEffectiveOrgSpy).toHaveBeenCalledWith("my-org");
-    expect(resolveOrgSpy).not.toHaveBeenCalled();
   });
 
   test("explicit type with o-prefixed numeric ID resolves to slug", async () => {
@@ -513,8 +512,10 @@ describe("resolveOrgFromTarget", () => {
     expect(resolveEffectiveOrgSpy).toHaveBeenCalledWith("o1169445");
   });
 
-  test("auto-detect with null resolveOrg throws ContextError", async () => {
-    resolveOrgSpy.mockResolvedValue(null);
+  test("auto-detect propagates missing-organization ContextError", async () => {
+    resolveOrgOnlyTargetSpy.mockRejectedValue(
+      new ContextError("Organization", "sentry dashboard view")
+    );
     const parsed = parseOrgProjectArg(undefined);
 
     await expect(
@@ -522,8 +523,8 @@ describe("resolveOrgFromTarget", () => {
     ).rejects.toThrow(ContextError);
   });
 
-  test("auto-detect delegates to resolveOrg", async () => {
-    resolveOrgSpy.mockResolvedValue({ org: "detected-org" });
+  test("auto-detect delegates to the org-only target resolver", async () => {
+    resolveOrgOnlyTargetSpy.mockResolvedValue("detected-org");
     const parsed = parseOrgProjectArg(undefined);
     const org = await resolveOrgFromTarget(
       parsed,
@@ -531,7 +532,7 @@ describe("resolveOrgFromTarget", () => {
       "sentry dashboard list"
     );
     expect(org).toBe("detected-org");
-    expect(resolveOrgSpy).toHaveBeenCalled();
+    expect(resolveOrgOnlyTargetSpy).toHaveBeenCalled();
   });
 });
 

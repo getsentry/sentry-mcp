@@ -30,7 +30,7 @@ import {
 import {
   type ResolvedTarget,
   resolveAllTargets,
-  resolveProjectBySlug,
+  resolveProjectBoundSlug,
 } from "../../lib/resolve-target.js";
 import { buildProjectUrl } from "../../lib/sentry-urls.js";
 import type { SentryProject } from "../../types/index.js";
@@ -318,7 +318,7 @@ export const viewCommand = buildCommand({
 
       case ProjectSpecificationType.ProjectSearch: {
         // Search for project across all orgs - single target
-        const resolved = await resolveProjectBySlug(
+        const resolved = await resolveProjectBoundSlug(
           parsed.projectSlug,
           USAGE_HINT,
           `sentry project view <org>/${parsed.projectSlug}`,
