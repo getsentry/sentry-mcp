@@ -4,10 +4,11 @@
  * Tests for shared utilities in src/commands/issue/utils.ts
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   buildCommandHint,
   ensureRootCauseAnalysis,
+  mapIssueArgsConcurrently,
   pollAutofixState,
   resolveIssue,
   resolveOrgAndIssueId,
@@ -27,6 +28,45 @@ import {
   useEnvSandbox,
   useTestConfigDir,
 } from "../../helpers.js";
+
+describe("mapIssueArgsConcurrently", () => {
+  test("reports only partial failures", async () => {
+    const failure = new Error("missing");
+    const onError = vi.fn();
+
+    const result = await mapIssueArgsConcurrently(
+      ["missing", "found"],
+      async (issueArg) => {
+        if (issueArg === "missing") {
+          throw failure;
+        }
+        return issueArg;
+      },
+      onError
+    );
+
+    expect(result).toEqual(["found"]);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith("missing", failure);
+  });
+
+  test("rethrows total failure without emitting warnings", async () => {
+    const primary = new Error("primary");
+    const secondary = new Error("secondary");
+    const onError = vi.fn();
+
+    await expect(
+      mapIssueArgsConcurrently(
+        ["first", "second"],
+        async (issueArg) => {
+          throw issueArg === "first" ? primary : secondary;
+        },
+        onError
+      )
+    ).rejects.toBe(primary);
+    expect(onError).not.toHaveBeenCalled();
+  });
+});
 
 describe("buildCommandHint", () => {
   test("suggests <org>/ID for numeric IDs", () => {

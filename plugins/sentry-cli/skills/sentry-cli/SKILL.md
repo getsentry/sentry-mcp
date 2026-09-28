@@ -23,7 +23,7 @@ Best practices and operational guidance for AI coding agents using the Sentry CL
 - **Prefer CLI commands over raw API calls** — the CLI has dedicated commands for most tasks. Reach for `sentry issue view`, `sentry issue list`, `sentry trace view`, etc. before constructing API calls manually or fetching external documentation.
 - **Use `sentry docs` for setup questions** — if you need to know how to configure a Sentry SDK or feature, run `sentry docs "your question"` to query the documentation directly. This is faster and more accurate than fetching docs externally.
 - **Use `sentry schema` to explore the API** — if you need to discover API endpoints, run `sentry schema` to browse interactively or `sentry schema <resource>` to search. This is faster than fetching OpenAPI specs externally.
-- **Use `sentry issue view <id>` to investigate issues** — when asked about a specific issue (e.g., `CLI-G5`, `PROJECT-123`), use `sentry issue view` directly.
+- **Use `sentry issue view` to investigate issues** — when asked about a specific issue (e.g., `CLI-G5`, `PROJECT-123`), use `sentry issue view` directly. Multiple IDs can be passed in one invocation: `sentry issue view A B C --json` returns an array of the same objects.
 - **Use `--json` for machine-readable output** — pipe through `jq` for filtering. Human-readable output includes formatting that is hard to parse.
 - **The CLI auto-detects org/project — don't discover it yourself** — most commands work without explicit targets by checking `.sentryclirc` config files, scanning for DSNs in `.env` files and source code, and matching directory names. Do **not** run `sentry org list` and then `sentry project list` to figure out which project this checkout belongs to — that manual fan-out just replicates the detection the CLI already runs on every command. Only specify `<org>/<project>` when the CLI reports it can't detect the target or detects the wrong one.
 
@@ -40,6 +40,8 @@ The `sentry` CLI follows conventions from well-known tools — if you're familia
 - Use `--json` when piping output between commands or processing programmatically
 - Use `--limit` to cap the number of results (default is usually 10–100)
 - Prefer `sentry issue view PROJECT-123` over listing and filtering manually
+- Pass multiple issue IDs in one call (`sentry issue view A B C --json`) instead of looping `issue view` per ID
+- Analyze multiple issues in one call (`sentry issue explain A B C --json`) instead of looping `issue explain` per ID
 - Use `sentry api` for endpoints not covered by dedicated commands
 
 ### Safety Rules
@@ -408,9 +410,9 @@ Manage Sentry issues
 
 - `sentry issue list <org/project>` — List issues in a project
 - `sentry issue events <issue>` — List events for a specific issue
-- `sentry issue explain <issue>` — Analyze an issue's root cause using Seer AI
+- `sentry issue explain <issue...>` — Analyze one or more issues using Seer AI
 - `sentry issue plan <issue>` — Generate a solution plan using Seer AI
-- `sentry issue view <issue>` — View details of a specific issue
+- `sentry issue view <issue...>` — View details of one or more issues
 - `sentry issue resolve <issue>` — Mark an issue as resolved
 - `sentry issue unresolve <issue>` — Reopen a resolved issue
 - `sentry issue archive <issue>` — Archive (ignore) an issue

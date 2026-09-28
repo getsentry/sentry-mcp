@@ -6,23 +6,31 @@
 
 import type { SentryContext } from "../../context.js";
 import { buildCommand } from "../../lib/command.js";
-import { ApiError } from "../../lib/errors.js";
+import { ApiError, ContextError } from "../../lib/errors.js";
 import { CommandOutput } from "../../lib/formatters/output.js";
 import {
-  formatRootCauseList,
+  formatIssueExplain,
   handleSeerApiError,
+  type IssueExplainResult,
+  jsonTransformIssueExplain,
 } from "../../lib/formatters/seer.js";
 import {
   applyFreshFlag,
   FRESH_ALIASES,
   FRESH_FLAG,
 } from "../../lib/list-command.js";
+import { logger } from "../../lib/logger.js";
 import { extractRootCauses } from "../../types/seer.js";
 import {
+  collectIssueArgs,
   ensureRootCauseAnalysis,
-  issueIdPositional,
+  issueIdsPositional,
+  mapIssueArgsConcurrently,
   resolveOrgAndIssueId,
 } from "./utils.js";
+
+const log = logger.withTag("issue.explain");
+const USAGE_HINT = "sentry issue explain <issue> [<issue>...]";
 
 type ExplainFlags = {
   readonly json: boolean;
@@ -31,11 +39,50 @@ type ExplainFlags = {
   readonly fields?: string[];
 };
 
+async function analyzeIssue(
+  issueArg: string,
+  cwd: string,
+  flags: ExplainFlags,
+  suppressProgress: boolean
+): Promise<IssueExplainResult> {
+  let resolvedOrg: string | undefined;
+
+  try {
+    const { org, issueId } = await resolveOrgAndIssueId({
+      issueArg,
+      cwd,
+      command: "explain",
+    });
+    resolvedOrg = org;
+
+    const state = await ensureRootCauseAnalysis({
+      org,
+      issueId,
+      json: suppressProgress,
+      force: flags.force,
+    });
+    const rootCauses = extractRootCauses(state);
+    if (rootCauses.length === 0) {
+      throw new Error(
+        "Analysis completed but no root causes found. " +
+          "The issue may not have enough context for root cause analysis."
+      );
+    }
+
+    return { issue: issueArg, org, issueId, rootCauses };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw handleSeerApiError(error.status, error.detail, resolvedOrg);
+    }
+    throw error;
+  }
+}
+
 export const explainCommand = buildCommand({
   docs: {
-    brief: "Analyze an issue's root cause using Seer AI",
+    brief: "Analyze one or more issues using Seer AI",
     fullDescription:
-      "Get a root cause analysis for a Sentry issue using Seer AI.\n\n" +
+      "Get root cause analyses for one or more Sentry issues using Seer AI.\n\n" +
       "This command analyzes the issue and provides:\n" +
       "  - Identified root causes\n" +
       "  - Reproduction steps\n" +
@@ -51,17 +98,23 @@ export const explainCommand = buildCommand({
       "  ID               - Short ID: CLI-G (searches across orgs)\n" +
       "  suffix           - Suffix only: G (requires DSN context)\n" +
       "  numeric          - Numeric ID: 123456789\n\n" +
+      "Multiple issue IDs can be passed as separate arguments or newline-separated\n" +
+      "within a single argument.\n\n" +
       "Examples:\n" +
       "  sentry issue explain @latest\n" +
       "  sentry issue explain 123456789\n" +
       "  sentry issue explain sentry/EXTENSION-7\n" +
       "  sentry issue explain cli-G\n" +
+      "  sentry issue explain CLI-G BACK-2\n" +
       "  sentry issue explain 123456789 --json\n" +
       "  sentry issue explain 123456789 --force",
   },
-  output: { human: formatRootCauseList },
+  output: {
+    human: formatIssueExplain,
+    jsonTransform: jsonTransformIssueExplain,
+  },
   parameters: {
-    positional: issueIdPositional,
+    positional: issueIdsPositional,
     flags: {
       force: {
         kind: "boolean",
@@ -72,47 +125,34 @@ export const explainCommand = buildCommand({
     },
     aliases: FRESH_ALIASES,
   },
-  async *func(this: SentryContext, flags: ExplainFlags, issueArg: string) {
+  async *func(this: SentryContext, flags: ExplainFlags, ...args: string[]) {
     applyFreshFlag(flags);
     const { cwd } = this;
 
-    // Declare org outside try block so it's accessible in catch for error messages
-    let resolvedOrg: string | undefined;
-
-    try {
-      // Resolve org and issue ID
-      const { org, issueId: numericId } = await resolveOrgAndIssueId({
-        issueArg,
-        cwd,
-        command: "explain",
-      });
-      resolvedOrg = org;
-
-      // Ensure root cause analysis exists (triggers if needed)
-      const state = await ensureRootCauseAnalysis({
-        org,
-        issueId: numericId,
-        json: flags.json,
-        force: flags.force,
-      });
-
-      // Extract root causes from steps
-      const causes = extractRootCauses(state);
-      if (causes.length === 0) {
-        throw new Error(
-          "Analysis completed but no root causes found. " +
-            "The issue may not have enough context for root cause analysis."
-        );
-      }
-
-      yield new CommandOutput(causes);
-      return { hint: `To create a plan, run: sentry issue plan ${issueArg}` };
-    } catch (error) {
-      // Handle API errors with friendly messages
-      if (error instanceof ApiError) {
-        throw handleSeerApiError(error.status, error.detail, resolvedOrg);
-      }
-      throw error;
+    const issueArgs = collectIssueArgs(args);
+    const [primaryArg] = issueArgs;
+    if (primaryArg === undefined) {
+      throw new ContextError("Issue ID", USAGE_HINT, []);
     }
+
+    const isBatch = issueArgs.length > 1;
+    if (isBatch && !flags.json) {
+      log.info(`Analyzing ${issueArgs.length} issues...`);
+    }
+    const results = await mapIssueArgsConcurrently(
+      issueArgs,
+      (issueArg) => analyzeIssue(issueArg, cwd, flags, flags.json || isBatch),
+      (issueArg, reason) => {
+        log.warn(`Failed to analyze issue ${issueArg}: ${reason}`);
+      }
+    );
+
+    yield new CommandOutput({
+      results,
+      requestedCount: issueArgs.length,
+    });
+    return isBatch
+      ? undefined
+      : { hint: `To create a plan, run: sentry issue plan ${primaryArg}` };
   },
 });
