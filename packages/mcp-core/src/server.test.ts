@@ -1491,12 +1491,14 @@ describe("buildServer", () => {
           constraints: {
             organizationSlug: "sentry-mcp-evals",
             projectSlug: "CLOUDFLARE-MCP",
+            regionUrl: "https://us.sentry.io",
           },
         },
       });
       const externalIssueUrl = "https://github.com/example/repo/issues/42";
-      const endpoint =
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/integrations/";
+      const issueEndpoint =
+        "https://us.sentry.io/api/0/organizations/sentry-mcp-evals/issues/";
+      const endpoint = `${issueEndpoint}${issueFixture.id}/integrations/`;
       const link = {
         id: "72",
         key: "example/repo#42",
@@ -1504,10 +1506,15 @@ describe("buildServer", () => {
         url: externalIssueUrl,
       };
       let linked = false;
-      let deletes = 0;
+      const requests = { resolve: 0, list: 0, link: 0, unlink: 0 };
       mswServer.use(
-        http.get(endpoint, () =>
-          HttpResponse.json([
+        http.get(`${issueEndpoint}${issueFixture.shortId}/`, () => {
+          requests.resolve++;
+          return HttpResponse.json(issueFixture);
+        }),
+        http.get(endpoint, () => {
+          requests.list++;
+          return HttpResponse.json([
             {
               id: "11",
               name: "example",
@@ -1516,9 +1523,10 @@ describe("buildServer", () => {
               provider: { key: "github", name: "GitHub" },
               externalIssues: linked ? [link] : [],
             },
-          ]),
-        ),
+          ]);
+        }),
         http.put(`${endpoint}11/`, async ({ request }) => {
+          requests.link++;
           expect(await request.json()).toEqual({
             externalIssue: externalIssueUrl,
           });
@@ -1530,7 +1538,7 @@ describe("buildServer", () => {
           expect(new URL(request.url).searchParams.get("externalIssue")).toBe(
             "72",
           );
-          deletes++;
+          requests.unlink++;
           linked = false;
           return new HttpResponse(null, { status: 204 });
         }),
@@ -1568,7 +1576,7 @@ describe("buildServer", () => {
         });
         expect(JSON.parse(getTextContent(result))).toEqual(payload);
       }
-      expect(deletes).toBe(1);
+      expect(requests).toEqual({ resolve: 4, list: 4, link: 2, unlink: 1 });
     });
 
     it("dispatches App linking with form fields and resolved project context", async () => {

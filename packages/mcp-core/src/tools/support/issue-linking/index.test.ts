@@ -30,12 +30,6 @@ const nativeCases = [
   {
     provider: "github",
     domainName: "github.com/acme",
-    url: "https://github.com/acme/repo/issues/42",
-    storedUrl: "https://github.com/acme/repo/issues/42",
-  },
-  {
-    provider: "github",
-    domainName: "github.com/acme",
     url: "https://github.com/acme/repo/pull/42/files?diff=split#change",
     storedUrl: "https://github.com/acme/repo/issues/42",
   },

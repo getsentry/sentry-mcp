@@ -2,16 +2,11 @@
 import type { SentryApiService } from "../../../api-client";
 import type { IssueIntegration } from "../../../api-client/types";
 import { UserInputError } from "../../../errors";
+import type { AppIssueLinkParams } from "./app";
 import { inferAppSlug, linkAppIssue, unlinkAppIssue } from "./app";
 
-export type IssueLinkParams = {
-  organizationSlug: string;
-  issueId: string;
-  projectId?: string;
-  externalIssueUrl: string;
+export type IssueLinkParams = AppIssueLinkParams & {
   integrationId?: string;
-  appSlug?: string;
-  fields?: Record<string, string | number>;
 };
 
 export type IssueLinkResult = {
@@ -34,7 +29,7 @@ function parseUrl(value: string): URL {
     ) {
       throw new Error("Invalid URL");
     }
-    const path = decodeURIComponent(url.pathname).replace(/\/+$/, "");
+    const path = pathOf(url);
     if (
       /[\\?#]/.test(path) ||
       path

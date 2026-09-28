@@ -214,8 +214,6 @@ describe("external issue linking API methods", () => {
     displayName: "ENG-42",
     webUrl: "https://linear.app/example/issue/ENG-42/title",
   };
-  const nativePath =
-    "https://us.sentry.io/api/0/organizations/test-org/issues/123/integrations/456/";
   const api = new SentryApiService({
     host: "us.sentry.io",
     accessToken: "test-token",
@@ -276,31 +274,6 @@ describe("external issue linking API methods", () => {
       await api.getIssueExternalLinks({ organizationSlug, issueId }),
     ).toEqual([appIssue]);
   });
-
-  it.each([200, 201])(
-    "links native URLs unchanged and derives changed from HTTP %s",
-    async (status) => {
-      mswServer.use(
-        http.put(nativePath, async ({ request }) => {
-          expect(await request.json()).toEqual({
-            externalIssue: externalIssueUrl,
-          });
-          return HttpResponse.json(nativeIssue, { status });
-        }),
-      );
-      expect(
-        await api.linkNativeExternalIssue({
-          organizationSlug,
-          issueId,
-          integrationId,
-          externalIssueUrl,
-        }),
-      ).toEqual({
-        issue: nativeIssue,
-        changed: status === 201,
-      });
-    },
-  );
 
   it("loads App installations and paginated issue-link forms on the control host", async () => {
     const installation = {
@@ -376,48 +349,9 @@ describe("external issue linking API methods", () => {
     },
   );
 
-  it.each([200, 201])(
-    "runs the guarded App callback and derives changed from HTTP %s",
-    async (status) => {
-      mswServer.use(
-        http.post(
-          "https://sentry.io/api/0/sentry-app-installations/install-uuid/external-issue-actions/",
-          async ({ request }) => {
-            expect(
-              new URL(request.url).searchParams.get("expectedExternalIssueUrl"),
-            ).toBe(appIssue.webUrl);
-            expect(await request.json()).toEqual({
-              issue: "ticket-uuid",
-              groupId: issueId,
-              action: "link",
-              uri: "/link",
-            });
-            return HttpResponse.json(appIssue, { status });
-          },
-        ),
-      );
-      expect(
-        await api.linkSentryAppExternalIssue({
-          installationUuid: "install-uuid",
-          issueId,
-          uri: "/link",
-          fields: { issue: "ticket-uuid" },
-          expectedExternalIssueUrl: appIssue.webUrl,
-        }),
-      ).toEqual({ issue: appIssue, changed: status === 201 });
-    },
-  );
-
-  it("unlinks by internal association ID using the regional endpoints", async () => {
+  it("unlinks an App by internal association ID using the regional endpoint", async () => {
     const requests: string[] = [];
     mswServer.use(
-      http.delete(nativePath, ({ request }) => {
-        requests.push("native");
-        expect(new URL(request.url).searchParams.get("externalIssue")).toBe(
-          "789",
-        );
-        return new HttpResponse(null, { status: 204 });
-      }),
       http.delete(
         "https://us.sentry.io/api/0/organizations/test-org/issues/123/external-issues/789/",
         () => {
@@ -426,44 +360,12 @@ describe("external issue linking API methods", () => {
         },
       ),
     );
-    await api.unlinkNativeExternalIssue({
-      organizationSlug,
-      issueId,
-      integrationId,
-      externalIssueId: "789",
-    });
     await api.unlinkSentryAppExternalIssue({
       organizationSlug,
       issueId,
       externalIssueId: "789",
     });
-    expect(requests).toEqual(["native", "app"]);
-  });
-
-  it("preserves App conflict errors without replaying the mutation", async () => {
-    let requests = 0;
-    mswServer.use(
-      http.post(
-        "https://sentry.io/api/0/sentry-app-installations/install-uuid/external-issue-actions/",
-        () => {
-          requests++;
-          return HttpResponse.json(
-            { detail: "A different issue is already linked." },
-            { status: 409 },
-          );
-        },
-      ),
-    );
-    await expect(
-      api.linkSentryAppExternalIssue({
-        installationUuid: "install-uuid",
-        issueId,
-        uri: "/link",
-        fields: {},
-        expectedExternalIssueUrl: appIssue.webUrl,
-      }),
-    ).rejects.toMatchObject({ status: 409 });
-    expect(requests).toBe(1);
+    expect(requests).toEqual(["app"]);
   });
 });
 

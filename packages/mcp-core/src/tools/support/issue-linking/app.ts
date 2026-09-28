@@ -2,6 +2,7 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../../api-client";
 import { ApiClientError } from "../../../api-client/errors";
+import { SentryAppExternalRequestOptionsSchema } from "../../../api-client/schema";
 import { UserInputError } from "../../../errors";
 
 type FormValues = Record<string, string | number>;
@@ -23,14 +24,13 @@ type AppIssueLinkApi = Pick<
   | "unlinkSentryAppExternalIssue"
 >;
 
-const ValueSchema = z.union([z.string(), z.number()]);
-const ChoiceSchema = z.tuple([ValueSchema, ValueSchema]);
 const FieldSchema = z.object({
   name: z.string().min(1),
   type: z.enum(["select", "text", "textarea"]),
-  choices: z.array(ChoiceSchema).optional(),
-  options: z.array(ChoiceSchema).optional(),
-  defaultValue: ValueSchema.nullish(),
+  choices: SentryAppExternalRequestOptionsSchema.shape.choices.optional(),
+  options: SentryAppExternalRequestOptionsSchema.shape.choices.optional(),
+  defaultValue:
+    SentryAppExternalRequestOptionsSchema.shape.defaultValue.nullable(),
   depends_on: z.array(z.string()).optional(),
   multiple: z.boolean().optional(),
   uri: z.string().optional(),
@@ -56,6 +56,12 @@ const TARGET_FIELD =
 
 function isIssueKey(value: string, key: string): boolean {
   return (/^\d+$/.test(key) ? /^\d+$/ : /^[A-Z][A-Z0-9]*-\d+$/i).test(value);
+}
+
+function choiceLabelKey(label: string | number): string {
+  return String(label)
+    .toUpperCase()
+    .split(/[^A-Z0-9-]+/)[0]!;
 }
 
 function parseTarget(raw: string) {
@@ -128,7 +134,7 @@ function validateFields(
     fields.set(field.name, field);
   }
   for (const name of Object.keys(supplied)) {
-    if (RESERVED_FIELDS.has(name) || !fields.has(name)) {
+    if (!fields.has(name)) {
       throw new UserInputError(
         `Field '${name}' is not allowed by the installed App's link form.`,
       );
@@ -186,19 +192,19 @@ async function resolveFields(
         throw new UserInputError(
           `The App's multiple-choice field '${name}' is not supported.`,
         );
-      const targetKey = name === target.name ? key : undefined;
-      const isTargetUrl = name === target.name && /url/i.test(name);
+      const isTarget = name === target.name;
+      const targetKey = isTarget ? key : undefined;
+      const isTargetUrl = isTarget && /url/i.test(name);
       let value: string | number | undefined =
         supplied[name] ??
         (targetKey || isTargetUrl
           ? undefined
           : (field.defaultValue ?? undefined));
-      const search =
-        name === target.name
-          ? /url/i.test(name)
-            ? params.externalIssueUrl
-            : (key ?? value ?? params.externalIssueUrl)
-          : value;
+      const search = isTarget
+        ? isTargetUrl
+          ? params.externalIssueUrl
+          : (key ?? value ?? params.externalIssueUrl)
+        : value;
       if (field.type === "select") {
         let choices = field.choices ?? field.options ?? [];
         if (field.uri) {
@@ -224,11 +230,9 @@ async function resolveFields(
           ([choiceValue, label]) =>
             String(choiceValue) === String(wanted) ||
             String(label) === String(wanted) ||
-            (name === target.name &&
+            (isTarget &&
               key !== undefined &&
-              String(label)
-                .toUpperCase()
-                .split(/[^A-Z0-9-]+/)[0] === key &&
+              choiceLabelKey(label) === key &&
               (value === undefined || String(choiceValue) === String(value))),
         );
         if (matches.length !== 1) {
@@ -239,15 +243,11 @@ async function resolveFields(
         if (targetKey) {
           const [selectedValue, selectedLabel] = matches[0]!;
           const valueKey = String(selectedValue).toUpperCase();
-          const labelKey = String(selectedLabel)
-            .toUpperCase()
-            .split(/[^A-Z0-9-]+/)[0]!;
+          const labelKey = choiceLabelKey(selectedLabel);
           const identifiedChoices = choices.filter(
             ([choiceValue, label]) =>
               String(choiceValue).toUpperCase() === targetKey ||
-              String(label)
-                .toUpperCase()
-                .split(/[^A-Z0-9-]+/)[0] === targetKey,
+              choiceLabelKey(label) === targetKey,
           );
           if (
             (isIssueKey(valueKey, targetKey) && valueKey !== targetKey) ||
@@ -267,7 +267,7 @@ async function resolveFields(
       } else {
         value ??= search;
         if (
-          name === target.name &&
+          isTarget &&
           value !== undefined &&
           (((isTargetUrl || /^https?:\/\//i.test(String(value))) &&
             !areEquivalentAppIssueUrls(
