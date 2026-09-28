@@ -24,6 +24,66 @@ describe("validateSearch tool contract", () => {
     const schema = tool.inputSchema as z.ZodObject;
     expect(Object.keys(schema.shape)).not.toContain("environment");
   });
+
+  it.each([
+    {
+      name: "does not add an environment filter when none is requested",
+      query: "span.duration:>100",
+    },
+    {
+      name: "preserves environment filters in the candidate query",
+      query: "span.duration:>100 environment:production",
+    },
+    {
+      name: "does not forward a hallucinated separate environment argument",
+      query: "span.duration:>100",
+      environment: ":/",
+    },
+  ])("$name", async ({ query, environment }) => {
+    const requests: URLSearchParams[] = [];
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/validate/",
+        ({ request }) => {
+          requests.push(new URL(request.url).searchParams);
+          return HttpResponse.json({
+            valid: true,
+            projects: [],
+            dataset: [],
+            environment: [],
+            field: [],
+            query: { valid: true, error: null, fields: [] },
+            orderby: [],
+          });
+        },
+      ),
+    );
+    const tool = createValidateEventsSearchTool({
+      apiService: new SentryApiService({ accessToken: "test-token" }),
+      organizationSlug: "test-org",
+    });
+    type ToolInput = Parameters<NonNullable<typeof tool.execute>>[0];
+    const schema = tool.inputSchema as z.ZodType<ToolInput>;
+    const input = schema.parse({
+      dataset: "spans",
+      query,
+      fields: ["span.duration"],
+      sort: "-span.duration",
+      environment,
+    });
+
+    const result = await tool.execute!(input, {
+      toolCallId: "validate-search-test",
+      messages: [],
+    });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.getAll("environment")).toEqual([]);
+    expect(requests[0]!.get("query")).toBe(query);
+    expect(result).toEqual({
+      result: { valid: true, message: "Search validation passed." },
+    });
+  });
 });
 
 describe("formatEventValue", () => {
