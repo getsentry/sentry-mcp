@@ -33,22 +33,37 @@ sentry event send --raw ./crash.json
 sentry event send --raw ./captured.envelope
 ```
 
+Prefix relative file paths with `./` to distinguish them from a project target.
+
 ### DSN authentication
 
-`sentry event send` authenticates via a **DSN** rather than a user token.
-No `sentry auth login` is required.
+`sentry event send` authenticates with ingest via a **DSN**, not a user token.
+An explicit DSN, `SENTRY_DSN`, and project auto-detection do not require login.
+Passing `<project>` or `<org>/<project>` does: the CLI uses your session to
+resolve the project and fetch its active DSN, then sends to ingest. If a project
+has multiple active DSNs, pass the desired DSN explicitly.
 
 The DSN is resolved in priority order:
 
-1. `--dsn <value>` flag (explicit)
+1. A leading `<dsn>`, `<project>`, or `<org>/<project>` positional
 2. `SENTRY_DSN` environment variable
+3. Auto-detection from the current project (`.env`, source code, env files)
 
 ```bash
 # Explicit DSN
-sentry event send -m "Test" --dsn "https://key@o123.ingest.us.sentry.io/456"
+sentry event send "https://key@o123.ingest.us.sentry.io/456" -m "Test"
 
 # Via environment variable
 export SENTRY_DSN="https://key@o123.ingest.us.sentry.io/456"
+sentry event send -m "Test"
+
+# Project target (logged-in session; CLI fetches its sole active DSN)
+sentry event send cli -m "Test"
+
+# Org/project target
+sentry event send sentry/cli -m "Test"
+
+# Auto-detect from the current project
 sentry event send -m "Test"
 ```
 
