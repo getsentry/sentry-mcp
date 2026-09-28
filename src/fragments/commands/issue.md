@@ -103,6 +103,9 @@ sentry issue events FRONT-ABC -c next
 
 ```bash
 sentry issue view FRONT-ABC
+
+# Multiple issues in one invocation (space-separated, not commas)
+sentry issue view FRONT-ABC BACK-2
 ```
 
 ```
@@ -121,8 +124,11 @@ Latest event:
 ```
 
 ```bash
-# Open in browser
-sentry issue view FRONT-ABC -w
+# Open one or more issues in the browser (up to 5 tabs by default)
+sentry issue view FRONT-ABC BACK-2 -w
+
+# Explicitly allow more than 5 tabs
+sentry issue view FRONT-ABC BACK-2 API-3 WEB-4 IOS-5 OPS-6 -w --force
 ```
 
 ```bash
@@ -135,11 +141,15 @@ sentry issue view my-project#FRONT-ABC
 
 `--json` returns the issue fields at the top level plus the latest event under
 `event`, the resolved `org` slug, related `replayIds`, and `trace` context.
-Prefer this over the human output when parsing programmatically.
+Prefer this over the human output when parsing programmatically. One issue ID
+still returns a single object; multiple IDs return an array of those objects.
 
 ```bash
 # Full JSON (issue fields + latest event + trace/replay context)
 sentry issue view FRONT-ABC --json
+
+# Multiple issues: JSON is an array of the same objects
+sentry issue view FRONT-ABC BACK-2 --json
 
 # Select specific top-level fields to keep output small
 sentry issue view FRONT-ABC --json --fields shortId,title,culprit,count,userCount,permalink
@@ -169,7 +179,7 @@ sentry issue view FRONT-ABC --json | jq '.event.entries[] | select(.type == "req
 sentry issue view FRONT-ABC --json | jq '.event.entries[] | select(.type == "exception") | .data.values[0] | {type, value}'
 ```
 
-### Explain and plan with Seer AI
+### Explain issues with Seer AI
 
 ```bash
 # Analyze root cause (may take a few minutes for new issues)
@@ -178,9 +188,20 @@ sentry issue explain 123456789
 # By short ID with org prefix
 sentry issue explain my-org/MYPROJECT-ABC
 
+# Analyze multiple issues in one invocation
+sentry issue explain FRONT-ABC BACK-2
+
 # Force a fresh analysis
 sentry issue explain 123456789 --force
+```
 
+With `--json`, one explained issue preserves the existing array of root causes.
+Multiple issues return an array of labeled objects containing `issue`, `org`,
+`issueId`, and `rootCauses`.
+
+### Generate a plan with Seer AI
+
+```bash
 # Generate a fix plan (automatically runs explain if needed)
 sentry issue plan 123456789
 
