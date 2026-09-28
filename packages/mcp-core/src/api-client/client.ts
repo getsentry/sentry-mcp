@@ -2795,7 +2795,8 @@ export class SentryApiService {
   }
 
   /**
-   * Retrieves the suspect commits for a specific event, grouped by committer.
+   * Retrieves the current suspect commit for the event's issue, grouped by committer.
+   * This reflects the issue's current suspect commit, not its state when the event occurred.
    * Unlike release commits, this response actually populates `suspectCommitType`.
    */
   async getEventCommitters(

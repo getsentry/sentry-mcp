@@ -2413,15 +2413,20 @@ describe("structuredContent", () => {
   it("keeps transactions on the local path so the performance trace survives", async () => {
     // the shared body carries no performance trace; that is fetched separately and only
     // rendered for transactions, so a transaction must not take the structured path
+    const event = createDefaultEvent();
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () =>
           HttpResponse.json({
-            ...createDefaultEvent(),
+            ...event,
             type: "transaction",
             formatted: { format: "json", content: FORMATTER_JSON },
           }),
+      ),
+      http.get(
+        `https://sentry.io/api/0/projects/sentry-mcp-evals/CLOUDFLARE-MCP/events/${event.id}/committers/`,
+        () => HttpResponse.json({ detail: "Issue not found" }, { status: 404 }),
       ),
     );
 
@@ -2429,6 +2434,7 @@ describe("structuredContent", () => {
 
     expect(result).not.toHaveProperty("structuredContent");
     expect(result).toContain("CLOUDFLARE-MCP-41");
+    expect(result).not.toContain("## Suspect Commit");
   });
 
   it("keeps the attached replay, which lives on the event not the related list", async () => {
@@ -2711,12 +2717,6 @@ describe("suspect commits", () => {
       formatted: undefined,
       structured: false,
     },
-    {
-      mode: "Markdown for transactions",
-      type: "transaction",
-      formatted,
-      structured: false,
-    },
   ])("$mode", ({ type, formatted, structured }) => {
     it.each([
       { selection: "latest event", eventId: undefined },
@@ -2776,12 +2776,23 @@ describe("suspect commits", () => {
     );
   });
 
-  it("omits unavailable optional commit fields from Markdown", async () => {
+  it("uses the author's email and omits a null commit message from Markdown", async () => {
     mockEvent({ formatted: undefined });
     mswServer.use(
       http.get(committersUrl, () =>
         HttpResponse.json({
-          committers: [{ author: null, commits: [{ id: sha, message: null }] }],
+          committers: [
+            {
+              author: { name: null, email: "dev@example.com" },
+              commits: [
+                {
+                  id: sha,
+                  message: null,
+                  suspectCommitType: "via commit in release",
+                },
+              ],
+            },
+          ],
         }),
       ),
     );
@@ -2791,6 +2802,8 @@ describe("suspect commits", () => {
     expect(result).toContain(`## Suspect Commit
 
 **SHA**: \`${sha}\`
+**Author**: dev@example.com
+**Source**: via commit in release
 
 ## Event Details`);
   });
