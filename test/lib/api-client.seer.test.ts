@@ -5,6 +5,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { normalizeAgentStatus } from "../../src/lib/api/seer.js";
 import {
   getAutofixState,
   triggerRootCauseAnalysis,
@@ -358,5 +359,31 @@ describe("triggerSolutionPlanning", () => {
       sentry_run_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       referrer: "api.cli",
     });
+  });
+});
+
+describe("normalizeAgentStatus", () => {
+  test.each([
+    ["processing", "PROCESSING"],
+    ["completed", "COMPLETED"],
+    ["error", "ERROR"],
+    ["canceled", "CANCELLED"],
+    ["cancelled", "CANCELLED"],
+    ["awaiting_user_input", "WAITING_FOR_USER_RESPONSE"],
+    ["need_more_information", "NEED_MORE_INFORMATION"],
+  ])("maps %s to %s", (input, expected) => {
+    expect(normalizeAgentStatus(input)).toBe(expected);
+  });
+
+  test.each([
+    [null],
+    [undefined],
+    [""],
+  ])("defaults %s status to PROCESSING", (input) => {
+    expect(normalizeAgentStatus(input)).toBe("PROCESSING");
+  });
+
+  test("uppercases unknown statuses", () => {
+    expect(normalizeAgentStatus("some_new_status")).toBe("SOME_NEW_STATUS");
   });
 });

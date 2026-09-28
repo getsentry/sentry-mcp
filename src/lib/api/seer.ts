@@ -32,7 +32,12 @@ const EXPLORER_MODE_PARAMS = { mode: "explorer" };
  * returns false and polling spins until timeout. `awaiting_user_input` maps to
  * `WAITING_FOR_USER_RESPONSE`.
  */
-function normalizeAgentStatus(status: string): string {
+export function normalizeAgentStatus(
+  status: string | null | undefined
+): string {
+  if (!status) {
+    return "PROCESSING";
+  }
   switch (status) {
     case "processing":
       return "PROCESSING";
