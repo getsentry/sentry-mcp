@@ -46,6 +46,8 @@ export interface SeerSearchTranslation {
   // Other projects Seer suggested searching beyond the requested one.
   suggestedProjectIds: number[];
   explanation: string;
+  // Correctness warnings must be shown even when explanations are disabled.
+  warning?: string;
 }
 
 async function hasSeerSearchAgentAccess(
@@ -136,11 +138,14 @@ function toSearchTranslation(
     .map(([type, query]) => `${type} \`${query}\``);
 
   let explanation = "Translated by Seer's search agent.";
+  let warning: string | undefined;
   if (crossEventFilters.length > 0) {
-    // The time series endpoint doesn't support cross-event filters.
-    explanation += timeSeries
-      ? ` Seer also suggested cross-event filters (${crossEventFilters.join(", ")}), which time series results do not apply.`
-      : ` Only includes results whose trace also has matching ${crossEventFilters.join(", ")}.`;
+    if (timeSeries) {
+      // The time series endpoint doesn't support cross-event filters.
+      warning = `**Warning:** Time series results are unfiltered by the requested cross-event filters (${crossEventFilters.join(", ")}). Counts and other values may include events outside the requested subset.`;
+    } else {
+      explanation += ` Only includes results whose trace also has matching ${crossEventFilters.join(", ")}.`;
+    }
   }
 
   return {
@@ -152,6 +157,7 @@ function toSearchTranslation(
     crossEventQueries,
     suggestedProjectIds,
     explanation,
+    warning,
   };
 }
 

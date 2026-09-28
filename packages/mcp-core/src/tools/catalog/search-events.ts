@@ -736,7 +736,11 @@ export default defineTool({
       suggestedProjectIds.length > 0
         ? `**Note:** Seer suggested also searching project IDs ${suggestedProjectIds.join(", ")}, for example other services in the same trace. Omit \`projectSlug\` to search all accessible projects.`
         : "";
-    const leadingNote = [environmentNote, projectSuggestionNote]
+    const leadingNote = [
+      seerTranslation?.warning,
+      environmentNote,
+      projectSuggestionNote,
+    ]
       .filter(Boolean)
       .join("\n\n");
     const withLeadingNote = (text: string): string =>
