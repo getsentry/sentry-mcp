@@ -197,6 +197,178 @@ describe("getTraceUrl", () => {
   });
 });
 
+describe("external issue linking API methods", () => {
+  const organizationSlug = "test-org";
+  const issueId = "123";
+  const integrationId = "456";
+  const externalIssueUrl = "https://github.com/example/project/issues/42";
+  const nativeIssue = {
+    id: 789,
+    key: "example/project#42",
+    url: externalIssueUrl,
+  };
+  const appIssue = {
+    id: "789",
+    issueId,
+    serviceType: "linear",
+    displayName: "ENG-42",
+    webUrl: "https://linear.app/example/issue/ENG-42/title",
+  };
+  const api = new SentryApiService({
+    host: "us.sentry.io",
+    accessToken: "test-token",
+  });
+
+  it("reads every integration page and preserves internal link IDs and provider metadata", async () => {
+    const integration = {
+      id: integrationId,
+      name: "example",
+      domainName: "github.com/example",
+      status: "active",
+      provider: { key: "github" },
+      externalIssues: [nativeIssue],
+    };
+    const pages: (string | null)[] = [];
+    mswServer.use(
+      http.get(
+        "https://us.sentry.io/api/0/organizations/test-org/issues/123/integrations/",
+        ({ request }) => {
+          const cursor = new URL(request.url).searchParams.get("cursor");
+          pages.push(cursor);
+          return HttpResponse.json(
+            [{ ...integration, id: cursor ? 457 : integrationId }],
+            {
+              headers: cursor
+                ? {}
+                : {
+                    Link: '<https://us.sentry.io/>; rel="next"; results="true"; cursor="next-page"',
+                  },
+            },
+          );
+        },
+      ),
+    );
+    expect(
+      await api.listIssueIntegrations({ organizationSlug, issueId }),
+    ).toEqual([integration, { ...integration, id: 457 }]);
+    expect(pages).toEqual([null, "next-page"]);
+  });
+
+  it("finds App associations beyond the first page", async () => {
+    mswServer.use(
+      http.get(
+        "https://us.sentry.io/api/0/organizations/test-org/issues/123/external-issues/",
+        ({ request }) => {
+          const cursor = new URL(request.url).searchParams.get("cursor");
+          return HttpResponse.json(cursor ? [appIssue] : [], {
+            headers: cursor
+              ? {}
+              : {
+                  Link: '<https://us.sentry.io/>; rel="next"; results="true"; cursor="next-page"',
+                },
+          });
+        },
+      ),
+    );
+    expect(
+      await api.getIssueExternalLinks({ organizationSlug, issueId }),
+    ).toEqual([appIssue]);
+  });
+
+  it("loads App installations and paginated issue-link forms on the control host", async () => {
+    const installation = {
+      uuid: "install-uuid",
+      status: "installed",
+      app: { slug: "linear", uuid: "app-uuid" },
+    };
+    const component = {
+      type: "issue-link",
+      sentryApp: { slug: "linear", uuid: "app-uuid" },
+      schema: { link: { uri: "/link" } },
+    };
+    const pages: (string | null)[] = [];
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/sentry-app-installations/",
+        () => HttpResponse.json([installation]),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/sentry-app-components/",
+        ({ request }) => {
+          const query = new URL(request.url).searchParams;
+          expect(query.get("filter")).toBe("issue-link");
+          pages.push(query.get("cursor"));
+          return HttpResponse.json(query.has("cursor") ? [component] : [], {
+            headers: query.has("cursor")
+              ? {}
+              : {
+                  Link: '<https://sentry.io/>; rel="next"; results="true"; cursor="next-page"',
+                },
+          });
+        },
+      ),
+    );
+    expect(await api.listSentryAppInstallations({ organizationSlug })).toEqual([
+      installation,
+    ]);
+    expect(await api.listSentryAppComponents({ organizationSlug })).toEqual([
+      component,
+    ]);
+    expect(pages).toEqual([null, "next-page"]);
+  });
+
+  it.each(["tenant.my.sentry.io", "sentry.example.com"])(
+    "keeps App choices on %s and encodes search dependencies",
+    async (host) => {
+      const tenantApi = new SentryApiService({ host });
+      mswServer.use(
+        http.get(
+          `https://${host}/api/0/sentry-app-installations/install-uuid/external-requests/`,
+          ({ request }) => {
+            expect(
+              Object.fromEntries(new URL(request.url).searchParams),
+            ).toEqual({
+              uri: "/search",
+              projectId: "42",
+              query: "ENG-42",
+              dependentData: JSON.stringify({ team: "ENG" }),
+            });
+            return HttpResponse.json({ choices: [["ticket-uuid", "ENG-42"]] });
+          },
+        ),
+      );
+      expect(
+        await tenantApi.getSentryAppExternalRequestOptions({
+          installationUuid: "install-uuid",
+          uri: "/search",
+          query: "ENG-42",
+          projectId: "42",
+          dependentData: { team: "ENG" },
+        }),
+      ).toEqual({ choices: [["ticket-uuid", "ENG-42"]] });
+    },
+  );
+
+  it("unlinks an App by internal association ID using the regional endpoint", async () => {
+    const requests: string[] = [];
+    mswServer.use(
+      http.delete(
+        "https://us.sentry.io/api/0/organizations/test-org/issues/123/external-issues/789/",
+        () => {
+          requests.push("app");
+          return new HttpResponse(null, { status: 204 });
+        },
+      ),
+    );
+    await api.unlinkSentryAppExternalIssue({
+      organizationSlug,
+      issueId,
+      externalIssueId: "789",
+    });
+    expect(requests).toEqual(["app"]);
+  });
+});
+
 describe("getEventsExplorerUrl", () => {
   it("should work with sentry.io", () => {
     const apiService = new SentryApiService({ host: "sentry.io" });

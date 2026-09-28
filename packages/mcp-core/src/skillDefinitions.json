@@ -331,7 +331,7 @@
     "description": "Resolve, assign, and update issues",
     "defaultEnabled": false,
     "order": 4,
-    "toolCount": 18,
+    "toolCount": 20,
     "tools": [
       {
         "name": "add_issue_note",
@@ -394,6 +394,11 @@
         "requiredScopes": ["event:read", "project:read"]
       },
       {
+        "name": "link_issue",
+        "description": "Link an existing external ticket or GitHub pull request to a Sentry issue by URL.\nSupports native Jira, GitHub/GitHub Enterprise, GitLab, Bitbucket, and Azure DevOps integrations, and installed Sentry Apps whose issue-link forms use single-value select or text fields.\nCreates a reference: it does not create a ticket, resolve the Sentry issue, or associate a commit. Use update_issue separately to change status or assignment.\nA repeated link returns already_linked. A different App association must be unlinked first.\nFor Apps, copy the canonical issue URL from the provider. Supply fields only when the installed App requires additional form values.\n<examples>\nlink_issue(organizationSlug='my-org', issueId='PROJECT-123', externalIssueUrl='https://github.com/example/repo/pull/42')\nlink_issue(issueUrl='https://my-org.sentry.io/issues/123/', externalIssueUrl='https://linear.app/example/issue/ENG-42/fix-crash')\n</examples>",
+        "requiredScopes": ["event:write", "org:read"]
+      },
+      {
         "name": "search_agent_conversations",
         "description": "Search Sentry Agent Conversations, formerly called AI Conversations, and return one summary row per conversation.\n\nUse this tool to find or list Agent Conversations. Results are conversation summaries, not raw span rows.\nEach row includes title (when available), USD cost, tokens, call counts, previews, and other list metadata.\nUse get_agent_conversation_details with a conversationId to fetch the transcript. Use get_sentry_resource for Sentry conversation URLs.\n\n<examples>\nsearch_agent_conversations(organizationSlug='my-org', query='failed conversations', period='7d')\nsearch_agent_conversations(organizationSlug='my-org', query='checkout', project='backend')\n</examples>",
         "requiredScopes": ["event:read", "project:read"]
@@ -412,6 +417,11 @@
         "name": "search_issues",
         "description": "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.\n\nProvide `query` as natural language or Sentry issue search syntax. When an embedded agent is configured, it fixes query and sort before running while preserving explicit Sentry search syntax.\n\nReturns grouped issues with metadata like title, status, and user count.\n\nCommon Query Syntax:\n- is:unresolved / is:resolved / is:ignored / is:for_review / is:new / is:regressed / is:escalating\n- level:error / level:warning\n- firstSeen:-24h / lastSeen:-7d\n- assigned:me / assigned_or_suggested:me\n- release:latest\n- issue.category:feedback\n- issue.priority:high\n- environment:production\n- userCount:>100\n\nDO NOT USE FOR COUNTS/AGGREGATIONS → use search_events\nDO NOT USE FOR individual events with timestamps → use search_events\nDO NOT USE FOR details about a specific issue → use get_sentry_resource\n\n<examples>\nsearch_issues(organizationSlug='my-org', query='critical bugs from last week')\nsearch_issues(organizationSlug='my-org', query='is:unresolved is:unassigned', sort='freq')\nsearch_issues(organizationSlug='my-org', query='level:error firstSeen:-24h', projectSlugOrId='my-project')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').\n</hints>",
         "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "unlink_issue",
+        "description": "Remove an external ticket or GitHub pull request reference from a Sentry issue by URL.\nRemoves only the Sentry association. It does not delete the external ticket or the Sentry issue, or change resolution status.\nSupports native integrations and installed Sentry Apps. Repeating the request is safe: not_linked means the association is absent, whether removed by this call or already absent.\n<examples>\nunlink_issue(organizationSlug='my-org', issueId='PROJECT-123', externalIssueUrl='https://github.com/example/repo/issues/42')\n</examples>",
+        "requiredScopes": ["event:write", "org:read"]
       },
       {
         "name": "update_issue",

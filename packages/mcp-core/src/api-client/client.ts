@@ -62,12 +62,14 @@ import {
   EventSchema,
   EventsStatsResponseSchema,
   ExternalIssueListSchema,
+  ExternalIssueSchema,
   FlamegraphSchema,
   IssueActivityListResponseSchema,
   IssueAlertRuleListSchema,
   IssueAlertRuleSchema,
   IssueCommentListSchema,
   IssueCommentSchema,
+  IssueIntegrationListSchema,
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
@@ -77,6 +79,7 @@ import {
   MonitorListSchema,
   MonitorSchema,
   MonitorStatsSchema,
+  NativeExternalIssueSchema,
   OrganizationEnvironmentListSchema,
   OrganizationListSchema,
   OrganizationSchema,
@@ -91,6 +94,9 @@ import {
   ReplayListResponseSchema,
   ReplayRecordingSegmentsSchema,
   RepositoryListSchema,
+  SentryAppComponentListSchema,
+  SentryAppExternalRequestOptionsSchema,
+  SentryAppInstallationListSchema,
   SpansSearchResponseSchema,
   StacktraceLinkSchema,
   TagListSchema,
@@ -129,6 +135,7 @@ import type {
   Event,
   EventAttachment,
   EventAttachmentList,
+  ExternalIssue,
   ExternalIssueList,
   Flamegraph,
   Issue,
@@ -137,6 +144,7 @@ import type {
   IssueAlertRuleList,
   IssueComment,
   IssueCommentList,
+  IssueIntegrationList,
   IssueList,
   IssueTagValues,
   MetricAlertRule,
@@ -147,6 +155,7 @@ import type {
   MonitorCheckInList,
   MonitorList,
   MonitorStats,
+  NativeExternalIssue,
   OrganizationEnvironmentList,
   OrganizationList,
   ProfileChunk,
@@ -157,6 +166,9 @@ import type {
   ReplayDetails,
   ReplayList,
   ReplayRecordingSegments,
+  SentryAppComponentList,
+  SentryAppExternalRequestOptions,
+  SentryAppInstallationList,
   StacktraceLink,
   TagList,
   Team,
@@ -3928,10 +3940,7 @@ export class SentryApiService {
   }
 
   /**
-   * Retrieves external issue links for a specific issue.
-   *
-   * Returns links to external issue tracking systems (Jira, GitHub Issues,
-   * GitLab, etc.) that have been associated with this Sentry issue.
+   * Retrieves Sentry App issue associations. Native links come from listIssueIntegrations.
    *
    * @param params Query parameters
    * @param params.organizationSlug Organization identifier
@@ -3949,12 +3958,212 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ExternalIssueList> {
-    const body = await this.requestJSON(
+    return this.listIssueLinkPages(
       apiPath`/organizations/${organizationSlug}/issues/${issueId}/external-issues/`,
-      undefined,
+      ExternalIssueListSchema,
       opts,
     );
-    return ExternalIssueListSchema.parse(body);
+  }
+
+  private async listIssueLinkPages<T>(
+    path: string,
+    schema: z.ZodType<T[]>,
+    opts?: RequestOptions,
+  ): Promise<T[]> {
+    const items: T[] = [];
+    let cursor: string | null = null;
+    do {
+      const query = new URLSearchParams({ per_page: "100" });
+      if (cursor) query.set("cursor", cursor);
+      const response = await this.request(
+        `${path}${path.includes("?") ? "&" : "?"}${query.toString()}`,
+        undefined,
+        opts,
+      );
+      items.push(...schema.parse(await this.parseJsonResponse(response)));
+      cursor = getNextCursor(response.headers.get("link"));
+    } while (cursor);
+    return items;
+  }
+
+  async listIssueIntegrations(
+    {
+      organizationSlug,
+      issueId,
+    }: { organizationSlug: string; issueId: string },
+    opts?: RequestOptions,
+  ): Promise<IssueIntegrationList> {
+    return this.listIssueLinkPages(
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/integrations/`,
+      IssueIntegrationListSchema,
+      opts,
+    );
+  }
+
+  /** Send a complete provider URL; HTTP 201 distinguishes a new association from a retry. */
+  async linkNativeExternalIssue(
+    {
+      organizationSlug,
+      issueId,
+      integrationId,
+      externalIssueUrl,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      integrationId: string;
+      externalIssueUrl: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ issue: NativeExternalIssue; changed: boolean }> {
+    const response = await this.request(
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/integrations/${integrationId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ externalIssue: externalIssueUrl }),
+      },
+      opts,
+    );
+    return {
+      issue: NativeExternalIssueSchema.parse(
+        await this.parseJsonResponse(response),
+      ),
+      changed: response.status === 201,
+    };
+  }
+
+  /** Delete using Sentry's ExternalIssue ID, not the provider's issue number. */
+  async unlinkNativeExternalIssue(
+    {
+      organizationSlug,
+      issueId,
+      integrationId,
+      externalIssueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      integrationId: string;
+      externalIssueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    const query = new URLSearchParams({ externalIssue: externalIssueId });
+    await this.request(
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/integrations/${integrationId}/` +
+        `?${query.toString()}`,
+      { method: "DELETE" },
+      opts,
+    );
+  }
+
+  async listSentryAppInstallations(
+    { organizationSlug }: { organizationSlug: string },
+    opts?: RequestOptions,
+  ): Promise<SentryAppInstallationList> {
+    return this.listIssueLinkPages(
+      apiPath`/organizations/${organizationSlug}/sentry-app-installations/`,
+      SentryAppInstallationListSchema,
+      { ...opts, host: this.isPublicSaas() ? "sentry.io" : opts?.host },
+    );
+  }
+
+  async listSentryAppComponents(
+    { organizationSlug }: { organizationSlug: string },
+    opts?: RequestOptions,
+  ): Promise<SentryAppComponentList> {
+    return this.listIssueLinkPages(
+      apiPath`/organizations/${organizationSlug}/sentry-app-components/` +
+        "?filter=issue-link",
+      SentryAppComponentListSchema,
+      { ...opts, host: this.isPublicSaas() ? "sentry.io" : opts?.host },
+    );
+  }
+
+  async getSentryAppExternalRequestOptions(
+    {
+      installationUuid,
+      uri,
+      query,
+      projectId,
+      dependentData,
+    }: {
+      installationUuid: string;
+      uri: string;
+      query?: string;
+      projectId?: string;
+      dependentData?: Record<string, string | number>;
+    },
+    opts?: RequestOptions,
+  ): Promise<SentryAppExternalRequestOptions> {
+    const params = new URLSearchParams({ uri });
+    if (query !== undefined) params.set("query", query);
+    if (projectId !== undefined) params.set("projectId", projectId);
+    if (dependentData !== undefined)
+      params.set("dependentData", JSON.stringify(dependentData));
+    const body = await this.requestJSON(
+      apiPath`/sentry-app-installations/${installationUuid}/external-requests/` +
+        `?${params.toString()}`,
+      undefined,
+      { ...opts, host: this.isPublicSaas() ? "sentry.io" : opts?.host },
+    );
+    return SentryAppExternalRequestOptionsSchema.parse(body);
+  }
+
+  /** Invoke the App callback with an exact canonical-URL guard, preserving HTTP 200/201. */
+  async linkSentryAppExternalIssue(
+    {
+      installationUuid,
+      issueId,
+      uri,
+      fields,
+      expectedExternalIssueUrl,
+    }: {
+      installationUuid: string;
+      issueId: string;
+      uri: string;
+      fields: Record<string, string | number>;
+      expectedExternalIssueUrl: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ issue: ExternalIssue; changed: boolean }> {
+    const query = new URLSearchParams({ expectedExternalIssueUrl });
+    const response = await this.request(
+      apiPath`/sentry-app-installations/${installationUuid}/external-issue-actions/` +
+        `?${query.toString()}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          ...fields,
+          groupId: issueId,
+          action: "link",
+          uri,
+        }),
+      },
+      { ...opts, host: this.isPublicSaas() ? "sentry.io" : opts?.host },
+    );
+    return {
+      issue: ExternalIssueSchema.parse(await this.parseJsonResponse(response)),
+      changed: response.status === 201,
+    };
+  }
+
+  /** Delete a group-scoped App association with event:write permissions. */
+  async unlinkSentryAppExternalIssue(
+    {
+      organizationSlug,
+      issueId,
+      externalIssueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      externalIssueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.request(
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/external-issues/${externalIssueId}/`,
+      { method: "DELETE" },
+      opts,
+    );
   }
 
   /**

@@ -6085,6 +6085,118 @@
     "surface": "catalog"
   },
   {
+    "name": "link_issue",
+    "description": "Link an existing external ticket or GitHub pull request to a Sentry issue by URL.\nSupports native Jira, GitHub/GitHub Enterprise, GitLab, Bitbucket, and Azure DevOps integrations, and installed Sentry Apps whose issue-link forms use single-value select or text fields.\nCreates a reference: it does not create a ticket, resolve the Sentry issue, or associate a commit. Use update_issue separately to change status or assignment.\nA repeated link returns already_linked. A different App association must be unlinked first.\nFor Apps, copy the canonical issue URL from the provider. Supply fields only when the installed App requires additional form values.\n<examples>\nlink_issue(organizationSlug='my-org', issueId='PROJECT-123', externalIssueUrl='https://github.com/example/repo/pull/42')\nlink_issue(issueUrl='https://my-org.sentry.io/issues/123/', externalIssueUrl='https://linear.app/example/issue/ENG-42/fix-crash')\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "issueId": {
+          "type": "string",
+          "description": "The Issue ID. e.g. `PROJECT-1Z43`"
+        },
+        "issueUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43"
+        },
+        "externalIssueUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the existing external ticket or GitHub pull request. For Sentry Apps, use the canonical issue URL shown by the provider."
+        },
+        "integrationId": {
+          "description": "Native integration ID, only needed when multiple installations match the URL.",
+          "type": "string",
+          "pattern": "^\\d+$"
+        },
+        "appSlug": {
+          "description": "Installed Sentry App slug. Inferred for Linear and Shortcut URLs; specify it for other Apps.",
+          "type": "string",
+          "minLength": 1
+        },
+        "fields": {
+          "description": "Additional App form values by field name; required fields are reported when missing.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          }
+        }
+      },
+      "required": ["externalIssueUrl"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string"
+        },
+        "issueId": {
+          "type": "string"
+        },
+        "issueUrl": {
+          "type": "string"
+        },
+        "externalIssue": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "displayName": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            }
+          },
+          "required": ["url"],
+          "additionalProperties": false
+        },
+        "status": {
+          "type": "string",
+          "enum": ["linked", "already_linked", "not_linked"]
+        }
+      },
+      "required": [
+        "organizationSlug",
+        "issueId",
+        "issueUrl",
+        "externalIssue",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["event:write", "org:read"],
+    "skills": ["triage"],
+    "surface": "catalog"
+  },
+  {
     "name": "onboarding_status_update",
     "description": "Update the progress shown in Sentry's agentic onboarding UI.\n\nUse this tool only when the Sentry getting started skill provides a run token. Call it at the workflow boundaries described by that skill.\n\n<hints>\n- Progress updates are operational UI state, not user analytics.\n- Keep eventNote brief and limited to context useful in the progress UI.\n- Do not include source code, repository paths, credentials, error output, or other sensitive data.\n- status is required for every update.\n- Set runStatus to completed or failed only when the entire onboarding run reaches that state.\n- A failed status requires a brief eventNote explaining the failure.\n</hints>",
     "inputSchema": {
@@ -7370,6 +7482,101 @@
     "requiredScopes": [],
     "skills": ["inspect", "seer", "docs", "triage", "project-management"],
     "surface": "direct"
+  },
+  {
+    "name": "unlink_issue",
+    "description": "Remove an external ticket or GitHub pull request reference from a Sentry issue by URL.\nRemoves only the Sentry association. It does not delete the external ticket or the Sentry issue, or change resolution status.\nSupports native integrations and installed Sentry Apps. Repeating the request is safe: not_linked means the association is absent, whether removed by this call or already absent.\n<examples>\nunlink_issue(organizationSlug='my-org', issueId='PROJECT-123', externalIssueUrl='https://github.com/example/repo/issues/42')\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "issueId": {
+          "type": "string",
+          "description": "The Issue ID. e.g. `PROJECT-1Z43`"
+        },
+        "issueUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43"
+        },
+        "externalIssueUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the existing external ticket or GitHub pull request. For Sentry Apps, use the canonical issue URL shown by the provider."
+        },
+        "integrationId": {
+          "description": "Native integration ID, only needed when multiple installations match the URL.",
+          "type": "string",
+          "pattern": "^\\d+$"
+        },
+        "appSlug": {
+          "description": "Installed Sentry App slug. Inferred for Linear and Shortcut URLs; specify it for other Apps.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["externalIssueUrl"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string"
+        },
+        "issueId": {
+          "type": "string"
+        },
+        "issueUrl": {
+          "type": "string"
+        },
+        "externalIssue": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "displayName": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            }
+          },
+          "required": ["url"],
+          "additionalProperties": false
+        },
+        "status": {
+          "type": "string",
+          "enum": ["linked", "already_linked", "not_linked"]
+        }
+      },
+      "required": [
+        "organizationSlug",
+        "issueId",
+        "issueUrl",
+        "externalIssue",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "requiredScopes": ["event:write", "org:read"],
+    "skills": ["triage"],
+    "surface": "catalog"
   },
   {
     "name": "update_alert_rule",
