@@ -794,6 +794,7 @@ export const CommitSchema = z
     message: z.string().nullable().optional(),
     dateCreated: z.string().datetime().nullable().optional(),
     pullRequest: z.record(z.string(), z.unknown()).nullable().optional(),
+    // The event committers endpoint populates this; release commits usually return an empty string.
     suspectCommitType: z.string().optional(),
     author: ApiActorSchema.nullable().optional(),
     repository: z
@@ -807,6 +808,17 @@ export const CommitSchema = z
   .passthrough();
 
 export const CommitListSchema = z.array(CommitSchema);
+
+export const CommitterSchema = z
+  .object({
+    author: ApiActorSchema.nullable().optional(),
+    commits: CommitListSchema,
+  })
+  .passthrough();
+
+export const CommittersResponseSchema = z.object({
+  committers: z.array(CommitterSchema),
+});
 
 export const IssueActivitySchema = z
   .object({

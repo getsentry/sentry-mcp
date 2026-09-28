@@ -58,6 +58,7 @@ import type {
   ClientKeySchema,
   CommitListSchema,
   CommitSchema,
+  CommittersResponseSchema,
   DashboardListItemSchema,
   DashboardSchema,
   DashboardWidgetSchema,
@@ -248,6 +249,9 @@ export type MetricAlertRuleList = z.infer<typeof MetricAlertRuleListSchema>;
 export type ReleaseList = z.infer<typeof ReleaseListSchema>;
 export type DeployList = z.infer<typeof DeployListSchema>;
 export type CommitList = z.infer<typeof CommitListSchema>;
+export type CommitterList = z.infer<
+  typeof CommittersResponseSchema
+>["committers"];
 export type IssueList = z.infer<typeof IssueListSchema>;
 export type IssueActivityList = z.infer<
   typeof IssueActivityListResponseSchema

@@ -52,6 +52,7 @@ import {
   ClientKeyListSchema,
   ClientKeySchema,
   CommitListSchema,
+  CommittersResponseSchema,
   DashboardListSchema,
   DashboardSchema,
   DeployListSchema,
@@ -120,6 +121,7 @@ import type {
   ClientKey,
   ClientKeyList,
   CommitList,
+  CommitterList,
   Dashboard,
   DashboardListItem,
   DeployList,
@@ -2934,6 +2936,31 @@ export class SentryApiService {
       opts,
     );
     return CommitListSchema.parse(body);
+  }
+
+  /**
+   * Retrieves the current suspect commit for the event's issue, grouped by committer.
+   * This reflects the issue's current suspect commit, not its state when the event occurred.
+   * Unlike release commits, this response actually populates `suspectCommitType`.
+   */
+  async getEventCommitters(
+    {
+      organizationSlug,
+      projectSlug,
+      eventId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      eventId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<CommitterList> {
+    const body = await this.requestJSON(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/events/${eventId}/committers/`,
+      undefined,
+      opts,
+    );
+    return CommittersResponseSchema.parse(body).committers;
   }
 
   async listMonitors(
