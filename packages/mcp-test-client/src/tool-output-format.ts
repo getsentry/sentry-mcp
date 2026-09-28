@@ -1,47 +1,19 @@
-interface ToolOutputRecord {
-  [key: string]: unknown;
-}
+import { z } from "zod";
 
-interface ToolContentPart {
-  type: string;
-}
+const ToolContentPartSchema = z
+  .object({
+    type: z.string(),
+    text: z.unknown().optional(),
+  })
+  .passthrough();
 
-interface TextToolContentPart extends ToolContentPart {
-  type: "text";
-  text: string;
-}
-
-function isRecord(value: unknown): value is ToolOutputRecord {
-  return typeof value === "object" && value !== null;
-}
-
-function hasContentArray(
-  value: unknown,
-): value is ToolOutputRecord & { content: unknown[] } {
-  return isRecord(value) && Array.isArray(value.content);
-}
-
-function hasStructuredContent(
-  value: unknown,
-): value is ToolOutputRecord & { structuredContent: unknown } {
-  return isRecord(value) && "structuredContent" in value;
-}
-
-function hasLegacyToolResult(
-  value: unknown,
-): value is ToolOutputRecord & { toolResult: unknown } {
-  return isRecord(value) && "toolResult" in value;
-}
-
-function isToolContentPart(value: unknown): value is ToolContentPart {
-  return isRecord(value) && typeof value.type === "string";
-}
-
-function isTextToolContentPart(value: unknown): value is TextToolContentPart {
-  return (
-    isRecord(value) && value.type === "text" && typeof value.text === "string"
-  );
-}
+const ToolOutputSchema = z
+  .object({
+    content: z.array(z.unknown()).optional().catch(undefined),
+    structuredContent: z.unknown().optional(),
+    toolResult: z.unknown().optional(),
+  })
+  .passthrough();
 
 function stringifyUnknown(value: unknown): string {
   if (typeof value === "string") {
@@ -60,18 +32,28 @@ export function formatToolOutputForDisplay(output: unknown): string {
     return output;
   }
 
-  if (hasContentArray(output)) {
-    const renderedContent = output.content
+  const parsedOutput = ToolOutputSchema.safeParse(output);
+  if (!parsedOutput.success) {
+    return stringifyUnknown(output);
+  }
+
+  const { content, structuredContent, toolResult } = parsedOutput.data;
+  if (content) {
+    const renderedContent = content
       .map((item) => {
-        if (isTextToolContentPart(item)) {
-          return item.text;
+        const parsedItem = ToolContentPartSchema.safeParse(item);
+        if (!parsedItem.success) {
+          return "<unknown message>";
         }
 
-        if (isToolContentPart(item)) {
-          return `<${item.type} message>`;
+        if (
+          parsedItem.data.type === "text" &&
+          typeof parsedItem.data.text === "string"
+        ) {
+          return parsedItem.data.text;
         }
 
-        return "<unknown message>";
+        return `<${parsedItem.data.type} message>`;
       })
       .join("");
 
@@ -80,12 +62,12 @@ export function formatToolOutputForDisplay(output: unknown): string {
     }
   }
 
-  if (hasStructuredContent(output) && output.structuredContent !== undefined) {
-    return stringifyUnknown(output.structuredContent);
+  if (structuredContent !== undefined) {
+    return stringifyUnknown(structuredContent);
   }
 
-  if (hasLegacyToolResult(output)) {
-    return stringifyUnknown(output.toolResult);
+  if (toolResult !== undefined) {
+    return stringifyUnknown(toolResult);
   }
 
   return stringifyUnknown(output);

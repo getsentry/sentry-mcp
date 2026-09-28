@@ -8,20 +8,20 @@ The remote MCP server runs on Cloudflare Workers and provides HTTP-based access 
 
 **When to use remote:**
 - Testing OAuth flows
+- Testing explicit Sentry API token auth over HTTP
 - Testing constraint-based access control (org/project filtering)
 - Testing the web chat interface
 - Production-like environment testing
 - Multi-user scenarios
 
 **When to use stdio instead:**
-- Self-hosted Sentry without OAuth
+- Self-hosted Sentry without a Cloudflare deployment
 - IDE integration testing
-- Direct API token authentication
 - Local development without network
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22.13+
 - pnpm installed
 - Wrangler CLI (for Cloudflare deployment)
 - Sentry OAuth application credentials
@@ -162,19 +162,6 @@ export MCP_URL=https://mcp.sentry.dev
 pnpm -w run cli "query"
 ```
 
-### Testing Agent Mode
-
-Agent mode uses only the `use_sentry` tool (natural language interface):
-
-```bash
-# Test agent mode locally
-pnpm -w run cli --agent "show me my recent errors"
-
-# Test agent mode in production
-pnpm -w run cli --mcp-host=https://mcp.sentry.dev --agent "what projects do I have?"
-```
-
-**Agent mode is ~2x slower** because it requires an additional AI call to translate natural language to tool calls.
 
 ### OAuth Flow Testing
 
@@ -194,6 +181,63 @@ pnpm -w run cli "who am I?"
 - Tokens stored in `~/.sentry-mcp-tokens.json`
 - Automatically refreshed when expired
 - To force re-auth: delete the token file
+
+**Running in a VM or container:**
+
+The callback server defaults to `127.0.0.1:8765`, which a browser on the host
+cannot reach. Three environment variables override it:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MCP_OAUTH_PORT` | `8765` | Port the callback server listens on |
+| `MCP_OAUTH_HOST` | `127.0.0.1` | Address the callback server binds to |
+| `MCP_OAUTH_REDIRECT_URI` | `http://localhost:$MCP_OAUTH_PORT/callback` | Redirect URI sent to the OAuth server |
+
+```bash
+# Bind on all interfaces and send the browser to the forwarded address
+MCP_OAUTH_HOST=0.0.0.0 \
+MCP_OAUTH_REDIRECT_URI=http://192.168.1.20:8765/callback \
+  pnpm -w run cli "who am I?"
+```
+
+Set `MCP_OAUTH_REDIRECT_URI` whenever the address the browser uses differs from
+the one the CLI binds to, such as behind port forwarding or a devcontainer.
+
+### Direct Sentry Token Testing
+
+Remote `/mcp` also accepts explicit upstream Sentry API tokens with a separate
+authorization scheme:
+
+```bash
+curl http://localhost:5173/mcp \
+  -H "Authorization: Sentry-Bearer $SENTRY_ACCESS_TOKEN" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+Use this path when the client or an upstream provider already owns the Sentry
+token lifecycle. The worker does not use MCP OAuth, store the token, validate it
+up front, refresh it, or revoke a grant when Sentry later rejects it.
+
+`Authorization: Bearer ...` remains the MCP OAuth token format. A malformed
+`Sentry-Bearer` header returns `401` directly instead of falling back to OAuth.
+
+Direct-token sessions default to all active skills. Narrow the exposed tools
+with query parameters:
+
+```bash
+curl "http://localhost:5173/mcp?skills=inspect,triage" \
+  -H "Authorization: Sentry-Bearer $SENTRY_ACCESS_TOKEN" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+Constrained URLs still set MCP org/project constraints, for example
+`/mcp/sentry/javascript`, but direct-token mode does not pre-verify those
+constraints during initialization. Tool calls rely on the upstream Sentry API to
+accept or reject the provided token for the requested org/project.
 
 ### Testing with Constraints
 
@@ -369,17 +413,17 @@ pnpm -w run cli "list organizations"
 ### 2. Test Skills Permissions
 
 **In OAuth approval screen, test:**
-- Minimal skills (inspect, docs only)
-- Default skills (inspect, seer)
-- All skills (inspect, seer, docs, triage, project-management)
+- Default selection: all active skills (inspect, seer, triage, project-management)
+- Minimal custom selection (inspect only)
+- Write-capable custom selection (triage, project-management)
 
 **Verify tools reflect the current session grant:**
 ```bash
 # With read-only grants: no write tools
-pnpm -w run cli "list tools" | grep "create_"
+pnpm -w run cli "search Sentry tools for create project"
 
-# With all grants: includes write tools
-# Should see: create_project, create_team, update_issue, etc.
+# With all grants: catalog search includes write-capable tools
+# Should find: create_project, create_team, update_issue, etc.
 ```
 
 ### 3. Test Multi-Organization Access
@@ -511,8 +555,9 @@ pnpm -w run cli "who am I?"
 # Check tool list
 pnpm -w run cli "list tools" | jq '.tools[] | .name'
 
-# Verify the session grant includes the capability for the tool you need
-# Example: create_project is only available with project-management capabilities
+# Verify the session grant includes the capability for the tool you need.
+# Project-management tools are catalog-only; find them with search_sentry_tools.
+# Example: create_project requires project-management and is hidden in project-scoped sessions.
 
 # Rebuild and restart
 pnpm -w run build && pnpm dev
@@ -641,11 +686,11 @@ Key differences to verify:
 
 | Feature | Stdio | Remote |
 |---------|-------|--------|
-| Authentication | Access token | OAuth |
+| Authentication | Access token | OAuth, or `Sentry-Bearer` access token |
 | Constraints | Via CLI flags | Via URL path |
 | Transport | stdin/stdout | HTTP/SSE |
 | Multi-user | No | Yes |
-| Token refresh | N/A | Automatic |
+| Token refresh | N/A | OAuth only; direct tokens are caller-managed |
 | Web UI | No | Yes |
 | Performance | Faster (no network) | Network latency |
 

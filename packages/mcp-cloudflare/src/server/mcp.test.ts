@@ -2,6 +2,7 @@ import { createExecutionContext, env } from "cloudflare:test";
 import { getOAuthApi } from "@cloudflare/workers-oauth-provider";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SCOPES } from "../constants";
+import { PKCE_CODE_CHALLENGE, PKCE_CODE_VERIFIER } from "../test-utils/pkce";
 import app from "./app";
 import handler from "./index";
 import mcpHandler from "./lib/mcp-handler";
@@ -58,6 +59,8 @@ function createAuthRequest(clientId: string, resource: string) {
   url.searchParams.set("scope", "org:read");
   url.searchParams.set("state", "test-state");
   url.searchParams.set("resource", resource);
+  url.searchParams.set("code_challenge", PKCE_CODE_CHALLENGE);
+  url.searchParams.set("code_challenge_method", "S256");
 
   return new Request(url);
 }
@@ -73,6 +76,7 @@ function createTokenExchangeRequest(clientId: string, code: string) {
       client_id: clientId,
       code,
       redirect_uri: REDIRECT_URI,
+      code_verifier: PKCE_CODE_VERIFIER,
     }).toString(),
   });
 }
@@ -231,6 +235,21 @@ describe("/mcp", () => {
       result?: { tools: Array<{ name: string }> };
     }>(response);
     expect(body.result?.tools.length).toBeGreaterThan(0);
+  });
+
+  it("does not accept a scoped token at a different tenant path", async () => {
+    const accessToken = await issueAccessToken(
+      "https://mcp.sentry.dev/mcp/org-a/project-a",
+    );
+
+    const ctx = createExecutionContext();
+    const response = await handler.fetch!(
+      createMcpRequest("/mcp/org-b/project-b", accessToken, "tools/list", {}),
+      workerEnv,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
   });
 
   it("refreshes token and serves MCP requests when upstream token is valid", async () => {

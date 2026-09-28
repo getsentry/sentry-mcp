@@ -16,8 +16,9 @@ import type {
   MessageEntrySchema,
   RequestEntrySchema,
   SentryApiService,
-  ThreadsEntrySchema,
+  ThreadEntrySchema,
 } from "../api-client";
+import { ThreadsEntrySchema } from "../api-client";
 import type {
   AutofixRunState,
   Event,
@@ -29,11 +30,22 @@ import type {
 } from "../api-client/types";
 import { logIssue } from "../telem/logging";
 import {
+  type CodeLocation,
+  findMostRelevantInAppFrame,
+  formatCodeLocation,
+} from "./code-location";
+import {
+  type AIConversationReference,
+  formatAIConversationActionInstructions,
+} from "./tool-helpers/ai-conversation-actions";
+import {
   getAutofixArtifactSummaries,
   getStatusDisplayName,
   isTerminalStatus,
+  wrapSeerContent,
 } from "./tool-helpers/seer";
 import { formatToolCallInstruction } from "./tool-helpers/tool-call-formatting";
+import { isPlainObject } from "./type-guards";
 import { formatUserGeoSummary } from "./user-formatting";
 
 /**
@@ -169,6 +181,42 @@ export function formatFrameHeader(
 }
 
 /**
+ * Whether the shared formatter covers this event type, and so whether its body should be used
+ * instead of the local rendering.
+ *
+ * "default" is an error event without exception data, "generic" a performance regression or
+ * metric issue, "csp" a Content Security Policy violation. Anything else (a transaction, most
+ * notably) keeps the local path, which renders things the shared body does not carry such as
+ * the fetched performance trace.
+ */
+/**
+ * Whether to read the issue's metadata instead of its top level fields. Performance issues can
+ * have various categories such as 'db_query', but the issueType starts with 'performance_'.
+ *
+ * It matters which side of this an issue falls on: metadata.value is a query pattern for a
+ * performance issue and the exception message for an error, so reading it unconditionally
+ * misnames the error text.
+ */
+export function isPerformanceIssueType(issue: {
+  issueType?: string | null;
+  issueCategory?: string | null;
+}): boolean {
+  return (
+    issue.issueType?.startsWith("performance_") === true ||
+    issue.issueCategory === "performance"
+  );
+}
+
+export function usesSharedFormatterBody(event: { type?: unknown }): boolean {
+  return (
+    event.type === "error" ||
+    event.type === "default" ||
+    event.type === "generic" ||
+    event.type === "csp"
+  );
+}
+
+/**
  * Formats a Sentry event into a structured markdown output.
  * Includes error messages, stack traces, request info, and contextual data.
  *
@@ -229,6 +277,9 @@ export function formatEventOutput(
     (e) => e.type === "exception",
   );
   const threadsEntry = eventToRender.entries.find((e) => e.type === "threads");
+  const threadsData = threadsEntry
+    ? parseThreadsEntryData(threadsEntry.data)
+    : undefined;
   const requestEntry = eventToRender.entries.find((e) => e.type === "request");
   const spansEntry = eventToRender.entries.find((e) => e.type === "spans");
   const cspEntry = eventToRender.entries.find((e) => e.type === "csp");
@@ -247,11 +298,13 @@ export function formatEventOutput(
       eventToRender,
       exceptionEntry.data as z.infer<typeof ErrorEntrySchema>,
     );
-  } else if (threadsEntry) {
-    output += formatThreadsInterfaceOutput(
-      eventToRender,
-      threadsEntry.data as z.infer<typeof ThreadsEntrySchema>,
-    );
+  } else if (threadsData) {
+    output += formatThreadsInterfaceOutput(eventToRender, threadsData);
+  }
+
+  if (threadsData?.values && threadsData.values.length > 1) {
+    output += formatThreadList(threadsData.values);
+    output += "\n";
   }
 
   // Request info (if HTTP error)
@@ -405,12 +458,12 @@ function formatExceptionInterfaceOutput(
 
     // Only show enhanced frame for the first (outermost) exception to avoid overwhelming output
     if (index === 0) {
-      const firstInAppFrame = findFirstInAppFrame(frames);
+      const relevantFrame = findMostRelevantInAppFrame(frames);
       if (
-        firstInAppFrame &&
-        (firstInAppFrame.context?.length || firstInAppFrame.vars)
+        relevantFrame &&
+        (relevantFrame.context?.length || relevantFrame.vars)
       ) {
-        parts.push(renderEnhancedFrame(firstInAppFrame, event));
+        parts.push(renderEnhancedFrame(relevantFrame, event));
         parts.push("");
         parts.push("**Full Stacktrace:**");
         parts.push("────────────────");
@@ -579,13 +632,10 @@ function formatThreadsInterfaceOutput(
 
   const frames = crashedThread.stacktrace.frames;
 
-  // Find and format the first in-app frame with enhanced view
-  const firstInAppFrame = findFirstInAppFrame(frames);
-  if (
-    firstInAppFrame &&
-    (firstInAppFrame.context?.length || firstInAppFrame.vars)
-  ) {
-    parts.push(renderEnhancedFrame(firstInAppFrame, event));
+  // Find and format the most relevant in-app frame with enhanced view
+  const relevantFrame = findMostRelevantInAppFrame(frames);
+  if (relevantFrame && (relevantFrame.context?.length || relevantFrame.vars)) {
+    parts.push(renderEnhancedFrame(relevantFrame, event));
     parts.push("");
     parts.push("**Full Stacktrace:**");
     parts.push("────────────────");
@@ -607,6 +657,157 @@ function formatThreadsInterfaceOutput(
   parts.push("");
 
   return parts.join("\n");
+}
+
+function getThreadDisplayValue(
+  value: string | number | boolean | null | undefined,
+): string {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+  return String(value);
+}
+
+function getThreadFlags(thread: z.infer<typeof ThreadEntrySchema>): string {
+  const flags: string[] = [];
+  if (thread.crashed) {
+    flags.push("crashed");
+  }
+  if (thread.current) {
+    flags.push("current");
+  }
+  return flags.length > 0 ? flags.join(", ") : "-";
+}
+
+function formatThreadList(
+  threads: z.infer<typeof ThreadEntrySchema>[],
+): string {
+  return [
+    "### Threads",
+    "",
+    `Found ${threads.length} thread${threads.length === 1 ? "" : "s"} in this event.`,
+    "",
+    ...formatThreadTable(threads),
+    "",
+  ].join("\n");
+}
+
+function formatThreadTable(
+  threads: z.infer<typeof ThreadEntrySchema>[],
+): string[] {
+  return [
+    "| Thread ID | Name | State | Flags | Frames |",
+    "| --- | --- | --- | --- | ---: |",
+    ...threads.map((thread) => {
+      const frameCount = thread.stacktrace?.frames?.length ?? 0;
+      return `| ${getThreadDisplayValue(thread.id)} | ${getThreadDisplayValue(thread.name)} | ${getThreadDisplayValue(thread.state)} | ${getThreadFlags(thread)} | ${frameCount} |`;
+    }),
+  ];
+}
+
+export function formatAvailableThreadList(
+  threads: z.infer<typeof ThreadEntrySchema>[],
+): string {
+  return [
+    "## Available Threads",
+    "",
+    ...formatThreadTable(threads),
+    "",
+    "Pass `thread` as a numeric Thread ID or exact thread Name.",
+  ].join("\n");
+}
+
+function parseThreadsEntryData(
+  data: unknown,
+): z.infer<typeof ThreadsEntrySchema> | undefined {
+  const result = ThreadsEntrySchema.safeParse(data);
+  return result.success ? result.data : undefined;
+}
+
+/**
+ * Formats the selected thread stacktrace using the same frame rendering
+ * conventions as issue event details.
+ */
+export function formatThreadStacktraceOutput({
+  event,
+  thread,
+  selectionReason,
+}: {
+  event: Event;
+  thread: z.infer<typeof ThreadEntrySchema>;
+  selectionReason: string;
+}): string {
+  const parts: string[] = [];
+
+  parts.push("## Selected Thread");
+  parts.push("");
+  parts.push(`**Selection**: ${selectionReason}`);
+  parts.push(`**Thread ID**: ${getThreadDisplayValue(thread.id)}`);
+  parts.push(`**Name**: ${getThreadDisplayValue(thread.name)}`);
+  parts.push(`**State**: ${getThreadDisplayValue(thread.state)}`);
+  parts.push(`**Crashed**: ${getThreadDisplayValue(thread.crashed)}`);
+  parts.push(`**Current**: ${getThreadDisplayValue(thread.current)}`);
+  parts.push("");
+
+  const frames = thread.stacktrace?.frames;
+  if (!frames || frames.length === 0) {
+    parts.push("No stacktrace is available for the selected thread.");
+    parts.push("");
+    return parts.join("\n");
+  }
+
+  parts.push("## Stacktrace");
+  parts.push("");
+  const framesOmitted = formatFramesOmitted(thread.stacktrace?.framesOmitted);
+  if (framesOmitted) {
+    parts.push(`**Frames Omitted**: ${framesOmitted}`);
+    parts.push("");
+  }
+
+  const relevantFrame = findMostRelevantInAppFrame(frames);
+  if (relevantFrame && (relevantFrame.context?.length || relevantFrame.vars)) {
+    parts.push(renderEnhancedFrame(relevantFrame, event));
+    parts.push("");
+    parts.push("**Full Stacktrace:**");
+    parts.push("────────────────");
+  } else {
+    parts.push("**Full Stacktrace:**");
+  }
+
+  parts.push("```");
+  parts.push(
+    frames
+      .map((frame) => {
+        const header = formatFrameHeader(frame, undefined, event.platform);
+        const context = renderInlineContext(frame);
+        return `${header}${context}`;
+      })
+      .join("\n"),
+  );
+  parts.push("```");
+  parts.push("");
+
+  return parts.join("\n");
+}
+
+function formatFramesOmitted(
+  framesOmitted: unknown[] | null | undefined,
+): string | null {
+  if (!framesOmitted?.length) {
+    return null;
+  }
+
+  const [firstOmitted, lastOmitted] = framesOmitted;
+  if (
+    typeof firstOmitted === "number" &&
+    typeof lastOmitted === "number" &&
+    Number.isFinite(firstOmitted) &&
+    Number.isFinite(lastOmitted)
+  ) {
+    return String(Math.max(0, lastOmitted - firstOmitted));
+  }
+
+  return null;
 }
 
 /**
@@ -719,27 +920,6 @@ function renderVariablesTable(vars: Record<string, unknown>): string {
   });
 
   return lines.join("\n");
-}
-
-/**
- * Finds the first application frame (in_app) in a stack trace.
- * Searches from the bottom of the stack (oldest frame) to find the first
- * frame that belongs to the user's application code rather than libraries.
- *
- * @param frames - Array of stack frames, typically in reverse chronological order
- * @returns The first in-app frame found, or undefined if none exist
- */
-function findFirstInAppFrame(
-  frames: z.infer<typeof FrameInterface>[],
-): z.infer<typeof FrameInterface> | undefined {
-  // Frames are usually in reverse order (most recent first)
-  // We want the first in-app frame from the bottom
-  for (let i = frames.length - 1; i >= 0; i--) {
-    if (frames[i].inApp === true) {
-      return frames[i];
-    }
-  }
-  return undefined;
 }
 
 /**
@@ -1498,6 +1678,138 @@ function formatPerformanceIssueOutput(
   return parts.length > 0 ? `${parts.join("\n")}\n` : "";
 }
 
+function isPrimitive(value: unknown): value is string | number | boolean {
+  return (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
+}
+
+function formatPrimitive(value: unknown): string | undefined {
+  return isPrimitive(value) ? String(value) : undefined;
+}
+
+/**
+ * Extracts the Snuba query from metric alert evidence data.
+ */
+function getMetricAlertSnubaQuery(
+  evidenceData: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const dataSources = evidenceData.data_sources;
+  if (!Array.isArray(dataSources)) {
+    return undefined;
+  }
+
+  for (const dataSource of dataSources) {
+    if (!isPlainObject(dataSource)) {
+      continue;
+    }
+    const queryObj = dataSource.query_obj;
+    if (!isPlainObject(queryObj)) {
+      continue;
+    }
+    const snubaQuery = queryObj.snuba_query;
+    if (isPlainObject(snubaQuery)) {
+      return snubaQuery;
+    }
+  }
+
+  return undefined;
+}
+
+function formatMetricAlertCondition(
+  condition: Record<string, unknown>,
+): string | undefined {
+  const comparison = condition.comparison;
+  const formattedComparison = formatPrimitive(comparison);
+  if (formattedComparison == null) {
+    return undefined;
+  }
+
+  const type = condition.type;
+  const typeLabel = (() => {
+    if (type === 0 || type === "0" || type === "gt" || type === "gte") {
+      return type === "gte" ? "at or above" : "above";
+    }
+    if (type === 1 || type === "1" || type === "lt" || type === "lte") {
+      return type === "lte" ? "at or below" : "below";
+    }
+    if (type != null) {
+      return String(type);
+    }
+    return undefined;
+  })();
+
+  if (typeLabel && !/^\d+$/.test(typeLabel)) {
+    return `${typeLabel} ${formattedComparison}`;
+  }
+
+  return formattedComparison;
+}
+
+function formatMetricAlertValue(value: unknown): string | undefined {
+  const formattedValue = formatPrimitive(value);
+  if (formattedValue) {
+    return formattedValue;
+  }
+
+  if (isPlainObject(value)) {
+    return formatPrimitive(value.value);
+  }
+
+  return undefined;
+}
+
+function formatMetricAlertDetails(
+  evidenceData: Record<string, unknown>,
+): string {
+  const parts: string[] = ["### Metric Alert Details", ""];
+
+  const snubaQuery = getMetricAlertSnubaQuery(evidenceData);
+  if (snubaQuery) {
+    if (snubaQuery.dataset != null) {
+      parts.push(`**Dataset**: ${String(snubaQuery.dataset)}`);
+    }
+    if (snubaQuery.aggregate != null) {
+      parts.push(`**Aggregate**: ${String(snubaQuery.aggregate)}`);
+    }
+    if (snubaQuery.query != null && String(snubaQuery.query).length > 0) {
+      parts.push(`**Query**: \`${String(snubaQuery.query)}\``);
+    }
+    if (snubaQuery.time_window != null) {
+      parts.push(`**Interval**: ${String(snubaQuery.time_window)} second(s)`);
+    }
+    if (snubaQuery.environment != null) {
+      parts.push(`**Environment**: ${String(snubaQuery.environment)}`);
+    }
+    parts.push("");
+  }
+
+  const formattedValue = formatMetricAlertValue(evidenceData.value);
+  if (formattedValue) {
+    parts.push(`**Evaluated Value**: ${formattedValue}`);
+  }
+
+  const conditions = evidenceData.conditions;
+  if (Array.isArray(conditions)) {
+    const formattedConditions = conditions
+      .filter(isPlainObject)
+      .map(formatMetricAlertCondition)
+      .filter((condition): condition is string => condition != null);
+    if (formattedConditions.length > 0) {
+      parts.push(`**Threshold**: ${formattedConditions.join(", ")}`);
+    }
+  }
+
+  if (evidenceData.alert_id != null) {
+    parts.push(`**Alert Rule ID**: ${String(evidenceData.alert_id)}`);
+  }
+
+  parts.push("");
+  return `${parts.join("\n")}\n`;
+}
+
 /**
  * Formats generic event output (performance regressions, metric-based issues).
  * Generic events don't have traditional error entries, but have occurrence data
@@ -1518,8 +1830,12 @@ function formatGenericEventOutput(event: Event): string {
     return "";
   }
 
-  // Add a section header for performance regression details
   const evidenceData = occurrence.evidenceData;
+  if (occurrence.type === 8001 && evidenceData) {
+    return formatMetricAlertDetails(evidenceData);
+  }
+
+  // Add a section header for performance regression details
   if (evidenceData) {
     parts.push("### Performance Regression Details");
     parts.push("");
@@ -1637,17 +1953,24 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
     parts.push("");
   }
 
-  // Summarize from the run's artifacts: the solution if available, otherwise
-  // the root cause if it has been identified.
-  const { rootCause, solution } = getAutofixArtifactSummaries(autofix);
-  if (solution) {
-    parts.push("**Summary:**");
-    parts.push(solution);
-  } else if (rootCause) {
-    parts.push("**Root Cause Identified:**");
-    parts.push(rootCause);
-  } else if (!isTerminalStatus(autofix.status)) {
-    parts.push("Analysis has started but no results yet.");
+  // Prefer the shared formatter's analysis for the body when the endpoint provides it, but
+  // keep the status handling around it: a run that failed or needs input must say so either
+  // way. Seer content is LLM-generated, so wrap it in the untrusted-data boundary.
+  if (autofixState.formatted?.content) {
+    parts.push(wrapSeerContent(autofixState.formatted.content, autofix.run_id));
+  } else {
+    // Summarize from the run's artifacts: the solution if available, otherwise
+    // the root cause if it has been identified.
+    const { rootCause, solution } = getAutofixArtifactSummaries(autofix);
+    if (solution) {
+      parts.push("**Summary:**");
+      parts.push(solution);
+    } else if (rootCause) {
+      parts.push("**Root Cause Identified:**");
+      parts.push(rootCause);
+    } else if (!isTerminalStatus(autofix.status)) {
+      parts.push("Analysis has started but no results yet.");
+    }
   }
 
   if (autofix.status === "error") {
@@ -1677,6 +2000,8 @@ export function formatIssueOutput({
   performanceTrace,
   externalIssues,
   relatedReplayIds,
+  aiConversations,
+  codeLocation,
   experimentalMode,
   availableToolNames,
   directToolNames,
@@ -1689,17 +2014,15 @@ export function formatIssueOutput({
   performanceTrace?: Trace;
   externalIssues?: ExternalIssueList;
   relatedReplayIds?: string[];
+  aiConversations?: AIConversationReference[];
+  codeLocation?: CodeLocation;
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
 }) {
   let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
 
-  // Check if this is a performance issue based on issueCategory or issueType
-  // Performance issues can have various categories like 'db_query' but issueType starts with 'performance_'
-  const isPerformanceIssue =
-    issue.issueType?.startsWith("performance_") ||
-    issue.issueCategory === "performance";
+  const isPerformanceIssue = isPerformanceIssueType(issue);
 
   if (isPerformanceIssue && issue.metadata) {
     // For performance issues, use metadata for better context
@@ -1763,6 +2086,11 @@ export function formatIssueOutput({
   output += `**Project**: ${issue.project.name}\n`;
   output += `**URL**: ${apiService.getIssueUrl(organizationSlug, issue.shortId)}\n`;
   output += "\n";
+
+  if (codeLocation) {
+    output += formatCodeLocation(codeLocation);
+  }
+
   output += "## Event Details\n\n";
 
   // Check if this is an unsupported event type
@@ -1805,21 +2133,25 @@ export function formatIssueOutput({
     }
     output += " to help us add support for this event type.\n";
 
+    if (aiConversations && aiConversations.length > 0) {
+      output += "\n## Response Notes\n\n";
+      output += formatAIConversationResponseNote({
+        aiConversations,
+        organizationSlug,
+        experimentalMode: experimentalMode ?? false,
+        availableToolNames,
+        directToolNames,
+      });
+    }
+
     // For unsupported event types, return early without trying to render event details
     return output;
   }
 
   output += `**Event ID**: ${event.id}\n`;
   output += `**Type**: ${event.type}\n`;
-  // "default" type represents error events without exception data
-  // "generic" type represents performance regressions and metric-based issues
-  // "csp" type represents Content Security Policy violations
-  if (
-    event.type === "error" ||
-    event.type === "default" ||
-    event.type === "generic" ||
-    event.type === "csp"
-  ) {
+  const isSharedFormatterType = usesSharedFormatterBody(event);
+  if (isSharedFormatterType) {
     const typedEvent = event as
       | z.infer<typeof ErrorEventSchema>
       | z.infer<typeof DefaultEventSchema>
@@ -1833,17 +2165,40 @@ export function formatIssueOutput({
     output += `**Message**:\n${event.message}\n`;
   }
   output += "\n";
-  output += formatEventOutput(event, {
-    performanceTrace,
-    replaySummary: {
+  // only a markdown body belongs in this output; a json body is for structuredContent, and
+  // pasting it here would put a serialized object in the middle of the prose
+  if (
+    isSharedFormatterType &&
+    event.formatted?.format === "markdown" &&
+    event.formatted.content
+  ) {
+    // the shared formatter body doesn't include the replay note — add it here to match formatEventOutput
+    output += formatIssueReplayOutput({
       apiService,
       organizationSlug,
+      event,
       relatedReplayIds,
       experimentalMode: experimentalMode ?? false,
       availableToolNames,
       directToolNames,
-    },
-  });
+    });
+    const formattedContent = event.formatted.content;
+    output += formattedContent.endsWith("\n")
+      ? formattedContent
+      : `${formattedContent}\n`;
+  } else {
+    output += formatEventOutput(event, {
+      performanceTrace,
+      replaySummary: {
+        apiService,
+        organizationSlug,
+        relatedReplayIds,
+        experimentalMode: experimentalMode ?? false,
+        availableToolNames,
+        directToolNames,
+      },
+    });
+  }
 
   // Add Seer context if available
   if (autofixState) {
@@ -1866,9 +2221,21 @@ export function formatIssueOutput({
       : undefined;
 
   output += "## Response Notes\n\n";
-  output += `- Commit message issue reference: \`Fixes ${issue.shortId}\` automatically closes the issue when the commit is merged.\n`;
+  const commitIssueReference = /^\d+$/.test(issue.shortId)
+    ? apiService.getIssueUrl(organizationSlug, issue.shortId)
+    : issue.shortId;
+  output += `- Commit message issue reference: \`Fixes ${commitIssueReference}\` automatically closes the issue when the commit is merged.\n`;
   output +=
     "- The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.\n";
+  if (aiConversations && aiConversations.length > 0) {
+    output += formatAIConversationResponseNote({
+      aiConversations,
+      organizationSlug,
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+    });
+  }
   const issueEventSearchInstruction = formatToolCallInstruction({
     toolName: "search_issue_events",
     arguments: {
@@ -1882,6 +2249,33 @@ export function formatIssueOutput({
     fallbackInstruction: "Issue event search is not available in this session",
   });
   output += `- Issue event search: ${issueEventSearchInstruction}\n`;
+  const hasMultipleThreads = event.entries?.some((entry) => {
+    if (entry.type !== "threads") {
+      return false;
+    }
+    const threadsData = parseThreadsEntryData(entry.data);
+    return Boolean(threadsData?.values && threadsData.values.length > 1);
+  });
+  if (hasMultipleThreads) {
+    const stacktraceInstruction = formatToolCallInstruction({
+      toolName: "get_event_stacktrace",
+      arguments: {
+        organizationSlug,
+        issueId: issue.shortId,
+        eventId: event.id,
+        thread: "thread name or numeric thread ID",
+      },
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+      fallbackInstruction: "",
+      purpose:
+        "to fetch a full thread stacktrace by numeric Thread ID or exact thread Name. Omit `thread` to use Sentry's default selected thread",
+    });
+    if (stacktraceInstruction) {
+      output += `- Thread stacktrace lookup: ${stacktraceInstruction}\n`;
+    }
+  }
   if (traceId) {
     const traceDetailsInstruction = formatToolCallInstruction({
       toolName: "get_sentry_resource",
@@ -1927,9 +2321,55 @@ export function formatIssueOutput({
     output += `- Related log search: ${logSearchInstruction}\n`;
   }
   if (experimentalMode) {
-    output += `- Breadcrumb trail leading up to this error: \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
+    const breadcrumbsInstruction = formatToolCallInstruction({
+      toolName: "get_issue_breadcrumbs",
+      arguments: {
+        issueUrl: apiService.getIssueUrl(organizationSlug, issue.shortId),
+      },
+      experimentalMode,
+      availableToolNames,
+      directToolNames,
+      fallbackInstruction:
+        "Issue breadcrumbs are not available in this session",
+    });
+    output += `- Breadcrumb trail leading up to this error: ${breadcrumbsInstruction}\n`;
   }
   return output;
+}
+
+function formatAIConversationResponseNote({
+  aiConversations,
+  organizationSlug,
+  experimentalMode,
+  availableToolNames,
+  directToolNames,
+}: {
+  aiConversations: AIConversationReference[];
+  organizationSlug: string;
+  experimentalMode: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
+}): string {
+  const instructions = formatAIConversationActionInstructions({
+    organizationSlug,
+    aiConversations,
+    experimentalMode,
+    availableToolNames,
+    directToolNames,
+  });
+
+  if (aiConversations.length === 1) {
+    const [conversation] = aiConversations;
+    const spanSuffix = conversation.spanId
+      ? ` Matching span: \`${conversation.spanId}\`.`
+      : "";
+    return `- Agent conversation found in this trace: \`${conversation.conversationId}\`.${spanSuffix}\n${instructions.map((instruction) => `- ${instruction}`).join("\n")}\n`;
+  }
+
+  const conversationIds = aiConversations
+    .map((conversation) => `\`${conversation.conversationId}\``)
+    .join(", ");
+  return `- Multiple agent conversations were found in this trace: ${conversationIds}.\n${instructions.map((instruction) => `- ${instruction}`).join("\n")}\n`;
 }
 
 const MAX_DISPLAY_REPLAYS = 5;
@@ -2023,7 +2463,7 @@ function formatIssueReplayOutput({
   return `${lines.join("\n")}\n\n`;
 }
 
-function getReplayIdFromEvent(event: Event): string | null {
+export function getReplayIdFromEvent(event: Event): string | null {
   const replayContext = event.contexts?.replay as
     | Record<string, unknown>
     | undefined;
@@ -2038,7 +2478,7 @@ function getReplayIdFromEvent(event: Event): string | null {
   return normalizeReplayId(replayContextId ?? replayTagId);
 }
 
-function dedupeReplayIds(replayIds: string[]): string[] {
+export function dedupeReplayIds(replayIds: string[]): string[] {
   const normalizedReplayIds: string[] = [];
   const seenReplayIds = new Set<string>();
 
@@ -2092,7 +2532,7 @@ function stripReplayMetadata(event: Event): Event {
         )
       : {
           ...event.contexts,
-          replay: nextReplayContext,
+          replay: { ...nextReplayContext, type: replayContext.type },
         };
 
   return {

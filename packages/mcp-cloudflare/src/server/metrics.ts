@@ -1,8 +1,17 @@
 import * as Sentry from "@sentry/cloudflare";
+import {
+  UTM_SOURCE_ATTRIBUTE,
+  resolveUtmSourceFromRequest,
+} from "./lib/attribution";
 import { resolveClientFamily } from "./lib/client-family";
-import type { OAuthErrorTelemetry } from "./oauth/telemetry";
+import {
+  OAUTH_ERROR_ATTRIBUTE,
+  OAUTH_ERROR_REASON_ATTRIBUTE,
+  OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE,
+  type OAuthErrorTelemetry,
+} from "./oauth/telemetry";
 
-export type RateLimitScope = "ip" | "user";
+export type RateLimitScope = "ip" | "user" | "sentry_access";
 type ResponseReason = "local_rate_limit";
 
 type TrackedRoute = {
@@ -85,8 +94,8 @@ function getBooleanAttribute(value: boolean): string {
 function getMcpRequestAttributes(request: Request, url: URL) {
   return {
     clientFamily: resolveClientFamily(request.headers.get("user-agent")),
-    agentMode: url.searchParams.get("agent") === "1",
     experimentalMode: url.searchParams.get("experimental") === "1",
+    utmSource: resolveUtmSourceFromRequest(request, url),
   };
 }
 
@@ -126,12 +135,12 @@ function getMetricAttributes(
 
   if (trackedRoute.group === "mcp") {
     const mcpAttributes = getMcpRequestAttributes(request, url);
-    attributes["app.server.mode.agent"] = getBooleanAttribute(
-      mcpAttributes.agentMode,
-    );
     attributes["app.server.mode.experimental"] = getBooleanAttribute(
       mcpAttributes.experimentalMode,
     );
+    if (mcpAttributes.utmSource) {
+      attributes[UTM_SOURCE_ATTRIBUTE] = mcpAttributes.utmSource;
+    }
   }
 
   return attributes;
@@ -179,11 +188,13 @@ export function annotateTrackedRequestSpan(
   if (trackedRoute.group === "mcp") {
     const mcpAttributes = getMcpRequestAttributes(request, url);
     activeSpan.setAttribute("app.transport", "http");
-    activeSpan.setAttribute("app.server.mode.agent", mcpAttributes.agentMode);
     activeSpan.setAttribute(
       "app.server.mode.experimental",
       mcpAttributes.experimentalMode,
     );
+    if (mcpAttributes.utmSource) {
+      activeSpan.setAttribute(UTM_SOURCE_ATTRIBUTE, mcpAttributes.utmSource);
+    }
   }
 
   if (options?.responseReason) {
@@ -195,20 +206,20 @@ export function annotateTrackedRequestSpan(
   }
 
   if (options?.oauthError) {
-    activeSpan.setAttribute("app.oauth.error", options.oauthError);
+    activeSpan.setAttribute(OAUTH_ERROR_ATTRIBUTE, options.oauthError);
   }
 
-  if (options?.oauthErrorDescription) {
+  if (options?.oauthErrorReason) {
     activeSpan.setAttribute(
-      "app.oauth.error_description",
-      options.oauthErrorDescription,
+      OAUTH_ERROR_REASON_ATTRIBUTE,
+      options.oauthErrorReason,
     );
   }
 
-  if (options?.oauthTokenShape) {
+  if (options?.oauthBearerShape) {
     activeSpan.setAttribute(
-      "app.oauth.request.token_shape",
-      options.oauthTokenShape,
+      OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE,
+      options.oauthBearerShape,
     );
   }
 }
@@ -250,7 +261,9 @@ export function extractResponseMetricOptions(
     responseReason:
       responseReason === "local_rate_limit" ? responseReason : undefined,
     rateLimitScope:
-      rateLimitScope === "ip" || rateLimitScope === "user"
+      rateLimitScope === "ip" ||
+      rateLimitScope === "user" ||
+      rateLimitScope === "sentry_access"
         ? rateLimitScope
         : undefined,
   };
@@ -295,17 +308,17 @@ export function recordResponseMetric(
   }
 
   if (options?.oauthError) {
-    responseAttributes["app.oauth.error"] = options.oauthError;
+    responseAttributes[OAUTH_ERROR_ATTRIBUTE] = options.oauthError;
   }
 
-  if (options?.oauthErrorDescription) {
-    responseAttributes["app.oauth.error_description"] =
-      options.oauthErrorDescription;
+  if (options?.oauthErrorReason) {
+    responseAttributes[OAUTH_ERROR_REASON_ATTRIBUTE] =
+      options.oauthErrorReason;
   }
 
-  if (options?.oauthTokenShape) {
-    responseAttributes["app.oauth.request.token_shape"] =
-      options.oauthTokenShape;
+  if (options?.oauthBearerShape) {
+    responseAttributes[OAUTH_REQUEST_HEADER_SHAPE_ATTRIBUTE] =
+      options.oauthBearerShape;
   }
 
   Sentry.metrics.count(RESPONSE_METRIC_NAME, 1, {

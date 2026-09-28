@@ -33,7 +33,7 @@ The AI agent has access to these shared agent tools from `../../agent-tools/`:
 - ✅ Error feedback loop for self-correction
 - ✅ 'Me' reference resolution via whoami tool
 - ✅ Field discovery with custom tags
-- ✅ Smart sort options (date, freq, new, user)
+- ✅ Smart sort options (date, freq, new, user, recommended)
 - ✅ Configurable result limits (1-100, default 10)
 - ✅ Project-specific and organization-wide searches
 

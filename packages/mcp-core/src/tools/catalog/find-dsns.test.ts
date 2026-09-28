@@ -1,35 +1,91 @@
-import { describe, it, expect } from "vitest";
+import { mswServer } from "@sentry/mcp-server-mocks";
+import { http, HttpResponse } from "msw";
+import { describe, expect, it } from "vitest";
+import { getServerContext } from "../../test-setup";
+import {
+  assertStructuredOnlyResult,
+  getStructuredContent,
+} from "../../test-utils/structured-content";
 import findDsns from "./find-dsns.js";
 
 describe("find_dsns", () => {
-  it("serializes", async () => {
+  it("returns all project DSNs as structured content", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/test-org/test-project/keys/",
+        () =>
+          HttpResponse.json([
+            {
+              id: 123,
+              name: "Production",
+              dsn: {
+                public: "https://public@example.ingest.sentry.io/1",
+                secret: "do-not-leak",
+              },
+              isActive: true,
+              dateCreated: "2026-07-28T12:00:00.000Z",
+              secretKey: "do-not-leak",
+              backendOnlyField: "do-not-leak",
+            },
+            {
+              id: "456",
+              name: "Development",
+              dsn: {
+                public: "https://development@example.ingest.sentry.io/2",
+              },
+              isActive: false,
+              dateCreated: "2026-07-28T12:00:00.000Z",
+            },
+          ]),
+      ),
+    );
+
     const result = await findDsns.handler(
       {
-        organizationSlug: "sentry-mcp-evals",
-        projectSlug: "cloudflare-mcp",
+        organizationSlug: "test-org",
+        projectSlug: "test-project",
         regionUrl: null,
       },
-      {
-        constraints: {
-          organizationSlug: null,
-          projectSlug: null,
-        },
-        accessToken: "access-token",
-        userId: "1",
-      },
+      getServerContext(),
     );
-    expect(result).toMatchInlineSnapshot(`
-      "# DSNs in **sentry-mcp-evals/cloudflare-mcp**
 
-      ## Default
-      **ID**: d20df0a1ab5031c7f3c7edca9c02814d
-      **DSN**: https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945
-
-      ## Response Notes
-
-      - Please tell the user the DSN.
-      - The \`SENTRY_DSN\` value is a URL used to initialize Sentry SDKs.
-      "
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toMatchInlineSnapshot(`
+      {
+        "dsns": [
+          {
+            "dsn": "https://public@example.ingest.sentry.io/1",
+            "id": "123",
+            "name": "Production",
+          },
+          {
+            "dsn": "https://development@example.ingest.sentry.io/2",
+            "id": "456",
+            "name": "Development",
+          },
+        ],
+      }
     `);
+  });
+
+  it("returns an empty DSN array", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/test-org/empty-project/keys/",
+        () => HttpResponse.json([]),
+      ),
+    );
+
+    const result = await findDsns.handler(
+      {
+        organizationSlug: "test-org",
+        projectSlug: "empty-project",
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+
+    assertStructuredOnlyResult(result);
+    expect(getStructuredContent(result)).toEqual({ dsns: [] });
   });
 });

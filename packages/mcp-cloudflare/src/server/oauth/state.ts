@@ -6,7 +6,7 @@ import { z } from "zod";
 // Safe envelope: keep the full downstream AuthRequest (+permissions) under `req`
 // and include only iat/exp metadata at top-level to avoid collisions.
 export const OAuthStateSchema = z.object({
-  req: z.record(z.unknown()),
+  req: z.record(z.string(), z.unknown()),
   iat: z.number().int(),
   exp: z.number().int(),
 });
@@ -29,6 +29,24 @@ async function importKey(secret: string): Promise<CryptoKey> {
     false,
     ["sign", "verify"],
   );
+}
+
+function utf8ToBase64(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+function base64ToUtf8(b64: string): string {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 async function signHex(key: CryptoKey, data: string): Promise<string> {
@@ -71,8 +89,8 @@ export async function signState(
   const key = await importKey(secret);
   const json = JSON.stringify(payload);
   const sig = await signHex(key, json);
-  // Using standard base64 to match other usage in the codebase
-  const b64 = btoa(json);
+  // Using UTF-8 safe base64 encoding to handle non-Latin1 characters
+  const b64 = utf8ToBase64(json);
   return `${sig}.${b64}`;
 }
 
@@ -84,7 +102,7 @@ export async function verifyAndParseState(
   if (!sig || !b64) {
     throw new Error("Invalid state format");
   }
-  const json = atob(b64);
+  const json = base64ToUtf8(b64);
   const key = await importKey(secret);
   const ok = await verifyHex(key, sig, json);
   if (!ok) {

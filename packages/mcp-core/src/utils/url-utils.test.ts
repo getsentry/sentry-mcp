@@ -1,18 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
-  validateSentryHostThrows,
-  validateAndParseSentryUrlThrows,
-  validateOpenAiBaseUrlThrows,
-  getIssueUrl,
+  extractConversationIdFromSearchQuery,
+  getAIConversationUrl,
+  getEventsExplorerUrl,
   getIssuesSearchUrl,
+  getIssueUrl,
+  getMonitorUrl,
   getPreprodSnapshotUrl,
+  getReleaseUrl,
   getReplaysSearchUrl,
   getReplayUrl,
-  getReleaseUrl,
-  getMonitorUrl,
-  getTraceUrl,
-  getEventsExplorerUrl,
   getTraceMetricsExploreUrl,
+  getTraceUrl,
+  getUptimeMonitorUrl,
+  validateAndParseSentryUrlThrows,
+  validateOpenAiBaseUrlThrows,
+  validateSentryHostThrows,
 } from "./url-utils";
 
 describe("url-utils", () => {
@@ -453,6 +456,88 @@ describe("url-utils", () => {
     });
   });
 
+  describe("extractConversationIdFromSearchQuery", () => {
+    it("extracts a quoted conversation id", () => {
+      expect(
+        extractConversationIdFromSearchQuery(
+          'gen_ai.conversation.id:"14365297"',
+        ),
+      ).toBe("14365297");
+    });
+
+    it("extracts an unquoted conversation id", () => {
+      expect(
+        extractConversationIdFromSearchQuery("gen_ai.conversation.id:14365297"),
+      ).toBe("14365297");
+    });
+
+    it("extracts an unquoted conversation id from a grouped filter", () => {
+      expect(
+        extractConversationIdFromSearchQuery(
+          "(gen_ai.conversation.id:14365297)",
+        ),
+      ).toBe("14365297");
+    });
+
+    it("returns undefined when no conversation id is present", () => {
+      expect(
+        extractConversationIdFromSearchQuery("span.op:ai"),
+      ).toBeUndefined();
+      expect(extractConversationIdFromSearchQuery("")).toBeUndefined();
+      expect(extractConversationIdFromSearchQuery(null)).toBeUndefined();
+    });
+
+    it("returns undefined when multiple conversation ids are present", () => {
+      expect(
+        extractConversationIdFromSearchQuery(
+          'gen_ai.conversation.id:"1" OR gen_ai.conversation.id:"2"',
+        ),
+      ).toBeUndefined();
+    });
+
+    it("returns undefined for negated conversation id filters", () => {
+      expect(
+        extractConversationIdFromSearchQuery(
+          '!gen_ai.conversation.id:"14365297"',
+        ),
+      ).toBeUndefined();
+      expect(
+        extractConversationIdFromSearchQuery(
+          'NOT gen_ai.conversation.id:"14365297"',
+        ),
+      ).toBeUndefined();
+      expect(
+        extractConversationIdFromSearchQuery(
+          'NOT (gen_ai.conversation.id:"14365297")',
+        ),
+      ).toBeUndefined();
+    });
+
+    it("returns undefined when negated and positive conversation id filters are combined", () => {
+      expect(
+        extractConversationIdFromSearchQuery(
+          '!gen_ai.conversation.id:"1" OR gen_ai.conversation.id:"2"',
+        ),
+      ).toBeUndefined();
+    });
+
+    it("returns undefined for IN-style bracket conversation id filters", () => {
+      expect(
+        extractConversationIdFromSearchQuery("gen_ai.conversation.id:[1,2]"),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("getAIConversationUrl", () => {
+    it("encodes conversation ids as path segments", () => {
+      expect(
+        getAIConversationUrl("us.sentry.io", "myorg", "thread/1?x=y"),
+      ).toBe(
+        "https://myorg.sentry.io/explore/conversations/thread%2F1%3Fx%3Dy/",
+      );
+    });
+  });
+
   describe("getTraceMetricsExploreUrl", () => {
     it("should build sample metric URLs with concrete metric state", () => {
       const result = getTraceMetricsExploreUrl("sentry.io", "myorg", {
@@ -486,6 +571,28 @@ describe("url-utils", () => {
           mode: "samples",
         },
       ]);
+    });
+  });
+
+  describe("getUptimeMonitorUrl", () => {
+    it("builds saas and self-hosted monitor urls", () => {
+      expect(getUptimeMonitorUrl("sentry.io", "my-org", "12345")).toBe(
+        "https://my-org.sentry.io/monitors/12345/",
+      );
+      expect(
+        getUptimeMonitorUrl("sentry.internal:9000", "my-org", "12345", "http"),
+      ).toBe(
+        "http://sentry.internal:9000/organizations/my-org/monitors/12345/",
+      );
+    });
+
+    it("normalizes regional saas hosts to sentry.io web urls", () => {
+      expect(getUptimeMonitorUrl("us.sentry.io", "my-org", "12345")).toBe(
+        "https://my-org.sentry.io/monitors/12345/",
+      );
+      expect(getUptimeMonitorUrl("de.sentry.io", "my-org", "12345")).toBe(
+        "https://my-org.sentry.io/monitors/12345/",
+      );
     });
   });
 });

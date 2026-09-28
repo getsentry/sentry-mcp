@@ -13,12 +13,10 @@ validated during the callback before becoming `grantedSkills`.
 ## Motivation
 
 Users frequently re-authorize the same MCP client after token expiry, local
-client resets, or auth cache cleanup. The current approval screen always starts
-from built-in `defaultEnabled` skills, so users who intentionally enabled
-optional skills must reselect them each time.
-
-Remembering prior selections reduces repeated consent work without changing the
-authorization model.
+client resets, or auth cache cleanup. Remembering prior selections reduces
+repeated consent work without changing the authorization model. When a client
+has no remembered preference, the approval screen starts with all active
+approvable skills selected.
 
 ## Design
 
@@ -62,7 +60,7 @@ On read and write:
 - Ignore deprecated skills.
 
 Invalid cookie data must not block authorization. It only falls back to the
-built-in skill defaults.
+all-active-skills approval default.
 
 ## Interface
 
@@ -78,7 +76,7 @@ interface ApprovalDialogOptions {
 Checkbox selection order:
 
 1. Use remembered skills for the current `clientId`, when present.
-2. Otherwise use existing `skill.defaultEnabled` values.
+2. Otherwise select all active approvable skills.
 
 ## OAuth Flow
 
@@ -136,7 +134,7 @@ Implementation steps:
 
 Add focused unit tests for:
 
-- No preference cookie falls back to built-in defaults.
+- No preference cookie falls back to all active approvable skills.
 - Remembered skills pre-check the approval form.
 - Unknown, malformed, and deprecated skills are ignored.
 - POST writes both cookies.
@@ -146,9 +144,9 @@ Add focused unit tests for:
 
 ## Migration
 
-No migration is required. Existing users without the new cookie continue to see
-the current built-in defaults. Existing `mcp-approved-clients` cookies remain
-valid and unchanged.
+No migration is required. Existing users without the preference cookie see all
+active approvable skills selected. Existing `mcp-approved-clients` cookies
+remain valid and unchanged.
 
 ## Future Work
 

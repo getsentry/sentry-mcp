@@ -1,4 +1,9 @@
-import { autofixStateFixture, mswServer } from "@sentry/mcp-server-mocks";
+import {
+  autofixStateFixture,
+  createRegressedIssue,
+  createUnsupportedIssue,
+  mswServer,
+} from "@sentry/mcp-server-mocks";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import analyzeIssueWithSeer from "./analyze-issue-with-seer.js";
@@ -6,6 +11,17 @@ import analyzeIssueWithSeer from "./analyze-issue-with-seer.js";
 describe("analyze_issue_with_seer", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/:org/issues/:issueId/",
+        ({ params }) =>
+          HttpResponse.json(
+            createUnsupportedIssue({
+              shortId: String(params.issueId),
+            }),
+          ),
+      ),
+    );
   });
 
   afterEach(() => {
@@ -41,10 +57,46 @@ describe("analyze_issue_with_seer", () => {
     expect(result).toContain("The analysis has completed successfully.");
   });
 
+  it("uses formatted.content from the autofix endpoint when present", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-FMT/autofix/",
+        () =>
+          HttpResponse.json({
+            autofix: { run_id: 42, status: "completed", blocks: [] },
+            formatted: {
+              format: "markdown",
+              content: "## Root Cause\n\nSHARED-AUTOFIX-MARKER",
+            },
+          }),
+      ),
+    );
+
+    const result = await analyzeIssueWithSeer.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        instruction: undefined,
+        issueId: "CLOUDFLARE-MCP-FMT",
+        issueUrl: undefined,
+      },
+      {
+        constraints: { organizationSlug: undefined },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain("SHARED-AUTOFIX-MARKER"); // body from the shared /autofix/ formatter
+    // LLM-generated content is still wrapped in the untrusted-data boundary
+    expect(result).toContain('<seer_analysis run_id="42" step="analysis">');
+    expect(result).toContain("</seer_analysis>");
+  });
+
   it("wraps completed Seer-authored sections with provenance tags", async () => {
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-TAGS/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-TAGS/autofix/",
         () =>
           HttpResponse.json({
             autofix: {
@@ -81,8 +133,7 @@ describe("analyze_issue_with_seer", () => {
                         steps: [
                           {
                             title: "Share canonical ID",
-                            description:
-                              "Pass the same ID to both procedures.",
+                            description: "Pass the same ID to both procedures.",
                           },
                           {
                             title: "Add regression coverage",
@@ -153,7 +204,7 @@ describe("analyze_issue_with_seer", () => {
     let attempts = 0;
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-99/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-99/autofix/",
         () => {
           attempts++;
           if (attempts < 3) {
@@ -196,7 +247,7 @@ describe("analyze_issue_with_seer", () => {
     let attempts = 0;
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-500/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-500/autofix/",
         () => {
           attempts++;
           if (attempts < 2) {
@@ -260,7 +311,7 @@ describe("analyze_issue_with_seer", () => {
 
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-TIMEOUT/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-TIMEOUT/autofix/",
         () => {
           // Always return in progress
           return HttpResponse.json(inProgressState);
@@ -308,7 +359,7 @@ describe("analyze_issue_with_seer", () => {
 
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-ERRORS/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-ERRORS/autofix/",
         () => {
           pollAttempts++;
           if (pollAttempts === 1) {
@@ -358,7 +409,7 @@ describe("analyze_issue_with_seer", () => {
 
     mswServer.use(
       http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-NEW/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-NEW/autofix/",
         () => {
           getCallCount++;
           if (getCallCount === 1) {
@@ -370,7 +421,7 @@ describe("analyze_issue_with_seer", () => {
         },
       ),
       http.post(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-NEW/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-NEW/autofix/",
         async ({ request }) => {
           const body = await request.json();
           expect(body).toEqual({
@@ -408,6 +459,45 @@ describe("analyze_issue_with_seer", () => {
     expect(result).toContain("Starting new analysis...");
     expect(result).toContain("Analysis started with Run ID: 123");
     expect(result).toContain("## Analysis Complete");
+  });
+
+  it("returns unsupported message for metric issues without calling Seer", async () => {
+    let autofixRequests = 0;
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/",
+        () => HttpResponse.json(createRegressedIssue()),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/autofix/",
+        () => {
+          autofixRequests++;
+          return HttpResponse.json({ autofix: null });
+        },
+      ),
+    );
+
+    const result = await analyzeIssueWithSeer.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        issueId: "MCP-SERVER-EQE",
+        instruction: undefined,
+      },
+      {
+        constraints: {
+          organizationSlug: undefined,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    expect(autofixRequests).toBe(0);
+    expect(result).toContain("Seer Analysis Not Available");
+    expect(result).toContain("metric");
+    expect(result).toContain("search_events");
   });
 
   it("rejects issues outside the active project constraint", async () => {

@@ -15,11 +15,13 @@ import {
   FlamegraphSchema,
   IssueSchema,
   IssueTagValuesSchema,
+  ProfileChunkResponseSchema,
   ProfileChunkSampleSchema,
   ProfileChunkSchema,
   ProfileFrameSchema,
   ReleaseSchema,
   ReplayDetailsSchema,
+  ReplayRecordingSegmentsSchema,
   TagSchema,
   TraceMetaSchema,
   TransactionProfileSampleSchema,
@@ -300,6 +302,24 @@ describe("EventSchema", () => {
     expect(result.type).toBe("error");
   });
 
+  it("should parse null dateReceived and null generic occurrence", () => {
+    const genericEvent = {
+      id: "2d9a3f30ee5a4a95b712e78b87631f9a",
+      title: "Metric regression",
+      message: null,
+      platform: null,
+      type: "generic",
+      entries: [],
+      dateCreated: "2025-01-01T00:00:00Z",
+      dateReceived: null,
+      occurrence: null,
+    };
+
+    const result = EventSchema.parse(genericEvent);
+    expect(result.dateReceived).toBeNull();
+    expect(result).toHaveProperty("occurrence", null);
+  });
+
   it("should allow partially populated user geo payloads", () => {
     const errorEvent = {
       id: "geo123",
@@ -539,6 +559,44 @@ describe("ReplayDetailsSchema", () => {
   });
 });
 
+describe("ReplayRecordingSegmentsSchema", () => {
+  it("keeps usable event fields when sibling fields are malformed", () => {
+    expect(
+      ReplayRecordingSegmentsSchema.parse([
+        [
+          {
+            timestamp: "invalid",
+            type: 5,
+            data: {
+              tag: "ui.click",
+              href: 123,
+              payload: {
+                message: "Clicked checkout",
+                data: { duration: "invalid" },
+              },
+            },
+          },
+        ],
+      ]),
+    ).toEqual([
+      [
+        {
+          timestamp: undefined,
+          type: 5,
+          data: {
+            tag: "ui.click",
+            href: undefined,
+            payload: {
+              message: "Clicked checkout",
+              data: { duration: undefined },
+            },
+          },
+        },
+      ],
+    ]);
+  });
+});
+
 describe("ClientKeySchema", () => {
   it("accepts null dateCreated from upstream project keys", () => {
     const clientKey = ClientKeySchema.parse({
@@ -746,6 +804,107 @@ describe("FlamegraphSchema", () => {
     expect(flamegraph.profiles[0]?.sample_durations_ns).toEqual([]);
     expect(flamegraph.profiles[0]?.sample_counts).toEqual([]);
   });
+
+  it("parses sparse empty flamegraph responses so tools can return no-data output", () => {
+    const flamegraph = FlamegraphSchema.parse({
+      metadata: {
+        platform: "javascript",
+        projectID: 1,
+        transactionName: "POST /checkout",
+      },
+    });
+
+    expect(flamegraph.platform).toBe("javascript");
+    expect(flamegraph.projectID).toBe(1);
+    expect(flamegraph.transactionName).toBe("POST /checkout");
+    expect(flamegraph.profiles).toEqual([]);
+    expect(flamegraph.shared.frames).toEqual([]);
+    expect(flamegraph.shared.frame_infos).toEqual([]);
+    expect(flamegraph.shared.profiles).toEqual([]);
+  });
+
+  it("parses continuous profile references returned in aggregate flamegraphs", () => {
+    const flamegraph = FlamegraphSchema.parse({
+      platform: "javascript",
+      projectID: 1,
+      profiles: [],
+      shared: {
+        frames: [],
+        profiles: [
+          {
+            project_id: 1,
+            profiler_id: "041bde57b9844e36b8b7e5734efae5f7",
+            chunk_id: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+            thread_id: "12345",
+            start: "1710958503629000000",
+            end: "1710958504629000000",
+            transaction_id: null,
+          },
+        ],
+      },
+    });
+
+    expect(flamegraph.shared.profiles).toHaveLength(1);
+    expect(flamegraph.shared.profiles[0]).toMatchObject({
+      project_id: 1,
+      profiler_id: "041bde57b9844e36b8b7e5734efae5f7",
+      chunk_id: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+      thread_id: "12345",
+      start: "1710958503629000000",
+      end: "1710958504629000000",
+      transaction_id: null,
+    });
+  });
+
+  it("parses fallback continuous profile references without optional timing or thread fields", () => {
+    const flamegraph = FlamegraphSchema.parse({
+      platform: "javascript",
+      projectID: 1,
+      profiles: [],
+      shared: {
+        frames: [],
+        profiles: [
+          {
+            project_id: 1,
+            profiler_id: "041bde57b9844e36b8b7e5734efae5f7",
+            chunk_id: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+          },
+        ],
+      },
+    });
+
+    expect(flamegraph.shared.profiles).toHaveLength(1);
+    expect(flamegraph.shared.profiles[0]).toMatchObject({
+      project_id: 1,
+      profiler_id: "041bde57b9844e36b8b7e5734efae5f7",
+      chunk_id: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+    });
+  });
+
+  it("parses upstream frame infos without weight and string profile references", () => {
+    const flamegraph = FlamegraphSchema.parse({
+      platform: "javascript",
+      projectID: 1,
+      profiles: [],
+      shared: {
+        frames: [],
+        frame_infos: [
+          {
+            count: 3,
+            sumDuration: 42,
+            sumSelfTime: 12,
+            p75Duration: 20,
+            p95Duration: 30,
+            p99Duration: 40,
+          },
+        ],
+        profiles: ["transaction-profile-id"],
+      },
+    });
+
+    expect(flamegraph.shared.frame_infos[0]?.weight).toBe(42);
+    expect(flamegraph.shared.profiles[0]).toBe("transaction-profile-id");
+  });
 });
 
 describe("ProfileChunkSampleSchema", () => {
@@ -863,7 +1022,7 @@ describe("profile fixtures", () => {
     // profile-chunk.json mirrors the continuous profiler output: string
     // thread_id, absolute timestamp per sample, no transaction block.
     const chunk = ProfileChunkSchema.parse(
-      structuredClone(profileChunkFixture.chunks[0]),
+      structuredClone(profileChunkFixture.chunk),
     );
 
     expect(
@@ -876,6 +1035,42 @@ describe("profile fixtures", () => {
         (sample) => typeof sample.timestamp === "number",
       ),
     ).toBe(true);
+  });
+
+  it("parses continuous profile thread metadata entries without names", () => {
+    const chunk = ProfileChunkSchema.parse({
+      ...structuredClone(profileChunkFixture.chunk),
+      profile: {
+        ...structuredClone(profileChunkFixture.chunk.profile),
+        thread_metadata: {
+          "1": { priority: 10 },
+        },
+      },
+    });
+
+    expect(chunk.profile.thread_metadata["1"]?.priority).toBe(10);
+  });
+
+  it("parses Sentry's singular profile chunk response wrapper", () => {
+    const response = ProfileChunkResponseSchema.parse(
+      structuredClone(profileChunkFixture),
+    );
+
+    expect(response.chunks).toHaveLength(1);
+    expect(response.chunks[0]?.chunk_id).toBe(
+      profileChunkFixture.chunk.chunk_id,
+    );
+  });
+
+  it("still parses the legacy plural profile chunk response wrapper", () => {
+    const response = ProfileChunkResponseSchema.parse({
+      chunks: [structuredClone(profileChunkFixture.chunk)],
+    });
+
+    expect(response.chunks).toHaveLength(1);
+    expect(response.chunks[0]?.chunk_id).toBe(
+      profileChunkFixture.chunk.chunk_id,
+    );
   });
 });
 
@@ -915,5 +1110,55 @@ describe("TransactionProfileSchema", () => {
     );
 
     expect(parsed.profile.frames[0]?.function).toBeUndefined();
+  });
+
+  it("defaults omitted thread_metadata to an empty object", () => {
+    // Sentry's SentrySampledProfile type marks thread_metadata optional, and
+    // the project profiling endpoint proxies the profiling-service payload
+    // without normalizing it. Regression coverage for MCP-SERVER-FSD.
+    const profile = TransactionProfileSchema.parse({
+      event_id: "cfe78a5c892d4a64a962d837673398d2",
+      profile_id: "cfe78a5c892d4a64a962d837673398d2",
+      platform: "python",
+      version: "2",
+      profile: {
+        frames: [{ function: "handle_request", in_app: true }],
+        samples: [{ stack_id: 0, thread_id: 1, elapsed_since_start_ns: 0 }],
+        stacks: [[0]],
+      },
+      transaction: {
+        name: "/api/users",
+        trace_id: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+        id: "7ca573c0f4814912aaa9bdc77d1a7d51",
+        active_thread_id: 1,
+      },
+    });
+
+    expect(profile.profile.thread_metadata).toEqual({});
+  });
+
+  it("defaults null thread_metadata to an empty object", () => {
+    // Observed V1 payloads can send null even though the frontend type only
+    // marks the field optional. Match ProfileChunkSchema's null-coalesce.
+    const profile = TransactionProfileSchema.parse({
+      event_id: "cfe78a5c892d4a64a962d837673398d2",
+      profile_id: "cfe78a5c892d4a64a962d837673398d2",
+      platform: "python",
+      version: "2",
+      profile: {
+        frames: [{ function: "handle_request", in_app: true }],
+        samples: [{ stack_id: 0, thread_id: 1, elapsed_since_start_ns: 0 }],
+        stacks: [[0]],
+        thread_metadata: null,
+      },
+      transaction: {
+        name: "/api/users",
+        trace_id: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+        id: "7ca573c0f4814912aaa9bdc77d1a7d51",
+        active_thread_id: 1,
+      },
+    });
+
+    expect(profile.profile.thread_metadata).toEqual({});
   });
 });

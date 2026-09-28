@@ -28,34 +28,41 @@ ApiError (base class)
   - Parameter validation failures
   - Any user-correctable error
 - `ConfigurationError` - Missing/invalid configuration
-- `LLMProviderError` - LLM provider availability issues (e.g., region restrictions)
+- `LLMProviderError` - LLM provider availability issues (e.g., region restrictions, budget/quota exhaustion, provider outages)
   - OpenAI rejecting requests from unsupported regions
-  - Provider service availability issues that cannot be resolved by retrying
+  - Provider service availability issues (4xx quota/config and 5xx/network failures)
+  - Returned as graceful tool errors; do **not** create per-request Sentry issues
+- `AgentExecutionError` - Unexpected embedded-agent failure (e.g., AI SDK `NoOutputGeneratedError`)
+  - Real defect/operational failure inside the agent run
+  - `callEmbeddedAgent` files **one** Sentry issue, then throws this typed error
+  - Callers must degrade gracefully (search fallback or formatted tool error) and must **not** call `logIssue` again
 
 ### AI SDK Error Classes (from ai package)
 
 - `APICallError` - Errors from LLM provider API calls (OpenAI, Anthropic, etc.)
-  - 4xx errors (account issues, rate limits, invalid keys) → Converted to `LLMProviderError`, NOT sent to Sentry
-  - 5xx errors (server errors) → System errors, SENT to Sentry
+  - 4xx errors (account issues, rate limits, invalid keys, budget exhaustion) → Converted to `LLMProviderError`, NOT sent to Sentry as issues
+  - 5xx / network errors (provider down) → Also converted to `LLMProviderError` so tools degrade gracefully instead of flooding issues
 
 **Conversion Flow:**
-- `callEmbeddedAgent` converts user-facing `APICallError` (4xx) → `LLMProviderError` immediately after the AI SDK call
+- `callEmbeddedAgent` converts provider `APICallError` (4xx, 5xx, and missing status) → `LLMProviderError` immediately after the AI SDK call
+- `callEmbeddedAgent` converts unexpected agent failures (including `NoOutputGeneratedError`) → `logIssue` once + `AgentExecutionError`
 - Defensive handling in `handleAgentToolError` and `formatErrorForUser` for any that slip through
+- AI-powered search tools catch `LLMProviderError` and `AgentExecutionError`, skip query rewriting, and continue with the caller's original query/default parameters
+- The generic formatted provider/agent error remains a last-resort boundary for callers that do not implement a direct fallback
 
 ### Error Categories
 
-**User-Facing Errors (Should NOT create Sentry issues):**
+**User-Facing / Expected Errors (Should NOT create Sentry issues):**
 - All `ApiClientError` subclasses
 - `UserInputError`
-- `ConfigurationError`
+- `ConfigurationError` (except HTTP transport, which notifies operators once via `logIssue` with a generic user message)
 - `LLMProviderError`
-- `APICallError` with 4xx status codes (converted to `LLMProviderError`)
+- `APICallError` from the upstream AI provider (converted to `LLMProviderError` / logged as warnings)
 
 **System Errors (Should be captured by Sentry):**
 - `ApiServerError`
-- `APICallError` with 5xx status codes
-- Network failures
-- Unexpected runtime errors
+- Unexpected runtime errors outside the AI provider boundary
+- Unexpected embedded-agent failures (`AgentExecutionError` / `NoOutputGeneratedError`) — captured once in `callEmbeddedAgent`, then handled gracefully downstream
 
 ## Critical Principles
 
@@ -332,9 +339,14 @@ When running in Cloudflare Workers:
 
 - **UserInputError to Agent:** `{ error: "Input Error: {message}. You may be able to resolve this by addressing the concern and trying again." }`
 - **LLMProviderError to Agent:** `{ error: "AI Provider Error: {message}. This is a service availability issue that cannot be resolved by retrying." }`
+- **AgentExecutionError to Agent:** `{ error: "AI Processing Error: the embedded agent failed unexpectedly. Event ID: ..." }` (issue already filed)
 - **ApiClientError to Agent:** `{ error: "Input Error: {toUserMessage()}. You may be able to resolve this by addressing the concern and trying again." }`
 - **ApiServerError to Agent:** `{ error: "Server Error (5xx): {message}. Event ID: {eventId}. This is a system error that cannot be resolved by retrying." }`
-- **LLMProviderError to MCP User:** Formatted with "**AI Provider Error**" header
+- **LLMProviderError to MCP User (stdio):** Formatted with "**AI Provider Error**" header + details; logged as warning only
+- **LLMProviderError in AI-powered search tools:** Not returned to the MCP user; logged at warning level, then the tool executes normally with the original query/default parameters
+- **AgentExecutionError in AI-powered search tools:** Not returned to the MCP user; issue already filed in `callEmbeddedAgent`, then the tool falls back to the original query/default parameters
+- **Unhandled LLMProviderError to MCP User (http):** Generic "**Feature Unavailable**" AI-powered features message as a last-resort boundary
+- **Unhandled AgentExecutionError to MCP User:** "**AI Processing Error**" with optional Event ID; does not create a second Sentry issue
 - **ApiClientError to MCP User:** Formatted with "**Input Error**" header and toUserMessage()
 - **ApiServerError to MCP User:** Formatted with "**Error**" header + Event ID (logged to Sentry)
 

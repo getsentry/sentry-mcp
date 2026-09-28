@@ -48,7 +48,6 @@ export default function Instrument() {
 
                 return (
                   <path
-                    // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
                     key={i}
                     d={d}
                     fill="none"

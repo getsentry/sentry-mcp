@@ -170,7 +170,6 @@ export default function LoadingSquares({
     rafRef.current = requestAnimationFrame(loop);
   }
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     const canvas = canvasRef.current!;
     const start = () => {

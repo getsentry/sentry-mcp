@@ -35,7 +35,6 @@ export default function FixBugs() {
             &nbsp;
             {"fixing...".split("").map((char, i) => (
               <span
-                // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
                 key={i}
                 style={{ "--delay": `${i * 0.1}s` } as React.CSSProperties}
                 className="text-orange-500 [animation:wave_1s_steps(2)_infinite] [animation-delay:var(--delay)] group-hover:[animation-play-state:running] [animation-play-state:paused]"

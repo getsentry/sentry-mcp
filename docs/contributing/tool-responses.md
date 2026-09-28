@@ -115,6 +115,89 @@ When changing Sentry API endpoint usage, validate the upstream behavior in
 should model what Sentry returns, but tool responses should model what users
 need.
 
+## Structured Content
+
+MCP tools may expose `structuredContent` alongside generated text `content`.
+Use it when clients need a typed result, pagination token, stable follow-up
+handle, or machine-readable projection of the same result. The current MCP spec
+defines `structuredContent` as a JSON object on `CallToolResult`, and
+`outputSchema` as the schema for that object.
+
+Policy (encoded in `packages/mcp-core/src/internal/tool-helpers/results.ts`):
+
+- `structuredContent` is the source of truth when present.
+- `content` text is a compatibility view of that same answer.
+- Never put unique product data in only one side. If both fields are present,
+  they must be equivalent. Form-only differences (JSON vs pretty text of the
+  same payload) are fine; a second answer that exists in only one field is a
+  bug.
+- Data tools should use `structuredResult(payload)`. The server generates
+  `content` as pretty JSON of that same payload.
+- Markdown-only tools (for example issue and trace details today) should return
+  markdown and omit `structuredContent` until they have a real structured
+  payload. Do not attach sparse structured side-channels such as
+  `suggestedActions` alone on top of markdown.
+- If a tool declares `outputSchema`, every successful `structuredContent` result
+  must conform to that schema.
+- Do not duplicate a large structured payload into a markdown artifact block.
+- Treat `structuredContent` as a stable product contract, not a raw upstream API
+  passthrough. Map only documented fields that callers should depend on.
+- Do not spread `.passthrough()` API schema objects directly into
+  `structuredContent`; backend-only fields can leak into the public MCP
+  interface.
+- Keep names, nullability, arrays, cursors, and URLs aligned between
+  `outputSchema`, tests, and generated definitions.
+- Snapshot `structuredContent` for structured tools, similar to handwritten
+  content snapshots for markdown tools. Include a regression assertion for
+  fields that must not leak when the upstream response schema is passthrough.
+- Test generated compatibility text at the server boundary, not inside
+  structured tool handler tests.
+- Use tool execution errors with `isError: true` for recoverable tool failures.
+  Do not return partial success-shaped `structuredContent` for errors unless the
+  error shape is explicitly modeled.
+
+Reference: MCP 2025-11-25 Tools specification, sections "Structured Content"
+and "Output Schema".
+
+## Suggested Actions
+
+Use `suggestedActions` when a tool result reveals a concrete follow-up tool call
+that a client or agent could offer as a continuation. This is the
+machine-readable counterpart to a narrow `## Response Notes` hint.
+
+```typescript
+interface SuggestedToolAction {
+  type: "tool_call";
+  toolName: string;
+  arguments: Record<string, unknown>;
+  reason: string;
+}
+
+interface SuggestedActionsContent {
+  suggestedActions: SuggestedToolAction[];
+}
+```
+
+Guidelines:
+
+- Include only actions that are directly supported by the current result. Do not
+  include broad investigation plans or generic next steps.
+- Arguments must be complete enough to call the tool without reparsing markdown.
+- Use public MCP parameter names and values, not upstream API field names.
+- Respect tool availability in the current session. Omit actions for unavailable
+  tools.
+- Keep the list small and ordered by likely usefulness. Prefer one action; use a
+  hard cap of three.
+- Keep `reason` concise and descriptive. It should explain why the action is
+  useful, not instruct the model how to behave.
+- When the tool result is markdown-only, put the follow-up only in
+  `## Response Notes` / product sections. Do not also emit sparse
+  `structuredContent.suggestedActions`.
+- When the tool result is structured, include `suggestedActions` in that same
+  structured payload and keep any markdown/compat text equivalent.
+- Do not include secrets, auth tokens, raw payloads, or sensitive user data in
+  action arguments or reasons.
+
 ## Response Notes
 
 Use response notes for narrow, operational guidance:

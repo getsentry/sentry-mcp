@@ -1,26 +1,63 @@
-import { Hono, type Context } from "hono";
-import { openai } from "@ai-sdk/openai";
-import {
-  streamText,
-  type ToolSet,
-  stepCountIs,
-  convertToModelMessages,
-} from "ai";
 import { experimental_createMCPClient } from "@ai-sdk/mcp";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { Env } from "../types";
+import {
+  getOpenRouterModel,
+  getOpenRouterProviderOptions,
+} from "@sentry/mcp-core/internal/agents/openrouter-provider";
 import { logInfo, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import {
-  AuthDataSchema,
-  TokenResponseSchema,
+  convertToModelMessages,
+  stepCountIs,
+  streamText,
+  type ToolSet,
+} from "ai";
+import { type Context, Hono } from "hono";
+import { annotateResponseMetric } from "../metrics";
+import type { Env } from "../types";
+import {
   type AuthData,
+  AuthDataSchema,
   type ChatRequest,
   type RateLimitResult,
+  TokenResponseSchema,
 } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
-import { annotateResponseMetric } from "../metrics";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
+
+/**
+ * Ensure OpenRouter provider helpers can read worker bindings via process.env.
+ * Returns false when no API key is available from either source.
+ */
+export function syncOpenRouterEnvFromBindings(
+  env: Pick<
+    Env,
+    "OPENROUTER_API_KEY" | "OPENROUTER_MODEL" | "OPENROUTER_REASONING_EFFORT"
+  >,
+): boolean {
+  const openRouterApiKey =
+    env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY;
+  if (!openRouterApiKey) {
+    return false;
+  }
+
+  process.env.OPENROUTER_API_KEY = openRouterApiKey;
+
+  // Always mirror or clear optional bindings so a reused worker isolate cannot
+  // keep a previous request's model/effort after the binding is removed.
+  if (env.OPENROUTER_MODEL) {
+    process.env.OPENROUTER_MODEL = env.OPENROUTER_MODEL;
+  } else {
+    delete process.env.OPENROUTER_MODEL;
+  }
+  if (env.OPENROUTER_REASONING_EFFORT !== undefined) {
+    process.env.OPENROUTER_REASONING_EFFORT = env.OPENROUTER_REASONING_EFFORT;
+  } else {
+    delete process.env.OPENROUTER_REASONING_EFFORT;
+  }
+
+  return true;
+}
 
 async function refreshTokenIfNeeded(
   c: Context<{ Bindings: Env }>,
@@ -93,9 +130,10 @@ async function refreshTokenIfNeeded(
 }
 
 export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
-  // Validate that we have an OpenAI API key
-  if (!c.env.OPENAI_API_KEY) {
-    logIssue("OPENAI_API_KEY is not configured", {
+  // OpenRouter helpers in mcp-core only read process.env. Bridge worker
+  // bindings first so validation and provider calls stay in sync.
+  if (!syncOpenRouterEnvFromBindings(c.env)) {
+    logIssue("OPENROUTER_API_KEY is not configured", {
       loggerScope: ["cloudflare", "chat"],
     });
     return c.json(
@@ -186,9 +224,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
   let mcpClient: MCPClient | null = null;
 
   try {
-    const { messages, endpointMode } = await c.req.json<
-      ChatRequest & { endpointMode?: "standard" | "agent" }
-    >();
+    const { messages } = await c.req.json<ChatRequest>();
 
     // Validate messages array
     if (!Array.isArray(messages)) {
@@ -207,13 +243,8 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
 
     try {
       // Get the current request URL to construct the MCP endpoint URL
-      // Use ?agent=1 query parameter to activate agent mode
       const requestUrl = new URL(c.req.url);
       const mcpUrl = new URL(`${requestUrl.protocol}//${requestUrl.host}/mcp`);
-      if (endpointMode === "agent") {
-        mcpUrl.searchParams.set("agent", "1");
-      }
-
       const httpTransport = new StreamableHTTPClientTransport(mcpUrl, {
         requestInit: {
           headers: {
@@ -250,10 +281,6 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             const mcpUrl = new URL(
               `${requestUrl.protocol}//${requestUrl.host}/mcp`,
             );
-            if (endpointMode === "agent") {
-              mcpUrl.searchParams.set("agent", "1");
-            }
-
             const httpTransport = new StreamableHTTPClientTransport(mcpUrl, {
               requestInit: {
                 headers: {
@@ -318,7 +345,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
     });
 
     const result = streamText({
-      model: openai("gpt-4o"),
+      model: getOpenRouterModel(),
       messages: modelMessages,
       tools,
       system: `You are an AI assistant designed EXCLUSIVELY for testing the Sentry MCP service. Your sole purpose is to help users test MCP functionality with their real Sentry account data - nothing more, nothing less.
@@ -343,8 +370,11 @@ Start conversations by exploring what's available in their account. Use tools li
 - \`get_sentry_resource\` to dive deep into a specific issue, event, or trace
 
 Remember: You're a test assistant, not a general-purpose helper. Stay focused on testing the MCP integration with their real data.`,
-      maxOutputTokens: 2000,
+      // Reasoning effort can consume completion budget before visible text/tool
+      // calls, so keep headroom above the old non-reasoning 2k cap.
+      maxOutputTokens: 16000,
       stopWhen: stepCountIs(10),
+      providerOptions: getOpenRouterProviderOptions(),
       experimental_telemetry: {
         isEnabled: true,
       },

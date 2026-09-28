@@ -13,7 +13,6 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { type Tiktoken, encoding_for_model } from "tiktoken";
 import { type ZodTypeAny, z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 // Lazy imports to avoid type bleed
 const toolsModule = await import("../src/tools/index.ts");
@@ -80,9 +79,9 @@ function formatToolsForMCP(tools: Record<string, ToolDefinition>) {
         ? z.object(inputSchema)
         : z.object({});
     // Use the same options as the MCP SDK to match actual payload
-    const jsonSchema = zodToJsonSchema(zodObject, {
-      strictUnions: true,
-      pipeStrategy: "input",
+    const jsonSchema = z.toJSONSchema(zodObject, {
+      io: "input",
+      unrepresentable: "any",
     });
 
     return {

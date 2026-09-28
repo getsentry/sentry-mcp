@@ -1,11 +1,16 @@
 import { setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
-import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
-import { isNumericId } from "../../utils/slug-validation";
+import {
+  ParamOrganizationSlug,
+  ParamPeriod,
+  ParamRegionUrl,
+} from "../../schema";
+import { isNumericId, validateSlugOrId } from "../../utils/slug-validation";
 import {
   formatFlamegraphAnalysis,
   formatFlamegraphComparison,
@@ -120,7 +125,7 @@ export default defineTool({
     "  organizationSlug='my-org',",
     "  transactionName='/api/users',",
     "  projectSlugOrId='backend',",
-    "  statsPeriod='7d',",
+    "  period='7d',",
     "  compareAgainstPeriod='14d'",
     ")",
     "```",
@@ -148,7 +153,7 @@ export default defineTool({
     organizationSlug: ParamOrganizationSlug.optional(),
     regionUrl: ParamRegionUrl.nullable().default(null),
     projectSlugOrId: z
-      .union([z.string(), z.number()])
+      .union([z.string().trim().superRefine(validateSlugOrId), z.number()])
       .optional()
       .describe("Project slug or numeric ID"),
     transactionName: z
@@ -158,18 +163,14 @@ export default defineTool({
       .describe("Transaction name (e.g., '/api/users', 'POST /graphql')"),
 
     // Time params
-    statsPeriod: z
-      .string()
-      .default("7d")
-      .describe("Time period: '1h', '24h', '7d', '14d', '30d' (default: '7d')"),
+    period: ParamPeriod.default("7d").describe(
+      "Profiling time window (default: '7d'). Use '1h' for very recent profiling data.",
+    ),
 
     // Comparison mode
-    compareAgainstPeriod: z
-      .string()
-      .optional()
-      .describe(
-        "Compare against this baseline period (e.g., '14d', '30d'). Enables regression detection.",
-      ),
+    compareAgainstPeriod: ParamPeriod.optional().describe(
+      "Compare against this baseline profiling time window. Enables regression detection.",
+    ),
 
     // Analysis options
     focusOnUserCode: z
@@ -187,7 +188,11 @@ export default defineTool({
       .describe("Number of hot paths to display (1-20, default: 10)"),
   },
 
-  annotations: { readOnlyHint: true, openWorldHint: true },
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true,
+  },
 
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
@@ -235,13 +240,13 @@ export default defineTool({
       setTag("project.id", String(project.id));
     }
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationContext(organizationSlug);
     setTag("transaction.name", transactionName);
 
     // Comparison mode: compare two time periods
     if (params.compareAgainstPeriod) {
       setTag("baseline.period", params.compareAgainstPeriod);
-      setTag("current.period", params.statsPeriod);
+      setTag("current.period", params.period);
 
       // Fetch both flamegraphs in parallel
       const [baselineFlamegraph, currentFlamegraph] = await Promise.all([
@@ -255,7 +260,7 @@ export default defineTool({
           organizationSlug,
           projectId,
           transactionName,
-          statsPeriod: params.statsPeriod,
+          statsPeriod: params.period,
         }),
       ]);
 
@@ -289,7 +294,7 @@ export default defineTool({
           "## Insufficient Baseline Data",
           "",
           `No profiling data found for the baseline period (${params.compareAgainstPeriod}).`,
-          `Current period (${params.statsPeriod}) has data.`,
+          `Current period (${params.period}) has data.`,
           "",
           "**Suggestion:** Try a shorter baseline period or analyze the current period only by removing compareAgainstPeriod.",
         ].join("\n");
@@ -301,7 +306,7 @@ export default defineTool({
           "",
           "## Insufficient Current Data",
           "",
-          `No profiling data found for the current period (${params.statsPeriod}).`,
+          `No profiling data found for the current period (${params.period}).`,
           `Baseline period (${params.compareAgainstPeriod}) has data.`,
           "",
           "**Suggestion:** The transaction may not have been executed recently. Try a longer current period.",
@@ -319,7 +324,7 @@ export default defineTool({
       organizationSlug,
       projectId,
       transactionName,
-      statsPeriod: params.statsPeriod,
+      statsPeriod: params.period,
     });
 
     // Check if we got data
@@ -329,7 +334,7 @@ export default defineTool({
         "",
         "## No Profile Data Found",
         "",
-        `No profiling data found for transaction **${transactionName}** in the last ${params.statsPeriod}.`,
+        `No profiling data found for transaction **${transactionName}** in the last ${params.period}.`,
         "",
         "**Possible reasons:**",
         "- Transaction name doesn't match exactly (names are case-sensitive)",

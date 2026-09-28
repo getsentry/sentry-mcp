@@ -1,6 +1,7 @@
 import { getActiveSpan } from "@sentry/core";
 import { z } from "zod";
 import { defineTool } from "../../internal/tool-helpers/define";
+import { structuredResult } from "../../internal/tool-helpers/results";
 import { ALL_SKILLS } from "../../skills";
 import type { ServerContext } from "../../types";
 import type { ToolRegistry } from "../catalog-runtime/availability";
@@ -23,7 +24,7 @@ export const searchToolsOutputSchema = z.object({
       name: z.string(),
       description: z.string(),
       inputSchema: z
-        .record(z.unknown())
+        .record(z.string(), z.unknown())
         .describe(
           "JSON Schema for the matching tool's arguments. Session-constrained parameters are omitted.",
         ),
@@ -45,15 +46,7 @@ function createSearchToolsResult(payload: SearchToolsOutput) {
     );
   }
 
-  return {
-    content: [
-      {
-        type: "text" as const,
-        text: JSON.stringify(payload, null, 2),
-      },
-    ],
-    structuredContent: payload,
-  };
+  return structuredResult(payload);
 }
 
 export function createSearchToolsTool(getTools: () => ToolRegistry) {
@@ -107,6 +100,7 @@ export function createSearchToolsTool(getTools: () => ToolRegistry) {
     },
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       openWorldHint: false,
     },
     outputSchema: searchToolsOutputSchema,

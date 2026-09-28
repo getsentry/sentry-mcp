@@ -1,12 +1,17 @@
 import { setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/resolve-region-url";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
-import { isNumericId } from "../../utils/slug-validation";
+import {
+  isNumericId,
+  validateResourceId,
+  validateSlugOrId,
+} from "../../utils/slug-validation";
 import { parseSentryUrl, isProfileUrl } from "../../internal/url-helpers";
 import {
   resolveScopedOrganizationSlug,
@@ -234,17 +239,19 @@ export default defineTool({
     organizationSlug: ParamOrganizationSlug.optional(),
     regionUrl: ParamRegionUrl.nullable().default(null),
     projectSlugOrId: z
-      .union([z.string(), z.number()])
+      .union([z.string().trim().superRefine(validateSlugOrId), z.number()])
       .optional()
       .describe("Project slug or numeric ID"),
     profileId: z
       .string()
       .trim()
+      .superRefine(validateResourceId)
       .optional()
       .describe("Transaction profile ID from a profile flamegraph URL"),
     profilerId: z
       .string()
       .trim()
+      .superRefine(validateResourceId)
       .optional()
       .describe("Continuous profiler session ID"),
     start: z
@@ -269,7 +276,11 @@ export default defineTool({
       ),
   },
 
-  annotations: { readOnlyHint: true, openWorldHint: true },
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true,
+  },
 
   async handler(params, context: ServerContext) {
     const resolved = resolveProfileDetailsParams({
@@ -292,7 +303,7 @@ export default defineTool({
       regionUrl: regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", resolved.organizationSlug);
+    setOrganizationContext(resolved.organizationSlug);
 
     if (resolved.mode === "transaction") {
       setTag("profile.id", resolved.profileId);

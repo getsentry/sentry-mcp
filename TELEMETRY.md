@@ -4,7 +4,6 @@
 
 Use this when investigating Sentry MCP production incidents across the
 Cloudflare HTTP server, stdio package, MCP tools, OAuth flows, and test-client
-agent mode.
 
 Primary backend: Sentry Logs, Issues, Spans/Traces, and Metrics in the MCP
 server projects. Start with a Sentry event, trace ID, route, user, client
@@ -18,11 +17,18 @@ the pivots and recipes below.
 | `trace_id` from an issue, span, or log | Sentry Traces and Logs | `span_id` | full request/tool timeline and failing span | inspect child spans and logs |
 | Sentry `event_id` | Sentry Issue/Event | `trace_id`, `http.route`, `gen_ai.tool.name` | exception context and owning request/tool | query trace logs |
 | HTTP route or status symptom | Sentry Metrics and Logs | `http.route`, `http.response.status_code` | route volume, status mix, local rate limits | inspect matching traces |
-| OAuth sign-out or refresh symptom | Sentry Metrics and Logs | `app.client.family`, `app.oauth.*` | refresh outcome, revoked grants, client family | inspect user trace or request logs |
+| OAuth sign-out or refresh symptom | Sentry Metrics and Logs | `app.client.family`, `app.access.*`, `app.oauth.*` metrics | refresh outcome, revoked grants, client family | inspect user trace or request logs |
 | MCP tool name | Sentry Spans and Issues | `gen_ai.tool.name` | failing or slow tool calls | inspect tool span and Sentry API spans |
 | Sentry resource URL/type | Sentry Spans | `app.resource.type` | `get_sentry_resource` dispatch behavior | inspect resolved type and downstream tool |
 | Agent/model/token symptom | Sentry Spans | `gen_ai.*` | provider, model, token, and agent behavior | inspect agent and tool spans |
 | Client or transport symptom | Sentry Logs, Spans, Metrics | `app.transport`, `app.client.family`, `user_agent.original` | stdio vs HTTP, client bucket, and request family | compare route or OAuth metrics |
+
+## Event Validation Diagnostics
+
+For `Event failed schema validation`, check `contexts.log.contextType` on the
+issue event or `contextType` in log properties. It records the legacy `context`
+container type (`null`, `array`, or JavaScript `typeof`), never its keys or values.
+Read it alongside `validationIssues`; another field may have failed.
 
 ## Investigation Pivots
 
@@ -38,7 +44,6 @@ the pivots and recipes below.
 | `app.rate_limit.scope` | local rate-limit scope | metrics | IP vs user rate limits |
 | `app.route.group` | coarse route family | metrics | `mcp`, `oauth`, `chat`, `search` |
 | `app.transport` | MCP transport | tags, spans | `http`, `sse`, or `stdio` |
-| `app.server.mode.agent` | agent-mode flag | metrics, spans, tags | `?agent=1` or stdio `--agent` adoption |
 | `app.server.mode.experimental` | experimental-mode flag | metrics, spans, tags | `?experimental=1` or stdio `--experimental` adoption |
 | `mcp.session.id` | MCP session identity | spans | session timeline |
 | `gen_ai.tool.name` | MCP tool being called | spans, issues | tool timeline |
@@ -50,15 +55,17 @@ the pivots and recipes below.
 | `app.constraint.project_slug` | active project constraint | spans | constrained session behavior |
 | `gen_ai.tool.call.arguments.<key>` | effective tool arguments | spans | called tool input |
 | `app.client.family` | bucketed MCP client family | metrics, spans | client-specific OAuth behavior |
-| `app.oauth.token_exchange.outcome` | OAuth refresh outcome | metrics | token refresh diagnosis |
-| `app.oauth.grant_revoked.reason` | wrapper grant revoke reason | metrics | sign-out diagnosis |
+| `app.access.method` | upstream access method | spans | `mcp_grant` or `sentry_access` |
+| `app.client.registration.method` | CIMD vs DCR client registration method | metrics, auth spans | `cimd`, `dcr`, or `unknown` on auth paths only |
+| `app.access.refresh.outcome` | OAuth refresh outcome | metrics | token refresh diagnosis |
+| `app.access.grant.revoked_reason` | wrapper grant revoke reason | metrics | sign-out diagnosis |
 | `app.consent.skill` | skill granted during approval | metrics | per-skill adoption |
 | `app.consent.skill.<skill>.granted` | skill granted on an MCP request | spans | tool behavior by enabled skills |
-| `app.oauth.probe.status_code` | upstream probe HTTP status | metrics | Sentry token validity probe result |
-| `app.oauth.probe.reason` | indeterminate probe bucket | metrics | upstream instability |
+| `app.access.probe.status_code` | upstream probe HTTP status | metrics | Sentry token validity probe result |
+| `app.access.probe.reason` | indeterminate probe bucket | metrics | upstream instability |
 | `app.upstream.host` | configured Sentry host | tags, spans | host-specific behavior |
 | `app.server.version` | MCP server package version | tags, spans | release/version behavior |
-| `app.utm_source` | sanitized in-product `utm_source` query param | spans | in-product attribution |
+| `app.utm_source` | sanitized `X-Sentry-Utm-Source` header or `utm_source` query param | spans | in-product / plugin attribution |
 | `app.referrer.family` | low-cardinality bucket of the `Referer` host | spans | external traffic attribution |
 | `gen_ai.provider.name` | GenAI provider | spans, tags | provider-specific model behavior |
 | `gen_ai.request.model` | requested GenAI model | spans | model-specific behavior |
@@ -77,8 +84,8 @@ sort=timestamp
 Captured errors for a route, tool, or OAuth symptom.
 
 ```text
-dataset=issues query='http.route:"<route>" OR gen_ai.tool.name:"<tool_name>" OR app.oauth.grant_revoked.reason:"<reason>"'
-fields=timestamp,event_id,trace_id,http.route,gen_ai.tool.name,app.oauth.grant_revoked.reason,error.type,exception.message
+dataset=issues query='http.route:"<route>" OR gen_ai.tool.name:"<tool_name>" OR app.access.grant.revoked_reason:"<reason>"'
+fields=timestamp,event_id,trace_id,http.route,gen_ai.tool.name,app.access.grant.revoked_reason,error.type,exception.message
 sort=-timestamp
 ```
 
@@ -86,7 +93,6 @@ HTTP response rates by route and status.
 
 ```text
 dataset=tracemetrics query='metric:app.server.response http.route:"<route>"'
-fields=timestamp,metric,http.request.method,http.route,http.response.status_code,app.response.status_class,app.route.group,app.client.family,app.server.mode.agent,app.server.mode.experimental,value
 aggregate=sum(value) by http.route,http.response.status_code
 ```
 
@@ -94,8 +100,6 @@ MCP mode adoption by client family.
 
 ```text
 dataset=tracemetrics query='metric:app.server.response http.route:"/mcp/:organizationSlug?/:projectSlug?"'
-fields=timestamp,metric,app.client.family,app.server.mode.agent,app.server.mode.experimental,value
-aggregate=sum(value) by app.client.family,app.server.mode.agent,app.server.mode.experimental
 ```
 
 Local rate-limit volume and scope.
@@ -110,16 +114,16 @@ OAuth refresh outcomes by client family.
 
 ```text
 dataset=tracemetrics query='metric:app.oauth.token_exchange'
-fields=timestamp,metric,app.oauth.token_exchange.outcome,app.oauth.grant.shape,app.client.family,app.oauth.probe.status_code,app.oauth.probe.reason,user.id,value
-aggregate=sum(value) by app.oauth.token_exchange.outcome,app.client.family
+fields=timestamp,metric,app.access.refresh.outcome,app.access.grant.shape,app.client.family,app.access.probe.status_code,app.access.probe.reason,user.id,value
+aggregate=sum(value) by app.access.refresh.outcome,app.client.family
 ```
 
 Grant revocations for sign-out reports.
 
 ```text
 dataset=tracemetrics query='metric:app.oauth.grant_revoked user.id:"<user_id>"'
-fields=timestamp,metric,app.oauth.grant_revoked.reason,app.client.family,user.id,value
-aggregate=sum(value) by app.oauth.grant_revoked.reason,app.client.family
+fields=timestamp,metric,app.access.grant.revoked_reason,app.client.family,user.id,value
+aggregate=sum(value) by app.access.grant.revoked_reason,app.client.family
 ```
 
 Register and callback volume by client family.
@@ -128,6 +132,22 @@ Register and callback volume by client family.
 dataset=tracemetrics query='metric:app.oauth.register OR metric:app.oauth.callback_completed'
 fields=timestamp,metric,app.client.family,value
 aggregate=sum(value) by metric,app.client.family
+```
+
+Completed auth flows by client registration method.
+
+```text
+dataset=tracemetrics query='metric:app.oauth.callback_completed'
+fields=timestamp,metric,app.client.registration.method,app.client.family,value
+aggregate=sum(value) by app.client.registration.method,app.client.family
+```
+
+Auth-path spans by client registration method.
+
+```text
+dataset=spans query='http.route:/oauth/callback OR http.route:/oauth/authorize OR http.route:/oauth/token OR http.route:/oauth/register'
+fields=timestamp,trace,span_id,http.route,app.client.registration.method,app.client.family,user.id,http.response.status_code
+aggregate=count() by app.client.registration.method,app.client.family,http.route
 ```
 
 OAuth skill adoption by client family.
@@ -150,7 +170,6 @@ Tool execution timeline for a slow or failing tool.
 
 ```text
 dataset=spans query='gen_ai.tool.name:"<tool_name>" app.consent.skill.<skill>.granted:true'
-fields=timestamp,trace,span_id,span.op,span.duration,gen_ai.tool.name,app.transport,app.client.family,app.server.mode.agent,app.server.mode.experimental,app.constraint.organization_slug,app.constraint.project_slug,gen_ai.tool.call.arguments.organizationSlug,gen_ai.tool.call.arguments.projectSlugOrId,error.type
 sort=-timestamp
 ```
 
@@ -177,7 +196,6 @@ Stdio sessions by configured host or mode.
 
 ```text
 dataset=spans query='app.transport:stdio app.upstream.host:"<host>"'
-fields=timestamp,trace,span_id,app.server.version,app.server.mode.agent,app.server.mode.experimental,app.url.full,error.type
 sort=-timestamp
 ```
 
@@ -194,7 +212,6 @@ Attributes: `http.request.method`, `http.route`,
 `http.response.status_code`, `app.response.status_class`,
 `app.route.group`, `app.response.reason`, `app.rate_limit.scope`,
 `app.request.duration_ms`. MCP responses also include
-`app.client.family`, `app.server.mode.agent`, and
 `app.server.mode.experimental`.
 
 ### OAuth And Client Registration
@@ -207,10 +224,22 @@ Metrics: `app.oauth.token_exchange`, `app.oauth.grant_revoked`,
 `app.oauth.callback_completed`, `app.consent.skill_granted`,
 `app.oauth.register`
 
-Attributes: `app.oauth.token_exchange.outcome`, `app.oauth.grant.shape`,
-`app.oauth.probe.status_code`, `app.oauth.probe.reason`,
-`app.oauth.grant_revoked.reason`, `app.consent.skill`,
-`app.client.family`, `user.id`
+Attributes: `app.access.method`, `app.access.refresh.outcome`, `app.access.grant.shape`,
+`app.access.probe.status_code`, `app.access.probe.reason`,
+`app.access.grant.revoked_reason`, `app.consent.skill`,
+`app.client.family`, `app.client.registration.method`, `user.id`
+
+`app.client.registration.method` is auth-path only (`cimd` | `dcr` |
+`unknown`) on authorize/callback/register/token metrics and spans. It is not
+attached to ordinary `/mcp` request spans. HTTPS URL `client_id` values map to
+`cimd`; opaque non-URL ids map to `dcr`; `/oauth/register` is always `dcr`.
+Named under `app.client.*` (not `app.oauth.*`) so default Sentry data scrubbing
+does not redact values via the `auth` substring in `oauth`.
+
+Diagnostic OAuth *attributes* use the readable `app.access.*` namespace for
+the OAuth access lifecycle. This avoids scrubbed substrings (`auth`/`oauth`,
+`token`, `bearer`, `credentials`); error/reason/method buckets avoid them too.
+Metric names remain under `app.oauth.*`.
 
 ### MCP Tool Execution
 
@@ -238,10 +267,8 @@ Attributes: `app.resource.type`, `gen_ai.tool.name`, `trace_id`, `span_id`
 
 ### Stdio Transport
 
-Local package startup, host selection, agent mode, experimental mode, or token
 resolution behaves differently than the hosted server.
 
-Attributes: `app.server.version`, `app.transport`, `app.server.mode.agent`,
 `app.server.mode.experimental`, `app.upstream.host`, `app.url.full`
 
 ### Agent And GenAI

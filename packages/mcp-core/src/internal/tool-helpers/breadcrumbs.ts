@@ -1,16 +1,19 @@
 import type { SentryApiService } from "../../api-client/index";
 
 /**
- * Fetches breadcrumbs from the latest event for an issue and formats them.
+ * Fetches breadcrumbs from an issue event and formats them.
+ * Defaults to the latest event when eventId is omitted.
  */
 export async function fetchAndFormatBreadcrumbs(
   apiService: SentryApiService,
   organizationSlug: string,
   issueId: string,
+  eventId: string = "latest",
 ): Promise<string> {
-  const event = await apiService.getLatestEventForIssue({
+  const event = await apiService.getEventForIssue({
     organizationSlug,
     issueId,
+    eventId,
   });
 
   const breadcrumbEntry = event.entries.find((e) => e.type === "breadcrumbs");
@@ -40,7 +43,7 @@ export function formatBreadcrumbs(
       "",
       `**Event ID**: ${eventId}`,
       "",
-      "No breadcrumbs found in the latest event for this issue.",
+      "No breadcrumbs found in this event for the issue.",
     ].join("\n");
   }
 

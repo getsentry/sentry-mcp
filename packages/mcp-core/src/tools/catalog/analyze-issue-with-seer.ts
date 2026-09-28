@@ -1,17 +1,20 @@
 import { z } from "zod";
-import { setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import {
-  ensureIssueWithinProjectConstraint,
   parseIssueParams,
+  assertIssueWithinProjectConstraint,
 } from "../../internal/tool-helpers/issue";
 import {
   getStatusDisplayName,
   isTerminalStatus,
   getHumanInterventionGuidance,
   getOutputForAutofixRun,
+  wrapSeerContent,
   getActiveAutofixTodo,
+  getSeerUnsupportedIssueMessage,
+  isSeerSupportedIssue,
   SEER_POLLING_INTERVAL,
   SEER_TIMEOUT,
   SEER_MAX_RETRIES,
@@ -67,6 +70,7 @@ export default defineTool({
     "",
     "<hints>",
     "- Only use when the user explicitly requests analysis or you cannot determine the root cause from issue details alone",
+    "- Seer Autofix does not support metric alert issues (issueCategory: metric); use get_issue_details and search_events instead",
     "- If the user provides an issueUrl, extract it and use that parameter alone",
     "- The analysis includes actual code snippets and fixes, not just error descriptions",
     "- Results are cached - subsequent calls return instantly",
@@ -98,14 +102,21 @@ export default defineTool({
         issueUrl: params.issueUrl,
       });
 
-    setTag("organization.slug", orgSlug);
+    setOrganizationContext(orgSlug);
 
-    await ensureIssueWithinProjectConstraint({
-      apiService,
+    const issue = await apiService.getIssue({
       organizationSlug: orgSlug,
       issueId: parsedIssueId!,
+    });
+
+    assertIssueWithinProjectConstraint({
+      issue,
       projectSlug: context.constraints.projectSlug,
     });
+
+    if (!isSeerSupportedIssue(issue)) {
+      return getSeerUnsupportedIssueMessage(issue);
+    }
 
     let output = `# Seer Analysis for Issue ${parsedIssueId}\n\n`;
 
@@ -167,7 +178,12 @@ export default defineTool({
       if (isTerminalStatus(existingStatus)) {
         // Return results immediately, no polling needed
         output += `## Analysis ${getStatusDisplayName(existingStatus)}\n\n`;
-        output += getOutputForAutofixRun(autofixState.autofix);
+        output += autofixState.formatted?.content
+          ? wrapSeerContent(
+              autofixState.formatted.content,
+              autofixState.autofix.run_id,
+            )
+          : getOutputForAutofixRun(autofixState.autofix);
 
         if (existingStatus !== "completed") {
           output += `\n**Status**: ${existingStatus}\n`;
@@ -200,7 +216,12 @@ export default defineTool({
       // Check if completed (terminal state)
       if (isTerminalStatus(status)) {
         output += `## Analysis ${getStatusDisplayName(status)}\n\n`;
-        output += getOutputForAutofixRun(autofixState.autofix);
+        output += autofixState.formatted?.content
+          ? wrapSeerContent(
+              autofixState.formatted.content,
+              autofixState.autofix.run_id,
+            )
+          : getOutputForAutofixRun(autofixState.autofix);
 
         if (status !== "completed") {
           output += `\n**Status**: ${status}\n`;
@@ -269,7 +290,12 @@ export default defineTool({
     // Show current progress
     if (autofixState.autofix) {
       output += `**Current Status**: ${getStatusDisplayName(autofixState.autofix.status)}\n\n`;
-      output += getOutputForAutofixRun(autofixState.autofix);
+      output += autofixState.formatted?.content
+        ? wrapSeerContent(
+            autofixState.formatted.content,
+            autofixState.autofix.run_id,
+          )
+        : getOutputForAutofixRun(autofixState.autofix);
     }
 
     // Timeout reached

@@ -43,6 +43,7 @@ Our testing approach prioritizes **functional coverage** over implementation det
 - Standard library behavior (Promise.all, Array.map, etc.)
 - Third-party package internals (Zod validation, MSW mocking, etc.)
 - Implementation details (private methods, internal state)
+- Agent/system prompt text or prompt wording (assert behavior via tool inputs/outputs and Sentry API requests instead)
 - Obvious behavior that will break immediately if wrong
 
 ### Example: Context Passing
@@ -79,6 +80,10 @@ Fast, focused tests of actual functionality:
   formatted handler response with `toMatchInlineSnapshot()`. Supplemental
   `toContain()` assertions are fine, but they do not replace a full-response
   snapshot.
+- For catalog-only tools, include server-level coverage that executes the tool
+  through `execute_sentry_tool` when the change affects discovery, generated
+  schemas, constraint injection, or dispatch. Prefer this MSW-backed route for
+  mutating tools when live QA would change real Sentry data.
 - Review tool output snapshots against
   [../contributing/tool-responses.md](../contributing/tool-responses.md) so
   formatted output stays user-facing and avoids raw internals.
@@ -97,8 +102,6 @@ Interactive testing with the MCP test client (preferred for testing MCP changes)
 # Test with local dev server (default: http://localhost:5173)
 pnpm -w run cli "who am I?"
 
-# Test agent mode (use_sentry tool only) - approximately 2x slower
-pnpm -w run cli --agent "who am I?"
 
 # Test against production
 pnpm -w run cli --mcp-host=https://mcp.sentry.dev "query"
@@ -112,7 +115,7 @@ pnpm -w run cli --access-token=TOKEN "query"
 - Testing OAuth flows
 - Debugging tool interactions
 - Validating real API responses
-- Testing AI-powered tools (search_events, search_issues, search_issue_events, use_sentry)
+- Testing AI-powered tools (search_events, search_issues, search_issue_events)
 
 **Note:** The CLI defaults to `http://localhost:5173` for easier local development. Override with `--mcp-host` or set `MCP_URL` environment variable to test against different servers.
 
@@ -121,16 +124,12 @@ Use the agent CLI harness when you need to verify behavior through the actual Cl
 
 ```bash
 # Claude Code against the local dev server config
-pnpm -w run agent-cli-test --provider claude --setup repo
 
 # Codex against the local dev server config
-pnpm -w run agent-cli-test --provider codex --setup repo
 
 # Claude Code against the checked-in stdio config
-pnpm -w run agent-cli-test --provider claude --setup stdio
 
 # Codex against the checked-in stdio config
-pnpm -w run agent-cli-test --provider codex --setup stdio
 ```
 
 This harness:
@@ -140,11 +139,9 @@ This harness:
 
 Use `--setup repo --server sentry` to target the hosted server instead of the local `sentry-dev` entry.
 
-The checked-in `stdio` setup uses an isolated auth cache at `packages/agent-cli-test/projects/stdio/.sentry/mcp.json`.
 Because real clients launch stdio servers non-interactively, first-run device-code auth does not start inside Claude or Codex. Warm that cache from a real TTY first:
 
 ```bash
-pnpm -w run agent-cli-test auth login
 ```
 
 When the harness fails, rerun the provider directly with debug enabled so you can inspect the exact MCP startup failure:
@@ -283,7 +280,7 @@ describeEval("tool-name", {
 ### Running Evals
 
 ```bash
-# Requires OPENAI_API_KEY in .env
+# Requires OPENROUTER_API_KEY in .env
 pnpm eval
 
 # Run specific eval

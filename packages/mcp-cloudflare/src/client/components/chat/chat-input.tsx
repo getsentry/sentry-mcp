@@ -99,7 +99,6 @@ export function ChatInput({
   };
 
   // Auto-resize textarea based on content
-  // biome-ignore lint/correctness/useExhaustiveDependencies: input is needed to trigger resize when content changes
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.style.height = "auto";

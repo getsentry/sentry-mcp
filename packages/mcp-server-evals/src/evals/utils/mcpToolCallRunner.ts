@@ -1,9 +1,7 @@
 import { experimental_createMCPClient } from "@ai-sdk/mcp";
 import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
-import { openai } from "@ai-sdk/openai";
+import { getOpenRouterModel } from "@sentry/mcp-core/internal/agents/openrouter-provider";
 import { generateText, stepCountIs, type LanguageModel } from "ai";
-
-const defaultModel = openai("gpt-4o");
 
 function toToolCall(call: { toolName: string; input: unknown }) {
   const input =
@@ -18,7 +16,7 @@ function toToolCall(call: { toolName: string; input: unknown }) {
 }
 
 export function McpToolCallTaskRunner(
-  model: LanguageModel = defaultModel,
+  model: LanguageModel = getOpenRouterModel(),
   maxSteps = 6,
 ) {
   return async function McpToolCallTaskRunner(input: string) {

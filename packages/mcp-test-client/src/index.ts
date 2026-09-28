@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+/**
+ * CLI entry point for MCP QA: loads env, resolves transport/provider, then runs
+ * either tool discovery or the test agent against a single MCP connection.
+ */
 import * as readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { Command, Option } from "commander";
@@ -15,6 +19,7 @@ import { logError, logInfo } from "./logger.js";
 import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
 import type { MCPConnection } from "./types.js";
 import { resolveTransportMode } from "./transport.js";
+import { resolveAgentProvider } from "./agent-provider.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../../../");
@@ -50,10 +55,6 @@ program
   )
   .option("--host <host>", "Sentry host for stdio transport")
   .option("--sentry-dsn <dsn>", "Sentry DSN for error reporting")
-  .option(
-    "--agent",
-    "Use agent mode (/mcp?agent=1) instead of standard mode (for use_sentry tool)",
-  )
   .option("--experimental", "Enable experimental tools (/mcp?experimental=1)")
   .option(
     "--list-tools",
@@ -61,6 +62,8 @@ program
   )
   .action(async (prompt, options) => {
     try {
+      const agentProvider = resolveAgentProvider(process.env);
+
       // Initialize Sentry with CLI-provided DSN if available
       const sentryDsn =
         options.sentryDsn ||
@@ -69,13 +72,12 @@ program
 
       Sentry.init({
         dsn: sentryDsn,
-        sendDefaultPii: true,
         tracesSampleRate: 1,
         beforeSend: sentryBeforeSend,
         initialScope: {
           tags: {
             "gen_ai.agent.name": "sentry-mcp-agent",
-            "gen_ai.provider.name": "openai",
+            "gen_ai.provider.name": agentProvider ?? "unknown",
           },
         },
         release: process.env.SENTRY_RELEASE,
@@ -99,19 +101,26 @@ program
         options.accessToken || process.env.SENTRY_ACCESS_TOKEN;
       const sentryHost = options.host || process.env.SENTRY_HOST;
 
-      const openaiKey = process.env.OPENAI_API_KEY;
       const transport = resolveTransportMode({
         requestedTransport: options.transport,
         accessToken,
       });
       const listToolsOnly = Boolean(options.listTools);
 
-      if (!listToolsOnly && !openaiKey) {
-        logError("OPENAI_API_KEY environment variable is required");
+      if (!listToolsOnly && !agentProvider) {
+        logError("No supported LLM provider is configured");
         console.log(
-          chalk.yellow("\nPlease set it in your .env file or environment:"),
+          chalk.yellow(
+            "\nPlease set one provider in your .env file or environment:",
+          ),
         );
         console.log(chalk.gray("OPENAI_API_KEY=your_openai_api_key"));
+        console.log(chalk.gray("OPENROUTER_API_KEY=your_openrouter_api_key"));
+        console.log(
+          chalk.gray(
+            "EMBEDDED_AGENT_PROVIDER=openrouter # required if multiple provider keys are set",
+          ),
+        );
         process.exit(1);
       }
 
@@ -122,14 +131,12 @@ program
           accessToken,
           host: sentryHost,
           sentryDsn: sentryDsn,
-          useAgentEndpoint: options.agent,
           useExperimental: options.experimental,
         });
       } else {
         connection = await connectToRemoteMCPServer({
           mcpHost: options.mcpHost,
           accessToken,
-          useAgentEndpoint: options.agent,
           useExperimental: options.experimental,
         });
       }
@@ -139,6 +146,7 @@ program
 
       const agentConfig = {
         model: options.model,
+        provider: agentProvider ?? "openai",
       };
 
       try {

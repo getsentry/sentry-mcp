@@ -1,10 +1,12 @@
 import { promises as fs } from "node:fs";
-import { join } from "node:path";
 import { homedir } from "node:os";
+import { join } from "node:path";
 
 export interface OAuthClientConfig {
   clientId: string;
   mcpHost: string;
+  /** Redirect URI this client was registered with. */
+  redirectUri?: string;
   registeredAt: string;
   accessToken?: string;
   tokenExpiresAt?: string;
@@ -66,15 +68,26 @@ export class ConfigManager {
    * Get OAuth client ID for a specific MCP host
    */
   async getOAuthClientId(mcpHost: string): Promise<string | null> {
-    const config = await this.loadConfig();
-    const clientConfig = config.oauthClients[mcpHost];
+    const clientConfig = await this.getOAuthClient(mcpHost);
     return clientConfig?.clientId || null;
+  }
+
+  /**
+   * Get the full OAuth client config for a specific MCP host
+   */
+  async getOAuthClient(mcpHost: string): Promise<OAuthClientConfig | null> {
+    const config = await this.loadConfig();
+    return config.oauthClients[mcpHost] || null;
   }
 
   /**
    * Store OAuth client ID for a specific MCP host
    */
-  async setOAuthClientId(mcpHost: string, clientId: string): Promise<void> {
+  async setOAuthClientId(
+    mcpHost: string,
+    clientId: string,
+    redirectUri?: string,
+  ): Promise<void> {
     const config = await this.loadConfig();
 
     // Preserve existing access token if present
@@ -82,6 +95,7 @@ export class ConfigManager {
     config.oauthClients[mcpHost] = {
       clientId,
       mcpHost,
+      redirectUri,
       registeredAt: new Date().toISOString(),
       accessToken: existing?.accessToken,
       tokenExpiresAt: existing?.tokenExpiresAt,

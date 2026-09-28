@@ -1,4 +1,4 @@
-import { setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import {
@@ -8,25 +8,13 @@ import {
 import { formatAssignedTo } from "../../internal/tool-helpers/formatting";
 import { logIssue } from "../../telem/logging";
 import { UserInputError } from "../../errors";
-import { ApiClientError } from "../../api-client";
-import type {
-  ExternalIssue,
-  Issue,
-  NativeExternalIssue,
-} from "../../api-client/types";
+import type { Issue } from "../../api-client/types";
 import type { ServerContext } from "../../types";
-import {
-  formatLinkedExternalIssue,
-  resolveExternalIssueLinkTarget,
-  type ExternalIssueLinkTarget,
-  type LinkedExternalIssue,
-} from "../support/issue-linking";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
   ParamIssueShortId,
   ParamIssueUrl,
-  ParamExternalIssueUrl,
   ParamIssueStatus,
   ParamIssueIgnoreMode,
   ParamAssignedTo,
@@ -349,51 +337,20 @@ function buildNoChangesOutput(params: {
   return output;
 }
 
-function buildCommentOnlyOutput(params: {
-  issue: Issue;
-  organizationSlug: string;
-  ignoreState: IgnoreState | null;
-  issueUrl: string;
-  reason: string;
-  commentResult: ReasonCommentResult;
-}): string {
-  const {
-    issue,
-    organizationSlug,
-    ignoreState,
-    issueUrl,
-    reason,
-    commentResult,
-  } = params;
-  const title = commentResult.posted ? "Commented" : "Comment Not Posted";
-  let output = `# Issue ${issue.shortId} ${title} in **${organizationSlug}**\n\n`;
-  output += `**Issue**: ${issue.title}\n`;
-  output += `**URL**: ${issueUrl}\n\n`;
-
-  output += "## Changes Made\n\n";
-  output += formatReasonCommentLine(reason, commentResult);
-  output += "- No issue fields were changed.\n";
-
-  output += "\n## Current Status\n\n";
-  output += `**Status**: ${getIssueStatusDisplay(issue)}\n`;
-  if (ignoreState) {
-    output += `**Ignore Behavior**: ${ignoreState.behavior}\n`;
-  }
-  output += `**Assigned To**: ${formatAssignedTo(issue.assignedTo ?? null)}\n`;
-
-  output += "\n## Response Notes\n\n";
-  output += "- The request only attempted to add a comment to the issue.\n";
-  output += `- Full issue details: \`get_sentry_resource(resourceType="issue", organizationSlug="${organizationSlug}", resourceId="${issue.shortId}")\`\n`;
-
-  return output;
-}
-
 function isAssigneeAlreadySet(
   issue: Issue,
-  requestedAssignee: string | undefined,
+  requestedAssignee: string | null | undefined,
   currentUserId: string | null | undefined,
 ): boolean {
-  if (!requestedAssignee || !issue.assignedTo) {
+  if (requestedAssignee === undefined) {
+    return false;
+  }
+
+  if (requestedAssignee === null) {
+    return !issue.assignedTo;
+  }
+
+  if (!issue.assignedTo) {
     return false;
   }
 
@@ -619,64 +576,6 @@ type ReasonCommentResult =
   | { posted: false; skipped: true }
   | { posted: false; error: string };
 
-async function executeExternalIssueLink(
-  apiService: {
-    linkNativeExternalIssue: (params: {
-      organizationSlug: string;
-      issueId: string;
-      integrationId: string;
-      data: Record<string, unknown>;
-    }) => Promise<NativeExternalIssue>;
-    createSentryAppExternalIssueLink: (params: {
-      installationUuid: string;
-      issueId: string;
-      webUrl: string;
-      project: string;
-      identifier: string;
-    }) => Promise<ExternalIssue>;
-  },
-  params: {
-    organizationSlug: string;
-    issueId: string;
-    currentIssue: Issue;
-    target: ExternalIssueLinkTarget;
-  },
-): Promise<LinkedExternalIssue> {
-  if (params.target.kind === "native") {
-    const issue = await apiService.linkNativeExternalIssue({
-      organizationSlug: params.organizationSlug,
-      issueId: params.issueId,
-      integrationId: params.target.integrationId,
-      data: params.target.payload,
-    });
-    return {
-      kind: "native",
-      issue,
-      provider: params.target.provider,
-      fallbackDisplayName: params.target.fallbackDisplayName,
-      fallbackUrl: params.target.fallbackUrl,
-    };
-  }
-
-  const sentryIssueId = String(params.currentIssue.id);
-  if (!/^\d+$/.test(sentryIssueId)) {
-    throw new UserInputError(
-      "Cannot link Sentry App external issue because the Sentry issue id is not numeric.",
-    );
-  }
-
-  const issue = await apiService.createSentryAppExternalIssueLink({
-    installationUuid: params.target.installationUuid,
-    issueId: sentryIssueId,
-    ...params.target.payload,
-  });
-  return {
-    kind: "sentryApp",
-    issue,
-    provider: params.target.provider,
-  };
-}
-
 async function tryPostReasonComment(
   apiService: {
     createIssueComment: (params: {
@@ -727,33 +626,35 @@ function formatReasonCommentLine(
 export default defineTool({
   name: "update_issue",
   skills: ["triage"], // Only available in triage skill
-  requiredScopes: ["event:write", "org:read"],
+  requiredScopes: ["event:write"],
   description: [
-    "Update a Sentry issue.",
+    "Update a Sentry issue's status or assignment.",
     "",
-    "Use this to resolve, reopen, assign, ignore, comment on, or link an existing external issue.",
+    "Use this to resolve, reopen, assign, unassign, or ignore an issue.",
     "",
     "<examples>",
     "```",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='resolved')",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', assignedTo='user:123456')",
+    "update_issue(organizationSlug='my-org', issueId='PROJECT-123', assignedTo=null)",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored')",
+    "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='forever')",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='untilOccurrenceCount', ignoreCount=100, ignoreWindowMinutes=60)",
-    "update_issue(organizationSlug='my-org', issueId='PROJECT-123', externalIssueUrl='https://github.com/getsentry/sentry/issues/123')",
-    "update_issue(organizationSlug='my-org', issueId='PROJECT-123', externalIssueUrl='https://linear.app/acme/issue/ENG-123/test')",
+    "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', reason='Ignoring because this is expected noise from the staging deploy')",
     "```",
     "</examples>",
     "",
     "<hints>",
     "- Provide `issueUrl` or `organizationSlug` + `issueId`.",
-    "- At least one of `status`, `assignedTo`, `externalIssueUrl`, or `reason` is required.",
-    "- `assignedTo`: `user:ID`, `team:ID_OR_SLUG`, or `me`.",
-    "- `externalIssueUrl` links an existing external issue; it does not create a new ticket.",
+    "- At least one of `status` or `assignedTo` is required.",
+    "- Omit `assignedTo` to leave assignment unchanged. Pass `null` to unassign; otherwise use `user:ID` or `team:ID_OR_SLUG`.",
     "- Use `execute_sentry_tool(name='whoami', arguments={})` to find your user ID for self-assignment.",
     "- Status values: `resolved`, `resolvedInNextRelease`, `unresolved`, `ignored`.",
-    "- Ignore modes: `untilEscalating` (default), `forever`, `forDuration`, `untilOccurrenceCount`, `untilUserCount`.",
-    "- Ignore inputs: `ignoreDurationMinutes`, `ignoreCount` + optional `ignoreWindowMinutes`, or `ignoreUserCount` + optional `ignoreUserWindowMinutes`.",
-    "- To switch ignore families on an already ignored issue, first set `status='unresolved'`, then ignore it again.",
+    "- `status='ignored'` defaults to `ignoreMode='untilEscalating'`.",
+    "- Ignore modes: `untilEscalating`, `forever`, `forDuration`, `untilOccurrenceCount`, `untilUserCount`.",
+    "- Matching ignore inputs are `ignoreDurationMinutes`, `ignoreCount` + optional `ignoreWindowMinutes`, or `ignoreUserCount` + optional `ignoreUserWindowMinutes`.",
+    "- To switch an already ignored issue between `untilEscalating`, `forever`, and condition-based ignore modes, first set `status='unresolved'`, then ignore it again with the new rule.",
+    "- `reason` is optional. When provided, it will be posted as a comment on the issue's activity feed explaining why the action was taken.",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -763,7 +664,6 @@ export default defineTool({
     issueUrl: ParamIssueUrl.optional(),
     status: ParamIssueStatus.optional(),
     assignedTo: ParamAssignedTo.optional(),
-    externalIssueUrl: ParamExternalIssueUrl.optional(),
     ignoreMode: ParamIssueIgnoreMode.optional(),
     ignoreDurationMinutes: ParamIgnoreDurationMinutes.optional(),
     ignoreCount: ParamIgnoreCount.optional(),
@@ -797,14 +697,9 @@ export default defineTool({
     }
 
     // Validate that at least one update parameter is provided
-    if (
-      !params.status &&
-      !params.assignedTo &&
-      !params.externalIssueUrl &&
-      !params.reason
-    ) {
+    if (params.status === undefined && params.assignedTo === undefined) {
       throw new UserInputError(
-        "At least one of `status`, `assignedTo`, `externalIssueUrl`, or `reason` must be provided to update the issue",
+        "At least one of `status` or `assignedTo` must be provided to update the issue",
       );
     }
 
@@ -815,7 +710,7 @@ export default defineTool({
         issueUrl: params.issueUrl,
       });
 
-    setTag("organization.slug", orgSlug);
+    setOrganizationContext(orgSlug);
 
     // Get current issue details first
     const currentIssue = await apiService.getIssue({
@@ -826,15 +721,6 @@ export default defineTool({
       issue: currentIssue,
       projectSlug: context.constraints.projectSlug,
     });
-
-    const linkTarget = params.externalIssueUrl
-      ? await resolveExternalIssueLinkTarget({
-          apiService,
-          organizationSlug: orgSlug,
-          issueId: parsedIssueId!,
-          externalIssueUrl: params.externalIssueUrl,
-        })
-      : null;
 
     const currentIgnoreState = getIgnoreState(currentIssue);
     const assignmentAlreadySet = isAssigneeAlreadySet(
@@ -885,29 +771,17 @@ export default defineTool({
       currentIssue.shortId,
     );
 
-    if (!updateStatus && !updateAssignedTo && !updateIgnore && !linkTarget) {
+    if (
+      updateStatus === undefined &&
+      updateAssignedTo === undefined &&
+      updateIgnore === undefined
+    ) {
       const commentResult = await tryPostReasonComment(
         apiService,
         orgSlug,
         parsedIssueId!,
         params.reason,
       );
-
-      if (
-        params.reason &&
-        !params.status &&
-        !params.assignedTo &&
-        !params.externalIssueUrl
-      ) {
-        return buildCommentOnlyOutput({
-          issue: currentIssue,
-          organizationSlug: orgSlug,
-          ignoreState: currentIgnoreState,
-          issueUrl: requestedIssueUrl,
-          reason: params.reason,
-          commentResult,
-        });
-      }
 
       return (
         buildNoChangesOutput({
@@ -919,69 +793,19 @@ export default defineTool({
       );
     }
 
-    const hasIssueUpdate = Boolean(
-      updateStatus || updateAssignedTo || updateIgnore,
-    );
-    let updatedIssue = currentIssue;
-    if (hasIssueUpdate) {
-      updatedIssue = await apiService.updateIssue({
-        organizationSlug: orgSlug,
-        issueId: parsedIssueId!,
-        status: updateStatus,
-        assignedTo: updateAssignedTo,
-        substatus: updateIgnore?.substatus,
-        ignoreDuration: updateIgnore?.ignoreDuration,
-        ignoreCount: updateIgnore?.ignoreCount,
-        ignoreWindow: updateIgnore?.ignoreWindow,
-        ignoreUserCount: updateIgnore?.ignoreUserCount,
-        ignoreUserWindow: updateIgnore?.ignoreUserWindow,
-      });
-    }
-
-    let linkedExternalIssue: LinkedExternalIssue | null = null;
-    if (linkTarget) {
-      try {
-        linkedExternalIssue = await executeExternalIssueLink(apiService, {
-          organizationSlug: orgSlug,
-          issueId: parsedIssueId!,
-          currentIssue,
-          target: linkTarget,
-        });
-      } catch (error) {
-        if (!hasIssueUpdate) {
-          throw error;
-        }
-        if (
-          !(error instanceof UserInputError) &&
-          !(error instanceof ApiClientError)
-        ) {
-          logIssue(error);
-        }
-        const partialCommentResult = await tryPostReasonComment(
-          apiService,
-          orgSlug,
-          parsedIssueId!,
-          params.reason,
-        );
-        let output = `# Issue ${updatedIssue.shortId} Partially Updated in **${orgSlug}**\n\n`;
-        output += `**Issue**: ${updatedIssue.title}\n`;
-        output += `**URL**: ${apiService.getIssueUrl(orgSlug, updatedIssue.shortId)}\n\n`;
-        output += "## Changes Made\n\n";
-        output += "- The Sentry issue update succeeded.\n";
-        output += `- External issue linking failed: ${error instanceof Error ? error.message : String(error)}\n`;
-        output += formatReasonCommentLine(params.reason, partialCommentResult);
-        output += "\n## Response Notes\n\n";
-        output += `- Full issue details: \`get_sentry_resource(resourceType="issue", organizationSlug="${orgSlug}", resourceId="${updatedIssue.shortId}")\`\n`;
-        return {
-          content: [
-            {
-              type: "text",
-              text: output,
-            },
-          ],
-        };
-      }
-    }
+    // Update the issue
+    const updatedIssue = await apiService.updateIssue({
+      organizationSlug: orgSlug,
+      issueId: parsedIssueId!,
+      status: updateStatus,
+      assignedTo: updateAssignedTo,
+      substatus: updateIgnore?.substatus,
+      ignoreDuration: updateIgnore?.ignoreDuration,
+      ignoreCount: updateIgnore?.ignoreCount,
+      ignoreWindow: updateIgnore?.ignoreWindow,
+      ignoreUserCount: updateIgnore?.ignoreUserCount,
+      ignoreUserWindow: updateIgnore?.ignoreUserWindow,
+    });
 
     const commentResult = await tryPostReasonComment(
       apiService,
@@ -1023,17 +847,13 @@ export default defineTool({
       }
     }
 
-    if (updateAssignedTo && assignmentChanged) {
+    if (updateAssignedTo !== undefined && assignmentChanged) {
       const oldAssignee = formatAssignedTo(currentIssue.assignedTo ?? null);
       const newAssignee =
         params.assignedTo === "me"
           ? "You"
           : formatAssignedTo(updatedIssue.assignedTo ?? null);
       output += `**Assigned To**: ${oldAssignee} → **${newAssignee}**\n`;
-    }
-
-    if (linkedExternalIssue) {
-      output += `**Linked External Issue**: ${formatLinkedExternalIssue(linkedExternalIssue)}\n`;
     }
 
     output += "\n## Current Status\n\n";
@@ -1045,12 +865,7 @@ export default defineTool({
     output += `**Assigned To**: ${currentAssignee}\n`;
 
     output += "\n## Response Notes\n\n";
-    if (hasIssueUpdate) {
-      output += `- The issue has been updated in Sentry.\n`;
-    }
-    if (linkedExternalIssue) {
-      output += `- The external issue has been linked in Sentry.\n`;
-    }
+    output += `- The issue has been updated in Sentry.\n`;
     output += `- Full issue details: \`get_sentry_resource(resourceType="issue", organizationSlug="${orgSlug}", resourceId="${updatedIssue.shortId}")\`\n`;
 
     if (statusChanged && updatedStatusDisplay === "resolved") {

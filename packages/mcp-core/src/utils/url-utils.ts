@@ -1,17 +1,20 @@
+import type { SentryProtocol } from "../types";
 import {
+  type EventsDataset,
   isMetricsDataset,
   isProfilesDataset,
-  type EventsDataset,
 } from "./events-datasets";
-import type { SentryProtocol } from "../types";
 
 /**
- * Determines if a Sentry instance is SaaS or self-hosted based on the host.
- * @param host The Sentry host (e.g., "sentry.io" or "sentry.company.com")
- * @returns true if SaaS instance, false if self-hosted
+ * Recognizes Sentry-owned hosts, including single-tenant deployments.
  */
 export function isSentryHost(host: string): boolean {
   return host === "sentry.io" || host.endsWith(".sentry.io");
+}
+
+/** Hosts that use the public SaaS control host and organization web subdomains. */
+export function isPublicSentryHost(host: string): boolean {
+  return isSentryHost(host) && !host.endsWith(".my.sentry.io");
 }
 
 export interface TraceMetricIdentifier {
@@ -69,7 +72,7 @@ function getSentryWebBaseUrl(
   path: string,
   protocol: SentryProtocol = "https",
 ): string {
-  const isSaas = isSentryHost(host);
+  const isSaas = isPublicSentryHost(host);
   const webHost = isSaas ? "sentry.io" : host;
   return isSaas
     ? `${protocol}://${organizationSlug}.${webHost}${path}`
@@ -436,6 +439,27 @@ export function getMonitorUrl(
  * @param releaseVersion Release version identifier
  * @returns The complete release URL
  */
+/**
+ * Generates a Sentry uptime monitor URL.
+ *
+ * Uses the monitors UI path (`/monitors/{id}/`), which is the current home for
+ * uptime detectors in Sentry.
+ */
+export function getUptimeMonitorUrl(
+  host: string,
+  organizationSlug: string,
+  uptimeMonitorId: string | number,
+  protocol: SentryProtocol = "https",
+): string {
+  const encodedId = encodeURIComponent(String(uptimeMonitorId));
+  return getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    `/monitors/${encodedId}/`,
+    protocol,
+  );
+}
+
 export function getReleaseUrl(
   host: string,
   organizationSlug: string,
@@ -606,9 +630,91 @@ export function getAIConversationUrl(
   return getSentryWebBaseUrl(
     host,
     organizationSlug,
-    `/explore/conversations/${conversationId}/`,
+    `/explore/conversations/${encodeURIComponent(conversationId)}/`,
     protocol,
   );
+}
+
+/**
+ * Extract a single non-negated AI conversation ID from a Sentry search query
+ * that filters on `gen_ai.conversation.id`. Returns undefined when the query
+ * does not contain exactly one such filter or contains a negated filter.
+ */
+export function extractConversationIdFromSearchQuery(
+  query: string | undefined | null,
+): string | undefined {
+  if (!query) {
+    return undefined;
+  }
+
+  if (
+    /!gen_ai\.conversation\.id:|\bNOT\s+(?:\(\s*)?gen_ai\.conversation\.id:/i.test(
+      query,
+    )
+  ) {
+    return undefined;
+  }
+
+  const pattern = /gen_ai\.conversation\.id:(?:"([^"]+)"|([^\s)]+))/g;
+  const matches = [...query.matchAll(pattern)];
+  if (matches.length !== 1) {
+    return undefined;
+  }
+
+  const conversationId = matches[0][1] ?? matches[0][2];
+  if (conversationId.startsWith("[")) {
+    return undefined;
+  }
+
+  return conversationId;
+}
+
+/**
+ * Generates a Sentry AI conversations list URL with optional search filters.
+ */
+export function getAIConversationsUrl(
+  host: string,
+  organizationSlug: string,
+  options: {
+    query?: string;
+    project?: string[];
+    environment?: string | string[];
+    statsPeriod?: string;
+    start?: string;
+    end?: string;
+  } = {},
+  protocol: SentryProtocol = "https",
+): string {
+  const urlParams = new URLSearchParams();
+
+  if (options.query) {
+    urlParams.set("query", options.query);
+  }
+  for (const projectId of options.project ?? []) {
+    urlParams.append("project", projectId);
+  }
+  const environments = Array.isArray(options.environment)
+    ? options.environment
+    : options.environment
+      ? [options.environment]
+      : [];
+  for (const environmentName of environments) {
+    urlParams.append("environment", environmentName);
+  }
+  if (options.start && options.end) {
+    urlParams.set("start", options.start);
+    urlParams.set("end", options.end);
+  } else if (options.statsPeriod) {
+    urlParams.set("statsPeriod", options.statsPeriod);
+  }
+  const baseUrl = getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    "/explore/conversations/",
+    protocol,
+  );
+  const queryString = urlParams.toString();
+  return queryString ? `${baseUrl}?${queryString}` : baseUrl;
 }
 
 export function getProfileUrl(

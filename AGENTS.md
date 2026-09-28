@@ -73,7 +73,6 @@ sentry-mcp/
 
 **Integrations:**
 - docs/integrations/claude-code-plugin.md — Plugin structure and agent prompts
-- docs/integrations/flue-hooks.md — Flue hook notes
 - docs/integrations/ide-instructions-refactor.md — IDE instruction refactor notes
 
 **Specs:**
@@ -96,7 +95,6 @@ pnpm run build                            # Build all packages
 # Testing
 pnpm -w run cli --transport stdio "q"      # Test MCP tools
 pnpm -w run cli --transport stdio --access-token=TOKEN "q"
-pnpm -w run cli --transport stdio --agent "query"
 
 # Quality (run before committing)
 pnpm run tsc && pnpm run lint && pnpm run test

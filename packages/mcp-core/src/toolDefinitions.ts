@@ -10,6 +10,8 @@ export interface ToolDefinition {
   description: string;
   // Full JSON Schema object for parameters
   inputSchema: unknown;
+  // Full JSON Schema object for structured output, when declared
+  outputSchema?: unknown;
   // Sentry API scopes required to use the tool
   requiredScopes: Scope[];
   // User-facing skill catalog memberships

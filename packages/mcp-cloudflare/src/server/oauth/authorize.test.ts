@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { AuthorizationError } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
-import oauthRoute from "./index";
-import type { Env } from "../types";
-import { verifyAndParseState, signState } from "./state";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SKILL_PREFERENCES_COOKIE_NAME } from "../lib/approval-dialog";
+import type { Env } from "../types";
+import oauthRoute from "./index";
+import { signState, verifyAndParseState } from "./state";
 
 // Mock the OAuth provider
 const mockOAuthProvider = {
@@ -164,6 +165,51 @@ describe("oauth authorize routes", () => {
       );
     });
 
+    it("renders a local 400 for an AuthorizationError with no redirectUri, without throwing", async () => {
+      mockOAuthProvider.parseAuthRequest.mockRejectedValueOnce(
+        new AuthorizationError("invalid_request", {
+          description: "client_id is required",
+        }),
+      );
+
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "GET",
+      });
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toBe("client_id is required");
+    });
+
+    it("redirects an AuthorizationError back to the client once redirectUri is validated", async () => {
+      mockOAuthProvider.parseAuthRequest.mockRejectedValueOnce(
+        new AuthorizationError("invalid_scope", {
+          description: "Requested scope is not supported",
+          redirectUri: "https://example.com/callback",
+          state: "orig",
+        }),
+      );
+
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "GET",
+      });
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(302);
+      const location = new URL(response.headers.get("location")!);
+      expect(location.origin + location.pathname).toBe(
+        "https://example.com/callback",
+      );
+      expect(location.searchParams.get("error")).toBe("invalid_scope");
+      expect(location.searchParams.get("error_description")).toBe(
+        "Requested scope is not supported",
+      );
+      expect(location.searchParams.get("state")).toBe("orig");
+      // No issuer on the error itself; falls back to the request origin so
+      // the redirect still carries RFC 9207 `iss`.
+      expect(location.searchParams.get("iss")).toBe("http://localhost");
+    });
+
     it("rejects redirect URIs with a userinfo component", async () => {
       mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
         clientId: "test-client",
@@ -256,10 +302,11 @@ describe("oauth authorize routes", () => {
       expect(response.status).toBe(200);
       expectSkillChecked(html, "inspect");
       expectSkillChecked(html, "seer");
-      expectSkillUnchecked(html, "triage");
+      expectSkillChecked(html, "triage");
+      expectSkillChecked(html, "project-management");
     });
 
-    it("ignores tampered remembered skill cookies and falls back to built-in defaults", async () => {
+    it("ignores tampered remembered skill cookies and falls back to all approvable skills", async () => {
       mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
         clientId: "test-client",
         redirectUri: "https://example.com/callback",
@@ -291,7 +338,8 @@ describe("oauth authorize routes", () => {
       expect(response.status).toBe(200);
       expectSkillChecked(html, "inspect");
       expectSkillChecked(html, "seer");
-      expectSkillUnchecked(html, "triage");
+      expectSkillChecked(html, "triage");
+      expectSkillChecked(html, "project-management");
     });
   });
 
@@ -331,6 +379,42 @@ describe("oauth authorize routes", () => {
       expect(await response.text()).toBe("Invalid redirect URI");
     });
 
+    it("accepts an ephemeral loopback port against a portless CIMD registration", async () => {
+      mockOAuthProvider.lookupClient.mockResolvedValue({
+        clientId: "https://claude.ai/oauth/claude-code-client-metadata",
+        clientName: "Claude Code",
+        redirectUris: [
+          "http://localhost/callback",
+          "http://127.0.0.1/callback",
+        ],
+        tokenEndpointAuthMethod: "none",
+      });
+      const oauthReqInfo = {
+        clientId: "https://claude.ai/oauth/claude-code-client-metadata",
+        redirectUri: "http://localhost:3118/callback",
+        scope: ["org:read"],
+        state: "original-state",
+      };
+      const formData = new FormData();
+      const signedState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      formData.append("state", signedState);
+      formData.append("skill", "triage");
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "POST",
+        body: formData,
+      });
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(302);
+    });
+
     it("should encode skills in the redirect state", async () => {
       const oauthReqInfo = {
         clientId: "test-client",
@@ -362,6 +446,9 @@ describe("oauth authorize routes", () => {
       const redirectUrl = new URL(location!);
       expect(redirectUrl.hostname).toBe("sentry.io");
       expect(redirectUrl.pathname).toBe("/oauth/authorize/");
+      expect(redirectUrl.searchParams.get("scope")?.split(" ")).toContain(
+        "alerts:write",
+      );
       const stateParam = redirectUrl.searchParams.get("state");
       expect(stateParam).toBeTruthy();
       const decodedState = await verifyAndParseState(
@@ -526,6 +613,39 @@ describe("oauth authorize routes", () => {
       expect(setCookie).toContain("Secure");
       expect(setCookie).toContain("SameSite=Lax");
     });
+
+    it("redirects cancel to the client with access_denied", async () => {
+      const oauthReqInfo = {
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+        state: "original-state",
+      };
+      const formData = new FormData();
+      const signedState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      formData.append("state", signedState);
+      formData.append("decision", "deny");
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "POST",
+        body: formData,
+      });
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("Set-Cookie")).toBeNull();
+      const redirectUrl = new URL(response.headers.get("location")!);
+      expect(redirectUrl.origin).toBe("https://example.com");
+      expect(redirectUrl.pathname).toBe("/callback");
+      expect(redirectUrl.searchParams.get("error")).toBe("access_denied");
+      expect(redirectUrl.searchParams.get("state")).toBe("original-state");
+    });
   });
 
   describe("POST /oauth/authorize (CSRF/validation)", () => {
@@ -665,6 +785,38 @@ describe("oauth authorize routes", () => {
 
         expect(response.status).toBe(200);
         const html = await response.text();
+        expect(html).not.toContain("Session scope");
+      });
+
+      // Regression: Claude plugin MCP URL is /mcp?utm_source=plugin. The AS
+      // must accept that exact resource indicator and must not emit
+      // invalid_target just because the issuer is query-free.
+      it("should allow request with plugin utm_source resource parameter", async () => {
+        mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp?utm_source=plugin",
+        });
+        mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+          clientId: "test-client",
+          clientName: "Test Client",
+          redirectUris: ["https://example.com/callback"],
+        });
+
+        const url = new URL("http://localhost/oauth/authorize");
+        url.searchParams.set(
+          "resource",
+          "http://localhost/mcp?utm_source=plugin",
+        );
+
+        const request = new Request(url, { method: "GET" });
+        const response = await app.fetch(request, testEnv as Env);
+
+        expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).toContain("<form");
+        expect(html).not.toContain("invalid_target");
         expect(html).not.toContain("Session scope");
       });
 
@@ -934,6 +1086,42 @@ describe("oauth authorize routes", () => {
 
         expect(response.status).toBe(302);
         const location = response.headers.get("location");
+        expect(location).toContain("sentry.io");
+      });
+
+      // Regression: consent approval must also accept the plugin-attributed
+      // resource and continue upstream rather than redirecting invalid_target.
+      it("should allow approval with plugin utm_source resource parameter", async () => {
+        const oauthReqInfo = {
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp?utm_source=plugin",
+        };
+        const formData = new FormData();
+        const signedState = await signState(
+          {
+            req: { oauthReqInfo },
+            iat: Date.now(),
+            exp: Date.now() + 10 * 60 * 1000,
+          },
+          testEnv.COOKIE_SECRET!,
+        );
+        formData.append("state", signedState);
+
+        const request = new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        });
+        const response = await app.fetch(request, testEnv as Env);
+
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        expect(location).toBeTruthy();
+        const locationUrl = new URL(location!);
+        expect(locationUrl.searchParams.get("error")).not.toBe(
+          "invalid_target",
+        );
         expect(location).toContain("sentry.io");
       });
 

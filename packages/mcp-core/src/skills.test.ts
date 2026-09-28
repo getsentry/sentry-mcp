@@ -32,6 +32,14 @@ function getGeneratedSkillToolDescription(skillId: string, toolName: string) {
 }
 
 describe("skills module", () => {
+  it("does not advertise workflow-only tools in generated skill prompts", () => {
+    for (const skill of skillDefinitions) {
+      expect(skill.tools?.map((tool) => tool.name) ?? []).not.toContain(
+        "onboarding_status_update",
+      );
+    }
+  });
+
   describe("SKILLS registry", () => {
     it("has all expected skills", () => {
       expect(SKILLS.inspect).toBeDefined();

@@ -17,7 +17,6 @@ export default function SpeedDisplay({
 }: SpeedDisplayProps) {
   const [animate, setAnimate] = useState(false);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: change in speed triggers the animation
   useEffect(() => {
     setAnimate(true);
     const t = setTimeout(() => setAnimate(false), durationMs);

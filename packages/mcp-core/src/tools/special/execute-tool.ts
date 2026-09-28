@@ -1,6 +1,10 @@
 import { type Span, type SpanAttributeValue, startSpan } from "@sentry/core";
 import { z } from "zod";
 import { defineTool } from "../../internal/tool-helpers/define";
+import {
+  isExpectedToolError,
+  recordToolFailure,
+} from "../../internal/error-handling";
 import { UserInputError } from "../../errors";
 import { ALL_SKILLS } from "../../skills";
 import type { ServerContext } from "../../types";
@@ -61,7 +65,12 @@ async function executeCatalogToolWithSpan({
         return output;
       } catch (error) {
         span.setStatus({ code: 2 });
-        span.recordException(error);
+        // Expected failures (validation, AI provider outages) still fail the
+        // span, but skip exception recording to avoid Sentry noise.
+        if (!isExpectedToolError(error)) {
+          span.recordException(error);
+        }
+        recordToolFailure(tool, error, params, context);
         throw error;
       }
     },
@@ -98,7 +107,7 @@ export function createExecuteTool(getTools: () => ToolRegistry) {
         .min(1)
         .describe("The name of the available tool to execute."),
       arguments: z
-        .record(z.unknown())
+        .record(z.string(), z.unknown())
         .default({})
         .describe(
           "Arguments for the target tool, matching the schema returned by search_sentry_tools.",

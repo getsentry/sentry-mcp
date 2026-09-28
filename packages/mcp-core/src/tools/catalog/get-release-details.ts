@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { UserInputError } from "../../errors";
@@ -101,7 +102,6 @@ export default defineTool({
     releaseVersion: z.string().trim().min(1).describe("Exact release version."),
     projectSlugOrId: z
       .string()
-      .toLowerCase()
       .trim()
       .superRefine(validateSlugOrId)
       .describe(
@@ -133,6 +133,7 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
@@ -140,7 +141,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
     const organizationSlug = params.organizationSlug;
-    setTag("organization.slug", organizationSlug);
+    setOrganizationContext(organizationSlug);
     setTag("release.version", params.releaseVersion);
     const scopedProjectSlug = context.constraints.projectSlug ?? undefined;
     const requestedProjectSlugOrId = params.projectSlugOrId ?? undefined;

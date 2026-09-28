@@ -1,0 +1,28 @@
+name: PR Risk Label Tests
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/pr-risk-jev.yml
+      - .github/workflows/pr-risk-labels-test.yml
+      - .github/tests/pr-risk-labels.test.mjs
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/pr-risk-jev.yml
+      - .github/workflows/pr-risk-labels-test.yml
+      - .github/tests/pr-risk-labels.test.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+      - run: node --test .github/tests/pr-risk-labels.test.mjs

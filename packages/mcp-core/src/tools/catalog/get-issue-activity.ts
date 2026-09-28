@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import {
@@ -7,6 +8,7 @@ import {
   parseIssueParams,
 } from "../../internal/tool-helpers/issue";
 import type { IssueActivity, IssueComment } from "../../api-client/types";
+import { isPlainObject } from "../../internal/type-guards";
 import { formatAvailableToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
 import type { ServerContext } from "../../types";
 import {
@@ -20,7 +22,6 @@ import {
   formatDate,
   formatId,
   formatUnknown,
-  isRecord,
   readString,
 } from "./support/api-formatting";
 
@@ -45,7 +46,9 @@ function formatActivity(activity: IssueActivity | IssueComment): string {
   const date = formatDate(activity.dateCreated) ?? "unknown time";
   const text = getActivityText(activity);
   const details =
-    !text && isRecord(activity.data) && Object.keys(activity.data).length > 0
+    !text &&
+    isPlainObject(activity.data) &&
+    Object.keys(activity.data).length > 0
       ? `\n  - Data: ${formatUnknown(activity.data)}`
       : "";
   return `- ${date}: ${activity.type ?? "activity"} by ${actor} (${formatId(activity.id)})${text ? `\n  - ${text}` : ""}${details}`;
@@ -78,6 +81,7 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
@@ -91,7 +95,7 @@ export default defineTool({
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? context.constraints.regionUrl ?? undefined,
     });
-    setTag("organization.slug", parsed.organizationSlug);
+    setOrganizationContext(parsed.organizationSlug);
     setTag("issue.id", parsed.issueId);
 
     await ensureIssueWithinProjectConstraint({

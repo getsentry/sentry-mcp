@@ -31,7 +31,6 @@ export function Sidebars({ isChatOpen, toggleChat }: SidebarProps) {
             <div className="flex flex-nowrap">
               {"open".split("").map((char, i) => (
                 <span
-                  // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
                   key={`open-${i}`}
                   className="animate-openchat"
                   // per-index delay so animation cascades
@@ -58,7 +57,6 @@ export function Sidebars({ isChatOpen, toggleChat }: SidebarProps) {
                 const offsetChars = "open".length + 1;
                 return (
                   <span
-                    // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
                     key={`chat-${i}`}
                     className="animate-openchat"
                     style={{

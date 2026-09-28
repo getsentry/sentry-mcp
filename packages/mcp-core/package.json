@@ -1,11 +1,11 @@
 {
   "name": "@sentry/mcp-core",
-  "version": "0.36.0",
+  "version": "0.42.0",
   "type": "module",
   "private": true,
-  "packageManager": "pnpm@10.8.1",
+  "packageManager": "pnpm@11.8.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "license": "FSL-1.1-ALv2",
   "author": "Sentry",
@@ -121,6 +121,10 @@
       "types": "./dist/internal/agents/anthropic-provider.d.ts",
       "default": "./dist/internal/agents/anthropic-provider.js"
     },
+    "./internal/agents/openrouter-provider": {
+      "types": "./dist/internal/agents/openrouter-provider.d.ts",
+      "default": "./dist/internal/agents/openrouter-provider.js"
+    },
     "./internal/agents/provider-factory": {
       "types": "./dist/internal/agents/provider-factory.d.ts",
       "default": "./dist/internal/agents/provider-factory.js"
@@ -142,8 +146,8 @@
     "prebuild": "pnpm run generate-definitions",
     "build": "tsdown",
     "pretest": "pnpm run generate-definitions",
-    "test": "vitest run",
-    "test:ci": "pnpm run generate-definitions && vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test": "pnpm run validate-skills && vitest run",
+    "test:ci": "pnpm run generate-definitions && pnpm run validate-skills && vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",
     "test:watch": "pnpm run generate-definitions && vitest",
     "tsc": "tsc --noEmit",
     "generate-definitions": "tsx scripts/generate-definitions.ts && biome format --write src/toolDefinitions.json src/skillDefinitions.json",
@@ -158,8 +162,7 @@
     "@sentry/mcp-server-tsconfig": "workspace:*",
     "msw": "catalog:",
     "tiktoken": "^1.0.18",
-    "yaml": "^2.8.3",
-    "zod-to-json-schema": "catalog:"
+    "yaml": "^2.8.3"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "catalog:",
@@ -168,6 +171,7 @@
     "@logtape/logtape": "^1.1.1",
     "@logtape/sentry": "^1.1.1",
     "@modelcontextprotocol/sdk": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
     "@sentry/core": "catalog:",
     "ai": "catalog:",
     "dotenv": "catalog:",

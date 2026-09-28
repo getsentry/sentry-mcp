@@ -19,10 +19,10 @@ describeEval("update-project", {
         ],
       },
       {
-        input: `Assign the project '${FIXTURES.projectSlug}' in organization '${FIXTURES.organizationSlug}' to the team '${FIXTURES.teamSlug}'. Output only the team slug as plain text without any formatting:\nthe-goats`,
+        input: `Grant the team '${FIXTURES.teamSlug}' access to the project '${FIXTURES.projectSlug}' in organization '${FIXTURES.organizationSlug}'. Output only the team slug as plain text without any formatting:\nthe-goats`,
         expectedTools: [
           {
-            name: "update_project",
+            name: "add_team_to_project",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
               projectSlug: FIXTURES.projectSlug,

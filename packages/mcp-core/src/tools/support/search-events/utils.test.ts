@@ -1,14 +1,16 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import {
-  fetchCustomAttributes,
-  formatEventValue,
-  formatKnownUserValue,
-  looksLikeSentrySearchSyntax,
-} from "./utils";
+import { HttpResponse, http } from "msw";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SentryApiService } from "../../../api-client";
 import * as logging from "../../../telem/logging";
+import {
+  fetchCustomAttributes,
+  formatEventsValidationResults,
+  formatEventValue,
+  formatKnownUserValue,
+  isSemanticFilterDowngrade,
+  looksLikeSentrySearchSyntax,
+} from "./utils";
 
 describe("formatEventValue", () => {
   describe("primitives", () => {
@@ -220,6 +222,104 @@ describe("search query helpers", () => {
     expect(looksLikeSentrySearchSyntax("Note: show slow spans")).toBe(false);
     expect(looksLikeSentrySearchSyntax("ERROR: service is down")).toBe(false);
   });
+
+  it("detects message full-text downgrades but allows real field renames", () => {
+    expect(
+      isSemanticFilterDowngrade("conv_id:ZYGC-86ZR", 'message:"*ZYGC-86ZR*"'),
+    ).toBe(true);
+    expect(
+      isSemanticFilterDowngrade(
+        "conv_id:ZYGC-86ZR",
+        "message:*ZYGC-86ZR* environment:prod",
+      ),
+    ).toBe(true);
+
+    // Legitimate typo/rename repairs must not be treated as downgrades.
+    expect(
+      isSemanticFilterDowngrade(
+        "spon.duration:>100 span.op:db",
+        "span.duration:>100 span.op:db",
+      ),
+    ).toBe(false);
+    expect(
+      isSemanticFilterDowngrade(
+        "tags[type]:Unified",
+        "tags[type]:Unified has:span.status",
+      ),
+    ).toBe(false);
+    expect(isSemanticFilterDowngrade("span.op:db AND", "span.op:db")).toBe(
+      false,
+    );
+
+    // Natural language input is not a structured-filter downgrade case.
+    expect(
+      isSemanticFilterDowngrade(
+        "errors mentioning ZYGC-86ZR",
+        'message:"*ZYGC-86ZR*"',
+      ),
+    ).toBe(false);
+
+    // message: inside a quoted value is not a full-text filter.
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:hello",
+        'transaction:"handle message:hello"',
+      ),
+    ).toBe(false);
+
+    // Duplicate structured keys must still catch a partial full-text downgrade.
+    // Set-based key comparison would miss this because "custom" remains present.
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:foo custom:bar",
+        'custom:bar message:"*foo*"',
+      ),
+    ).toBe(true);
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:foo custom:foo",
+        'custom:foo message:"*foo*"',
+      ),
+    ).toBe(true);
+
+    // Keeping both structured values (or renaming one) is not a downgrade.
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:foo custom:bar",
+        "custom:foo custom:bar environment:prod",
+      ),
+    ).toBe(false);
+    expect(
+      isSemanticFilterDowngrade(
+        "custom:foo custom:bar",
+        "tags[custom]:foo custom:bar",
+      ),
+    ).toBe(false);
+
+    // Quoted multi-word values must keep later words for downgrade detection.
+    // Truncating at the first space would miss message rewrites of "world".
+    expect(
+      isSemanticFilterDowngrade(
+        'transaction:"hello world"',
+        'message:"*world*"',
+      ),
+    ).toBe(true);
+    expect(
+      isSemanticFilterDowngrade(
+        "transaction:'hello world'",
+        'log.body:"*hello world*"',
+      ),
+    ).toBe(true);
+
+    // Bare substring matches are not enough — short values must not false-hit
+    // inside unrelated full-text (e.g. "1" inside "401").
+    expect(
+      isSemanticFilterDowngrade("id:1", 'message:"error 401"'),
+    ).toBe(false);
+    expect(
+      isSemanticFilterDowngrade("id:1", 'message:"error 1"'),
+    ).toBe(true);
+  });
 });
 
 describe("fetchCustomAttributes", () => {
@@ -367,36 +467,40 @@ describe("fetchCustomAttributes", () => {
 
   describe("successful responses", () => {
     it("should return attributes for spans dataset", async () => {
-      // Mock with separate string and number queries as the real API does
-      // The API client makes two separate calls with attributeType parameter
       mswServer.use(
         http.get(
           "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
           ({ request }) => {
             const url = new URL(request.url);
-            const attributeType = url.searchParams.get("attributeType");
             const itemType = url.searchParams.get("itemType");
 
-            // Validate the request has expected parameters
-            if (!attributeType || !itemType) {
+            if (!itemType) {
               return HttpResponse.json(
                 { detail: "Missing required parameters" },
                 { status: 400 },
               );
             }
 
-            if (attributeType === "string") {
-              return HttpResponse.json([
-                { key: "span.op", name: "Operation" },
-                { key: "sentry:internal", name: "Internal" }, // Should be filtered
-              ]);
-            }
-            if (attributeType === "number") {
-              return HttpResponse.json([
-                { key: "span.duration", name: "Duration" },
-              ]);
-            }
-            return HttpResponse.json([]);
+            return HttpResponse.json([
+              {
+                key: "span.op",
+                name: "Operation",
+                attributeType: "string",
+                attributeSource: { source_type: "sentry" },
+              },
+              {
+                key: "sentry:internal",
+                name: "Internal",
+                attributeType: "string",
+                attributeSource: { source_type: "sentry" },
+              },
+              {
+                key: "span.duration",
+                name: "Duration",
+                attributeType: "number",
+                attributeSource: { source_type: "sentry" },
+              },
+            ]);
           },
         ),
       );
@@ -451,25 +555,30 @@ describe("fetchCustomAttributes", () => {
           "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
           ({ request }) => {
             const url = new URL(request.url);
-            const attributeType = url.searchParams.get("attributeType");
             const itemType = url.searchParams.get("itemType");
 
             expect(itemType).toBe("tracemetrics");
 
-            if (attributeType === "string") {
-              return HttpResponse.json([
-                { key: "metric.name", name: "Metric Name" },
-                { key: "metric.type", name: "Metric Type" },
-              ]);
-            }
-
-            if (attributeType === "number") {
-              return HttpResponse.json([
-                { key: "value", name: "Metric Value" },
-              ]);
-            }
-
-            return HttpResponse.json([]);
+            return HttpResponse.json([
+              {
+                key: "metric.name",
+                name: "Metric Name",
+                attributeType: "string",
+                attributeSource: { source_type: "sentry" },
+              },
+              {
+                key: "metric.type",
+                name: "Metric Type",
+                attributeType: "string",
+                attributeSource: { source_type: "sentry" },
+              },
+              {
+                key: "value",
+                name: "Metric Value",
+                attributeType: "number",
+                attributeSource: { source_type: "sentry" },
+              },
+            ]);
           },
         ),
       );
@@ -504,35 +613,26 @@ describe("fetchCustomAttributes", () => {
             const url = new URL(request.url);
             requests.push(url.searchParams);
 
-            const attributeType = url.searchParams.get("attributeType");
-            if (attributeType === "string") {
-              return HttpResponse.json([
-                {
-                  key: "tags[type]",
-                  name: "type",
-                  attributeType: "string",
-                },
-              ]);
-            }
-            if (attributeType === "number") {
-              return HttpResponse.json([
-                {
-                  key: "tags[sequence,number]",
-                  name: "sequence",
-                  attributeType: "number",
-                },
-              ]);
-            }
-            if (attributeType === "boolean") {
-              return HttpResponse.json([
-                {
-                  key: "tags[enabled,boolean]",
-                  name: "enabled",
-                  attributeType: "boolean",
-                },
-              ]);
-            }
-            return HttpResponse.json([]);
+            return HttpResponse.json([
+              {
+                key: "tags[type]",
+                name: "type",
+                attributeType: "string",
+                attributeSource: { source_type: "sentry" },
+              },
+              {
+                key: "tags[sequence,number]",
+                name: "sequence",
+                attributeType: "number",
+                attributeSource: { source_type: "user" },
+              },
+              {
+                key: "tags[enabled,boolean]",
+                name: "enabled",
+                attributeType: "boolean",
+                attributeSource: { source_type: "user" },
+              },
+            ]);
           },
         ),
       );
@@ -550,10 +650,8 @@ describe("fetchCustomAttributes", () => {
         },
       );
 
-      expect(requests).toHaveLength(3);
-      expect(
-        requests.map((params) => params.get("attributeType")).sort(),
-      ).toEqual(["boolean", "number", "string"]);
+      expect(requests).toHaveLength(1);
+      expect(requests[0]!.get("attributeType")).toBeNull();
       for (const params of requests) {
         expect(params.get("itemType")).toBe("spans");
         expect(params.get("project")).toBe("123");
@@ -574,5 +672,138 @@ describe("fetchCustomAttributes", () => {
         },
       });
     });
+  });
+});
+
+describe("formatEventsValidationResults", () => {
+  it("returns an empty string when there are no validation sections", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: true,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: { valid: true, fields: [] },
+        orderby: [],
+      }),
+    ).toBe("");
+  });
+
+  it("formats all validation sections for a mixed result", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: false,
+        projects: [{ valid: true }],
+        dataset: [
+          {
+            name: "spans",
+            valid: false,
+            error: "dataset must be one of: spans, errors",
+          },
+        ],
+        environment: [{ valid: true }],
+        field: [
+          { name: "span.duration", valid: true, type: "number" },
+          {
+            name: "tags[missing]",
+            valid: false,
+            error: "Unknown attribute",
+          },
+        ],
+        query: {
+          valid: false,
+          error: "Invalid syntax",
+          fields: [{ name: "transaction", valid: true, type: "string" }],
+        },
+        orderby: [
+          {
+            name: "-spon.duration",
+            valid: false,
+            error: "Orderby must also be a selected field",
+          },
+        ],
+      }),
+    ).toBe(`Validation Result: invalid
+Validated Dataset:
+- INVALID spans — dataset must be one of: spans, errors
+
+Validated Fields:
+- INVALID tags[missing] — Unknown attribute
+
+Validated Query:
+- INVALID query — Invalid syntax
+
+Validated Order By:
+- INVALID -spon.duration — Orderby must also be a selected field
+`);
+  });
+
+  it("formats invalid query with invalid query fields", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: false,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: {
+          valid: false,
+          error: 'quotes are not closed at "VPN connections',
+          fields: [
+            { name: "hello", valid: false, error: "Unknown attribute" },
+            { name: "tags[fake]", valid: false, error: "Unknown attribute" },
+          ],
+        },
+        orderby: [],
+      }),
+    ).toBe(`Validation Result: invalid
+Validated Query:
+- INVALID query — quotes are not closed at "VPN connections
+  - INVALID hello — Unknown attribute
+  - INVALID tags[fake] — Unknown attribute
+`);
+  });
+
+  it("formats valid query field details when validation passes", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: true,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: {
+          valid: true,
+          fields: [{ name: "transaction", valid: true, type: "string" }],
+        },
+        orderby: [],
+      }),
+    ).toBe(`Validation Result: valid
+Validated Query:
+- OK query
+  - OK transaction — type: string
+`);
+  });
+
+  it("formats query-only validation failure", () => {
+    expect(
+      formatEventsValidationResults({
+        valid: false,
+        projects: [],
+        dataset: [],
+        environment: [],
+        field: [],
+        query: {
+          valid: false,
+          error: "Invalid syntax",
+          fields: [],
+        },
+        orderby: [],
+      }),
+    ).toBe(`Validation Result: invalid
+Validated Query:
+- INVALID query — Invalid syntax
+`);
   });
 });

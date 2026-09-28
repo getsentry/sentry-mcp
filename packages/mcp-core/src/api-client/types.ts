@@ -40,9 +40,18 @@
  */
 import type { z } from "zod";
 import type {
-  AssignedToSchema,
+  AgenticOnboardingRunSchema,
+  AgenticOnboardingStatusUpdateSchema,
+  AIConversationDetailsResponseSchema,
   AIConversationSpanListSchema,
   AIConversationSpanSchema,
+  AIConversationSummaryListSchema,
+  AIConversationSummarySchema,
+  AIConversationUserSchema,
+  AlertActionOptionSchema,
+  AlertConditionOptionSchema,
+  AlertRuleProjectScopeSchema,
+  AssignedToSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
   ClientKeyListSchema,
@@ -55,16 +64,13 @@ import type {
   DefaultEventSchema,
   DeployListSchema,
   DeploySchema,
+  DetectorSchema,
   ErrorEventSchema,
   EventAttachmentListSchema,
   EventAttachmentSchema,
   EventSchema,
   ExternalIssueListSchema,
   ExternalIssueSchema,
-  IssueIntegrationLinkConfigSchema,
-  IssueIntegrationListSchema,
-  IssueIntegrationSchema,
-  NativeExternalIssueSchema,
   FlamegraphFrameInfoSchema,
   FlamegraphFrameSchema,
   FlamegraphProfileMetadataSchema,
@@ -77,17 +83,21 @@ import type {
   IssueAlertRuleSchema,
   IssueCommentListSchema,
   IssueCommentSchema,
+  IssueIntegrationListSchema,
+  IssueIntegrationSchema,
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
+  MetricAlertRuleListSchema,
+  MetricAlertRuleSchema,
   MonitorCheckInListSchema,
   MonitorCheckInSchema,
   MonitorListSchema,
   MonitorSchema,
-  MonitorStatsSchema,
   MonitorStatSchema,
-  MetricAlertRuleListSchema,
-  MetricAlertRuleSchema,
+  MonitorStatsSchema,
+  NativeExternalIssueSchema,
+  OrganizationEnvironmentListSchema,
   OrganizationListSchema,
   OrganizationSchema,
   ProfileChunkResponseSchema,
@@ -95,15 +105,19 @@ import type {
   ProfileChunkSchema,
   ProfileFrameSchema,
   ProjectListSchema,
+  ProjectRepositoryMappingSchema,
   ProjectSchema,
   ReleaseDetailsSchema,
   ReleaseListSchema,
   ReleaseSchema,
   ReplayDetailsSchema,
   ReplayListResponseSchema,
+  ReplayRecordingEventSchema,
   ReplayRecordingSegmentsSchema,
+  SentryAppComponentListSchema,
+  SentryAppExternalRequestOptionsSchema,
   SentryAppInstallationListSchema,
-  SentryAppInstallationSchema,
+  StacktraceLinkSchema,
   TagListSchema,
   TagSchema,
   TeamListSchema,
@@ -116,14 +130,78 @@ import type {
   TransactionProfileSampleSchema,
   TransactionProfileSchema,
   UnknownEventSchema,
+  UptimeCheckListSchema,
+  UptimeCheckSchema,
+  UptimeMonitorListSchema,
+  UptimeMonitorSchema,
+  UserReportListSchema,
   UserSchema,
 } from "./schema";
 
+export type AgenticOnboardingRun = z.infer<typeof AgenticOnboardingRunSchema>;
+export type AgenticOnboardingStatusUpdate = z.infer<
+  typeof AgenticOnboardingStatusUpdateSchema
+>;
 export type User = z.infer<typeof UserSchema>;
 export type Organization = z.infer<typeof OrganizationSchema>;
 export type Team = z.infer<typeof TeamSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
+export type ProjectRepositoryMapping = z.infer<
+  typeof ProjectRepositoryMappingSchema
+>;
 export type IssueAlertRule = z.infer<typeof IssueAlertRuleSchema>;
+export type AlertActionOption = z.infer<typeof AlertActionOptionSchema>;
+export type AlertConditionOption = z.infer<typeof AlertConditionOptionSchema>;
+export type AlertRuleProjectScope = z.infer<typeof AlertRuleProjectScopeSchema>;
+export type Detector = z.infer<typeof DetectorSchema>;
+export type MetricMonitorUpdate = {
+  name?: string;
+  description?: string | null;
+  enabled?: boolean;
+  owner?: string | null;
+  workflowIds?: string[];
+  config?: Record<string, unknown>;
+  conditionGroup?: {
+    id?: string | number;
+    logicType: string;
+    conditions: Array<{
+      id?: string | number;
+      type: string;
+      comparison: unknown;
+      conditionResult: unknown;
+    }>;
+  };
+  dataSources?: Array<{
+    dataset: string;
+    query: string;
+    aggregate: string;
+    timeWindow: number;
+    environment: string | null;
+    eventTypes: string[];
+    extrapolationMode?: string | null;
+  }>;
+};
+export type MetricMonitorCreate = Pick<
+  MetricMonitorUpdate,
+  "description" | "owner"
+> &
+  Required<
+    Pick<
+      MetricMonitorUpdate,
+      "name" | "config" | "conditionGroup" | "dataSources" | "workflowIds"
+    >
+  > & { type: "metric_issue" };
+export type AlertRuleUpdate = {
+  name: string;
+  enabled: boolean;
+  config?: Record<string, unknown>;
+  environment?: string | null;
+  owner?: string | null;
+  triggers?: NonNullable<IssueAlertRule["triggers"]>;
+  actionFilters?: NonNullable<IssueAlertRule["actionFilters"]>;
+  detectorIds?: string[];
+};
+export type AlertRuleCreate = AlertRuleUpdate & { detectorIds: string[] };
 export type MetricAlertRule = z.infer<typeof MetricAlertRuleSchema>;
 export type ClientKey = z.infer<typeof ClientKeySchema>;
 export type Release = z.infer<typeof ReleaseSchema>;
@@ -136,6 +214,8 @@ export type IssueComment = z.infer<typeof IssueCommentSchema>;
 export type Monitor = z.infer<typeof MonitorSchema>;
 export type MonitorCheckIn = z.infer<typeof MonitorCheckInSchema>;
 export type MonitorStat = z.infer<typeof MonitorStatSchema>;
+export type UptimeMonitor = z.infer<typeof UptimeMonitorSchema>;
+export type UptimeCheck = z.infer<typeof UptimeCheckSchema>;
 
 // Individual event types
 export type ErrorEvent = z.infer<typeof ErrorEventSchema>;
@@ -152,6 +232,7 @@ export type Event =
   | TransactionEvent
   | GenericEvent
   | UnknownEvent;
+export type StacktraceLink = z.infer<typeof StacktraceLinkSchema>;
 
 export type EventAttachment = z.infer<typeof EventAttachmentSchema>;
 export type Tag = z.infer<typeof TagSchema>;
@@ -160,6 +241,7 @@ export type AutofixRunState = z.infer<typeof AutofixRunStateSchema>;
 export type AssignedTo = z.infer<typeof AssignedToSchema>;
 export type ReplayDetails = z.infer<typeof ReplayDetailsSchema>;
 export type ReplayList = z.infer<typeof ReplayListResponseSchema>["data"];
+export type ReplayRecordingEvent = z.infer<typeof ReplayRecordingEventSchema>;
 export type ReplayRecordingSegments = z.infer<
   typeof ReplayRecordingSegmentsSchema
 >;
@@ -180,7 +262,12 @@ export type IssueCommentList = z.infer<typeof IssueCommentListSchema>;
 export type MonitorList = z.infer<typeof MonitorListSchema>;
 export type MonitorCheckInList = z.infer<typeof MonitorCheckInListSchema>;
 export type MonitorStats = z.infer<typeof MonitorStatsSchema>;
+export type UptimeMonitorList = z.infer<typeof UptimeMonitorListSchema>;
+export type UptimeCheckList = z.infer<typeof UptimeCheckListSchema>;
 export type EventAttachmentList = z.infer<typeof EventAttachmentListSchema>;
+export type OrganizationEnvironmentList = z.infer<
+  typeof OrganizationEnvironmentListSchema
+>;
 export type TagList = z.infer<typeof TagListSchema>;
 export type ClientKeyList = z.infer<typeof ClientKeyListSchema>;
 
@@ -197,6 +284,14 @@ export type Trace = z.infer<typeof TraceSchema>;
 export type AIConversationSpan = z.infer<typeof AIConversationSpanSchema>;
 export type AIConversationSpanList = z.infer<
   typeof AIConversationSpanListSchema
+>;
+export type AIConversationDetails = z.infer<
+  typeof AIConversationDetailsResponseSchema
+>;
+export type AIConversationUser = z.infer<typeof AIConversationUserSchema>;
+export type AIConversationSummary = z.infer<typeof AIConversationSummarySchema>;
+export type AIConversationSummaryList = z.infer<
+  typeof AIConversationSummaryListSchema
 >;
 
 // Profile types
@@ -224,11 +319,16 @@ export type ExternalIssue = z.infer<typeof ExternalIssueSchema>;
 export type ExternalIssueList = z.infer<typeof ExternalIssueListSchema>;
 export type IssueIntegration = z.infer<typeof IssueIntegrationSchema>;
 export type IssueIntegrationList = z.infer<typeof IssueIntegrationListSchema>;
-export type IssueIntegrationLinkConfig = z.infer<
-  typeof IssueIntegrationLinkConfigSchema
->;
 export type NativeExternalIssue = z.infer<typeof NativeExternalIssueSchema>;
-export type SentryAppInstallation = z.infer<typeof SentryAppInstallationSchema>;
 export type SentryAppInstallationList = z.infer<
   typeof SentryAppInstallationListSchema
 >;
+export type SentryAppComponentList = z.infer<
+  typeof SentryAppComponentListSchema
+>;
+export type SentryAppExternalRequestOptions = z.infer<
+  typeof SentryAppExternalRequestOptionsSchema
+>;
+
+// User Report
+export type UserReportList = z.infer<typeof UserReportListSchema>;

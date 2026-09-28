@@ -69,8 +69,10 @@ SORTING RULES:
 - freq: Event frequency
 - new: First seen
 - user: User count
+- recommended: Sentry's prioritized ranking
 - If the user asks to sort/rank by users or impact, set sort to user.
 - If the user asks for most frequent/noisy issues, set sort to freq.
+- If the user asks for what to look at/prioritize/triage first, set sort to recommended.
 - Never put sort syntax inside query.
 
 ME REFERENCES:

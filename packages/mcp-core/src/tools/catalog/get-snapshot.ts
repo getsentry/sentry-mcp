@@ -1,5 +1,5 @@
-import { setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import { UserInputError } from "../../errors";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
@@ -81,6 +81,7 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
@@ -90,7 +91,7 @@ export default defineTool({
       );
     }
 
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationContext(params.organizationSlug);
 
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -104,7 +105,6 @@ export default defineTool({
       {
         showUnmodified: params.showUnmodified,
         listImagesWhenNoDiffs: true,
-        nextSteps: "snapshot-tools",
         experimentalMode: context.experimentalMode ?? false,
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,

@@ -221,7 +221,7 @@ Ordinary operation modules live as flat files under
 need more implementation structure.
 `packages/mcp-core/src/tools/catalog-runtime/` contains the shared filtering,
 search, schema, and execution helpers. Wrapper/gateway tools such as
-`search_sentry_tools`, `execute_sentry_tool`, and `use_sentry` live in
+`search_sentry_tools`, `execute_sentry_tool` live in
 `packages/mcp-core/src/tools/special/`.
 
 `packages/mcp-core/src/tools/surfaces.ts` only centralizes the subsets of
@@ -332,66 +332,3 @@ This pattern is used when:
 - Embedded agent errors are returned as UserInputError
 - Calling agent sees the error and can retry
 - No internal retry loops - single responsibility
-
-### use_sentry Tool Architecture
-
-The `use_sentry` tool provides a natural language interface to all Sentry MCP tools using an in-memory MCP client-server architecture:
-
-**Architecture**:
-1. Creates linked pair of `InMemoryTransport` from MCP SDK
-2. Builds internal MCP server with all 18 tools (excludes use_sentry to prevent recursion)
-3. Connects server to serverTransport within ServerContext
-4. Creates MCP client with clientTransport
-5. Embedded GPT-5 agent accesses tools through MCP protocol
-6. Zero network overhead - all communication is in-memory
-
-**Data Flow**:
-```
-User request → use_sentry handler
-  ↓
-Creates InMemoryTransport pair
-  ↓
-Builds internal MCP server (18 tools)
-  ↓
-Creates MCP client
-  ↓
-Embedded agent calls tools via MCP protocol
-  ↓
-MCP server executes tool handlers
-  ↓
-Results returned through MCP protocol
-  ↓
-Agent processes and returns final result
-```
-
-**Benefits**:
-- Full MCP protocol compliance throughout
-- Architectural consistency - all tool access via MCP
-- Zero performance overhead (no network, no serialization)
-- Proper tool isolation at protocol level
-- No recursion risk (use_sentry excluded from internal server)
-
-**Implementation**: Uses built-in `InMemoryTransport.createLinkedPair()` from `@modelcontextprotocol/sdk/inMemory.js` for reliable in-process communication.
-
-## Security Model
-
-- Access tokens never logged
-- OAuth tokens encrypted in KV
-- Per-organization isolation
-- CORS configured for security
-
-## Testing Architecture
-
-Three levels of testing:
-
-1. **Unit tests**: Fast, isolated, snapshot-based
-2. **Integration tests**: With mocked API
-3. **Evaluation tests**: Real-world scenarios with LLM
-
-## References
-
-- MCP SDK: `@modelcontextprotocol/sdk`
-- Build config: `turbo.json`
-- TypeScript config: `packages/mcp-server-tsconfig/`
-- API client: `packages/mcp-core/src/api-client/`
-- stdio package: `packages/mcp-server/`

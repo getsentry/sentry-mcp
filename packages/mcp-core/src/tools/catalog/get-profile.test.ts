@@ -1,3 +1,5 @@
+import { mswServer } from "@sentry/mcp-server-mocks";
+import { http, HttpResponse } from "msw";
 import { describe, it, expect } from "vitest";
 import getProfile from "./get-profile";
 
@@ -5,6 +7,7 @@ describe("get_profile", () => {
   it("marks profile analysis as open-world because it reads Sentry APIs", () => {
     expect(getProfile.annotations).toEqual({
       readOnlyHint: true,
+      destructiveHint: false,
       openWorldHint: true,
     });
   });
@@ -16,7 +19,7 @@ describe("get_profile", () => {
           organizationSlug: "sentry-mcp-evals",
           projectSlugOrId: "cloudflare-mcp",
           transactionName: "/api/users",
-          statsPeriod: "7d",
+          period: "7d",
           focusOnUserCode: true,
           maxHotPaths: 5,
           regionUrl: null,
@@ -111,7 +114,7 @@ describe("get_profile", () => {
           organizationSlug: "sentry-mcp-evals",
           projectSlugOrId: "cloudflare-mcp",
           transactionName: "/api/nonexistent",
-          statsPeriod: "7d",
+          period: "7d",
           focusOnUserCode: true,
           maxHotPaths: 5,
           regionUrl: null,
@@ -145,13 +148,54 @@ describe("get_profile", () => {
       `);
     });
 
+    it("returns no data message when Sentry returns a sparse empty flamegraph", async () => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/sentry-mcp-evals/profiling/flamegraph/",
+          () =>
+            HttpResponse.json({
+              metadata: {
+                platform: "javascript",
+                projectID: 4509062593708032,
+                transactionName: "/api/sparse",
+              },
+            }),
+          { once: true },
+        ),
+      );
+
+      const result = await getProfile.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlugOrId: 4509062593708032,
+          transactionName: "/api/sparse",
+          period: "7d",
+          focusOnUserCode: true,
+          maxHotPaths: 5,
+          regionUrl: null,
+        },
+        {
+          constraints: {
+            organizationSlug: null,
+          },
+          accessToken: "access-token",
+          userId: "1",
+        },
+      );
+
+      expect(result).toContain("## No Profile Data Found");
+      expect(result).toContain(
+        "No profiling data found for transaction **/api/sparse** in the last 7d.",
+      );
+    });
+
     it("works with numeric project ID", async () => {
       const result = await getProfile.handler(
         {
           organizationSlug: "sentry-mcp-evals",
           projectSlugOrId: 4509062593708032,
           transactionName: "/api/users",
-          statsPeriod: "7d",
+          period: "7d",
           focusOnUserCode: true,
           maxHotPaths: 5,
           regionUrl: null,
@@ -177,7 +221,7 @@ describe("get_profile", () => {
           organizationSlug: "sentry-mcp-evals",
           projectSlugOrId: "cloudflare-mcp",
           transactionName: "/api/users",
-          statsPeriod: "7d",
+          period: "7d",
           compareAgainstPeriod: "14d",
           focusOnUserCode: true,
           maxHotPaths: 10,
@@ -214,7 +258,7 @@ describe("get_profile", () => {
           organizationSlug: "sentry-mcp-evals",
           projectSlugOrId: "cloudflare-mcp",
           transactionName: "/api/nonexistent",
-          statsPeriod: "7d",
+          period: "7d",
           compareAgainstPeriod: "14d",
           focusOnUserCode: true,
           maxHotPaths: 10,
@@ -253,7 +297,7 @@ describe("get_profile", () => {
           organizationSlug: "sentry-mcp-evals",
           projectSlugOrId: "cloudflare-mcp",
           transactionName: "/api/users",
-          statsPeriod: "7d",
+          period: "7d",
           compareAgainstPeriod: "7d",
           focusOnUserCode: false,
           maxHotPaths: 10,
@@ -293,7 +337,7 @@ describe("get_profile", () => {
           {
             projectSlugOrId: "cloudflare-mcp",
             transactionName: "/api/users",
-            statsPeriod: "7d",
+            period: "7d",
             focusOnUserCode: true,
             maxHotPaths: 5,
             regionUrl: null,
@@ -317,7 +361,7 @@ describe("get_profile", () => {
           {
             organizationSlug: "sentry-mcp-evals",
             projectSlugOrId: "cloudflare-mcp",
-            statsPeriod: "7d",
+            period: "7d",
             focusOnUserCode: true,
             maxHotPaths: 5,
             regionUrl: null,
@@ -341,7 +385,7 @@ describe("get_profile", () => {
           {
             organizationSlug: "sentry-mcp-evals",
             transactionName: "/api/users",
-            statsPeriod: "7d",
+            period: "7d",
             focusOnUserCode: true,
             maxHotPaths: 5,
             regionUrl: null,
@@ -364,7 +408,7 @@ describe("get_profile", () => {
         getProfile.handler(
           {
             profileUrl: "https://sentry.io/issues/123",
-            statsPeriod: "7d",
+            period: "7d",
             focusOnUserCode: true,
             maxHotPaths: 5,
             regionUrl: null,
@@ -391,7 +435,7 @@ describe("get_profile", () => {
             organizationSlug: "sentry-mcp-evals",
             projectSlugOrId: "cloudflare-mcp",
             transactionName: "/api/users",
-            statsPeriod: "7d",
+            period: "7d",
             focusOnUserCode: true,
             maxHotPaths: 5,
             regionUrl: null,

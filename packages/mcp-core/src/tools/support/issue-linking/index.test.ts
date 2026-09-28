@@ -1,524 +1,448 @@
+import { mswServer } from "@sentry/mcp-server-mocks";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
+import { SentryApiService } from "../../../api-client";
+import type { IssueIntegration } from "../../../api-client/types";
 import { UserInputError } from "../../../errors";
-import { parseExternalIssueUrl, resolveExternalIssueLinkTarget } from ".";
-import type {
-  IssueIntegration,
-  IssueIntegrationLinkConfig,
-  SentryAppInstallation,
-} from "../../../api-client/types";
+import { linkExternalIssue, unlinkExternalIssue } from ".";
+
+const api = new SentryApiService({ accessToken: "test-token" });
+const params = { organizationSlug: "example", issueId: "123" };
+const endpoint =
+  "https://sentry.io/api/0/organizations/example/issues/123/integrations/";
+const appEndpoint =
+  "https://sentry.io/api/0/organizations/example/issues/123/external-issues/";
 
 function integration(
   overrides: Partial<IssueIntegration> = {},
 ): IssueIntegration {
   return {
     id: "1",
-    name: "GitHub",
-    domainName: "github.com/getsentry",
-    provider: { key: "github", slug: "github", name: "GitHub" },
+    name: "acme",
+    domainName: "github.com/acme",
+    provider: { key: "github" },
     externalIssues: [],
     ...overrides,
   };
 }
 
-function linkConfig(
-  overrides: Partial<IssueIntegrationLinkConfig> = {},
-): IssueIntegrationLinkConfig {
-  return {
-    id: "1",
-    name: "GitHub",
-    domainName: "github.com/getsentry",
-    provider: { key: "github", slug: "github", name: "GitHub" },
-    linkIssueConfig: [
-      {
-        name: "repo",
-        required: true,
-        choices: [["getsentry/sentry", "getsentry/sentry"]],
+const nativeCases = [
+  {
+    provider: "github",
+    domainName: "github.com/acme",
+    url: "https://github.com/acme/repo/issues/42",
+    storedUrl: "https://github.com/acme/repo/issues/42",
+  },
+  {
+    provider: "github",
+    domainName: "github.com/acme",
+    url: "https://github.com/acme/repo/pull/42/files?diff=split#change",
+    storedUrl: "https://github.com/acme/repo/issues/42",
+  },
+  {
+    provider: "github_enterprise",
+    domainName: "github.example.com:8443/acme",
+    url: "https://github.example.com:8443/acme/repo/issues/42",
+    storedUrl: "https://github.example.com:8443/acme/repo/issues/42",
+  },
+  {
+    provider: "jira",
+    domainName: "acme.atlassian.net",
+    url: "https://acme.atlassian.net/browse/ENG-42?source=search",
+    storedUrl: "https://acme.atlassian.net/browse/ENG-42",
+  },
+  {
+    provider: "jira_server",
+    domainName: "jira.example.com:8443",
+    url: "https://jira.example.com:8443/jira/browse/eng-42",
+    storedUrl: "https://jira.example.com:8443/jira/browse/ENG-42",
+  },
+  {
+    provider: "gitlab",
+    domainName: "gitlab.com/acme",
+    url: "https://gitlab.com/acme/backend/repo/-/issues/42",
+    storedUrl: "https://gitlab.com/acme/backend/repo/issues/42",
+  },
+  {
+    provider: "gitlab",
+    domainName: "gitlab.example.com/acme",
+    url: "https://gitlab.example.com/gitlab/acme/backend/repo/issues/42",
+    storedUrl:
+      "https://gitlab.example.com/gitlab/acme/backend/repo/-/issues/42",
+  },
+  {
+    provider: "bitbucket",
+    domainName: "bitbucket.org/acme",
+    url: "https://bitbucket.org/acme/repo/issues/42/old-title",
+    storedUrl: "https://bitbucket.org/acme/repo/issues/42/current-title",
+  },
+  {
+    provider: "bitbucket",
+    domainName: "acme",
+    url: "https://bitbucket.org/acme/repo/issues/42",
+    storedUrl: "https://bitbucket.org/acme/repo/issues/42",
+  },
+  {
+    provider: "vsts",
+    domainName: "https://acme.visualstudio.com",
+    url: "https://dev.azure.com/acme/project/_workitems/edit/42",
+    storedUrl: "https://acme.visualstudio.com/project/_workitems/edit/42",
+  },
+  {
+    provider: "vsts",
+    domainName: "dev.azure.com/acme",
+    url: "https://acme.visualstudio.com/_workitems/edit/42",
+    storedUrl: "https://dev.azure.com/acme/project/_workitems/edit/42",
+  },
+];
+
+function useIntegrations(integrations: IssueIntegration[]) {
+  mswServer.use(http.get(endpoint, () => HttpResponse.json(integrations)));
+}
+
+function usePut(status = 201) {
+  const writes: { integrationId: string; body: unknown }[] = [];
+  mswServer.use(
+    http.put(
+      `${endpoint}:integrationId/`,
+      async ({ request, params: route }) => {
+        const body = await request.json();
+        writes.push({ integrationId: String(route.integrationId), body });
+        return HttpResponse.json(
+          {
+            id: "900",
+            key: "acme/repo#42",
+            url: "https://github.com/acme/repo/issues/42",
+          },
+          { status },
+        );
       },
-      { name: "externalIssue", required: true },
-      { name: "comment", required: false, default: "Sentry Issue" },
-    ],
-    ...overrides,
-  };
+    ),
+  );
+  return writes;
 }
 
-function installation(
-  overrides: Partial<SentryAppInstallation> = {},
-): SentryAppInstallation {
-  return {
-    uuid: "linear-installation",
-    status: "installed",
-    app: { slug: "linear", uuid: "linear-app", sentryAppId: 1 },
-    ...overrides,
-  };
+function useDelete(status = 204) {
+  const writes: string[] = [];
+  mswServer.use(
+    http.delete(`${endpoint}:integrationId/`, ({ request }) => {
+      writes.push(request.url);
+      return new HttpResponse(null, { status });
+    }),
+  );
+  return writes;
 }
 
-describe("parseExternalIssueUrl", () => {
-  it("parses supported native provider URLs", () => {
-    expect(
-      parseExternalIssueUrl("https://acme.atlassian.net/browse/ENG-123"),
-    ).toMatchObject({
-      kind: "native",
-      provider: "jira",
-      issueId: "ENG-123",
-    });
-    expect(
-      parseExternalIssueUrl("https://jira.example.org:8443/browse/OPS-456"),
-    ).toMatchObject({
-      kind: "native",
-      provider: "jira",
-      host: "jira.example.org:8443",
-      domainPath: "jira.example.org:8443",
-      issueId: "OPS-456",
-    });
-    expect(
-      parseExternalIssueUrl("https://github.com/getsentry/sentry/issues/123"),
-    ).toMatchObject({
-      kind: "native",
+describe("linkExternalIssue", () => {
+  it("rejects App fields on native links instead of silently ignoring them", async () => {
+    await expect(
+      linkExternalIssue(api, {
+        ...params,
+        externalIssueUrl: "https://github.com/acme/repo/issues/42",
+        fields: { issue: "99" },
+      }),
+    ).rejects.toThrow("fields are only supported for Sentry App links");
+  });
+
+  it.each(nativeCases)(
+    "passes a full URL to the selected $provider integration: $url",
+    async ({ provider, domainName, url }) => {
+      useIntegrations([
+        integration({ provider: { key: provider }, domainName }),
+      ]);
+      const writes = usePut();
+      const result = await linkExternalIssue(api, {
+        ...params,
+        externalIssueUrl: url,
+      });
+      expect(writes).toEqual([
+        { integrationId: "1", body: { externalIssue: url } },
+      ]);
+      expect(result).toMatchObject({ provider, status: "linked" });
+    },
+  );
+
+  it.each([201, 200])(
+    "uses HTTP %i to report whether the backend created the association",
+    async (status) => {
+      const externalIssueUrl = "https://github.com/acme/repo/issues/42";
+      useIntegrations([
+        integration({
+          externalIssues: [
+            { id: "900", key: "acme/repo#42", url: externalIssueUrl },
+          ],
+        }),
+      ]);
+      const writes = usePut(status);
+      expect(
+        await linkExternalIssue(api, { ...params, externalIssueUrl }),
+      ).toEqual({
+        url: externalIssueUrl,
+        displayName: "acme/repo#42",
+        provider: "github",
+        status: status === 201 ? "linked" : "already_linked",
+      });
+      expect(writes).toHaveLength(1);
+    },
+  );
+
+  it("requires integrationId for overlapping GitLab installations and never tries candidates", async () => {
+    useIntegrations([
+      integration({
+        provider: { key: "gitlab" },
+        domainName: "gitlab.com/acme",
+      }),
+      integration({
+        id: "2",
+        provider: { key: "gitlab" },
+        domainName: "gitlab.com/acme/backend",
+      }),
+    ]);
+    const writes = usePut();
+    const input = {
+      ...params,
+      externalIssueUrl: "https://gitlab.com/acme/backend/repo/-/issues/42",
+    };
+    await expect(linkExternalIssue(api, input)).rejects.toThrow(
+      "Provide integrationId",
+    );
+    expect(writes).toEqual([]);
+    await linkExternalIssue(api, { ...input, integrationId: "2" });
+    expect(writes).toEqual([
+      { integrationId: "2", body: { externalIssue: input.externalIssueUrl } },
+    ]);
+  });
+
+  it.each([
+    {
       provider: "github",
-      repo: "getsentry/sentry",
-      issueId: "123",
-    });
-    expect(
-      parseExternalIssueUrl(
-        "https://gitlab.com/getsentry/backend/service/-/issues/456",
-      ),
-    ).toMatchObject({
-      kind: "native",
+      domainName: "github.com/other",
+      url: "https://github.com/acme/repo/issues/42",
+    },
+    {
+      provider: "github",
+      domainName: null,
+      url: "https://internal.example.com/acme/repo/issues/42",
+    },
+    {
+      provider: "github_enterprise",
+      domainName: "github.example.com/acme",
+      url: "https://github.example.com:8443/acme/repo/issues/42",
+    },
+    {
       provider: "gitlab",
-      project: "getsentry/backend/service",
-      issueId: "456",
-    });
-    expect(
-      parseExternalIssueUrl(
-        "https://bitbucket.org/getsentry/sentry/issues/789/test",
-      ),
-    ).toMatchObject({
-      kind: "native",
+      domainName: "gitlab.com/acme",
+      url: "https://gitlab.com/acme-other/repo/-/issues/42",
+    },
+    {
+      provider: "jira",
+      domainName: "other.atlassian.net",
+      url: "https://acme.atlassian.net/browse/ENG-42",
+    },
+    {
       provider: "bitbucket",
-      repo: "getsentry/sentry",
-      issueId: "789",
-    });
-    expect(
-      parseExternalIssueUrl(
-        "https://dev.azure.com/acme/project/_workitems/edit/42",
-      ),
-    ).toMatchObject({
-      kind: "native",
+      domainName: "bitbucket.org/other",
+      url: "https://bitbucket.org/acme/repo/issues/42",
+    },
+    {
       provider: "vsts",
-      issueId: "42",
-    });
-  });
+      domainName: "dev.azure.com/other",
+      url: "https://acme.visualstudio.com/_workitems/edit/42",
+    },
+    {
+      provider: "github",
+      domainName: "github.com/acme",
+      url: "https://github.com/acme/repo/commit/abc123",
+    },
+  ])(
+    "rejects a mismatched $provider installation before PUT: $url",
+    async ({ provider, domainName, url }) => {
+      useIntegrations([
+        integration({ provider: { key: provider }, domainName }),
+      ]);
+      const writes = usePut();
+      await expect(
+        linkExternalIssue(api, {
+          ...params,
+          externalIssueUrl: url,
+          integrationId: "1",
+        }),
+      ).rejects.toThrow("does not match");
+      expect(writes).toEqual([]);
+    },
+  );
 
-  it("parses supported Sentry App provider URLs", () => {
-    expect(
-      parseExternalIssueUrl("https://linear.app/acme/issue/ENG-123/test"),
-    ).toMatchObject({
-      kind: "sentryApp",
-      appSlug: "linear",
-      project: "ENG",
-      identifier: "ENG-123",
-    });
-    expect(
-      parseExternalIssueUrl("https://app.shortcut.com/acme/story/123/test"),
-    ).toMatchObject({
-      kind: "sentryApp",
-      appSlug: "shortcut",
-      project: "shortcut",
-      identifier: "123",
-    });
-  });
+  it.each([
+    "file:///acme/repo/issues/42",
+    "javascript:alert(1)",
+    "https://user:secret@github.com/acme/repo/issues/42",
+    "https://github.com/acme/repo/issues/%ZZ",
+    "https://github.com/acme/repo/issues/42%3Ffake",
+  ])(
+    "rejects unsafe URL %s before reading integrations",
+    async (externalIssueUrl) => {
+      const requests: string[] = [];
+      mswServer.use(
+        http.all("https://sentry.io/api/0/*", ({ request }) => {
+          requests.push(request.url);
+          return HttpResponse.json([]);
+        }),
+      );
+      await expect(
+        linkExternalIssue(api, { ...params, externalIssueUrl }),
+      ).rejects.toBeInstanceOf(UserInputError);
+      expect(requests).toEqual([]);
+    },
+  );
 
-  it("rejects unsupported URLs", () => {
-    expect(() =>
-      parseExternalIssueUrl("https://tickets.example.com/work/ABC-1"),
-    ).toThrow(UserInputError);
-    // GitLab URL missing the /-/ marker must not fall through to the Bitbucket parser
-    expect(() =>
-      parseExternalIssueUrl("https://gitlab.com/getsentry/sentry/issues/123"),
-    ).toThrow(UserInputError);
-  });
+  it.each([403, 404, 409])(
+    "preserves backend HTTP %i instead of reporting success",
+    async (status) => {
+      useIntegrations([integration()]);
+      mswServer.use(
+        http.put(`${endpoint}1/`, () =>
+          HttpResponse.json({ detail: "Cannot link" }, { status }),
+        ),
+      );
+      await expect(
+        linkExternalIssue(api, {
+          ...params,
+          externalIssueUrl: "https://github.com/acme/repo/issues/42",
+        }),
+      ).rejects.toMatchObject({ status });
+    },
+  );
 });
 
-describe("resolveExternalIssueLinkTarget", () => {
-  it("resolves native integrations and builds payloads independently", async () => {
-    const target = await resolveExternalIssueLinkTarget({
-      apiService: {
-        listIssueIntegrations: async () => [
-          integration({ id: "1", domainName: "github.com/getsentry" }),
-        ],
-        getIssueIntegrationLinkConfig: async () => linkConfig({ id: "1" }),
-        listSentryAppInstallations: async () => [],
-      },
-      organizationSlug: "sentry",
-      issueId: "PROJ-1",
-      externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
-    });
+describe("unlinkExternalIssue", () => {
+  it.each(nativeCases)(
+    "finds equivalent $provider URLs and deletes the internal association ID: $url",
+    async ({ provider, domainName, url, storedUrl }) => {
+      useIntegrations([
+        integration({
+          provider: { key: provider },
+          domainName,
+          externalIssues: [{ id: "900", key: "42", url: storedUrl }],
+        }),
+      ]);
+      const writes = useDelete();
+      expect(
+        await unlinkExternalIssue(api, { ...params, externalIssueUrl: url }),
+      ).toMatchObject({ url: storedUrl, provider, status: "not_linked" });
+      expect(writes).toEqual([`${endpoint}1/?externalIssue=900`]);
+    },
+  );
 
-    expect(target).toMatchObject({
-      kind: "native",
-      integrationId: "1",
-      payload: {
-        repo: "getsentry/sentry",
-        externalIssue: "123",
-        comment: "Sentry Issue",
-      },
-    });
-  });
-
-  it("uses longest domain match for nested GitLab groups", async () => {
-    const target = await resolveExternalIssueLinkTarget({
-      apiService: {
-        listIssueIntegrations: async () => [
-          integration({
-            id: "1",
-            name: "GitLab Root",
-            domainName: "gitlab.com/getsentry",
-            provider: { key: "gitlab" },
-          }),
-          integration({
-            id: "2",
-            name: "GitLab Backend",
-            domainName: "gitlab.com/getsentry/backend",
-            provider: { key: "gitlab" },
-          }),
-        ],
-        getIssueIntegrationLinkConfig: async ({ integrationId }) =>
-          linkConfig({
-            id: integrationId,
-            provider: { key: "gitlab" },
-            linkIssueConfig: [
-              {
-                name: "project",
-                required: true,
-                choices: [
-                  ["getsentry/backend/service", "getsentry/backend/service"],
-                ],
-              },
-              { name: "externalIssue", required: true },
-            ],
-          }),
-        listSentryAppInstallations: async () => [],
-      },
-      organizationSlug: "sentry",
-      issueId: "PROJ-1",
-      externalIssueUrl:
-        "https://gitlab.com/getsentry/backend/service/-/issues/123",
-    });
-
-    expect(target).toMatchObject({
-      kind: "native",
-      integrationId: "2",
-      payload: {
-        project: "getsentry/backend/service",
-        externalIssue: "getsentry/backend/service#123",
-      },
-    });
-  });
-
-  it("normalizes www-prefixed integration domains for matching", async () => {
-    const target = await resolveExternalIssueLinkTarget({
-      apiService: {
-        listIssueIntegrations: async () => [
-          integration({ id: "1", name: "GitHub Other", domainName: null }),
-          integration({
-            id: "2",
-            name: "GitHub Getsentry",
-            domainName: "www.github.com/getsentry",
-          }),
-        ],
-        getIssueIntegrationLinkConfig: async ({ integrationId }) =>
-          linkConfig({ id: integrationId }),
-        listSentryAppInstallations: async () => [],
-      },
-      organizationSlug: "sentry",
-      issueId: "PROJ-1",
-      externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
-    });
-
-    expect(target).toMatchObject({
-      kind: "native",
-      integrationId: "2",
-    });
-  });
-
-  it("resolves self-hosted Jira Server integrations by domain", async () => {
-    const target = await resolveExternalIssueLinkTarget({
-      apiService: {
-        listIssueIntegrations: async () => [
-          integration({
-            id: "1",
-            name: "Jira Cloud",
-            domainName: "acme.atlassian.net",
-            provider: { key: "jira" },
-          }),
-          integration({
-            id: "2",
-            name: "Example Jira",
-            domainName: "jira.example.org:8443",
-            provider: { key: "jira_server" },
-          }),
-        ],
-        getIssueIntegrationLinkConfig: async ({ integrationId }) =>
-          linkConfig({
-            id: integrationId,
-            provider: { key: "jira_server" },
-            linkIssueConfig: [{ name: "externalIssue", required: true }],
-          }),
-        listSentryAppInstallations: async () => [],
-      },
-      organizationSlug: "sentry",
-      issueId: "PROJ-1",
-      externalIssueUrl: "https://jira.example.org:8443/browse/OPS-456",
-    });
-
-    expect(target).toMatchObject({
-      kind: "native",
-      integrationId: "2",
-      payload: {
-        externalIssue: "OPS-456",
-      },
-    });
-  });
-
-  it("uses the Azure DevOps organization segment for domain matching", async () => {
-    const target = await resolveExternalIssueLinkTarget({
-      apiService: {
-        listIssueIntegrations: async () => [
-          integration({
-            id: "1",
-            name: "Azure Other",
-            domainName: "dev.azure.com/other",
-            provider: { key: "vsts" },
-          }),
-          integration({
-            id: "2",
-            name: "Azure Acme",
-            domainName: "dev.azure.com/acme",
-            provider: { key: "vsts" },
-          }),
-        ],
-        getIssueIntegrationLinkConfig: async ({ integrationId }) =>
-          linkConfig({
-            id: integrationId,
-            provider: { key: "vsts" },
-            linkIssueConfig: [{ name: "externalIssue", required: true }],
-          }),
-        listSentryAppInstallations: async () => [],
-      },
-      organizationSlug: "sentry",
-      issueId: "PROJ-1",
-      externalIssueUrl: "https://dev.azure.com/acme/project/_workitems/edit/42",
-    });
-
-    expect(target).toMatchObject({
-      kind: "native",
-      integrationId: "2",
-      payload: {
-        externalIssue: "42",
-      },
-    });
-  });
-
-  it("rejects non-github.com hosts with no matching GitHub Enterprise integration domain", async () => {
-    await expect(
-      resolveExternalIssueLinkTarget({
-        apiService: {
-          listIssueIntegrations: async () => [
-            integration({ id: "1", domainName: null }),
-          ],
-          getIssueIntegrationLinkConfig: async () => linkConfig({ id: "1" }),
-          listSentryAppInstallations: async () => [],
-        },
-        organizationSlug: "sentry",
-        issueId: "PROJ-1",
-        externalIssueUrl:
-          "https://internal.company.com/getsentry/sentry/issues/123",
-      }),
-    ).rejects.toThrow(
-      /Configure a GitHub Enterprise integration with a matching domain/,
-    );
-  });
-
-  it("resolves GitHub Enterprise URLs with a configured integration domain", async () => {
-    const target = await resolveExternalIssueLinkTarget({
-      apiService: {
-        listIssueIntegrations: async () => [
-          integration({
-            id: "1",
-            name: "GitHub Enterprise",
-            domainName: "internal.company.com/getsentry",
-            provider: { key: "github_enterprise" },
-          }),
-        ],
-        getIssueIntegrationLinkConfig: async () =>
-          linkConfig({
-            id: "1",
-            provider: { key: "github_enterprise" },
-          }),
-        listSentryAppInstallations: async () => [],
-      },
-      organizationSlug: "sentry",
-      issueId: "PROJ-1",
-      externalIssueUrl:
-        "https://internal.company.com/getsentry/sentry/issues/123",
-    });
-
-    expect(target).toMatchObject({
-      kind: "native",
-      integrationId: "1",
-      payload: {
-        repo: "getsentry/sentry",
-        externalIssue: "123",
-      },
-    });
-  });
-
-  it("ignores integrations whose configured domain does not match the URL", async () => {
-    let configCalled = false;
-    await expect(
-      resolveExternalIssueLinkTarget({
-        apiService: {
-          listIssueIntegrations: async () => [
-            integration({
-              id: "1",
-              name: "Jira Cloud",
-              domainName: "other.atlassian.net",
-              provider: { key: "jira" },
-            }),
-          ],
-          getIssueIntegrationLinkConfig: async ({ integrationId }) => {
-            configCalled = true;
-            return linkConfig({
-              id: integrationId,
-              provider: { key: "jira" },
-              linkIssueConfig: [{ name: "externalIssue", required: true }],
-            });
+  it("does not delete when only a different external issue is linked", async () => {
+    mswServer.use(http.get(appEndpoint, () => HttpResponse.json([])));
+    useIntegrations([
+      integration({
+        externalIssues: [
+          {
+            id: "900",
+            key: "acme/repo#99",
+            url: "https://github.com/acme/repo/issues/99",
           },
-          listSentryAppInstallations: async () => [],
-        },
-        organizationSlug: "sentry",
-        issueId: "PROJ-1",
-        externalIssueUrl: "https://acme.atlassian.net/browse/PROJ-1",
-      }),
-    ).rejects.toThrow(
-      /No installed jira issue integration matches the URL domain\/path/,
-    );
-    // domain filtering should short-circuit before fetching link config
-    expect(configCalled).toBe(false);
-  });
-
-  it("rejects github.com URLs when only a wrong-org integration is configured", async () => {
-    await expect(
-      resolveExternalIssueLinkTarget({
-        apiService: {
-          listIssueIntegrations: async () => [
-            integration({
-              id: "1",
-              name: "GitHub Other",
-              domainName: "github.com/other",
-              provider: { key: "github" },
-            }),
-          ],
-          getIssueIntegrationLinkConfig: async () => linkConfig({ id: "1" }),
-          listSentryAppInstallations: async () => [],
-        },
-        organizationSlug: "sentry",
-        issueId: "PROJ-1",
-        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
-      }),
-    ).rejects.toThrow(
-      /No installed github issue integration matches the URL domain\/path/,
-    );
-  });
-
-  it("rejects ambiguous native integrations", async () => {
-    await expect(
-      resolveExternalIssueLinkTarget({
-        apiService: {
-          listIssueIntegrations: async () => [
-            integration({ id: "1", name: "GitHub A", domainName: null }),
-            integration({ id: "2", name: "GitHub B", domainName: null }),
-          ],
-          getIssueIntegrationLinkConfig: async () => linkConfig(),
-          listSentryAppInstallations: async () => [],
-        },
-        organizationSlug: "sentry",
-        issueId: "PROJ-1",
-        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
-      }),
-    ).rejects.toThrow("Multiple installed github issue integrations");
-  });
-
-  it("resolves native integrations to the projected link target", async () => {
-    const target = await resolveExternalIssueLinkTarget({
-      apiService: {
-        listIssueIntegrations: async () => [
-          integration({ id: "1", name: "GitHub A", domainName: null }),
         ],
-        getIssueIntegrationLinkConfig: async () => linkConfig(),
-        listSentryAppInstallations: async () => [],
-      },
-      organizationSlug: "sentry",
-      issueId: "PROJ-1",
-      externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
-    });
-
-    expect(target).toMatchObject({
-      kind: "native",
-      integrationId: "1",
-      provider: "github",
-      fallbackDisplayName: "123",
-      fallbackUrl: "https://github.com/getsentry/sentry/issues/123",
-      payload: {
-        repo: "getsentry/sentry",
-        externalIssue: "123",
-      },
-    });
-  });
-
-  it("resolves Sentry App installations without exposing UUIDs", async () => {
-    const target = await resolveExternalIssueLinkTarget({
-      apiService: {
-        listIssueIntegrations: async () => [],
-        getIssueIntegrationLinkConfig: async () => {
-          throw new Error("not used");
-        },
-        listSentryAppInstallations: async () => [installation()],
-      },
-      organizationSlug: "sentry",
-      issueId: "PROJ-1",
-      externalIssueUrl: "https://linear.app/acme/issue/ENG-123/test",
-    });
-
-    expect(target).toMatchObject({
-      kind: "sentryApp",
-      installationUuid: "linear-installation",
-      provider: "linear",
-      payload: {
-        webUrl: "https://linear.app/acme/issue/ENG-123/test",
-        project: "ENG",
-        identifier: "ENG-123",
-      },
-    });
-  });
-
-  it("does not leak Sentry App installation UUIDs in ambiguity errors", async () => {
-    await expect(
-      resolveExternalIssueLinkTarget({
-        apiService: {
-          listIssueIntegrations: async () => [],
-          getIssueIntegrationLinkConfig: async () => {
-            throw new Error("not used");
-          },
-          listSentryAppInstallations: async () => [
-            installation({ uuid: "secret-1" }),
-            installation({ uuid: "secret-2" }),
-          ],
-        },
-        organizationSlug: "sentry",
-        issueId: "PROJ-1",
-        externalIssueUrl: "https://linear.app/acme/issue/ENG-123/test",
       }),
-    ).rejects.toThrow("Multiple installed Sentry Apps");
+    ]);
+    const writes = useDelete();
+    expect(
+      await unlinkExternalIssue(api, {
+        ...params,
+        externalIssueUrl: "https://github.com/acme/repo/issues/42",
+      }),
+    ).toMatchObject({ status: "not_linked" });
+    expect(writes).toEqual([]);
   });
+
+  it("unlinks a stored association after its installation was disabled or reconfigured", async () => {
+    const externalIssueUrl = "https://github.com/acme/repo/issues/42";
+    useIntegrations([
+      integration({
+        status: "disabled",
+        domainName: "github.com/new-owner",
+        externalIssues: [
+          { id: "900", key: "acme/repo#42", url: externalIssueUrl },
+        ],
+      }),
+    ]);
+    const writes = useDelete();
+    await unlinkExternalIssue(api, { ...params, externalIssueUrl });
+    expect(writes).toEqual([`${endpoint}1/?externalIssue=900`]);
+  });
+
+  it("finds a custom App association by its URL without requiring appSlug", async () => {
+    const externalIssueUrl = "https://tracker.example.com/tasks/42";
+    useIntegrations([]);
+    const writes: string[] = [];
+    mswServer.use(
+      http.get(appEndpoint, () =>
+        HttpResponse.json([
+          {
+            id: "700",
+            issueId: "123",
+            serviceType: "custom-tracker",
+            displayName: "Task 42",
+            webUrl: externalIssueUrl,
+          },
+        ]),
+      ),
+      http.delete(`${appEndpoint}700/`, ({ request }) => {
+        writes.push(request.url);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    expect(
+      await unlinkExternalIssue(api, { ...params, externalIssueUrl }),
+    ).toMatchObject({
+      provider: "custom-tracker",
+      status: "not_linked",
+    });
+    expect(writes).toEqual([`${appEndpoint}700/`]);
+  });
+
+  it("rejects multiple matching links until an integration is selected", async () => {
+    const externalIssueUrl = "https://github.com/acme/repo/issues/42";
+    const externalIssues = [
+      { id: "900", key: "acme/repo#42", url: externalIssueUrl },
+    ];
+    useIntegrations([
+      integration({ externalIssues }),
+      integration({ id: "2", externalIssues }),
+    ]);
+    const writes = useDelete();
+    await expect(
+      unlinkExternalIssue(api, { ...params, externalIssueUrl }),
+    ).rejects.toThrow("Provide integrationId");
+    expect(writes).toEqual([]);
+    await unlinkExternalIssue(api, {
+      ...params,
+      externalIssueUrl,
+      integrationId: "2",
+    });
+    expect(writes).toEqual([`${endpoint}2/?externalIssue=900`]);
+  });
+
+  it.each(["lookup", "delete"])(
+    "does not swallow a 404 during %s",
+    async (step) => {
+      const externalIssueUrl = "https://github.com/acme/repo/issues/42";
+      useIntegrations([
+        integration({
+          externalIssues: [
+            { id: "900", key: "acme/repo#42", url: externalIssueUrl },
+          ],
+        }),
+      ]);
+      useDelete(404);
+      if (step === "lookup")
+        mswServer.use(
+          http.get(endpoint, () => new HttpResponse(null, { status: 404 })),
+        );
+      await expect(
+        unlinkExternalIssue(api, { ...params, externalIssueUrl }),
+      ).rejects.toMatchObject({ status: 404 });
+    },
+  );
 });

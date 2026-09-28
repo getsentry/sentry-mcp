@@ -10,7 +10,6 @@ The token cost of tool metadata that MCP sends to clients via `tools/list`:
 - Total overhead per tool and across all tools
 
 **Exclusions:**
-- `use_sentry` tool (agent-mode only, not exposed via standard MCP)
 - Runtime token usage by embedded agents (search_events, search_issues, search_issue_events)
 
 ## Running Locally
@@ -80,7 +79,6 @@ GitHub Actions workflow runs on every PR and push to main:
 
 ## Understanding the Results
 
-**Current baseline (24 tools, excluding use_sentry):**
 - ~14,068 tokens total
 - ~586 tokens/tool average
 

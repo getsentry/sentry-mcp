@@ -53,15 +53,17 @@ canonical workflow and required docs live in [../AGENTS.md](../AGENTS.md)
 ### Integrations
 
 - [integrations/claude-code-plugin.md](integrations/claude-code-plugin.md) - Plugin structure and agent prompts
-- [integrations/flue-hooks.md](integrations/flue-hooks.md) - Flue hook notes
 - [integrations/ide-instructions-refactor.md](integrations/ide-instructions-refactor.md) - IDE instruction refactor notes
 
 ### Specs
 
 - [specs/README.md](specs/README.md) - Specs index
+- [specs/alert-rules.md](specs/alert-rules.md) - Alert inspection, editing, options, and connected sources
 - [specs/embedded-agent-openai-routing.md](specs/embedded-agent-openai-routing.md) - Embedded agent OpenAI routing spec
+- [specs/project-management.md](specs/project-management.md) - Project management tools spec
 - [specs/remembered-oauth-skills.md](specs/remembered-oauth-skills.md) - Remembered OAuth skill defaults spec
 - [specs/search-events.md](specs/search-events.md) - Search Events spec
+- [specs/sentry-bearer-cloudflare-auth.md](specs/sentry-bearer-cloudflare-auth.md) - Direct Sentry token auth for the Cloudflare transport
 - [specs/subpath-constraints.md](specs/subpath-constraints.md) - Subpath constraints spec
 
 ### Releases

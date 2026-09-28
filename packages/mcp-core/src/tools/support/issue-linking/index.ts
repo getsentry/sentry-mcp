@@ -1,620 +1,309 @@
+/** Select native integrations locally; Sentry owns URL validation and link mutations. */
+import type { SentryApiService } from "../../../api-client";
+import type { IssueIntegration } from "../../../api-client/types";
 import { UserInputError } from "../../../errors";
-import type {
-  ExternalIssue,
-  IssueIntegration,
-  IssueIntegrationLinkConfig,
-  NativeExternalIssue,
-  SentryAppInstallation,
-} from "../../../api-client/types";
+import { inferAppSlug, linkAppIssue, unlinkAppIssue } from "./app";
 
-type NativeProvider = "jira" | "github" | "gitlab" | "bitbucket" | "vsts";
-type AppProvider = "linear" | "shortcut";
-
-type ParsedNativeIssueUrl = {
-  kind: "native";
-  provider: NativeProvider;
-  url: string;
-  host: string;
-  domainPath?: string;
+export type IssueLinkParams = {
+  organizationSlug: string;
   issueId: string;
-  repo?: string;
-  project?: string;
+  projectId?: string;
+  externalIssueUrl: string;
+  integrationId?: string;
+  appSlug?: string;
+  fields?: Record<string, string | number>;
 };
 
-type ParsedAppIssueUrl = {
-  kind: "sentryApp";
-  provider: AppProvider;
+export type IssueLinkResult = {
   url: string;
-  host: string;
-  appSlug: string;
-  project: string;
-  identifier: string;
+  displayName?: string;
+  provider?: string;
+  status: "linked" | "already_linked" | "not_linked";
 };
 
-export type ParsedExternalIssueUrl = ParsedNativeIssueUrl | ParsedAppIssueUrl;
-
-type LinkConfigField = IssueIntegrationLinkConfig["linkIssueConfig"][number];
-
-export type NativeExternalIssueLinkTarget = {
-  kind: "native";
-  integrationId: string;
-  provider: string;
-  fallbackDisplayName: string;
-  fallbackUrl: string;
-  payload: Record<string, unknown>;
-};
-
-export type SentryAppExternalIssueLinkTarget = {
-  kind: "sentryApp";
-  installationUuid: string;
-  provider: string;
-  payload: {
-    webUrl: string;
-    project: string;
-    identifier: string;
-  };
-};
-
-export type ExternalIssueLinkTarget =
-  | NativeExternalIssueLinkTarget
-  | SentryAppExternalIssueLinkTarget;
-
-export type LinkedExternalIssue =
-  | {
-      kind: "native";
-      issue: NativeExternalIssue;
-      provider: string;
-      fallbackDisplayName: string;
-      fallbackUrl: string;
-    }
-  | { kind: "sentryApp"; issue: ExternalIssue; provider: string };
-
-export type ExternalIssueLinkApi = {
-  listIssueIntegrations(params: {
-    organizationSlug: string;
-    issueId: string;
-  }): Promise<IssueIntegration[]>;
-  getIssueIntegrationLinkConfig(params: {
-    organizationSlug: string;
-    issueId: string;
-    integrationId: string;
-  }): Promise<IssueIntegrationLinkConfig>;
-  listSentryAppInstallations(params: {
-    organizationSlug: string;
-  }): Promise<SentryAppInstallation[]>;
-};
-
-function trimSlashes(value: string): string {
-  return value.replace(/^\/+|\/+$/g, "");
-}
-
-function normalizeHost(value: string): string {
-  return value.toLowerCase().replace(/^www\./, "");
-}
-
-function normalizeUrlHost(url: URL): string {
-  return normalizeHost(url.host);
-}
-
-function normalizeDomain(value?: string | null): string | null {
-  if (!value) {
-    return null;
-  }
-  const withoutProtocol = value.replace(/^https?:\/\//i, "");
-  const withoutWww = withoutProtocol.replace(/^www\./i, "");
-  return trimSlashes(withoutWww).toLowerCase();
-}
-
-function pathSegments(url: URL): string[] {
-  return url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
-}
-
-function parseIssueNumber(value: string): string | null {
-  return /^\d+$/.test(value) ? value : null;
-}
-
-function parseJiraUrl(url: URL): ParsedNativeIssueUrl | null {
-  const segments = pathSegments(url);
-  const browseIndex = segments.findIndex((segment) => segment === "browse");
-  const issueId = browseIndex >= 0 ? segments[browseIndex + 1] : undefined;
-  if (!issueId || !/^[A-Z][A-Z0-9]+-\d+$/i.test(issueId)) {
-    return null;
-  }
-  const host = normalizeUrlHost(url);
-  return {
-    kind: "native",
-    provider: "jira",
-    url: url.toString(),
-    host,
-    domainPath: host,
-    issueId,
-  };
-}
-
-function parseGithubUrl(url: URL): ParsedNativeIssueUrl | null {
-  const host = normalizeUrlHost(url);
-  if (host === "bitbucket.org" || host === "gitlab.com") {
-    return null;
-  }
-  const segments = pathSegments(url);
-  if (segments.length < 4 || segments[2] !== "issues") {
-    return null;
-  }
-  const issueId = parseIssueNumber(segments[3] ?? "");
-  if (!issueId) {
-    return null;
-  }
-  const repo = `${segments[0]}/${segments[1]}`;
-  return {
-    kind: "native",
-    provider: "github",
-    url: url.toString(),
-    host,
-    domainPath: `${host}/${segments[0]}`,
-    repo,
-    issueId,
-  };
-}
-
-function parseGitlabUrl(url: URL): ParsedNativeIssueUrl | null {
-  const host = normalizeUrlHost(url);
-  const segments = pathSegments(url);
-  const markerIndex = segments.findIndex((segment) => segment === "-");
-  if (
-    markerIndex < 1 ||
-    segments[markerIndex + 1] !== "issues" ||
-    !segments[markerIndex + 2]
-  ) {
-    return null;
-  }
-  const issueId = parseIssueNumber(segments[markerIndex + 2]);
-  if (!issueId) {
-    return null;
-  }
-  const project = segments.slice(0, markerIndex).join("/");
-  return {
-    kind: "native",
-    provider: "gitlab",
-    url: url.toString(),
-    host,
-    domainPath: `${host}/${project}`,
-    project,
-    issueId,
-  };
-}
-
-function parseBitbucketUrl(url: URL): ParsedNativeIssueUrl | null {
-  const host = normalizeUrlHost(url);
-  if (host !== "bitbucket.org") {
-    return null;
-  }
-  const segments = pathSegments(url);
-  if (segments.length < 4 || segments[2] !== "issues") {
-    return null;
-  }
-  const issueId = parseIssueNumber(segments[3] ?? "");
-  if (!issueId) {
-    return null;
-  }
-  const repo = `${segments[0]}/${segments[1]}`;
-  return {
-    kind: "native",
-    provider: "bitbucket",
-    url: url.toString(),
-    host,
-    domainPath: `${host}/${segments[0]}`,
-    repo,
-    issueId,
-  };
-}
-
-function parseVstsUrl(url: URL): ParsedNativeIssueUrl | null {
-  const segments = pathSegments(url);
-  const editIndex = segments.findIndex((segment) => segment === "edit");
-  if (
-    editIndex < 1 ||
-    segments[editIndex - 1] !== "_workitems" ||
-    !segments[editIndex + 1]
-  ) {
-    return null;
-  }
-  const issueId = parseIssueNumber(segments[editIndex + 1]);
-  if (!issueId) {
-    return null;
-  }
-  const host = normalizeUrlHost(url);
-  const domainPath =
-    normalizeHost(url.hostname) === "dev.azure.com" && segments[0]
-      ? `${host}/${segments[0]}`
-      : host;
-  return {
-    kind: "native",
-    provider: "vsts",
-    url: url.toString(),
-    host,
-    domainPath,
-    issueId,
-  };
-}
-
-function parseLinearUrl(url: URL): ParsedAppIssueUrl | null {
-  if (normalizeHost(url.hostname) !== "linear.app") {
-    return null;
-  }
-  const segments = pathSegments(url);
-  const issueIndex = segments.findIndex((segment) => segment === "issue");
-  const identifier = issueIndex >= 0 ? segments[issueIndex + 1] : undefined;
-  if (!identifier) {
-    return null;
-  }
-  const project = identifier.split("-")[0] || "linear";
-  return {
-    kind: "sentryApp",
-    provider: "linear",
-    appSlug: "linear",
-    url: url.toString(),
-    host: normalizeHost(url.hostname),
-    project,
-    identifier,
-  };
-}
-
-function parseShortcutUrl(url: URL): ParsedAppIssueUrl | null {
-  const host = normalizeHost(url.hostname);
-  if (host !== "app.shortcut.com" && host !== "shortcut.com") {
-    return null;
-  }
-  const segments = pathSegments(url);
-  const storyIndex = segments.findIndex((segment) => segment === "story");
-  const identifier = storyIndex >= 0 ? segments[storyIndex + 1] : undefined;
-  if (!identifier) {
-    return null;
-  }
-  return {
-    kind: "sentryApp",
-    provider: "shortcut",
-    appSlug: "shortcut",
-    url: url.toString(),
-    host,
-    project: "shortcut",
-    identifier,
-  };
-}
-
-export function parseExternalIssueUrl(
-  externalIssueUrl: string,
-): ParsedExternalIssueUrl {
-  let url: URL;
+function parseUrl(value: string): URL {
   try {
-    url = new URL(externalIssueUrl);
+    const url = new URL(value);
+    if (
+      !["https:", "http:"].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      [...value].some(
+        (character) => character.charCodeAt(0) <= 32 || character === "\\",
+      )
+    ) {
+      throw new Error("Invalid URL");
+    }
+    const path = decodeURIComponent(url.pathname).replace(/\/+$/, "");
+    if (
+      /[\\?#]/.test(path) ||
+      path
+        .split("/")
+        .slice(1)
+        .some((part) => !part || part === "." || part === "..")
+    ) {
+      throw new Error("Invalid URL path");
+    }
+    return url;
   } catch {
-    throw new UserInputError("`externalIssueUrl` must be a valid URL.");
-  }
-
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new UserInputError(
-      "`externalIssueUrl` must use the http or https protocol.",
+      "Provide a valid HTTP(S) external issue URL without credentials.",
     );
   }
-
-  const host = normalizeHost(url.hostname);
-
-  const nativeParsers: Array<(url: URL) => ParsedNativeIssueUrl | null> = [
-    parseJiraUrl,
-    parseGithubUrl,
-    parseGitlabUrl,
-    parseBitbucketUrl,
-    parseVstsUrl,
-  ];
-  for (const parse of nativeParsers) {
-    const parsed = parse(url);
-    if (parsed) {
-      return parsed;
-    }
-  }
-
-  const appParsers: Array<(url: URL) => ParsedAppIssueUrl | null> = [
-    parseLinearUrl,
-    parseShortcutUrl,
-  ];
-  for (const parse of appParsers) {
-    const parsed = parse(url);
-    if (parsed) {
-      return parsed;
-    }
-  }
-
-  throw new UserInputError(
-    `Unsupported external issue URL host \`${host}\`. Provide a supported Jira, GitHub, GitLab, Bitbucket, Azure DevOps, Linear, or Shortcut issue URL.`,
-  );
 }
 
-function providerKeys(provider: NativeProvider): string[] {
+function pathOf(url: URL): string {
+  return decodeURIComponent(url.pathname).replace(/\/+$/, "");
+}
+
+function integrationDomain(integration: IssueIntegration): URL | undefined {
+  const value = integration.domainName;
+  if (!value) return undefined;
+  try {
+    return new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+  } catch {
+    return undefined;
+  }
+}
+
+function azureAccount(url: URL): string | undefined {
+  if (url.hostname === "dev.azure.com")
+    return pathOf(url).split("/")[1]?.toLowerCase();
+  if (url.hostname.endsWith(".visualstudio.com")) {
+    return url.hostname.slice(0, -".visualstudio.com".length);
+  }
+  return undefined;
+}
+
+/** Compare references, not titles, query strings, or GitHub PR tabs. */
+function nativeIdentity(url: URL, provider: string): string | undefined {
+  const path = pathOf(url);
   switch (provider) {
     case "github":
-      return ["github", "github_enterprise"];
-    case "jira":
-      return ["jira", "jira_server"];
-    case "vsts":
-      return ["vsts"];
-    default:
-      return [provider];
-  }
-}
-
-function integrationProviderKey(integration: IssueIntegration): string {
-  return integration.provider.key.toLowerCase();
-}
-
-function domainMatchScore(
-  integration: IssueIntegration,
-  parsed: ParsedNativeIssueUrl,
-): number {
-  const domain = normalizeDomain(integration.domainName);
-  if (!domain || !parsed.domainPath) {
-    return 0;
-  }
-  const parsedDomain = normalizeDomain(parsed.domainPath);
-  if (!parsedDomain) {
-    return 0;
-  }
-  if (parsedDomain === domain || parsedDomain.startsWith(`${domain}/`)) {
-    return domain.length;
-  }
-  return 0;
-}
-
-function hasChoice(field: LinkConfigField, value: string): boolean {
-  if (!field.choices || field.choices.length === 0) {
-    return true;
-  }
-  return field.choices.some(([choiceValue]) => choiceValue === value);
-}
-
-function fieldByName(
-  config: IssueIntegrationLinkConfig,
-  name: string,
-): LinkConfigField | undefined {
-  return config.linkIssueConfig.find((field) => field.name === name);
-}
-
-function configMatchesParsedUrl(
-  config: IssueIntegrationLinkConfig,
-  parsed: ParsedNativeIssueUrl,
-): boolean {
-  if (parsed.repo) {
-    const repoField = fieldByName(config, "repo");
-    if (repoField && !hasChoice(repoField, parsed.repo)) {
-      return false;
-    }
-  }
-  if (parsed.project) {
-    const projectField = fieldByName(config, "project");
-    if (projectField && !hasChoice(projectField, parsed.project)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function buildNativeLinkPayload(
-  parsed: ParsedNativeIssueUrl,
-  config: IssueIntegrationLinkConfig,
-): Record<string, unknown> {
-  const payload: Record<string, unknown> = {};
-  for (const field of config.linkIssueConfig) {
-    if (field.default !== undefined && field.default !== "") {
-      payload[field.name] = field.default;
-    }
-  }
-
-  switch (parsed.provider) {
-    case "jira":
-    case "vsts":
-      payload.externalIssue = parsed.issueId;
-      break;
-    case "github":
-    case "bitbucket":
-      payload.repo = parsed.repo;
-      payload.externalIssue = parsed.issueId;
-      break;
-    case "gitlab":
-      payload.project = parsed.project;
-      payload.externalIssue = `${parsed.project}#${parsed.issueId}`;
-      break;
-  }
-
-  const missingFields = config.linkIssueConfig
-    .filter((field) => field.required)
-    .filter((field) => {
-      const value = payload[field.name];
-      return value === undefined || value === null || value === "";
-    })
-    .map((field) => field.name);
-
-  if (missingFields.length > 0) {
-    throw new UserInputError(
-      `Unsupported external issue URL for ${config.provider.name ?? config.provider.key}. Missing required link fields: ${missingFields.join(", ")}.`,
-    );
-  }
-
-  return payload;
-}
-
-async function resolveNativeTarget(params: {
-  apiService: ExternalIssueLinkApi;
-  organizationSlug: string;
-  issueId: string;
-  parsed: ParsedNativeIssueUrl;
-}): Promise<NativeExternalIssueLinkTarget> {
-  const { apiService, organizationSlug, issueId, parsed } = params;
-  const integrations = await apiService.listIssueIntegrations({
-    organizationSlug,
-    issueId,
-  });
-  let candidates = integrations.filter((integration) =>
-    providerKeys(parsed.provider).includes(integrationProviderKey(integration)),
-  );
-
-  if (candidates.length === 0) {
-    throw new UserInputError(
-      `No installed ${parsed.provider} issue integration can link ${parsed.url}.`,
-    );
-  }
-
-  const bestDomainScore = Math.max(
-    0,
-    ...candidates.map((candidate) => domainMatchScore(candidate, parsed)),
-  );
-
-  // For non-public GitHub hosts (GitHub Enterprise), require a positive domain
-  // match so that arbitrary URLs with GitHub-shaped paths cannot silently link
-  // to a null-domain GitHub integration.
-  if (
-    parsed.provider === "github" &&
-    parsed.host !== "github.com" &&
-    bestDomainScore === 0
-  ) {
-    throw new UserInputError(
-      `No installed GitHub Enterprise integration matches the URL domain/path \`${parsed.domainPath ?? parsed.host}\`. Configure a GitHub Enterprise integration with a matching domain name before linking this URL.`,
-    );
-  }
-
-  if (bestDomainScore > 0) {
-    candidates = candidates.filter(
-      (candidate) => domainMatchScore(candidate, parsed) === bestDomainScore,
-    );
-  } else {
-    // No candidate matched the URL's domain. Filter out any candidate that has
-    // an explicit domainName configured — a domain that is set but doesn't
-    // match is a stronger exclusion signal than having no domain restriction.
-    // Candidates with no domainName are kept as fallback (e.g. github.com
-    // integrations that don't advertise a domainName).
-    candidates = candidates.filter(
-      (candidate) => !normalizeDomain(candidate.domainName),
-    );
-    if (candidates.length === 0) {
-      throw new UserInputError(
-        `No installed ${parsed.provider} issue integration matches the URL domain/path \`${parsed.domainPath ?? parsed.host}\` for ${parsed.url}.`,
+    case "github_enterprise": {
+      const match = path.match(
+        /^\/([^/]+\/[^/]+)\/(issues|pull)\/(\d+)(?:\/(files|changes|commits|checks))?$/,
       );
+      if (!match || (match[2] === "issues" && match[4])) return undefined;
+      return `${url.origin}/${match[1]!.toLowerCase()}#${match[3]}`;
+    }
+    case "gitlab": {
+      const match = path.match(/^\/(.+?)(?:\/-)?\/issues\/(\d+)$/);
+      return match ? `${url.origin}/${match[1]}#${match[2]}` : undefined;
+    }
+    case "bitbucket": {
+      const match = path.match(/^\/([^/]+\/[^/]+)\/issues\/(\d+)(?:\/[^/]+)?$/);
+      return match ? `${url.origin}/${match[1]}#${match[2]}` : undefined;
+    }
+    case "jira":
+    case "jira_server": {
+      const match = path.match(/^(.*)\/browse\/([a-z][a-z\d_]*-\d+)$/i);
+      return match
+        ? `${url.origin}${match[1]}/${match[2]!.toUpperCase()}`
+        : undefined;
+    }
+    case "vsts": {
+      const account = azureAccount(url);
+      const accountPath =
+        url.hostname === "dev.azure.com" ? path.replace(/^\/[^/]+/, "") : path;
+      const match = accountPath.match(
+        /^\/(?:[^/]+\/)?_workitems\/edit\/(\d+)$/,
+      );
+      return account && match
+        ? `${url.protocol}//${account}:${url.port}#${match[1]}`
+        : undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
+function matchesIntegration(url: URL, integration: IssueIntegration): boolean {
+  if (integration.status && integration.status !== "active") return false;
+  const provider = integration.provider.key;
+  if (!nativeIdentity(url, provider)) return false;
+  const domain = integrationDomain(integration);
+  const path = pathOf(url);
+  const owner = path.split("/")[1];
+
+  switch (provider) {
+    case "github":
+    case "github_enterprise": {
+      if (provider === "github" && url.host !== "github.com") return false;
+      if (provider === "github_enterprise" && !domain) return false;
+      if (domain && domain.host !== url.host) return false;
+      const installedOwner = domain
+        ? pathOf(domain).split("/")[1] || integration.name
+        : integration.name;
+      return owner?.toLowerCase() === installedOwner.toLowerCase();
+    }
+    case "bitbucket": {
+      if (url.host !== "bitbucket.org") return false;
+      // Older personal installations store only the username as domainName.
+      const installedOwner =
+        domain?.host === "bitbucket.org"
+          ? pathOf(domain).split("/")[1]
+          : integration.name;
+      return owner?.toLowerCase() === installedOwner?.toLowerCase();
+    }
+    case "vsts":
+      return (
+        !!domain &&
+        !!azureAccount(url) &&
+        azureAccount(url) === azureAccount(domain) &&
+        url.port === domain.port
+      );
+    case "gitlab": {
+      if (!domain || domain.host !== url.host) return false;
+      const group = pathOf(domain);
+      // domainName omits a self-hosted instance's deployment prefix. The
+      // backend validates its base URL; matching groups stay ambiguous.
+      return !group || path.includes(`${group}/`);
+    }
+    default: {
+      if (!domain || domain.host !== url.host) return false;
+      const prefix = pathOf(domain);
+      return !prefix || path.startsWith(`${prefix}/`);
     }
   }
-
-  const candidatesWithConfig = await Promise.all(
-    candidates.map(async (integration) => {
-      const config = await apiService.getIssueIntegrationLinkConfig({
-        organizationSlug,
-        issueId,
-        integrationId: String(integration.id),
-      });
-      return { integration, config };
-    }),
-  );
-  const matchingCandidates = candidatesWithConfig.filter(({ config }) =>
-    configMatchesParsedUrl(config, parsed),
-  );
-
-  if (matchingCandidates.length === 0) {
-    throw new UserInputError(
-      `No installed ${parsed.provider} issue integration can access the project or repository in ${parsed.url}.`,
-    );
-  }
-  if (matchingCandidates.length > 1) {
-    throw new UserInputError(
-      `Multiple installed ${parsed.provider} issue integrations match ${parsed.url}: ${matchingCandidates
-        .map(
-          ({ integration }) =>
-            `${integration.name} (${integration.provider.key})`,
-        )
-        .join(", ")}.`,
-    );
-  }
-  const [{ integration, config }] = matchingCandidates;
-  return {
-    kind: "native",
-    integrationId: String(integration.id),
-    provider: integration.provider.key,
-    fallbackDisplayName: parsed.issueId,
-    fallbackUrl: parsed.url,
-    payload: buildNativeLinkPayload(parsed, config),
-  };
 }
 
-function describeSentryAppCandidates(
-  candidates: SentryAppInstallation[],
-): string {
-  return candidates.map((candidate) => candidate.app.slug).join(", ");
+async function nativeCandidates(
+  apiService: SentryApiService,
+  params: IssueLinkParams,
+  url: URL,
+): Promise<IssueIntegration[]> {
+  const integrations = await apiService.listIssueIntegrations(params);
+  const candidates = integrations.filter(
+    (integration) =>
+      (!params.integrationId ||
+        String(integration.id) === params.integrationId) &&
+      matchesIntegration(url, integration),
+  );
+  if (params.integrationId && !candidates.length) {
+    throw new UserInputError(
+      "The selected integration does not match the external issue URL or is not active.",
+    );
+  }
+  return candidates;
 }
 
-async function resolveSentryAppTarget(params: {
-  apiService: ExternalIssueLinkApi;
-  organizationSlug: string;
-  parsed: ParsedAppIssueUrl;
-}): Promise<SentryAppExternalIssueLinkTarget> {
-  const { apiService, organizationSlug, parsed } = params;
-  const appSlug = parsed.appSlug;
-  const installations = await apiService.listSentryAppInstallations({
-    organizationSlug,
-  });
-  const candidates = installations.filter(
-    (installation) =>
-      installation.status?.toLowerCase() !== "pending" &&
-      installation.app.slug.toLowerCase() === appSlug,
-  );
+function describeIntegrations(integrations: IssueIntegration[]): string {
+  return integrations
+    .slice(0, 5)
+    .map(
+      (integration) =>
+        `${integration.id} (${integration.name.slice(0, 60)}, ${integration.provider.key})`,
+    )
+    .join("; ");
+}
 
-  if (candidates.length === 0) {
+function validatedParams(params: IssueLinkParams): {
+  params: IssueLinkParams;
+  url: URL;
+} {
+  const externalIssueUrl = params.externalIssueUrl.trim();
+  const url = parseUrl(externalIssueUrl);
+  const appSlug = params.appSlug ?? inferAppSlug(externalIssueUrl);
+  if (appSlug && params.integrationId) {
     throw new UserInputError(
-      `No installed Sentry App with slug \`${appSlug}\` can link ${parsed.url}.`,
+      "Provide either appSlug or integrationId to select an integration.",
+    );
+  }
+  if (!appSlug && params.fields !== undefined) {
+    throw new UserInputError(
+      "fields are only supported for Sentry App links. Provide appSlug to select an App.",
+    );
+  }
+  return { params: { ...params, externalIssueUrl, appSlug }, url };
+}
+
+/** Link a reference to a resolved numeric Sentry issue, preserving the backend's no-op result. */
+export async function linkExternalIssue(
+  apiService: SentryApiService,
+  input: IssueLinkParams,
+): Promise<IssueLinkResult> {
+  const { params, url } = validatedParams(input);
+  if (params.appSlug) return linkAppIssue(apiService, params);
+  const candidates = await nativeCandidates(apiService, params, url);
+  if (!candidates.length) {
+    throw new UserInputError(
+      "No active issue integration matches this URL. Use a supported issue or pull request URL, or provide appSlug for a Sentry App.",
     );
   }
   if (candidates.length > 1) {
     throw new UserInputError(
-      `Multiple installed Sentry Apps match ${parsed.url}: ${describeSentryAppCandidates(candidates)}.`,
+      `Multiple installed issue integrations match this URL. Provide integrationId to select one: ${describeIntegrations(candidates)}.`,
     );
   }
-
+  const integration = candidates[0]!;
+  const { issue, changed } = await apiService.linkNativeExternalIssue({
+    ...params,
+    integrationId: String(integration.id),
+  });
   return {
-    kind: "sentryApp",
-    installationUuid: candidates[0].uuid,
-    provider: candidates[0].app.slug,
-    payload: {
-      webUrl: parsed.url,
-      project: parsed.project,
-      identifier: parsed.identifier,
-    },
+    url: issue.url || params.externalIssueUrl,
+    displayName: issue.displayName || issue.key,
+    provider: integration.provider.key,
+    status: changed ? "linked" : "already_linked",
   };
 }
 
-export async function resolveExternalIssueLinkTarget(params: {
-  apiService: ExternalIssueLinkApi;
-  organizationSlug: string;
-  issueId: string;
-  externalIssueUrl: string;
-}): Promise<ExternalIssueLinkTarget> {
-  const parsed = parseExternalIssueUrl(params.externalIssueUrl);
-
-  if (parsed.kind === "native") {
-    return resolveNativeTarget({
-      apiService: params.apiService,
-      organizationSlug: params.organizationSlug,
-      issueId: params.issueId,
-      parsed,
-    });
+/** Find the stored association by URL, then delete it by its internal Sentry ID. */
+export async function unlinkExternalIssue(
+  apiService: SentryApiService,
+  input: IssueLinkParams,
+): Promise<IssueLinkResult> {
+  const { params, url } = validatedParams(input);
+  if (params.appSlug) return unlinkAppIssue(apiService, params);
+  // Existing associations can outlive a disabled or reconfigured installation.
+  // Match their stored URL, without applying link-time installation eligibility.
+  const integrations = await apiService.listIssueIntegrations(params);
+  const candidates = integrations.filter(
+    (integration) =>
+      !params.integrationId || String(integration.id) === params.integrationId,
+  );
+  if (params.integrationId && !candidates.length) {
+    throw new UserInputError(
+      "The selected integration was not found on this issue.",
+    );
   }
-
-  return resolveSentryAppTarget({
-    apiService: params.apiService,
-    organizationSlug: params.organizationSlug,
-    parsed,
+  const matches = candidates.flatMap((integration) =>
+    integration.externalIssues.flatMap((issue) => {
+      if (!issue.url) return [];
+      const identity = nativeIdentity(url, integration.provider.key);
+      if (!identity) return [];
+      let existing: URL;
+      try {
+        existing = parseUrl(issue.url);
+      } catch {
+        return [];
+      }
+      return nativeIdentity(existing, integration.provider.key) === identity
+        ? [{ integration, issue }]
+        : [];
+    }),
+  );
+  if (matches.length > 1) {
+    throw new UserInputError(
+      `Multiple linked issues match this URL. Provide integrationId to select one: ${describeIntegrations(matches.map(({ integration }) => integration))}.`,
+    );
+  }
+  const match = matches[0];
+  if (!match) {
+    // Custom Apps can own any URL, including one with a native provider shape.
+    if (!params.integrationId) return unlinkAppIssue(apiService, params);
+    return { url: params.externalIssueUrl, status: "not_linked" };
+  }
+  await apiService.unlinkNativeExternalIssue({
+    ...params,
+    integrationId: String(match.integration.id),
+    externalIssueId: String(match.issue.id),
   });
-}
-
-export function formatLinkedExternalIssue(linked: LinkedExternalIssue): string {
-  if (linked.kind === "sentryApp") {
-    return `${linked.issue.displayName || linked.issue.issueId} (${linked.issue.serviceType || linked.provider}) → ${linked.issue.webUrl}`;
-  }
-  const displayName =
-    linked.issue.displayName || linked.issue.key || linked.fallbackDisplayName;
-  const url = linked.issue.url || linked.fallbackUrl;
-  return `${displayName} (${linked.provider}) → ${url}`;
+  return {
+    url: match.issue.url || params.externalIssueUrl,
+    displayName: match.issue.displayName || match.issue.key,
+    provider: match.integration.provider.key,
+    status: "not_linked",
+  };
 }

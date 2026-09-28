@@ -1,12 +1,38 @@
-import { describe, it, expect } from "vitest";
+import { mswServer, teamFixture } from "@sentry/mcp-server-mocks";
+import { http, HttpResponse } from "msw";
+import { afterEach, describe, it, expect } from "vitest";
 import createTeam from "./create-team.js";
 
 describe("create_team", () => {
-  it("serializes", async () => {
+  afterEach(() => {
+    mswServer.resetHandlers();
+  });
+
+  it("returns structured team details", async () => {
+    mswServer.use(
+      http.post(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/teams/",
+        async ({ request }) => {
+          expect(await request.json()).toEqual({
+            name: "Platform Engineering",
+          });
+          return HttpResponse.json(
+            {
+              ...teamFixture,
+              id: 4509109078196224,
+              slug: "platform-engineering",
+              name: "Platform Engineering",
+            },
+            { status: 201 },
+          );
+        },
+      ),
+    );
+
     const result = await createTeam.handler(
       {
         organizationSlug: "sentry-mcp-evals",
-        name: "the-goats",
+        name: "Platform Engineering",
         regionUrl: null,
       },
       {
@@ -18,16 +44,15 @@ describe("create_team", () => {
       },
     );
     expect(result).toMatchInlineSnapshot(`
-      "# New Team in **sentry-mcp-evals**
-
-      **ID**: 4509109078196224
-      **Slug**: the-goats
-      **Name**: the-goats
-
-      ## Response Notes
-
-      - Please tell the user the team slug.
-      "
+      {
+        "structuredContent": {
+          "team": {
+            "id": "4509109078196224",
+            "name": "Platform Engineering",
+            "slug": "platform-engineering",
+          },
+        },
+      }
     `);
   });
 });

@@ -1,6 +1,9 @@
 import { getActiveSpan, setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
+import { SEARCH_ISSUES_PERIOD_VALUES } from "../../constants";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
+import { withProviderFallback } from "../../internal/agents/provider-fallback";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
@@ -12,9 +15,11 @@ import {
   formatExplanation,
 } from "../support/search-issues/formatters";
 
+const ProjectSlugOrIdSchema = z.string().trim().superRefine(validateSlugOrId);
+
 function buildIssueSearchRepairPrompt(params: {
   query: string;
-  sort: "date" | "freq" | "new" | "user";
+  sort: "date" | "freq" | "new" | "user" | "recommended";
 }): string {
   return [
     "Fix this Sentry issue search request.",
@@ -77,17 +82,12 @@ export default defineTool({
       .default("is:unresolved")
       .describe("Natural language or Sentry issue search query syntax."),
     sort: z
-      .enum(["date", "freq", "new", "user"])
+      .enum(["date", "freq", "new", "user", "recommended"])
       .default("date")
       .describe(
-        "Sort order: date (last seen), freq (frequency), new (first seen), user (user count)",
+        "Sort order: date (last seen), freq (frequency), new (first seen), user (user count), recommended (Sentry's prioritized ranking)",
       ),
-    projectSlugOrId: z
-      .string()
-      .toLowerCase()
-      .trim()
-      .superRefine(validateSlugOrId)
-      .nullable()
+    projectSlugOrId: ProjectSlugOrIdSchema.nullable()
       .default(null)
       .describe("The project's slug or numeric ID (optional)"),
     regionUrl: ParamRegionUrl.nullable().default(null),
@@ -97,6 +97,12 @@ export default defineTool({
       .max(100)
       .default(10)
       .describe("Maximum number of issues to return (1-100)"),
+    period: z
+      .enum(SEARCH_ISSUES_PERIOD_VALUES)
+      .default("30d")
+      .describe(
+        "Time window for issue search results. Controls which issues are returned based on when they had activity. Default 30d is a balance between coverage and query performance; use 24h for very recent issues or 90d for broader historical searches.",
+      ),
     includeExplanation: z
       .boolean()
       .default(false)
@@ -106,6 +112,7 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: true,
+    destructiveHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
@@ -113,7 +120,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationContext(params.organizationSlug);
     if (params.projectSlugOrId) {
       if (isNumericId(params.projectSlugOrId)) {
         setTag("project.id", params.projectSlugOrId);
@@ -123,35 +130,51 @@ export default defineTool({
     }
 
     let query: string;
-    let sort: "date" | "freq" | "new" | "user";
+    let sort: "date" | "freq" | "new" | "user" | "recommended";
     let explanation: string | undefined;
 
-    if (hasAgentProvider()) {
-      // Agent mode: repair requests before calling Sentry.
-      let projectId: string | undefined;
-      if (params.projectSlugOrId) {
-        if (isNumericId(params.projectSlugOrId)) {
-          projectId = params.projectSlugOrId;
-        } else {
-          const project = await apiService.getProject({
-            organizationSlug: params.organizationSlug,
-            projectSlugOrId: params.projectSlugOrId,
-          });
-          projectId = String(project.id);
-        }
+    let projectId: string | undefined;
+    if (params.projectSlugOrId) {
+      const projectSlugOrId = ProjectSlugOrIdSchema.parse(
+        params.projectSlugOrId,
+      );
+      if (isNumericId(projectSlugOrId)) {
+        projectId = projectSlugOrId;
+      } else {
+        const project = await apiService.getProject({
+          organizationSlug: params.organizationSlug,
+          projectSlugOrId,
+        });
+        projectId = String(project.id);
       }
+    }
 
-      const agentResult = await searchIssuesAgent({
-        query: buildIssueSearchRepairPrompt({
+    if (hasAgentProvider()) {
+      // Agent mode: repair requests before calling Sentry. If the optional AI
+      // provider is unavailable, preserve the original query and continue.
+      const translatedQuery = await withProviderFallback<
+        Awaited<ReturnType<typeof searchIssuesAgent>>["result"]
+      >({
+        operation: "search_issues.rewrite",
+        fallback: () => ({
           query: params.query,
           sort: params.sort,
+          explanation: "",
         }),
-        organizationSlug: params.organizationSlug,
-        apiService,
-        projectId,
+        run: async () =>
+          (
+            await searchIssuesAgent({
+              query: buildIssueSearchRepairPrompt({
+                query: params.query,
+                sort: params.sort,
+              }),
+              organizationSlug: params.organizationSlug,
+              apiService,
+              projectId,
+            })
+          ).result,
       });
 
-      const translatedQuery = agentResult.result;
       query = translatedQuery.query ?? params.query;
       sort = translatedQuery.sort || params.sort;
       explanation = translatedQuery.explanation;
@@ -163,10 +186,11 @@ export default defineTool({
 
     const issues = await apiService.listIssues({
       organizationSlug: params.organizationSlug,
-      projectSlug: params.projectSlugOrId ?? undefined,
+      projectId,
       query,
       sortBy: sort,
       limit: params.limit,
+      statsPeriod: params.period,
     });
 
     getActiveSpan()?.setAttribute(

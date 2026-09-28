@@ -23,8 +23,16 @@ vi.mock("@sentry/cloudflare", () => ({
 }));
 
 import {
+  OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE,
+  OAUTH_GRANT_SHAPE_ATTRIBUTE,
+  OAUTH_REFRESH_OUTCOME_ATTRIBUTE,
+  OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE,
+} from "./telemetry";
+import {
+  appendAuthorizationResponseIss,
   createResourceValidationError,
   exchangeCodeForAccessToken,
+  getAuthorizationServerIssuer,
   getOAuthCallbackFailureDetails,
   getTokenExchangeFailureDetails,
   tokenExchangeCallback,
@@ -246,9 +254,11 @@ describe("tokenExchangeCallback", () => {
       1,
       {
         attributes: expect.objectContaining({
-          "app.oauth.token_exchange.outcome": "cached_valid_local",
-          "app.oauth.grant.age_bucket": "1d_7d",
-          "app.oauth.upstream.expires_in_bucket": "1d_7d",
+          [OAUTH_REFRESH_OUTCOME_ATTRIBUTE]: "cached_valid_local",
+          [OAUTH_GRANT_AGE_BUCKET_ATTRIBUTE]: "1d_7d",
+          [OAUTH_UPSTREAM_EXPIRES_IN_BUCKET_ATTRIBUTE]: "1d_7d",
+          "app.client.registration.method":
+            expect.stringMatching(/^(cimd|dcr|unknown)$/),
         }),
       },
     );
@@ -684,6 +694,17 @@ describe("validateResourceParameter", () => {
       expect(result).toBe(true);
     });
 
+    // Regression: Claude plugin attribution URL must remain a valid RFC 8707
+    // resource even though path-scoped AS metadata advertises a query-free
+    // issuer (RFC 8414 forbids query components on issuer).
+    it("should allow plugin utm_source resource parameter", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/mcp?utm_source=plugin",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
     it("should allow resource with different port when both match", () => {
       const result = validateResourceParameter(
         "https://mcp.sentry.dev:8443/mcp",
@@ -906,11 +927,62 @@ describe("validateResourceParameter", () => {
   });
 });
 
+describe("getAuthorizationServerIssuer", () => {
+  it("returns the request origin as the canonical issuer", () => {
+    expect(
+      getAuthorizationServerIssuer(
+        "https://mcp.sentry.dev/oauth/callback?code=abc",
+      ),
+    ).toBe("https://mcp.sentry.dev");
+    expect(
+      getAuthorizationServerIssuer(
+        new URL("http://localhost:8787/oauth/authorize"),
+      ),
+    ).toBe("http://localhost:8787");
+  });
+});
+
+describe("appendAuthorizationResponseIss", () => {
+  it("appends iss to query-mode authorization responses", () => {
+    expect(
+      appendAuthorizationResponseIss(
+        "https://client.example.com/callback?code=abc&state=xyz",
+        "https://mcp.sentry.dev",
+      ),
+    ).toBe(
+      "https://client.example.com/callback?code=abc&state=xyz&iss=https%3A%2F%2Fmcp.sentry.dev",
+    );
+  });
+
+  it("appends iss to fragment-mode authorization responses", () => {
+    expect(
+      appendAuthorizationResponseIss(
+        "https://client.example.com/callback#code=abc&state=xyz",
+        "https://mcp.sentry.dev",
+      ),
+    ).toBe(
+      "https://client.example.com/callback#code=abc&state=xyz&iss=https%3A%2F%2Fmcp.sentry.dev",
+    );
+  });
+
+  it("replaces an existing iss parameter with the canonical issuer", () => {
+    expect(
+      appendAuthorizationResponseIss(
+        "https://client.example.com/callback?code=abc&iss=https%3A%2F%2Fother.example",
+        "https://mcp.sentry.dev",
+      ),
+    ).toBe(
+      "https://client.example.com/callback?code=abc&iss=https%3A%2F%2Fmcp.sentry.dev",
+    );
+  });
+});
+
 describe("createResourceValidationError", () => {
   it("should create redirect response with invalid_target error", () => {
     const response = createResourceValidationError(
       "https://client.example.com/callback",
       "state123",
+      "https://mcp.sentry.dev/oauth/authorize",
     );
 
     expect(response.status).toBe(302);
@@ -926,11 +998,14 @@ describe("createResourceValidationError", () => {
       "resource parameter",
     );
     expect(locationUrl.searchParams.get("state")).toBe("state123");
+    expect(locationUrl.searchParams.get("iss")).toBe("https://mcp.sentry.dev");
   });
 
   it("should create redirect without state parameter if not provided", () => {
     const response = createResourceValidationError(
       "https://client.example.com/callback",
+      undefined,
+      "https://mcp.sentry.dev/oauth/authorize",
     );
 
     const location = response.headers.get("Location");
@@ -939,12 +1014,14 @@ describe("createResourceValidationError", () => {
     const locationUrl = new URL(location!);
     expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
     expect(locationUrl.searchParams.get("state")).toBeNull();
+    expect(locationUrl.searchParams.get("iss")).toBe("https://mcp.sentry.dev");
   });
 
   it("should preserve existing query parameters in redirect URI", () => {
     const response = createResourceValidationError(
       "https://client.example.com/callback?existing=param",
       "state456",
+      "https://mcp.sentry.dev/oauth/authorize",
     );
 
     const location = response.headers.get("Location");
@@ -953,11 +1030,14 @@ describe("createResourceValidationError", () => {
     expect(locationUrl.searchParams.get("existing")).toBe("param");
     expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
     expect(locationUrl.searchParams.get("state")).toBe("state456");
+    expect(locationUrl.searchParams.get("iss")).toBe("https://mcp.sentry.dev");
   });
 
   it("should have proper error description per RFC 8707", () => {
     const response = createResourceValidationError(
       "https://client.example.com/callback",
+      undefined,
+      "https://mcp.sentry.dev/oauth/authorize",
     );
 
     const location = response.headers.get("Location");
