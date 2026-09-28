@@ -19,6 +19,7 @@
     "./lint-rules/no-inline-touch-cache.grit",
     "./lint-rules/no-stderr-write-in-commands.grit",
     "./lint-rules/no-args-join-in-release.grit",
+    "./lint-rules/no-direct-target-resolution.grit",
     "./lint-rules/no-generic-is-record.grit",
     "./lint-rules/prefer-paginate-helper.grit"
   ],

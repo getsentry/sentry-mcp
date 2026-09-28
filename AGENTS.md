@@ -677,7 +677,9 @@ Do not call `findProjectsBySlug()` or implement org fallback directly in a
 command. `sentry init` is the intentional not-found exception: it calls the
 classifier with fuzzy recovery disabled, then treats `not-found` as a new
 project name. Issue-short-ID recovery in `commands/issue/utils.ts` is not CLI
-target resolution and may perform its own project lookup.
+target resolution and may perform its own project lookup. The
+`no-direct-target-resolution` Biome plugin enforces this command-layer
+boundary.
 
 ### List Command Infrastructure
 
