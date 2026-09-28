@@ -255,6 +255,18 @@ export class AuthError extends CliError {
   }
 }
 
+/** Malformed credentials are reportable without retaining their secret value. */
+export class MalformedAuthTokenError extends AuthError {
+  constructor() {
+    super(
+      "invalid",
+      "Invalid authentication token. Copy it again as a single line without spaces or control characters, " +
+        "or run 'sentry auth login' to replace stored credentials."
+    );
+    this.name = "MalformedAuthTokenError";
+  }
+}
+
 /**
  * Configuration or DSN errors.
  *

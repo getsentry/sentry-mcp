@@ -4,7 +4,7 @@
  * Provides two things:
  *
  * 1. **Silencing rules** — `OutputError`, network failures (offline/DNS/proxy),
- *    `AuthError` (expected auth states the user must act on), 401–499 `ApiError`,
+ *    `AuthError` (except `MalformedAuthTokenError`), 401–499 `ApiError`,
  *    and 400 `ApiError`s that report an unparseable user search query are not
  *    sent to Sentry as issues. A `cli.error.silenced` metric preserves volume +
  *    user/org context.
@@ -13,6 +13,8 @@
  *    silenced: its volume is the signal driving auto-detection/UX improvements
  *    (e.g. single-org auto-select, the interactive picker), so it must stay
  *    visible (CLI-3B).
+ *    `MalformedAuthTokenError` is also captured to keep token-formatting
+ *    failures visible; its fixed message never includes the rejected token.
  *
  * 2. **Grouping tags** — enriches every error event with `cli_error.*` tags
  *    that Sentry's server-side fingerprint rules use for stable grouping.
@@ -33,6 +35,7 @@ import {
   DeviceFlowError,
   HostScopeError,
   isNetworkError,
+  MalformedAuthTokenError,
   OutputError,
   ResolutionError,
   SeerError,
@@ -85,13 +88,13 @@ export function classifySilenced(error: unknown): SilenceReason | null {
   // stays captured (CLI-3B). The accompanying `resolveOrgProjectOrGuide`
   // changes aim to drive this volume down by helping users succeed instead.
   //
-  // All AuthError reasons are expected auth states the user must act on, not
-  // CLI bugs: `not_authenticated` (no token), `expired` (token aged out), and
-  // `invalid` (a bad/insufficiently-scoped token the user supplied). `invalid`
-  // is now only thrown for a genuine 401/403 (see auth/login.ts) — transient
-  // network/server failures no longer masquerade as it — so it is safe to
-  // silence alongside the others (CLI-19).
-  if (error instanceof AuthError) {
+  // Missing, expired, and rejected credentials are expected auth states.
+  // Malformed tokens stay visible to investigate configuration/formatting
+  // failures, using an error that never contains the credential (CLI-19).
+  if (
+    error instanceof AuthError &&
+    !(error instanceof MalformedAuthTokenError)
+  ) {
     return "auth_expected";
   }
   // A ValidationError with field "project.ambiguous_org" means the user

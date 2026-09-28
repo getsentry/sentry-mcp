@@ -3,7 +3,7 @@
  *
  * Verifies invariants that must hold for any valid token values:
  * - SENTRY_AUTH_TOKEN always takes priority over SENTRY_TOKEN
- * - Env vars always take priority over stored tokens
+ * - Stored OAuth takes priority unless SENTRY_FORCE_ENV_TOKEN is set
  * - Env tokens never trigger refresh
  * - AuthConfig.source correctly identifies the origin
  */
@@ -14,8 +14,9 @@ import {
   option,
   property,
   string,
+  stringMatching,
 } from "fast-check";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
   type AuthSource,
   getAuthConfig,
@@ -26,41 +27,19 @@ import {
   resetAuthTokenCache,
   setAuthToken,
 } from "../../../src/lib/db/auth.js";
-import { useTestConfigDir } from "../../helpers.js";
+import { useEnvSandbox, useTestConfigDir } from "../../helpers.js";
 import { DEFAULT_NUM_RUNS } from "../../model-based/helpers.js";
 
 useTestConfigDir("auth-prop-");
+useEnvSandbox(["SENTRY_AUTH_TOKEN", "SENTRY_TOKEN", "SENTRY_FORCE_ENV_TOKEN"]);
 
 /** Arbitrary for non-empty, trimmed token strings */
 const tokenArb = string({ minLength: 1, maxLength: 100 }).filter(
   (s) => s.trim().length > 0
 );
 
-/** Save and restore env vars around each test */
-let savedAuthToken: string | undefined;
-let savedSentryToken: string | undefined;
-
-beforeEach(() => {
-  savedAuthToken = process.env.SENTRY_AUTH_TOKEN;
-  savedSentryToken = process.env.SENTRY_TOKEN;
-  delete process.env.SENTRY_AUTH_TOKEN;
-  delete process.env.SENTRY_TOKEN;
-  resetAuthTokenCache();
-  resetAuthRowCache();
-});
-
-afterEach(() => {
-  if (savedAuthToken !== undefined) {
-    process.env.SENTRY_AUTH_TOKEN = savedAuthToken;
-  } else {
-    delete process.env.SENTRY_AUTH_TOKEN;
-  }
-  if (savedSentryToken !== undefined) {
-    process.env.SENTRY_TOKEN = savedSentryToken;
-  } else {
-    delete process.env.SENTRY_TOKEN;
-  }
-});
+/** Stored tokens must satisfy the persistence boundary; malformed inputs have separate coverage. */
+const storedTokenArb = stringMatching(/^[\x21-\x7e]{1,100}$/);
 
 /** Invalidate between property iterations — env-var mutations bypass setAuthToken. */
 function resetAuthCaches() {
@@ -87,7 +66,7 @@ describe("property: env var priority", () => {
 
   test("stored OAuth wins over env var (default behavior)", () => {
     fcAssert(
-      property(tokenArb, tokenArb, (envToken, storedToken) => {
+      property(tokenArb, storedTokenArb, (envToken, storedToken) => {
         resetAuthCaches();
         setAuthToken(storedToken);
         process.env.SENTRY_AUTH_TOKEN = envToken;
@@ -95,6 +74,7 @@ describe("property: env var priority", () => {
         // Stored OAuth takes priority — env token is for build tooling
         expect(getAuthToken()).toBe(storedToken);
         expect(getAuthConfig()?.source).toBe("oauth" satisfies AuthSource);
+        expect(isEnvTokenActive()).toBe(true);
       }),
       { numRuns: DEFAULT_NUM_RUNS }
     );
@@ -102,7 +82,7 @@ describe("property: env var priority", () => {
 
   test("SENTRY_FORCE_ENV_TOKEN overrides stored OAuth", () => {
     fcAssert(
-      property(tokenArb, tokenArb, (envToken, storedToken) => {
+      property(tokenArb, storedTokenArb, (envToken, storedToken) => {
         resetAuthCaches();
         setAuthToken(storedToken);
         process.env.SENTRY_AUTH_TOKEN = envToken;
@@ -124,7 +104,7 @@ describe("property: env var priority", () => {
 
   test("stored token used when no env vars set", () => {
     fcAssert(
-      property(tokenArb, (storedToken) => {
+      property(storedTokenArb, (storedToken) => {
         resetAuthCaches();
         setAuthToken(storedToken);
 
@@ -171,7 +151,7 @@ describe("property: env tokens never trigger refresh", () => {
 describe("property: isEnvTokenActive consistency", () => {
   test("when no env token, getAuthConfig never returns env source", () => {
     fcAssert(
-      property(option(tokenArb), (storedTokenOpt) => {
+      property(option(storedTokenArb), (storedTokenOpt) => {
         resetAuthCaches();
         // Clean slate — no env tokens
         delete process.env.SENTRY_AUTH_TOKEN;
@@ -188,22 +168,6 @@ describe("property: isEnvTokenActive consistency", () => {
         if (config) {
           expect(config.source).toBe("oauth");
         }
-      }),
-      { numRuns: DEFAULT_NUM_RUNS }
-    );
-  });
-
-  test("stored OAuth takes priority: getAuthConfig returns oauth even when env token is set", () => {
-    fcAssert(
-      property(tokenArb, tokenArb, (envToken, storedToken) => {
-        resetAuthCaches();
-        process.env.SENTRY_AUTH_TOKEN = envToken;
-        setAuthToken(storedToken);
-
-        const config = getAuthConfig();
-        expect(config?.source).toBe("oauth");
-        // But isEnvTokenActive is still true (env token exists)
-        expect(isEnvTokenActive()).toBe(true);
       }),
       { numRuns: DEFAULT_NUM_RUNS }
     );

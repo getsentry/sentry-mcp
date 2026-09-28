@@ -4,6 +4,8 @@
  * Tests for sentry auth login, logout, and status commands.
  */
 
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import {
   afterAll,
   afterEach,
@@ -13,6 +15,7 @@ import {
   expect,
   test,
 } from "vitest";
+import { Database } from "../../src/lib/db/sqlite.js";
 import { EXIT } from "../../src/lib/errors.js";
 import { createE2EContext, type E2EContext } from "../fixture.js";
 import { cleanupTestDir, createTestConfigDir } from "../helpers.js";
@@ -114,6 +117,27 @@ describe("sentry auth login --token", () => {
 });
 
 describe("sentry auth whoami", () => {
+  test("rejects a split stored token without exposing it in JSON mode", async () => {
+    const token = "sntryu_SYNTHETIC-PREFIX\nSYNTHETIC-SECRET-TAIL";
+    await ctx.setAuthToken(TEST_TOKEN);
+    // Model a pre-validation credential; the setter now rejects this input.
+    const db = new Database(join(ctx.configDir, "cli.db"));
+    try {
+      db.query("UPDATE auth SET token = ? WHERE id = 1").run(token);
+    } finally {
+      db.close();
+    }
+
+    const result = await ctx.run(["auth", "whoami", "--json"]);
+    const output = result.stdout + result.stderr;
+
+    expect(result.exitCode).toBe(EXIT.AUTH_INVALID);
+    expect(output).toContain("single line");
+    expect(output).not.toContain("SYNTHETIC-PREFIX");
+    expect(output).not.toContain("SYNTHETIC-SECRET-TAIL");
+    expect(output).not.toContain("Headers.set");
+  });
+
   test("requires authentication", async () => {
     const result = await ctx.run(["auth", "whoami"]);
 
@@ -150,6 +174,45 @@ describe("sentry auth whoami", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("test@example.com");
+  });
+});
+
+describe("auth formatting recovery", () => {
+  test("forced login rejects a split token without losing the previous login", async () => {
+    await ctx.setAuthToken(TEST_TOKEN);
+    const result = await ctx.run([
+      "auth",
+      "login",
+      "--force",
+      "--token",
+      "synthetic-secret-prefix\nsynthetic-secret-tail",
+      "--url",
+      "https://different.example.com",
+    ]);
+    expect(result.exitCode).toBe(EXIT.AUTH_INVALID);
+    expect(result.stdout + result.stderr).toContain("single line");
+    expect(result.stdout + result.stderr).not.toContain("synthetic-secret");
+
+    const stored = await ctx.run(["auth", "token"]);
+    expect(stored.exitCode).toBe(0);
+    expect(stored.stdout.trim()).toBe(TEST_TOKEN);
+    // The previous credential must still work against its original host.
+    expect((await ctx.run(["auth", "whoami"])).exitCode).toBe(0);
+  });
+
+  test("malformed legacy JSON does not prevent help or logout", async () => {
+    const path = join(ctx.configDir, "config.json");
+    const contents = JSON.stringify({
+      auth: { token: "synthetic-secret-prefix\0synthetic-secret-tail" },
+    });
+    await writeFile(path, contents);
+
+    for (const args of [["--help"], ["auth", "logout"]]) {
+      const result = await ctx.run(args);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout + result.stderr).not.toContain("synthetic-secret");
+      expect(await readFile(path, "utf8")).toBe(contents);
+    }
   });
 });
 

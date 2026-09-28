@@ -27,6 +27,7 @@ import {
   option,
   property,
   string,
+  stringMatching,
   tuple,
 } from "fast-check";
 import { describe, expect, test } from "vitest";
@@ -631,8 +632,9 @@ class GetVersionCheckCommand implements AsyncCommand<DbModel, RealDb> {
 
 // Arbitraries (Random Data Generators)
 
-/** Generate valid token strings */
+/** Env/refresh candidates retain their existing domain; stored access tokens must be valid. */
 const tokenArb = string({ minLength: 1, maxLength: 64 });
+const storedTokenArb = stringMatching(/^[\x21-\x7e]{1,64}$/);
 
 /** Generate org/project slugs (alphanumeric with hyphens) */
 const slugChars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -677,7 +679,7 @@ const expiresInArb = option(integer({ min: -10, max: 7200 }), {
 // Command Arbitraries
 
 const setAuthTokenCmdArb = tuple(
-  tokenArb,
+  storedTokenArb,
   expiresInArb,
   option(tokenArb, { nil: undefined })
 ).map(
@@ -918,7 +920,7 @@ describe("model-based: database layer", () => {
 
   test("expired tokens return undefined", () => {
     fcAssert(
-      property(tokenArb, (token) => {
+      property(storedTokenArb, (token) => {
         const cleanup = createIsolatedDbContext();
         const savedAuthToken = process.env.SENTRY_AUTH_TOKEN;
         delete process.env.SENTRY_AUTH_TOKEN;

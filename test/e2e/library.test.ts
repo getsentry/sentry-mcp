@@ -10,9 +10,11 @@
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
+import { EXIT } from "../../src/lib/errors.js";
+import { useTestConfigDir } from "../helpers.js";
 import {
   BUNDLE_INDEX_PATH,
   BUNDLE_TYPES_PATH,
@@ -86,6 +88,8 @@ async function runNodeScriptOk(
 }
 
 describe("library mode (bundled)", () => {
+  const getConfigDir = useTestConfigDir("e2e-library-");
+
   beforeAll(async () => {
     await ensureBundleBuilt();
   }, 60_000);
@@ -200,6 +204,63 @@ describe("library mode (bundled)", () => {
   });
 
   // --- Typed SDK ---
+
+  test("sourcemap upload rejects a split token without leaking it or fetching", async () => {
+    const directory = getConfigDir();
+    await writeFile(
+      join(directory, "app.js"),
+      "console.log('fixture');\n//# sourceMappingURL=app.js.map\n"
+    );
+    await writeFile(
+      join(directory, "app.js.map"),
+      JSON.stringify({
+        version: 3,
+        sources: ["app.ts"],
+        sourcesContent: ["console.log('fixture');"],
+        names: [],
+        mappings: "AAAA",
+      })
+    );
+    const claim = Buffer.from(
+      JSON.stringify({ org: "test-org", url: "http://localhost:9000" })
+    ).toString("base64");
+    const token = `sntrys_${claim}_ab\nSYNTHETIC-SECRET-TAIL`;
+    const { stdout, stderr } = await runNodeScriptOk(`
+      const { createSentrySDK, SentryError } = require('./dist/index.cjs');
+      let fetches = 0;
+      globalThis.fetch = async () => {
+        fetches++;
+        throw new Error('Unexpected request');
+      };
+      const sdk = createSentrySDK({
+        token: ${JSON.stringify(token)},
+        url: 'http://localhost:9000',
+        org: 'test-org',
+        project: 'test-project',
+        cwd: ${JSON.stringify(directory)},
+      });
+      sdk.sourcemap.upload({ directory: ${JSON.stringify(directory)} }).then(() => {
+        console.log(JSON.stringify({ error: false, fetches }));
+      }).catch(e => {
+        console.log(JSON.stringify({
+          isSentryError: e instanceof SentryError,
+          exitCode: e.exitCode,
+          message: e.message,
+          stderr: e.stderr,
+          stack: e.stack,
+          fetches,
+        }));
+      });
+    `);
+    const result = JSON.parse(stdout.trim());
+    expect(result.isSentryError).toBe(true);
+    expect(result.exitCode).toBe(EXIT.AUTH_INVALID);
+    expect(result.message).toContain("single line");
+    expect(result.fetches).toBe(0);
+    expect(stdout + stderr).not.toContain(claim);
+    expect(stdout + stderr).not.toContain("SYNTHETIC-SECRET-TAIL");
+    expect(stdout + stderr).not.toContain("Headers.set");
+  });
 
   test("createSentrySDK() returns object with namespaces", async () => {
     const { stdout } = await runNodeScriptOk(`

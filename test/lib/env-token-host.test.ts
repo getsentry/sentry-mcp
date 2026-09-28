@@ -14,14 +14,31 @@ import {
   getEnvTokenHost,
   resetEnvTokenHostForTesting,
 } from "../../src/lib/env-token-host.js";
-import { useEnvSandbox } from "../helpers.js";
+import { mintSntrysToken, useEnvSandbox } from "../helpers.js";
 
-const ENV_KEYS = ["SENTRY_HOST", "SENTRY_URL"] as const;
+const ENV_KEYS = [
+  "SENTRY_HOST",
+  "SENTRY_URL",
+  "SENTRY_AUTH_TOKEN",
+  "SENTRY_TOKEN",
+] as const;
 
 describe("env-token-host", () => {
   useEnvSandbox(ENV_KEYS);
   beforeEach(resetEnvTokenHostForTesting);
   afterEach(resetEnvTokenHostForTesting);
+
+  test("keeps the claim's host authoritative for a token wrapped in controls", () => {
+    const token = mintSntrysToken({
+      iat: 1,
+      url: "https://self-hosted.example.com",
+      org: "synthetic-org",
+    });
+    process.env.SENTRY_AUTH_TOKEN = `\x01\u00a0${token}\x7f`;
+    process.env.SENTRY_HOST = "https://different.example.com";
+    captureEnvTokenHost();
+    expect(getEnvTokenHost()).toBe("https://self-hosted.example.com");
+  });
 
   test("defaults to SaaS when neither SENTRY_HOST nor SENTRY_URL is set", () => {
     captureEnvTokenHost();

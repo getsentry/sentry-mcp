@@ -8,6 +8,8 @@ import { join } from "node:path";
 
 const _require = createRequire(import.meta.url);
 
+import { normalizeAuthToken } from "../auth-header.js";
+import { MalformedAuthTokenError } from "../errors.js";
 import { logger } from "../logger.js";
 import { getConfigDir } from "./index.js";
 import type { Database } from "./sqlite.js";
@@ -76,7 +78,7 @@ function deleteOldConfig(): boolean {
 
 type OldConfig = {
   auth?: {
-    token?: string;
+    token?: unknown;
     refreshToken?: string;
     expiresAt?: number;
     issuedAt?: number;
@@ -119,6 +121,7 @@ type OldConfig = {
   };
 };
 
+/** Migrate once, retaining the original file and skipping auth if its access token is malformed. */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one-time migration
 export function migrateFromJson(db: Database): void {
   // Check SQLite metadata first - this is the authoritative source
@@ -140,19 +143,38 @@ export function migrateFromJson(db: Database): void {
     return;
   }
 
+  let token: string | undefined;
+  let invalidAuthToken = false;
+  if (oldConfig.auth?.token !== undefined) {
+    try {
+      if (typeof oldConfig.auth.token !== "string") {
+        throw new MalformedAuthTokenError();
+      }
+      token = normalizeAuthToken(oldConfig.auth.token);
+    } catch (error) {
+      if (!(error instanceof MalformedAuthTokenError)) {
+        throw error;
+      }
+      // Do not block DB initialization (including login/logout) on a bad
+      // credential. Preserve the original file instead of binding a token
+      // that SQLite could truncate at an embedded NUL.
+      invalidAuthToken = true;
+    }
+  }
+
   log.info("Migrating config to SQLite...");
 
   db.exec("BEGIN TRANSACTION");
 
   try {
-    if (oldConfig.auth?.token) {
+    if (token && oldConfig.auth) {
       // Direct write (not via setAuthToken) — safe only because migration
       // runs during DB bootstrap, before getIdentityFingerprint() memoizes.
       db.query(`
         INSERT OR REPLACE INTO auth (id, token, refresh_token, expires_at, issued_at, updated_at)
         VALUES (1, ?, ?, ?, ?, ?)
       `).run(
-        oldConfig.auth.token,
+        token,
         oldConfig.auth.refreshToken ?? null,
         oldConfig.auth.expiresAt ?? null,
         oldConfig.auth.issuedAt ?? null,
@@ -275,9 +297,15 @@ export function migrateFromJson(db: Database): void {
     markMigrationCompleted(db);
     db.exec("COMMIT");
 
-    // Best-effort cleanup of old file - if it fails, we're still safe
-    // because SQLite metadata is the authoritative source
-    deleteOldConfig();
+    if (invalidAuthToken) {
+      log.warn(
+        "Malformed authentication credentials were not migrated. The original config.json was kept. " +
+          "Run 'sentry auth login' to authenticate again, then remove the old file."
+      );
+    } else {
+      // Best-effort cleanup: SQLite metadata prevents re-import if it fails.
+      deleteOldConfig();
+    }
     log.success("Migration complete.");
   } catch (error) {
     db.exec("ROLLBACK");

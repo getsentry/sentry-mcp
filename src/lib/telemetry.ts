@@ -231,8 +231,8 @@ export async function withTelemetry<T>(
     // Route through reportCliError so silencing (OutputError, expected-auth
     // AuthError, 401–499 ApiError) and fingerprint normalization are applied
     // consistently. Silenced errors emit a `cli.error.silenced` metric +
-    // optional structured log instead of creating a Sentry issue. (ContextError
-    // is intentionally NOT silenced — see classifySilenced.)
+    // optional structured log instead of creating a Sentry issue. ContextError
+    // and MalformedAuthTokenError stay captured — see classifySilenced.
     reportCliError(e);
     // Only mark the session crashed for genuine, unexpected CLI bugs. This is a
     // stricter gate than `classifySilenced`: an error can be *captured* to
