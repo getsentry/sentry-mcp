@@ -2,16 +2,16 @@ import type {
   AuthRequest,
   ClientInfo,
 } from "@cloudflare/workers-oauth-provider";
-import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
-import { getUrlHost, sanitizeHtml, sanitizeHrefUrl } from "./html-utils";
 import skillDefinitions, {
   type SkillDefinition,
 } from "@sentry/mcp-core/skillDefinitions";
+import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import {
+  type OAuthState,
   signState,
   verifyAndParseState,
-  type OAuthState,
 } from "../oauth/state";
+import { getUrlHost, sanitizeHrefUrl, sanitizeHtml } from "./html-utils";
 
 const COOKIE_NAME = "mcp-approved-clients";
 export const SKILL_PREFERENCES_COOKIE_NAME = "mcp-skill-preferences";
@@ -718,6 +718,15 @@ export async function renderApprovalDialog(
             gap: var(--space-md);
           }
 
+          /* Keep Approve as the form's default submit while rendering Cancel first. */
+          .actions .button-primary {
+            order: 2;
+          }
+
+          .actions .button-secondary {
+            order: 1;
+          }
+
           a {
             color: var(--purple-primary);
             text-decoration: none;
@@ -1012,8 +1021,8 @@ export async function renderApprovalDialog(
                   }
 
                   <div class="actions">
-                    <button type="button" class="button button-secondary" onclick="window.history.back()" aria-label="Cancel authorization">Cancel</button>
-                    <button type="submit" class="button button-primary" aria-label="Approve authorization request">Approve</button>
+                    <button type="submit" name="decision" value="approve" class="button button-primary" aria-label="Approve authorization request">Approve</button>
+                    <button type="submit" name="decision" value="deny" class="button button-secondary" aria-label="Cancel authorization">Cancel</button>
                   </div>
                 </div>
               </div>
@@ -1032,24 +1041,25 @@ export async function renderApprovalDialog(
 }
 
 /**
- * Result of parsing the approval form submission.
+ * Result of parsing an approval or denial from the consent form.
  */
 export interface ParsedApprovalResult {
   /** The original state object passed through the form. */
   state: any;
-  /** Headers to set on the redirect response, including the Set-Cookie header. */
+  /** Headers to set on approval. Empty when authorization is denied. */
   headers: Headers;
-  /** Selected skills */
+  /** Selected skills. Empty when authorization is denied. */
   skills: string[];
+  /** Whether the user approved or denied authorization. */
+  decision: "approve" | "deny";
 }
 
 /**
- * Parses the form submission from the approval dialog, extracts the state,
- * and generates Set-Cookie headers to mark the client as approved.
+ * Parses the consent form and signs approval cookies only when approved.
  *
  * @param request - The incoming POST Request object containing the form data.
  * @param cookieSecret - The secret key used to sign the approval cookie.
- * @returns A promise resolving to an object containing the parsed state and necessary headers.
+ * @returns The parsed consent decision, state, skills, and response headers.
  * @throws If the request method is not POST, form data is invalid, or state is missing.
  */
 export async function parseRedirectApproval(
@@ -1063,13 +1073,22 @@ export async function parseRedirectApproval(
   let state: any;
   let clientId: string | undefined;
   let skills: string[];
+  let decision: "approve" | "deny";
 
   try {
     const formData = await request.formData();
     const encodedState = formData.get("state");
+    const formDecision = formData.get("decision");
 
     if (typeof encodedState !== "string" || !encodedState) {
       throw new Error("Missing or invalid 'state' in form data.");
+    }
+    if (
+      formDecision !== null &&
+      formDecision !== "approve" &&
+      formDecision !== "deny"
+    ) {
+      throw new Error("Invalid approval decision.");
     }
 
     state = await decodeState<{ oauthReqInfo?: AuthRequest }>(
@@ -1084,6 +1103,9 @@ export async function parseRedirectApproval(
 
     // Extract skill selections from checkboxes - collect all 'skill' field values
     skills = filterApprovableSkillIds(formData.getAll("skill"));
+    // Forms opened before this field existed submit no decision; those were
+    // approval-only forms, so preserve their original behavior.
+    decision = formDecision === "deny" ? "deny" : "approve";
   } catch (error) {
     logError(error, {
       loggerScope: ["cloudflare", "approval-dialog"],
@@ -1094,6 +1116,10 @@ export async function parseRedirectApproval(
     throw new Error(
       `Failed to parse approval form: ${error instanceof Error ? error.message : String(error)}`,
     );
+  }
+
+  if (decision === "deny") {
+    return { decision, state, headers: new Headers(), skills: [] };
   }
 
   // Get existing approved clients
@@ -1125,7 +1151,7 @@ export async function parseRedirectApproval(
     ),
   );
 
-  return { state, headers, skills };
+  return { decision, state, headers, skills };
 }
 
 // sanitizeHtml function is now imported from "./html-utils"

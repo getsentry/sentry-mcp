@@ -249,10 +249,12 @@ export default new Hono<{ Bindings: Env }>()
   /**
    * OAuth Authorization Endpoint (POST /oauth/authorize)
    *
-   * This route handles the approval form submission and redirects to Sentry.
+   * Approve redirects to Sentry. Deny redirects the MCP client with
+   * `error=access_denied`.
    */
   .post("/", async (c) => {
-    // Validates form submission, extracts state, and generates Set-Cookie headers to skip approval dialog next time
+    // Validates form submission and extracts state. Approve also sets cookies
+    // so the next consent prompt can remember this client and its skills.
     let result: Awaited<ReturnType<typeof parseRedirectApproval>>;
     try {
       result = await parseRedirectApproval(c.req.raw, c.env.COOKIE_SECRET);
@@ -264,7 +266,7 @@ export default new Hono<{ Bindings: Env }>()
       return c.text("Invalid request", 400);
     }
 
-    const { state, headers, skills } = result;
+    const { state, headers, skills, decision } = result;
 
     if (!state.oauthReqInfo) {
       return c.text("Invalid request", 400);
@@ -277,7 +279,7 @@ export default new Hono<{ Bindings: Env }>()
       skills,
     };
 
-    // Reject redirect URIs with userinfo components)
+    // Reject redirect URIs with userinfo components
     if (redirectUriHasUserInfo(oauthReqWithSkills.redirectUri)) {
       logWarn("Rejected redirect URI with userinfo component", {
         loggerScope: ["cloudflare", "oauth", "authorize"],
@@ -317,6 +319,16 @@ export default new Hono<{ Bindings: Env }>()
         extra: { error: String(lookupErr) },
       });
       return c.text("Invalid request", 400);
+    }
+
+    if (decision === "deny") {
+      return createAuthorizationErrorRedirect(
+        oauthReqWithSkills.redirectUri,
+        "access_denied",
+        "The user denied the authorization request",
+        oauthReqWithSkills.state ?? undefined,
+        getAuthorizationServerIssuer(c.req.url),
+      );
     }
 
     // Validate resource parameter (RFC 8707)

@@ -9,7 +9,7 @@ export default function getSentryConfig(env: Env): CloudflareOptions {
 
   return {
     dsn: env.SENTRY_DSN,
-    tracesSampleRate: 1,
+    tracesSampleRate: 0.3,
     beforeSend: sentryBeforeSend,
     initialScope: {
       tags: {

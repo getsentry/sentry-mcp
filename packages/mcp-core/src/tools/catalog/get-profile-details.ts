@@ -1,5 +1,6 @@
 import { setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/resolve-region-url";
@@ -302,7 +303,7 @@ export default defineTool({
       regionUrl: regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", resolved.organizationSlug);
+    setOrganizationContext(resolved.organizationSlug);
 
     if (resolved.mode === "transaction") {
       setTag("profile.id", resolved.profileId);

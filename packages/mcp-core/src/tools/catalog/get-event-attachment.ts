@@ -3,7 +3,7 @@ import type {
   ImageContent,
   TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
-import { setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import { DEFAULT_MAX_INLINE_ATTACHMENT_BYTES } from "../../api-client";
 import { bytesToBase64 } from "../../internal/blob-utils";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
@@ -131,7 +131,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationContext(params.organizationSlug);
 
     // If attachmentId is provided, download the specific attachment
     if (params.attachmentId) {

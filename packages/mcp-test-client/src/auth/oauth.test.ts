@@ -1,6 +1,6 @@
 import open from "open";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OAuthClient } from "./oauth.js";
+import { OAuthClient, renderOAuthCallbackPage } from "./oauth.js";
 
 vi.mock("open", () => ({
   default: vi.fn().mockResolvedValue(undefined),
@@ -157,5 +157,23 @@ describe("OAuthClient", () => {
 
     expect(clientId).toBe("client-legacy");
     expect(registerClient).not.toHaveBeenCalled();
+  });
+
+  it("renders escaped OAuth callback content in the MCP style", () => {
+    const html = renderOAuthCallbackPage(
+      "Processing Authentication...",
+      ['Error: <access_denied> & "retry"'],
+      "Authentication in Progress",
+    );
+
+    expect(html).toContain("<title>Authentication in Progress</title>");
+    expect(html).toContain("background: #160f24");
+    expect(html).toContain("place-items: center");
+    expect(html).toContain("text-align: center");
+    expect(html).toContain("font-family: -apple-system");
+    expect(html).toContain("<h1>Processing Authentication...</h1>");
+    expect(html).toContain(
+      "Error: &lt;access_denied&gt; &amp; &quot;retry&quot;",
+    );
   });
 });

@@ -21,6 +21,7 @@ import type {
 import { ThreadsEntrySchema } from "../api-client";
 import type {
   AutofixRunState,
+  CommitterList,
   Event,
   ExternalIssueList,
   GenericEvent,
@@ -2017,6 +2018,22 @@ function formatPackageText(value: string): string {
     .replace(/([\\`*_\[\]|>])/g, "\\$1");
 }
 
+/** Projects the suspect commit consistently for structured and markdown issue details. */
+export function getSuspectCommit(committers: CommitterList | undefined) {
+  // The endpoint currently returns the issue's latest suspect commit, grouped by author.
+  const committer = committers?.[0];
+  const commit = committer?.commits[0];
+  if (!commit) {
+    return null;
+  }
+  return {
+    id: String(commit.id),
+    message: commit.message,
+    author: committer.author?.name ?? committer.author?.email,
+    suspectCommitType: commit.suspectCommitType,
+  };
+}
+
 /**
  * Formats a Sentry issue with its latest event into comprehensive markdown output.
  * Includes issue metadata, event details, and usage instructions.
@@ -2036,6 +2053,7 @@ export function formatIssueOutput({
   relatedReplayIds,
   aiConversations,
   codeLocation,
+  committers,
   experimentalMode,
   availableToolNames,
   directToolNames,
@@ -2051,6 +2069,7 @@ export function formatIssueOutput({
   relatedReplayIds?: string[];
   aiConversations?: AIConversationReference[];
   codeLocation?: CodeLocation;
+  committers?: CommitterList;
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
@@ -2124,6 +2143,22 @@ export function formatIssueOutput({
 
   if (codeLocation) {
     output += formatCodeLocation(codeLocation);
+  }
+
+  const suspectCommit = getSuspectCommit(committers);
+  if (suspectCommit) {
+    output += "## Suspect Commit\n\n";
+    output += `**SHA**: \`${suspectCommit.id}\`\n`;
+    if (suspectCommit.message) {
+      output += `**Message**: ${suspectCommit.message}\n`;
+    }
+    if (suspectCommit.author) {
+      output += `**Author**: ${suspectCommit.author}\n`;
+    }
+    if (suspectCommit.suspectCommitType) {
+      output += `**Source**: ${suspectCommit.suspectCommitType}\n`;
+    }
+    output += "\n";
   }
 
   output += "## Event Details\n\n";

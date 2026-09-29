@@ -1032,7 +1032,7 @@ describe("event package selection", () => {
     async (params) => {
       mswServer.use(
         http.get(
-          `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/${eventId}/`,
+          `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/${eventId}/`,
           () =>
             HttpResponse.json({
               ...createDefaultEvent({ id: eventId, contexts: {} }),
@@ -1096,7 +1096,7 @@ describe("event package selection", () => {
   it("returns selected packages when an event URL resolves to structured output", async () => {
     mswServer.use(
       http.get(
-        `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/${eventId}/`,
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/${eventId}/`,
         () =>
           HttpResponse.json({
             ...createDefaultEvent({ id: eventId, contexts: {} }),

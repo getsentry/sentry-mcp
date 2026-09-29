@@ -95,6 +95,29 @@ The AI produces different query patterns based on the selected dataset:
 - **Logs dataset**: Focus on `message`, `severity`, `severity_number`, **NO timestamp filters** (uses statsPeriod instead)
 - **Tracemetrics dataset**: Focus on `metric.name`, `metric.type`, `metric.unit`, `value`, and metric-aware aggregates like `p95(value,http.request.duration,distribution,millisecond)`
 
+### Environment Filters
+
+The embedded agent receives known visible environment names as context. It must
+only add an environment filter when requested; a single available environment or
+grouping by environment does not imply a filter. These instructions also apply
+when discovery fails or the list is too large to include in the prompt.
+
+For non-replay datasets, environment filters belong in `query`; the agent leaves
+its separate `environment` output null. The internal `validateSearch` tool accepts
+the candidate query without a separate environment argument. Replays retain the
+separate environment parameter and do not use this validation tool.
+
+The discovered list is not an exhaustive allowlist: hidden environments can be
+absent. Existing final validation and unknown-environment notices remain in place.
+
+### Time Series
+
+Requests for a metric over time ("per hour", "per day", "trend", "over time") return a bucketed series via the `events-stats` endpoint instead of failing.
+
+- The embedded agent sets `timeSeries: { yAxis, interval }` on its output. `yAxis` is the aggregate to plot (e.g. `count()`); the query, environment, and time range are reused from the normal translation.
+- **Interval is agent-decided, never a required input.** It is set only when the user names a granularity ("per hour" → `1h`); otherwise it is left `null` so Sentry picks a sensible bucket for the range (mirrors `get_interval_from_range`). Sentry rejects an interval that would produce too many buckets.
+- The handler routes `timeSeries` to `SentryApiService.getEventsTimeSeries` and renders the buckets (with total and peak) via `formatTimeSeriesResults`.
+
 ### Key Technical Constraints
 
 - **Logs timestamp handling**: Logs don't support query-based timestamp filters like `timestamp:-1h`. Instead, use `statsPeriod=24h` parameter

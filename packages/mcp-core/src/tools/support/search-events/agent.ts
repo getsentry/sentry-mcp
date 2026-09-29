@@ -34,7 +34,27 @@ export const searchEventsAgentOutputSchema = z
       .nullable()
       .default(null)
       .describe(
-        "Separate environment filter for datasets like replays that do not support environment in the query string. Set only to a real environment the user named (see the 'Available environments' list); omit otherwise. Never use wildcards, placeholders, or example values.",
+        "Environment filter for replays only, when requested. Otherwise null; non-replay filters belong in query.",
+      ),
+    timeSeries: z
+      .object({
+        yAxis: z
+          .string()
+          .describe(
+            "The aggregate to plot over time, e.g. 'count()', 'count_unique(user)', 'sum(span.duration)'.",
+          ),
+        interval: z
+          .string()
+          .nullable()
+          .default(null)
+          .describe(
+            "Bucket size like '1h' or '1d'. Set ONLY when the user names a granularity (e.g. 'per hour' -> '1h'); otherwise null so Sentry picks a sensible bucket for the time range.",
+          ),
+      })
+      .nullable()
+      .default(null)
+      .describe(
+        "Set ONLY when the user wants a metric OVER TIME (e.g. 'per hour', 'per day', 'trend', 'over time'). Otherwise leave null and return a normal query. The interval is decided here, never required from the caller.",
       ),
     timeRange: z
       .union([
@@ -60,6 +80,11 @@ export const searchEventsAgentOutputSchema = z
   .refine(
     (data) => {
       if (data.dataset === "replays") {
+        return true;
+      }
+
+      // Timeseries requests use yAxis/interval, not sort-in-fields.
+      if (data.timeSeries) {
         return true;
       }
 
@@ -95,9 +120,8 @@ export interface SearchEventsAgentOptions {
   environmentNames?: string[];
 }
 
-// Above this many environments we stop inlining the full list into the prompt
-// (token cost) and rely on the guidance text alone; validation still checks the
-// value against the real list.
+// Above this many environments we omit the names to bound prompt size. The
+// environment filtering instructions still apply without the list.
 const MAX_INLINE_ENVIRONMENTS = 100;
 
 /**
@@ -112,16 +136,18 @@ export function buildSystemPromptWithEnvironments(
   base: string,
   environmentNames: string[],
 ): string {
-  if (environmentNames.length === 0) {
-    return base;
-  }
   const rule =
-    'When the user names an environment, set the `environment` field to a matching value from this list EXACTLY; otherwise OMIT the field. Never use wildcards, placeholders, "null", "*", empty strings, or example values.';
-  if (environmentNames.length <= MAX_INLINE_ENVIRONMENTS) {
-    const list = environmentNames.map((name) => `"${name}"`).join(", ");
-    return `${base}\n\n## Available environments\nThe only valid \`environment\` values for this organization are: ${list}.\n${rule}`;
+    "Filter by environment only when requested. Use query filters for non-replays; reserve `environment` for replays and set it to null otherwise. Never invent values; grouping or availability alone does not request a filter.";
+  if (environmentNames.length === 0) {
+    return `${base}\n\n## Environment filters\n${rule}`;
   }
-  return `${base}\n\n## Environments\nThis organization has ${environmentNames.length} environments. ${rule}`;
+  if (environmentNames.length <= MAX_INLINE_ENVIRONMENTS) {
+    const list = environmentNames
+      .map((name) => JSON.stringify(name))
+      .join(", ");
+    return `${base}\n\n## Available environments\nVisible environments: ${list}. Hidden environments may be absent.\n${rule}`;
+  }
+  return `${base}\n\n## Environments\n${environmentNames.length} visible environments (list omitted). ${rule}`;
 }
 
 /**

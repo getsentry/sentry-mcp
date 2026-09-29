@@ -11,13 +11,14 @@ import {
   issueNullCulpritFixture,
   mswServer,
 } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { HttpResponse, http } from "msw";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { Skill } from "../../skills";
+import * as logging from "../../telem/logging";
 import {
-  getTextContent,
   getStructuredContent,
+  getTextContent,
 } from "../../test-utils/structured-content";
 import getIssueDetails, {
   getIssueDetailsOutputSchema,
@@ -374,7 +375,7 @@ describe("get_issue_details", () => {
       }
       mswServer.use(
         http.get(
-          `${base}/events/latest/`,
+          `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/${issue ? issue().id : "6507376925"}/events/latest/`,
           () =>
             HttpResponse.json({
               ...event(),
@@ -415,7 +416,7 @@ describe("get_issue_details", () => {
         { once: true },
       ),
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/7890123456/events/latest/",
         () =>
           HttpResponse.json({
             ...createPerformanceEvent(),
@@ -452,7 +453,7 @@ describe("get_issue_details", () => {
   it("keeps the replay note when error events use formatted.content", async () => {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () =>
           HttpResponse.json({
             ...createDefaultEvent(),
@@ -489,7 +490,7 @@ describe("get_issue_details", () => {
   it("embeds the shared formatter's analysis in the Seer section when present", async () => {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
         () =>
           HttpResponse.json({
             autofix: { run_id: 7, status: "completed", blocks: [] },
@@ -540,7 +541,7 @@ describe("get_issue_details", () => {
     async ({ status, expected }) => {
       mswServer.use(
         http.get(
-          "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+          "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
           () =>
             HttpResponse.json({
               autofix: { run_id: 7, status, blocks: [] },
@@ -584,7 +585,7 @@ describe("get_issue_details", () => {
 
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () => HttpResponse.json(event),
         { once: true },
       ),
@@ -716,7 +717,7 @@ describe("get_issue_details", () => {
 
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () => HttpResponse.json(event),
         { once: true },
       ),
@@ -756,7 +757,7 @@ describe("get_issue_details", () => {
 
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () => HttpResponse.json(event),
         { once: true },
       ),
@@ -820,7 +821,7 @@ describe("get_issue_details", () => {
         { once: true },
       ),
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/TEAM-ISSUE-001/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/123456789/events/latest/",
         () => HttpResponse.json(createDefaultEvent()),
         { once: true },
       ),
@@ -844,7 +845,7 @@ describe("get_issue_details", () => {
   it("lists threads and stacktrace lookup guidance only for multi-thread events", async () => {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () =>
           HttpResponse.json(
             createDefaultEvent({
@@ -940,7 +941,7 @@ describe("get_issue_details", () => {
   it("omits thread list and stacktrace lookup guidance for single-thread events", async () => {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () =>
           HttpResponse.json(
             createDefaultEvent({
@@ -1009,7 +1010,7 @@ describe("get_issue_details", () => {
 
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () => HttpResponse.json(event),
         { once: true },
       ),
@@ -1179,7 +1180,7 @@ describe("get_issue_details", () => {
         { once: true },
       ),
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/7890123456/events/latest/",
         () => {
           // Create event with specific evidence data for this test
           const event = createPerformanceEvent();
@@ -1269,7 +1270,7 @@ describe("get_issue_details", () => {
         { once: true },
       ),
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/7890123456/events/latest/",
         () => {
           // Create event with specific evidence data for this test
           const event = createPerformanceEvent();
@@ -1560,7 +1561,7 @@ describe("get_issue_details", () => {
     let autofixRequested = false;
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
         () => {
           autofixRequested = true;
           return HttpResponse.json({ autofix: null });
@@ -1590,7 +1591,7 @@ describe("get_issue_details", () => {
     let autofixRequested = false;
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
         () => {
           autofixRequested = true;
           return HttpResponse.json({ autofix: null });
@@ -1645,7 +1646,7 @@ describe("get_issue_details", () => {
     // Use mswServer.use to prepend a handler - MSW uses LIFO order
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
         () => HttpResponse.json(inProgressFixture),
         { once: true }, // Ensure this handler is only used once for this test
       ),
@@ -1688,7 +1689,7 @@ describe("get_issue_details", () => {
 
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
         () => HttpResponse.json(failedFixture),
         { once: true },
       ),
@@ -1743,7 +1744,7 @@ describe("get_issue_details", () => {
 
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
         () => HttpResponse.json(needsInfoFixture),
         { once: true },
       ),
@@ -1782,7 +1783,7 @@ describe("get_issue_details", () => {
 
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/DEFAULT-001/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/123456/events/latest/",
         () => HttpResponse.json(defaultEvent),
       ),
       http.get(
@@ -1846,7 +1847,7 @@ describe("get_issue_details", () => {
 
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/BLOG-CSP-4XC/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/4256774711/events/latest/",
         () => HttpResponse.json(cspEvent),
       ),
       http.get(
@@ -1928,7 +1929,7 @@ describe("get_issue_details", () => {
           }),
       ),
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/MALFORMED-TAGS-001/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/123456/events/latest/",
         () => HttpResponse.json(eventWithMalformedTags),
       ),
     );
@@ -2018,7 +2019,7 @@ describe("get_issue_details", () => {
         },
       ),
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CONTEXT-001/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/123456/events/latest/",
         () => {
           return HttpResponse.json(eventWithContext);
         },
@@ -2074,7 +2075,7 @@ describe("get_issue_details", () => {
         { once: true },
       ),
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6898891101/events/latest/",
         () => HttpResponse.json(regressedEventFixture),
         { once: true },
       ),
@@ -2156,7 +2157,7 @@ describe("get_issue_details", () => {
 
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/external-issues/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/external-issues/",
         () => HttpResponse.json(mockExternalIssues),
         { once: true },
       ),
@@ -2220,7 +2221,7 @@ describe("get_issue_details", () => {
     mswServer.use(
       // More specific pattern for events (must come first to match before the issue pattern)
       http.get(
-        "https://sentry.io/api/0/organizations/*/issues/FUTURE-TYPE-001/events/latest/",
+        "https://sentry.io/api/0/organizations/*/issues/7777777777/events/latest/",
         () => {
           return HttpResponse.json(unsupportedEventFixture);
         },
@@ -2346,7 +2347,7 @@ describe("structuredContent", () => {
   function mockLatestEventWithFormatted(formatted: unknown) {
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () => HttpResponse.json({ ...createDefaultEvent(), formatted }),
       ),
     );
@@ -2413,15 +2414,20 @@ describe("structuredContent", () => {
   it("keeps transactions on the local path so the performance trace survives", async () => {
     // the shared body carries no performance trace; that is fetched separately and only
     // rendered for transactions, so a transaction must not take the structured path
+    const event = createDefaultEvent();
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () =>
           HttpResponse.json({
-            ...createDefaultEvent(),
+            ...event,
             type: "transaction",
             formatted: { format: "json", content: FORMATTER_JSON },
           }),
+      ),
+      http.get(
+        `https://sentry.io/api/0/projects/sentry-mcp-evals/CLOUDFLARE-MCP/events/${event.id}/committers/`,
+        () => HttpResponse.json({ detail: "Issue not found" }, { status: 404 }),
       ),
     );
 
@@ -2429,13 +2435,14 @@ describe("structuredContent", () => {
 
     expect(result).not.toHaveProperty("structuredContent");
     expect(result).toContain("CLOUDFLARE-MCP-41");
+    expect(result).not.toContain("## Suspect Commit");
   });
 
   it("keeps the attached replay, which lives on the event not the related list", async () => {
     // an issue whose only replay is attached would otherwise report no replays at all
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () =>
           HttpResponse.json({
             ...createDefaultEvent(),
@@ -2476,7 +2483,7 @@ describe("structuredContent", () => {
     // upstream schemas are passthrough, so anything not mapped must not appear
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () =>
           HttpResponse.json({
             ...createDefaultEvent(),
@@ -2484,7 +2491,7 @@ describe("structuredContent", () => {
           }),
       ),
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/external-issues/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/external-issues/",
         () =>
           HttpResponse.json([
             {
@@ -2512,7 +2519,7 @@ describe("structuredContent", () => {
     // renders and the payload drops is a regression for every MCP user
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () =>
           HttpResponse.json({
             ...createDefaultEvent(),
@@ -2570,7 +2577,7 @@ describe("structuredContent", () => {
           }),
       ),
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/7890123456/events/latest/",
         () =>
           HttpResponse.json({
             ...createDefaultEvent(),
@@ -2608,7 +2615,7 @@ describe("structuredContent", () => {
           }),
       ),
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/7890123456/events/latest/",
         () =>
           HttpResponse.json({
             ...createDefaultEvent(),
@@ -2633,7 +2640,7 @@ describe("structuredContent", () => {
     );
     mswServer.use(
       http.get(
-        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
         () =>
           HttpResponse.json({
             ...createDefaultEvent(),
@@ -2662,6 +2669,201 @@ describe("structuredContent", () => {
   });
 });
 
+describe("suspect commits", () => {
+  const sha = "2ce6a2700fec4913a2cde8e2d41dee362ce6a270";
+  const fixtureEventId = "8d17c61b471a4a2ab0c79b32cae564ef";
+  const params = {
+    organizationSlug: "sentry-mcp-evals",
+    issueId: "CLOUDFLARE-MCP-41",
+    eventId: undefined,
+    issueUrl: undefined,
+    regionUrl: null,
+  };
+  const formatted = {
+    format: "json",
+    content: JSON.stringify({ title: { text: "Example error" } }),
+  };
+  const committersUrl = `https://sentry.io/api/0/projects/sentry-mcp-evals/CLOUDFLARE-MCP/events/${fixtureEventId}/committers/`;
+
+  function mockEvent(
+    options: { type?: string; formatted?: unknown } = {},
+    eventSelector = "latest",
+  ) {
+    mswServer.use(
+      http.get(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/${eventSelector}/`,
+        () =>
+          HttpResponse.json({
+            ...createDefaultEvent({
+              id: fixtureEventId,
+              eventID: fixtureEventId,
+            }),
+            ...options,
+          }),
+      ),
+    );
+  }
+
+  beforeEach(() => mswServer.resetHandlers());
+  afterEach(() => {
+    mswServer.resetHandlers();
+    vi.restoreAllMocks();
+  });
+
+  describe.each([
+    { mode: "structured JSON", type: "error", formatted, structured: true },
+    {
+      mode: "Markdown without the formatter rollout",
+      type: "error",
+      formatted: undefined,
+      structured: false,
+    },
+  ])("$mode", ({ type, formatted, structured }) => {
+    it.each([
+      { selection: "latest event", eventId: undefined },
+      {
+        selection: "explicit event ID",
+        eventId: fixtureEventId,
+      },
+    ])(
+      "includes the suspect commit for the $selection",
+      async ({ eventId }) => {
+        mockEvent({ type, formatted }, eventId);
+        mswServer.use(
+          http.get(committersUrl, () =>
+            HttpResponse.json({
+              committers: [
+                {
+                  author: { name: "Jane Developer", email: "jane@example.com" },
+                  commits: [
+                    {
+                      id: sha,
+                      message: "Fix duplicate tool registration",
+                      suspectCommitType: "via SCM integration",
+                    },
+                  ],
+                },
+              ],
+            }),
+          ),
+        );
+
+        const result = await getIssueDetails.handler(
+          { ...params, eventId },
+          baseContext,
+        );
+
+        if (structured) {
+          const payload = getIssueDetailsOutputSchema.parse(
+            getStructuredContent(result),
+          );
+          expect(payload.suspectCommit).toEqual({
+            id: sha,
+            message: "Fix duplicate tool registration",
+            author: "Jane Developer",
+            suspectCommitType: "via SCM integration",
+          });
+        } else {
+          expect(result).toContain(`## Suspect Commit
+
+**SHA**: \`${sha}\`
+**Message**: Fix duplicate tool registration
+**Author**: Jane Developer
+**Source**: via SCM integration
+
+## Event Details`);
+        }
+      },
+    );
+  });
+
+  it("uses the author's email and omits a null commit message from Markdown", async () => {
+    mockEvent({ formatted: undefined });
+    mswServer.use(
+      http.get(committersUrl, () =>
+        HttpResponse.json({
+          committers: [
+            {
+              author: { name: null, email: "dev@example.com" },
+              commits: [
+                {
+                  id: sha,
+                  message: null,
+                  suspectCommitType: "via commit in release",
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(params, baseContext);
+
+    expect(result).toContain(`## Suspect Commit
+
+**SHA**: \`${sha}\`
+**Author**: dev@example.com
+**Source**: via commit in release
+
+## Event Details`);
+  });
+
+  it.each([
+    {
+      failure: "permission denied",
+      status: 403,
+      body: { detail: "Permission denied" },
+      reported: false,
+    },
+    {
+      failure: "no committers found",
+      status: 404,
+      body: { detail: "No committers found" },
+      reported: false,
+    },
+    {
+      failure: "server failure",
+      status: 500,
+      body: { detail: "Internal error" },
+      reported: true,
+    },
+    {
+      failure: "invalid response schema",
+      status: 200,
+      body: { committers: [{ commits: [{ message: "Missing commit ID" }] }] },
+      reported: true,
+    },
+  ])(
+    "preserves issue details for $failure (reported: $reported)",
+    async ({ status, body, reported }) => {
+      mockEvent({ formatted });
+      const logIssue = vi.spyOn(logging, "logIssue").mockReturnValue(undefined);
+      mswServer.use(
+        http.get(committersUrl, () => HttpResponse.json(body, { status })),
+      );
+
+      const result = await getIssueDetails.handler(params, baseContext);
+      const payload = getIssueDetailsOutputSchema.parse(
+        getStructuredContent(result),
+      );
+
+      expect(payload.issue.shortId).toBe("CLOUDFLARE-MCP-41");
+      expect(payload.suspectCommit).toBeNull();
+      if (reported) {
+        expect(logIssue).toHaveBeenCalledExactlyOnceWith(
+          expect.any(Error),
+          expect.objectContaining({
+            loggerScope: ["tools", "get-issue-details", "committers"],
+          }),
+        );
+      } else {
+        expect(logIssue).not.toHaveBeenCalled();
+      }
+    },
+  );
+});
+
 describe("selected event package versions", () => {
   beforeEach(() => mswServer.resetHandlers());
   afterEach(() => mswServer.resetHandlers());
@@ -2680,7 +2882,7 @@ describe("selected event package versions", () => {
   ) {
     mswServer.use(
       http.get(
-        `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/${eventId}/`,
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/${eventId}/`,
         ({ request }) => {
           expect(new URL(request.url).searchParams.get("llmFormat")).toBe(
             "json",
@@ -2798,6 +3000,7 @@ describe("selected event package versions", () => {
         },
         "replays": null,
         "seer": null,
+        "suspectCommit": null,
       }
     `);
   });
@@ -3074,7 +3277,7 @@ describe("selected event package versions", () => {
   it("retains selected packages even for an unsupported event type", async () => {
     mswServer.use(
       http.get(
-        `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/${eventId}/`,
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/${eventId}/`,
         () =>
           HttpResponse.json({
             ...createUnknownEvent({ id: eventId, contexts: {} }),

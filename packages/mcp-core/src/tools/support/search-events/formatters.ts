@@ -927,3 +927,100 @@ export function formatTraceMetricsResults(
 
   return output;
 }
+
+/**
+ * Whether summing per-bucket values yields a meaningful series total.
+ * Only `count()` and `sum(...)` are additive across time buckets;
+ * `count_unique`, `avg`, percentiles, min/max, rates, etc. are not.
+ */
+function isAdditiveAggregate(yAxis: string): boolean {
+  const fn = yAxis.trim().toLowerCase();
+  return fn === "count()" || fn.startsWith("sum(");
+}
+
+/**
+ * Format an events-stats (timeseries) result: a metric bucketed over time.
+ * `interval` is null when Sentry chose the bucket size for the range.
+ */
+export function formatTimeSeriesResults(params: {
+  series: { data: Array<[number, Array<{ count?: number | null }>]> };
+  yAxis: string;
+  interval: string | null;
+  inputQuery: string;
+  includeExplanation?: boolean;
+  explanation?: string;
+  timeRange?: SearchTimeRange;
+  url?: string;
+}): string {
+  const {
+    series,
+    yAxis,
+    interval,
+    inputQuery,
+    includeExplanation,
+    explanation,
+    timeRange,
+    url,
+  } = params;
+
+  const points = series.data.map(([ts, values]) => ({
+    time: new Date(ts * 1000).toISOString().slice(0, 16).replace("T", " "),
+    value: values[0]?.count ?? 0,
+  }));
+
+  // Total is only meaningful for additive aggregates; summing count_unique /
+  // avg / percentile buckets would be wrong, so omit it for those.
+  const total = isAdditiveAggregate(yAxis)
+    ? points.reduce((sum, p) => sum + p.value, 0)
+    : null;
+  const peak = points.reduce<(typeof points)[number] | undefined>(
+    (max, p) => (max === undefined || p.value > max.value ? p : max),
+    undefined,
+  );
+
+  const MAX_ROWS = 48;
+  const shown = points.length > MAX_ROWS ? points.slice(-MAX_ROWS) : points;
+  const truncatedNote =
+    points.length > MAX_ROWS
+      ? ` (most recent ${MAX_ROWS} of ${points.length})`
+      : "";
+
+  const lines: string[] = [`# Search Results for "${inputQuery}"`];
+
+  if (includeExplanation && explanation) {
+    lines.push("", formatExplanation(explanation));
+  }
+
+  lines.push("", `## ${yAxis} over time`);
+  lines.push(
+    `- **Interval**: ${interval ? `\`${interval}\`` : "auto (chosen by Sentry for the range)"}`,
+  );
+  lines.push(`- **Time range**: ${formatExecutedTimeRange(timeRange)}`);
+  if (total !== null) {
+    lines.push(`- **Total**: ${total.toLocaleString()}`);
+  }
+  if (peak) {
+    lines.push(`- **Peak**: ${peak.value.toLocaleString()} at ${peak.time}`);
+  }
+
+  if (shown.length > 0) {
+    lines.push(
+      "",
+      `## Buckets${truncatedNote}`,
+      "",
+      "| Time (UTC) | Value |",
+      "| --- | --- |",
+    );
+    for (const p of shown) {
+      lines.push(`| ${p.time} | ${p.value.toLocaleString()} |`);
+    }
+  } else {
+    lines.push("", "No data points in this range.");
+  }
+
+  if (url) {
+    lines.push("", formatSentryDashboardLink(url).trimEnd());
+  }
+
+  return lines.join("\n");
+}

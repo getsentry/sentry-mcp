@@ -28,7 +28,7 @@ import {
   getTraceMetricsExploreUrl,
   getTraceUrl as getTraceUrlUtil,
   getUptimeMonitorUrl as getUptimeMonitorUrlUtil,
-  isSentryHost,
+  isPublicSentryHost,
   type TraceMetricIdentifier,
 } from "../utils/url-utils";
 import { USER_AGENT } from "../version";
@@ -43,24 +43,33 @@ import {
   AgenticOnboardingRunSchema,
   AIConversationDetailsResponseSchema,
   AIConversationSummaryListSchema,
+  AlertActionOptionSchema,
+  AlertConditionOptionSchema,
+  AlertRuleProjectScopeSchema,
   ApiErrorSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
   ClientKeyListSchema,
   ClientKeySchema,
   CommitListSchema,
+  CommittersResponseSchema,
   DashboardListSchema,
   DashboardSchema,
   DeployListSchema,
+  DetectorSchema,
   ErrorsSearchResponseSchema,
   EventAttachmentListSchema,
   EventSchema,
+  EventsStatsResponseSchema,
   ExternalIssueListSchema,
+  ExternalIssueSchema,
   FlamegraphSchema,
   IssueActivityListResponseSchema,
   IssueAlertRuleListSchema,
+  IssueAlertRuleSchema,
   IssueCommentListSchema,
   IssueCommentSchema,
+  IssueIntegrationListSchema,
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
@@ -70,6 +79,7 @@ import {
   MonitorListSchema,
   MonitorSchema,
   MonitorStatsSchema,
+  NativeExternalIssueSchema,
   OrganizationEnvironmentListSchema,
   OrganizationListSchema,
   OrganizationSchema,
@@ -84,6 +94,9 @@ import {
   ReplayListResponseSchema,
   ReplayRecordingSegmentsSchema,
   RepositoryListSchema,
+  SentryAppComponentListSchema,
+  SentryAppExternalRequestOptionsSchema,
+  SentryAppInstallationListSchema,
   SpansSearchResponseSchema,
   StacktraceLinkSchema,
   TagListSchema,
@@ -104,17 +117,25 @@ import type {
   AIConversationDetails,
   AIConversationSpanList,
   AIConversationSummary,
+  AlertActionOption,
+  AlertConditionOption,
+  AlertRuleCreate,
+  AlertRuleProjectScope,
+  AlertRuleUpdate,
   AutofixRun,
   AutofixRunState,
   ClientKey,
   ClientKeyList,
   CommitList,
+  CommitterList,
   Dashboard,
   DashboardListItem,
   DeployList,
+  Detector,
   Event,
   EventAttachment,
   EventAttachmentList,
+  ExternalIssue,
   ExternalIssueList,
   Flamegraph,
   Issue,
@@ -123,14 +144,18 @@ import type {
   IssueAlertRuleList,
   IssueComment,
   IssueCommentList,
+  IssueIntegrationList,
   IssueList,
   IssueTagValues,
   MetricAlertRule,
   MetricAlertRuleList,
+  MetricMonitorCreate,
+  MetricMonitorUpdate,
   Monitor,
   MonitorCheckInList,
   MonitorList,
   MonitorStats,
+  NativeExternalIssue,
   OrganizationEnvironmentList,
   OrganizationList,
   ProfileChunk,
@@ -141,6 +166,9 @@ import type {
   ReplayDetails,
   ReplayList,
   ReplayRecordingSegments,
+  SentryAppComponentList,
+  SentryAppExternalRequestOptions,
+  SentryAppInstallationList,
   StacktraceLink,
   TagList,
   Team,
@@ -197,13 +225,6 @@ function normalizeStatsPeriod(statsPeriod?: string): string | undefined {
 function formatWorkflowNameQuery(query: string): string {
   const escapedQuery = query.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `name:"*${escapedQuery}*"`;
-}
-
-// Workflow projectSlug responses can include unattached org-level workflows.
-function filterAttachedIssueAlertRules(
-  rules: IssueAlertRuleList,
-): IssueAlertRuleList {
-  return rules.filter((rule) => (rule.detectorIds ?? []).length > 0);
 }
 
 function parseStatsPeriod(statsPeriod: string): {
@@ -585,15 +606,10 @@ export class SentryApiService {
   }
 
   /**
-   * Checks if the current host is Sentry SaaS (sentry.io).
-   *
-   * Used to determine API endpoint availability and URL formats.
-   * Self-hosted instances may not have all endpoints available.
-   *
-   * @returns True if using Sentry SaaS, false for self-hosted instances
+   * Whether API control requests and web URLs use public SaaS routing.
    */
-  private isSaas(): boolean {
-    return isSentryHost(this.host);
+  private isPublicSaas(): boolean {
+    return isPublicSentryHost(this.host);
   }
 
   /**
@@ -1137,10 +1153,17 @@ export class SentryApiService {
     organizationSlug: string,
     uptimeMonitorId: string | number,
   ): string {
+    return this.getDetectorUrl(organizationSlug, uptimeMonitorId);
+  }
+
+  getDetectorUrl(
+    organizationSlug: string,
+    detectorId: string | number,
+  ): string {
     return getUptimeMonitorUrlUtil(
       this.host,
       organizationSlug,
-      uptimeMonitorId,
+      detectorId,
       this.protocol,
     );
   }
@@ -1173,7 +1196,7 @@ export class SentryApiService {
     ruleId: string | number,
   ): string {
     const encodedRuleId = encodeURIComponent(String(ruleId));
-    if (this.isSaas()) {
+    if (this.isPublicSaas()) {
       return `${this.protocol}://${organizationSlug}.sentry.io/monitors/alerts/${encodedRuleId}/`;
     }
     return `${this.protocol}://${this.host}/organizations/${organizationSlug}/monitors/alerts/${encodedRuleId}/`;
@@ -1184,7 +1207,7 @@ export class SentryApiService {
     ruleId: string | number,
   ): string {
     const encodedRuleId = encodeURIComponent(String(ruleId));
-    if (this.isSaas()) {
+    if (this.isPublicSaas()) {
       return `${this.protocol}://${organizationSlug}.sentry.io/issues/alerts/rules/details/${encodedRuleId}/`;
     }
     return `${this.protocol}://${this.host}/organizations/${organizationSlug}/issues/alerts/rules/details/${encodedRuleId}/`;
@@ -1275,10 +1298,10 @@ export class SentryApiService {
       urlParams.set("yAxis", "count()");
     }
 
-    // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+    // Public SaaS uses sentry.io for web UI URLs regardless of region.
     // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
-    const webHost = this.isSaas() ? "sentry.io" : this.host;
-    const path = this.isSaas()
+    const webHost = this.isPublicSaas() ? "sentry.io" : this.host;
+    const path = this.isPublicSaas()
       ? `${this.protocol}://${organizationSlug}.${webHost}/explore/discover/homepage/`
       : `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
 
@@ -1359,9 +1382,9 @@ export class SentryApiService {
     organizationSlug: string,
     page: "logs" | "traces",
   ): string {
-    // For SaaS instances, always use sentry.io for web UI URLs regardless of region.
+    // Public SaaS uses sentry.io for web UI URLs regardless of region.
     // Regional subdomains (e.g., us.sentry.io) are only for API endpoints.
-    if (this.isSaas()) {
+    if (this.isPublicSaas()) {
       return `${this.protocol}://${organizationSlug}.sentry.io/explore/${page}/`;
     }
     return `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/${page}/`;
@@ -1575,15 +1598,13 @@ export class SentryApiService {
    * @throws {ApiError} If authentication fails or user not found
    */
   async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
-    // Auth endpoints only exist on the main API server, never on regional endpoints
+    // User identity belongs to the deployment's control host.
     let authHost: string | undefined;
 
-    if (this.isSaas()) {
-      // For SaaS, always use the main sentry.io host, not regional hosts
-      // This handles cases like us.sentry.io, eu.sentry.io, etc.
+    if (this.isPublicSaas()) {
       authHost = "sentry.io";
     }
-    // For self-hosted, use the configured host (authHost remains undefined)
+    // Single-tenant and self-hosted deployments keep their configured host.
 
     const body = await this.requestJSON("/auth/", undefined, {
       ...opts,
@@ -1627,8 +1648,9 @@ export class SentryApiService {
     const path = `/organizations/?${queryString}`;
 
     let host = undefined;
-    // For SaaS, always use the main sentry.io host, not regional hosts
-    if (this.isSaas()) {
+    // Public SaaS lists across regions on sentry.io; single-tenant instances
+    // must keep organization discovery on their configured host.
+    if (this.isPublicSaas()) {
       host = "sentry.io";
     }
 
@@ -2016,7 +2038,7 @@ export class SentryApiService {
   async listIssueAlertRules(
     params: {
       organizationSlug: string;
-      projectSlug: string;
+      projectSlug?: string;
       query?: string;
       cursor?: string;
       limit?: number;
@@ -2036,55 +2058,44 @@ export class SentryApiService {
       limit,
     }: {
       organizationSlug: string;
-      projectSlug: string;
+      projectSlug?: string;
       query?: string;
       cursor?: string;
       limit?: number;
     },
     opts?: RequestOptions,
   ): Promise<{ rules: IssueAlertRuleList; nextCursor: string | null }> {
-    const rules: IssueAlertRuleList = [];
+    const searchQuery = new URLSearchParams({ sortBy: "-id" });
+    if (projectSlug) {
+      searchQuery.set("projectSlug", projectSlug);
+    }
+    if (query) {
+      searchQuery.set("query", formatWorkflowNameQuery(query));
+    }
+    if (cursor) {
+      searchQuery.set("cursor", cursor);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+
+    const response = await this.request(
+      apiPath`/organizations/${organizationSlug}/workflows/` +
+        `?${searchQuery.toString()}`,
+      undefined,
+      opts,
+    );
+    const rules = IssueAlertRuleListSchema.parse(
+      await this.parseJsonResponse(response),
+    );
     const targetLimit = limit ?? 100;
-    let currentCursor: string | null | undefined = cursor;
-    let nextCursor: string | null = null;
-
-    do {
-      const searchQuery = new URLSearchParams();
-      searchQuery.append("projectSlug", projectSlug);
-      searchQuery.set("sortBy", "-id");
-      if (query) {
-        searchQuery.set("query", formatWorkflowNameQuery(query));
-      }
-      if (currentCursor) {
-        searchQuery.set("cursor", currentCursor);
-      }
-      if (limit !== undefined) {
-        searchQuery.set("per_page", String(targetLimit - rules.length));
-      }
-
-      const response = await this.request(
-        apiPath`/organizations/${organizationSlug}/workflows/` +
-          `?${searchQuery.toString()}`,
-        undefined,
-        opts,
-      );
-      const body = await this.parseJsonResponse(response);
-      const attachedRules = filterAttachedIssueAlertRules(
-        IssueAlertRuleListSchema.parse(body),
-      );
-      const remaining = targetLimit - rules.length;
-      if (attachedRules.length > remaining) {
-        rules.push(...attachedRules.slice(0, remaining));
-        nextCursor = null;
-        break;
-      }
-
-      rules.push(...attachedRules);
-      nextCursor = getNextCursor(response.headers.get("link"));
-      currentCursor = nextCursor;
-    } while (rules.length < targetLimit && nextCursor);
-
-    return { rules, nextCursor };
+    return {
+      rules: rules.slice(0, targetLimit),
+      nextCursor:
+        rules.length > targetLimit
+          ? null
+          : getNextCursor(response.headers.get("link")),
+    };
   }
 
   async getIssueAlertRule(
@@ -2094,36 +2105,315 @@ export class SentryApiService {
       ruleId,
     }: {
       organizationSlug: string;
-      projectSlug: string;
+      projectSlug?: string;
       ruleId: string | number;
     },
     opts?: RequestOptions,
   ): Promise<IssueAlertRule> {
-    const searchQuery = new URLSearchParams();
-    searchQuery.append("projectSlug", projectSlug);
-    searchQuery.append("id", String(ruleId));
-    searchQuery.set("per_page", "1");
+    // Workflow list ID filters override project filters. Verify the association explicitly.
+    if (projectSlug) {
+      const [project, scope] = await Promise.all([
+        this.getProject(
+          { organizationSlug, projectSlugOrId: projectSlug },
+          opts,
+        ),
+        this.getAlertRuleProjectScope({ organizationSlug, ruleId }, opts),
+      ]);
+      if (
+        !scope.includesAllProjects &&
+        !scope.projectIds.includes(String(project.id))
+      ) {
+        throw new ApiNotFoundError(
+          "Workflow not found in this project",
+          undefined,
+          undefined,
+          "workflow",
+          String(ruleId),
+        );
+      }
+    }
 
-    const response = await this.request(
-      apiPath`/organizations/${organizationSlug}/workflows/` +
-        `?${searchQuery.toString()}`,
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/`,
       undefined,
       opts,
     );
-    const rules = filterAttachedIssueAlertRules(
-      IssueAlertRuleListSchema.parse(await this.parseJsonResponse(response)),
+    return IssueAlertRuleSchema.parse(body);
+  }
+
+  /** Private Sentry endpoint: keep the complete association check separate from filtered lists. */
+  async getAlertRuleProjectScope(
+    {
+      organizationSlug,
+      ruleId,
+    }: { organizationSlug: string; ruleId: string | number },
+    opts?: RequestOptions,
+  ): Promise<AlertRuleProjectScope> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/project-scope/`,
+      undefined,
+      opts,
     );
-    const rule = rules[0];
-    if (!rule) {
-      throw new ApiNotFoundError(
-        "Workflow not found",
-        undefined,
-        undefined,
-        "workflow",
-        String(ruleId),
-      );
+    return AlertRuleProjectScopeSchema.parse(body);
+  }
+
+  async getDetectorForAlertRule(
+    {
+      organizationSlug,
+      alertRuleId,
+    }: { organizationSlug: string; alertRuleId: string | number },
+    opts?: RequestOptions,
+  ): Promise<string> {
+    const query = new URLSearchParams({ alert_rule_id: String(alertRuleId) });
+    const body = await this.requestJSON(
+      `${apiPath`/organizations/${organizationSlug}/alert-rule-detector/`}?${query}`,
+      undefined,
+      opts,
+    );
+    return z.object({ detectorId: z.string() }).parse(body).detectorId;
+  }
+
+  async getDetector(
+    {
+      organizationSlug,
+      detectorId,
+    }: { organizationSlug: string; detectorId: string | number },
+    opts?: RequestOptions,
+  ): Promise<Detector> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/detectors/${detectorId}/`,
+      undefined,
+      opts,
+    );
+    return DetectorSchema.parse(body);
+  }
+
+  async createMetricMonitor(
+    {
+      organizationSlug,
+      projectSlug,
+      body,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      body: MetricMonitorCreate;
+    },
+    opts?: RequestOptions,
+  ): Promise<Detector> {
+    const response = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/projects/${projectSlug}/detectors/`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      opts,
+    );
+    return DetectorSchema.parse(response);
+  }
+
+  async updateMetricMonitor(
+    {
+      organizationSlug,
+      monitorId,
+      body,
+    }: {
+      organizationSlug: string;
+      monitorId: string | number;
+      body: MetricMonitorUpdate;
+    },
+    opts?: RequestOptions,
+  ): Promise<Detector> {
+    const response = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/detectors/${monitorId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      },
+      opts,
+    );
+    return DetectorSchema.parse(response);
+  }
+
+  async deleteMetricMonitor(
+    {
+      organizationSlug,
+      monitorId,
+    }: {
+      organizationSlug: string;
+      monitorId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.request(
+      apiPath`/organizations/${organizationSlug}/detectors/${monitorId}/`,
+      { method: "DELETE" },
+      opts,
+    );
+  }
+
+  async listDetectorsPage(
+    {
+      organizationSlug,
+      projectId,
+      types,
+      query,
+      cursor,
+      limit = 25,
+    }: {
+      organizationSlug: string;
+      projectId?: string;
+      types?: string[];
+      query?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ detectors: Detector[]; nextCursor: string | null }> {
+    const search = new URLSearchParams({
+      project: projectId ?? "-1",
+      per_page: String(limit),
+    });
+    for (const type of types ?? []) {
+      search.append("type", type);
     }
-    return rule;
+    if (query) search.set("query", query);
+    if (cursor) search.set("cursor", cursor);
+    const response = await this.request(
+      `${apiPath`/organizations/${organizationSlug}/detectors/`}?${search}`,
+      undefined,
+      opts,
+    );
+    return {
+      detectors: z
+        .array(DetectorSchema)
+        .parse(await this.parseJsonResponse(response)),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async listAvailableAlertActionsPage(
+    {
+      organizationSlug,
+      types,
+      cursor,
+      limit = 25,
+    }: {
+      organizationSlug: string;
+      types?: string[];
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ actions: AlertActionOption[]; nextCursor: string | null }> {
+    const search = new URLSearchParams({ per_page: String(limit) });
+    for (const type of types ?? []) {
+      search.append("type", type);
+    }
+    if (cursor) search.set("cursor", cursor);
+    const response = await this.request(
+      `${apiPath`/organizations/${organizationSlug}/available-actions/`}?${search}`,
+      undefined,
+      opts,
+    );
+    return {
+      actions: z
+        .array(AlertActionOptionSchema)
+        .parse(await this.parseJsonResponse(response)),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async listAlertConditionsPage(
+    {
+      organizationSlug,
+      group,
+      cursor,
+      limit = 25,
+    }: {
+      organizationSlug: string;
+      group: "workflow_trigger" | "action_filter";
+      cursor?: string;
+      limit?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{
+    conditions: AlertConditionOption[];
+    nextCursor: string | null;
+  }> {
+    const search = new URLSearchParams({ group, per_page: String(limit) });
+    if (cursor) search.set("cursor", cursor);
+    const response = await this.request(
+      `${apiPath`/organizations/${organizationSlug}/data-conditions/`}?${search}`,
+      undefined,
+      opts,
+    );
+    return {
+      conditions: z
+        .array(AlertConditionOptionSchema)
+        .parse(await this.parseJsonResponse(response)),
+      nextCursor: getNextCursor(response.headers.get("link")),
+    };
+  }
+
+  async createAlertRule(
+    {
+      organizationSlug,
+      body,
+    }: {
+      organizationSlug: string;
+      body: AlertRuleCreate;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const response = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      opts,
+    );
+    return IssueAlertRuleSchema.parse(response);
+  }
+
+  async updateAlertRule(
+    {
+      organizationSlug,
+      ruleId,
+      body,
+    }: {
+      organizationSlug: string;
+      ruleId: string | number;
+      body: AlertRuleUpdate;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const response = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      },
+      opts,
+    );
+    return IssueAlertRuleSchema.parse(response);
+  }
+
+  async deleteAlertRule(
+    {
+      organizationSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      ruleId: string | number;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.request(
+      apiPath`/organizations/${organizationSlug}/workflows/${ruleId}/`,
+      { method: "DELETE" },
+      opts,
+    );
   }
 
   async listMetricAlertRules(
@@ -2658,6 +2948,31 @@ export class SentryApiService {
       opts,
     );
     return CommitListSchema.parse(body);
+  }
+
+  /**
+   * Retrieves the current suspect commit for the event's issue, grouped by committer.
+   * This reflects the issue's current suspect commit, not its state when the event occurred.
+   * Unlike release commits, this response actually populates `suspectCommitType`.
+   */
+  async getEventCommitters(
+    {
+      organizationSlug,
+      projectSlug,
+      eventId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      eventId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<CommitterList> {
+    const body = await this.requestJSON(
+      apiPath`/projects/${organizationSlug}/${projectSlug}/events/${eventId}/committers/`,
+      undefined,
+      opts,
+    );
+    return CommittersResponseSchema.parse(body).committers;
   }
 
   async listMonitors(
@@ -3625,10 +3940,7 @@ export class SentryApiService {
   }
 
   /**
-   * Retrieves external issue links for a specific issue.
-   *
-   * Returns links to external issue tracking systems (Jira, GitHub Issues,
-   * GitLab, etc.) that have been associated with this Sentry issue.
+   * Retrieves Sentry App issue associations. Native links come from listIssueIntegrations.
    *
    * @param params Query parameters
    * @param params.organizationSlug Organization identifier
@@ -3646,12 +3958,212 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ExternalIssueList> {
-    const body = await this.requestJSON(
+    return this.listIssueLinkPages(
       apiPath`/organizations/${organizationSlug}/issues/${issueId}/external-issues/`,
-      undefined,
+      ExternalIssueListSchema,
       opts,
     );
-    return ExternalIssueListSchema.parse(body);
+  }
+
+  private async listIssueLinkPages<T>(
+    path: string,
+    schema: z.ZodType<T[]>,
+    opts?: RequestOptions,
+  ): Promise<T[]> {
+    const items: T[] = [];
+    let cursor: string | null = null;
+    do {
+      const query = new URLSearchParams({ per_page: "100" });
+      if (cursor) query.set("cursor", cursor);
+      const response = await this.request(
+        `${path}${path.includes("?") ? "&" : "?"}${query.toString()}`,
+        undefined,
+        opts,
+      );
+      items.push(...schema.parse(await this.parseJsonResponse(response)));
+      cursor = getNextCursor(response.headers.get("link"));
+    } while (cursor);
+    return items;
+  }
+
+  async listIssueIntegrations(
+    {
+      organizationSlug,
+      issueId,
+    }: { organizationSlug: string; issueId: string },
+    opts?: RequestOptions,
+  ): Promise<IssueIntegrationList> {
+    return this.listIssueLinkPages(
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/integrations/`,
+      IssueIntegrationListSchema,
+      opts,
+    );
+  }
+
+  /** Send a complete provider URL; HTTP 201 distinguishes a new association from a retry. */
+  async linkNativeExternalIssue(
+    {
+      organizationSlug,
+      issueId,
+      integrationId,
+      externalIssueUrl,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      integrationId: string;
+      externalIssueUrl: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ issue: NativeExternalIssue; changed: boolean }> {
+    const response = await this.request(
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/integrations/${integrationId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ externalIssue: externalIssueUrl }),
+      },
+      opts,
+    );
+    return {
+      issue: NativeExternalIssueSchema.parse(
+        await this.parseJsonResponse(response),
+      ),
+      changed: response.status === 201,
+    };
+  }
+
+  /** Delete using Sentry's ExternalIssue ID, not the provider's issue number. */
+  async unlinkNativeExternalIssue(
+    {
+      organizationSlug,
+      issueId,
+      integrationId,
+      externalIssueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      integrationId: string;
+      externalIssueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    const query = new URLSearchParams({ externalIssue: externalIssueId });
+    await this.request(
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/integrations/${integrationId}/` +
+        `?${query.toString()}`,
+      { method: "DELETE" },
+      opts,
+    );
+  }
+
+  async listSentryAppInstallations(
+    { organizationSlug }: { organizationSlug: string },
+    opts?: RequestOptions,
+  ): Promise<SentryAppInstallationList> {
+    return this.listIssueLinkPages(
+      apiPath`/organizations/${organizationSlug}/sentry-app-installations/`,
+      SentryAppInstallationListSchema,
+      { ...opts, host: this.isPublicSaas() ? "sentry.io" : opts?.host },
+    );
+  }
+
+  async listSentryAppComponents(
+    { organizationSlug }: { organizationSlug: string },
+    opts?: RequestOptions,
+  ): Promise<SentryAppComponentList> {
+    return this.listIssueLinkPages(
+      apiPath`/organizations/${organizationSlug}/sentry-app-components/` +
+        "?filter=issue-link",
+      SentryAppComponentListSchema,
+      { ...opts, host: this.isPublicSaas() ? "sentry.io" : opts?.host },
+    );
+  }
+
+  async getSentryAppExternalRequestOptions(
+    {
+      installationUuid,
+      uri,
+      query,
+      projectId,
+      dependentData,
+    }: {
+      installationUuid: string;
+      uri: string;
+      query?: string;
+      projectId?: string;
+      dependentData?: Record<string, string | number>;
+    },
+    opts?: RequestOptions,
+  ): Promise<SentryAppExternalRequestOptions> {
+    const params = new URLSearchParams({ uri });
+    if (query !== undefined) params.set("query", query);
+    if (projectId !== undefined) params.set("projectId", projectId);
+    if (dependentData !== undefined)
+      params.set("dependentData", JSON.stringify(dependentData));
+    const body = await this.requestJSON(
+      apiPath`/sentry-app-installations/${installationUuid}/external-requests/` +
+        `?${params.toString()}`,
+      undefined,
+      { ...opts, host: this.isPublicSaas() ? "sentry.io" : opts?.host },
+    );
+    return SentryAppExternalRequestOptionsSchema.parse(body);
+  }
+
+  /** Invoke the App callback with an exact canonical-URL guard, preserving HTTP 200/201. */
+  async linkSentryAppExternalIssue(
+    {
+      installationUuid,
+      issueId,
+      uri,
+      fields,
+      expectedExternalIssueUrl,
+    }: {
+      installationUuid: string;
+      issueId: string;
+      uri: string;
+      fields: Record<string, string | number>;
+      expectedExternalIssueUrl: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ issue: ExternalIssue; changed: boolean }> {
+    const query = new URLSearchParams({ expectedExternalIssueUrl });
+    const response = await this.request(
+      apiPath`/sentry-app-installations/${installationUuid}/external-issue-actions/` +
+        `?${query.toString()}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          ...fields,
+          groupId: issueId,
+          action: "link",
+          uri,
+        }),
+      },
+      { ...opts, host: this.isPublicSaas() ? "sentry.io" : opts?.host },
+    );
+    return {
+      issue: ExternalIssueSchema.parse(await this.parseJsonResponse(response)),
+      changed: response.status === 201,
+    };
+  }
+
+  /** Delete a group-scoped App association with event:write permissions. */
+  async unlinkSentryAppExternalIssue(
+    {
+      organizationSlug,
+      issueId,
+      externalIssueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      externalIssueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.request(
+      apiPath`/organizations/${organizationSlug}/issues/${issueId}/external-issues/${externalIssueId}/`,
+      { method: "DELETE" },
+      opts,
+    );
   }
 
   /**
@@ -3764,6 +4276,13 @@ export class SentryApiService {
         eventId: bodyObj.id,
         validationError: parseResult.error.message,
         validationIssues: parseResult.error.issues,
+        // Log the container type, not user-provided extra data.
+        contextType:
+          bodyObj.context === null
+            ? "null"
+            : Array.isArray(bodyObj.context)
+              ? "array"
+              : typeof bodyObj.context,
       },
     });
 
@@ -4558,6 +5077,60 @@ export class SentryApiService {
       apiPath`/organizations/${organizationSlug}/events/` +
       `?${queryParams.toString()}`;
     return await this.requestJSON(apiUrl, undefined, opts);
+  }
+
+  /**
+   * Fetch a timeseries (events-stats) for a single yAxis, bucketed over time.
+   *
+   * `interval` is optional: omit it to let Sentry pick a sensible bucket size
+   * for the range (mirrors get_interval_from_range in the Sentry source).
+   * Environment and other filters travel in `query`, same as searchEvents.
+   */
+  async getEventsTimeSeries(
+    {
+      organizationSlug,
+      query,
+      yAxis,
+      interval,
+      projectId,
+      dataset = "errors",
+      statsPeriod,
+      start,
+      end,
+    }: {
+      organizationSlug: string;
+      query: string;
+      yAxis: string;
+      interval?: string;
+      projectId?: string;
+      dataset?: EventsDataset;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+    },
+    opts?: RequestOptions,
+  ) {
+    const queryParams = new URLSearchParams();
+    queryParams.set("dataset", normalizeEventsDataset(dataset));
+    queryParams.set("query", query);
+    queryParams.set("yAxis", yAxis);
+    // Omit interval to let Sentry pick a sensible bucket size for the range.
+    if (interval) {
+      queryParams.set("interval", interval);
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
+    if (projectId) {
+      queryParams.set("project", projectId);
+    }
+    // partial=1 keeps the current (in-progress) bucket, matching Sentry's charts.
+    queryParams.set("partial", "1");
+    queryParams.set("referrer", SENTRY_MCP_SEARCH_EVENTS_REFERRER);
+
+    const apiUrl =
+      apiPath`/organizations/${organizationSlug}/events-stats/` +
+      `?${queryParams.toString()}`;
+    const body = await this.requestJSON(apiUrl, undefined, opts);
+    return EventsStatsResponseSchema.parse(body);
   }
 
   // POST https://us.sentry.io/api/0/issues/5485083130/autofix/

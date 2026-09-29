@@ -62,7 +62,7 @@ When we redirect to Sentry OAuth, we always request the shared Sentry scope set
 defined in `packages/mcp-core/src/scopes.ts`:
 
 ```text
-org:read project:write team:write event:write
+org:read project:write team:write event:write alerts:write
 ```
 
 We ask Sentry for this broader shared token because:

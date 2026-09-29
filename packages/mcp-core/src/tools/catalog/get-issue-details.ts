@@ -1,9 +1,10 @@
-import { setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import type { SentryApiService } from "../../api-client";
-import { ApiNotFoundError } from "../../api-client";
+import { ApiClientError, ApiNotFoundError } from "../../api-client";
 import type {
   AutofixRunState,
+  CommitterList,
   DefaultEvent,
   ErrorEvent,
   Event,
@@ -12,7 +13,7 @@ import type {
   Trace,
   TransactionEvent,
 } from "../../api-client/types";
-import { UserInputError } from "../../errors";
+import { ConfigurationError, UserInputError } from "../../errors";
 import type { CodeLocation } from "../../internal/code-location";
 import {
   SelectedEventPackagesSchema,
@@ -28,6 +29,7 @@ import {
   getReplayIdFromEvent,
   isPerformanceIssueType,
   getSeerActionabilityLabel,
+  getSuspectCommit,
   usesSharedFormatterBody,
 } from "../../internal/formatting";
 import {
@@ -47,7 +49,7 @@ import {
   ParamPackageNames,
   ParamRegionUrl,
 } from "../../schema";
-import { logError } from "../../telem/logging";
+import { logError, logIssue } from "../../telem/logging";
 import type { ServerContext } from "../../types";
 import { resolveCodeLocation } from "../support/code-location";
 
@@ -110,6 +112,14 @@ export const getIssueDetailsOutputSchema = z.object({
       path: z.string().nullish(),
       line: z.number().nullish(),
       url: z.string(),
+    })
+    .nullish(),
+  suspectCommit: z
+    .object({
+      id: z.string(),
+      message: z.string().nullish(),
+      author: z.string().nullish(),
+      suspectCommitType: z.string().nullish(),
     })
     .nullish(),
   replays: z
@@ -219,6 +229,7 @@ function buildIssueDetailsPayload({
   relatedReplayIds,
   aiConversations,
   codeLocation,
+  committers,
 }: {
   packageNames?: string[];
   organizationSlug: string;
@@ -231,6 +242,7 @@ function buildIssueDetailsPayload({
   relatedReplayIds?: string[];
   aiConversations?: AIConversationReference[];
   codeLocation?: CodeLocation;
+  committers?: CommitterList;
 }): GetIssueDetailsPayload {
   const autofix = autofixState?.autofix;
   // the run's own artifacts, not the whole state: an AutofixRunState carries every step and
@@ -292,6 +304,7 @@ function buildIssueDetailsPayload({
         }
       : null,
     replays: buildReplays(event, relatedReplayIds),
+    suspectCommit: getSuspectCommit(committers),
     // mapped field by field, not handed through: several upstream schemas are passthrough, and
     // structuredContent is a product contract rather than a view of the api response
     externalIssues: externalIssues?.length
@@ -324,6 +337,7 @@ export default defineTool({
     "- Ask to 'explain [ISSUE-ID]', 'tell me about [ISSUE-ID]'",
     "- Want details/stacktrace/analysis for a known issue",
     "- Need installed package versions for an exact event (pass eventId and packageNames)",
+    "- Want the suspect commit's SHA, message, author, and source when available",
     "- Provide a Sentry issue URL",
     "",
     "DO NOT USE for:",
@@ -393,7 +407,7 @@ export default defineTool({
         );
       }
 
-      setTag("organization.slug", orgSlug);
+      setOrganizationContext(orgSlug);
       // Use issueId directly if provided (e.g., from URL parsing), otherwise search by eventId
       let issue: Awaited<ReturnType<typeof apiService.getIssue>>;
       if (params.issueId) {
@@ -417,13 +431,13 @@ export default defineTool({
       });
       // For this call, we might want to provide context if it fails
       const [
-        { event, performanceTrace, aiConversations, codeLocation },
+        { event, performanceTrace, aiConversations, codeLocation, committers },
         { autofixState, externalIssues, relatedReplayIds },
       ] = await Promise.all([
         apiService
           .getEventForIssue({
             organizationSlug: orgSlug,
-            issueId: issue.shortId,
+            issueId: String(issue.id),
             eventId,
           })
           // Optionally enhance 404 errors with parameter context
@@ -431,7 +445,7 @@ export default defineTool({
             if (error instanceof ApiNotFoundError) {
               throw enhanceNotFoundError(error, {
                 organizationSlug: orgSlug,
-                issueId: issue.shortId,
+                issueId: String(issue.id),
                 eventId,
               });
             }
@@ -469,6 +483,7 @@ export default defineTool({
             relatedReplayIds,
             aiConversations,
             codeLocation,
+            committers,
           }),
         );
       }
@@ -487,6 +502,7 @@ export default defineTool({
         relatedReplayIds,
         aiConversations,
         codeLocation,
+        committers,
         experimentalMode: context.experimentalMode,
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
@@ -513,7 +529,7 @@ export default defineTool({
         issueUrl: params.issueUrl,
       });
 
-    setTag("organization.slug", orgSlug);
+    setOrganizationContext(orgSlug);
 
     // For the main issue lookup, provide parameter context on 404
     let issue: Awaited<ReturnType<typeof apiService.getIssue>>;
@@ -537,13 +553,13 @@ export default defineTool({
     });
 
     const [
-      { event, performanceTrace, aiConversations, codeLocation },
+      { event, performanceTrace, aiConversations, codeLocation, committers },
       { autofixState, externalIssues, relatedReplayIds },
     ] = await Promise.all([
       apiService
         .getLatestEventForIssue({
           organizationSlug: orgSlug,
-          issueId: issue.shortId,
+          issueId: String(issue.id),
         })
         .then(async (event) => ({
           event,
@@ -576,6 +592,7 @@ export default defineTool({
           relatedReplayIds,
           aiConversations,
           codeLocation,
+          committers,
         }),
       );
     }
@@ -593,6 +610,7 @@ export default defineTool({
       relatedReplayIds,
       aiConversations,
       codeLocation,
+      committers,
       experimentalMode: context.experimentalMode,
       availableToolNames: context.availableToolNames,
       directToolNames: context.directToolNames,
@@ -614,27 +632,69 @@ async function fetchEventEnrichment({
   performanceTrace: Trace | undefined;
   aiConversations: AIConversationReference[];
   codeLocation: CodeLocation | undefined;
+  committers: CommitterList | undefined;
 }> {
-  const [performanceTrace, aiConversations, codeLocation] = await Promise.all([
-    maybeFetchPerformanceTrace({
-      apiService,
-      organizationSlug,
-      event,
-    }),
-    maybeFindAIConversationsForIssueEvent({
-      apiService,
-      organizationSlug,
-      event,
-    }),
-    resolveCodeLocation({
-      apiService,
-      organizationSlug,
-      projectSlug: issue.project.slug,
-      event,
-    }),
-  ]);
+  const [performanceTrace, aiConversations, codeLocation, committers] =
+    await Promise.all([
+      maybeFetchPerformanceTrace({
+        apiService,
+        organizationSlug,
+        event,
+      }),
+      maybeFindAIConversationsForIssueEvent({
+        apiService,
+        organizationSlug,
+        event,
+      }),
+      resolveCodeLocation({
+        apiService,
+        organizationSlug,
+        projectSlug: issue.project.slug,
+        event,
+      }),
+      maybeFetchCommitters({
+        apiService,
+        organizationSlug,
+        projectSlug: issue.project.slug,
+        event,
+      }),
+    ]);
 
-  return { performanceTrace, aiConversations, codeLocation };
+  return { performanceTrace, aiConversations, codeLocation, committers };
+}
+
+/** Keeps issue details available when optional commit lookup fails, reporting unexpected failures. */
+async function maybeFetchCommitters({
+  apiService,
+  organizationSlug,
+  projectSlug,
+  event,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  projectSlug: string;
+  event: Event;
+}): Promise<CommitterList | undefined> {
+  try {
+    return await apiService.getEventCommitters({
+      organizationSlug,
+      projectSlug,
+      eventId: event.id,
+    });
+  } catch (error) {
+    if (
+      !(error instanceof ApiClientError) &&
+      !(error instanceof ConfigurationError)
+    ) {
+      logIssue(error, {
+        loggerScope: ["tools", "get-issue-details", "committers"],
+        contexts: {
+          request: { organizationSlug, projectSlug, eventId: event.id },
+        },
+      });
+    }
+    return undefined;
+  }
 }
 
 /**
@@ -667,7 +727,7 @@ async function fetchIssueEnrichmentData({
       seerEnabled,
     }),
     apiService
-      .getIssueExternalLinks({ organizationSlug, issueId: issue.shortId })
+      .getIssueExternalLinks({ organizationSlug, issueId })
       .catch(() => undefined),
     apiService
       .listReplayIdsForIssue({
@@ -710,7 +770,7 @@ async function maybeFetchAutofixState({
   }
 
   return apiService
-    .getAutofixState({ organizationSlug, issueId: issue.shortId })
+    .getAutofixState({ organizationSlug, issueId: String(issue.id) })
     .catch(() => undefined);
 }
 
