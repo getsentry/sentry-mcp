@@ -1,5 +1,6 @@
 import { getActiveSpan, setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import { UserInputError } from "../../errors";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { withProviderFallback } from "../../internal/agents/provider-fallback";
@@ -498,7 +499,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationContext(organizationSlug);
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
     const inputDataset = params.dataset ?? "errors";

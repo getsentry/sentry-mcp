@@ -128,6 +128,7 @@ describe("app", () => {
           "project:write",
           "team:write",
           "event:write",
+          "alerts:write",
         ],
         bearer_methods_supported: ["header"],
       });
@@ -150,6 +151,7 @@ describe("app", () => {
           "project:write",
           "team:write",
           "event:write",
+          "alerts:write",
         ],
         bearer_methods_supported: ["header"],
       });
@@ -172,6 +174,7 @@ describe("app", () => {
           "project:write",
           "team:write",
           "event:write",
+          "alerts:write",
         ],
         bearer_methods_supported: ["header"],
       });
@@ -194,6 +197,7 @@ describe("app", () => {
           "project:write",
           "team:write",
           "event:write",
+          "alerts:write",
         ],
         bearer_methods_supported: ["header"],
       });
@@ -216,6 +220,7 @@ describe("app", () => {
           "project:write",
           "team:write",
           "event:write",
+          "alerts:write",
         ],
         bearer_methods_supported: ["header"],
       });
@@ -241,6 +246,7 @@ describe("app", () => {
           "project:write",
           "team:write",
           "event:write",
+          "alerts:write",
         ],
         bearer_methods_supported: ["header"],
       });
@@ -269,6 +275,7 @@ describe("app", () => {
           "project:write",
           "team:write",
           "event:write",
+          "alerts:write",
         ],
         response_types_supported: ["code"],
         response_modes_supported: ["query"],

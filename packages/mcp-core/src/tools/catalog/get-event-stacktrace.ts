@@ -1,5 +1,6 @@
 import { setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import { ApiNotFoundError } from "../../api-client";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
@@ -60,7 +61,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", params.organizationSlug);
+    setOrganizationContext(params.organizationSlug);
     setTag("issue.id", params.issueId);
 
     try {

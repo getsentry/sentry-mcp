@@ -14,6 +14,7 @@ allowBuilds:
   "@biomejs/biome": true
   "@sentry/cli": false
   "@tailwindcss/oxide": false
+  better-sqlite3: true
   core-js: false
   core-js-pure: false
   esbuild: true
@@ -60,6 +61,7 @@ catalog:
   "@vitest/coverage-v8": ^4.1.10
   agents: 0.20.1
   ai: ^6.0.64
+  better-sqlite3: ^11.10.0
   chalk: ^5.4.1
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1

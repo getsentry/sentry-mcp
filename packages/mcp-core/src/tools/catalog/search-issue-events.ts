@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getActiveSpan, setTag } from "@sentry/core";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { ensureIssueWithinProjectConstraint } from "../../internal/tool-helpers/issue";
@@ -142,7 +143,7 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationContext(organizationSlug);
     setTag("issue.id", issueId);
     if (params.projectSlug) {
       setTag("project.slug", params.projectSlug);

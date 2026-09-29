@@ -1,5 +1,5 @@
-import { setTag } from "@sentry/core";
 import { z } from "zod";
+import { setOrganizationContext } from "../../telem/organization";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { structuredResult } from "../../internal/tool-helpers/results";
@@ -60,7 +60,7 @@ export default defineTool({
       );
     }
 
-    setTag("organization.slug", organizationSlug);
+    setOrganizationContext(organizationSlug);
 
     const teams = await apiService.listTeams(organizationSlug, {
       query: params.query ?? undefined,

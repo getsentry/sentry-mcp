@@ -16,6 +16,9 @@ Different Sentry SDKs for different environments:
 
 See `logIssue` in `packages/mcp-server/src/telem/logging.ts` (documented in [Logging Reference](logging.md)) for the canonical way to create an Issue and structured log entry.
 
+For event schema failures, see [Event Validation Diagnostics](../../TELEMETRY.md#event-validation-diagnostics)
+for the `contextType` diagnostic and its privacy constraints.
+
 ### Tracing Pattern
 
 ```typescript
@@ -40,6 +43,13 @@ export async function createTracedToolHandler<T extends ToolName>(
   ];
 }
 ```
+
+### Organization Context
+
+Call `setOrganizationContext(slug)` from `src/telem/organization.ts` after
+resolving the organization, including from URLs. It sets `organization.slug`
+as a scope attribute for streamed spans, logs, and metrics, and as a tag for
+errors. SDK v11 no longer copies scope tags onto spans.
 
 ### Span Management
 

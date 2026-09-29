@@ -293,6 +293,73 @@ export const IssueAlertRuleSchema = z
 
 export const IssueAlertRuleListSchema = z.array(IssueAlertRuleSchema);
 
+export const AlertRuleProjectScopeSchema = z.object({
+  projectIds: z.array(z.string()),
+  includesAllProjects: z.boolean(),
+});
+
+export const AlertActionOptionSchema = z.object({
+  type: z.string(),
+  handlerGroup: z.string(),
+  configSchema: z.record(z.string(), z.unknown()),
+  dataSchema: z.record(z.string(), z.unknown()),
+  integrations: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        services: z
+          .array(z.object({ id: z.string(), name: z.string() }))
+          .optional(),
+      }),
+    )
+    .optional(),
+  services: z
+    .array(z.object({ slug: z.string(), name: z.string() }))
+    .optional(),
+  sentryApp: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      installationId: z.string(),
+      installationUuid: z.string(),
+      status: z.string(),
+      settings: z.record(z.string(), z.unknown()).optional(),
+      title: z.string().optional(),
+    })
+    .optional(),
+});
+
+export const AlertConditionOptionSchema = z.object({
+  type: z.string(),
+  handlerGroup: z.string(),
+  handlerSubgroup: z.string().optional(),
+  comparisonJsonSchema: z.record(z.string(), z.unknown()),
+});
+
+// Source: workflow_engine/endpoints/serializers/detector_serializer.py.
+// Configuration and data sources vary by detector type; preserve their native fields.
+export const DetectorSchema = z
+  .object({
+    id: z.string(),
+    projectId: z.string().nullable(),
+    name: z.string(),
+    type: z.string(),
+    enabled: z.boolean(),
+    config: z.record(z.string(), z.unknown()),
+    conditionGroup: AlertRuleComponentSchema.nullable(),
+    dataSources: z.array(AlertRuleComponentSchema).nullable(),
+    workflowIds: z.array(z.string()).nullable(),
+    description: z.string().nullable().optional(),
+    owner: z.unknown().optional(),
+    createdBy: z.string().nullable().optional(),
+    dateCreated: z.string(),
+    dateUpdated: z.string(),
+    alertRuleId: z.number().nullable().optional(),
+    ruleId: z.number().nullable().optional(),
+  })
+  .passthrough();
+
 export const MetricAlertRuleSchema = z
   .object({
     id: z.union([z.string(), z.number()]),
@@ -727,6 +794,7 @@ export const CommitSchema = z
     message: z.string().nullable().optional(),
     dateCreated: z.string().datetime().nullable().optional(),
     pullRequest: z.record(z.string(), z.unknown()).nullable().optional(),
+    // The event committers endpoint populates this; release commits usually return an empty string.
     suspectCommitType: z.string().optional(),
     author: ApiActorSchema.nullable().optional(),
     repository: z
@@ -740,6 +808,17 @@ export const CommitSchema = z
   .passthrough();
 
 export const CommitListSchema = z.array(CommitSchema);
+
+export const CommitterSchema = z
+  .object({
+    author: ApiActorSchema.nullable().optional(),
+    commits: CommitListSchema,
+  })
+  .passthrough();
+
+export const CommittersResponseSchema = z.object({
+  committers: z.array(CommitterSchema),
+});
 
 export const IssueActivitySchema = z
   .object({
@@ -1443,6 +1522,84 @@ export const UserReportSchema = z.object({
 export const UserReportListSchema = z.array(UserReportSchema);
 
 export const ExternalIssueListSchema = z.array(ExternalIssueSchema);
+
+export const IntegrationProviderSchema = z
+  .object({
+    key: z.string(),
+    slug: z.string().optional(),
+    name: z.string().optional(),
+  })
+  .passthrough();
+
+export const IssueIntegrationExternalIssueSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    key: z.string(),
+    url: z.string().optional(),
+    title: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    displayName: z.string().optional(),
+  })
+  .passthrough();
+
+export const IssueIntegrationSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    name: z.string(),
+    domainName: z.string().nullable().optional(),
+    status: z.string().optional(),
+    provider: IntegrationProviderSchema,
+    externalIssues: z.array(IssueIntegrationExternalIssueSchema).default([]),
+  })
+  .passthrough();
+
+export const IssueIntegrationListSchema = z.array(IssueIntegrationSchema);
+
+export const NativeExternalIssueSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    key: z.string(),
+    url: z.string().optional(),
+    integrationId: z.union([z.string(), z.number()]).optional(),
+    displayName: z.string().optional(),
+  })
+  .passthrough();
+
+export const SentryAppInstallationSchema = z
+  .object({
+    uuid: z.string(),
+    status: z.string().optional(),
+    app: z
+      .object({
+        uuid: z.string().optional(),
+        slug: z.string(),
+        sentryAppId: z.number().optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
+export const SentryAppInstallationListSchema = z.array(
+  SentryAppInstallationSchema,
+);
+
+export const SentryAppComponentSchema = z.object({
+  type: z.string(),
+  sentryApp: z.object({ uuid: z.string(), slug: z.string() }),
+  schema: z.record(z.string(), z.unknown()),
+  error: z.unknown().optional(),
+});
+export const SentryAppComponentListSchema = z.array(SentryAppComponentSchema);
+
+export const SentryAppExternalRequestOptionsSchema = z.object({
+  choices: z.array(
+    z.tuple([
+      z.union([z.string(), z.number()]),
+      z.union([z.string(), z.number()]),
+    ]),
+  ),
+  defaultValue: z.union([z.string(), z.number()]).optional(),
+});
 
 /**
  * Schema for Sentry trace metadata response.

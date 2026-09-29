@@ -63,7 +63,27 @@ await api.issues.update({
 });
 ```
 
+### Resolved Issue IDs
+
+Use `String(issue.id)` for API requests after resolving an issue. Short IDs can
+fail to resolve for legacy mixed-case project slugs; keep them for display.
+
 ### Multi-Region Support
+
+Organization discovery uses a single `/api/0/organizations/` request. Public
+SaaS hosts use `sentry.io` to list organizations across regions. Single-tenant
+hosts under `*.my.sentry.io` and self-hosted instances keep their configured
+host for this request.
+
+User identity (`/api/0/auth/`, used by `whoami`) follows the same control-host
+routing. Organization-scoped requests continue to use the configured host or
+a validated `regionUrl`.
+
+Web links use `<organization>.sentry.io` for public SaaS. Single-tenant and
+self-hosted links keep the configured host and `/organizations/<organization>`
+path prefix. Use `isPublicSentryHost` for these routing decisions;
+`isSentryHost` also recognizes single-tenant deployments and remains the broader
+check for HTTPS enforcement and capabilities.
 
 Sentry uses region-specific URLs:
 
