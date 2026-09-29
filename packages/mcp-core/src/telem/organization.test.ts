@@ -1,11 +1,11 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
-  type StreamedSpanJSON,
-  type ErrorEvent,
   captureException,
+  type ErrorEvent,
   getCurrentScope,
   getIsolationScope,
+  type StreamedSpanJSON,
   setCurrentClient,
 } from "@sentry/core";
 import { ServerRuntimeClient } from "@sentry/core/server";
@@ -106,7 +106,12 @@ describe("organization telemetry", () => {
 
   it("preserves organization tags on error events", async () => {
     await findProjects.handler(
-      { organizationSlug: "sentry-mcp-evals", regionUrl: null, query: null },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        query: null,
+        cursor: null,
+      },
       getServerContext(),
     );
     captureException(new Error("organization telemetry regression"));

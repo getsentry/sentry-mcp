@@ -1,5 +1,5 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SentryApiService } from "../../api-client/index.js";
 import { getServerContext } from "../../test-setup.js";
@@ -9,11 +9,21 @@ import {
 } from "../../test-utils/structured-content.js";
 import findOrganizations from "./find-organizations.js";
 
-function mockOrganizations(organizations: unknown[]) {
+function mockOrganizations(
+  organizations: unknown[],
+  headers?: Record<string, string>,
+  searchParams: Record<string, string> = {},
+) {
   mswServer.use(
     http.get("https://sentry.io/api/0/organizations/", ({ request }) => {
-      expect(new URL(request.url).searchParams.get("per_page")).toBe("26");
-      return HttpResponse.json(organizations);
+      expect(Object.fromEntries(new URL(request.url).searchParams)).toEqual({
+        per_page: "25",
+        ...searchParams,
+      });
+      return HttpResponse.json(
+        organizations,
+        headers ? { headers } : undefined,
+      );
     }),
   );
 }
@@ -45,19 +55,20 @@ describe("find_organizations", () => {
     );
 
     const result = await findOrganizations.handler(
-      { query: "example" },
+      { query: "example", cursor: null },
       getServerContext({ sentryHost: host, accessToken: "test-token" }),
     );
 
     expect(requests).toEqual([
       {
-        url: `https://${expectedHost}/api/0/organizations/?per_page=26&query=example`,
+        url: `https://${expectedHost}/api/0/organizations/?per_page=25&query=example`,
         authorization: "Bearer test-token",
       },
     ]);
     expect(getStructuredContent(result)).toEqual({
       organizations: [{ slug: "example", webUrl: null, regionUrl: null }],
       hasMore: false,
+      nextCursor: null,
     });
   });
 
@@ -80,13 +91,14 @@ describe("find_organizations", () => {
     ]);
 
     const result = await findOrganizations.handler(
-      { query: null },
+      { query: null, cursor: null },
       getServerContext(),
     );
 
     expect(getStructuredContent(result)).toMatchInlineSnapshot(`
       {
         "hasMore": false,
+        "nextCursor": null,
         "organizations": [
           {
             "regionUrl": "https://us.sentry.io",
@@ -108,20 +120,23 @@ describe("find_organizations", () => {
     vi.spyOn(
       SentryApiService.prototype,
       "listOrganizations",
-    ).mockResolvedValueOnce([
-      {
-        id: "1",
-        slug: "whitespace-region-org",
-        name: "Whitespace Region Org",
-        links: {
-          organizationUrl: "https://sentry.io/whitespace-region-org",
-          regionUrl: " \t\n ",
+    ).mockResolvedValueOnce({
+      organizations: [
+        {
+          id: "1",
+          slug: "whitespace-region-org",
+          name: "Whitespace Region Org",
+          links: {
+            organizationUrl: "https://sentry.io/whitespace-region-org",
+            regionUrl: " \t\n ",
+          },
         },
-      },
-    ]);
+      ],
+      nextCursor: null,
+    });
 
     const result = await findOrganizations.handler(
-      { query: null },
+      { query: null, cursor: null },
       getServerContext(),
     );
 
@@ -134,13 +149,14 @@ describe("find_organizations", () => {
         },
       ],
       hasMore: false,
+      nextCursor: null,
     });
     assertStructuredOnlyResult(result);
   });
 
-  it("requests 26 organizations and returns 25 with hasMore", async () => {
+  it("preserves search and cursor while returning a page of 25 organizations", async () => {
     mockOrganizations(
-      Array.from({ length: 26 }, (_, index) => ({
+      Array.from({ length: 25 }, (_, index) => ({
         id: String(index + 1),
         slug: `organization-${index + 1}`,
         name: `Organization ${index + 1}`,
@@ -149,15 +165,20 @@ describe("find_organizations", () => {
           regionUrl: "https://us.sentry.io",
         },
       })),
+      {
+        Link: '<https://sentry.io/api/0/organizations/?cursor=page-2>; rel="next"; results="true"; cursor="page-2"',
+      },
+      { query: "example", cursor: "previous" },
     );
 
     const result = await findOrganizations.handler(
-      { query: null },
+      { query: "example", cursor: "previous" },
       getServerContext(),
     );
     const structuredContent = getStructuredContent<{
       organizations: Array<{ slug: string }>;
       hasMore: boolean;
+      nextCursor: string | null;
     }>(result);
 
     expect(structuredContent.organizations).toHaveLength(25);
@@ -165,6 +186,7 @@ describe("find_organizations", () => {
       "organization-25",
     );
     expect(structuredContent.hasMore).toBe(true);
+    expect(structuredContent.nextCursor).toBe("page-2");
     assertStructuredOnlyResult(result);
   });
 });
