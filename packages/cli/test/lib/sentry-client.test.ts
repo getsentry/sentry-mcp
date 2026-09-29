@@ -12,7 +12,12 @@ import {
   getSdkConfig,
   resetAuthenticatedFetch,
 } from "../../src/lib/sentry-client.js";
-import { mockFetch, useTestConfigDir } from "../helpers.js";
+import {
+  extractFetchUrl,
+  mockFetch,
+  useEnvSandbox,
+  useTestConfigDir,
+} from "../helpers.js";
 
 useTestConfigDir("sentry-client-");
 
@@ -34,6 +39,39 @@ afterEach(() => {
 function getAuthenticatedFetch(): typeof fetch {
   return getSdkConfig(REGION_URL).fetch as typeof fetch;
 }
+
+describe("401 replay", () => {
+  useEnvSandbox(["SENTRY_CLIENT_ID"]);
+
+  /** Answer resource requests with `statuses` in order while OAuth refresh succeeds. */
+  async function mockRefreshableSession(statuses: number[]): Promise<string[]> {
+    process.env.SENTRY_CLIENT_ID = "synthetic-client-id";
+    await setAuthToken("stored-token", 3600, "synthetic-refresh-token");
+    const urls: string[] = [];
+    globalThis.fetch = mockFetch(async (input) => {
+      const url = extractFetchUrl(input);
+      urls.push(url);
+      if (url.endsWith("/oauth/token/")) {
+        return Response.json({
+          access_token: "refreshed-token",
+          token_type: "bearer",
+          expires_in: 3600,
+        });
+      }
+      return new Response("{}", { status: statuses.shift() ?? 200 });
+    });
+    return urls;
+  }
+
+  test("returns a 401 from the final attempt instead of replaying it", async () => {
+    const urls = await mockRefreshableSession([503, 503, 401]);
+    const response = await getAuthenticatedFetch()(
+      `${REGION_URL}/api/0/organizations/`
+    );
+    expect(response.status).toBe(401);
+    expect(urls.filter((url) => url.endsWith("/oauth/token/"))).toEqual([]);
+  });
+});
 
 describe("fetchWithRetry / buildAttemptFactory", () => {
   test("retries a POST with a string body without re-consuming the body", async () => {
