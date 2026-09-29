@@ -336,8 +336,14 @@ process.exitCode = result.status ?? 1;
   test("checks further release pages before selecting a stable Toolkit CLI", () => {
     const firstPage = join(testDir, "releases-1.json");
     const secondPage = join(testDir, "releases-2.json");
-    writeFileSync(firstPage, '[\n  {\n    "tag_name": "mcp@1.0.0",\n    "prerelease": false\n  }\n]\n');
-    writeFileSync(secondPage, '[\n  {\n    "tag_name": "cli@0.46.0",\n    "prerelease": false\n  }\n]\n');
+    writeFileSync(
+      firstPage,
+      '[\n  {\n    "tag_name": "mcp@1.0.0",\n    "prerelease": false\n  }\n]\n'
+    );
+    writeFileSync(
+      secondPage,
+      '[\n  {\n    "tag_name": "cli@0.46.0",\n    "prerelease": false\n  }\n]\n'
+    );
     env.SENTRY_TEST_RELEASES_PAGE_1 = firstPage;
     env.SENTRY_TEST_RELEASES_PAGE_2 = secondPage;
     const result = spawnSync("bash", [installScript, "--no-modify-path"], {
@@ -352,7 +358,9 @@ process.exitCode = result.status ?? 1;
       "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=2",
       "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.46.0",
     ]);
-    expect(recorded("curl-urls")[3]).toContain("/getsentry/sentry-mcp/releases/download/cli@0.46.0/");
+    expect(recorded("curl-urls")[3]).toContain(
+      "/getsentry/sentry-mcp/releases/download/cli@0.46.0/"
+    );
   });
 
   test("resolves the latest legacy version until Toolkit has a CLI release", () => {
