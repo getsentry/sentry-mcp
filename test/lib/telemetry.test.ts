@@ -17,8 +17,14 @@ import {
   test,
   vi,
 } from "vitest";
+import { formatAuthHeader } from "../../src/lib/auth-header.js";
 import { Database } from "../../src/lib/db/sqlite.js";
-import { ApiError, AuthError, OutputError } from "../../src/lib/errors.js";
+import {
+  ApiError,
+  AuthError,
+  MalformedAuthTokenError,
+  OutputError,
+} from "../../src/lib/errors.js";
 import {
   createTracedDatabase,
   createWizardPromptTelemetry,
@@ -331,6 +337,39 @@ describe("withTelemetry", () => {
       metricSpy.mockRestore();
       isolationScopeSpy.mockRestore();
       currentScopeSpy.mockRestore();
+    });
+
+    test("captures malformed tokens without marking the session crashed", async () => {
+      const captureSpy = vi.spyOn(Sentry, "captureException");
+      const metricSpy = vi.spyOn(Sentry.metrics, "distribution");
+      const session = { status: "ok", errors: 0 };
+      const isolationScopeSpy = vi
+        .spyOn(Sentry, "getIsolationScope")
+        .mockReturnValue({
+          getSession: () => session,
+        } as unknown as Sentry.Scope);
+      const currentScopeSpy = vi
+        .spyOn(Sentry, "getCurrentScope")
+        .mockReturnValue({
+          getSession: () => null,
+        } as unknown as Sentry.Scope);
+      try {
+        await expect(
+          withTelemetry(() => formatAuthHeader("first-part\nsecond-part"))
+        ).rejects.toThrow(MalformedAuthTokenError);
+        expect(captureSpy).toHaveBeenCalledExactlyOnceWith(
+          expect.any(MalformedAuthTokenError)
+        );
+        expect(
+          metricSpy.mock.calls.find((c) => c[0] === "cli.error.silenced")
+        ).toBeUndefined();
+        expect(session.status).toBe("ok");
+      } finally {
+        captureSpy.mockRestore();
+        metricSpy.mockRestore();
+        isolationScopeSpy.mockRestore();
+        currentScopeSpy.mockRestore();
+      }
     });
 
     test("marks session crashed for a genuine CLI bug", async () => {

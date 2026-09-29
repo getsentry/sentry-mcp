@@ -10,6 +10,7 @@ import {
 describe("extractCommandPathFromHeading", () => {
   test.each([
     ["`sentry issue view <issue-id>`", "sentry issue view"],
+    ["`sentry issue view <issue...>`", "sentry issue view"],
     [
       "`sentry project create [<org>/]<name>:<platform>...`",
       "sentry project create",

@@ -131,6 +131,7 @@ import * as dbUser from "../../../src/lib/db/user.js";
 import {
   ApiError,
   AuthError,
+  MalformedAuthTokenError,
   ValidationError,
 } from "../../../src/lib/errors.js";
 
@@ -150,11 +151,13 @@ vi.mock("../../../src/lib/interactive-login.js", async (importOriginal) => {
 // biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
 import * as interactiveLogin from "../../../src/lib/interactive-login.js";
 import type { SentryCliRcConfig } from "../../../src/lib/sentryclirc.js";
+import { useEnvSandbox } from "../../helpers.js";
 
 type LoginFlags = {
   readonly token?: string;
   readonly timeout: number;
   readonly force: boolean;
+  readonly url?: string;
   readonly "read-only"?: boolean;
   readonly scope?: readonly string[];
 };
@@ -213,6 +216,8 @@ function expectTokenStored(
 }
 
 describe("loginCommand.func --token path", () => {
+  useEnvSandbox(["SENTRY_HOST", "SENTRY_URL"]);
+
   let isAuthenticatedSpy: ReturnType<typeof spyOn>;
   let isEnvTokenActiveSpy: ReturnType<typeof spyOn>;
   let setAuthTokenSpy: ReturnType<typeof spyOn>;
@@ -332,6 +337,59 @@ describe("loginCommand.func --token path", () => {
     const out = getStdout();
     expect(out).toContain("Authenticated");
     expect(out).toContain("Jane Doe");
+  });
+
+  test.each([
+    ["line break", "synthetic-prefix\nsynthetic-suffix"],
+    ["NUL", "synthetic-prefix\0synthetic-suffix"],
+    ["empty value", ""],
+    ["control-only value", "\x01\x7f"],
+  ])("--force --token rejects %s before changing the session or host", async (_, token) => {
+    isAuthenticatedSpy.mockReturnValue(true);
+    process.env.SENTRY_HOST = "https://previous.example.com";
+    process.env.SENTRY_URL = "https://previous.example.com";
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    try {
+      const { context } = createContext();
+      await expect(
+        func.call(context, {
+          token,
+          force: true,
+          timeout: 900,
+          url: "https://replacement.example.com",
+        })
+      ).rejects.toBeInstanceOf(MalformedAuthTokenError);
+
+      expect(process.env.SENTRY_HOST).toBe("https://previous.example.com");
+      expect(process.env.SENTRY_URL).toBe("https://previous.example.com");
+      expect(clearAuthSpy).not.toHaveBeenCalled();
+      expect(setAuthTokenSpy).not.toHaveBeenCalled();
+      expect(setUserInfoSpy).not.toHaveBeenCalled();
+      expect(getUserRegionsSpy).not.toHaveBeenCalled();
+      expect(getCurrentUserSpy).not.toHaveBeenCalled();
+      expect(runInteractiveLoginSpy).not.toHaveBeenCalled();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  test.each([
+    "\t\n\u00a0synthetic-token\r\n",
+    "\0\u00a0\x01synthetic-token\x7f\ufeff\0",
+  ])("--token normalizes surrounding whitespace and controls before storage %#", async (token) => {
+    isAuthenticatedSpy.mockReturnValue(false);
+    setAuthTokenSpy.mockReturnValue(undefined);
+    getUserRegionsSpy.mockResolvedValue([]);
+    getCurrentUserSpy.mockResolvedValue(SAMPLE_USER);
+    setUserInfoSpy.mockReturnValue(undefined);
+
+    const { context } = createContext();
+    await func.call(context, { token, force: false, timeout: 900 });
+
+    expectTokenStored(setAuthTokenSpy, "synthetic-token");
+    expect(runInteractiveLoginSpy).not.toHaveBeenCalled();
   });
 
   test("--token: null user.name is converted to undefined in setUserInfo", async () => {

@@ -285,6 +285,25 @@ describe("injectDebugId", () => {
     expect(jsAfterSecond).toBe(jsAfterFirst);
   });
 
+  test("skipSnippet: true preserves an existing map ID without runtime registration", async () => {
+    const jsPath = join(tmpDir, "bundle.js");
+    const mapPath = `${jsPath}.map`;
+    const debugId = "11111111-2222-5333-9444-555555555555";
+    const js = 'console.log("hello");\n';
+    const map = JSON.stringify({ version: 3, mappings: "AAAA", debugId });
+    await writeFile(jsPath, js);
+    await writeFile(mapPath, map);
+
+    expect(await injectDebugId(jsPath, mapPath, { skipSnippet: true })).toEqual(
+      {
+        debugId,
+        wasInjected: false,
+      }
+    );
+    expect(await readFile(jsPath, "utf-8")).toBe(js);
+    expect(await readFile(mapPath, "utf-8")).toBe(map);
+  });
+
   test("normalizes backslashes in sourcemap sources array", async () => {
     const jsPath = join(tmpDir, "bundle.js");
     const mapPath = join(tmpDir, "bundle.js.map");

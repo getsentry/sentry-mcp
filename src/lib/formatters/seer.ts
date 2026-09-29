@@ -12,6 +12,7 @@ import type {
 } from "../../types/seer.js";
 import { ApiError, SeerError } from "../errors.js";
 import { cyan } from "./colors.js";
+import { filterFields } from "./json.js";
 import { escapeMarkdownInline, renderMarkdown } from "./markdown.js";
 
 // Spinner Frames
@@ -122,6 +123,26 @@ export function getProgressMessage(state: AutofixState): string {
 
 // Root Cause Formatting
 
+/** Root-cause output for one requested issue. */
+export type IssueExplainResult = {
+  /** Issue identifier as supplied by the caller. */
+  issue: string;
+  /** Resolved organization slug. */
+  org: string;
+  /** Resolved numeric issue identifier. */
+  issueId: string;
+  /** Root causes returned by Seer. */
+  rootCauses: RootCause[];
+};
+
+/** Aggregate root-cause output for single- and multi-issue invocations. */
+export type IssueExplainData = {
+  /** Successful issue analyses in request order. */
+  results: IssueExplainResult[];
+  /** Number of distinct issues requested before partial failures. */
+  requestedCount: number;
+};
+
 /**
  * Build a markdown document for a single root cause.
  *
@@ -161,6 +182,23 @@ function buildRootCauseMarkdown(cause: RootCause, index: number): string {
   return lines.join("\n");
 }
 
+function buildRootCauseListMarkdown(causes: RootCause[]): string {
+  const lines = ["## Root Cause Analysis Complete", ""];
+
+  if (causes.length === 0) {
+    lines.push("*No root causes identified.*");
+  } else {
+    for (let index = 0; index < causes.length; index++) {
+      const cause = causes[index];
+      if (cause) {
+        lines.push(buildRootCauseMarkdown(cause, index));
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
+
 /**
  * Format all root causes as rendered terminal output.
  *
@@ -168,23 +206,57 @@ function buildRootCauseMarkdown(cause: RootCause, index: number): string {
  * @returns Rendered terminal string
  */
 export function formatRootCauseList(causes: RootCause[]): string {
-  const lines: string[] = [];
+  return renderMarkdown(buildRootCauseListMarkdown(causes));
+}
 
-  lines.push("## Root Cause Analysis Complete");
-  lines.push("");
-
-  if (causes.length === 0) {
-    lines.push("*No root causes identified.*");
-  } else {
-    for (let i = 0; i < causes.length; i++) {
-      const cause = causes[i];
-      if (cause) {
-        lines.push(buildRootCauseMarkdown(cause, i));
-      }
-    }
+/**
+ * Format one or more issue analyses for terminal output.
+ *
+ * @param data - Aggregate issue analysis output
+ * @returns The historical single-issue output or labeled issue sections
+ */
+export function formatIssueExplain(data: IssueExplainData): string {
+  if (data.requestedCount <= 1) {
+    return data.results[0]
+      ? formatRootCauseList(data.results[0].rootCauses)
+      : "";
   }
 
-  return renderMarkdown(lines.join("\n"));
+  const sections = data.results.map(
+    (result) =>
+      `# ${escapeMarkdownInline(result.issue)}\n\n${buildRootCauseListMarkdown(result.rootCauses)}`
+  );
+  return renderMarkdown(sections.join("\n\n---\n\n"));
+}
+
+/**
+ * Transform issue analyses for JSON output.
+ *
+ * A single requested issue preserves the historical array of root causes.
+ * Multiple issues return labeled envelopes so each cause remains attributable
+ * to its issue. Field filtering applies to each root-cause object.
+ *
+ * @param data - Aggregate issue analysis output
+ * @param fields - Optional root-cause fields to retain
+ * @returns Root causes for one issue, otherwise labeled result envelopes
+ */
+export function jsonTransformIssueExplain(
+  data: IssueExplainData,
+  fields?: string[]
+): unknown {
+  const filterRootCauses = (rootCauses: RootCause[]): unknown =>
+    fields && fields.length > 0 ? filterFields(rootCauses, fields) : rootCauses;
+
+  if (data.requestedCount <= 1) {
+    return data.results[0] ? filterRootCauses(data.results[0].rootCauses) : [];
+  }
+
+  return data.results.map((result) => ({
+    issue: result.issue,
+    org: result.org,
+    issueId: result.issueId,
+    rootCauses: filterRootCauses(result.rootCauses),
+  }));
 }
 
 // Error Messages

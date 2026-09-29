@@ -68,14 +68,15 @@ import {
   getSynonymSuggestionFromArgv,
 } from "./lib/command-suggestions.js";
 import { CLI_VERSION } from "./lib/constants.js";
+import { redactCredentialText } from "./lib/credential-redaction.js";
 import { reportCliError } from "./lib/error-reporting.js";
 import {
   ApiError,
   AuthError,
   CliError,
+  formatError,
   getExitCode,
   OutputError,
-  stringifyUnknown,
   WizardError,
 } from "./lib/errors.js";
 import { error as errorColor, warning } from "./lib/formatters/colors.js";
@@ -383,7 +384,7 @@ const customText: ApplicationText = {
     // user mistakes, not real errors.
     const synonymResult = formatSynonymError(exc, ansiColor);
     if (synonymResult) {
-      return synonymResult;
+      return redactCredentialText(synonymResult);
     }
 
     // Report command errors to Sentry with stable fingerprinting. Stricli
@@ -400,12 +401,12 @@ const customText: ApplicationText = {
         return "";
       }
       const prefix = ansiColor ? errorColor("Error:") : "Error:";
-      return `${prefix} ${exc.format()}`;
+      return `${prefix} ${formatError(exc)}`;
     }
     if (exc instanceof Error) {
-      return `Unexpected error: ${exc.stack ?? exc.message}`;
+      return `Unexpected error: ${redactCredentialText(exc.stack ?? exc.message)}`;
     }
-    return `Unexpected error: ${stringifyUnknown(exc)}`;
+    return `Unexpected error: ${formatError(exc)}`;
   },
 };
 

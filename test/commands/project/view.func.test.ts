@@ -90,14 +90,16 @@ describe("viewCommand.func", () => {
   // so we mock tryGetPrimaryDsn to control DSN resolution.
   const tryGetPrimaryDsnSpy = vi.mocked(apiClient.tryGetPrimaryDsn);
   const resolveAllTargetsSpy = vi.mocked(resolveTarget.resolveAllTargets);
-  const resolveProjectBySlugSpy = vi.mocked(resolveTarget.resolveProjectBySlug);
+  const resolveProjectBoundSlugSpy = vi.mocked(
+    resolveTarget.resolveProjectBoundSlug
+  );
   const openInBrowserSpy = vi.mocked(browser.openInBrowser);
 
   afterEach(() => {
     getProjectSpy.mockReset();
     tryGetPrimaryDsnSpy.mockReset();
     resolveAllTargetsSpy.mockReset();
-    resolveProjectBySlugSpy.mockReset();
+    resolveProjectBoundSlugSpy.mockReset();
     openInBrowserSpy.mockReset();
   });
 
@@ -182,7 +184,7 @@ describe("viewCommand.func", () => {
   });
 
   test("project search resolves and fetches project", async () => {
-    resolveProjectBySlugSpy.mockResolvedValue({
+    resolveProjectBoundSlugSpy.mockResolvedValue({
       org: "acme",
       project: "frontend",
     });
@@ -195,7 +197,7 @@ describe("viewCommand.func", () => {
     const func = await viewCommand.loader();
     await func.call(context, { json: true, web: false }, "frontend");
 
-    expect(resolveProjectBySlugSpy).toHaveBeenCalledWith(
+    expect(resolveProjectBoundSlugSpy).toHaveBeenCalledWith(
       "frontend",
       "sentry project view <org>/<project>",
       "sentry project view <org>/frontend",
@@ -306,7 +308,7 @@ describe("viewCommand.func", () => {
   });
 
   test("non-auth API error on project-search target is rethrown verbatim", async () => {
-    resolveProjectBySlugSpy.mockResolvedValue({
+    resolveProjectBoundSlugSpy.mockResolvedValue({
       org: "acme",
       project: "frontend",
     });

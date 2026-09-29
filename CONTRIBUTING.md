@@ -31,13 +31,13 @@ View commands use **optional positional arguments** for the primary identifier, 
 ```bash
 sentry org view [org-slug] [--json] [-w]                       # works with DSN if no arg
 sentry project view [<org>/<project>] [--json] [-w]            # works with DSN if no arg
-sentry issue view <issue-id> [--json] [-w]                     # issue ID required
+sentry issue view <issue-id> [<issue-id>...] [--json] [-w]     # one or more issue IDs
 sentry event view [<org>/<project>] <event-id> [--json] [-w]   # event ID required
 ```
 
 **Key insight**: `org view` and `project view` mirror `gh repo view` - works in context (DSN) or with explicit arg.
 
-**Browser flag**: All view commands support `-w` (or `--web`) to open the resource in your default browser instead of displaying it in the terminal.
+**Browser flag**: All view commands support `-w` (or `--web`) to open the resource in your default browser instead of displaying it in the terminal. Batch `issue view` opens at most 5 tabs unless `--force` is passed.
 
 ## Context Resolution
 

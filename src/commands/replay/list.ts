@@ -44,7 +44,7 @@ import {
   getReplayUserLabel,
   parseReplayEnvironmentFilter,
 } from "../../lib/replay-search.js";
-import { resolveOrgOptionalProjectFromArg } from "../../lib/resolve-target.js";
+import { resolveOrgOptionalFromArg } from "../../lib/resolve-target.js";
 import { sanitizeQuery } from "../../lib/search-query.js";
 import {
   appendPeriodHint,
@@ -328,11 +328,7 @@ export const listCommand = buildListCommand("replay", {
     const environment = parseReplayEnvironmentFilter(flags.environment);
     const { query } = flags;
 
-    const resolved = await resolveOrgOptionalProjectFromArg(
-      target,
-      cwd,
-      COMMAND_NAME
-    );
+    const resolved = await resolveOrgOptionalFromArg(target, cwd, COMMAND_NAME);
 
     const contextKey = buildPaginationContextKey(
       "replay",

@@ -5,11 +5,32 @@
  * and targetArgToTraceTarget from src/lib/trace-target.ts.
  */
 
-import { describe, expect, test } from "vitest";
-import { ContextError, ValidationError } from "../../src/lib/errors.js";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+
+vi.mock("../../src/lib/api-client.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../src/lib/api-client.js")>();
+  return Object.fromEntries(
+    Object.entries(actual).map(([key, value]) => [
+      key,
+      typeof value === "function" ? vi.fn(value) : value,
+    ])
+  );
+});
+
+// biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
+import * as apiClient from "../../src/lib/api-client.js";
+import {
+  ContextError,
+  ResolutionError,
+  ValidationError,
+} from "../../src/lib/errors.js";
 import {
   parseSlashSeparatedTraceTarget,
   parseTraceTarget,
+  resolveTraceOrg,
+  resolveTraceOrgOptionalProject,
+  resolveTraceOrgProject,
   targetArgToTraceTarget,
 } from "../../src/lib/trace-target.js";
 
@@ -116,9 +137,82 @@ describe("targetArgToTraceTarget", () => {
     }
   });
 
+  test("preserves scoped display-name metadata", () => {
+    const result = targetArgToTraceTarget("my-org/My Project", VALID_TRACE_ID);
+    expect(result).toMatchObject({
+      type: "project-search",
+      org: "my-org",
+      projectSlug: "My Project",
+      originalSlug: "My Project",
+    });
+  });
+
   test("empty string → auto-detect", () => {
     const result = targetArgToTraceTarget("", VALID_TRACE_ID);
     expect(result.type).toBe("auto-detect");
+  });
+});
+
+describe("trace target resolution", () => {
+  let findProjectsBySlugSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    findProjectsBySlugSpy = vi.spyOn(apiClient, "findProjectsBySlug");
+  });
+
+  afterEach(() => {
+    findProjectsBySlugSpy.mockRestore();
+  });
+
+  test("org-only mode uses the parent org of a matching bare project", async () => {
+    findProjectsBySlugSpy.mockResolvedValue({
+      projects: [
+        {
+          id: "1",
+          slug: "frontend",
+          name: "Frontend",
+          orgSlug: "project-owner",
+        },
+      ],
+      orgs: [{ slug: "project-owner", name: "Project Owner" }],
+    });
+    const parsed = targetArgToTraceTarget("frontend", VALID_TRACE_ID);
+
+    const resolved = await resolveTraceOrg(
+      parsed,
+      "/tmp",
+      "sentry trace logs [<org>/[<project>/]]<trace-id>"
+    );
+
+    expect(resolved.org).toBe("project-owner");
+  });
+
+  test("project-bound errors preserve the full trace usage hint", async () => {
+    findProjectsBySlugSpy.mockResolvedValue({ projects: [], orgs: [] });
+    const parsed = targetArgToTraceTarget("missing", VALID_TRACE_ID);
+    const usageHint = "sentry span view [<org>/<project>/]<span-id>";
+
+    try {
+      await resolveTraceOrgProject(parsed, "/tmp", usageHint);
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ResolutionError);
+      expect((error as ResolutionError).hint).toBe(usageHint);
+    }
+  });
+
+  test("org-capable errors preserve the full trace usage hint", async () => {
+    findProjectsBySlugSpy.mockResolvedValue({ projects: [], orgs: [] });
+    const parsed = targetArgToTraceTarget("missing", VALID_TRACE_ID);
+    const usageHint = "sentry trace view [<org>/<project>/]<trace-id>";
+
+    try {
+      await resolveTraceOrgOptionalProject(parsed, "/tmp", usageHint);
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ResolutionError);
+      expect((error as ResolutionError).hint).toBe(usageHint);
+    }
   });
 });
 

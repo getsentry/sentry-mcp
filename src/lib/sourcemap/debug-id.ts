@@ -23,6 +23,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { UUID_DASH_RE } from "../hex-id.js";
 import { logger } from "../logger.js";
+import { isLikelyBinary } from "../scan/binary.js";
 import {
   type DecodedInlineMap,
   encodeInlineSourcemap,
@@ -35,6 +36,26 @@ const DEBUGID_COMMENT_PREFIX = "//# debugId=";
 
 /** Regex to extract an existing debug ID from a JS file. @internal */
 export const EXISTING_DEBUGID_RE = /\/\/# debugId=([0-9a-fA-F-]{36})/;
+
+/** Indexed registry writes emitted by Sentry's bundler plugins and legacy CLI. */
+const DEBUGID_REGISTRATION_RE =
+  /(?:\.\s*_sentryDebugIds|\[\s*["']_sentryDebugIds["']\s*\])\s*\[\s*[$\w]+\s*\]\s*=\s*(["'])([0-9a-fA-F-]{36})\1/g;
+
+/**
+ * Recognize a Sentry runtime snippet registering the selected debug ID.
+ * SDK registry reads and ECMA-426 comments alone do not register a bundle.
+ * Match the writer rather than the identifier marker, which the legacy CLI
+ * does not emit. This recognizes emitted snippets, not arbitrary JavaScript.
+ * @internal
+ */
+export function hasDebugIdRegistration(js: string, debugId: string): boolean {
+  for (const match of js.matchAll(DEBUGID_REGISTRATION_RE)) {
+    if (match[2]?.toLowerCase() === debugId.toLowerCase()) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Read a pre-existing debug ID off a parsed sourcemap.
@@ -141,10 +162,12 @@ export function prependDebugIdSnippet(
  * This is used by the CLI's own build pipeline where the debug ID is
  * registered in source code (`constants.ts`) instead of via the IIFE.
  *
- * The operation is **idempotent** — files that already contain a
- * `//# debugId=` comment are returned unchanged. A debug ID already present
- * on the sourcemap is likewise adopted as-is, leaving both files untouched
- * (see {@link readSourcemapDebugId}).
+ * Existing IDs are preserved (JS comment first, then sourcemap). Files with
+ * a runtime registration for that ID are left untouched to preserve SRI.
+ * Otherwise the missing snippet is injected under the existing ID. In
+ * metadata-only mode, an existing ID is sufficient to leave files untouched.
+ * Binary bundles with an existing ID are also preserved: adding JavaScript
+ * would corrupt bytecode such as Hermes bundles.
  *
  * @param jsPath - Path to the JavaScript file
  * @param mapPath - Path to the companion `.map` file
@@ -157,28 +180,29 @@ export async function injectDebugId(
   mapPath: string,
   options?: { skipSnippet?: boolean }
 ): Promise<{ debugId: string; wasInjected: boolean }> {
-  const [jsContent, mapContent] = await Promise.all([
-    readFile(jsPath, "utf-8"),
+  const [jsBytes, mapContent] = await Promise.all([
+    readFile(jsPath),
     readFile(mapPath, "utf-8"),
   ]);
+  const jsContent = jsBytes.toString("utf-8");
 
-  // Idempotent: if the JS file already has a debug ID, extract and return it
-  const existingMatch = jsContent.match(EXISTING_DEBUGID_RE);
-  if (existingMatch?.[1]) {
-    return { debugId: existingMatch[1], wasInjected: false };
+  const skipSnippet = options?.skipSnippet ?? false;
+  const skipRuntimeCheck = skipSnippet || isLikelyBinary(jsBytes);
+  const jsDebugId = jsContent.match(EXISTING_DEBUGID_RE)?.[1];
+  if (
+    jsDebugId &&
+    (skipRuntimeCheck || hasDebugIdRegistration(jsContent, jsDebugId))
+  ) {
+    return { debugId: jsDebugId, wasInjected: false };
   }
 
   const map = JSON.parse(mapContent) as SourcemapJson;
-
-  // The JS carries no comment, but the map may already have been stamped by a
-  // bundler plugin that intentionally left the bundle alone. Adopt that ID and
-  // touch neither file: the bundle already registers it via the plugin's own
-  // `_sentryDebugIds` writer (a second snippet under a different stack key
-  // would make the runtime mapping ambiguous), and the map's `mappings` line
-  // up with the un-offset bundle.
-  const mapDebugId = readSourcemapDebugId(map);
-  if (mapDebugId) {
-    return { debugId: mapDebugId, wasInjected: false };
+  const existingId = jsDebugId ?? readSourcemapDebugId(map);
+  if (
+    existingId &&
+    (skipRuntimeCheck || hasDebugIdRegistration(jsContent, existingId))
+  ) {
+    return { debugId: existingId, wasInjected: false };
   }
 
   // Derive the debug ID from the minified JS content combined with the
@@ -190,8 +214,7 @@ export async function injectDebugId(
   // separator can't occur in JS/JSON text, so the two inputs can't bleed
   // across the boundary. Collisions now require both files to be
   // byte-identical, in which case sharing an ID is correct.
-  const debugId = contentToDebugId(`${jsContent}\0${mapContent}`);
-  const skipSnippet = options?.skipSnippet ?? false;
+  const debugId = existingId ?? contentToDebugId(`${jsContent}\0${mapContent}`);
 
   // --- Mutate JS file ---
   let newJs: string;
@@ -203,8 +226,9 @@ export async function injectDebugId(
     // Full mode: prepend the runtime IIFE snippet (for user-facing injection).
     newJs = prependDebugIdSnippet(jsContent, getDebugIdSnippet(debugId));
   }
-  // Append debug ID comment at the end
-  newJs += `\n${DEBUGID_COMMENT_PREFIX}${debugId}\n`;
+  if (!jsDebugId) {
+    newJs += `\n${DEBUGID_COMMENT_PREFIX}${debugId}\n`;
+  }
 
   // --- Mutate sourcemap ---
   mutateSourcemap(map, debugId, { offsetMappings: !skipSnippet });
@@ -282,8 +306,8 @@ const INLINE_DIRECTIVE_RE =
  * place**, so the file stays self-contained. Only the **last** inline
  * directive is rewritten.
  *
- * Idempotent — files already carrying a `//# debugId=` comment are unchanged,
- * as are files whose decoded inline map already carries a debug ID.
+ * Existing IDs from the JS comment or decoded map are reused. Files already
+ * registering that ID at runtime are left unchanged.
  *
  * @param jsPath - Path to the JavaScript file
  * @param decoded - The decoded inline sourcemap and its re-encode metadata
@@ -302,36 +326,29 @@ export async function injectInlineDebugId(
 }> {
   // Full read required: the directive lives in the file body and must be
   // rewritten in place.
-  const jsContent = await readFile(jsPath, "utf-8");
+  const jsBytes = await readFile(jsPath);
+  const jsContent = jsBytes.toString("utf-8");
+
+  const jsDebugId = jsContent.match(EXISTING_DEBUGID_RE)?.[1];
+  const existingId = jsDebugId ?? readSourcemapDebugId(decoded.map);
+  if (
+    existingId &&
+    (isLikelyBinary(jsBytes) || hasDebugIdRegistration(jsContent, existingId))
+  ) {
+    return {
+      debugId: existingId,
+      wasInjected: false,
+      injectedMapContent: Buffer.from(decoded.json),
+    };
+  }
 
   // Derive from the minified JS content combined with the (decoded) inline
   // sourcemap, mirroring the external path so distinct chunks that share a
   // byte-identical inline map still get distinct debug IDs
   // (getsentry/sentry-cli#3350). `jsContent` already embeds the inline map,
   // so this is belt-and-suspenders, but keeps the two paths symmetric.
-  const debugId = contentToDebugId(`${jsContent}\0${decoded.json}`);
-
-  // Idempotent: if already injected, return the existing ID without writing.
-  const existingMatch = jsContent.match(EXISTING_DEBUGID_RE);
-  if (existingMatch?.[1]) {
-    return {
-      debugId: existingMatch[1],
-      wasInjected: false,
-      injectedMapContent: Buffer.from(decoded.json),
-    };
-  }
-
-  // Same rule as the external path: a debug ID already stamped on the map by a
-  // bundler plugin is adopted verbatim, leaving the JS (and its embedded map)
-  // untouched. Upload the map exactly as decoded.
-  const mapDebugId = readSourcemapDebugId(decoded.map);
-  if (mapDebugId) {
-    return {
-      debugId: mapDebugId,
-      wasInjected: false,
-      injectedMapContent: Buffer.from(decoded.json),
-    };
-  }
+  const debugId =
+    existingId ?? contentToDebugId(`${jsContent}\0${decoded.json}`);
 
   // Locate the LAST inline directive to rewrite. If it can't be found (the
   // discovery parser and this regex disagree on an edge case), abort WITHOUT
@@ -366,7 +383,9 @@ export async function injectInlineDebugId(
     jsContent.slice(end);
 
   let newJs = prependDebugIdSnippet(rewritten, getDebugIdSnippet(debugId));
-  newJs += `\n${DEBUGID_COMMENT_PREFIX}${debugId}\n`;
+  if (!jsDebugId) {
+    newJs += `\n${DEBUGID_COMMENT_PREFIX}${debugId}\n`;
+  }
 
   await writeFile(jsPath, newJs);
 

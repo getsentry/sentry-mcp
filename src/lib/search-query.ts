@@ -10,6 +10,10 @@
  * - **OR**: Attempted rewrite to in-list syntax (`key:[val1,val2]`)
  *   when all OR operands share the same qualifier key. Throws a
  *   {@link ValidationError} when the rewrite is not possible.
+ * - **`project:<digits>`**: `project` is the slug. Numeric ids belong on
+ *   `project_id`. Agents often paste `project:4511…` (CLI-FA). Rewritten
+ *   with a warning. Slugs, `project_id:…`, and namespaced keys
+ *   (`bolt.project_id`) are left alone.
  *
  * Parsing uses a pre-compiled PEG parser generated from
  * `script/search-query.pegjs` (a simplified version of Sentry's
@@ -346,21 +350,19 @@ export function sanitizeQuery(query: string | undefined): string | undefined {
   // These fix common patterns that agents/users produce, regardless of
   // whether the PEG parser would accept them.
   const normalized = normalizeQuery(query);
+  const withNumericProject = rewriteNumericProjectFilters(normalized);
+  const notes = preParseRewriteNotes(query, normalized, withNumericProject);
 
   let nodes: SearchNode[];
-  // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
   try {
-    nodes = parse(normalized);
-  } catch {
+    nodes = parse(withNumericProject);
+  } catch (err) {
     // PEG parse still failed after normalization — pass through to the
-    // API which returns a proper 400 with actionable details.
-    return normalized;
-  }
-
-  if (normalized !== query) {
-    log.warn(
-      `Auto-repaired search query syntax. Running query: "${normalized}"`
-    );
+    // API which returns a proper 400 with actionable details. The text
+    // rewrites already ran, so say so: the 400 will quote them.
+    log.debug("Search query did not parse; sending as-is", err);
+    warnRunningQuery(notes, withNumericProject);
+    return withNumericProject;
   }
 
   // Check for OR inside paren groups first — these are opaque and can't
@@ -382,37 +384,70 @@ export function sanitizeQuery(query: string | undefined): string | undefined {
   if (hasOr) {
     // Strip AND nodes before OR rewrite
     const withoutAnd = hasAnd ? stripAndNodes(nodes) : nodes;
-    return handleOr(withoutAnd, hasAnd);
+    const result = handleOr(withoutAnd, hasAnd, notes);
+    warnRunningQuery(notes, result);
+    return result;
   }
 
   if (hasAnd) {
     const sanitized = serializeNodes(stripAndNodes(nodes));
-    log.warn(
-      "Sentry search implicitly ANDs terms — removed explicit AND operator. " +
-        `Running query: "${sanitized}"`
+    notes.push(
+      "Sentry search implicitly ANDs terms — removed explicit AND operator."
     );
+    warnRunningQuery(notes, sanitized);
     return sanitized;
   }
 
-  return normalized;
+  warnRunningQuery(notes, withNumericProject);
+  return withNumericProject;
+}
+
+/** Notes from text-layer rewrites that run before PEG parse. */
+function preParseRewriteNotes(
+  query: string,
+  normalized: string,
+  withNumericProject: string
+): string[] {
+  const notes: string[] = [];
+  if (normalized !== query) {
+    notes.push("Auto-repaired search query syntax.");
+  }
+  if (withNumericProject !== normalized) {
+    notes.push(
+      "`project` is the slug; numeric ids use project_id. Rewrote numeric project: filters."
+    );
+  }
+  return notes;
+}
+
+/**
+ * One warning after every successful rewrite. Reasons on the first
+ * line; the query that will actually be sent on the second. Skip if
+ * nothing changed.
+ */
+function warnRunningQuery(notes: string[], result: string): void {
+  if (notes.length === 0) {
+    return;
+  }
+  log.warn(`${notes.join(" ")}\nRunning query: "${result}"`);
 }
 
 /**
  * Handle the OR rewrite path — extracted to keep `sanitizeQuery` under
  * the cognitive complexity limit.
  */
-function handleOr(nodes: SearchNode[], hasAnd: boolean): string {
+function handleOr(
+  nodes: SearchNode[],
+  hasAnd: boolean,
+  notes: string[]
+): string {
   const rewritten = tryRewriteOr(nodes);
   if (rewritten) {
-    const result = serializeNodes(rewritten);
-    const notes: string[] = [];
     notes.push("Rewrote OR using in-list syntax: key:[val1,val2].");
     if (hasAnd) {
       notes.push("Also removed explicit AND (implicit in Sentry search).");
     }
-    notes.push(`Running query: "${result}"`);
-    log.warn(notes.join(" "));
-    return result;
+    return serializeNodes(rewritten);
   }
 
   throw new ValidationError(
@@ -512,12 +547,38 @@ const BALANCED_BRACKET_RE = /\[[^\]]*\]/g;
 const TRAILING_LIST_COMMA_RE = /,\s*\]$/;
 
 /**
+ * `project:<digits>` as its own filter — not `bolt.project`, not `project_id`.
+ * Issue search treats `project` as a slug and `project_id` as a numeric id.
+ */
+const PROJECT_NUMERIC_RE = /(^|\s)(!?)project:(\d+)(?=\s|$)/gi;
+
+/** `project:[123,456]` — every list value must be digits. */
+const PROJECT_NUMERIC_LIST_RE = /(^|\s)(!?)project:\[(\d+(?:\s*,\s*\d+)*)\]/gi;
+
+/**
  * Pattern that splits a query into alternating unquoted / quoted segments.
  *
  * Matches double-quoted strings (including escaped quotes inside them).
  * Between matches is unquoted text that can be safely normalized.
  */
 const QUOTED_SEGMENT_RE = /"(?:[^"\\]|\\.)*"/g;
+
+/**
+ * Rewrite `project:<digits>` / `project:[digits,…]` to `project_id`.
+ *
+ * `project` is the slug; a numeric value is almost always a pasted Sentry
+ * project id (CLI-FA). Namespaced keys (`bolt.project:…`) and slugs are
+ * untouched. Quoted regions are preserved via {@link transformUnquoted}.
+ */
+function rewriteNumericProjectFilters(query: string): string {
+  return transformUnquoted(query, (segment) => {
+    PROJECT_NUMERIC_RE.lastIndex = 0;
+    PROJECT_NUMERIC_LIST_RE.lastIndex = 0;
+    return segment
+      .replace(PROJECT_NUMERIC_RE, "$1$2project_id:$3")
+      .replace(PROJECT_NUMERIC_LIST_RE, "$1$2project_id:[$3]");
+  });
+}
 
 /**
  * Normalize a search query by applying a pipeline of text repairs.

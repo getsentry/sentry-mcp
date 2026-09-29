@@ -60,7 +60,7 @@ describe("alert issues delete", () => {
   beforeEach(() => {
     getRuleSpy = vi.spyOn(apiClient, "getIssueAlertRule");
     deleteRuleSpy = vi.spyOn(apiClient, "deleteIssueAlertRule");
-    resolveSpy = vi.spyOn(resolveTarget, "resolveTargetsFromParsedArg");
+    resolveSpy = vi.spyOn(resolveTarget, "resolveProjectBoundTargets");
 
     getRuleSpy.mockResolvedValue(sampleRule);
     deleteRuleSpy.mockResolvedValue(undefined);

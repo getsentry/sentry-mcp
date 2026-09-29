@@ -11,6 +11,7 @@
 // biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
 import * as Sentry from "@sentry/node-core/light";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { formatAuthHeader } from "../../src/lib/auth-header.js";
 import {
   classifySilenced,
   enrichEventWithGroupingTags,
@@ -26,6 +27,7 @@ import {
   ConfigError,
   ContextError,
   HostScopeError,
+  MalformedAuthTokenError,
   OutputError,
   ResolutionError,
   SeerError,
@@ -225,9 +227,12 @@ describe("classifySilenced", () => {
   });
 
   test("silences AuthError(invalid)", () => {
-    // `invalid` is only thrown for a genuine 401/403 (a bad/insufficient token
-    // the user supplied), so it is an expected auth state like the others.
+    // Rejected credentials stay silenced; malformed tokens use a subclass.
     expect(classifySilenced(new AuthError("invalid"))).toBe("auth_expected");
+  });
+
+  test("does NOT silence MalformedAuthTokenError", () => {
+    expect(classifySilenced(new MalformedAuthTokenError())).toBeNull();
   });
 
   test.each([
@@ -579,6 +584,36 @@ describe("reportCliError integration", () => {
         }),
       })
     );
+  });
+
+  test("captures malformed-token failures once without retaining credentials", () => {
+    const firstPart = "sntrys_reporting-secret-first";
+    const secondPart = "reporting-secret-second";
+    let error: unknown;
+    try {
+      formatAuthHeader(`${firstPart}\n${secondPart}`);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(MalformedAuthTokenError);
+
+    const { tags, contexts } = capturedScopeTags(error);
+    expect(captureSpy).toHaveBeenCalledExactlyOnceWith(error);
+    expect(metricSpy).not.toHaveBeenCalled();
+    expect(tags).toMatchObject({
+      "cli_error.class": "MalformedAuthTokenError",
+      "cli_error.kind": "invalid",
+    });
+
+    const captured = captureSpy.mock.calls[0]?.[0] as Error;
+    expect(captured.cause).toBeUndefined();
+    const diagnostics = JSON.stringify({
+      properties: Object.getOwnPropertyDescriptors(captured),
+      tags,
+      contexts,
+    });
+    expect(diagnostics).not.toContain(firstPart);
+    expect(diagnostics).not.toContain(secondPart);
   });
 
   test("captures ApiError(400) with normalized endpoint tag", () => {

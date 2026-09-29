@@ -29,7 +29,7 @@ import {
   resolveLogProjectId,
   resolveOrg,
   resolveOrgAndProject,
-  resolveOrgOptionalProjectTarget,
+  resolveOrgOptionalTarget,
   resolveOrgsForListing,
   toNumericId,
   tryFuzzyProjectRecovery,
@@ -869,11 +869,11 @@ describe("tryFuzzyProjectRecovery", () => {
 });
 
 // ============================================================================
-// resolveOrgOptionalProjectTarget — org-optional resolution for commands
+// resolveOrgOptionalTarget — org-optional resolution for commands
 // that accept org-all mode (e.g., sentry explore)
 // ============================================================================
 
-describe("resolveOrgOptionalProjectTarget", () => {
+describe("resolveOrgOptionalTarget", () => {
   const getConfigDir = useTestConfigDir("test-resolve-optional-");
 
   let originalFetch: typeof globalThis.fetch;
@@ -900,7 +900,7 @@ describe("resolveOrgOptionalProjectTarget", () => {
     const parsed = parseOrgProjectArg("myorg/");
     expect(parsed.type).toBe("org-all");
 
-    const result = await resolveOrgOptionalProjectTarget(
+    const result = await resolveOrgOptionalTarget(
       parsed,
       getConfigDir(),
       "explore"
@@ -913,7 +913,7 @@ describe("resolveOrgOptionalProjectTarget", () => {
     const parsed = parseOrgProjectArg("myorg/myproject");
     expect(parsed.type).toBe("explicit");
 
-    const result = await resolveOrgOptionalProjectTarget(
+    const result = await resolveOrgOptionalTarget(
       parsed,
       getConfigDir(),
       "explore"
@@ -927,7 +927,7 @@ describe("resolveOrgOptionalProjectTarget", () => {
     const parsed = parseOrgProjectArg(undefined);
     expect(parsed.type).toBe("auto-detect");
 
-    const result = await resolveOrgOptionalProjectTarget(
+    const result = await resolveOrgOptionalTarget(
       parsed,
       getConfigDir(),
       "explore"
@@ -941,7 +941,7 @@ describe("resolveOrgOptionalProjectTarget", () => {
     const parsed = parseOrgProjectArg(undefined);
 
     await expect(
-      resolveOrgOptionalProjectTarget(parsed, getConfigDir(), "explore")
+      resolveOrgOptionalTarget(parsed, getConfigDir(), "explore")
     ).rejects.toThrow(ContextError);
   });
 
@@ -949,7 +949,7 @@ describe("resolveOrgOptionalProjectTarget", () => {
     const parsed = parseOrgProjectArg(undefined);
 
     try {
-      await resolveOrgOptionalProjectTarget(parsed, getConfigDir(), "explore");
+      await resolveOrgOptionalTarget(parsed, getConfigDir(), "explore");
       // Should not reach here
       expect(true).toBe(false);
     } catch (err) {

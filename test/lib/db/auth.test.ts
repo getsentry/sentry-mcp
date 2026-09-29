@@ -7,7 +7,7 @@
  * by property tests (isAuthenticated, getActiveEnvVarName).
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
   ANON_IDENTITY,
   clearAuth,
@@ -20,42 +20,17 @@ import {
   isAuthenticated,
   isEnvTokenActive,
   refreshToken,
-  resetAuthRowCache,
   resetAuthTokenCache,
   resetHasStoredCredsCache,
   resetIdentityFingerprintCache,
   setAuthToken,
 } from "../../../src/lib/db/auth.js";
 import { getDatabase } from "../../../src/lib/db/index.js";
-import { useTestConfigDir } from "../../helpers.js";
+import { MalformedAuthTokenError } from "../../../src/lib/errors.js";
+import { useEnvSandbox, useTestConfigDir } from "../../helpers.js";
 
 useTestConfigDir("auth-env-");
-
-let savedAuthToken: string | undefined;
-let savedSentryToken: string | undefined;
-
-beforeEach(() => {
-  savedAuthToken = process.env.SENTRY_AUTH_TOKEN;
-  savedSentryToken = process.env.SENTRY_TOKEN;
-  delete process.env.SENTRY_AUTH_TOKEN;
-  delete process.env.SENTRY_TOKEN;
-  resetIdentityFingerprintCache();
-  resetAuthTokenCache();
-  resetAuthRowCache();
-});
-
-afterEach(() => {
-  if (savedAuthToken !== undefined) {
-    process.env.SENTRY_AUTH_TOKEN = savedAuthToken;
-  } else {
-    delete process.env.SENTRY_AUTH_TOKEN;
-  }
-  if (savedSentryToken !== undefined) {
-    process.env.SENTRY_TOKEN = savedSentryToken;
-  } else {
-    delete process.env.SENTRY_TOKEN;
-  }
-});
+useEnvSandbox(["SENTRY_AUTH_TOKEN", "SENTRY_TOKEN", "SENTRY_FORCE_ENV_TOKEN"]);
 
 describe("env var auth: getAuthToken edge cases", () => {
   test("ignores empty SENTRY_AUTH_TOKEN", () => {
@@ -105,16 +80,6 @@ describe("env var auth: isEnvTokenActive edge case", () => {
 });
 
 describe("env var auth: getActiveEnvVarName", () => {
-  test("returns SENTRY_AUTH_TOKEN when that var is set", () => {
-    process.env.SENTRY_AUTH_TOKEN = "test_token";
-    expect(getActiveEnvVarName()).toBe("SENTRY_AUTH_TOKEN");
-  });
-
-  test("returns SENTRY_TOKEN when only that var is set", () => {
-    process.env.SENTRY_TOKEN = "test_token";
-    expect(getActiveEnvVarName()).toBe("SENTRY_TOKEN");
-  });
-
   test("prefers SENTRY_AUTH_TOKEN when both are set", () => {
     process.env.SENTRY_AUTH_TOKEN = "primary";
     process.env.SENTRY_TOKEN = "secondary";
@@ -164,13 +129,65 @@ describe("env var auth: refreshToken edge cases", () => {
 });
 
 describe("env var auth: getRawEnvToken", () => {
-  test("returns SENTRY_TOKEN when SENTRY_AUTH_TOKEN is unset", () => {
-    process.env.SENTRY_TOKEN = "fallback_token";
-    expect(getRawEnvToken()).toBe("fallback_token");
+  test.each([
+    "SENTRY_AUTH_TOKEN",
+    "SENTRY_TOKEN",
+  ] as const)("shares normalization and source selection for %s", (source) => {
+    process.env[source] = "\x01\u00a0synthetic-token\x7f";
+    expect(getRawEnvToken()).toBe("synthetic-token");
+    expect(getAuthToken()).toBe("synthetic-token");
+    expect(getAuthConfig()).toMatchObject({
+      token: "synthetic-token",
+      source: `env:${source}`,
+    });
+    expect(getActiveEnvVarName()).toBe(source);
+  });
+
+  test("keeps a control-only primary credential selected over the alias", () => {
+    process.env.SENTRY_AUTH_TOKEN = "\x01\x7f";
+    process.env.SENTRY_TOKEN = "secondary-token";
+    expect(getRawEnvToken()).toBe("\x01\x7f");
+    expect(getAuthConfig()).toMatchObject({
+      token: "\x01\x7f",
+      source: "env:SENTRY_AUTH_TOKEN",
+    });
+    expect(getActiveEnvVarName()).toBe("SENTRY_AUTH_TOKEN");
+  });
+
+  test("still selects the alias when the primary is only whitespace", () => {
+    process.env.SENTRY_AUTH_TOKEN = " \t\n\u00a0";
+    process.env.SENTRY_TOKEN = "\x01secondary-token\x7f";
+    expect(getRawEnvToken()).toBe("secondary-token");
+    expect(getActiveEnvVarName()).toBe("SENTRY_TOKEN");
   });
 
   test("returns undefined when no env var is set", () => {
     expect(getRawEnvToken()).toBeUndefined();
+  });
+});
+
+describe("stored credential validation", () => {
+  test("normalizes before SQLite can truncate surrounding NULs", () => {
+    setAuthToken("\0\u00a0stored-token\x7f\0", 3600, "refresh-token");
+    expect(getAuthConfig()).toMatchObject({
+      token: "stored-token",
+      refreshToken: "refresh-token",
+    });
+  });
+
+  test.each([
+    "prefix\0secret-tail",
+    "prefix\nsecret-tail",
+    "",
+    "\x01\x7f",
+  ])("rejects a malformed replacement without changing stored credentials %#", (token) => {
+    setAuthToken("previous-token", 3600, "previous-refresh-token");
+    const before = getDatabase().query("SELECT * FROM auth").get();
+    expect(() => setAuthToken(token, 60, "new-refresh-token")).toThrow(
+      MalformedAuthTokenError
+    );
+    expect(getDatabase().query("SELECT * FROM auth").get()).toEqual(before);
+    expect(getAuthToken()).toBe("previous-token");
   });
 });
 
@@ -316,7 +333,7 @@ describe("getIdentityFingerprint", () => {
     const fp = getIdentityFingerprint();
 
     // With no DB row, same env token should produce the same fingerprint.
-    setAuthToken("", -1);
+    getDatabase().query("DELETE FROM auth").run();
     resetIdentityFingerprintCache();
     expect(getIdentityFingerprint()).toBe(fp);
   });

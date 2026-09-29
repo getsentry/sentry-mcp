@@ -101,10 +101,7 @@ describe("feedback list", () => {
       slug: "test-project",
       name: "Test Project",
     });
-    resolveTargetSpy = vi.spyOn(
-      resolveTarget,
-      "resolveOrgOptionalProjectFromArg"
-    );
+    resolveTargetSpy = vi.spyOn(resolveTarget, "resolveOrgOptionalFromArg");
     resolveCursorSpy = vi.spyOn(paginationDb, "resolveCursor").mockReturnValue({
       cursor: undefined,
       direction: "next",

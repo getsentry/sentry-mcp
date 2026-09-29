@@ -494,9 +494,9 @@ describe("listCommand.func (trace mode)", () => {
 
 describe("listCommand.func (project mode)", () => {
   let func: ListFunc;
-  // span/list.ts calls resolveOrgProjectFromArg (not resolveOrgAndProject)
+  // span/list.ts calls resolveProjectBoundFromArg (not resolveOrgAndProject)
   const resolveOrgAndProjectSpy = vi.mocked(
-    resolveTarget.resolveOrgProjectFromArg
+    resolveTarget.resolveProjectBoundFromArg
   );
   const listSpansSpy = vi.mocked(apiClient.listSpans);
   const resolveCursorSpy = vi.mocked(paginationDb.resolveCursor);
@@ -527,7 +527,7 @@ describe("listCommand.func (project mode)", () => {
 
   beforeEach(async () => {
     func = (await listCommand.loader()) as unknown as ListFunc;
-    // Mock resolveOrgProjectFromArg to parse explicit "org/project" targets
+    // Mock resolveProjectBoundFromArg to parse explicit "org/project" targets
     // and fall back to a default for auto-detect (no target).
     resolveOrgAndProjectSpy.mockImplementation(
       async (target: string | undefined) => {
@@ -611,7 +611,7 @@ describe("listCommand.func (project mode)", () => {
       "my-project",
       expect.anything()
     );
-    // resolveOrgProjectFromArg is called with the explicit target
+    // resolveProjectBoundFromArg is called with the explicit target
     expect(resolveOrgAndProjectSpy).toHaveBeenCalledWith(
       "my-org/my-project",
       expect.any(String),

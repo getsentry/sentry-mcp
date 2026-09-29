@@ -144,15 +144,15 @@ describe("project delete", () => {
   let getProjectSpy: ReturnType<typeof spyOn>;
   let deleteProjectSpy: ReturnType<typeof spyOn>;
   let getOrganizationSpy: ReturnType<typeof spyOn>;
-  let resolveOrgProjectTargetSpy: ReturnType<typeof spyOn>;
+  let resolveProjectBoundTargetSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     getProjectSpy = vi.spyOn(apiClient, "getProject");
     deleteProjectSpy = vi.spyOn(apiClient, "deleteProject");
     getOrganizationSpy = vi.spyOn(apiClient, "getOrganization");
-    resolveOrgProjectTargetSpy = vi.spyOn(
+    resolveProjectBoundTargetSpy = vi.spyOn(
       resolveTarget,
-      "resolveOrgProjectTarget"
+      "resolveProjectBoundTarget"
     );
 
     // Default mocks
@@ -163,7 +163,7 @@ describe("project delete", () => {
       slug: "acme-corp",
       name: "Acme Corp",
     });
-    resolveOrgProjectTargetSpy.mockResolvedValue({
+    resolveProjectBoundTargetSpy.mockResolvedValue({
       org: "acme-corp",
       project: "my-app",
     });
@@ -173,7 +173,7 @@ describe("project delete", () => {
     getProjectSpy.mockRestore();
     deleteProjectSpy.mockRestore();
     getOrganizationSpy.mockRestore();
-    resolveOrgProjectTargetSpy.mockRestore();
+    resolveProjectBoundTargetSpy.mockRestore();
   });
 
   test("deletes project with explicit org/project and --yes", async () => {
@@ -190,12 +190,12 @@ describe("project delete", () => {
     expect(output).toContain("acme-corp/my-app");
   });
 
-  test("delegates to resolveOrgProjectTarget for resolution", async () => {
+  test("delegates to resolveProjectBoundTarget for resolution", async () => {
     const { context } = createMockContext();
     const func = await deleteCommand.loader();
     await func.call(context, defaultFlags, "acme-corp/my-app");
 
-    expect(resolveOrgProjectTargetSpy).toHaveBeenCalledWith(
+    expect(resolveProjectBoundTargetSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "explicit",
         org: "acme-corp",
@@ -206,12 +206,12 @@ describe("project delete", () => {
     );
   });
 
-  test("resolves bare slug via resolveOrgProjectTarget", async () => {
+  test("resolves bare slug via resolveProjectBoundTarget", async () => {
     const { context } = createMockContext();
     const func = await deleteCommand.loader();
     await func.call(context, defaultFlags, "my-app");
 
-    expect(resolveOrgProjectTargetSpy).toHaveBeenCalledWith(
+    expect(resolveProjectBoundTargetSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "project-search",
         projectSlug: "my-app",
@@ -417,7 +417,7 @@ describe("project delete", () => {
 describe("project delete — interactive confirmation", () => {
   let getProjectSpy: ReturnType<typeof spyOn>;
   let deleteProjectSpy: ReturnType<typeof spyOn>;
-  let resolveOrgProjectTargetSpy: ReturnType<typeof spyOn>;
+  let resolveProjectBoundTargetSpy: ReturnType<typeof spyOn>;
 
   function createPromptMockContext() {
     const stdoutWrite = vi.fn(() => true);
@@ -435,14 +435,14 @@ describe("project delete — interactive confirmation", () => {
     mockIsatty.mockReturnValue(true);
     getProjectSpy = vi.spyOn(apiClient, "getProject");
     deleteProjectSpy = vi.spyOn(apiClient, "deleteProject");
-    resolveOrgProjectTargetSpy = vi.spyOn(
+    resolveProjectBoundTargetSpy = vi.spyOn(
       resolveTarget,
-      "resolveOrgProjectTarget"
+      "resolveProjectBoundTarget"
     );
 
     getProjectSpy.mockResolvedValue(sampleProject);
     deleteProjectSpy.mockResolvedValue(undefined);
-    resolveOrgProjectTargetSpy.mockResolvedValue({
+    resolveProjectBoundTargetSpy.mockResolvedValue({
       org: "acme-corp",
       project: "my-app",
     });
@@ -454,7 +454,7 @@ describe("project delete — interactive confirmation", () => {
   afterEach(() => {
     getProjectSpy.mockRestore();
     deleteProjectSpy.mockRestore();
-    resolveOrgProjectTargetSpy.mockRestore();
+    resolveProjectBoundTargetSpy.mockRestore();
     mockIsatty.mockReturnValue(false);
   });
 

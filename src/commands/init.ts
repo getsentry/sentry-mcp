@@ -20,7 +20,6 @@
 import path from "node:path";
 import { setTag } from "@sentry/node-core/light";
 import type { SentryContext } from "../context.js";
-import { findProjectsBySlug } from "../lib/api/projects.js";
 import { looksLikePath, parseOrgProjectArg } from "../lib/arg-parsing.js";
 import { buildCommand } from "../lib/command.js";
 import { refreshToken } from "../lib/db/auth.js";
@@ -35,6 +34,7 @@ import {
   YES_ALIASES,
   YES_FLAG,
 } from "../lib/mutate-command.js";
+import { classifyProjectSearchTarget } from "../lib/resolve-target.js";
 
 const log = logger.withTag("init");
 
@@ -241,34 +241,33 @@ async function resolveTarget(targetArg: string | undefined): Promise<{
       validateResourceId(parsed.org, "organization slug");
       return { org: parsed.org, project: undefined };
     case "project-search": {
-      // Bare slug — could be an existing project name or a new project name.
-      // Search for an existing project first, then fall back to treating as
-      // the name for a new project to create.
-      const { projects, orgs } = await findProjectsBySlug(parsed.projectSlug);
+      const resolution = await classifyProjectSearchTarget(parsed, {
+        // A miss is a new project name for init, not a fuzzy recovery.
+        fuzzy: false,
+      });
 
       // Multiple matches — disambiguation error
-      if (projects.length > 1) {
-        const first = projects[0];
-        const orgList = projects
+      if (resolution.kind === "projects" && resolution.projects.length > 1) {
+        const first = resolution.projects[0];
+        const orgList = resolution.projects
           .map((p) => `  ${p.orgSlug}/${p.slug}`)
           .join("\n");
         throw new ValidationError(
           `Project "${parsed.projectSlug}" exists in multiple organizations.\n\n` +
             `Specify the organization:\n${orgList}\n\n` +
-            `Example: sentry init ${first?.orgSlug ?? "<org>"}/${parsed.projectSlug}`
+            `Example: sentry init ${first.orgSlug}/${parsed.projectSlug}`
         );
       }
 
       // Exactly one match — use it (wizard handles existing-project flow)
-      const [match] = projects;
-      if (match) {
+      if (resolution.kind === "projects") {
+        const match = resolution.projects[0];
         return { org: match.orgSlug, project: match.slug };
       }
 
       // No project found — is the slug an org name?
-      const isOrg = orgs.some((o) => o.slug === parsed.projectSlug);
-      if (isOrg) {
-        return { org: parsed.projectSlug, project: undefined };
+      if (resolution.kind === "organization") {
+        return { org: resolution.org, project: undefined };
       }
 
       // Truly not found — treat as the name for a new project to create.

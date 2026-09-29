@@ -66,8 +66,10 @@ import {
 } from "../../../lib/org-list.js";
 import { withProgress } from "../../../lib/polling.js";
 import {
+  classifyProjectSearchTarget,
+  type ProjectSearchTargetResolution,
   type ResolvedTarget,
-  resolveTargetsFromParsedArg,
+  resolveProjectBoundTargets,
 } from "../../../lib/resolve-target.js";
 import { buildIssueAlertsUrl } from "../../../lib/sentry-urls.js";
 import type { ProjectAliasEntry, Writer } from "../../../types/index.js";
@@ -120,7 +122,6 @@ type IssueAlertListResult = ListResult<IssueAlertRule> & {
 
 const issueAlertListMeta: ListCommandMeta = {
   paginationKey: PAGINATION_KEY,
-  entityName: "issue alert rule",
   entityPlural: "issue alert rules",
   commandPrefix: "sentry alert issues list",
 };
@@ -196,9 +197,26 @@ async function resolveWebUrl(
     return buildIssueAlertsUrl(parsed.org);
   }
 
-  const { targets } = await resolveTargetsFromParsedArg(parsed, {
+  let projectSearchResolution: ProjectSearchTargetResolution | undefined;
+  if (
+    parsed.type === "project-search" &&
+    parsed.org === undefined &&
+    parsed.originalSlug === undefined
+  ) {
+    const resolution = await classifyProjectSearchTarget(parsed);
+    if (resolution.kind === "organization") {
+      logger.warn(
+        `'${parsed.projectSlug}' is an organization, not a project. Opening organization '${resolution.org}'.`
+      );
+      return buildIssueAlertsUrl(resolution.org);
+    }
+    projectSearchResolution = resolution;
+  }
+
+  const { targets } = await resolveProjectBoundTargets(parsed, {
     cwd,
     usageHint: USAGE_HINT,
+    projectSearchResolution,
   });
   if (targets.length === 0) {
     throw new ContextError("Organization and project", USAGE_HINT);
@@ -226,17 +244,18 @@ type ResolvedTargetsOptions = {
   parsed: ReturnType<typeof parseOrgProjectArg>;
   flags: ListFlags;
   cwd: string;
+  projectSearchResolution?: ProjectSearchTargetResolution;
 };
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: inherent multi-target resolution, compound cursor, error handling, and display logic
 async function handleResolvedTargets(
   options: ResolvedTargetsOptions
 ): Promise<IssueAlertListResult> {
-  const { parsed, flags, cwd } = options;
+  const { parsed, flags, cwd, projectSearchResolution } = options;
 
-  const { targets, footer, detectedDsns } = await resolveTargetsFromParsedArg(
+  const { targets, footer, detectedDsns } = await resolveProjectBoundTargets(
     parsed,
-    { cwd, usageHint: USAGE_HINT }
+    { cwd, usageHint: USAGE_HINT, projectSearchResolution }
   );
 
   if (targets.length === 0) {
@@ -580,7 +599,6 @@ export const listCommand = buildListCommand("alert issues", {
       cwd,
       flags,
       parsed,
-      orgSlugMatchBehavior: "redirect",
       // All modes use per-project fetching with compound cursor support
       allowCursorInModes: [
         "auto-detect",

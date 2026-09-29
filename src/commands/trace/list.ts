@@ -30,7 +30,7 @@ import {
 import { withProgress } from "../../lib/polling.js";
 import {
   resolveLogProjectId,
-  resolveOrgProjectFromArg,
+  resolveProjectBoundFromArg,
 } from "../../lib/resolve-target.js";
 import { sanitizeQuery } from "../../lib/search-query.js";
 import {
@@ -264,7 +264,7 @@ export const listCommand = buildListCommand("trace", {
     const { query } = flags;
 
     // Resolve org/project from positional arg, config, or DSN auto-detection
-    const { org, project } = await resolveOrgProjectFromArg(
+    const { org, project } = await resolveProjectBoundFromArg(
       target,
       cwd,
       COMMAND_NAME

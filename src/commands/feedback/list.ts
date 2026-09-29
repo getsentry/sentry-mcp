@@ -33,8 +33,8 @@ import {
 import { jsonTransformListResult } from "../../lib/org-list.js";
 import { withProgress } from "../../lib/polling.js";
 import {
-  type ResolvedOrgOptionalProject,
-  resolveOrgOptionalProjectFromArg,
+  type ResolvedOrgOptionalTarget,
+  resolveOrgOptionalFromArg,
   toNumericId,
 } from "../../lib/resolve-target.js";
 import { sanitizeQuery } from "../../lib/search-query.js";
@@ -76,7 +76,7 @@ function formatScope(org: string, project?: string): string {
 }
 
 async function projectIdFor(
-  resolved: ResolvedOrgOptionalProject
+  resolved: ResolvedOrgOptionalTarget
 ): Promise<number | undefined> {
   if (!resolved.project) {
     return;
@@ -196,7 +196,7 @@ export const listCommand = buildListCommand("feedback", {
     },
   },
   async *func(this: SentryContext, flags: ListFlags, target?: string) {
-    const resolved = await resolveOrgOptionalProjectFromArg(
+    const resolved = await resolveOrgOptionalFromArg(
       target,
       this.cwd,
       COMMAND_NAME

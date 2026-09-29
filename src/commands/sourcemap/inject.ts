@@ -59,7 +59,8 @@ export const injectCommand = buildCommand({
     fullDescription:
       "Scans a directory for .js/.mjs/.cjs files and their companion .map files, " +
       "then injects Sentry debug IDs for reliable sourcemap resolution.\n\n" +
-      "The injection is idempotent — files that already have debug IDs are skipped.\n\n" +
+      "Existing debug IDs are preserved; missing runtime registration snippets are added.\n" +
+      "Files that already register their debug ID at runtime are left unchanged.\n\n" +
       "Exits with an error if zero JS + sourcemap pairs are discovered " +
       "(typical cause: bundler not emitting .map files). Pass " +
       "--allow-empty to suppress this check for directories that may " +

@@ -35,12 +35,15 @@ type MonitorWithOrg = SentryMonitor & { orgSlug?: string };
  * Interval schedules show `"every <value> <unit>"` (e.g. `"every 1 hour"`).
  * Returns an empty string when no schedule is configured.
  */
-function formatSchedule(monitor: MonitorWithOrg): string {
+export function formatSchedule(monitor: MonitorWithOrg): string {
   const config = monitor.config;
   if (!config?.schedule) {
     return "";
   }
   if (Array.isArray(config.schedule)) {
+    if (config.schedule.length < 2) {
+      return String(config.schedule[0] ?? "");
+    }
     return `every ${config.schedule[0]} ${config.schedule[1]}`;
   }
   return config.schedule;
@@ -58,7 +61,6 @@ const MONITOR_COLUMNS: Column<MonitorWithOrg>[] = [
 /** Shared config that plugs into the org-list framework. */
 const monitorListConfig: OrgListConfig<SentryMonitor, MonitorWithOrg> = {
   paginationKey: PAGINATION_KEY,
-  entityName: "monitor",
   entityPlural: "monitors",
   commandPrefix: "sentry monitor list",
   listForOrg: (org) => listMonitors(org),

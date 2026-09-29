@@ -14,7 +14,8 @@
 import type { FileHandle } from "node:fs/promises";
 import { open } from "node:fs/promises";
 import { promisify } from "node:util";
-import { crc32, deflateRaw as deflateRawCb } from "node:zlib";
+import { deflateRaw as deflateRawCb } from "node:zlib";
+import { crc32 } from "../crc32.js";
 
 const deflateRaw = promisify(deflateRawCb);
 

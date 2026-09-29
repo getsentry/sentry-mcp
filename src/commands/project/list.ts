@@ -12,7 +12,6 @@
 
 import type { SentryContext } from "../../context.js";
 import {
-  findProjectsBySlug,
   getProject,
   listOrganizations,
   listProjects,
@@ -55,10 +54,11 @@ import {
 } from "../../lib/org-list.js";
 import { withProgress } from "../../lib/polling.js";
 import {
-  type ProjectNotFoundOutcome,
+  classifyProjectSearchTarget,
+  type ProjectSearchTargetResolution,
+  projectSearchNotFoundSuggestions,
   type ResolvedTarget,
   resolveAllTargets,
-  triageProjectNotFound,
 } from "../../lib/resolve-target.js";
 import { getApiBaseUrl } from "../../lib/sentry-client.js";
 import type { SentryProject } from "../../types/index.js";
@@ -521,133 +521,69 @@ export async function handleOrgAll(
  * Handle project-search mode (bare slug, e.g., "sentry").
  * Searches for the project across all accessible organizations.
  */
-/**
- * Handle the "no matching project" case — check for org match, attempt
- * fuzzy recovery (including display-name matching), or throw an error.
- *
- * Extracted from {@link handleProjectSearch} to stay within the cognitive
- * complexity budget.
- */
-async function handleProjectNotFound(
-  projectSlug: string,
-  orgs: { slug: string }[],
-  flags: ListFlags,
-  options?: {
-    originalSlug?: string;
-    isRecoveryAttempt?: boolean;
-    scopedOrg?: string;
-  }
-): Promise<ListResult<ProjectWithOrg>> {
-  const { originalSlug, isRecoveryAttempt = false, scopedOrg } = options ?? {};
-  const displaySlug = originalSlug ?? projectSlug;
-
-  // Skip triage on recovery attempts to prevent infinite recursion.
-  const outcome: ProjectNotFoundOutcome = isRecoveryAttempt
-    ? { kind: "not-found", displaySlug, suggestions: [] }
-    : await triageProjectNotFound(projectSlug, orgs, originalSlug);
-
-  if (outcome.kind === "org-match") {
-    const contextKey = buildContextKey(
-      { type: "org-all", org: projectSlug },
-      flags,
-      getApiBaseUrl()
-    );
-    const result = await handleOrgAll({
-      org: projectSlug,
-      flags,
-      contextKey,
-      cursor: undefined,
-      direction: "first",
-    });
-    const r = result as ProjectListResult;
-    r.title = `'${projectSlug}' is an organization, not a project. Showing all projects in '${projectSlug}'`;
-    return r;
-  }
-
-  if (outcome.kind === "fuzzy-match") {
-    // Pass isRecoveryAttempt=true to prevent infinite recursion if the
-    // fuzzy-recovered slug also fails to resolve. Preserve scopedOrg so
-    // the recovery lookup stays scoped to the user's specified org.
-    return handleProjectSearch(outcome.project, flags, {
-      isRecoveryAttempt: true,
-      scopedOrg,
-    });
-  }
-
-  // JSON mode returns empty array; human mode throws a helpful error
-  if (flags.json) {
-    return { items: [] };
-  }
-  const fallback = scopedOrg
-    ? [
-        `No project with this name found in organization '${scopedOrg}'`,
-        `Check the organization slug or try: sentry project list ${scopedOrg}/`,
-      ]
-    : ["No project with this slug found in any accessible organization"];
-  throw new ResolutionError(
-    `Project '${displaySlug}'`,
-    "not found",
-    `sentry project list <org>/${projectSlug}`,
-    outcome.suggestions.length > 0 ? outcome.suggestions : fallback
-  );
-}
-
 export async function handleProjectSearch(
   projectSlug: string,
   flags: ListFlags,
   options?: {
     /** Original user input before normalization — for clearer messages. */
     originalSlug?: string;
-    /** @internal — prevents infinite recursion from fuzzy recovery. */
-    isRecoveryAttempt?: boolean;
     /** Organization slug to scope the search to (e.g. from "org/My Project"). */
     scopedOrg?: string;
+    /** Classification supplied by the dispatcher after its target pre-check. */
+    projectSearchResolution?: ProjectSearchTargetResolution;
   }
 ): Promise<ListResult<ProjectWithOrg>> {
-  const { originalSlug, isRecoveryAttempt = false, scopedOrg } = options ?? {};
-  // When the input is a display name (originalSlug set, contains spaces),
-  // skip the slug-based API lookup and go straight to name-based matching.
-  const isDisplayName = originalSlug !== undefined;
-  const { projects, orgs: foundOrgs } = isDisplayName
-    ? { projects: [], orgs: await listOrganizations() }
-    : await withProgress(
-        {
-          message: `Fetching projects (up to ${flags.limit})...`,
-          json: flags.json,
-        },
-        () => findProjectsBySlug(projectSlug)
-      );
+  const { originalSlug, scopedOrg, projectSearchResolution } = options ?? {};
+  const parsed = {
+    type: "project-search" as const,
+    projectSlug,
+    ...(originalSlug !== undefined && { originalSlug }),
+    ...(scopedOrg !== undefined && { org: scopedOrg }),
+  };
+  const resolution =
+    projectSearchResolution ??
+    (await withProgress(
+      {
+        message: `Fetching projects (up to ${flags.limit})...`,
+        json: flags.json,
+      },
+      () => classifyProjectSearchTarget(parsed)
+    ));
 
-  // When the caller provided an org (e.g. "org/My Project"), scope the
-  // search to that org instead of all accessible orgs. This applies to both
-  // display-name searches and slug-based recovery lookups. The slug-based
-  // lookup (findProjectsBySlug) fans out across every accessible org, so the
-  // recovered projects must be filtered too — otherwise a recovered slug that
-  // also exists in a different org could leak into a scoped result.
-  const orgs =
-    scopedOrg !== undefined
-      ? foundOrgs.filter((o) => o.slug === scopedOrg)
-      : foundOrgs;
-  const scopedProjects =
-    scopedOrg !== undefined
-      ? projects.filter((p) => p.orgSlug === scopedOrg)
-      : projects;
-
-  const filtered = filterByPlatform(scopedProjects, flags.platform);
-
-  if (filtered.length === 0) {
-    if (scopedProjects.length > 0 && flags.platform) {
-      return {
-        items: [],
-        hint: `No project '${projectSlug}' found matching platform '${flags.platform}'.`,
-      };
-    }
-
-    return handleProjectNotFound(projectSlug, orgs, flags, {
-      originalSlug,
-      isRecoveryAttempt,
-      scopedOrg,
+  if (resolution.kind === "organization") {
+    const contextKey = buildContextKey(
+      { type: "org-all", org: resolution.org },
+      flags,
+      getApiBaseUrl()
+    );
+    const result = await handleOrgAll({
+      org: resolution.org,
+      flags,
+      contextKey,
+      cursor: undefined,
+      direction: "first",
     });
+    const projectListResult = result as ProjectListResult;
+    projectListResult.title = `'${projectSlug}' is an organization, not a project. Showing all projects in '${resolution.org}'`;
+    return projectListResult;
+  }
+
+  if (resolution.kind === "not-found") {
+    return handleProjectSearchNotFound(resolution, projectSlug, flags.json);
+  }
+
+  const projects =
+    resolution.kind === "fuzzy-project"
+      ? [resolution.projectData]
+      : resolution.projects;
+  const resolvedProjectSlug =
+    resolution.kind === "fuzzy-project" ? resolution.project : projectSlug;
+  const filtered = filterByPlatform(projects, flags.platform);
+  if (filtered.length === 0 && flags.platform) {
+    return {
+      items: [],
+      hint: `No project '${resolvedProjectSlug}' found matching platform '${flags.platform}'.`,
+    };
   }
 
   const limited = filtered.slice(0, flags.limit);
@@ -657,7 +593,7 @@ export async function handleProjectSearch(
   if (filtered.length > limited.length) {
     header = `Showing ${limited.length} of ${filtered.length} matches. Use --limit to show more.`;
   } else if (limited.length > 1) {
-    header = `Found '${projectSlug}' in ${limited.length} organizations`;
+    header = `Found '${resolvedProjectSlug}' in ${limited.length} organizations`;
   }
 
   return {
@@ -667,10 +603,25 @@ export async function handleProjectSearch(
   };
 }
 
+function handleProjectSearchNotFound(
+  resolution: Extract<ProjectSearchTargetResolution, { kind: "not-found" }>,
+  projectSlug: string,
+  json: boolean
+): ListResult<ProjectWithOrg> {
+  if (json) {
+    return { items: [] };
+  }
+  throw new ResolutionError(
+    `Project '${resolution.displaySlug}'`,
+    "not found",
+    `sentry project list <org>/${projectSlug}`,
+    projectSearchNotFoundSuggestions(resolution)
+  );
+}
+
 /** Metadata used by the shared dispatch infrastructure for error messages and cursor keys. */
 const projectListMeta: ListCommandMeta = {
   paginationKey: PAGINATION_KEY,
-  entityName: "project",
   entityPlural: "projects",
   commandPrefix: "sentry project list",
 };
@@ -737,7 +688,6 @@ export const listCommand = buildListCommand("project", {
       cwd,
       flags,
       parsed,
-      orgSlugMatchBehavior: "redirect",
       overrides: {
         "auto-detect": (ctx) => handleAutoDetect(ctx.cwd, flags),
         explicit: (ctx) =>
@@ -767,6 +717,7 @@ export const listCommand = buildListCommand("project", {
           handleProjectSearch(ctx.parsed.projectSlug, flags, {
             originalSlug: ctx.parsed.originalSlug,
             scopedOrg: ctx.parsed.org,
+            projectSearchResolution: ctx.projectSearchResolution,
           }),
       },
     });

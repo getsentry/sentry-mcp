@@ -433,6 +433,23 @@ function hasExpectedInitServiceAuthPolicy(err: unknown): boolean {
 }
 
 describe("runWizard", () => {
+  test("rejects a malformed bearer before constructing the service client", async () => {
+    resolveInitContextSpy.mockResolvedValue(
+      makeContext({ authToken: "synthetic-prefix\nsynthetic-secret-tail" })
+    );
+
+    const error = await runWizard(makeOptions()).catch(
+      (caught: unknown) => caught
+    );
+    expect(error).toMatchObject({
+      reason: "invalid",
+      exitCode: EXIT.AUTH_INVALID,
+    });
+    expect(String(error)).not.toContain("synthetic-secret-tail");
+    expect(capturedClientOptions).toEqual([]);
+    expect(getWorkflowSpy).not.toHaveBeenCalled();
+  });
+
   test("formats successful results", async () => {
     await runWizard(makeOptions());
 

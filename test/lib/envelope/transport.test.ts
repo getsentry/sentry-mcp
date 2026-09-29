@@ -9,18 +9,22 @@
  * - Both string and Uint8Array bodies are supported
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+// biome-ignore lint/performance/noNamespaceImport: needed for spyOn
+import * as dsnIndex from "../../../src/lib/dsn/index.js";
 import {
   buildEnvelopeUrl,
   resolveDsn,
+  resolveIngestDsn,
   sendEnvelopeRequest,
 } from "../../../src/lib/envelope/transport.js";
 import { ApiError, ValidationError } from "../../../src/lib/errors.js";
+import { useEnvSandbox } from "../../helpers.js";
 
 const SAAS_DSN = "https://abc123@o1169445.ingest.us.sentry.io/4505229541441536";
 const SELF_HOSTED_DSN = "https://pubkey99@sentry.mycompany.com/7";
 
-// ── buildEnvelopeUrl ───────────────────────────────────────────────
+useEnvSandbox(["SENTRY_DSN"]);
 
 describe("buildEnvelopeUrl", () => {
   test("SaaS DSN → correct ingest URL with auth params", () => {
@@ -51,19 +55,7 @@ describe("buildEnvelopeUrl", () => {
   });
 });
 
-// ── resolveDsn ────────────────────────────────────────────────────
-
 describe("resolveDsn", () => {
-  const originalEnv = process.env.SENTRY_DSN;
-
-  afterEach(() => {
-    if (originalEnv === undefined) {
-      delete process.env.SENTRY_DSN;
-    } else {
-      process.env.SENTRY_DSN = originalEnv;
-    }
-  });
-
   test("explicit --dsn flag takes priority over env", () => {
     process.env.SENTRY_DSN = SELF_HOSTED_DSN;
     const result = resolveDsn({ dsn: SAAS_DSN });
@@ -94,7 +86,37 @@ describe("resolveDsn", () => {
   });
 });
 
-// ── sendEnvelopeRequest ───────────────────────────────────────────
+describe("resolveIngestDsn", () => {
+  let detectSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    detectSpy = vi.spyOn(dsnIndex, "detectDsn").mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    detectSpy.mockRestore();
+  });
+
+  test("returns flag/env DSN without scanning", async () => {
+    process.env.SENTRY_DSN = SAAS_DSN;
+    await expect(resolveIngestDsn({}, "/tmp")).resolves.toBe(SAAS_DSN);
+    expect(detectSpy).not.toHaveBeenCalled();
+  });
+
+  test("returns a project-scanned DSN when explicit sources are absent", async () => {
+    detectSpy.mockResolvedValue({
+      raw: SAAS_DSN,
+      protocol: "https",
+      publicKey: "abc123",
+      host: "o1169445.ingest.us.sentry.io",
+      projectId: "4505229541441536",
+      source: "env_file",
+    });
+
+    await expect(resolveIngestDsn({}, "/tmp/project")).resolves.toBe(SAAS_DSN);
+    expect(detectSpy).toHaveBeenCalledWith("/tmp/project");
+  });
+});
 
 describe("sendEnvelopeRequest", () => {
   let originalFetch: typeof globalThis.fetch;

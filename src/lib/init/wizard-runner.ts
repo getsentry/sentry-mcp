@@ -20,6 +20,7 @@ import {
   getTraceData,
   setTag,
 } from "@sentry/node-core/light";
+import { formatAuthHeader } from "../auth-header.js";
 import { formatBanner } from "../banner.js";
 import { CLI_VERSION } from "../constants.js";
 import { customFetch } from "../custom-ca.js";
@@ -1051,7 +1052,7 @@ export async function runWizard(initialOptions: WizardOptions): Promise<void> {
   const client = new MastraClient({
     baseUrl: MASTRA_API_URL,
     retries: 0,
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: token ? { Authorization: formatAuthHeader(token) } : {},
     abortSignal: abortController.signal,
     fetch: ((url, init) => {
       const traceData = getTraceData();

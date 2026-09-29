@@ -24,6 +24,7 @@ import {
   terminalPixelWidth,
 } from "../lib/sixel.js";
 import { imageBytesToSixel } from "../lib/sixel-image.js";
+import { setOrgProjectContext } from "../lib/telemetry.js";
 
 const log = logger.withTag("api");
 
@@ -225,6 +226,70 @@ function resolveApiTarget(endpoint: string): {
       (withoutLeadingSlash.startsWith("api/0/") ||
         withoutLeadingSlash === "api/0"),
   };
+}
+
+/**
+ * Org/project slugs or numeric IDs in API paths. Rejects schema placeholders
+ * (`{organization_id_or_slug}`) and empty/dot segments so we never tag junk.
+ */
+const API_PATH_SLUG_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+
+function isApiPathSlug(segment: string | undefined): segment is string {
+  return segment !== undefined && API_PATH_SLUG_RE.test(segment);
+}
+
+/**
+ * Parse org (and project when present) from a Sentry API endpoint path.
+ *
+ * `sentry api` never goes through target resolve, so the slug lives only in
+ * the URL. `organizations/`, `projects/`, and `teams/` prefixes carry the
+ * org; `projects/` and `organizations/{org}/projects/{project}/` also carry
+ * a project when that segment is a real slug.
+ *
+ * @param endpoint - Path relative to `/api/0/`, optionally with a query string
+ *   or a leading `/api/0/` prefix
+ * @returns Org (and project when present), or `undefined` when the path is
+ *   unscoped, a list endpoint, or a schema placeholder
+ * @internal Exported for testing
+ */
+export function parseOrgProjectFromApiPath(
+  endpoint: string
+): { org: string; project?: string } | undefined {
+  const path = endpoint.split("?", 1)[0] ?? "";
+  const segments = path.split("/").filter((segment) => segment.length > 0);
+
+  if (segments[0] === "api" && segments[1] === "0") {
+    segments.splice(0, 2);
+  }
+
+  if (segments[0] === "organizations" && isApiPathSlug(segments[1])) {
+    const org = segments[1];
+    if (segments[2] === "projects" && isApiPathSlug(segments[3])) {
+      return { org, project: segments[3] };
+    }
+    return { org };
+  }
+
+  if (segments[0] === "projects" && isApiPathSlug(segments[1])) {
+    const org = segments[1];
+    if (isApiPathSlug(segments[2])) {
+      return { org, project: segments[2] };
+    }
+    return { org };
+  }
+
+  if (segments[0] === "teams" && isApiPathSlug(segments[1])) {
+    return { org: segments[1] };
+  }
+
+  return;
+}
+
+function tagOrgFromApiPath(endpoint: string): void {
+  const parsed = parseOrgProjectFromApiPath(endpoint);
+  if (parsed) {
+    setOrgProjectContext([parsed.org], parsed.project ? [parsed.project] : []);
+  }
 }
 
 /**
@@ -1560,6 +1625,7 @@ export const apiCommand = buildCommand({
 
     const { normalizedEndpoint, requestBaseUrl, strippedApiPrefix } =
       resolveApiTarget(endpoint);
+    tagOrgFromApiPath(normalizedEndpoint);
     if (strippedApiPrefix) {
       // Silent auto-fix — not a warning. Users commonly copy/paste URLs
       // that include the /api/0/ prefix; we strip it transparently and

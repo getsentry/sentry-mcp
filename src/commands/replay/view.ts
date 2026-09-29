@@ -39,7 +39,7 @@ import {
   FRESH_FLAG,
 } from "../../lib/list-command.js";
 import { logger } from "../../lib/logger.js";
-import { resolveOrgOptionalProjectFromArg } from "../../lib/resolve-target.js";
+import { resolveOrgOptionalFromArg } from "../../lib/resolve-target.js";
 import {
   applySentryUrlContext,
   parseSentryUrl,
@@ -385,7 +385,7 @@ export const viewCommand = buildCommand({
     }
 
     const replayId = validateHexId(parsedArgs.replayId, "replay ID");
-    const resolved = await resolveOrgOptionalProjectFromArg(
+    const resolved = await resolveOrgOptionalFromArg(
       parsedArgs.targetArg,
       cwd,
       "replay view"

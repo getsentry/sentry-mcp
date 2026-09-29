@@ -277,10 +277,23 @@ else
   # Stable build: resolve version and download from GitHub Releases.
 
   if [[ -z "$requested_version" ]]; then
-    version=$(curl -fsSL https://api.github.com/repos/getsentry/cli/releases/latest \
-      | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')
-    if [[ -z "$version" ]]; then
-      die "Failed to fetch latest version" "gh-version"
+    # Craft publishes this app's stable version to the release registry.
+    # Avoid GitHub's anonymous API quota, which is shared by every user of an IP.
+    # Consume the full JSON response: an early parser exit can cause SIGPIPE under pipefail.
+    if metadata=$(curl -fsSL --max-time 10 https://release-registry.services.sentry.io/apps/sentry/latest); then
+      version=$(printf '%s\n' "$metadata" \
+        | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p')
+    fi
+    if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      echo -e "${MUTED}Could not resolve latest version from Sentry's release registry. Trying GitHub...${NC}" >&2
+      version=""
+      if metadata=$(curl -fsSL --max-time 10 https://api.github.com/repos/getsentry/cli/releases/latest); then
+        version=$(printf '%s\n' "$metadata" \
+          | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')
+      fi
+      if [[ ! "$version" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        die "Failed to fetch latest stable version from Sentry's release registry and GitHub. Retry or install a specific version with --version <version>." "resolve-version"
+      fi
     fi
   else
     version="$requested_version"

@@ -31,8 +31,8 @@ export const issueRoute = buildRouteMap({
       "Commands:\n" +
       "  list       List issues in a project\n" +
       "  events     List events for a specific issue\n" +
-      "  view       View details of a specific issue\n" +
-      "  explain    Analyze an issue using Seer AI\n" +
+      "  view       View details of one or more issues\n" +
+      "  explain    Analyze one or more issues using Seer AI\n" +
       "  plan       Generate a solution plan using Seer AI\n" +
       "  resolve    Mark an issue as resolved (optionally in a release)\n" +
       "  unresolve  Reopen a resolved issue (alias: reopen)\n" +
@@ -43,6 +43,8 @@ export const issueRoute = buildRouteMap({
       "  @most_frequent   Issue with the highest event frequency\n\n" +
       "Examples:\n" +
       "  sentry issue view @latest\n" +
+      "  sentry issue view FRONT-ABC BACK-2\n" +
+      "  sentry issue explain FRONT-ABC BACK-2\n" +
       "  sentry issue events CLI-G\n" +
       "  sentry issue resolve CLI-12Z --in 0.26.1\n" +
       "  sentry issue archive CLI-AB --until auto\n" +

@@ -48,7 +48,7 @@ describe("alert issues create", () => {
   let detectorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    resolveSpy = vi.spyOn(resolveTarget, "resolveTargetsFromParsedArg");
+    resolveSpy = vi.spyOn(resolveTarget, "resolveProjectBoundTargets");
     createSpy = vi.spyOn(apiClient, "createIssueAlertRule");
     detectorSpy = vi.spyOn(apiClient, "resolveErrorDetectorId");
     detectorSpy.mockResolvedValue(100);

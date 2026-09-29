@@ -117,7 +117,7 @@ import {
 } from "../../../src/lib/errors.js";
 // biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
 import * as resolveTarget from "../../../src/lib/resolve-target.js";
-import { resolveProjectBySlug } from "../../../src/lib/resolve-target.js";
+import { resolveProjectBoundSlug } from "../../../src/lib/resolve-target.js";
 import type { DetailedSentryLog } from "../../../src/types/index.js";
 
 /** A valid 32-char hex log ID for tests */
@@ -315,7 +315,7 @@ describe("parsePositionalArgs", () => {
   });
 });
 
-describe("resolveProjectBySlug", () => {
+describe("resolveProjectBoundSlug", () => {
   const HINT = "sentry log view <org>/<project> <log-id> [<log-id>...]";
   let findProjectsBySlugSpy: ReturnType<typeof spyOn>;
 
@@ -331,7 +331,7 @@ describe("resolveProjectBySlug", () => {
     test("throws ResolutionError when project not found", async () => {
       findProjectsBySlugSpy.mockResolvedValue({ projects: [], orgs: [] });
 
-      await expect(resolveProjectBySlug("my-project", HINT)).rejects.toThrow(
+      await expect(resolveProjectBoundSlug("my-project", HINT)).rejects.toThrow(
         ResolutionError
       );
     });
@@ -340,7 +340,7 @@ describe("resolveProjectBySlug", () => {
       findProjectsBySlugSpy.mockResolvedValue({ projects: [], orgs: [] });
 
       try {
-        await resolveProjectBySlug("frontend", HINT);
+        await resolveProjectBoundSlug("frontend", HINT);
         expect.unreachable("Should have thrown");
       } catch (error) {
         expect(error).toBeInstanceOf(ResolutionError);
@@ -366,7 +366,7 @@ describe("resolveProjectBySlug", () => {
         orgs: [],
       });
 
-      await expect(resolveProjectBySlug("frontend", HINT)).rejects.toThrow(
+      await expect(resolveProjectBoundSlug("frontend", HINT)).rejects.toThrow(
         ValidationError
       );
     });
@@ -381,7 +381,7 @@ describe("resolveProjectBySlug", () => {
       });
 
       try {
-        await resolveProjectBySlug(
+        await resolveProjectBoundSlug(
           "frontend",
           HINT,
           "sentry log view <org>/frontend log-456"
@@ -408,7 +408,7 @@ describe("resolveProjectBySlug", () => {
       });
 
       try {
-        await resolveProjectBySlug(
+        await resolveProjectBoundSlug(
           "api",
           HINT,
           "sentry log view <org>/api abc123"
@@ -431,7 +431,7 @@ describe("resolveProjectBySlug", () => {
         orgs: [],
       });
 
-      const result = await resolveProjectBySlug("backend", HINT);
+      const result = await resolveProjectBoundSlug("backend", HINT);
 
       expect(result).toMatchObject({
         org: "my-company",
@@ -453,7 +453,7 @@ describe("resolveProjectBySlug", () => {
         orgs: [],
       });
 
-      const result = await resolveProjectBySlug("mobile-app", HINT);
+      const result = await resolveProjectBoundSlug("mobile-app", HINT);
 
       expect(result.org).toBe("acme-industries");
     });
@@ -471,7 +471,7 @@ describe("resolveProjectBySlug", () => {
         orgs: [],
       });
 
-      const result = await resolveProjectBySlug("web-frontend", HINT);
+      const result = await resolveProjectBoundSlug("web-frontend", HINT);
 
       expect(result.project).toBe("web-frontend");
     });
@@ -544,7 +544,7 @@ describe("viewCommand.func", () => {
     expect(getLogsSpy).toHaveBeenCalled();
   });
 
-  test("resolves project-search target via resolveProjectBySlug", async () => {
+  test("resolves project-search target via resolveProjectBoundSlug", async () => {
     findProjectsBySlugSpy.mockResolvedValue({
       projects: [
         { slug: "frontend", orgSlug: "acme", id: "1", name: "Frontend" },
@@ -556,7 +556,7 @@ describe("viewCommand.func", () => {
 
     const { context } = createMockContext();
     const func = await viewCommand.loader();
-    // "frontend" (no slash) → project-search → resolveProjectBySlug (line 176-180)
+    // "frontend" (no slash) → project-search → resolveProjectBoundSlug
     await func.call(
       context,
       { json: true, web: false },
