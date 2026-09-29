@@ -75,8 +75,32 @@ describe("install script", () => {
     writeFileSync(
       join(binDir, "curl"),
       `#!/usr/bin/env bash
-cat <<'SCRIPT'
+set -euo pipefail
+url="\${!#}"
+printf '%s\\n' "$url" >> "$SENTRY_TEST_DIR/curl-urls"
+case "$url" in
+  *"/repos/getsentry/sentry-mcp/releases/tags/"*)
+    printf '%s' "\${SENTRY_TEST_TOOLKIT_STATUS:-200}"
+    ;;
+  *"/repos/getsentry/cli/releases/tags/"*)
+    printf '%s' "\${SENTRY_TEST_LEGACY_STATUS:-200}"
+    ;;
+  *"/repos/getsentry/sentry-mcp/releases?per_page=100&page="*)
+    page="\${url##*=}"
+    case "$page" in
+      1) if [[ -n "\${SENTRY_TEST_RELEASES_PAGE_1:-}" ]]; then cat "$SENTRY_TEST_RELEASES_PAGE_1"; else printf '[]'; fi ;;
+      2) if [[ -n "\${SENTRY_TEST_RELEASES_PAGE_2:-}" ]]; then cat "$SENTRY_TEST_RELEASES_PAGE_2"; else printf '[]'; fi ;;
+      *) printf '[]' ;;
+    esac
+    ;;
+  *"/repos/getsentry/cli/releases/latest")
+    printf '{"tag_name":"0.42.2"}'
+    ;;
+  *)
+    cat <<'SCRIPT'
 ${downloadedExecutable}SCRIPT
+    ;;
+esac
 `
     );
     chmodSync(join(binDir, "curl"), 0o755);
@@ -275,6 +299,77 @@ process.exitCode = result.status ?? 1;
       "--no-modify-path",
     ]);
     expect(existsSync(join(installDir, "sentry"))).toBe(true);
+  });
+
+  test("uses the legacy release only after a Toolkit tag returns HTTP 404", () => {
+    env.SENTRY_TEST_TOOLKIT_STATUS = "404";
+    const result = spawnSync(
+      "bash",
+      [installScript, "--version", "0.42.2", "--no-modify-path"],
+      { env, encoding: "utf8", timeout: 10_000 }
+    );
+
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(recorded("curl-urls")).toEqual([
+      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.42.2",
+      "https://api.github.com/repos/getsentry/cli/releases/tags/0.42.2",
+      `https://github.com/getsentry/cli/releases/download/0.42.2/sentry-${process.platform === "darwin" ? "darwin" : "linux"}-${process.arch === "arm64" ? "arm64" : "x64"}.gz`,
+    ]);
+    expect(existsSync(join(installDir, "sentry"))).toBe(true);
+  });
+
+  test("never falls back to legacy for a Toolkit server failure", () => {
+    env.SENTRY_TEST_TOOLKIT_STATUS = "500";
+    const result = spawnSync("bash", [installScript, "--version", "0.42.2"], {
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Toolkit release check failed (HTTP 500)");
+    expect(recorded("curl-urls")).toEqual([
+      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.42.2",
+    ]);
+  });
+
+  test("checks further release pages before selecting a stable Toolkit CLI", () => {
+    const firstPage = join(testDir, "releases-1.json");
+    const secondPage = join(testDir, "releases-2.json");
+    writeFileSync(firstPage, '[\n  {\n    "tag_name": "mcp@1.0.0",\n    "prerelease": false\n  }\n]\n');
+    writeFileSync(secondPage, '[\n  {\n    "tag_name": "cli@0.46.0",\n    "prerelease": false\n  }\n]\n');
+    env.SENTRY_TEST_RELEASES_PAGE_1 = firstPage;
+    env.SENTRY_TEST_RELEASES_PAGE_2 = secondPage;
+    const result = spawnSync("bash", [installScript, "--no-modify-path"], {
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(recorded("curl-urls").slice(0, 3)).toEqual([
+      "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=1",
+      "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=2",
+      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.46.0",
+    ]);
+    expect(recorded("curl-urls")[3]).toContain("/getsentry/sentry-mcp/releases/download/cli@0.46.0/");
+  });
+
+  test("resolves the latest legacy version until Toolkit has a CLI release", () => {
+    env.SENTRY_TEST_TOOLKIT_STATUS = "404";
+    const result = spawnSync("bash", [installScript, "--no-modify-path"], {
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(recorded("curl-urls").slice(0, 4)).toEqual([
+      "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=1",
+      "https://api.github.com/repos/getsentry/cli/releases/latest",
+      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.42.2",
+      "https://api.github.com/repos/getsentry/cli/releases/tags/0.42.2",
+    ]);
   });
 
   test("connects setup to the controlling terminal without launching another process", () => {
