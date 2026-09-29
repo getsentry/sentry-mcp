@@ -2,6 +2,9 @@
   "name": "sentry-cli-docs",
   "version": "1.0.0",
   "private": true,
+  "sentryCi": {
+    "dependencies": ["sentry"]
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",

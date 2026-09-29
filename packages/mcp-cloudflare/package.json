@@ -1,5 +1,10 @@
 {
   "name": "@sentry/mcp-cloudflare",
+  "sentryCi": {
+    "roles": [
+      "cloudflare"
+    ]
+  },
   "version": "0.39.0",
   "private": true,
   "type": "module",

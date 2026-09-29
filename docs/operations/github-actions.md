@@ -11,9 +11,15 @@ the imported CLI and docs when `SENTRY_CLIENT_ID` is available.
 ## Workflows
 
 ### test.yml
-Runs on all pushes to main and pull requests:
-- Build, lint, unit tests
-- Code coverage reporting
+Runs on pushes to `main`, pull requests, and merge queue entries. Discovery
+reads pnpm workspace projects and their package scripts. Pull requests check
+changed projects, their workspace consumers, and semantic dependencies (the CLI
+docs depend on `sentry`). Root-level changes and non-PR events check every
+enabled project. Each project has its own build, lint, typecheck, test, policy,
+and E2E steps when those scripts exist. The always-present `test` job checks
+discovery, installation, repository quality, and every selected project.
+Package-specific exceptions live in `package.json#sentryCi`; the standalone
+smoke-test suite remains in its own workflow.
 
 ### deploy.yml
 Currently disabled. Its old canary, production, and rollback steps must not

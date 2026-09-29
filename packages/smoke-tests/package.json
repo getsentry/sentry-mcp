@@ -1,5 +1,11 @@
 {
   "name": "@sentry/mcp-smoke-tests",
+  "sentryCi": {
+    "enabled": false,
+    "roles": [
+      "smoke"
+    ]
+  },
   "version": "0.39.0",
   "private": true,
   "type": "module",

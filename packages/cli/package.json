@@ -49,6 +49,11 @@
     }
   },
   "packageManager": "pnpm@10.11.0",
+  "sentryCi": {
+    "coverage": "coverage/lcov.info",
+    "npmRuntime": "bundle",
+    "policy": "ci:policy"
+  },
   "scripts": {
     "tsx": "tsx --env-file-if-exists=.env.local --import ./script/require-shim.mjs",
     "cli": "tsx --env-file-if-exists=.env.local --import ./script/require-shim.mjs src/bin.ts",
@@ -83,7 +88,8 @@
     "check:patches": "pnpm tsx script/check-patches.ts",
     "check:docs-sections": "pnpm tsx script/generate-docs-sections.ts --check",
     "check:env-coverage": "pnpm tsx script/check-env-coverage.ts",
-    "check:stale-refs": "pnpm tsx script/check-stale-references.ts"
+    "check:stale-refs": "pnpm tsx script/check-stale-references.ts",
+    "ci:policy": "pnpm run check:patches && pnpm run check:deps && pnpm run check:errors && pnpm run check:fragments && pnpm run check:docs-sections && pnpm run check:env-coverage && pnpm run check:stale-refs"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
