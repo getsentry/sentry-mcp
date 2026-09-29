@@ -62,6 +62,7 @@ View details of one or more events
 | `resolvedWith` | array |  |
 | `nextEventID` | string \| null |  |
 | `previousEventID` | string \| null |  |
+| `formatted` | object |  |
 | `trace` | object \| null | Trace context, or null when unavailable |
 | `attachments` | array | Event attachments; each includes metadata and an absolute authenticated download URL |
 
