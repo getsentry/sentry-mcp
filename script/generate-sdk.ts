@@ -160,7 +160,7 @@ function extractSdkFlags(command: Command): SdkFlagInfo[] {
     flags.push({
       name,
       kind,
-      tsType,
+      tsType: def.variadic ? `Array<${tsType}>` : tsType,
       optional,
       default: def.default,
       brief: def.brief,
