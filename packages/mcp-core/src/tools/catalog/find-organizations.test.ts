@@ -7,6 +7,7 @@ import {
   assertStructuredOnlyResult,
   getStructuredContent,
 } from "../../test-utils/structured-content.js";
+import { prepareToolParams } from "../catalog-runtime/availability";
 import findOrganizations from "./find-organizations.js";
 
 function mockOrganizations(
@@ -55,7 +56,7 @@ describe("find_organizations", () => {
     );
 
     const result = await findOrganizations.handler(
-      { query: "example", cursor: null },
+      { query: "example", cursor: null, limit: 25 },
       getServerContext({ sentryHost: host, accessToken: "test-token" }),
     );
 
@@ -73,6 +74,7 @@ describe("find_organizations", () => {
   });
 
   it("returns only the structured organization payload", async () => {
+    const context = getServerContext();
     mockOrganizations([
       {
         id: "1",
@@ -90,10 +92,12 @@ describe("find_organizations", () => {
       },
     ]);
 
-    const result = await findOrganizations.handler(
-      { query: null, cursor: null },
-      getServerContext(),
-    );
+    const params = prepareToolParams({
+      tool: findOrganizations,
+      params: { query: null, cursor: null },
+      context,
+    }) as Parameters<typeof findOrganizations.handler>[0];
+    const result = await findOrganizations.handler(params, context);
 
     expect(getStructuredContent(result)).toMatchInlineSnapshot(`
       {
@@ -136,7 +140,7 @@ describe("find_organizations", () => {
     });
 
     const result = await findOrganizations.handler(
-      { query: null, cursor: null },
+      { query: null, cursor: null, limit: 25 },
       getServerContext(),
     );
 
@@ -154,9 +158,9 @@ describe("find_organizations", () => {
     assertStructuredOnlyResult(result);
   });
 
-  it("preserves search and cursor while returning a page of 25 organizations", async () => {
+  it("preserves search and cursor while returning a page of 100 organizations", async () => {
     mockOrganizations(
-      Array.from({ length: 25 }, (_, index) => ({
+      Array.from({ length: 100 }, (_, index) => ({
         id: String(index + 1),
         slug: `organization-${index + 1}`,
         name: `Organization ${index + 1}`,
@@ -168,11 +172,11 @@ describe("find_organizations", () => {
       {
         Link: '<https://sentry.io/api/0/organizations/?cursor=page-2>; rel="next"; results="true"; cursor="page-2"',
       },
-      { query: "example", cursor: "previous" },
+      { per_page: "100", query: "example", cursor: "previous" },
     );
 
     const result = await findOrganizations.handler(
-      { query: "example", cursor: "previous" },
+      { query: "example", cursor: "previous", limit: 100 },
       getServerContext(),
     );
     const structuredContent = getStructuredContent<{
@@ -181,9 +185,9 @@ describe("find_organizations", () => {
       nextCursor: string | null;
     }>(result);
 
-    expect(structuredContent.organizations).toHaveLength(25);
+    expect(structuredContent.organizations).toHaveLength(100);
     expect(structuredContent.organizations.at(-1)?.slug).toBe(
-      "organization-25",
+      "organization-100",
     );
     expect(structuredContent.hasMore).toBe(true);
     expect(structuredContent.nextCursor).toBe("page-2");

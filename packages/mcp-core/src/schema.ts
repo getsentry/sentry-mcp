@@ -53,7 +53,7 @@ export const ParamSearchQuery = z
 export const ParamCursor = z
   .string()
   .describe(
-    "Pagination cursor from a previous call's nextCursor. Reuse it with the same filters and scope to fetch the next page.",
+    "Pagination cursor from a previous call's nextCursor. Reuse it with the same filters, scope, and limit to fetch the next page.",
   );
 
 export const ParamIssueShortId = z

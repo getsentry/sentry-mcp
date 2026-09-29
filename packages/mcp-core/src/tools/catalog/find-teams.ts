@@ -12,7 +12,7 @@ import {
 import { setOrganizationContext } from "../../telem/organization";
 import type { ServerContext } from "../../types";
 
-const RESULT_LIMIT = 25;
+const DEFAULT_LIMIT = 25;
 
 export const findTeamsOutputSchema = z.object({
   teams: z.array(
@@ -37,13 +37,20 @@ export default defineTool({
     "- Find a team's slug and numeric ID to aid other tool requests",
     "- Search for specific teams by name or slug",
     "",
-    `Returns up to ${RESULT_LIMIT} results. When hasMore is true, pass the returned nextCursor to fetch the next page, or use the query parameter to narrow down results.`,
+    `Returns up to ${DEFAULT_LIMIT} results by default. Use limit to request up to 100 results. When hasMore is true, pass the returned nextCursor with the same filters and limit to fetch the next page.`,
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
     regionUrl: ParamRegionUrl.nullable().default(null),
     query: ParamSearchQuery.nullable().default(null),
     cursor: ParamCursor.nullable().default(null),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .describe("Maximum number of teams to return per page.")
+      .default(DEFAULT_LIMIT),
   },
   annotations: {
     readOnlyHint: true,
@@ -67,7 +74,7 @@ export default defineTool({
 
     const { teams, nextCursor } = await apiService.listTeams(organizationSlug, {
       query: params.query ?? undefined,
-      limit: RESULT_LIMIT,
+      limit: params.limit,
       cursor: params.cursor ?? undefined,
     });
 

@@ -111,6 +111,7 @@ describe("organization telemetry", () => {
         regionUrl: null,
         query: null,
         cursor: null,
+        limit: 25,
       },
       getServerContext(),
     );

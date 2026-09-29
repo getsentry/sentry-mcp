@@ -6,10 +6,12 @@ import {
   assertStructuredOnlyResult,
   getStructuredContent,
 } from "../../test-utils/structured-content.js";
+import { prepareToolParams } from "../catalog-runtime/availability";
 import findTeams, { findTeamsOutputSchema } from "./find-teams.js";
 
 describe("find_teams", () => {
   it("serializes", async () => {
+    const context = getServerContext();
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/teams/",
@@ -26,15 +28,17 @@ describe("find_teams", () => {
       ),
     );
 
-    const result = await findTeams.handler(
-      {
+    const params = prepareToolParams({
+      tool: findTeams,
+      params: {
         organizationSlug: "sentry-mcp-evals",
         query: null,
         regionUrl: null,
         cursor: null,
       },
-      getServerContext(),
-    );
+      context,
+    }) as Parameters<typeof findTeams.handler>[0];
+    const result = await findTeams.handler(params, context);
     assertStructuredOnlyResult(result);
     const structuredContent = getStructuredContent(result);
     expect(findTeamsOutputSchema.parse(structuredContent)).toEqual(
@@ -54,20 +58,20 @@ describe("find_teams", () => {
     `);
   });
 
-  it("preserves search and cursor while returning a page of 25 teams", async () => {
+  it("preserves search and cursor while returning a page of 100 teams", async () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/teams/",
         ({ request }) => {
           expect(Object.fromEntries(new URL(request.url).searchParams)).toEqual(
             {
-              per_page: "25",
+              per_page: "100",
               query: "example",
               cursor: "previous",
             },
           );
           return HttpResponse.json(
-            Array.from({ length: 25 }, (_, index) => ({
+            Array.from({ length: 100 }, (_, index) => ({
               id: index + 1,
               slug: `team-${String(index + 1).padStart(3, "0")}`,
               name: `Team ${index + 1}`,
@@ -88,6 +92,7 @@ describe("find_teams", () => {
         query: "example",
         regionUrl: null,
         cursor: "previous",
+        limit: 100,
       },
       getServerContext(),
     );
@@ -96,10 +101,10 @@ describe("find_teams", () => {
     const structuredContent = findTeamsOutputSchema.parse(
       getStructuredContent(result),
     );
-    expect(structuredContent.teams).toHaveLength(25);
+    expect(structuredContent.teams).toHaveLength(100);
     expect(structuredContent.teams.at(-1)).toEqual({
-      slug: "team-025",
-      id: "25",
+      slug: "team-100",
+      id: "100",
     });
     expect(structuredContent).toMatchObject({
       hasMore: true,
