@@ -33,7 +33,7 @@ jobs:
       - name: Get pnpm store directory
         shell: bash
         run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+          echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - uses: actions/cache@v4
         name: Setup pnpm cache
@@ -65,9 +65,11 @@ jobs:
             exit 0
           fi
 
-          echo "all=false" >> "$GITHUB_OUTPUT"
-          echo "base=$BASE_SHA" >> "$GITHUB_OUTPUT"
-          echo "cli=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "all=false"
+            echo "base=$BASE_SHA"
+            echo "cli=false"
+          } >> "$GITHUB_OUTPUT"
           git diff --name-only "$BASE_SHA" HEAD > "$RUNNER_TEMP/changed-paths"
           git diff --diff-filter=D --name-only "$BASE_SHA" HEAD > "$RUNNER_TEMP/deleted-paths"
 
@@ -89,7 +91,12 @@ jobs:
         run: |
           if [[ "${{ steps.scope.outputs.all }}" == "true" ]]; then
             pnpm build
+            pnpm --filter sentry run build
+            pnpm --filter sentry-cli-docs run build
           else
+            if grep -q '^apps/cli-docs/' "$RUNNER_TEMP/changed-paths" && [[ "${{ steps.scope.outputs.cli }}" != "true" ]]; then
+              pnpm --filter sentry run generate:docs
+            fi
             pnpm --filter "...[${{ steps.scope.outputs.base }}]..." --if-present run build
             if [[ "${{ steps.scope.outputs.cli }}" == "true" ]]; then
               pnpm --filter sentry-cli-docs run build
