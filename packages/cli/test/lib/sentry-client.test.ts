@@ -7,6 +7,10 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { setAuthToken } from "../../src/lib/db/auth.js";
 import { TimeoutError } from "../../src/lib/errors.js";
 import {
+  getCachedResponse,
+  storeCachedResponse,
+} from "../../src/lib/response-cache.js";
+import {
   __injectTimeoutOverrideForTests,
   __resolveRequestTimeoutMsForTests,
   getSdkConfig,
@@ -70,6 +74,86 @@ describe("401 replay", () => {
     );
     expect(response.status).toBe(401);
     expect(urls.filter((url) => url.endsWith("/oauth/token/"))).toEqual([]);
+  });
+
+  test("retry false returns a 401 without refreshing the token", async () => {
+    const urls = await mockRefreshableSession([401]);
+    const url = `${REGION_URL}/api/0/issue-link/`;
+    const fetchOnce = getSdkConfig(REGION_URL, { retry: false }).fetch;
+    const response = await fetchOnce(url, { method: "POST" });
+    expect(response.status).toBe(401);
+    expect(urls).toEqual([url]);
+  });
+});
+
+describe("per-request transport controls", () => {
+  test("retry false sends a mutation once for transient HTTP and network failures", async () => {
+    let callCount = 0;
+    globalThis.fetch = mockFetch(async () => {
+      callCount += 1;
+      return new Response("provider unavailable", { status: 503 });
+    });
+    const fetchOnce = getSdkConfig(REGION_URL, { retry: false }).fetch;
+    expect(
+      (await fetchOnce(`${REGION_URL}/api/0/issue-link/`, { method: "POST" }))
+        .status
+    ).toBe(503);
+    expect(callCount).toBe(1);
+
+    const networkError = new TypeError(
+      "connection reset after request body sent"
+    );
+    globalThis.fetch = mockFetch(async () => {
+      callCount += 1;
+      throw networkError;
+    });
+    await expect(
+      fetchOnce(`${REGION_URL}/api/0/issue-link/`, { method: "POST" })
+    ).rejects.toBe(networkError);
+    expect(callCount).toBe(2);
+  });
+
+  test("no-store preflight bypasses both cache lookup and cache storage", async () => {
+    const url = `${REGION_URL}/api/0/organizations/example/issues/1/external-issues/`;
+    const headers = { Authorization: "Bearer test-token" };
+    await storeCachedResponse(
+      "GET",
+      url,
+      headers,
+      Response.json(
+        { source: "cached" },
+        {
+          headers: {
+            "Cache-Control": "max-age=600",
+            Date: new Date().toUTCString(),
+          },
+        }
+      )
+    );
+    expect(
+      await (await getCachedResponse("GET", url, headers))?.json()
+    ).toEqual({ source: "cached" });
+    let callCount = 0;
+    globalThis.fetch = mockFetch(async (_input, init) => {
+      callCount += 1;
+      expect(init?.cache).toBe("no-store");
+      return Response.json(
+        { source: "fresh" },
+        {
+          headers: {
+            "Cache-Control": "max-age=600",
+            Date: new Date().toUTCString(),
+          },
+        }
+      );
+    });
+    const freshFetch = getSdkConfig(REGION_URL, { cache: "no-store" }).fetch;
+    expect(await (await freshFetch(url)).json()).toEqual({ source: "fresh" });
+    expect(await (await freshFetch(url)).json()).toEqual({ source: "fresh" });
+    expect(callCount).toBe(2);
+    expect(
+      await (await getCachedResponse("GET", url, headers))?.json()
+    ).toEqual({ source: "cached" });
   });
 });
 

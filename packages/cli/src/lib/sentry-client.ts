@@ -75,6 +75,14 @@ const ENDPOINT_TIMEOUT_OVERRIDES: TimeoutOverride[] = [
 /** Maximum retry attempts for failed requests */
 const MAX_RETRIES = 2;
 
+/** Per-request controls for mutations with external effects and fresh preflights. */
+export type SentryRequestOptions = {
+  /** False sends exactly one request, without HTTP, network, timeout, or 401 replay. */
+  retry?: boolean;
+  /** Bypass both reads and writes of the local response cache. */
+  cache?: "no-store";
+};
+
 /** Maximum backoff delay between retries in milliseconds */
 const MAX_BACKOFF_MS = 10_000;
 
@@ -529,16 +537,17 @@ async function buildAttemptFactory(
 async function fetchWithRetry(
   input: Request | string | URL,
   init: RequestInit | undefined,
-  method: string,
-  fullUrl: string
+  request: { method: string; fullUrl: string; options: SentryRequestOptions }
 ): Promise<Response> {
+  const { method, fullUrl, options } = request;
   const { token } = await refreshToken();
   const headers = prepareHeaders(input, init, token);
   const attemptFactory = await buildAttemptFactory(input, init);
   const timeoutMs = resolveTimeoutMs(fullUrl);
+  const maxRetries = options.retry === false ? 0 : MAX_RETRIES;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const isLastAttempt = attempt === MAX_RETRIES;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const isLastAttempt = attempt === maxRetries;
     const { input: attemptInput, init: attemptInit } = attemptFactory();
     const result = await executeAttempt({
       input: attemptInput,
@@ -551,12 +560,14 @@ async function fetchWithRetry(
     if (result.action === "done") {
       // Use getAuthToken() instead of captured `token` — after a 401 refresh,
       // handleUnauthorized stores a new token in the DB
-      cacheResponse(
-        method,
-        fullUrl,
-        authHeaders(getAuthToken()),
-        result.response
-      );
+      if (options.cache !== "no-store") {
+        cacheResponse(
+          method,
+          fullUrl,
+          authHeaders(getAuthToken()),
+          result.response
+        );
+      }
       await invalidateAfterMutation(method, fullUrl, result.response);
       return result.response;
     }
@@ -566,7 +577,7 @@ async function fetchWithRetry(
 
     const delay = backoffDelay(attempt);
     log.debug(
-      `${method} ${new URL(fullUrl).pathname} → retry ${attempt + 1}/${MAX_RETRIES} after ${delay}ms`
+      `${method} ${new URL(fullUrl).pathname} → retry ${attempt + 1}/${maxRetries} after ${delay}ms`
     );
     await sleepMs(delay);
   }
@@ -594,10 +605,9 @@ async function fetchWithRetry(
  *
  * @returns A fetch-compatible function for use with @sentry/api SDK functions
  */
-function createAuthenticatedFetch(): (
-  input: Request | string | URL,
-  init?: RequestInit
-) => Promise<Response> {
+function createAuthenticatedFetch(
+  options: SentryRequestOptions = {}
+): (input: Request | string | URL, init?: RequestInit) => Promise<Response> {
   return function authenticatedFetch(
     input: Request | string | URL,
     init?: RequestInit
@@ -626,11 +636,10 @@ function createAuthenticatedFetch(): (
 
         // Check cache before auth/retry for GET requests.
         // Uses current token (no refresh) so lookups are fast but Vary-correct.
-        const cached = await tryCacheHit(
-          method,
-          fullUrl,
-          authHeaders(getAuthToken())
-        );
+        const cached =
+          options.cache === "no-store"
+            ? undefined
+            : await tryCacheHit(method, fullUrl, authHeaders(getAuthToken()));
         if (cached) {
           span.setAttribute("http.response.status_code", cached.status);
           log.debug(
@@ -639,7 +648,14 @@ function createAuthenticatedFetch(): (
           return cached;
         }
 
-        const response = await fetchWithRetry(input, init, method, fullUrl);
+        const requestInit = options.cache
+          ? { ...init, cache: options.cache }
+          : init;
+        const response = await fetchWithRetry(input, requestInit, {
+          method,
+          fullUrl,
+          options,
+        });
         span.setAttribute("http.response.status_code", response.status);
         if (!response.ok) {
           span.setStatus({ code: 2, message: `${response.status}` });
@@ -728,6 +744,7 @@ export function getControlSiloUrl(): string {
  * - `throwOnError`: Always false (we handle errors ourselves)
  *
  * @param regionUrl - The base URL for the target region (e.g., https://us.sentry.io)
+ * @param options - Per-request retry and cache controls; omit for the shared fetch
  * @returns Configuration object to spread into SDK function options
  *
  * @example
@@ -736,7 +753,10 @@ export function getControlSiloUrl(): string {
  * const result = await listOrganizations({ ...config });
  * ```
  */
-export function getSdkConfig(regionUrl: string) {
+export function getSdkConfig(
+  regionUrl: string,
+  options: SentryRequestOptions = {}
+) {
   const normalizedBase = regionUrl.endsWith("/")
     ? regionUrl.slice(0, -1)
     : regionUrl;
@@ -745,7 +765,10 @@ export function getSdkConfig(regionUrl: string) {
     // SDK functions already include /api/0/ in their URL paths,
     // so baseUrl should be the plain region URL without /api/0.
     baseUrl: normalizedBase,
-    fetch: getAuthenticatedFetch(),
+    fetch:
+      options.retry !== undefined || options.cache !== undefined
+        ? (createAuthenticatedFetch(options) as typeof fetch)
+        : getAuthenticatedFetch(),
     throwOnError: false as const,
   };
 }
