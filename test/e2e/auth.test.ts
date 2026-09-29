@@ -17,7 +17,7 @@ import {
 } from "vitest";
 import { Database } from "../../src/lib/db/sqlite.js";
 import { EXIT } from "../../src/lib/errors.js";
-import { createE2EContext, type E2EContext } from "../fixture.js";
+import { createE2EContext, type E2EContext, runCli } from "../fixture.js";
 import { cleanupTestDir, createTestConfigDir } from "../helpers.js";
 import { createSentryMockServer, TEST_TOKEN } from "../mocks/routes.js";
 import type { MockServer } from "../mocks/server.js";
@@ -248,5 +248,28 @@ describe("sentry auth logout", () => {
 
     // Should not error, just inform user
     expect(result.exitCode).toBe(0);
+  });
+});
+
+describe("command error redaction", () => {
+  test("redacts unexpected command errors handled inside Stricli", async () => {
+    const result = await runCli(["auth", "whoami", "--json"], {
+      env: {
+        SENTRY_CONFIG_DIR: testConfigDir,
+        SENTRY_URL: mockServer.url,
+        SENTRY_AUTH_TOKEN: TEST_TOKEN,
+        SENTRY_FORCE_ENV_TOKEN: "1",
+        SENTRY_CUSTOM_HEADERS:
+          "X-Proxy: Bearer SYNTHETIC-PREFIX\rSYNTHETIC-SECRET-TAIL",
+        SENTRY_CLI_NO_TELEMETRY: "1",
+      },
+    });
+    const output = result.stdout + result.stderr;
+
+    expect(result.exitCode).toBe(EXIT.GENERAL);
+    expect(output).toContain("Unexpected error: TypeError:");
+    expect(output).toContain("[REDACTED]");
+    expect(output).not.toContain("SYNTHETIC-PREFIX");
+    expect(output).not.toContain("SYNTHETIC-SECRET-TAIL");
   });
 });

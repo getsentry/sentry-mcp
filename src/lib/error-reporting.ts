@@ -27,6 +27,7 @@
 
 // biome-ignore lint/performance/noNamespaceImport: Sentry SDK recommends namespace import
 import * as Sentry from "@sentry/node-core/light";
+import { redactCredentialText } from "./credential-redaction.js";
 import {
   ApiError,
   AuthError,
@@ -255,7 +256,7 @@ export function extractResourceKind(resource: string): string {
  * `"Invalid trace ID \"abc\". Expected ..."` → `"Invalid trace ID"` (with maxWords=3)
  */
 export function extractMessagePrefix(message: string, maxWords = 3): string {
-  const firstLine = message.split("\n", 1)[0] ?? "";
+  const firstLine = redactCredentialText(message).split("\n", 1)[0] ?? "";
   return firstLine
     .replace(/'[^']*'/g, "")
     .replace(/"[^"]*"/g, "")
