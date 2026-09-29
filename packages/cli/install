@@ -405,7 +405,6 @@ trap - EXIT
 # Reconnect stdin to the real terminal so the wizard can prompt
 # interactively — when piped (curl | bash), stdin is the pipe.
 if [[ "${SENTRY_INIT:-}" == "1" ]]; then
-  sentry_bin=""
   # Only honor XDG_BIN_HOME when absolute, per the XDG spec (matches the Node
   # determineInstallDir logic); a relative value is ignored. Accept both POSIX
   # (/…) and Windows drive-letter (C:\… or C:/…) absolute paths so a Windows
@@ -414,14 +413,23 @@ if [[ "${SENTRY_INIT:-}" == "1" ]]; then
   if [[ "$xdg_bin_home" != /* && ! "$xdg_bin_home" =~ ^[A-Za-z]:[\\/] ]]; then
     xdg_bin_home=""
   fi
-  for dir in "${SENTRY_INSTALL_DIR:-}" "$xdg_bin_home" "$HOME/.local/bin" "$HOME/bin" "$HOME/.sentry/bin"; do
-    [[ -z "$dir" ]] && continue
-    if [[ -x "${dir}/sentry${suffix}" ]]; then
-      sentry_bin="${dir}/sentry${suffix}"
-      break
-    fi
-  done
-  if [[ -z "$sentry_bin" ]]; then
+  if [[ -n "${SENTRY_INSTALL_DIR:-}" ]]; then
+    install_dir="$SENTRY_INSTALL_DIR"
+  elif [[ -n "$xdg_bin_home" ]]; then
+    install_dir="$xdg_bin_home"
+  else
+    # Match determineInstallDir(): prefer existing directories on PATH, then
+    # fall back to the XDG location even when it is not yet on PATH.
+    install_dir="$HOME/.local/bin"
+    for dir in "$HOME/.local/bin" "$HOME/bin"; do
+      if [[ -d "$dir" ]] && { [[ ":${PATH:-}:" == *":${dir}:"* ]] || [[ ":${PATH:-}:" == *":${dir}/:"* ]]; }; then
+        install_dir="$dir"
+        break
+      fi
+    done
+  fi
+  sentry_bin="${install_dir}/sentry${suffix}"
+  if [[ ! -x "$sentry_bin" ]]; then
     die "Cannot find installed sentry binary" "init"
   fi
   if [[ ! -e /dev/tty ]]; then

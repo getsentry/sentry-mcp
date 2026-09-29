@@ -162,7 +162,7 @@ sentry-cli() {
   # are collected into `lead` and re-applied before the command.
   local envs=() lead=() headers="" allow_failure=""
   while [ "$#" -gt 0 ]; do
-    case "$1" in
+    case "${1:-}" in
       --auth-token)   envs+=("SENTRY_AUTH_TOKEN=$2" "SENTRY_FORCE_ENV_TOKEN=1"); shift 2 2>/dev/null || shift ;;
       --auth-token=*) envs+=("SENTRY_AUTH_TOKEN=${1#*=}" "SENTRY_FORCE_ENV_TOKEN=1"); shift ;;
       --url)          envs+=("SENTRY_HOST=$2" "SENTRY_URL=$2"); shift 2 2>/dev/null || shift ;;
@@ -210,7 +210,7 @@ sentry-cli() {
   }
 
   _scli_dispatch() {
-    case "$1" in
+    case "${1:-}" in
     # Moved commands
     login|logout)            local c=$1; shift; "${run[@]}" auth "$c" "$@" ;;
     update)                  shift; "${run[@]}" cli upgrade "$@" ;;
@@ -223,7 +223,7 @@ sentry-cli() {
     # `releases` → `release` (bare lists). v3 nested deploys under `releases`.
     releases)
       shift
-      if [ "$1" = "deploys" ]; then shift; _scli_deploys "$@"; return; fi
+      if [ "${1:-}" = "deploys" ]; then shift; _scli_deploys "$@"; return; fi
       # v3 `releases` lists; insert `list` when there's no subcommand (only flags).
       if [ "$#" -eq 0 ] || [ "${1#-}" != "$1" ]; then "${run[@]}" release list "$@";
       else "${run[@]}" release "$@"; fi ;;

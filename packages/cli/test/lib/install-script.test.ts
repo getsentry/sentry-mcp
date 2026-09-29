@@ -39,8 +39,9 @@ if [[ "$1" == "cli" && "$2" == "setup" ]]; then
   printf '%s\\n' "$@" > "$SENTRY_TEST_DIR/setup-args"
   printf '%s\\n' "$0" > "$SENTRY_TEST_DIR/setup-binary"
   record_tty 3> "$SENTRY_TEST_DIR/setup-tty"
-  mkdir -p "$SENTRY_INSTALL_DIR"
-  cp "$0" "$SENTRY_INSTALL_DIR/sentry"
+  setup_dir="\${SENTRY_TEST_SETUP_INSTALL_DIR:-$SENTRY_INSTALL_DIR}"
+  mkdir -p "$setup_dir"
+  cp "$0" "$setup_dir/sentry"
   rm "$0"
   exit "\${SENTRY_TEST_SETUP_EXIT:-0}"
 fi
@@ -430,6 +431,25 @@ process.exitCode = result.status ?? 1;
       "2:true",
       "controlling:true",
     ]);
+  });
+
+  test("initializes the new binary instead of a stale install outside PATH", () => {
+    const home = env.HOME!;
+    const staleDir = join(home, ".local", "bin");
+    const currentDir = join(home, "bin");
+    mkdirSync(staleDir, { recursive: true });
+    mkdirSync(currentDir);
+    writeFileSync(join(staleDir, "sentry"), downloadedExecutable);
+    chmodSync(join(staleDir, "sentry"), 0o755);
+    env.SENTRY_INSTALL_DIR = "";
+    env.SENTRY_TEST_SETUP_INSTALL_DIR = currentDir;
+    env.PATH = `${currentDir}:${env.PATH}`;
+    env.SENTRY_INIT = "1";
+
+    const result = runInTerminal();
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(recorded("post-args")).toEqual(["init"]);
+    expect(recorded("post-binary")).toEqual([join(currentDir, "sentry")]);
   });
 
   test.each([
