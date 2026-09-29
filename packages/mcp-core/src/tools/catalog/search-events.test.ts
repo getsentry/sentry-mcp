@@ -3530,6 +3530,7 @@ describe("search_events", () => {
       expect(mockGenerateText).not.toHaveBeenCalled();
       expect(result).toContain("## count() over time");
       expect(result).toContain("- **Total**: 13");
+      expect(result).not.toContain("**Warning:**");
     });
 
     it("should apply Seer's cross-event filters", async () => {
@@ -3565,44 +3566,94 @@ describe("search_events", () => {
       expect(result).toContain(
         "Only includes results whose trace also has matching spans `span.op:db`, logs `severity:error`.",
       );
+      expect(result).not.toContain("**Warning:**");
     });
 
-    it("should note Seer's cross-event filters for a time series", async () => {
-      mswServer.use(
-        mockOrganization(["gen-ai-features", "gen-ai-search-agent-translate"]),
-        mockSeerState({
-          status: "completed",
-          final_response: {
-            responses: [
-              {
-                ...seerQuery,
-                group_by: [],
-                visualization: [
-                  { chart_type: 1, y_axes: ["count()"], interval: "1h" },
-                ],
-                sort: "-count()",
-                log_query: "severity:error",
-              },
-            ],
-            unsupported_reason: null,
-          },
-        }),
-        http.get(
-          "https://sentry.io/api/0/organizations/test-org/events-stats/",
-          ({ request }) => {
-            const url = new URL(request.url);
-            expect(url.searchParams.has("logQuery")).toBe(false);
-            return HttpResponse.json({ data: [] });
-          },
-        ),
-      );
+    it.each([false, undefined, true])(
+      "warns about unapplied time-series filters with includeExplanation=%s",
+      async (includeExplanation) => {
+        mswServer.use(
+          mockOrganization([
+            "gen-ai-features",
+            "gen-ai-search-agent-translate",
+          ]),
+          mockSeerState({
+            status: "completed",
+            final_response: {
+              responses: [
+                {
+                  ...seerQuery,
+                  group_by: [],
+                  visualization: [
+                    { chart_type: 1, y_axes: ["count()"], interval: "1h" },
+                  ],
+                  sort: "-count()",
+                  span_query: "span.op:db",
+                  log_query: "severity:error",
+                  metric_query: "metric.name:requests",
+                },
+              ],
+              unsupported_reason: null,
+            },
+          }),
+          http.get(
+            "https://sentry.io/api/0/organizations/test-org/events-stats/",
+            ({ request }) => {
+              const url = new URL(request.url);
+              expect(url.searchParams.has("spanQuery")).toBe(false);
+              expect(url.searchParams.has("logQuery")).toBe(false);
+              expect(url.searchParams.has("metricQuery")).toBe(false);
+              return HttpResponse.json({
+                data: [[1757548800, [{ count: 100 }]]],
+              });
+            },
+          ),
+        );
 
-      const result = await searchEvents.handler(seerParams, context);
+        const result = await searchEvents.handler(
+          {
+            ...seerParams,
+            includeExplanation:
+              searchEvents.inputSchema.includeExplanation.parse(
+                includeExplanation,
+              ),
+          },
+          context,
+        );
 
-      expect(result).toContain(
-        "Seer also suggested cross-event filters (logs `severity:error`), which time series results do not apply.",
-      );
-    });
+        const warning =
+          "**Warning:** Time series results are unfiltered by the requested cross-event filters (spans `span.op:db`, logs `severity:error`, metrics `metric.name:requests`). Counts and other values may include events outside the requested subset.";
+        expect(result.startsWith(`${warning}\n\n`)).toBe(true);
+        expect(result.split(warning)).toHaveLength(2);
+        expect(result.includes("Translated by Seer's search agent.")).toBe(
+          includeExplanation === true,
+        );
+        expect(result).toContain("- **Total**: 100");
+        if (includeExplanation === false) {
+          expect(result).toMatchInlineSnapshot(`
+            "**Warning:** Time series results are unfiltered by the requested cross-event filters (spans \`span.op:db\`, logs \`severity:error\`, metrics \`metric.name:requests\`). Counts and other values may include events outside the requested subset.
+
+            # Search Results for "slowest http requests in the last day"
+
+            ## count() over time
+            - **Interval**: \`1h\`
+            - **Time range**: Last 24h
+            - **Total**: 100
+            - **Peak**: 100 at 2025-09-11 00:00
+
+            ## Buckets
+
+            | Time (UTC) | Value |
+            | --- | --- |
+            | 2025-09-11 00:00 | 100 |
+
+            **View these results in Sentry**:
+            https://test-org.sentry.io/explore/traces/?query=span.op%3Ahttp.client&project=42&aggregateField=%7B%22yAxes%22%3A%5B%22count%28%29%22%5D%7D&mode=aggregate&sort=-count%28%29&statsPeriod=24h&table=span
+            Please tell the user this dashboard link is available if they want to open the results in Sentry."
+          `);
+        }
+      },
+    );
 
     it("should keep a grouped Seer query with an interval as a table", async () => {
       mswServer.use(
