@@ -95,6 +95,7 @@ export function explicitProjectSlugs(
  *
  * @param org - Organization slug
  * @param projects - Project slugs; omit or pass an empty list for `org/`
+ * @returns `org/a,b` for a project list, or `org/` without projects
  */
 export function formatProjectTarget(
   org: string,

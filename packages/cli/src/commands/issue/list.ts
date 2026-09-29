@@ -706,10 +706,13 @@ async function fetchOrganizationIssues(
 
 /** Options for {@link handleOrganizationIssues}. */
 type OrganizationIssuesOptions = {
+  /** Organization slug; the dispatcher has already resolved DSN-style identifiers. */
   org: string;
   /** Project slugs from `org/a,b`; omit for an org-wide listing. */
   projects?: readonly string[];
+  /** Parsed `issue list` flags (query, sort, limit, cursor, output options). */
   flags: ListFlags;
+  /** Time window from `--period`, sent as `statsPeriod` or `start`/`end`. */
   timeRange: TimeRange;
 };
 
@@ -860,7 +863,7 @@ async function handleOrganizationIssues(
     const projectSlug = issue.project?.slug ?? "";
     return {
       issue,
-      // org-all: org context comes from the `org` param; issue.organization may be absent
+      // Org context comes from the request's `org`; issue.organization may be absent
       orgSlug: org,
       formatOptions: {
         projectSlug,

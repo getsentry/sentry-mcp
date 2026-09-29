@@ -678,6 +678,10 @@ Commands select a capability wrapper instead of performing API lookups:
   organization or a project.
 - `resolveOrgOnlyTarget()` / `resolveOrgOnlyFromArg()` return the effective
   organization while preserving project-first precedence for bare targets.
+- `resolveProjectIdsInOrg()` / `findProjectsInOrg()` resolve a
+  comma-separated `org/a,b` selector: numeric IDs for a single request
+  (unknown slugs are an error), or the projects themselves plus the slugs
+  that returned 404.
 
 Do not call `findProjectsBySlug()` or implement org fallback directly in a
 command. `sentry init` is the intentional not-found exception: it calls the

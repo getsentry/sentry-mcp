@@ -2054,15 +2054,22 @@ describe("issue list: comma-separated project slugs", () => {
     expect(listIssuesAllPagesMock).not.toHaveBeenCalled();
   });
 
-  test("reports every unknown slug in one error", async () => {
+  test("reports every unknown slug in one error with attributed suggestions", async () => {
     const error = await func
-      .call(createContext().context, baseFlags, "test-org/nope,web,gone")
+      .call(createContext().context, baseFlags, "test-org/workr,web,nope")
       .catch((caught: Error) => caught);
 
     expect(error).toBeInstanceOf(ResolutionError);
-    expect((error as Error).message).toContain(
-      "Projects 'nope', 'gone' not found in organization 'test-org'"
+    const { message, suggestions } = error as ResolutionError;
+    expect(message).toContain(
+      "Projects 'workr', 'nope' not found in organization 'test-org'"
     );
+    expect(suggestions).toContain("'workr': Similar projects: 'worker'");
+    expect(
+      suggestions.filter((line) => line.includes("Check the project slug at"))
+    ).toEqual([
+      "Check the project slug at https://sentry.io/organizations/test-org/projects/",
+    ]);
     expect(listIssuesAllPagesMock).not.toHaveBeenCalled();
   });
 

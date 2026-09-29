@@ -138,11 +138,12 @@ export async function listIssuesPaginated(
     sort?: IssueSort;
     statsPeriod?: string;
     /**
-     * Project IDs or slugs sent as the repeated `project` query param. Selects
+     * Numeric project IDs sent as the repeated `project` query param. Selects
      * projects directly, bypassing the "actively selected" requirement that
-     * `project:<slug>` search syntax is subject to.
+     * `project:<slug>` search syntax is subject to. IDs only: self-hosted
+     * releases before 26.6 reject slugs in this param.
      */
-    projects?: ReadonlyArray<number | string>;
+    projects?: readonly number[];
     /** Controls the time resolution of inline stats data. "auto" adapts to statsPeriod. */
     groupStatsPeriod?: "" | "14d" | "24h" | "auto";
     /** Fields to collapse (omit) from the response for performance.
@@ -219,8 +220,8 @@ export async function listIssuesAllPages(
     limit: number;
     sort?: IssueSort;
     statsPeriod?: string;
-    /** Project IDs or slugs to select in one organization-scoped request. */
-    projects?: ReadonlyArray<number | string>;
+    /** Numeric project IDs to select in one organization-scoped request. */
+    projects?: readonly number[];
     /** Controls the time resolution of inline stats data. "auto" adapts to statsPeriod. */
     groupStatsPeriod?: "" | "14d" | "24h" | "auto";
     /** Resume pagination from this cursor instead of starting from the beginning. */

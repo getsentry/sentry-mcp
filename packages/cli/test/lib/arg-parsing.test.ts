@@ -73,17 +73,6 @@ describe("parseOrgProjectArg", () => {
     });
   });
 
-  test("comma-separated slugs return explicit with projects", () => {
-    expect(
-      parseOrgProjectArg("acme/frontend,backend", PROJECT_LIST_OPTIONS)
-    ).toEqual({
-      type: "explicit",
-      org: "acme",
-      project: "frontend",
-      projects: ["frontend", "backend"],
-    });
-  });
-
   test("trims and de-duplicates comma-separated slugs", () => {
     expect(
       parseOrgProjectArg("acme/web, api,web", PROJECT_LIST_OPTIONS)

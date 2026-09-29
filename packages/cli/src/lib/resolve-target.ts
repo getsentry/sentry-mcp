@@ -1049,9 +1049,8 @@ export async function fetchProjectId(
  * Look up the projects of a comma-separated selector (`org/web,api`).
  *
  * Each slug is fetched directly and in parallel, so the cost follows the
- * number of slugs rather than the size of the organization, and a project is
- * never reported missing just because a truncated catalog did not reach it.
- * The caller decides how to treat `missing`.
+ * number of slugs rather than the size of the organization. The caller
+ * decides how to treat `missing`.
  *
  * @param org - Organization slug
  * @param slugs - Project slugs to find
@@ -1084,6 +1083,40 @@ export async function findProjectsInOrg(
 }
 
 /**
+ * Merge the not-found errors of several selector slugs into one.
+ *
+ * Suggestions every slug shares (such as the org's projects page) are listed
+ * once; the rest are prefixed with the slug they belong to, so similar-project
+ * hints stay attributable.
+ *
+ * @param org - Organization slug the selector was resolved in
+ * @param misses - Unknown slugs with the error their lookup raised
+ * @returns A single error naming every unknown slug
+ */
+function combineProjectNotFoundErrors(
+  org: string,
+  misses: readonly { slug: string; error: ResolutionError }[]
+): ResolutionError {
+  const [first, ...others] = misses.map(
+    ({ error }) => new Set(error.suggestions)
+  );
+  const shared = [...(first ?? [])].filter((suggestion) =>
+    others.every((suggestions) => suggestions.has(suggestion))
+  );
+  const specific = misses.flatMap(({ slug, error }) =>
+    error.suggestions
+      .filter((suggestion) => !shared.includes(suggestion))
+      .map((suggestion) => `'${slug}': ${suggestion}`)
+  );
+  return new ResolutionError(
+    `Projects ${misses.map(({ slug }) => `'${slug}'`).join(", ")}`,
+    `not found in organization '${org}'`,
+    `sentry project list ${org}/`,
+    [...specific, ...shared]
+  );
+}
+
+/**
  * Resolve the project slugs of a comma-separated selector to numeric IDs.
  *
  * Each slug takes the same cache-first path as a single `<org>/<project>`
@@ -1098,7 +1131,8 @@ export async function findProjectsInOrg(
  * @param slugs - Project slugs to resolve
  * @returns Numeric project IDs in input order
  * @throws {ResolutionError} When any slug does not exist in `org`; a single
- *   miss keeps the similar-project suggestions of the single-project path
+ *   miss keeps the error of the single-project path, several misses are
+ *   merged with each slug's suggestions
  * @throws The underlying error when a lookup fails for any other reason
  */
 export async function resolveProjectIdsInOrg(
@@ -1123,18 +1157,15 @@ export async function resolveProjectIdsInOrg(
   if (failure) {
     throw failure.error;
   }
-  const missing = lookups.filter(({ error }) => error !== undefined);
-  const [onlyMissing] = missing;
-  if (onlyMissing && missing.length === 1) {
-    throw onlyMissing.error;
+  const misses = lookups.flatMap(({ slug, error }) =>
+    error instanceof ResolutionError ? [{ slug, error }] : []
+  );
+  const [onlyMiss] = misses;
+  if (onlyMiss && misses.length === 1) {
+    throw onlyMiss.error;
   }
-  if (missing.length > 1) {
-    throw new ResolutionError(
-      `Projects ${missing.map(({ slug }) => `'${slug}'`).join(", ")}`,
-      `not found in organization '${org}'`,
-      `sentry project list ${org}/`,
-      ["Check the project slugs and try again"]
-    );
+  if (misses.length > 1) {
+    throw combineProjectNotFoundErrors(org, misses);
   }
   return lookups.map(({ slug, id }) => {
     if (id === undefined) {
