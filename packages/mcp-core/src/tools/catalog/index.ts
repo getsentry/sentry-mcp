@@ -36,6 +36,8 @@ import getSpanDetails from "./get-span-details";
 import getReplayDetails from "./get-replay-details";
 import getEventAttachment from "./get-event-attachment";
 import updateIssue from "./update-issue";
+import linkIssue from "./link-issue";
+import unlinkIssue from "./unlink-issue";
 import searchEvents from "./search-events";
 import createTeam from "./create-team";
 import createProject from "./create-project";
@@ -131,6 +133,8 @@ const catalogTools = {
   get_replay_details: getReplayDetails,
   get_event_attachment: getEventAttachment,
   update_issue: updateIssue,
+  link_issue: linkIssue,
+  unlink_issue: unlinkIssue,
   search_events: searchEvents,
   create_team: createTeam,
   create_project: createProject,

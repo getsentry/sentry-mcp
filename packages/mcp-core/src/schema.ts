@@ -64,6 +64,14 @@ export const ParamIssueUrl = z
     "The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43",
   );
 
+export const ParamExternalIssueUrl = z
+  .string()
+  .url()
+  .trim()
+  .describe(
+    "URL of the existing external ticket or GitHub pull request. For Sentry Apps, use the canonical issue URL shown by the provider.",
+  );
+
 export const ParamReplayId = z
   .string()
   .trim()
