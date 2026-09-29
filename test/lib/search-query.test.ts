@@ -99,6 +99,69 @@ describe("sanitizeQuery: AND", () => {
 });
 
 // ---------------------------------------------------------------------------
+// project:<digits> → project_id
+// ---------------------------------------------------------------------------
+
+describe("sanitizeQuery: numeric project:", () => {
+  test("rewrites a numeric project: filter to project_id", () => {
+    expect(
+      sanitizeQuery("project:4511730126487632 environment:vercel-production")
+    ).toBe("project_id:4511730126487632 environment:vercel-production");
+  });
+
+  test("rewrites a numeric project: in-list", () => {
+    expect(
+      sanitizeQuery("is:unresolved project:[4505521413357568,6442225]")
+    ).toBe("is:unresolved project_id:[4505521413357568,6442225]");
+  });
+
+  test("rewrites a negated numeric project: filter", () => {
+    expect(sanitizeQuery("!project:1423462 lastSeen:-1h")).toBe(
+      "!project_id:1423462 lastSeen:-1h"
+    );
+  });
+
+  test("leaves project slugs alone", () => {
+    expect(sanitizeQuery("project:frontend is:unresolved")).toBe(
+      "project:frontend is:unresolved"
+    );
+  });
+
+  test("leaves project_id numeric filters alone", () => {
+    expect(sanitizeQuery("project_id:4511730126487632")).toBe(
+      "project_id:4511730126487632"
+    );
+  });
+
+  test("leaves namespaced project keys alone", () => {
+    expect(sanitizeQuery("bolt.project_id:70054175")).toBe(
+      "bolt.project_id:70054175"
+    );
+    expect(sanitizeQuery("bolt.project:70054175")).toBe(
+      "bolt.project:70054175"
+    );
+  });
+
+  test("does not rewrite a numeric id inside a quoted value", () => {
+    expect(sanitizeQuery('message:"project:4511730126487632"')).toBe(
+      'message:"project:4511730126487632"'
+    );
+  });
+
+  test("does not rewrite mixed slug/numeric in-lists", () => {
+    expect(sanitizeQuery("project:[frontend,6442225]")).toBe(
+      "project:[frontend,6442225]"
+    );
+  });
+
+  test("rewrites numeric project: then OR in one step", () => {
+    expect(sanitizeQuery("project:123 OR project:456")).toBe(
+      "project_id:[123,456]"
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // OR → in-list rewrites (successful)
 // ---------------------------------------------------------------------------
 
