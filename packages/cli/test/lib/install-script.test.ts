@@ -9,6 +9,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -42,7 +43,9 @@ if [[ "$1" == "cli" && "$2" == "setup" ]]; then
   setup_dir="\${SENTRY_TEST_SETUP_INSTALL_DIR:-$SENTRY_INSTALL_DIR}"
   mkdir -p "$setup_dir"
   cp "$0" "$setup_dir/sentry"
-  rm "$0"
+  if [[ "\${SENTRY_TEST_KEEP_TEMP_BINARY:-}" != "1" ]]; then
+    rm "$0"
+  fi
   exit "\${SENTRY_TEST_SETUP_EXIT:-0}"
 fi
 printf '%s\\n' "$@" >> "$SENTRY_TEST_DIR/post-args"
@@ -118,6 +121,12 @@ esac
     return existsSync(path)
       ? readFileSync(path, "utf8").trim().split("\n")
       : [];
+  }
+
+  function installerTempFiles(): string[] {
+    return readdirSync(testDir).filter((name) =>
+      name.startsWith("sentry-install-")
+    );
   }
 
   function configureNightlyDownload(redirect: boolean): void {
@@ -275,6 +284,7 @@ process.exitCode = result.status ?? 1;
     ]);
     expect(recorded("post-args")).toEqual([]);
     expect(existsSync(join(installDir, "sentry"))).toBe(true);
+    expect(installerTempFiles()).toEqual([]);
   });
 
   test.each([
@@ -300,6 +310,7 @@ process.exitCode = result.status ?? 1;
       "--no-modify-path",
     ]);
     expect(existsSync(join(installDir, "sentry"))).toBe(true);
+    expect(installerTempFiles()).toEqual([]);
   });
 
   test("uses the legacy release only after a Toolkit tag returns HTTP 404", () => {
@@ -381,7 +392,8 @@ process.exitCode = result.status ?? 1;
     ]);
   });
 
-  test("connects setup to the controlling terminal without launching another process", () => {
+  test("connects setup to the controlling terminal and cleans up after setup", () => {
+    env.SENTRY_TEST_KEEP_TEMP_BINARY = "1";
     const result = runInTerminal();
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(recorded("setup-tty")).toEqual([
@@ -392,6 +404,7 @@ process.exitCode = result.status ?? 1;
     ]);
     expect(recorded("post-args")).toEqual([]);
     expect(existsSync(join(installDir, "sentry"))).toBe(true);
+    expect(installerTempFiles()).toEqual([]);
   });
 
   test.each([
@@ -419,6 +432,7 @@ process.exitCode = result.status ?? 1;
 
   test("hands off to init instead of login when SENTRY_INIT is set", () => {
     env.SENTRY_INIT = "1";
+    env.SENTRY_TEST_KEEP_TEMP_BINARY = "1";
     env.SENTRY_TEST_POST_EXIT = "7";
     const result = runInTerminal();
     expect(result.status, result.stdout + result.stderr).toBe(7);
@@ -431,6 +445,7 @@ process.exitCode = result.status ?? 1;
       "2:true",
       "controlling:true",
     ]);
+    expect(installerTempFiles()).toEqual([]);
   });
 
   test("initializes the new binary instead of a stale install outside PATH", () => {

@@ -208,7 +208,7 @@ blob_headers="${tmpdir}/sentry-install-headers-$$"
 blob_file="${tmpdir}/sentry-install-blob-$$"
 version=""
 
-# Clean up temporary files on failure (setup handles the installed binary).
+# Clean up temporary files after setup or on failure.
 trap 'rm -f "$tmp_binary" "$blob_headers" "$blob_file"' EXIT
 
 if [[ "$requested_version" == "nightly" ]]; then
@@ -392,14 +392,13 @@ fi
 # this is a fresh human install before starting login.
 trap - ERR
 if [[ "${SENTRY_INIT:-}" != "1" && -t 1 && -t 2 ]] && { exec 3</dev/tty; } 2>/dev/null; then
-  trap - EXIT
   # shellcheck disable=SC2086
-  exec "$tmp_binary" cli setup $setup_args <&3 3<&-
+  "$tmp_binary" cli setup $setup_args <&3 3<&-
+  exit 0
 fi
 
 # shellcheck disable=SC2086
 "$tmp_binary" cli setup $setup_args
-trap - EXIT
 
 # Optionally launch the setup wizard after install.
 # Reconnect stdin to the real terminal so the wizard can prompt
@@ -435,5 +434,5 @@ if [[ "${SENTRY_INIT:-}" == "1" ]]; then
   if [[ ! -e /dev/tty ]]; then
     die "SENTRY_INIT=1 requires an interactive terminal (/dev/tty not available)" "init"
   fi
-  exec "$sentry_bin" init </dev/tty
+  "$sentry_bin" init </dev/tty
 fi
