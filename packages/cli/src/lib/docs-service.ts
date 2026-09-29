@@ -1,3 +1,4 @@
+import { formatAuthHeader } from "./auth-header.js";
 import { customFetch } from "./custom-ca.js";
 import { refreshToken } from "./db/auth.js";
 import type { DocsProjectContext } from "./docs-context.js";
@@ -25,7 +26,7 @@ async function postDocs<T>(
   const response = await customFetch(`${MASTRA_API_URL}${path}`, {
     body: JSON.stringify(body),
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: formatAuthHeader(token),
       "Content-Type": "application/json",
     },
     method: "POST",

@@ -65,7 +65,11 @@ describe("CVE: custom-headers leak (share URL + auth-login bypass)", () => {
     }) as typeof fetch;
 
     try {
-      await getSharedIssue("https://evil.com", "deadbeef12345678").catch(() => {
+      await getSharedIssue(
+        "https://evil.com",
+        "test-org",
+        "deadbeef12345678"
+      ).catch(() => {
         /* we only care about headers, not the response */
       });
       expect(capturedHeaders?.get("X-IAP-Token")).toBeNull();

@@ -1,10 +1,11 @@
 /**
  * `sentry event send` — Send a Sentry event from CLI flags or a JSON file.
  *
- * Unlike most commands, this authenticates via a DSN (not a Bearer token),
- * so no `sentry auth login` is required. The DSN can be provided via:
- *   1. --dsn flag
+ * Unlike most commands, this authenticates via a DSN (not a Bearer token).
+ * The DSN is resolved in order:
+ *   1. A positional `<dsn>`, `<project>`, or `<org>/<project>`
  *   2. SENTRY_DSN environment variable
+ *   3. Auto-detection from the current project (`.env`, source, env files)
  */
 
 import type { DsnComponents, Event } from "@sentry/core";
@@ -16,8 +17,11 @@ import {
   type SendEventFlags,
 } from "../../lib/envelope/event-builder.js";
 import {
+  peelEventSendTarget,
+  resolveEventSendDsn,
+} from "../../lib/envelope/event-send-dsn.js";
+import {
   readFileBytes,
-  requireDsn,
   sendEnvelopeRequest,
 } from "../../lib/envelope/transport.js";
 import { ConfigError, ValidationError } from "../../lib/errors.js";
@@ -94,12 +98,17 @@ export const sendCommand = buildCommand({
     fullDescription: `\
 Send a Sentry event to the ingest pipeline using DSN-based authentication.
 
-No login required — provide a DSN via --dsn or the SENTRY_DSN environment variable.
+The first positional may be a \`<dsn>\`, \`<project>\`, or
+\`<org>/<project>\`. Project targets require login and must have exactly one
+active DSN. Without a target, the command uses \`SENTRY_DSN\` or auto-detects
+a DSN from the current project.
 
 ## Building an event from flags
 
 \`\`\`
 sentry event send -m "Something went wrong" -l error --tag env:prod
+sentry event send sentry/cli -m "Something went wrong"
+sentry event send "https://key@o123.ingest.us.sentry.io/456" -m "Test"
 \`\`\`
 
 ## Sending from a JSON file
@@ -120,7 +129,6 @@ built entirely from the file contents.
 
 | Flag | Description |
 |------|-------------|
-| \`--dsn\` | DSN to send to (overrides SENTRY_DSN) |
 | \`-m\` / \`--message\` | Event message (repeat for multi-line) |
 | \`-l\` / \`--level\` | Severity: debug, info, warning, error, fatal |
 | \`-r\` / \`--release\` | Release version |
@@ -141,18 +149,14 @@ built entirely from the file contents.
     positional: {
       kind: "array",
       parameter: {
-        brief: "Path(s) to JSON event file(s) to send",
+        brief:
+          "Optional DSN/project target followed by JSON event file path(s)",
+        placeholder: "target-or-file",
         parse: String,
         optional: true,
       },
     },
     flags: {
-      dsn: {
-        kind: "parsed",
-        parse: String,
-        brief: "DSN to send events to (overrides SENTRY_DSN env var)",
-        optional: true,
-      },
       message: {
         kind: "parsed",
         parse: String,
@@ -276,13 +280,13 @@ built entirely from the file contents.
   async *func(
     this: SentryContext,
     flags: SendEventFlags & {
-      dsn?: string;
       raw?: boolean;
       json?: boolean;
     },
     ...files: string[]
   ) {
-    const dsn = requireDsn(flags);
+    const { target, files: eventFiles } = peelEventSendTarget(files);
+    const dsn = await resolveEventSendDsn(this.cwd, target);
     let dsnComponents: ReturnType<typeof makeDsn>;
     try {
       dsnComponents = makeDsn(dsn);
@@ -291,11 +295,11 @@ built entirely from the file contents.
       dsnComponents = undefined;
     }
     if (!dsnComponents) {
-      throw new ValidationError(`Invalid DSN: ${dsn}`, "dsn");
+      throw new ValidationError(`Invalid DSN: ${dsn}`, "target");
     }
 
-    if (files.length > 0) {
-      for (const file of files) {
+    if (eventFiles.length > 0) {
+      for (const file of eventFiles) {
         const { body, eventId } = await buildFilePayload(
           file,
           flags.raw ?? false,

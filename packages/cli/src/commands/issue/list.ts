@@ -77,8 +77,9 @@ import {
 } from "../../lib/org-list.js";
 import { withProgress } from "../../lib/polling.js";
 import {
+  type ProjectSearchTargetResolution,
   type ResolvedTarget,
-  resolveTargetsFromParsedArg,
+  resolveProjectBoundTargets,
 } from "../../lib/resolve-target.js";
 import {
   SEARCH_SYNTAX_REFERENCE,
@@ -810,6 +811,7 @@ type ResolvedTargetsOptions = {
   flags: ListFlags;
   cwd: string;
   timeRange: TimeRange;
+  projectSearchResolution?: ProjectSearchTargetResolution;
 };
 
 /** Default --period value (used to detect user-implicit vs explicit). */
@@ -1023,12 +1025,13 @@ function appendProjectMembershipHint(detail: string | undefined): string {
 async function handleResolvedTargets(
   options: ResolvedTargetsOptions
 ): Promise<IssueListResult> {
-  const { parsed, flags, cwd, timeRange } = options;
+  const { parsed, flags, cwd, timeRange, projectSearchResolution } = options;
 
   const { targets, footer, skippedSelfHosted, detectedDsns } =
-    await resolveTargetsFromParsedArg(parsed, {
+    await resolveProjectBoundTargets(parsed, {
       cwd,
       usageHint: USAGE_HINT,
+      projectSearchResolution,
       enrichProjectIds: true,
       checkIssueShortId: true,
     });
@@ -1324,7 +1327,6 @@ async function handleResolvedTargets(
 /** Metadata for the shared dispatch infrastructure. */
 const issueListMeta: ListCommandMeta = {
   paginationKey: PAGINATION_KEY,
-  entityName: "issue",
   entityPlural: "issues",
   commandPrefix: "sentry issue list",
 };
@@ -1608,10 +1610,8 @@ export const listCommand = buildListCommand("issue", {
       cwd,
       flags,
       parsed,
-      // When a bare slug matches a cached org, silently redirect to org-all
-      // mode instead of erroring (CLI-MC, 17 users). The user typed an org
-      // slug — their intent is clear, and org-all handles it correctly.
-      orgSlugMatchBehavior: "redirect",
+      // Bare slug: the project wins when one exists. If none does and the
+      // slug is an organization, list that org. `<org>/` is the explicit form.
       // Multi-target modes (auto-detect, explicit, project-search) handle
       // compound cursor pagination themselves via handleResolvedTargets.
       allowCursorInModes: ["auto-detect", "explicit", "project-search"],

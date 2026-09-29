@@ -208,7 +208,7 @@ export const uploadCommand = buildCommand({
     fullDescription:
       "Upload JavaScript sourcemaps and source files to Sentry using " +
       "debug-ID-based matching.\n\n" +
-      "Automatically injects debug IDs into any files that don't already have them.\n" +
+      "Automatically injects missing debug IDs and runtime registration snippets, preserving existing IDs.\n" +
       "Org/project are auto-detected from DSN, env vars, or config defaults.\n\n" +
       "Exits with an error if zero JS + sourcemap pairs are discovered " +
       "(typical cause: bundler not emitting .map files). Pass " +

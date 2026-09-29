@@ -25,7 +25,7 @@ vi.mock("../../../src/lib/api-client.js", async (importOriginal) => {
 // biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
 import * as apiClient from "../../../src/lib/api-client.js";
 import { ResolutionError, ValidationError } from "../../../src/lib/errors.js";
-import { resolveProjectBySlug } from "../../../src/lib/resolve-target.js";
+import { resolveProjectBoundSlug } from "../../../src/lib/resolve-target.js";
 
 const VALID_TRACE_ID = "aaaa1111bbbb2222cccc3333dddd4444";
 
@@ -83,7 +83,7 @@ describe("preProcessArgs", () => {
   });
 });
 
-describe("resolveProjectBySlug", () => {
+describe("resolveProjectBoundSlug", () => {
   const HINT = "sentry trace view [<org>/<project>/]<trace-id>";
   let findProjectsBySlugSpy: ReturnType<typeof spyOn>;
 
@@ -99,7 +99,7 @@ describe("resolveProjectBySlug", () => {
     test("throws ResolutionError when project not found", async () => {
       findProjectsBySlugSpy.mockResolvedValue({ projects: [], orgs: [] });
 
-      await expect(resolveProjectBySlug("my-project", HINT)).rejects.toThrow(
+      await expect(resolveProjectBoundSlug("my-project", HINT)).rejects.toThrow(
         ResolutionError
       );
     });
@@ -108,7 +108,7 @@ describe("resolveProjectBySlug", () => {
       findProjectsBySlugSpy.mockResolvedValue({ projects: [], orgs: [] });
 
       try {
-        await resolveProjectBySlug("frontend", HINT);
+        await resolveProjectBoundSlug("frontend", HINT);
         expect.unreachable("Should have thrown");
       } catch (error) {
         expect(error).toBeInstanceOf(ResolutionError);
@@ -133,7 +133,7 @@ describe("resolveProjectBySlug", () => {
         orgs: [],
       });
 
-      await expect(resolveProjectBySlug("frontend", HINT)).rejects.toThrow(
+      await expect(resolveProjectBoundSlug("frontend", HINT)).rejects.toThrow(
         ValidationError
       );
     });
@@ -158,7 +158,7 @@ describe("resolveProjectBySlug", () => {
       });
 
       try {
-        await resolveProjectBySlug(
+        await resolveProjectBoundSlug(
           "frontend",
           HINT,
           "sentry trace view <org>/frontend trace-456"
@@ -189,7 +189,7 @@ describe("resolveProjectBySlug", () => {
         orgs: [],
       });
 
-      const result = await resolveProjectBySlug("backend", HINT);
+      const result = await resolveProjectBoundSlug("backend", HINT);
 
       expect(result).toMatchObject({
         org: "my-company",
@@ -211,7 +211,7 @@ describe("resolveProjectBySlug", () => {
         orgs: [],
       });
 
-      const result = await resolveProjectBySlug("mobile-app", HINT);
+      const result = await resolveProjectBoundSlug("mobile-app", HINT);
 
       expect(result.org).toBe("acme-industries");
       expect(result.project).toBe("mobile-app");

@@ -7,6 +7,8 @@
  * @module
  */
 
+import { redactCredentialText } from "./credential-redaction.js";
+
 /** Options for programmatic CLI invocation. */
 export type SentryOptions = {
   /**
@@ -73,13 +75,13 @@ export class SentryError extends Error {
   /** CLI exit code (non-zero). */
   readonly exitCode: number;
 
-  /** Raw stderr output from the command. */
+  /** Captured stderr output with recognizable credentials redacted. */
   readonly stderr: string;
 
   constructor(message: string, exitCode: number, stderr: string) {
-    super(message);
+    super(redactCredentialText(message));
     this.name = "SentryError";
     this.exitCode = exitCode;
-    this.stderr = stderr;
+    this.stderr = redactCredentialText(stderr);
   }
 }

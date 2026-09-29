@@ -5,6 +5,7 @@ import {
   getUserRegions,
   listOrganizationsUncached,
 } from "../../lib/api-client.js";
+import { normalizeAuthToken } from "../../lib/auth-header.js";
 import { buildCommand, numberParser } from "../../lib/command.js";
 import { normalizeUrl } from "../../lib/constants.js";
 import {
@@ -459,6 +460,10 @@ export const loginCommand = buildCommand({
     // (--token + --read-only/--scope, --read-only + --scope) and invalid
     // scope values fail fast before any network or DB work.
     const oauthScope = resolveLoginScope(flags);
+    // Validate explicit credentials before changing the host or replacing an
+    // existing session. An empty --token is invalid, not an OAuth request.
+    const token =
+      flags.token === undefined ? undefined : normalizeAuthToken(flags.token);
 
     // Apply --url first so the device flow / token refresh target the
     // requested instance. Default URL persistence is deferred until login
@@ -490,9 +495,9 @@ export const loginCommand = buildCommand({
       // Non-fatal: cache directory may not exist
     }
 
-    if (flags.token) {
+    if (token !== undefined) {
       // Save token first (with host scope), then validate by fetching user regions
-      await setAuthToken(flags.token, undefined, undefined, {
+      await setAuthToken(token, undefined, undefined, {
         host: effectiveHost,
       });
 

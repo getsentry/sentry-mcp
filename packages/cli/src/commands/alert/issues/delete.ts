@@ -16,7 +16,7 @@ import {
   isConfirmationBypassed,
   requireExplicitTarget,
 } from "../../../lib/mutate-command.js";
-import { resolveTargetsFromParsedArg } from "../../../lib/resolve-target.js";
+import { resolveProjectBoundTargets } from "../../../lib/resolve-target.js";
 import { parseIssueRuleArg, resolveIssueAlertRule } from "./rule-resolve.js";
 
 const USAGE_HINT =
@@ -100,7 +100,7 @@ export const deleteCommand = buildDeleteCommand({
       );
     }
 
-    const { targets } = await resolveTargetsFromParsedArg(parsed, {
+    const { targets } = await resolveProjectBoundTargets(parsed, {
       cwd,
       usageHint: USAGE_HINT,
     });

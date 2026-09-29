@@ -5,10 +5,11 @@
  * Automatically runs root cause analysis if not already done.
  */
 
+import { isatty } from "node:tty";
 import type { SentryContext } from "../../context.js";
 import { triggerSolutionPlanning } from "../../lib/api-client.js";
 import { buildCommand } from "../../lib/command.js";
-import { ApiError } from "../../lib/errors.js";
+import { ApiError, CliError } from "../../lib/errors.js";
 import { CommandOutput } from "../../lib/formatters/output.js";
 import {
   formatSolution,
@@ -154,6 +155,48 @@ function buildPlanData(state: AutofixState): PlanData {
   return data;
 }
 
+/**
+ * Root cause analysis paused waiting for the user to confirm the identified root
+ * cause before solution planning. When the session is interactive (a TTY and not
+ * JSON output), show the root cause and ask whether to continue; the caller then
+ * advances the run via {@link triggerSolutionPlanning}, which is how the Sentry
+ * UI proceeds from this state.
+ *
+ * The Sentry API has no endpoint to submit a specific `cause_id` from the CLI
+ * (selecting among candidates happens through the web UI's interactive run
+ * state), so this is a confirm-to-continue rather than a picker. Throws a
+ * {@link CliError} pointing at the Sentry UI when we cannot prompt (JSON mode,
+ * non-TTY, no root cause) or the user declines.
+ */
+async function confirmRootCauseAndContinue(
+  state: AutofixState,
+  json: boolean
+): Promise<void> {
+  const causes = json ? [] : extractRootCauses(state);
+  const primaryCause = causes[0];
+
+  if (isatty(0) && isatty(2) && primaryCause) {
+    const log = logger.withTag("issue.plan");
+    log.info("Root cause identified:");
+    log.info(`"${primaryCause.description}"`);
+
+    const proceed = await log.prompt("Generate a solution plan for it?", {
+      type: "confirm",
+      initial: true,
+    });
+
+    // consola returns a non-boolean (Symbol(clack:cancel)) when cancelled.
+    if (proceed === true) {
+      return;
+    }
+  }
+
+  throw new CliError(
+    "Root cause analysis requires your input before a plan can be generated.\n" +
+      "Open the issue in Sentry to select a root cause, then re-run this command."
+  );
+}
+
 export const planCommand = buildCommand({
   docs: {
     brief: "Generate a solution plan using Seer AI",
@@ -217,6 +260,13 @@ export const planCommand = buildCommand({
         json: flags.json,
       });
 
+      // Root cause analysis can pause waiting for the user to confirm the
+      // root cause before planning. When running interactively, confirm in the
+      // terminal and continue; otherwise point them at the Sentry UI.
+      if (state.status === "WAITING_FOR_USER_RESPONSE") {
+        await confirmRootCauseAndContinue(state, flags.json);
+      }
+
       // Check if solution already exists (skip if --force)
       if (!flags.force) {
         const existingSolution = extractSolution(state);
@@ -259,6 +309,13 @@ export const planCommand = buildCommand({
 
       if (finalState.status === "CANCELLED") {
         throw new Error("Plan creation was cancelled.");
+      }
+
+      if (finalState.status === "WAITING_FOR_USER_RESPONSE") {
+        throw new CliError(
+          "Plan creation requires your input in the Sentry UI.\n" +
+            "Open the issue in Sentry to provide the requested information, then re-run this command."
+        );
       }
 
       return yield new CommandOutput(buildPlanData(finalState));

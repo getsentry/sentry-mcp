@@ -12,6 +12,7 @@
  */
 
 import { getEnvelopeEndpointWithUrlEncodedAuth, makeDsn } from "@sentry/core";
+import { detectDsn } from "../dsn/index.js";
 import { ApiError, ConfigError, ValidationError } from "../errors.js";
 import { logger } from "../logger.js";
 
@@ -20,7 +21,7 @@ const log = logger.withTag("envelope.transport");
 /** Client name passed to getEnvelopeEndpointWithUrlEncodedAuth, which appends /<version> internally. */
 const SENTRY_CLIENT = "sentry-cli";
 
-/** Flags subset relevant to DSN resolution. */
+/** Optional `--dsn` flag exposed by some ingest commands. */
 export type DsnFlags = {
   dsn?: string;
 };
@@ -66,19 +67,47 @@ export function resolveDsn(flags: DsnFlags): string | undefined {
 }
 
 /**
- * Require a DSN to be available, throwing a helpful ConfigError if not.
+ * Resolve a DSN for envelope ingest: optional flag → `SENTRY_DSN` → project scan.
  *
- * Auto-detection via project scanning is intentionally deferred — callers
- * that want it can call the DSN detector before this.
+ * Used by ingest commands such as `event send` and `monitor run`. Returns `undefined`
+ * when none of those sources yield a DSN; callers decide whether to look up
+ * a project key via the Web API or throw.
+ *
+ * @param flags - Optional DSN flag source, with `SENTRY_DSN` fallback.
+ * @param cwd - Directory to scan for a project DSN when flag/env are absent.
+ */
+export async function resolveIngestDsn(
+  flags: DsnFlags,
+  cwd: string
+): Promise<string | undefined> {
+  const explicit = resolveDsn(flags);
+  if (explicit) {
+    return explicit;
+  }
+
+  const detected = await detectDsn(cwd);
+  if (detected) {
+    log.debug(`Using auto-detected DSN from ${detected.source}`);
+    return detected.raw;
+  }
+
+  return;
+}
+
+/**
+ * Require a DSN from `--dsn` or `SENTRY_DSN` only (no project scan).
+ *
+ * Prefer {@link resolveIngestDsn} for user-facing ingest commands. This
+ * narrower helper remains for callers that must not touch the filesystem
+ * (e.g. `bash-hook` generating a script).
  *
  * @param flags - DSN flag source (`--dsn`), with `SENTRY_DSN` fallback.
  * @param usageHint - Optional command-specific usage example shown in the
- *   error (e.g. `"sentry monitor run <slug> -- <command>"`). Defaults to the
- *   `event send` example.
+ *   error (e.g. `"sentry monitor run <slug> -- <command>"`).
  */
 export function requireDsn(
   flags: DsnFlags,
-  usageHint = "sentry event send --dsn <your-dsn>"
+  usageHint = "sentry bash-hook --dsn <your-dsn>"
 ): string {
   const dsn = resolveDsn(flags);
   if (dsn) {

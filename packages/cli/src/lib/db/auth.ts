@@ -3,6 +3,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { normalizeAuthToken, trimAuthToken } from "../auth-header.js";
 import { DEFAULT_SENTRY_URL, getConfiguredSentryUrl } from "../constants.js";
 import { getEnv } from "../env.js";
 import { getEnvTokenHost } from "../env-token-host.js";
@@ -91,23 +92,11 @@ export type AuthConfig = {
 };
 
 /**
- * Read the raw token string from environment variables, ignoring all filters.
- *
- * Unlike {@link getEnvToken}, this always returns the env token if set, even
- * when stored OAuth credentials would normally take priority. Used by the HTTP
- * layer to check "was an env token provided?" independent of whether it's being
- * used, and by the per-endpoint permission cache.
+ * Read the trimmed env token even when stored OAuth takes priority.
+ * Does not validate credentials that may never be used.
  */
 export function getRawEnvToken(): string | undefined {
-  const authToken = getEnv().SENTRY_AUTH_TOKEN?.trim();
-  if (authToken) {
-    return authToken;
-  }
-  const sentryToken = getEnv().SENTRY_TOKEN?.trim();
-  if (sentryToken) {
-    return sentryToken;
-  }
-  return;
+  return getEnvToken()?.token;
 }
 
 /**
@@ -120,13 +109,21 @@ export function getRawEnvToken(): string | undefined {
  * which check the DB first when `SENTRY_FORCE_ENV_TOKEN` is not set.
  */
 function getEnvToken(): { token: string; source: AuthSource } | undefined {
+  // Preserve presence rules: whitespace is unset, but control-only credentials
+  // must remain selected so validation cannot silently fall back to another identity.
   const authToken = getEnv().SENTRY_AUTH_TOKEN?.trim();
   if (authToken) {
-    return { token: authToken, source: "env:SENTRY_AUTH_TOKEN" };
+    return {
+      token: trimAuthToken(authToken) || authToken,
+      source: "env:SENTRY_AUTH_TOKEN",
+    };
   }
   const sentryToken = getEnv().SENTRY_TOKEN?.trim();
   if (sentryToken) {
-    return { token: sentryToken, source: "env:SENTRY_TOKEN" };
+    return {
+      token: trimAuthToken(sentryToken) || sentryToken,
+      source: "env:SENTRY_TOKEN",
+    };
   }
   return;
 }
@@ -146,14 +143,9 @@ export function isEnvTokenActive(): boolean {
  * Falls back to "SENTRY_AUTH_TOKEN" if no env var is set.
  */
 export function getActiveEnvVarName(): string {
-  // Match getRawEnvToken() priority: SENTRY_AUTH_TOKEN first, then SENTRY_TOKEN
-  if (getEnv().SENTRY_AUTH_TOKEN?.trim()) {
-    return "SENTRY_AUTH_TOKEN";
-  }
-  if (getEnv().SENTRY_TOKEN?.trim()) {
-    return "SENTRY_TOKEN";
-  }
-  return "SENTRY_AUTH_TOKEN";
+  return getEnvToken()?.source === "env:SENTRY_TOKEN"
+    ? "SENTRY_TOKEN"
+    : "SENTRY_AUTH_TOKEN";
 }
 
 export function getAuthConfig(): AuthConfig | undefined {
@@ -387,12 +379,14 @@ export type SetAuthTokenOptions = {
   host?: string;
 };
 
+/** Normalize an access token before storage; malformed input leaves the auth row unchanged. */
 export function setAuthToken(
   token: string,
   expiresIn?: number,
   newRefreshToken?: string,
   options?: SetAuthTokenOptions
 ): void {
+  const normalizedToken = normalizeAuthToken(token);
   withDbSpan("setAuthToken", () => {
     const db = getDatabase();
     const now = Date.now();
@@ -422,7 +416,7 @@ export function setAuthToken(
       "auth",
       {
         id: 1,
-        token,
+        token: normalizedToken,
         refresh_token: newRefreshToken ?? null,
         expires_at: expiresAt,
         issued_at: issuedAt,
@@ -609,23 +603,9 @@ async function performTokenRefresh(
   const { refreshAccessToken } = await import("../oauth.js");
   const { AuthError } = await import("../errors.js");
 
+  let tokenResponse: Awaited<ReturnType<typeof refreshAccessToken>>;
   try {
-    const tokenResponse = await refreshAccessToken(storedRefreshToken);
-    const now = Date.now();
-    const expiresAt = now + tokenResponse.expires_in * 1000;
-
-    await setAuthToken(
-      tokenResponse.access_token,
-      tokenResponse.expires_in,
-      tokenResponse.refresh_token ?? storedRefreshToken
-    );
-
-    return {
-      token: tokenResponse.access_token,
-      refreshed: true,
-      expiresAt,
-      expiresIn: tokenResponse.expires_in,
-    };
+    tokenResponse = await refreshAccessToken(storedRefreshToken);
   } catch (error) {
     // Only clear auth on explicit rejection, not network errors
     if (error instanceof AuthError) {
@@ -633,6 +613,25 @@ async function performTokenRefresh(
     }
     throw error;
   }
+
+  // Validate before SQLite can truncate NUL-containing credentials or replace
+  // the stored credentials with a malformed response. Leave those values unchanged.
+  const token = normalizeAuthToken(tokenResponse.access_token);
+  const now = Date.now();
+  const expiresAt = now + tokenResponse.expires_in * 1000;
+
+  await setAuthToken(
+    token,
+    tokenResponse.expires_in,
+    tokenResponse.refresh_token ?? storedRefreshToken
+  );
+
+  return {
+    token,
+    refreshed: true,
+    expiresAt,
+    expiresIn: tokenResponse.expires_in,
+  };
 }
 
 /** Get a valid token, refreshing if needed. Use force=true after 401 responses. */

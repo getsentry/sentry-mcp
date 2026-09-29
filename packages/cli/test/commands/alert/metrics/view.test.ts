@@ -56,7 +56,7 @@ describe("alert metrics view", () => {
     getRuleSpy = vi.spyOn(apiClient, "getMetricAlertRule");
     listRulesSpy = vi.spyOn(apiClient, "listMetricAlertsPaginated");
     openInBrowserSpy = vi.spyOn(browser, "openInBrowser");
-    resolveSpy = vi.spyOn(resolveTarget, "resolveOrgOptionalProjectFromArg");
+    resolveSpy = vi.spyOn(resolveTarget, "resolveOrgOnlyFromArg");
 
     openInBrowserSpy.mockResolvedValue(undefined);
   });
@@ -84,7 +84,7 @@ describe("alert metrics view", () => {
 
   test("numeric id: propagates non-404 API errors (e.g. 500)", async () => {
     const { context } = createContext();
-    resolveSpy.mockResolvedValue({ org: "test-org" });
+    resolveSpy.mockResolvedValue("test-org");
     getRuleSpy.mockRejectedValue(new ApiError("Server error", 500, "nope"));
     const func = (await viewCommand.loader()) as unknown as (
       this: unknown,
@@ -99,7 +99,7 @@ describe("alert metrics view", () => {
 
   test("numeric id: renders human output for the resolved metric alert rule", async () => {
     const { context, stdoutWrite } = createContext();
-    resolveSpy.mockResolvedValue({ org: "test-org" });
+    resolveSpy.mockResolvedValue("test-org");
     getRuleSpy.mockResolvedValue({
       ...baseRule,
       id: "9",
@@ -150,7 +150,7 @@ describe("alert metrics view", () => {
 
   test("name: no exact match with suggestions returns ValidationError with Did you mean", async () => {
     const { context, stdoutWrite } = createContext();
-    resolveSpy.mockResolvedValue({ org: "test-org" });
+    resolveSpy.mockResolvedValue("test-org");
     listRulesSpy.mockResolvedValue({
       data: [baseRule],
       nextCursor: undefined,

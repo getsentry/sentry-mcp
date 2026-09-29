@@ -135,9 +135,9 @@ sentry issue events FRONT-ABC --limit 50 --period 24h
 sentry issue events FRONT-ABC -c next
 ```
 
-### `sentry issue explain <issue>`
+### `sentry issue explain <issue...>`
 
-Analyze an issue's root cause using Seer AI
+Analyze one or more issues using Seer AI
 
 **Flags:**
 - `--force - Force new analysis even if one exists`
@@ -179,12 +179,13 @@ Generate a solution plan using Seer AI
 - `--force - Force new plan even if one exists`
 - `-f, --fresh - Bypass cache, re-detect projects, and fetch fresh data`
 
-### `sentry issue view <issue>`
+### `sentry issue view <issue...>`
 
-View details of a specific issue
+View details of one or more issues
 
 **Flags:**
 - `-w, --web - Open in browser`
+- `--force - Allow --web to open more than 5 issues`
 - `--spans <value> - Span tree depth limit (number, "all" for unlimited, "no" to disable) - (default: "3")`
 - `-f, --fresh - Bypass cache, re-detect projects, and fetch fresh data`
 

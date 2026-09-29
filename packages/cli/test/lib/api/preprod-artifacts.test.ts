@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse, safeParse } from "valibot";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { ApiError, ValidationError } from "../../../src/lib/errors.js";
+import { ApiError, EXIT, ValidationError } from "../../../src/lib/errors.js";
 
 const {
   customFetchMock,
@@ -157,6 +157,27 @@ describe("downloadBuildArtifact", () => {
       headers: Record<string, string>;
     };
     expect(init.headers.Authorization).toBe("Bearer secret-token");
+  });
+
+  test("rejects a malformed bearer before downloading a build or snapshot", async () => {
+    getAuthTokenMock.mockReturnValue("synthetic-prefix\nsynthetic-secret-tail");
+    for (const download of [
+      () =>
+        downloadBuildArtifact(
+          "https://us.sentry.io",
+          "https://us.sentry.io/dl/?response_format=ipa",
+          join(tmpDir, "out.ipa")
+        ),
+      () => openSnapshotArchive("my-org", "snap-1"),
+    ]) {
+      const error = await download().catch((caught: unknown) => caught);
+      expect(error).toMatchObject({
+        reason: "invalid",
+        exitCode: EXIT.AUTH_INVALID,
+      });
+      expect(String(error)).not.toContain("synthetic-secret-tail");
+    }
+    expect(customFetchMock).not.toHaveBeenCalled();
   });
 
   test("does NOT attach the auth token to a cross-origin (signed) URL", async () => {

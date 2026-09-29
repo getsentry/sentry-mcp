@@ -6,10 +6,14 @@
  */
 
 import { homedir } from "node:os";
+import { isAbsolute } from "node:path";
 import type { CommandContext } from "@stricli/core";
 import { getConfigDir } from "./lib/db/index.js";
+import { logger } from "./lib/logger.js";
 import { type Span, setCommandSpanName } from "./lib/telemetry.js";
 import type { Writer } from "./types/index.js";
+
+const log = logger.withTag("context");
 
 export interface SentryContext extends CommandContext {
   readonly process: NodeJS.Process;
@@ -31,6 +35,28 @@ export interface SentryContext extends CommandContext {
 }
 
 /**
+ * Resolve the working directory, tolerating one that has been deleted.
+ *
+ * `process.cwd()` throws ENOENT (`uv_cwd`) once the directory the CLI was
+ * started in is removed (e.g. an agent's git worktree cleaned up under it).
+ * The shell's logical `PWD` still names that directory, so use it instead:
+ * lookups under the missing path find nothing, and commands that don't need
+ * local files keep working.
+ */
+function resolveCwd(process: NodeJS.Process): string {
+  try {
+    return process.cwd();
+  } catch (error) {
+    const pwd = process.env.PWD;
+    if (!(pwd && isAbsolute(pwd))) {
+      throw error;
+    }
+    log.debug(`Working directory is unavailable, using PWD (${pwd})`, error);
+    return pwd;
+  }
+}
+
+/**
  * Build a dynamic context that uses forCommand to set telemetry tags.
  *
  * The forCommand method is called by stricli with the command prefix
@@ -43,7 +69,7 @@ export function buildContext(process: NodeJS.Process, span?: Span) {
   const baseContext: SentryContext = {
     process,
     env: process.env,
-    cwd: process.cwd(),
+    cwd: resolveCwd(process),
     homeDir: homedir(),
     configDir: getConfigDir(),
     stdout: process.stdout,

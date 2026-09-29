@@ -40,6 +40,7 @@ import {
 import { ApiError, isUserError } from "./errors.js";
 import { attachSentryReporter, logger } from "./logger.js";
 import { getSentryBaseUrl, isSentrySaasUrl } from "./sentry-urls.js";
+import { redactTelemetryEnvelope } from "./telemetry/credential-redaction.js";
 import { makeCompressedTransport } from "./telemetry/zstd-transport.js";
 import { getRealUsername } from "./utils.js";
 
@@ -231,8 +232,8 @@ export async function withTelemetry<T>(
     // Route through reportCliError so silencing (OutputError, expected-auth
     // AuthError, 401–499 ApiError) and fingerprint normalization are applied
     // consistently. Silenced errors emit a `cli.error.silenced` metric +
-    // optional structured log instead of creating a Sentry issue. (ContextError
-    // is intentionally NOT silenced — see classifySilenced.)
+    // optional structured log instead of creating a Sentry issue. ContextError
+    // and MalformedAuthTokenError stay captured — see classifySilenced.
     reportCliError(e);
     // Only mark the session crashed for genuine, unexpected CLI bugs. This is a
     // stricter gate than `classifySilenced`: an error can be *captured* to
@@ -595,7 +596,15 @@ export function initSentry(
     // smaller payloads, faster compress/decompress on both sides.
     // Automatic gzip fallback when running on Node < 22.15, where
     // `node:zlib`'s zstd support is unavailable.
-    transport: makeCompressedTransport,
+    transport: (transportOptions) => {
+      const transport = makeCompressedTransport(transportOptions);
+      return {
+        // The SDK adds log scope attributes after beforeSendLog and skips
+        // beforeSend for internal errors. Redact at the final delivery boundary.
+        send: (envelope) => transport.send(redactTelemetryEnvelope(envelope)),
+        flush: (timeout) => transport.flush(timeout),
+      };
+    },
     // Pass custom CA certificates to the transport for corporate TLS proxies.
     // The zstd-transport reads `caCerts` and passes it as `ca:` to
     // `http.request()`, and the SDK's fallback `makeNodeTransport` does the same.

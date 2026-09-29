@@ -9,12 +9,14 @@ import { SeerError } from "../../../src/lib/errors.js";
 import {
   createSeerError,
   formatAutofixError,
+  formatIssueExplain,
   formatProgressLine,
   formatRootCauseList,
   formatSolution,
   getProgressMessage,
   getSpinnerFrame,
   handleSeerApiError,
+  jsonTransformIssueExplain,
   truncateProgressMessage,
 } from "../../../src/lib/formatters/seer.js";
 import type {
@@ -284,6 +286,74 @@ describe("formatRootCauseList", () => {
   test("handles empty causes array", () => {
     const output = stripAnsi(formatRootCauseList([]));
     expect(output).toContain("No root causes");
+  });
+});
+
+describe("issue explain batch formatting", () => {
+  const data = {
+    results: [
+      {
+        issue: "IOS-1",
+        org: "test-org",
+        issueId: "1",
+        rootCauses: [{ id: 0, description: "First cause" }],
+      },
+      {
+        issue: "IOS-2",
+        org: "test-org",
+        issueId: "2",
+        rootCauses: [{ id: 0, description: "Second cause" }],
+      },
+    ],
+    requestedCount: 2,
+  };
+
+  test("labels each issue in human output", () => {
+    const output = stripAnsi(formatIssueExplain(data));
+    expect(output).toContain("IOS-1");
+    expect(output).toContain("First cause");
+    expect(output).toContain("─");
+    expect(output).toContain("IOS-2");
+    expect(output).toContain("Second cause");
+  });
+
+  test("returns labeled envelopes in multi-issue JSON", () => {
+    expect(jsonTransformIssueExplain(data)).toEqual([
+      expect.objectContaining({
+        issue: "IOS-1",
+        rootCauses: [expect.objectContaining({ description: "First cause" })],
+      }),
+      expect.objectContaining({
+        issue: "IOS-2",
+        rootCauses: [expect.objectContaining({ description: "Second cause" })],
+      }),
+    ]);
+  });
+
+  test("preserves the root-cause array for single-issue JSON", () => {
+    expect(
+      jsonTransformIssueExplain({
+        results: data.results.slice(0, 1),
+        requestedCount: 1,
+      })
+    ).toEqual([expect.objectContaining({ description: "First cause" })]);
+  });
+
+  test("filters root-cause fields without dropping issue labels", () => {
+    expect(jsonTransformIssueExplain(data, ["description"])).toEqual([
+      {
+        issue: "IOS-1",
+        org: "test-org",
+        issueId: "1",
+        rootCauses: [{ description: "First cause" }],
+      },
+      {
+        issue: "IOS-2",
+        org: "test-org",
+        issueId: "2",
+        rootCauses: [{ description: "Second cause" }],
+      },
+    ]);
   });
 });
 

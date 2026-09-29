@@ -20,7 +20,12 @@ import {
   triggerRootCauseAnalysis,
   tryGetIssueByShortId,
 } from "../../lib/api-client.js";
-import { type IssueSelector, parseIssueArg } from "../../lib/arg-parsing.js";
+import {
+  type IssueSelector,
+  type ParsedIssueArg,
+  parseIssueArg,
+  splitNewlineArg,
+} from "../../lib/arg-parsing.js";
 import {
   clearCachedIssueOrg,
   getCachedIssueOrg,
@@ -66,6 +71,77 @@ export const issueIdPositional = {
     },
   ],
 } as const;
+
+/** Variadic positional parameter for commands that accept multiple issues. */
+export const issueIdsPositional = {
+  kind: "array",
+  parameter: {
+    placeholder: "issue",
+    brief: "One or more issue IDs",
+    parse: String,
+  },
+} as const;
+
+/**
+ * Normalize variadic issue arguments.
+ *
+ * Newline-separated values are expanded for pasted or piped input. Duplicate
+ * tokens are removed while preserving the first-seen order. Commas remain
+ * part of the identifier, matching the CLI's positional-argument convention.
+ *
+ * @param args - Raw positional arguments
+ * @returns Normalized issue identifiers
+ */
+export function collectIssueArgs(args: readonly string[]): string[] {
+  return [...new Set(args.flatMap(splitNewlineArg))];
+}
+
+/**
+ * Map issue identifiers with the standard organization fan-out concurrency.
+ *
+ * Successful values preserve input order. Partial failures invoke `onError`.
+ * If every operation fails, the first error is rethrown without invoking
+ * `onError`, avoiding duplicate warning and error output.
+ *
+ * @param issueArgs - Normalized issue identifiers
+ * @param operation - Async work to perform for each identifier
+ * @param onError - Called for each failed identifier
+ * @returns Successful operation results in input order
+ */
+export async function mapIssueArgsConcurrently<T>(
+  issueArgs: readonly string[],
+  operation: (issueArg: string) => Promise<T>,
+  onError: (issueArg: string, reason: unknown) => void
+): Promise<T[]> {
+  const limit = pLimit(ORG_FANOUT_CONCURRENCY);
+  const settled = await Promise.allSettled(
+    issueArgs.map((issueArg) => limit(() => operation(issueArg)))
+  );
+
+  const values: T[] = [];
+  for (const result of settled) {
+    if (result?.status === "fulfilled") {
+      values.push(result.value);
+    }
+  }
+
+  if (values.length === 0) {
+    const first = settled[0];
+    if (first?.status === "rejected") {
+      throw first.reason;
+    }
+  }
+
+  for (let index = 0; index < settled.length; index++) {
+    const result = settled[index];
+    const issueArg = issueArgs[index];
+    if (result?.status === "rejected" && issueArg !== undefined) {
+      onError(issueArg, result.reason);
+    }
+  }
+
+  return values;
+}
 
 /**
  * Build a command hint string for error messages.
@@ -513,61 +589,31 @@ async function resolveSelector(
  * 1. Call public share API to get numeric group ID
  * 2. Fetch full issue details via authenticated API
  *
- * When the share URL includes org context (from subdomain), uses org-scoped
- * endpoint for proper region routing. Otherwise falls back to the unscoped
- * endpoint and extracts org from the response permalink.
+ * Both requests require organization context, taken from the share URL
+ * or the usual defaults and DSN resolution.
  *
- * @param shareId - The share ID from the URL
- * @param org - Optional organization slug (from share URL subdomain)
- * @param baseUrl - The Sentry instance base URL
+ * @param share - Share URL components, including optional organization context
  * @param cwd - Current working directory for context resolution
+ * @param commandHint - Recovery command when organization context is missing
  */
 async function resolveShareIssue(
-  shareId: string,
-  org: string | undefined,
-  baseUrl: string,
-  cwd: string
-): Promise<ResolvedIssueResult> {
-  const shared = await getSharedIssue(baseUrl, shareId);
-  const groupId = shared.groupID;
-
-  // Fetch full issue via authenticated API
-  if (org) {
-    const resolvedOrg = await resolveEffectiveOrg(org);
-    const orgScopedIssue = await getIssueInOrg(resolvedOrg, groupId, {
-      collapse: ISSUE_DETAIL_COLLAPSE,
-    });
-    return { org: resolvedOrg, issue: orgScopedIssue };
+  share: Extract<ParsedIssueArg, { type: "share" }>,
+  cwd: string,
+  commandHint: string
+): Promise<StrictResolvedIssue> {
+  const { shareId, org, baseUrl } = share;
+  const resolvedOrg = org
+    ? await resolveEffectiveOrg(org)
+    : (await resolveOrg({ cwd }))?.org;
+  if (!resolvedOrg) {
+    throw new ContextError("Organization", commandHint);
   }
 
-  // No org from URL — try env/DSN context, then the issue-id → org cache,
-  // then fall back to the unscoped fetch. See resolveNumericIssue for the
-  // full rationale behind the cache.
-  const resolvedOrg = await resolveOrg({ cwd });
-  const cachedOrg = resolvedOrg ? null : getCachedIssueOrg(groupId);
-  const { issue, cacheEvicted } = await fetchIssueByNumericId(
-    groupId,
-    resolvedOrg?.org,
-    cachedOrg
-  );
-  // When `cacheEvicted` is true, the cached org was stale (404'd) — do NOT
-  // let it win the `??` chain; re-derive from the permalink instead.
-  const effectiveCachedOrg = cacheEvicted ? null : cachedOrg;
-  const resolvedOrgSlug =
-    resolvedOrg?.org ??
-    effectiveCachedOrg ??
-    extractOrgFromPermalink(issue.permalink);
-  if (resolvedOrgSlug && !resolvedOrg && !effectiveCachedOrg) {
-    // Best-effort — a broken/read-only DB must not fail a successful lookup.
-    try {
-      setCachedIssueOrg(groupId, resolvedOrgSlug);
-    } catch (cacheErr) {
-      log.debug(
-        `Failed to cache issue-org mapping for ${groupId}: ${String(cacheErr)}`
-      );
-    }
-  }
-  return { org: resolvedOrgSlug, issue };
+  const shared = await getSharedIssue(baseUrl, resolvedOrg, shareId);
+  const issue = await getIssueInOrg(resolvedOrg, shared.id, {
+    collapse: ISSUE_DETAIL_COLLAPSE,
+  });
+  return { org: resolvedOrg, issue };
 }
 
 /**
@@ -844,12 +890,7 @@ export async function resolveIssue(
 
     case "share":
       // Share URL — resolve via public share API, then authenticated fetch
-      result = await resolveShareIssue(
-        parsed.shareId,
-        parsed.org,
-        parsed.baseUrl,
-        cwd
-      );
+      result = await resolveShareIssue(parsed, cwd, commandHint);
       break;
 
     default: {

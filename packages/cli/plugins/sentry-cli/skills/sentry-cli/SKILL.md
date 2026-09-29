@@ -408,9 +408,9 @@ Manage Sentry issues
 
 - `sentry issue list <org/project>` — List issues in a project
 - `sentry issue events <issue>` — List events for a specific issue
-- `sentry issue explain <issue>` — Analyze an issue's root cause using Seer AI
+- `sentry issue explain <issue...>` — Analyze one or more issues using Seer AI
 - `sentry issue plan <issue>` — Generate a solution plan using Seer AI
-- `sentry issue view <issue>` — View details of a specific issue
+- `sentry issue view <issue...>` — View details of one or more issues
 - `sentry issue resolve <issue>` — Mark an issue as resolved
 - `sentry issue unresolve <issue>` — Reopen a resolved issue
 - `sentry issue archive <issue>` — Archive (ignore) an issue
@@ -424,7 +424,7 @@ View, list, and send Sentry events
 
 - `sentry event view <org/project/event-id...>` — View details of one or more events
 - `sentry event list <issue>` — List events for an issue
-- `sentry event send <args...>` — Send a Sentry event
+- `sentry event send <target-or-file...>` — Send a Sentry event
 
 → Full flags and examples: `references/event.md`
 
@@ -447,7 +447,7 @@ Manage Sentry alert rules
 - `sentry alert issues edit <org/project/rule-id-or-name>` — Edit an issue alert rule
 - `sentry alert metrics list <target>` — List metric alert rules
 - `sentry alert metrics view <org/rule-id-or-name>` — View a metric alert rule
-- `sentry alert metrics create <org>` — Create a metric alert rule
+- `sentry alert metrics create <target>` — Create a metric alert rule
 - `sentry alert metrics delete <org/rule-id-or-name>` — Delete a metric alert rule
 - `sentry alert metrics edit <org/rule-id-or-name>` — Edit a metric alert rule
 

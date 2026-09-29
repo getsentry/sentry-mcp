@@ -52,11 +52,7 @@ import {
 // biome-ignore lint/performance/noNamespaceImport: namespace needed for vi.spyOn on mocked module
 import * as paginationDb from "../../../src/lib/db/pagination.js";
 import { setOrgRegion } from "../../../src/lib/db/regions.js";
-import {
-  ApiError,
-  ResolutionError,
-  ValidationError,
-} from "../../../src/lib/errors.js";
+import { ApiError, ValidationError } from "../../../src/lib/errors.js";
 import type { TimeRange } from "../../../src/lib/time-range.js";
 import { parsePeriod } from "../../../src/lib/time-range.js";
 import { mockFetch, useTestConfigDir } from "../../helpers.js";
@@ -423,13 +419,17 @@ describe("issue list: error propagation", () => {
 });
 
 describe("issue list: org-as-project detection", () => {
-  test("throws ResolutionError when bare slug matches an organization", async () => {
-    // Two orgs returned from /organizations/, but getProject returns 404 for both
-    // The slug "acme-corp" matches one of the org slugs
+  test("lists the organization when no project has that slug", async () => {
+    listIssuesAllPagesMock.mockResolvedValue({
+      issues: [],
+      nextCursor: undefined,
+    });
+
+    // Two orgs returned from /organizations/, but getProject returns 404 for both.
+    // The slug "acme-corp" matches one of the org slugs and no project.
     globalThis.fetch = mockFetch(async (input, init) => {
       const req = new Request(input, init);
 
-      // listOrganizations — return two orgs, one matching the slug
       if (
         req.url.includes("/organizations/") &&
         !req.url.includes("/projects/")
@@ -440,14 +440,12 @@ describe("issue list: org-as-project detection", () => {
         ]);
       }
 
-      // getProject: no project found for either org
       if (req.url.includes("/projects/")) {
         return new Response(JSON.stringify({ detail: "Not found" }), {
           status: 404,
         });
       }
 
-      // region resolution
       if (req.url.includes("/region/")) {
         return Response.json([{ name: "default", url: DEFAULT_SENTRY_URL }]);
       }
@@ -460,18 +458,65 @@ describe("issue list: org-as-project detection", () => {
     const { context } = createContext();
 
     try {
-      // Bare slug "acme-corp" triggers project-search mode
       await func.call(
         context,
         { limit: 10, sort: "date", period: parsePeriod("90d"), json: false },
         "acme-corp"
       );
-      expect.unreachable("Should have thrown ResolutionError");
-    } catch (error) {
-      expect(error).toBeInstanceOf(ResolutionError);
-      const msg = (error as ResolutionError).message;
-      expect(msg).toContain("is an organization, not a project");
-      expect(msg).toContain("acme-corp/");
+      expect(listIssuesAllPagesMock).toHaveBeenCalledWith(
+        "acme-corp",
+        "",
+        expect.any(Object)
+      );
+    } finally {
+      listIssuesAllPagesMock.mockReset();
+    }
+  });
+
+  test("uses the project when an organization has the same slug", async () => {
+    const findProjectsBySlugMock = vi.mocked(projectsApi.findProjectsBySlug);
+    findProjectsBySlugMock.mockReset();
+    findProjectsBySlugMock.mockResolvedValue({
+      projects: [
+        {
+          id: "9",
+          slug: "acme-corp",
+          name: "Acme Project",
+          orgSlug: "other-org",
+        },
+      ],
+      orgs: [
+        { slug: "acme-corp", id: "1", name: "Acme Corp" },
+        { slug: "other-org", id: "2", name: "Other Org" },
+      ],
+    });
+    listIssuesAllPagesMock.mockResolvedValue({
+      issues: [],
+      nextCursor: undefined,
+    });
+    resolveCursorMock.mockReturnValue({
+      cursor: undefined,
+      direction: "first",
+    });
+
+    const { context } = createContext();
+
+    try {
+      await func.call(
+        context,
+        { limit: 10, sort: "date", period: parsePeriod("90d"), json: true },
+        "acme-corp"
+      );
+      expect(listIssuesAllPagesMock).toHaveBeenCalledWith(
+        "other-org",
+        "acme-corp",
+        expect.any(Object)
+      );
+      expect(findProjectsBySlugMock).toHaveBeenCalledTimes(1);
+    } finally {
+      findProjectsBySlugMock.mockReset();
+      listIssuesAllPagesMock.mockReset();
+      resolveCursorMock.mockReset();
     }
   });
 });

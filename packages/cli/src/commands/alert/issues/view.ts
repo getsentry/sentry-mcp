@@ -4,7 +4,7 @@ import { openInBrowser } from "../../../lib/browser.js";
 import { buildCommand } from "../../../lib/command.js";
 import { ContextError } from "../../../lib/errors.js";
 import { CommandOutput } from "../../../lib/formatters/output.js";
-import { resolveTargetsFromParsedArg } from "../../../lib/resolve-target.js";
+import { resolveProjectBoundTargets } from "../../../lib/resolve-target.js";
 import { buildIssueAlertsUrl } from "../../../lib/sentry-urls.js";
 import {
   type IssueRuleResolution,
@@ -90,7 +90,7 @@ export const viewCommand = buildCommand({
       return;
     }
 
-    const { targets } = await resolveTargetsFromParsedArg(parsed, {
+    const { targets } = await resolveProjectBoundTargets(parsed, {
       cwd,
       usageHint: "sentry alert issues view <org>/<project>/<rule-id-or-name>",
     });

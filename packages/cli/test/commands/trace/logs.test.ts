@@ -139,11 +139,15 @@ function collectMockOutput(
 describe("logsCommand.func", () => {
   let listTraceLogsSpy: ReturnType<typeof spyOn>;
   let resolveOrgSpy: ReturnType<typeof spyOn>;
+  let resolveOrgOnlyTargetSpy: ReturnType<typeof spyOn>;
   let withProgressSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     listTraceLogsSpy = vi.spyOn(apiClient, "listTraceLogs");
     resolveOrgSpy = vi.spyOn(resolveTarget, "resolveOrg");
+    resolveOrgOnlyTargetSpy = vi
+      .spyOn(resolveTarget, "resolveOrgOnlyTarget")
+      .mockResolvedValue(ORG);
     // Bypass the withProgress spinner to prevent real stderr timers
     withProgressSpy = vi
       .spyOn(polling, "withProgress")
@@ -157,6 +161,7 @@ describe("logsCommand.func", () => {
   afterEach(() => {
     listTraceLogsSpy.mockRestore();
     resolveOrgSpy.mockRestore();
+    resolveOrgOnlyTargetSpy.mockRestore();
     withProgressSpy.mockRestore();
   });
 
@@ -377,7 +382,7 @@ describe("logsCommand.func", () => {
   });
 
   describe("org resolution", () => {
-    test("uses explicit org from first positional arg", async () => {
+    test("resolves a bare first positional through the org-only resolver", async () => {
       listTraceLogsSpy.mockResolvedValue([]);
       resolveOrgSpy.mockResolvedValue({ org: ORG });
 
@@ -396,10 +401,7 @@ describe("logsCommand.func", () => {
         TRACE_ID
       );
 
-      expect(resolveOrgSpy).toHaveBeenCalledWith({
-        org: ORG,
-        cwd: "/tmp",
-      });
+      expect(resolveOrgOnlyTargetSpy).toHaveBeenCalled();
     });
 
     test("passes undefined org when only trace ID given", async () => {

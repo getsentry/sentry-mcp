@@ -42,7 +42,7 @@ import {
 import { withProgress } from "../../lib/polling.js";
 import {
   resolveLogProjectId,
-  resolveOrgProjectFromArg,
+  resolveProjectBoundFromArg,
 } from "../../lib/resolve-target.js";
 import { sanitizeQuery } from "../../lib/search-query.js";
 import {
@@ -450,7 +450,7 @@ async function handleProjectMode(
   ctx: ModeContext
 ): Promise<{ output: SpanListData; hint?: string }> {
   const { flags, cwd, extraApiFields, timeRange } = ctx;
-  const { org, project } = await resolveOrgProjectFromArg(
+  const { org, project } = await resolveProjectBoundFromArg(
     target,
     cwd,
     COMMAND_NAME

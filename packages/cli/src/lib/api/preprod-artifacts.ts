@@ -27,6 +27,7 @@ import {
   string,
   tuple,
 } from "valibot";
+import { formatAuthHeader } from "../auth-header.js";
 import { customFetch } from "../custom-ca.js";
 import { getAuthToken } from "../db/auth.js";
 import { ApiError, TimeoutError, ValidationError } from "../errors.js";
@@ -154,7 +155,7 @@ export async function downloadBuildArtifact(
   if (isRegionOrigin(url, regionUrl)) {
     const token = getAuthToken();
     if (token) {
-      headers.Authorization = `Bearer ${token}`;
+      headers.Authorization = formatAuthHeader(token);
     }
   }
 
@@ -565,7 +566,7 @@ export async function openSnapshotArchive(
   const headers: Record<string, string> = {};
   const token = getAuthToken();
   if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    headers.Authorization = formatAuthHeader(token);
   }
   const response = await customFetch(url, { headers });
   if (!response.ok) {

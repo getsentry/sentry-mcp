@@ -6,13 +6,12 @@
 
 import type { SentryContext } from "../../../context.js";
 import { createMetricAlertRule } from "../../../lib/api-client.js";
-import { parseOrgProjectArg } from "../../../lib/arg-parsing.js";
 import { buildCommand, numberParser } from "../../../lib/command.js";
-import { ContextError, ValidationError } from "../../../lib/errors.js";
+import { ValidationError } from "../../../lib/errors.js";
 import { warning } from "../../../lib/formatters/colors.js";
 import { CommandOutput } from "../../../lib/formatters/output.js";
 import { DRY_RUN_ALIASES, DRY_RUN_FLAG } from "../../../lib/mutate-command.js";
-import { resolveOrg } from "../../../lib/resolve-target.js";
+import { resolveOrgOnlyFromArg } from "../../../lib/resolve-target.js";
 import {
   normalizeProjectList,
   parseJsonObjectList,
@@ -54,25 +53,16 @@ function formatCreated(result: CreateResult): string {
   return `Created metric alert rule ${result.id ?? "(unknown id)"} in ${result.org}: ${result.name} (${result.status ?? "active"}).`;
 }
 
-async function resolveMetricCreateOrg(
+function resolveMetricCreateOrg(
   arg: string | undefined,
   cwd: string
 ): Promise<string> {
-  const parsed = parseOrgProjectArg(arg);
-  let org: string | undefined;
-  if (parsed.type === "explicit" || parsed.type === "org-all") {
-    org = parsed.org;
-  } else if (parsed.type === "project-search") {
-    // Metric alert rules are org-scoped, so a bare target is always treated
-    // as an organization slug here, never as a project search.
-    org = parsed.projectSlug;
-  }
-
-  const resolved = await resolveOrg({ org, cwd });
-  if (!resolved) {
-    throw new ContextError("Organization", "sentry alert metrics create <org>");
-  }
-  return resolved.org;
+  return resolveOrgOnlyFromArg(
+    arg,
+    cwd,
+    "alert metrics create",
+    "sentry alert metrics create <org>/"
+  );
 }
 
 export const createCommand = buildCommand({
@@ -85,11 +75,11 @@ export const createCommand = buildCommand({
       "Optional fields:\n" +
       "  --environment, --owner\n\n" +
       "Examples:\n" +
-      "  sentry alert metrics create my-org --name 'P95 latency' \\\n" +
+      "  sentry alert metrics create my-org/ --name 'P95 latency' \\\n" +
       "    --query 'environment:prod' --aggregate 'p95(span.duration)' \\\n" +
       "    --dataset spans --time-window 5 \\\n" +
       '    --trigger \'{"alertThreshold":500,"actions":[{"id":"sentry.mail.actions.NotifyEmailAction","targetType":"Team","targetIdentifier":1}]}\'\n\n' +
-      "  sentry alert metrics create my-org --name 'Error volume' \\\n" +
+      "  sentry alert metrics create my-org/ --name 'Error volume' \\\n" +
       "    --query 'event.type:error' --aggregate 'count()' --dataset errors \\\n" +
       '    --time-window 15 --trigger \'[{"alertThreshold":100,"actions":[{"id":"sentry.mail.actions.NotifyEmailAction","targetType":"Team","targetIdentifier":1}]}]\' \\\n' +
       "    --project my-app --dry-run",
@@ -103,8 +93,8 @@ export const createCommand = buildCommand({
       kind: "tuple",
       parameters: [
         {
-          placeholder: "org",
-          brief: "Target organization",
+          placeholder: "target",
+          brief: "Target project or organization",
           parse: String,
         },
       ],

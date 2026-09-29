@@ -62,6 +62,7 @@ View details of one or more events
 | `resolvedWith` | array |  |
 | `nextEventID` | string \| null |  |
 | `previousEventID` | string \| null |  |
+| `formatted` | object |  |
 | `trace` | object \| null | Trace context, or null when unavailable |
 | `attachments` | array | Event attachments; each includes metadata and an absolute authenticated download URL |
 
@@ -135,12 +136,11 @@ sentry event list PROJ-ABC -c prev
 sentry event list PROJ-ABC --json
 ```
 
-### `sentry event send <args...>`
+### `sentry event send <target-or-file...>`
 
 Send a Sentry event
 
 **Flags:**
-- `--dsn <value> - DSN to send events to (overrides SENTRY_DSN env var)`
 - `-m, --message <value>... - Event message (repeat for multi-line)`
 - `-a, --message-arg <value>... - Arguments for message template (repeat for multiple)`
 - `-l, --level <value> - Event severity level - (default: "error")`

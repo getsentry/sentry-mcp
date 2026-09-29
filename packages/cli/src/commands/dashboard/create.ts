@@ -18,7 +18,7 @@ import {
   fetchProjectId,
   resolveAllTargets,
   resolveOrg,
-  resolveProjectBySlug,
+  resolveProjectBoundSlug,
   toNumericId,
 } from "../../lib/resolve-target.js";
 import { buildDashboardUrl } from "../../lib/sentry-urls.js";
@@ -100,7 +100,7 @@ async function resolveDashboardTarget(
       return { orgSlug: parsed.org, projectIds: [] };
 
     case "project-search": {
-      const found = await resolveProjectBySlug(
+      const found = await resolveProjectBoundSlug(
         parsed.projectSlug,
         "sentry dashboard create <org>/<project> <title>",
         undefined,

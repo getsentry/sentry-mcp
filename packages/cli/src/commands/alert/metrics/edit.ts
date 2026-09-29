@@ -13,7 +13,7 @@ import { buildCommand, numberParser } from "../../../lib/command.js";
 import { ValidationError } from "../../../lib/errors.js";
 import { warning } from "../../../lib/formatters/colors.js";
 import { CommandOutput } from "../../../lib/formatters/output.js";
-import { resolveOrgOptionalProjectFromArg } from "../../../lib/resolve-target.js";
+import { resolveOrgOnlyFromArg } from "../../../lib/resolve-target.js";
 import {
   normalizeMetricDataset,
   normalizeProjectList,
@@ -266,7 +266,7 @@ export const editCommand = buildCommand({
     const { cwd } = this;
     validateMetricEditFlags(flags);
     const { ref, targetArg } = parseMetricRuleArg(arg, USAGE_HINT);
-    const { org } = await resolveOrgOptionalProjectFromArg(
+    const org = await resolveOrgOnlyFromArg(
       targetArg,
       cwd,
       "alert metrics edit"

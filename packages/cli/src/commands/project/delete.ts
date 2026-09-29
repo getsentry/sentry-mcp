@@ -39,7 +39,7 @@ import {
   isConfirmationBypassed,
   requireExplicitTarget,
 } from "../../lib/mutate-command.js";
-import { resolveOrgProjectTarget } from "../../lib/resolve-target.js";
+import { resolveProjectBoundTarget } from "../../lib/resolve-target.js";
 import { buildProjectUrl } from "../../lib/sentry-urls.js";
 
 const log = logger.withTag("project.delete");
@@ -184,7 +184,7 @@ export const deleteCommand = buildDeleteCommand({
       `sentry ${COMMAND_NAME} <org>/<project>`
     );
 
-    const resolved = await resolveOrgProjectTarget(parsed, cwd, COMMAND_NAME);
+    const resolved = await resolveProjectBoundTarget(parsed, cwd, COMMAND_NAME);
     const { org: orgSlug, project: projectSlug } = resolved;
 
     // Use already-fetched project data from project-search, or fetch for

@@ -3,7 +3,7 @@ import { parseOrgProjectArg } from "../../../lib/arg-parsing.js";
 import { openInBrowser } from "../../../lib/browser.js";
 import { buildCommand } from "../../../lib/command.js";
 import { CommandOutput } from "../../../lib/formatters/output.js";
-import { resolveOrgOptionalProjectFromArg } from "../../../lib/resolve-target.js";
+import { resolveOrgOnlyFromArg } from "../../../lib/resolve-target.js";
 import { buildMetricAlertsUrl } from "../../../lib/sentry-urls.js";
 import {
   type MetricRuleResolution,
@@ -91,7 +91,7 @@ export const viewCommand = buildCommand({
       return;
     }
 
-    const { org } = await resolveOrgOptionalProjectFromArg(
+    const org = await resolveOrgOnlyFromArg(
       targetArg,
       cwd,
       "alert metrics view"

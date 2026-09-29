@@ -17,6 +17,26 @@ import { queryDocs } from "../../src/lib/docs-service.js";
 import { EXIT, isUserError } from "../../src/lib/errors.js";
 
 describe("queryDocs", () => {
+  test("rejects a malformed bearer before calling the docs service", async () => {
+    customFetch.mockClear();
+    refreshToken.mockResolvedValue({
+      token: "synthetic-prefix\nsynthetic-secret-tail",
+    });
+
+    const error = await queryDocs("How do I configure tracing?", {
+      frameworks: [],
+      languages: [],
+      sentryConfigured: false,
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({
+      reason: "invalid",
+      exitCode: EXIT.AUTH_INVALID,
+    });
+    expect(String(error)).not.toContain("synthetic-secret-tail");
+    expect(customFetch).not.toHaveBeenCalled();
+  });
+
   test("explains when Docs AI is unavailable in the service region", async () => {
     refreshToken.mockResolvedValue({ token: "test-token" });
     customFetch.mockResolvedValue({

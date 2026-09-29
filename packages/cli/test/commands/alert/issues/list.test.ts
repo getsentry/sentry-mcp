@@ -208,6 +208,48 @@ describe("alert issues list pagination", () => {
     );
   });
 
+  test("--web falls back to an organization when no project matches the bare slug", async () => {
+    setOrgRegion("acme-corp", DEFAULT_SENTRY_URL);
+
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const req = new Request(input, init);
+      const url = new URL(req.url);
+      if (url.pathname === "/api/0/organizations/") {
+        return Response.json([{ slug: "acme-corp", name: "Acme Corp" }]);
+      }
+      if (url.pathname === "/api/0/projects/acme-corp/acme-corp/") {
+        return new Response(JSON.stringify({ detail: "Not found" }), {
+          status: 404,
+        });
+      }
+      if (url.pathname.includes("/workflows/")) {
+        throw new Error("rule fetch should not be called for --web");
+      }
+      return new Response(JSON.stringify({ detail: "Not found" }), {
+        status: 404,
+      });
+    });
+
+    const { context } = createContext();
+    await func.call(
+      context,
+      {
+        web: true,
+        fresh: false,
+        limit: 30,
+        json: false,
+      },
+      "acme-corp"
+    );
+
+    expect(openInBrowserSpy).toHaveBeenCalledWith(
+      expect.stringContaining("acme-corp"),
+      "issue alert rules"
+    );
+    const openedUrl = String(openInBrowserSpy.mock.calls[0]?.[0]);
+    expect(openedUrl).not.toContain("?project=");
+  });
+
   test("--web with project search resolves target and skips rule fetch", async () => {
     setOrgRegion("org-one", DEFAULT_SENTRY_URL);
 

@@ -73,6 +73,9 @@ describe("install script", () => {
       SENTRY_CLI_NO_TELEMETRY: "1",
       SENTRY_TEST_DIR: testDir,
       SENTRY_TEST_INSTALL_SCRIPT: installScript,
+      SENTRY_TEST_GITHUB_FAIL: "22",
+      SENTRY_TEST_GITHUB_RESPONSE: '{"tag_name":"0.42.2"}',
+      SENTRY_TEST_TOOLKIT_STATUS: "404",
       TMPDIR: testDir,
     };
 
@@ -83,6 +86,13 @@ set -euo pipefail
 url="\${!#}"
 printf '%s\\n' "$url" >> "$SENTRY_TEST_DIR/curl-urls"
 case "$url" in
+  https://release-registry.services.sentry.io/apps/sentry/latest)
+    printf '%s\\n' "$url" >> "$SENTRY_TEST_DIR/download-urls"
+    if [[ "\${SENTRY_TEST_REGISTRY_FAIL:-0}" != "0" ]]; then
+      exit "$SENTRY_TEST_REGISTRY_FAIL"
+    fi
+    printf '%s\\n' "\${SENTRY_TEST_REGISTRY_RESPONSE:-}"
+    ;;
   *"/repos/getsentry/sentry-mcp/releases/tags/"*)
     printf '%s' "\${SENTRY_TEST_TOOLKIT_STATUS:-200}"
     ;;
@@ -98,9 +108,14 @@ case "$url" in
     esac
     ;;
   *"/repos/getsentry/cli/releases/latest")
-    printf '{"tag_name":"0.42.2"}'
+    printf '%s\\n' "$url" >> "$SENTRY_TEST_DIR/download-urls"
+    if [[ "\${SENTRY_TEST_GITHUB_FAIL:-0}" != "0" ]]; then
+      exit "$SENTRY_TEST_GITHUB_FAIL"
+    fi
+    printf '%s\\n' "$SENTRY_TEST_GITHUB_RESPONSE"
     ;;
   *)
+    printf '%s\\n' "$url" >> "$SENTRY_TEST_DIR/download-urls"
     cat <<'SCRIPT'
 ${downloadedExecutable}SCRIPT
     ;;
@@ -114,6 +129,125 @@ esac
 
   afterEach(() => {
     rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test.each([
+    '{"canonical":"app:sentry","version":"0.45.0"}',
+    '{\n  "canonical": "app:sentry",\n  "version": "0.45.0"\n}',
+    JSON.stringify(
+      { version: "0.45.0", description: "x".repeat(96 * 1024) },
+      null,
+      2
+    ),
+  ])("installs the latest stable release when GitHub API access is blocked", (metadata) => {
+    env.SENTRY_TEST_REGISTRY_RESPONSE = metadata;
+    const result = spawnSync("bash", [installScript], {
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(recorded("download-urls")).toEqual([
+      "https://release-registry.services.sentry.io/apps/sentry/latest",
+      expect.stringMatching(
+        /^https:\/\/github\.com\/getsentry\/cli\/releases\/download\/0\.45\.0\/sentry-.+\.gz$/
+      ),
+    ]);
+    expect(existsSync(join(installDir, "sentry"))).toBe(true);
+  });
+
+  test.each([
+    { name: "HTTP error", metadata: "", failure: "22" },
+    { name: "timeout", metadata: "", failure: "28" },
+    { name: "missing version", metadata: "{}" },
+    { name: "non-JSON response", metadata: "<html>Unavailable</html>" },
+    { name: "nonstable version", metadata: '{"version":"nightly"}' },
+  ])("falls back to GitHub after a registry $name", ({ metadata, failure }) => {
+    env.SENTRY_TEST_REGISTRY_RESPONSE = metadata;
+    env.SENTRY_TEST_REGISTRY_FAIL = failure;
+    env.SENTRY_TEST_GITHUB_FAIL = "0";
+    env.SENTRY_TEST_GITHUB_RESPONSE = '{"tag_name":"0.45.0"}';
+    const result = spawnSync("bash", [installScript], {
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(result.stderr).toContain("Trying GitHub");
+    expect(recorded("download-urls")).toEqual([
+      "https://release-registry.services.sentry.io/apps/sentry/latest",
+      "https://api.github.com/repos/getsentry/cli/releases/latest",
+      expect.stringMatching(
+        /^https:\/\/github\.com\/getsentry\/cli\/releases\/download\/0\.45\.0\/sentry-.+\.gz$/
+      ),
+    ]);
+    expect(existsSync(join(installDir, "sentry"))).toBe(true);
+  });
+
+  test.each([
+    { name: "a leading v", metadata: '{\n  "tag_name": "v0.45.0"\n}' },
+    {
+      name: "large release metadata",
+      metadata: JSON.stringify(
+        { tag_name: "0.45.0", body: "x".repeat(96 * 1024) },
+        null,
+        2
+      ),
+    },
+  ])("accepts a GitHub release with $name", ({ metadata }) => {
+    env.SENTRY_TEST_REGISTRY_FAIL = "22";
+    env.SENTRY_TEST_GITHUB_FAIL = "0";
+    env.SENTRY_TEST_GITHUB_RESPONSE = metadata;
+    const result = spawnSync("bash", [installScript], {
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(recorded("download-urls").at(-1)).toMatch(
+      /^https:\/\/github\.com\/getsentry\/cli\/releases\/download\/0\.45\.0\/sentry-.+\.gz$/
+    );
+    expect(existsSync(join(installDir, "sentry"))).toBe(true);
+  });
+
+  test.each([
+    { name: "HTTP error", metadata: "", failure: "22" },
+    { name: "timeout", metadata: "", failure: "28" },
+    { name: "missing tag", metadata: "{}", failure: "0" },
+    {
+      name: "non-JSON response",
+      metadata: "<html>Unavailable</html>",
+      failure: "0",
+    },
+    { name: "nonstable tag", metadata: '{"tag_name":"nightly"}', failure: "0" },
+  ])("stops when the registry and GitHub fail: $name", ({
+    metadata,
+    failure,
+  }) => {
+    env.SENTRY_TEST_REGISTRY_FAIL = "22";
+    env.SENTRY_TEST_GITHUB_RESPONSE = metadata;
+    env.SENTRY_TEST_GITHUB_FAIL = failure;
+    const result = spawnSync("bash", [installScript], {
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "Failed to fetch latest stable version from Sentry's release registry and GitHub"
+    );
+    expect(result.stderr).toContain("--version <version>");
+    expect(result.stderr).not.toContain("Unexpected failure at line");
+    expect(recorded("download-urls")).toEqual([
+      "https://release-registry.services.sentry.io/apps/sentry/latest",
+      "https://api.github.com/repos/getsentry/cli/releases/latest",
+    ]);
+    expect(recorded("setup-args")).toEqual([]);
+    expect(existsSync(join(installDir, "sentry"))).toBe(false);
   });
 
   function recorded(name: string): string[] {
@@ -285,6 +419,11 @@ process.exitCode = result.status ?? 1;
     expect(recorded("post-args")).toEqual([]);
     expect(existsSync(join(installDir, "sentry"))).toBe(true);
     expect(installerTempFiles()).toEqual([]);
+    expect(recorded("download-urls")).toEqual([
+      expect.stringMatching(
+        /^https:\/\/github\.com\/getsentry\/cli\/releases\/download\/0\.31\.0\/sentry-.+\.gz$/
+      ),
+    ]);
   });
 
   test.each([
@@ -358,6 +497,7 @@ process.exitCode = result.status ?? 1;
     );
     env.SENTRY_TEST_RELEASES_PAGE_1 = firstPage;
     env.SENTRY_TEST_RELEASES_PAGE_2 = secondPage;
+    env.SENTRY_TEST_TOOLKIT_STATUS = "200";
     const result = spawnSync("bash", [installScript, "--no-modify-path"], {
       env,
       encoding: "utf8",
@@ -366,17 +506,21 @@ process.exitCode = result.status ?? 1;
 
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(recorded("curl-urls").slice(0, 3)).toEqual([
+      "https://release-registry.services.sentry.io/apps/sentry/latest",
       "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=1",
       "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=2",
-      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.46.0",
     ]);
-    expect(recorded("curl-urls")[3]).toContain(
+    expect(recorded("curl-urls")[3]).toBe(
+      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.46.0"
+    );
+    expect(recorded("curl-urls")[4]).toContain(
       "/getsentry/sentry-mcp/releases/download/cli@0.46.0/"
     );
   });
 
   test("resolves the latest legacy version until Toolkit has a CLI release", () => {
     env.SENTRY_TEST_TOOLKIT_STATUS = "404";
+    env.SENTRY_TEST_GITHUB_FAIL = "0";
     const result = spawnSync("bash", [installScript, "--no-modify-path"], {
       env,
       encoding: "utf8",
@@ -385,11 +529,14 @@ process.exitCode = result.status ?? 1;
 
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(recorded("curl-urls").slice(0, 4)).toEqual([
+      "https://release-registry.services.sentry.io/apps/sentry/latest",
       "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=1",
       "https://api.github.com/repos/getsentry/cli/releases/latest",
       "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.42.2",
-      "https://api.github.com/repos/getsentry/cli/releases/tags/0.42.2",
     ]);
+    expect(recorded("curl-urls")[4]).toBe(
+      "https://api.github.com/repos/getsentry/cli/releases/tags/0.42.2"
+    );
   });
 
   test("connects setup to the controlling terminal and cleans up after setup", () => {

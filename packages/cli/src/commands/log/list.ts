@@ -51,7 +51,7 @@ import { logger } from "../../lib/logger.js";
 import { withProgress } from "../../lib/polling.js";
 import {
   resolveLogProjectId,
-  resolveOrgProjectFromArg,
+  resolveProjectBoundFromArg,
 } from "../../lib/resolve-target.js";
 import { sanitizeQuery } from "../../lib/search-query.js";
 import {
@@ -895,7 +895,7 @@ export const listCommand = buildListCommand(
 
       // Standard project-scoped mode
       {
-        const { org, project } = await resolveOrgProjectFromArg(
+        const { org, project } = await resolveProjectBoundFromArg(
           parsed.target,
           cwd,
           COMMAND_NAME

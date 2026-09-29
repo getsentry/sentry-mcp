@@ -147,7 +147,7 @@ sentry alert metrics view my-org/67890
 sentry alert metrics view my-org/"P95 latency alert"
 ```
 
-### `sentry alert metrics create <org>`
+### `sentry alert metrics create <target>`
 
 Create a metric alert rule
 

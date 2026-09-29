@@ -55,7 +55,7 @@ describe("alert metrics edit", () => {
     getRuleSpy = vi.spyOn(apiClient, "getMetricAlertRule");
     getDocSpy = vi.spyOn(apiClient, "getMetricAlertRuleDocument");
     putSpy = vi.spyOn(apiClient, "putMetricAlertRule");
-    resolveSpy = vi.spyOn(resolveTarget, "resolveOrgOptionalProjectFromArg");
+    resolveSpy = vi.spyOn(resolveTarget, "resolveOrgOnlyFromArg");
   });
 
   afterEach(() => {
@@ -80,7 +80,7 @@ describe("alert metrics edit", () => {
 
   test("merges advanced fields and validates trigger payload", async () => {
     const context = createContext();
-    resolveSpy.mockResolvedValue({ org: "test-org" });
+    resolveSpy.mockResolvedValue("test-org");
     getRuleSpy.mockResolvedValue(sampleRule);
     getDocSpy.mockResolvedValue({
       id: "9",
@@ -136,7 +136,7 @@ describe("alert metrics edit", () => {
 
   test("does not validate unedited API fields when renaming existing rule", async () => {
     const context = createContext();
-    resolveSpy.mockResolvedValue({ org: "test-org" });
+    resolveSpy.mockResolvedValue("test-org");
     getRuleSpy.mockResolvedValue({
       ...sampleRule,
       query: "",
@@ -189,7 +189,7 @@ describe("alert metrics edit", () => {
 
   test("allows explicitly clearing query to match all events", async () => {
     const context = createContext();
-    resolveSpy.mockResolvedValue({ org: "test-org" });
+    resolveSpy.mockResolvedValue("test-org");
     getRuleSpy.mockResolvedValue(sampleRule);
     getDocSpy.mockResolvedValue({
       id: "9",
@@ -235,7 +235,7 @@ describe("alert metrics edit", () => {
 
   test("routes --dataset transactions to spans with is_transaction:true and a tip", async () => {
     const context = createContext();
-    resolveSpy.mockResolvedValue({ org: "test-org" });
+    resolveSpy.mockResolvedValue("test-org");
     getRuleSpy.mockResolvedValue(sampleRule);
     getDocSpy.mockResolvedValue({
       id: "9",

@@ -18,7 +18,7 @@
 
 import type { FileHandle } from "node:fs/promises";
 import { open } from "node:fs/promises";
-import { crc32 } from "node:zlib";
+import { crc32 } from "../crc32.js";
 
 /** Local-file-header signature (`PK\x03\x04`). */
 const LOCAL_FILE_HEADER_SIG = 0x0403_4b50;

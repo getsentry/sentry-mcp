@@ -52,11 +52,11 @@ describe("alert metrics delete", () => {
   beforeEach(() => {
     getRuleSpy = vi.spyOn(apiClient, "getMetricAlertRule");
     deleteRuleSpy = vi.spyOn(apiClient, "deleteMetricAlertRule");
-    resolveSpy = vi.spyOn(resolveTarget, "resolveOrgOptionalProjectFromArg");
+    resolveSpy = vi.spyOn(resolveTarget, "resolveOrgOnlyFromArg");
 
     getRuleSpy.mockResolvedValue(sampleRule);
     deleteRuleSpy.mockResolvedValue(undefined);
-    resolveSpy.mockResolvedValue({ org: "test-org" });
+    resolveSpy.mockResolvedValue("test-org");
   });
 
   afterEach(() => {

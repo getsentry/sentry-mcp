@@ -15,7 +15,7 @@ import {
   isConfirmationBypassed,
   requireExplicitTarget,
 } from "../../../lib/mutate-command.js";
-import { resolveOrgOptionalProjectFromArg } from "../../../lib/resolve-target.js";
+import { resolveOrgOnlyFromArg } from "../../../lib/resolve-target.js";
 import { parseMetricRuleArg, resolveMetricAlertRule } from "./rule-resolve.js";
 
 const USAGE_HINT = "sentry alert metrics delete <org>/<rule-id-or-name>";
@@ -79,7 +79,7 @@ export const deleteCommand = buildDeleteCommand({
       "Metric alert target",
       USAGE_HINT
     );
-    const { org } = await resolveOrgOptionalProjectFromArg(
+    const org = await resolveOrgOnlyFromArg(
       targetArg,
       cwd,
       "alert metrics delete"

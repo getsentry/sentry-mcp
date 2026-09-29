@@ -240,9 +240,13 @@ function runWrappedBuild(
 
   const status = runScript(script, scriptArgs, env);
 
-  const report = JSON.parse(
-    readFileSync(reportPath, "utf-8")
-  ) as SourceMapReport;
+  let report: SourceMapReport;
+  try {
+    report = JSON.parse(readFileSync(reportPath, "utf-8")) as SourceMapReport;
+  } catch (error) {
+    log.debug("Failed to read sourcemap report file", error);
+    return { status, pair: null };
+  }
   if (!(report.packager_bundle_path && report.packager_sourcemap_path)) {
     return { status, pair: null };
   }

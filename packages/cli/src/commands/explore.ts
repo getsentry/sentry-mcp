@@ -44,7 +44,7 @@ import {
   listSupportedReplayFields,
   parseReplayEnvironmentFilter,
 } from "../lib/replay-search.js";
-import { resolveOrgOptionalProjectFromArg } from "../lib/resolve-target.js";
+import { resolveOrgOptionalFromArg } from "../lib/resolve-target.js";
 import { sanitizeQuery } from "../lib/search-query.js";
 import {
   appendPeriodHint,
@@ -764,7 +764,7 @@ export const exploreCommand = buildListCommand("explore", {
   },
   async *func(this: SentryContext, flags: ExploreFlags, target?: string) {
     const { cwd } = this;
-    const { org, project } = await resolveOrgOptionalProjectFromArg(
+    const { org, project } = await resolveOrgOptionalFromArg(
       target,
       cwd,
       "explore"

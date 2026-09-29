@@ -655,6 +655,32 @@ import type { SentryContext } from "../../context.js";
 import { getAuthToken } from "../../lib/db/auth.js";
 ```
 
+### Target Resolution
+
+`parseOrgProjectArg()` owns target syntax: a value without `/` is a
+`project-search`; `<org>/` is `org-all`; `<org>/<project>` is explicit.
+`classifyProjectSearchTarget()` owns the lookup order for project-search:
+exact project(s), exact organization, fuzzy project, then not found.
+
+Commands select a capability wrapper instead of performing API lookups:
+
+- `resolveProjectBoundSlug()`, `resolveProjectBoundTarget()`, and
+  `resolveProjectBoundFromArg()` require one project. An organization match is
+  an actionable error.
+- `resolveProjectBoundTargets()` resolves one or more project targets.
+- `resolveOrgOptionalTarget()` / `resolveOrgOptionalFromArg()` allow either an
+  organization or a project.
+- `resolveOrgOnlyTarget()` / `resolveOrgOnlyFromArg()` return the effective
+  organization while preserving project-first precedence for bare targets.
+
+Do not call `findProjectsBySlug()` or implement org fallback directly in a
+command. `sentry init` is the intentional not-found exception: it calls the
+classifier with fuzzy recovery disabled, then treats `not-found` as a new
+project name. Issue-short-ID recovery in `commands/issue/utils.ts` is not CLI
+target resolution and may perform its own project lookup. The
+`no-direct-target-resolution` Biome plugin enforces this command-layer
+boundary.
+
 ### List Command Infrastructure
 
 Two abstraction levels exist for list commands:
@@ -664,11 +690,13 @@ Two abstraction levels exist for list commands:
 2. **`src/lib/org-list.ts`** — `dispatchOrgScopedList` with `OrgListConfig` and a 4-mode handler map: `auto-detect`, `explicit`, `org-all`, `project-search`. Complex commands (`project list`, `issue list`) call `dispatchOrgScopedList` with an `overrides` map directly instead of using `buildOrgListCommand`.
 
 Key rules when writing overrides:
-- Each mode handler receives a `HandlerContext<T>` with the narrowed `parsed` plus shared I/O (`stdout`, `cwd`, `flags`). Access parsed fields via `ctx.parsed.org`, `ctx.parsed.projectSlug`, etc. — no manual `Extract<>` casts needed.
+- Each mode handler receives a `HandlerContext<T>` with narrowed `parsed`, `cwd`, `flags`, and optional request-scoped project-search classification. Access parsed fields via `ctx.parsed.org`, `ctx.parsed.projectSlug`, etc. — no manual `Extract<>` casts needed.
 - Commands with extra fields (e.g., `stderr`, `setContext`) spread the context and add them: `(ctx) => handle({ ...ctx, flags, stderr, setContext })`. Override `ctx.flags` with the command-specific flags type when needed.
 - `resolveCursor()` must be called **inside** the `org-all` override closure, not before `dispatchOrgScopedList`, so that `--cursor` validation errors fire correctly for non-org-all modes.
-- `handleProjectSearch` errors must use `"Project"` as the `ContextError` resource, not `config.entityName`.
-- Always set `orgSlugMatchBehavior` on `dispatchOrgScopedList` to declare how bare-slug org matches are handled. Use `"redirect"` for commands where listing all entities in the org makes sense (e.g., `project list`, `team list`, `issue list`). Use `"error"` for commands where org-all redirect is inappropriate. The pre-check uses cached orgs to avoid N API calls — when the cache is cold, the handler's own org-slug check serves as a safety net (throws `ResolutionError` with a hint).
+- For an unscoped bare target, `dispatchOrgScopedList` applies the shared
+  classifier before dispatch: an organization match becomes `org-all`, while
+  project results are passed request-scoped to the handler. Scoped and
+  display-name searches stay in `project-search` and are classified there.
 
 3. **Standalone list commands** (e.g., `span list`, `trace list`) that don't use org-scoped dispatch wire pagination directly in `func()`. See the "List Command Pagination" section above for the pattern.
 

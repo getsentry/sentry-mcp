@@ -23,6 +23,7 @@
  * @see https://cli.sentry.dev/exit-codes/ for full reference
  */
 
+import { redactCredentialText } from "./credential-redaction.js";
 import {
   buildBillingUrl,
   buildOrgSettingsUrl,
@@ -252,6 +253,18 @@ export class AuthError extends CliError {
     this.name = "AuthError";
     this.reason = reason;
     this.skipAutoAuth = options?.skipAutoAuth ?? false;
+  }
+}
+
+/** Malformed credentials are reportable without retaining their secret value. */
+export class MalformedAuthTokenError extends AuthError {
+  constructor() {
+    super(
+      "invalid",
+      "Invalid authentication token. Copy it again as a single line without spaces or control characters, " +
+        "or run 'sentry auth login' to replace stored credentials."
+    );
+    this.name = "MalformedAuthTokenError";
   }
 }
 
@@ -790,10 +803,9 @@ export function stringifyUnknown(value: unknown): string {
  * @returns Formatted error string
  */
 export function formatError(error: unknown): string {
-  if (error instanceof CliError) {
-    return error.format();
-  }
-  return stringifyUnknown(error);
+  return redactCredentialText(
+    error instanceof CliError ? error.format() : stringifyUnknown(error)
+  );
 }
 
 /**

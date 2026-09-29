@@ -7,7 +7,9 @@
 
 import { writeFile } from "node:fs/promises";
 import { Readable } from "node:stream";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+// biome-ignore lint/performance/noNamespaceImport: needed for spyOn mocking
+import * as Sentry from "@sentry/node-core/light";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   apiCommand,
   buildBodyFromFields,
@@ -27,6 +29,7 @@ import {
   parseFieldKey,
   parseFields,
   parseHeaders,
+  parseOrgProjectFromApiPath,
   prepareRequestOptions,
   readStdin,
   resolveApiResponseOutput,
@@ -105,6 +108,55 @@ describe("normalizeEndpoint: api/0/ prefix stripping (CLI-K1)", () => {
     expect(normalizeEndpoint("api/1/organizations/")).toBe(
       "api/1/organizations/"
     );
+  });
+});
+
+describe("parseOrgProjectFromApiPath", () => {
+  test.each([
+    ["organizations/acme/issues/", { org: "acme" }],
+    ["projects/acme/web/events/", { org: "acme", project: "web" }],
+    ["teams/acme/engineering/", { org: "acme" }],
+    ["organizations/", undefined],
+    ["organizations/{organization_id_or_slug}/issues/", undefined],
+    ["issues/", undefined],
+  ] as const)("%s", (path, expected) => {
+    expect(parseOrgProjectFromApiPath(path)).toEqual(expected);
+  });
+});
+
+describe("apiCommand tags org from the path", () => {
+  let setTagSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    setTagSpy = vi.spyOn(Sentry, "setTag");
+  });
+
+  afterEach(() => {
+    setTagSpy.mockRestore();
+  });
+
+  test("dry-run of a projects path sets sentry.org and sentry.project", async () => {
+    const func = await apiCommand.loader();
+    const context = {
+      stdin: createMockStdin(""),
+      stdout: { write: vi.fn(() => true), isTTY: false },
+      stderr: { write: vi.fn(() => true) },
+      cwd: "/tmp",
+    };
+    await func.call(
+      context,
+      {
+        method: "GET",
+        silent: false,
+        verbose: false,
+        "dry-run": true,
+        json: false,
+      },
+      "projects/acme/web/events/"
+    );
+
+    expect(setTagSpy).toHaveBeenCalledWith("sentry.org", "acme");
+    expect(setTagSpy).toHaveBeenCalledWith("sentry.project", "web");
   });
 });
 

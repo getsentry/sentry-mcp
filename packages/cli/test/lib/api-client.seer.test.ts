@@ -5,6 +5,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { normalizeAgentStatus } from "../../src/lib/api/seer.js";
 import {
   getAutofixState,
   triggerRootCauseAnalysis,
@@ -12,6 +13,7 @@ import {
 } from "../../src/lib/api-client.js";
 import { setAuthToken } from "../../src/lib/db/auth.js";
 import { setOrgRegion } from "../../src/lib/db/regions.js";
+import { ApiError } from "../../src/lib/errors.js";
 import { useTestConfigDir } from "../helpers.js";
 
 useTestConfigDir("test-seer-api-");
@@ -231,7 +233,50 @@ describe("getAutofixState", () => {
     expect(result).toBeNull();
   });
 
+  test.each([
+    { name: "a null response", payload: null },
+    { name: "a missing status", payload: { autofix: { run_id: 1 } } },
+    {
+      name: "a non-string status",
+      payload: { autofix: { run_id: 1, status: 123 } },
+    },
+  ])("throws a validation ApiError for $name", async ({ payload }) => {
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+
+    const request = getAutofixState("test-org", "123456789");
+
+    await expect(request).rejects.toBeInstanceOf(ApiError);
+    await expect(request).rejects.toMatchObject({
+      message:
+        "Unexpected response format from /organizations/test-org/issues/123456789/autofix/",
+      status: 200,
+      detail: expect.any(String),
+    });
+  });
+
   test("returns completed state with blocks", async () => {
+    const blocks = [
+      {
+        id: "block-1",
+        message: { role: "assistant", content: "Found the root cause" },
+        timestamp: "2025-01-01T00:00:00Z",
+        artifacts: [
+          {
+            key: "root_cause",
+            data: {
+              one_line_description: "Test cause",
+              five_whys: ["Why 1"],
+            },
+            reason: "",
+          },
+        ],
+      },
+    ];
+
     globalThis.fetch = async () =>
       new Response(
         JSON.stringify({
@@ -239,23 +284,7 @@ describe("getAutofixState", () => {
             run_id: 12_345,
             status: "completed",
             updated_at: "2025-01-01T00:00:00Z",
-            blocks: [
-              {
-                id: "block-1",
-                message: { role: "assistant", content: "Found the root cause" },
-                timestamp: "2025-01-01T00:00:00Z",
-                artifacts: [
-                  {
-                    key: "root_cause",
-                    data: {
-                      one_line_description: "Test cause",
-                      five_whys: ["Why 1"],
-                    },
-                    reason: "",
-                  },
-                ],
-              },
-            ],
+            blocks,
           },
         }),
         {
@@ -266,6 +295,7 @@ describe("getAutofixState", () => {
 
     const result = await getAutofixState("test-org", "123456789");
     expect(result?.status).toBe("COMPLETED");
+    expect(result?.blocks).toEqual(blocks);
   });
 });
 
@@ -329,5 +359,31 @@ describe("triggerSolutionPlanning", () => {
       sentry_run_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       referrer: "api.cli",
     });
+  });
+});
+
+describe("normalizeAgentStatus", () => {
+  test.each([
+    ["processing", "PROCESSING"],
+    ["completed", "COMPLETED"],
+    ["error", "ERROR"],
+    ["canceled", "CANCELLED"],
+    ["cancelled", "CANCELLED"],
+    ["awaiting_user_input", "WAITING_FOR_USER_RESPONSE"],
+    ["need_more_information", "NEED_MORE_INFORMATION"],
+  ])("maps %s to %s", (input, expected) => {
+    expect(normalizeAgentStatus(input)).toBe(expected);
+  });
+
+  test.each([
+    [null],
+    [undefined],
+    [""],
+  ])("defaults %s status to PROCESSING", (input) => {
+    expect(normalizeAgentStatus(input)).toBe("PROCESSING");
+  });
+
+  test("uppercases unknown statuses", () => {
+    expect(normalizeAgentStatus("some_new_status")).toBe("SOME_NEW_STATUS");
   });
 });

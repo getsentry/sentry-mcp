@@ -291,33 +291,43 @@ else
   # Stable build: resolve version and download from GitHub Releases.
 
   if [[ -z "$requested_version" ]]; then
-    release_tag=""
-    # GitHub may have more than one page of MCP releases before the newest CLI release.
-    for page in {1..20}; do
-      if ! releases=$(curl -fsSL "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=${page}"); then
-        die "Failed to list Toolkit releases" "gh-version"
-      fi
-      release_tag=$(printf '%s\n' "$releases" \
-        | awk -F'"' '/^[[:space:]]*\{/ { tag="" } /"tag_name":[[:space:]]*"cli@/ { tag=$4 } /"prerelease":[[:space:]]*false/ && tag != "" { print tag; exit }')
-      if [[ -n "$release_tag" || "$releases" == "[]" ]]; then
-        break
-      fi
-    done
-    if [[ -z "$release_tag" ]]; then
-      if [[ "$releases" != "[]" ]]; then
-        die "Toolkit release pagination exceeded 20 pages" "gh-version"
-      fi
-      # Before Toolkit's first CLI release, resolve a version from legacy,
-      # then still probe Toolkit for that exact tag before choosing a source.
-      if ! legacy_release=$(curl -fsSL 'https://api.github.com/repos/getsentry/cli/releases/latest'); then
-        die "Failed to fetch latest CLI release" "gh-version"
-      fi
-      release_tag=$(printf '%s\n' "$legacy_release" | awk -F'"' '/"tag_name":[[:space:]]*"/ { print $4; exit }')
-      if [[ -z "$release_tag" ]]; then
-        die "Failed to read latest CLI release" "gh-version"
-      fi
+    # Craft publishes this app's stable version to the release registry.
+    # Consume the full response: an early parser exit can cause SIGPIPE under pipefail.
+    if metadata=$(curl -fsSL --max-time 10 https://release-registry.services.sentry.io/apps/sentry/latest); then
+      version=$(printf '%s\n' "$metadata" \
+        | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p')
     fi
-    version="${release_tag#cli@}"
+    if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      echo -e "${MUTED}Could not resolve latest version from Sentry's release registry. Trying GitHub...${NC}" >&2
+      release_tag=""
+      # GitHub may have many pages of MCP releases before its newest CLI release.
+      for page in {1..20}; do
+        if ! releases=$(curl -fsSL "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=${page}"); then
+          die "Failed to list Toolkit releases" "gh-version"
+        fi
+        release_tag=$(printf '%s\n' "$releases" \
+          | awk -F'"' '/^[[:space:]]*\{/ { tag="" } /"tag_name":[[:space:]]*"cli@/ { tag=$4 } /"prerelease":[[:space:]]*false/ && tag != "" { print tag; exit }')
+        if [[ -n "$release_tag" || "$releases" == "[]" ]]; then
+          break
+        fi
+      done
+      if [[ -z "$release_tag" ]]; then
+        if [[ "$releases" != "[]" ]]; then
+          die "Toolkit release pagination exceeded 20 pages" "gh-version"
+        fi
+        # Before the first Toolkit CLI release, use the legacy version only
+        # after checking whether that exact Toolkit tag exists.
+        if ! legacy_release=$(curl -fsSL 'https://api.github.com/repos/getsentry/cli/releases/latest'); then
+          die "Failed to fetch latest stable version from Sentry's release registry and GitHub. Retry or install a specific version with --version <version>." "resolve-version"
+        fi
+        release_tag=$(printf '%s\n' "$legacy_release" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')
+        if [[ ! "${release_tag#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          die "Failed to fetch latest stable version from Sentry's release registry and GitHub. Retry or install a specific version with --version <version>." "resolve-version"
+        fi
+      fi
+      version="${release_tag#cli@}"
+      version="${version#v}"
+    fi
   else
     version="$requested_version"
     version="${version#cli@}"
