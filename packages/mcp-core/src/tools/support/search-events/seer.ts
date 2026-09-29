@@ -17,9 +17,8 @@ export const SEER_SEARCH_AGENT_TIMEOUT = 60 * 1000; // 1 minute
 // Sentry's sentinel for all projects the user can access.
 const ALL_ACCESSIBLE_PROJECTS = -1;
 
-// Organization features the search agent endpoints require. `hideAiFeatures`
-// is checked separately.
-const REQUIRED_FEATURES = ["gen-ai-features", "gen-ai-search-agent-translate"];
+// The search agent endpoints require this feature. `hideAiFeatures` is checked separately.
+const SEARCH_AGENT_FEATURE = "gen-ai-search-agent-translate";
 
 const SEER_STRATEGIES = {
   errors: "Errors",
@@ -63,7 +62,7 @@ async function hasSeerSearchAgentAccess(
     return false;
   }
   const features = organization.features ?? [];
-  return REQUIRED_FEATURES.every((feature) => features.includes(feature));
+  return features.includes(SEARCH_AGENT_FEATURE);
 }
 
 function toSearchTranslation(
