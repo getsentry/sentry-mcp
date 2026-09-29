@@ -35,6 +35,13 @@ describe("workspace CI selection", () => {
     assert.ok(names.includes("@sentry/mcp-core"));
     assert.ok(!names.includes("@sentry/mcp-smoke-tests"));
     assert.equal(new Set(names).size, names.length);
+    const docs = matrix.include.find(({ name }) => name === "sentry-cli-docs");
+    assert.equal(docs.prepare, "ci:prepare");
+    const docsScripts = JSON.parse(
+      readFileSync(resolve(root, "apps/cli-docs/package.json"), "utf8"),
+    ).scripts;
+    assert.match(docsScripts[docs.prepare], /sentry run generate:schema/);
+    assert.match(docsScripts[docs.prepare], /sentry run generate:docs/);
     const cli = matrix.include.find(({ name }) => name === "sentry");
     assert.equal(cli.policy, "ci:policy");
     assert.equal(cli.e2e, "test:e2e");
@@ -115,6 +122,9 @@ describe("workspace CI selection", () => {
     assert.match(workflow, /merge_group:/);
     assert.match(workflow, /node scripts\/ci-projects\.mjs --event/);
     assert.match(workflow, /name: \$\{\{ matrix\.name \}\}/);
+    assert.match(workflow, /if: matrix\.prepare != ''/);
+    assert.match(workflow, /CHECK_SCRIPT: \$\{\{ matrix\.prepare \}\}/);
+    assert.doesNotMatch(workflow, /matrix\.name == 'sentry-cli-docs'/);
     assert.match(
       workflow,
       /needs: \[discover-projects, install, quality, project, npm-runtime\]/,

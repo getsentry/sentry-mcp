@@ -26,6 +26,7 @@ const CI_CONFIG_FIELDS = new Set([
   "lint",
   "npmRuntime",
   "policy",
+  "prepare",
   "roles",
   "test",
   "typecheck",
@@ -228,6 +229,7 @@ export function buildProjects(entries) {
       enabled: config.enabled !== false,
       roles: config.roles ?? [],
       dependencies: new Set(config.dependencies ?? []),
+      prepare: optionalScript(scripts, config.prepare, ["ci:prepare"]),
       build: optionalScript(scripts, config.build, ["build"]),
       lint: optionalScript(scripts, config.lint, ["lint"]),
       typecheck: optionalScript(scripts, config.typecheck, [
@@ -354,6 +356,7 @@ export function selectAffectedProjects(projects, changedFiles, eventName) {
 export function buildMatrix(projects) {
   const runnableProjects = projects.filter((project) =>
     [
+      project.prepare,
       project.build,
       project.lint,
       project.typecheck,
@@ -381,6 +384,7 @@ export function buildMatrix(projects) {
       name: project.name,
       path: project.path,
       slug,
+      prepare: project.prepare,
       build: project.build,
       lint: project.lint,
       typecheck: project.typecheck,

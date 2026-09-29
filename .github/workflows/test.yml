@@ -113,9 +113,12 @@ jobs:
         env:
           PROJECT_NAME: ${{ matrix.name }}
         run: pnpm --filter "${PROJECT_NAME}^..." --if-present run build
-      - name: Generate CLI docs for docs workspace
-        if: matrix.name == 'sentry-cli-docs'
-        run: pnpm --filter sentry run generate:docs
+      - name: Prepare project
+        if: matrix.prepare != ''
+        env:
+          PROJECT_NAME: ${{ matrix.name }}
+          CHECK_SCRIPT: ${{ matrix.prepare }}
+        run: pnpm --filter "$PROJECT_NAME" run "$CHECK_SCRIPT"
       - name: Build project
         if: matrix.build != ''
         env:
