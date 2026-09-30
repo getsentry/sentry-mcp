@@ -180,6 +180,38 @@ sentry-cli() {
       *)              break ;;
     esac
   done
+
+  # v3 accepts auth, headers and allow-failure after the command too. Keep
+  # --url on releases/deploys: there it can name the release or deploy URL.
+  local command="${1:-}" remaining=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --auth-token)
+        [ "$#" -ge 2 ] || { remaining+=("$1"); shift; continue; }
+        envs+=("SENTRY_AUTH_TOKEN=$2" "SENTRY_FORCE_ENV_TOKEN=1"); shift 2 ;;
+      --auth-token=*) envs+=("SENTRY_AUTH_TOKEN=${1#*=}" "SENTRY_FORCE_ENV_TOKEN=1"); shift ;;
+      --header)
+        [ "$#" -ge 2 ] || { remaining+=("$1"); shift; continue; }
+        headers="${headers:+$headers; }$2"; shift 2 ;;
+      --header=*) headers="${headers:+$headers; }${1#*=}"; shift ;;
+      --allow-failure) allow_failure=1; shift ;;
+      --url)
+        if [ "$command" = releases ] || [ "$command" = deploys ] || [ "$#" -lt 2 ]; then
+          remaining+=("$1"); shift
+        else
+          envs+=("SENTRY_HOST=$2" "SENTRY_URL=$2"); shift 2
+        fi ;;
+      --url=*)
+        if [ "$command" = releases ] || [ "$command" = deploys ]; then
+          remaining+=("$1")
+        else
+          envs+=("SENTRY_HOST=${1#*=}" "SENTRY_URL=${1#*=}")
+        fi
+        shift ;;
+      *) remaining+=("$1"); shift ;;
+    esac
+  done
+  set -- "${remaining[@]}"
   [ "${SENTRY_ALLOW_FAILURE:-}" = "1" ] && allow_failure=1
   [ -n "$headers" ] && envs+=("SENTRY_CUSTOM_HEADERS=$headers")
 

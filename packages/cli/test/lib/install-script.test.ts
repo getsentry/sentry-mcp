@@ -518,6 +518,56 @@ process.exitCode = result.status ?? 1;
     );
   });
 
+  test("reads a large releases page without SIGPIPE and selects its first stable CLI", () => {
+    const firstPage = join(testDir, "releases-large.json");
+    writeFileSync(
+      firstPage,
+      `[
+  {
+    "tag_name": "cli@0.46.0",
+    "prerelease": false
+  },
+  {
+    "tag_name": "cli@0.45.0",
+    "prerelease": false,
+    "body": "${"x".repeat(256 * 1024)}"
+  }
+]`
+    );
+    env.SENTRY_TEST_RELEASES_PAGE_1 = firstPage;
+    env.SENTRY_TEST_TOOLKIT_STATUS = "200";
+    const result = spawnSync("bash", [installScript, "--no-modify-path"], {
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(recorded("curl-urls")).toContain(
+      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.46.0"
+    );
+    expect(existsSync(join(installDir, "sentry"))).toBe(true);
+  });
+
+  test("directs musl users to the npm package before downloading a glibc binary", () => {
+    writeFileSync(
+      join(binDir, "ldd"),
+      "#!/bin/sh\nprintf 'musl libc (x86_64)\\n'\n",
+      {
+        mode: 0o700,
+      }
+    );
+    const result = spawnSync("bash", [installScript, "--no-modify-path"], {
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("npm install -g sentry");
+    expect(recorded("curl-urls")).toEqual([]);
+  });
+
   test("resolves the latest legacy version until Toolkit has a CLI release", () => {
     env.SENTRY_TEST_TOOLKIT_STATUS = "404";
     env.SENTRY_TEST_GITHUB_FAIL = "0";

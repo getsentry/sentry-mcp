@@ -148,9 +148,7 @@ case "$arch" in
   *) die "Unsupported architecture: $arch" "detect-arch" ;;
 esac
 
-# Detect C library variant (musl vs glibc) on Linux.
-# musl-based systems (Alpine, Void, etc.) need a different binary.
-libc_suffix=""
+# Official Node.js SEA binaries target glibc, not musl.
 if [[ "$os" == "linux" ]]; then
   detect_musl() {
     # Heuristic 1: Check for musl dynamic linker
@@ -170,25 +168,8 @@ if [[ "$os" == "linux" ]]; then
   }
 
   if detect_musl; then
-    libc_suffix="-musl"
     libc_variant="musl"
-
-    # Bun musl binaries dynamically link libstdc++ and libgcc_s.
-    # Auto-install them on Alpine when running as root (typical in Docker).
-    # When not root, warn with install instructions.
-    if ! ldconfig -p 2>/dev/null | grep -q libstdc++ && ! [ -f /usr/lib/libstdc++.so.6 ]; then
-      if command -v apk >/dev/null 2>&1; then
-        if [ "$(id -u)" = "0" ]; then
-          echo -e "${MUTED}Installing required C++ runtime libraries...${NC}"
-          apk add --no-cache libstdc++ libgcc >/dev/null 2>&1 \
-            || die "Failed to install libstdc++ and libgcc (required for musl binary)" "deps"
-        else
-          echo -e "${RED}Missing required libraries: libstdc++ libgcc${NC}" >&2
-          echo -e "${RED}Run: apk add libstdc++ libgcc${NC}" >&2
-          die "Cannot install dependencies without root. Run as root or install manually." "deps"
-        fi
-      fi
-    fi
+    die "The standalone binary requires glibc. On musl (Alpine), install Node.js and run: npm install -g sentry" "detect-libc"
   fi
 fi
 
@@ -250,7 +231,7 @@ if [[ "$requested_version" == "nightly" ]]; then
   # Each OCI layer has "digest" before "org.opencontainers.image.title".
   # Track the last-seen digest and print it when the target filename matches.
   # This avoids sed newline replacement which differs between GNU and BSD.
-  gz_filename="sentry-${os}-${arch}${libc_suffix}${suffix}.gz"
+  gz_filename="sentry-${os}-${arch}${suffix}.gz"
   digest=$(echo "$MANIFEST" \
     | awk -F'"' -v target="$gz_filename" '{
         for(i=1;i<=NF;i++){
@@ -305,8 +286,9 @@ else
         if ! releases=$(curl -fsSL "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=${page}"); then
           die "Failed to list Toolkit releases" "gh-version"
         fi
+        # Read the full page: exiting awk early can SIGPIPE printf under pipefail.
         release_tag=$(printf '%s\n' "$releases" \
-          | awk -F'"' '/^[[:space:]]*\{/ { tag="" } /"tag_name":[[:space:]]*"cli@/ { tag=$4 } /"prerelease":[[:space:]]*false/ && tag != "" { print tag; exit }')
+          | awk -F'"' '/^[[:space:]]*\{/ { tag="" } /"tag_name":[[:space:]]*"cli@/ { tag=$4 } /"prerelease":[[:space:]]*false/ && tag != "" && selected == "" { selected=tag } END { print selected }')
         if [[ -n "$release_tag" || "$releases" == "[]" ]]; then
           break
         fi
@@ -359,7 +341,7 @@ else
     *) die "Toolkit release check failed (HTTP ${release_status})" "gh-version" ;;
   esac
 
-  filename="sentry-${os}-${arch}${libc_suffix}${suffix}"
+  filename="sentry-${os}-${arch}${suffix}"
   url="https://github.com/${release_repo}/releases/download/${release_tag}/${filename}"
 
   echo -e "${MUTED}Downloading sentry v${version}...${NC}"

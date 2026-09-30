@@ -518,7 +518,7 @@ function generateSelfHostedEnvVarsTable(): string {
  */
 const PLATFORM_ROWS: readonly [string, string, string][] = [
   ["macOS", "x64, arm64 (Apple Silicon)", ""],
-  ["Linux", "x64, arm64", "glibc and musl (Alpine)"],
+  ["Linux", "x64, arm64", "Standalone binary requires glibc"],
   ["Windows", "x64", "Via Git Bash, MSYS2, or WSL"],
 ];
 

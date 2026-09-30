@@ -24,7 +24,7 @@ import { TEST_TMP_DIR } from "../../constants.js";
 /**
  * Records the env passed to the most recent `spawn` call so tests can assert
  * which variables were injected into the child process. The mock below still
- * delegates to the real `spawn`, so commands like `printenv`/`true` run for
+ * delegates to the real `spawn`, so commands like `true` run for
  * real and exit codes propagate normally.
  */
 const spawnCapture: {
@@ -575,7 +575,7 @@ describe("sentry local run", () => {
 
     // `node:child_process` is mocked at module scope (see vi.mock below). The
     // mock records the env handed to spawn so we can assert against it.
-    await func.call(ctx, { port, host, verify: false, timeout: 0 }, "printenv");
+    await func.call(ctx, { port, host, verify: false, timeout: 0 }, "true");
 
     const capturedEnv = spawnCapture.env;
     expect(capturedEnv).toBeDefined();

@@ -60,7 +60,7 @@ const issues = await sdk.issue.list({
   sort: "date",
 });
 
-const issue = await sdk.issue.view({ issue: "ACME-123" });
+const issue = await sdk.issue.view({}, "ACME-123");
 ```
 
 ### Events, Traces, Spans
@@ -182,7 +182,7 @@ import createSentrySDK, { SentryError } from "sentry";
 const sdk = createSentrySDK();
 
 try {
-  await sdk.issue.view({ issue: "NONEXISTENT-1" });
+  await sdk.issue.view({}, "NONEXISTENT-1");
 } catch (err) {
   if (err instanceof SentryError) {
     console.error(err.message);   // Clean error message (no ANSI codes)

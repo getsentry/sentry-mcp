@@ -76,7 +76,7 @@ curl https://cli.sentry.dev/install -fsS | SENTRY_INSTALL_DIR="$HOME/.local/bin"
     <tr>
       <td><strong>Linux</strong></td>
       <td>x64, arm64</td>
-      <td>glibc and musl (Alpine)</td>
+      <td>Standalone binary requires glibc</td>
     </tr>
     <tr>
       <td><strong>Windows</strong></td>
@@ -87,6 +87,9 @@ curl https://cli.sentry.dev/install -fsS | SENTRY_INSTALL_DIR="$HOME/.local/bin"
 </table>
 
 {/* GENERATED:END platform-support */}
+
+On Alpine and other musl-based Linux systems, install Node.js and use
+`npm install -g sentry` instead of the standalone installer.
 
 ## Homebrew
 
