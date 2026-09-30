@@ -17,7 +17,9 @@ jobs:
   deploy:
     name: Deploy to Cloudflare
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    # Keep the production Worker unchanged while the CLI/docs import lands.
+    # Restore deployments only through a separately reviewed workflow change.
+    if: ${{ false }}
 
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +38,7 @@ jobs:
       - name: Get pnpm store directory
         shell: bash
         run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+          echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - uses: actions/cache@v4
         name: Setup pnpm cache
@@ -51,7 +53,7 @@ jobs:
 
       # === BUILD AND DEPLOY CANARY WORKER ===
       - name: Build
-        run: pnpm -w run build
+        run: pnpm --filter '@sentry/mcp-cloudflare...' run build
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}

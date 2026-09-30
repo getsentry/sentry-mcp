@@ -241,10 +241,10 @@ Two-tier error system:
 
 ### 7. Build System
 
-Turbo for monorepo orchestration:
+pnpm workspace orchestration:
 
 - Dependency-aware builds
-- Parallel task execution
+- Package-scoped task execution
 - Shared TypeScript configs
 - Centralized linting/formatting
 
