@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
@@ -38,10 +39,18 @@ describe("package.json exports (dual ESM/CJS)", () => {
 
   // Only meaningful after a build; skipped in a clean checkout where dist/ is absent.
   const built = existsSync(resolve("dist/index.mjs"));
-  test.runIf(built)("built ESM entry exposes createSentrySDK", async () => {
-    const mod = await import(resolve("dist/index.mjs"));
-    expect(typeof mod.default).toBe("function");
-    expect(typeof mod.createSentrySDK).toBe("function");
+  test.runIf(built)("built ESM entry exposes createSentrySDK", () => {
+    // Load the built bundle in Node, outside Vitest's source-map transformer.
+    execFileSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        "import assert from 'node:assert/strict'; const mod = await import(process.argv[1]); assert.equal(typeof mod.default, 'function'); assert.equal(typeof mod.createSentrySDK, 'function');",
+        resolve("dist/index.mjs"),
+      ],
+      { timeout: 15_000 }
+    );
   });
 
   test.runIf(built)("built CJS entry exposes createSentrySDK", () => {

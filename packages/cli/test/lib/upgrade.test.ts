@@ -190,6 +190,37 @@ describe("parseInstallationMethod", () => {
 });
 
 describe("fetchLatestFromGitHub", () => {
+  test("selects the first CLI release after sentry-mcp is renamed to Toolkit", async () => {
+    const requests: string[] = [];
+    mockFetch(async (url) => {
+      const request = String(url);
+      requests.push(request);
+      if (request.endsWith("/releases?per_page=100")) {
+        return Response.json([
+          { tag_name: "0.42.0" },
+          { tag_name: "cli@0.46.0", prerelease: false },
+        ]);
+      }
+      if (request.endsWith("/releases/tags/cli%400.46.0")) {
+        return Response.json({ tag_name: "cli@0.46.0" });
+      }
+      throw new Error(`Unexpected release request: ${request}`);
+    });
+
+    const version = await fetchLatestFromGitHub();
+    const resolved = await resolveExistingUpgradeVersion(version);
+
+    expect(version).toBe("0.46.0");
+    expect(resolved).toEqual({ version, source: UPGRADE_SOURCES[0] });
+    expect(getBinaryDownloadUrl(version, resolved?.source)).toStartWith(
+      "https://github.com/getsentry/toolkit/releases/download/cli@0.46.0/"
+    );
+    expect(requests).toEqual([
+      "https://api.github.com/repos/getsentry/toolkit/releases?per_page=100",
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.46.0",
+    ]);
+  });
+
   test("selects the latest CLI-prefixed Toolkit release", async () => {
     const requests: string[] = [];
     mockFetch(async (url) => {
