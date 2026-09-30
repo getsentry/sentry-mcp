@@ -1,6 +1,6 @@
 /** Tests for generated command-heading and example association parsing. */
 
-import { readFile } from "node:fs/promises";
+import { lstat, readFile, realpath } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 import {
   extractCommandPathFromHeading,
@@ -87,4 +87,17 @@ describe("matchExampleToCommand", () => {
       "sentry project create my-new-app:javascript-nextjs"
     );
   });
+});
+
+test("published skill matches the plugin and links to its references", async () => {
+  const plugin = "plugins/sentry-cli/skills/sentry-cli";
+  const published = "../../apps/cli-docs/public/.well-known/skills/sentry-cli";
+
+  expect(await readFile(`${published}/SKILL.md`)).toEqual(
+    await readFile(`${plugin}/SKILL.md`)
+  );
+  expect((await lstat(`${published}/references`)).isSymbolicLink()).toBe(true);
+  expect(await realpath(`${published}/references`)).toBe(
+    await realpath(`${plugin}/references`)
+  );
 });

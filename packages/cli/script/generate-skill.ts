@@ -16,6 +16,8 @@
  * Output:
  *   plugins/sentry-cli/skills/sentry-cli/SKILL.md
  *   plugins/sentry-cli/skills/sentry-cli/references/*.md
+ *   docs/public/.well-known/skills/sentry-cli/SKILL.md
+ *   docs/public/.well-known/skills/sentry-cli/references (symlink to plugin references)
  *   docs/public/.well-known/skills/index.json
  */
 
@@ -90,7 +92,7 @@ function findDefaultCommandName(routeMap: RouteMap): string | undefined {
 
 const SKILL_DIR = "plugins/sentry-cli/skills/sentry-cli";
 const OUTPUT_PATH = `${SKILL_DIR}/SKILL.md`;
-const REFERENCES_DIR = `${SKILL_DIR}/references`;
+const PUBLIC_SKILL_DIR = `${DOCS_PUBLIC}/.well-known/skills/sentry-cli`;
 const INDEX_JSON_PATH = `${DOCS_PUBLIC}/.well-known/skills/index.json`;
 const DOCS_PATH = DOCS_CONTENT;
 
@@ -904,21 +906,21 @@ function generateIndexJson(generatedFiles: GeneratedFiles): string {
 
 const files = await generateAllSkillFiles(routes as unknown as RouteMap);
 
-// Clean references directory to remove stale files
-try {
-  rmSync(REFERENCES_DIR, { recursive: true, force: true });
-} catch {
-  // Directory may not exist yet
-}
-
-// Write all generated files
+// The public references are a symlink to these generated plugin references.
+rmSync(`${SKILL_DIR}/references`, { recursive: true, force: true });
 for (const [relativePath, content] of files) {
   const fullPath = `${SKILL_DIR}/${relativePath}`;
-  // Ensure parent directory exists for reference files
   const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
   mkdirSync(dir, { recursive: true });
   await writeFile(fullPath, content);
 }
+
+const publicSkill = files.get("SKILL.md");
+if (publicSkill === undefined) {
+  throw new Error("Generated skill is missing SKILL.md");
+}
+mkdirSync(PUBLIC_SKILL_DIR, { recursive: true });
+await writeFile(`${PUBLIC_SKILL_DIR}/SKILL.md`, publicSkill);
 
 // Write index.json
 const indexJson = generateIndexJson(files);

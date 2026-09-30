@@ -191,37 +191,42 @@ const id = `pm-${Math.random().toString(36).substr(2, 9)}`;
 </style>
 
 <script>
-  document.querySelectorAll('.pm-code').forEach(block => {
-    const tabs = block.querySelectorAll('.pm-tab');
-    const pres = block.querySelectorAll('.pm-pre');
-    const copyBtn = block.querySelector('.pm-copy');
+  function initPackageManagerCode() {
+    document.querySelectorAll('.pm-code').forEach(block => {
+      const tabs = block.querySelectorAll('.pm-tab');
+      const pres = block.querySelectorAll('.pm-pre');
+      const copyBtn = block.querySelector('.pm-copy');
 
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        const pm = tab.getAttribute('data-pm');
-        
-        // Update tabs
-        tabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        
-        // Update code blocks
-        pres.forEach(pre => {
-          if (pre.getAttribute('data-pm') === pm) {
-            pre.removeAttribute('hidden');
-          } else {
-            pre.setAttribute('hidden', '');
-          }
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          const pm = tab.getAttribute('data-pm');
+
+          // Update tabs
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+
+          // Update code blocks
+          pres.forEach(pre => {
+            if (pre.getAttribute('data-pm') === pm) {
+              pre.removeAttribute('hidden');
+            } else {
+              pre.setAttribute('hidden', '');
+            }
+          });
         });
       });
-    });
 
-    copyBtn?.addEventListener('click', async () => {
-      const activePre = block.querySelector('.pm-pre:not([hidden])');
-      const code = activePre?.querySelector('code')?.textContent || '';
-      
-      await navigator.clipboard.writeText(code);
-      copyBtn.classList.add('copied');
-      setTimeout(() => copyBtn.classList.remove('copied'), 2000);
+      copyBtn?.addEventListener('click', async () => {
+        const activePre = block.querySelector('.pm-pre:not([hidden])');
+        const code = activePre?.querySelector('code')?.textContent || '';
+
+        await navigator.clipboard.writeText(code);
+        copyBtn.classList.add('copied');
+        setTimeout(() => copyBtn.classList.remove('copied'), 2000);
+      });
     });
-  });
+  }
+
+  initPackageManagerCode();
+  document.addEventListener('astro:after-swap', initPackageManagerCode);
 </script>
