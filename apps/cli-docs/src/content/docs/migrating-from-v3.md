@@ -226,12 +226,27 @@ sentry-cli() {
   # re-applying any leading global flags before the translated command.
   local run=(env "${envs[@]}" sentry "${lead[@]}")
 
+  _scli_set_host() {
+    local index=1
+    while [ "${run[$index]}" != sentry ]; do index=$((index + 1)); done
+    run=("${run[@]:0:$index}" "SENTRY_HOST=$1" "SENTRY_URL=$1" "${run[@]:$index}")
+  }
+
   # `deploys` handling (top-level or nested under `releases`). Bare/`list` map to
   # `release deploys` (list); only `new` (create) can't be shimmed — v4 takes the
   # environment/name as positionals, not v3's `-e`/`-n` flags — so flag those.
   local deploy_msg='sentry-cli: `deploys new` changed in v4 — environment/name are positionals now:\n  sentry release deploy <version> <environment> [name] [--url … --started … --finished …]\n'
   _scli_deploys() {
     local a release="" dargs=()
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --url)
+          [ "$#" -ge 2 ] || break
+          _scli_set_host "$2"; shift 2 ;;
+        --url=*) _scli_set_host "${1#*=}"; shift ;;
+        *) break ;;
+      esac
+    done
     for a in "$@"; do [ "$a" = "new" ] && { printf '%b' "$deploy_msg" >&2; return 64; }; done
     while [ "$#" -gt 0 ]; do
       case "$1" in
@@ -258,6 +273,10 @@ sentry-cli() {
           run+=("$1" "$2"); shift 2 ;;
         --org=*|--project=*|--log-level=*|--fields=*|-v|--verbose|--json)
           run+=("$1"); shift ;;
+        --url)
+          [ "$#" -ge 2 ] || break
+          _scli_set_host "$2"; shift 2 ;;
+        --url=*) _scli_set_host "${1#*=}"; shift ;;
         *) break ;;
       esac
     done

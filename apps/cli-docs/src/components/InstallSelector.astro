@@ -295,8 +295,14 @@ const defaultOption = highlightedOptions[defaultIndex];
 
 <script is:inline>
   (function() {
+    if (window.__sentryInstallSelectorInit) {
+      window.__sentryInstallSelectorInit();
+      return;
+    }
+
     function initInstallSelector() {
       document.querySelectorAll('.install-selector').forEach(function(selector) {
+        if (selector.dataset.installSelectorInitialized) return;
         const installBox = selector.querySelector('.install-box');
         const trigger = selector.querySelector('.dropdown-trigger');
         const label = selector.querySelector('.dropdown-label');
@@ -306,6 +312,7 @@ const defaultOption = highlightedOptions[defaultIndex];
         const optionsArray = Array.from(options);
 
         if (!trigger || !installBox) return;
+        selector.dataset.installSelectorInitialized = 'true';
 
         /**
          * Selects an option: updates UI, closes dropdown, returns focus to trigger.
@@ -492,32 +499,34 @@ const defaultOption = highlightedOptions[defaultIndex];
           });
         }
       });
-
-      // Close dropdown when clicking outside
-      document.addEventListener('click', function(e) {
-        if (!e.target.closest('.install-selector')) {
-          document.querySelectorAll('.install-box.open').forEach(function(box) {
-            box.classList.remove('open');
-            const trigger = box.querySelector('.dropdown-trigger');
-            if (trigger) trigger.setAttribute('aria-expanded', 'false');
-          });
-        }
-      });
-
-      // Close on escape (global handler for when focus is elsewhere)
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-          document.querySelectorAll('.install-box.open').forEach(function(box) {
-            box.classList.remove('open');
-            const trigger = box.querySelector('.dropdown-trigger');
-            if (trigger) {
-              trigger.setAttribute('aria-expanded', 'false');
-              trigger.focus();
-            }
-          });
-        }
-      });
     }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.install-selector')) {
+        document.querySelectorAll('.install-box.open').forEach(function(box) {
+          box.classList.remove('open');
+          const trigger = box.querySelector('.dropdown-trigger');
+          if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        });
+      }
+    });
+
+    // Close on escape (global handler for when focus is elsewhere)
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.install-box.open').forEach(function(box) {
+          box.classList.remove('open');
+          const trigger = box.querySelector('.dropdown-trigger');
+          if (trigger) {
+            trigger.setAttribute('aria-expanded', 'false');
+            trigger.focus();
+          }
+        });
+      }
+    });
+
+    window.__sentryInstallSelectorInit = initInstallSelector;
 
     // Run when DOM is ready
     if (document.readyState === 'loading') {

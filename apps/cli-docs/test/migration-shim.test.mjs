@@ -77,6 +77,41 @@ test("translates trailing host URL but preserves release URL", () => {
   assert.deepEqual(release.stdout.trim().split("\n"), ["release", "new", "1.0.0", "--url", "https://release.example.com", "auth=", "headers=", "host="]);
 });
 
+test("releases maps a host URL before the subcommand without losing its release URL", () => {
+  for (const urlFlag of [
+    ["--url", "https://sentry.example.com"],
+    ["--url=https://sentry.example.com"],
+  ]) {
+    const result = runShim([
+      "releases", "--org", "acme", ...urlFlag, "new", "1.0.0", "--url", "https://release.example.com",
+    ], { SENTRY_TEST_SHIM_ENV: "1" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(result.stdout.trim().split("\n"), [
+      "--org", "acme", "release", "new", "1.0.0", "--url", "https://release.example.com",
+      "auth=", "headers=", "host=https://sentry.example.com",
+    ]);
+  }
+
+  const overridden = runShim([
+    "--url", "https://old.example.com", "releases", "--url", "https://sentry.example.com", "list",
+  ], { SENTRY_TEST_SHIM_ENV: "1" });
+  assert.equal(overridden.status, 0, overridden.stderr);
+  assert.match(overridden.stdout, /host=https:\/\/sentry\.example\.com/);
+});
+
+test("deploys and nested release deploys map host URLs before the subcommand", () => {
+  for (const args of [
+    ["deploys", "--url", "https://sentry.example.com", "list"],
+    ["releases", "deploys", "--url=https://sentry.example.com", "list"],
+  ]) {
+    const result = runShim(args, { SENTRY_TEST_SHIM_ENV: "1" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(result.stdout.trim().split("\n"), [
+      "release", "deploys", "auth=", "headers=", "host=https://sentry.example.com",
+    ]);
+  }
+});
+
 test("login retains the URL before or after the command", () => {
   for (const args of [
     ["--url", "https://sentry.example.com", "login"],
