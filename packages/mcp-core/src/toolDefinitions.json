@@ -2698,7 +2698,7 @@
   },
   {
     "name": "find_organizations",
-    "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+    "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results by default. Use limit to request up to 100 results. When hasMore is true, pass the returned nextCursor with the same filters and limit to fetch the next page.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2713,6 +2713,25 @@
               "type": "null"
             }
           ]
+        },
+        "cursor": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Pagination cursor from a previous call's nextCursor. Reuse it with the same filters, scope, and limit to fetch the next page."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "default": 25,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "description": "Maximum number of organizations to return per page."
         }
       }
     },
@@ -2756,9 +2775,19 @@
         },
         "hasMore": {
           "type": "boolean"
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
-      "required": ["organizations", "hasMore"],
+      "required": ["organizations", "hasMore", "nextCursor"],
       "additionalProperties": false
     },
     "requiredScopes": ["org:read"],
@@ -2767,7 +2796,7 @@
   },
   {
     "name": "find_projects",
-    "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
+    "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results by default. Use limit to request up to 100 results. When hasMore is true, pass the returned nextCursor with the same filters and limit to fetch the next page.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2798,6 +2827,25 @@
               "type": "null"
             }
           ]
+        },
+        "cursor": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Pagination cursor from a previous call's nextCursor. Reuse it with the same filters, scope, and limit to fetch the next page."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "default": 25,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "description": "Maximum number of projects to return per page."
         }
       },
       "required": ["organizationSlug"]
@@ -2820,9 +2868,19 @@
         },
         "hasMore": {
           "type": "boolean"
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
-      "required": ["projects", "hasMore"],
+      "required": ["projects", "hasMore", "nextCursor"],
       "additionalProperties": false
     },
     "requiredScopes": ["project:read"],
@@ -3065,7 +3123,7 @@
   },
   {
     "name": "find_teams",
-    "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. When hasMore is true, use the query parameter to narrow down results.",
+    "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results by default. Use limit to request up to 100 results. When hasMore is true, pass the returned nextCursor with the same filters and limit to fetch the next page.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3096,6 +3154,25 @@
               "type": "null"
             }
           ]
+        },
+        "cursor": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Pagination cursor from a previous call's nextCursor. Reuse it with the same filters, scope, and limit to fetch the next page."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "default": 25,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "description": "Maximum number of teams to return per page."
         }
       },
       "required": ["organizationSlug"]
@@ -3121,9 +3198,19 @@
         },
         "hasMore": {
           "type": "boolean"
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
-      "required": ["teams", "hasMore"],
+      "required": ["teams", "hasMore", "nextCursor"],
       "additionalProperties": false
     },
     "requiredScopes": ["team:read"],
