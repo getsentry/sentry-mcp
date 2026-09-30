@@ -345,7 +345,48 @@ describe("classifySilenced", () => {
   ])("does NOT silence %s", (_label, err) => {
     expect(classifySilenced(err)).toBeNull();
   });
+
+  test.each([
+    "not_enabled",
+    "no_budget",
+    "ai_disabled",
+  ] as const)("silences SeerError(%s) on self-hosted (CLI-1WP)", (reason) => {
+    withSentryUrl("https://sentry.example.com", () => {
+      expect(classifySilenced(new SeerError(reason, "my-org"))).toBe(
+        "seer_unavailable_self_hosted"
+      );
+    });
+  });
+
+  test("does NOT silence SeerError when SENTRY_URL points at SaaS", () => {
+    withSentryUrl("https://sentry.io", () => {
+      expect(classifySilenced(new SeerError("not_enabled"))).toBeNull();
+    });
+  });
 });
+
+/**
+ * Run `fn` with `SENTRY_URL` set to `url`, restoring the previous value after.
+ * `SENTRY_HOST` is cleared for the duration since it takes precedence.
+ */
+function withSentryUrl(url: string, fn: () => void): void {
+  const savedUrl = process.env.SENTRY_URL;
+  const savedHost = process.env.SENTRY_HOST;
+  process.env.SENTRY_URL = url;
+  delete process.env.SENTRY_HOST;
+  try {
+    fn();
+  } finally {
+    if (savedUrl === undefined) {
+      delete process.env.SENTRY_URL;
+    } else {
+      process.env.SENTRY_URL = savedUrl;
+    }
+    if (savedHost !== undefined) {
+      process.env.SENTRY_HOST = savedHost;
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // enrichEventWithGroupingTags
@@ -569,6 +610,24 @@ describe("reportCliError integration", () => {
     reportCliError(new SeerError("not_enabled", "my-org"));
     expect(captureSpy).toHaveBeenCalled();
     expect(metricSpy).not.toHaveBeenCalled();
+  });
+
+  test("silences SeerError on self-hosted and emits metric (CLI-1WP)", () => {
+    withSentryUrl("https://sentry.example.com", () => {
+      reportCliError(new SeerError("not_enabled", "my-org"));
+    });
+    expect(captureSpy).not.toHaveBeenCalled();
+    expect(metricSpy).toHaveBeenCalledWith(
+      "cli.error.silenced",
+      1,
+      expect.objectContaining({
+        attributes: expect.objectContaining({
+          error_class: "SeerError",
+          reason: "seer_unavailable_self_hosted",
+          seer_reason: "not_enabled",
+        }),
+      })
+    );
   });
 
   test("silences AuthError(invalid) and emits metric", () => {
