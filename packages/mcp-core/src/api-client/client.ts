@@ -1614,19 +1614,20 @@ export class SentryApiService {
   }
 
   /**
-   * Lists all organizations accessible to the authenticated user.
+   * Lists a page of organizations accessible to the authenticated user.
    *
    * Queries the `/organizations/` endpoint on the root host.
    *
    * @param params Query parameters
    * @param params.query Search query to filter organizations by name/slug
    * @param params.limit Maximum number of organizations to return (defaults to 25)
-   * @returns Array of organizations across all accessible regions
+   * @param params.cursor Pagination cursor from a previous call's nextCursor
+   * @returns A page of organizations across all accessible regions, plus a cursor for the next page (null once exhausted)
    *
    * @example
    * ```typescript
-   * const orgs = await apiService.listOrganizations();
-   * orgs.forEach(org => {
+   * const { organizations } = await apiService.listOrganizations();
+   * organizations.forEach(org => {
    *   // regionUrl present for Cloud Service, empty for self-hosted
    *   console.log(`${org.name} (${org.slug}) - ${org.links?.regionUrl || 'No region URL'}`);
    * });
@@ -1684,14 +1685,15 @@ export class SentryApiService {
   }
 
   /**
-   * Lists teams within an organization.
+   * Lists a page of teams within an organization.
    *
    * @param organizationSlug Organization identifier
    * @param params Query parameters
    * @param params.query Search query to filter teams by name/slug
    * @param params.limit Maximum number of teams to return
+   * @param params.cursor Pagination cursor from a previous call's nextCursor
    * @param opts Request options including host override
-   * @returns Array of teams in the organization
+   * @returns A page of teams in the organization, plus a cursor for the next page (null once exhausted)
    */
   async listTeams(
     organizationSlug: string,

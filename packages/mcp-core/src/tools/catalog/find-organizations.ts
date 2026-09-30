@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { defineTool } from "../../internal/tool-helpers/define";
 import { structuredResult } from "../../internal/tool-helpers/results";
-import type { ServerContext } from "../../types";
-import { ParamSearchQuery } from "../../schema";
+import { ParamCursor, ParamSearchQuery } from "../../schema";
 import { ALL_SKILLS } from "../../skills";
+import type { ServerContext } from "../../types";
 
-const RESULT_LIMIT = 100;
+const DEFAULT_LIMIT = 25;
 
 export const findOrganizationsOutputSchema = z.object({
   organizations: z.array(
@@ -36,17 +36,18 @@ export default defineTool({
     "- Find an organization's slug to aid other tool requests",
     "- Search for specific organizations by name or slug",
     "",
-    `Returns up to ${RESULT_LIMIT} results. When hasMore is true, pass the returned nextCursor to fetch the next page, or use the query parameter to narrow down results.`,
+    `Returns up to ${DEFAULT_LIMIT} results by default. Use limit to request up to 100 results. When hasMore is true, pass the returned nextCursor with the same filters and limit to fetch the next page.`,
   ].join("\n"),
   inputSchema: {
     query: ParamSearchQuery.nullable().default(null),
-    cursor: z
-      .string()
-      .nullable()
-      .default(null)
-      .describe(
-        "Pagination cursor from a previous call's nextCursor, to fetch the next page of results.",
-      ),
+    cursor: ParamCursor.nullable().default(null),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .describe("Maximum number of organizations to return per page.")
+      .default(DEFAULT_LIMIT),
   },
   annotations: {
     readOnlyHint: true,
@@ -60,7 +61,7 @@ export default defineTool({
     const apiService = apiServiceFromContext(context);
     const { organizations, nextCursor } = await apiService.listOrganizations({
       query: params.query ?? undefined,
-      limit: RESULT_LIMIT,
+      limit: params.limit,
       cursor: params.cursor ?? undefined,
     });
 

@@ -1,21 +1,22 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
-import { describe, it, expect } from "vitest";
+import { HttpResponse, http } from "msw";
+import { describe, expect, it } from "vitest";
+import { getServerContext } from "../../test-setup.js";
 import {
   assertStructuredOnlyResult,
   getStructuredContent,
 } from "../../test-utils/structured-content.js";
-import findProjects, { findProjectsOutputSchema } from "./find-projects.js";
 import { prepareToolParams } from "../catalog-runtime/availability";
-import { getServerContext } from "../../test-setup.js";
+import findProjects, { findProjectsOutputSchema } from "./find-projects.js";
 
 describe("find_projects", () => {
   it("serializes", async () => {
+    const context = getServerContext();
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/projects/",
         ({ request }) => {
-          expect(new URL(request.url).searchParams.get("per_page")).toBe("100");
+          expect(new URL(request.url).searchParams.get("per_page")).toBe("25");
           return HttpResponse.json([
             {
               id: "1",
@@ -27,15 +28,17 @@ describe("find_projects", () => {
       ),
     );
 
-    const result = await findProjects.handler(
-      {
+    const params = prepareToolParams({
+      tool: findProjects,
+      params: {
         organizationSlug: "sentry-mcp-evals",
         regionUrl: null,
         query: null,
         cursor: null,
       },
-      getServerContext(),
-    );
+      context,
+    }) as Parameters<typeof findProjects.handler>[0];
+    const result = await findProjects.handler(params, context);
 
     assertStructuredOnlyResult(result);
     const structuredContent = getStructuredContent(result);
@@ -55,12 +58,18 @@ describe("find_projects", () => {
     `);
   });
 
-  it("returns up to 100 projects per call and reports a cursor when there are more", async () => {
+  it("preserves search and cursor while returning a page of 100 projects", async () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/projects/",
         ({ request }) => {
-          expect(new URL(request.url).searchParams.get("per_page")).toBe("100");
+          expect(Object.fromEntries(new URL(request.url).searchParams)).toEqual(
+            {
+              per_page: "100",
+              query: "example",
+              cursor: "previous",
+            },
+          );
           return HttpResponse.json(
             Array.from({ length: 100 }, (_, index) => ({
               id: String(index + 1),
@@ -81,37 +90,50 @@ describe("find_projects", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         regionUrl: null,
-        query: null,
-        cursor: null,
+        query: "example",
+        cursor: "previous",
+        limit: 100,
       },
       getServerContext(),
     );
 
     assertStructuredOnlyResult(result);
-    expect(getStructuredContent(result)).toEqual({
-      projects: Array.from({ length: 100 }, (_, index) => ({
-        slug: `project-${String(index + 1).padStart(3, "0")}`,
-      })),
+    const structuredContent = findProjectsOutputSchema.parse(
+      getStructuredContent(result),
+    );
+    expect(structuredContent.projects).toHaveLength(100);
+    expect(structuredContent.projects.at(-1)).toEqual({ slug: "project-100" });
+    expect(structuredContent).toMatchObject({
       hasMore: true,
       nextCursor: "page-2",
     });
   });
 
-  it("reports no more results, and no cursor, once the server stops returning a next link", async () => {
+  it("reports no more results when the next link has results=false", async () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/projects/",
         ({ request }) => {
-          expect(new URL(request.url).searchParams.get("cursor")).toBe(
-            "page-2",
-          );
-          return HttpResponse.json([
+          expect(Object.fromEntries(new URL(request.url).searchParams)).toEqual(
             {
-              id: "101",
-              slug: "project-101",
-              name: "Project 101",
+              per_page: "25",
+              cursor: "page-2",
             },
-          ]);
+          );
+          return HttpResponse.json(
+            [
+              {
+                id: "26",
+                slug: "project-026",
+                name: "Project 26",
+              },
+            ],
+            {
+              headers: {
+                Link: '<https://sentry.io/api/0/organizations/sentry-mcp-evals/projects/?cursor=page-3>; rel="next"; results="false"; cursor="page-3"',
+              },
+            },
+          );
         },
       ),
     );
@@ -122,13 +144,14 @@ describe("find_projects", () => {
         regionUrl: null,
         query: null,
         cursor: "page-2",
+        limit: 25,
       },
       getServerContext(),
     );
 
     assertStructuredOnlyResult(result);
     expect(getStructuredContent(result)).toEqual({
-      projects: [{ slug: "project-101" }],
+      projects: [{ slug: "project-026" }],
       hasMore: false,
       nextCursor: null,
     });

@@ -1,5 +1,5 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SentryApiService } from "../../api-client/index.js";
 import { getServerContext } from "../../test-setup.js";
@@ -7,15 +7,20 @@ import {
   assertStructuredOnlyResult,
   getStructuredContent,
 } from "../../test-utils/structured-content.js";
+import { prepareToolParams } from "../catalog-runtime/availability";
 import findOrganizations from "./find-organizations.js";
 
 function mockOrganizations(
   organizations: unknown[],
   headers?: Record<string, string>,
+  searchParams: Record<string, string> = {},
 ) {
   mswServer.use(
     http.get("https://sentry.io/api/0/organizations/", ({ request }) => {
-      expect(new URL(request.url).searchParams.get("per_page")).toBe("100");
+      expect(Object.fromEntries(new URL(request.url).searchParams)).toEqual({
+        per_page: "25",
+        ...searchParams,
+      });
       return HttpResponse.json(
         organizations,
         headers ? { headers } : undefined,
@@ -51,23 +56,25 @@ describe("find_organizations", () => {
     );
 
     const result = await findOrganizations.handler(
-      { query: "example" },
+      { query: "example", cursor: null, limit: 25 },
       getServerContext({ sentryHost: host, accessToken: "test-token" }),
     );
 
     expect(requests).toEqual([
       {
-        url: `https://${expectedHost}/api/0/organizations/?per_page=26&query=example`,
+        url: `https://${expectedHost}/api/0/organizations/?per_page=25&query=example`,
         authorization: "Bearer test-token",
       },
     ]);
     expect(getStructuredContent(result)).toEqual({
       organizations: [{ slug: "example", webUrl: null, regionUrl: null }],
       hasMore: false,
+      nextCursor: null,
     });
   });
 
   it("returns only the structured organization payload", async () => {
+    const context = getServerContext();
     mockOrganizations([
       {
         id: "1",
@@ -85,10 +92,12 @@ describe("find_organizations", () => {
       },
     ]);
 
-    const result = await findOrganizations.handler(
-      { query: null, cursor: null },
-      getServerContext(),
-    );
+    const params = prepareToolParams({
+      tool: findOrganizations,
+      params: { query: null, cursor: null },
+      context,
+    }) as Parameters<typeof findOrganizations.handler>[0];
+    const result = await findOrganizations.handler(params, context);
 
     expect(getStructuredContent(result)).toMatchInlineSnapshot(`
       {
@@ -131,7 +140,7 @@ describe("find_organizations", () => {
     });
 
     const result = await findOrganizations.handler(
-      { query: null, cursor: null },
+      { query: null, cursor: null, limit: 25 },
       getServerContext(),
     );
 
@@ -149,7 +158,7 @@ describe("find_organizations", () => {
     assertStructuredOnlyResult(result);
   });
 
-  it("returns up to 100 organizations per call and reports a cursor when there are more", async () => {
+  it("preserves search and cursor while returning a page of 100 organizations", async () => {
     mockOrganizations(
       Array.from({ length: 100 }, (_, index) => ({
         id: String(index + 1),
@@ -163,10 +172,11 @@ describe("find_organizations", () => {
       {
         Link: '<https://sentry.io/api/0/organizations/?cursor=page-2>; rel="next"; results="true"; cursor="page-2"',
       },
+      { per_page: "100", query: "example", cursor: "previous" },
     );
 
     const result = await findOrganizations.handler(
-      { query: null, cursor: null },
+      { query: "example", cursor: "previous", limit: 100 },
       getServerContext(),
     );
     const structuredContent = getStructuredContent<{
