@@ -58,20 +58,20 @@ describe("find_teams", () => {
     `);
   });
 
-  it("preserves search and cursor while returning a page of 100 teams", async () => {
+  it("preserves search and cursor while returning a page of 25 teams", async () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/teams/",
         ({ request }) => {
           expect(Object.fromEntries(new URL(request.url).searchParams)).toEqual(
             {
-              per_page: "100",
+              per_page: "25",
               query: "example",
               cursor: "previous",
             },
           );
           return HttpResponse.json(
-            Array.from({ length: 100 }, (_, index) => ({
+            Array.from({ length: 25 }, (_, index) => ({
               id: index + 1,
               slug: `team-${String(index + 1).padStart(3, "0")}`,
               name: `Team ${index + 1}`,
@@ -92,7 +92,6 @@ describe("find_teams", () => {
         query: "example",
         regionUrl: null,
         cursor: "previous",
-        limit: 100,
       },
       getServerContext(),
     );
@@ -101,10 +100,10 @@ describe("find_teams", () => {
     const structuredContent = findTeamsOutputSchema.parse(
       getStructuredContent(result),
     );
-    expect(structuredContent.teams).toHaveLength(100);
+    expect(structuredContent.teams).toHaveLength(25);
     expect(structuredContent.teams.at(-1)).toEqual({
-      slug: "team-100",
-      id: "100",
+      slug: "team-025",
+      id: "25",
     });
     expect(structuredContent).toMatchObject({
       hasMore: true,

@@ -13,7 +13,7 @@ import { ALL_SKILLS } from "../../skills";
 import { setOrganizationContext } from "../../telem/organization";
 import type { ServerContext } from "../../types";
 
-const DEFAULT_LIMIT = 25;
+const RESULT_LIMIT = 25;
 
 export const findProjectsOutputSchema = z.object({
   projects: z.array(
@@ -37,20 +37,13 @@ export default defineTool({
     "- Find a project's slug to aid other tool requests",
     "- Search for specific projects by name or slug",
     "",
-    `Returns up to ${DEFAULT_LIMIT} results by default. Use limit to request up to 100 results. When hasMore is true, pass the returned nextCursor with the same filters and limit to fetch the next page.`,
+    `Returns up to ${RESULT_LIMIT} results per page. When hasMore is true, pass the returned nextCursor with the same filters and scope to fetch the next page.`,
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
     regionUrl: ParamRegionUrl.nullable().default(null),
     query: ParamSearchQuery.nullable().default(null),
     cursor: ParamCursor.nullable().default(null),
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .max(100)
-      .describe("Maximum number of projects to return per page.")
-      .default(DEFAULT_LIMIT),
   },
   annotations: {
     readOnlyHint: true,
@@ -76,7 +69,7 @@ export default defineTool({
       organizationSlug,
       {
         query: params.query ?? undefined,
-        limit: params.limit,
+        limit: RESULT_LIMIT,
         cursor: params.cursor ?? undefined,
       },
     );

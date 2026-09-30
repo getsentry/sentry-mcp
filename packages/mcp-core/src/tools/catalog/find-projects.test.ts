@@ -58,20 +58,20 @@ describe("find_projects", () => {
     `);
   });
 
-  it("preserves search and cursor while returning a page of 100 projects", async () => {
+  it("preserves search and cursor while returning a page of 25 projects", async () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/projects/",
         ({ request }) => {
           expect(Object.fromEntries(new URL(request.url).searchParams)).toEqual(
             {
-              per_page: "100",
+              per_page: "25",
               query: "example",
               cursor: "previous",
             },
           );
           return HttpResponse.json(
-            Array.from({ length: 100 }, (_, index) => ({
+            Array.from({ length: 25 }, (_, index) => ({
               id: String(index + 1),
               slug: `project-${String(index + 1).padStart(3, "0")}`,
               name: `Project ${index + 1}`,
@@ -92,7 +92,6 @@ describe("find_projects", () => {
         regionUrl: null,
         query: "example",
         cursor: "previous",
-        limit: 100,
       },
       getServerContext(),
     );
@@ -101,8 +100,8 @@ describe("find_projects", () => {
     const structuredContent = findProjectsOutputSchema.parse(
       getStructuredContent(result),
     );
-    expect(structuredContent.projects).toHaveLength(100);
-    expect(structuredContent.projects.at(-1)).toEqual({ slug: "project-100" });
+    expect(structuredContent.projects).toHaveLength(25);
+    expect(structuredContent.projects.at(-1)).toEqual({ slug: "project-025" });
     expect(structuredContent).toMatchObject({
       hasMore: true,
       nextCursor: "page-2",
@@ -144,7 +143,6 @@ describe("find_projects", () => {
         regionUrl: null,
         query: null,
         cursor: "page-2",
-        limit: 25,
       },
       getServerContext(),
     );
