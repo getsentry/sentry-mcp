@@ -287,8 +287,47 @@ else
           die "Failed to list Toolkit releases" "gh-version"
         fi
         # Read the full page: exiting awk early can SIGPIPE printf under pipefail.
+        # Match top-level release fields regardless of whitespace, field order, or nested assets.
         release_tag=$(printf '%s\n' "$releases" \
-          | awk -F'"' '/^[[:space:]]*\{/ { tag="" } /"tag_name":[[:space:]]*"cli@/ { tag=$4 } /"prerelease":[[:space:]]*false/ && tag ~ /^cli@[0-9]+\.[0-9]+\.[0-9]+$/ && selected == "" { selected=tag } END { print selected }')
+          | awk '
+              function consider() {
+                if (selected == "" && !prerelease && tag ~ /^cli@[0-9]+\.[0-9]+\.[0-9]+$/) selected=tag
+              }
+              {
+                for (i=1; i<=length($0); i++) {
+                  c=substr($0,i,1)
+                  if (quoted) {
+                    if (escaped) { escaped=0; continue }
+                    if (c == "\\") { escaped=1; invalid=1; continue }
+                    if (c == "\"") {
+                      quoted=0
+                      if (depth == 1 && !invalid) {
+                        if (key == "") key=token
+                        else if (key == "tag_name") tag=token
+                      }
+                      continue
+                    }
+                    if (depth == 1 && (key == "" || key == "tag_name")) {
+                      if (length(token) < 128) token=token c
+                      else invalid=1
+                    }
+                    continue
+                  }
+                  if (c == "\"") { quoted=1; token=""; invalid=0; continue }
+                  if (c == "{") {
+                    depth++
+                    if (depth == 1) { key=""; tag=""; prerelease=1 }
+                  } else if (c == "}") {
+                    if (depth == 1) consider()
+                    depth--
+                  } else if (depth == 1) {
+                    if (c == ",") key=""
+                    else if (key == "prerelease" && c == "f" && substr($0,i,5) == "false") prerelease=0
+                  }
+                }
+              }
+              END { print selected }
+            ')
         if [[ -n "$release_tag" || "$releases" == "[]" ]]; then
           break
         fi
