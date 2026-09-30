@@ -518,6 +518,30 @@ process.exitCode = result.status ?? 1;
     );
   });
 
+  test("skips SemVer prereleases even when GitHub marks them stable", () => {
+    const firstPage = join(testDir, "releases-1.json");
+    writeFileSync(
+      firstPage,
+      '[\n  {\n    "tag_name": "cli@0.47.0-dev.1",\n    "prerelease": false\n  },\n  {\n    "tag_name": "cli@0.46.0",\n    "prerelease": false\n  }\n]\n'
+    );
+    env.SENTRY_TEST_RELEASES_PAGE_1 = firstPage;
+    env.SENTRY_TEST_TOOLKIT_STATUS = "200";
+    const result = spawnSync("bash", [installScript, "--no-modify-path"], {
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(recorded("curl-urls")[2]).toBe(
+      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.46.0"
+    );
+    expect(recorded("curl-urls")[3]).toContain(
+      "/getsentry/sentry-mcp/releases/download/cli@0.46.0/"
+    );
+    expect(recorded("setup-args")).toContain("stable");
+  });
+
   test("reads a large releases page without SIGPIPE and selects its first stable CLI", () => {
     const firstPage = join(testDir, "releases-large.json");
     writeFileSync(

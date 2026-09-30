@@ -288,7 +288,7 @@ else
         fi
         # Read the full page: exiting awk early can SIGPIPE printf under pipefail.
         release_tag=$(printf '%s\n' "$releases" \
-          | awk -F'"' '/^[[:space:]]*\{/ { tag="" } /"tag_name":[[:space:]]*"cli@/ { tag=$4 } /"prerelease":[[:space:]]*false/ && tag != "" && selected == "" { selected=tag } END { print selected }')
+          | awk -F'"' '/^[[:space:]]*\{/ { tag="" } /"tag_name":[[:space:]]*"cli@/ { tag=$4 } /"prerelease":[[:space:]]*false/ && tag ~ /^cli@[0-9]+\.[0-9]+\.[0-9]+$/ && selected == "" { selected=tag } END { print selected }')
         if [[ -n "$release_tag" || "$releases" == "[]" ]]; then
           break
         fi
