@@ -131,3 +131,17 @@ override this precedence and force environment tokens to win, set
 `SENTRY_FORCE_ENV_TOKEN=1`.
 
 When a token comes from an environment variable, the CLI skips expiry checks and automatic refresh.
+
+## Invalid Token Formatting
+
+Tokens must be a single line of printable ASCII characters, without spaces.
+When preparing an access token for storage or an authenticated request, the CLI
+removes surrounding whitespace and ASCII control characters, then rejects any
+remaining whitespace, control characters, and non-ASCII characters. It does not
+join split lines.
+
+If you see "Invalid authentication token", copy the complete token again into
+the configuration that supplies it. For environment tokens, check
+`SENTRY_AUTH_TOKEN` (or the legacy `SENTRY_TOKEN`). For stored credentials, run
+`sentry auth login` to replace them. A token rejected for formatting exits with
+code `12` (`AUTH_INVALID`).

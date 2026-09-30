@@ -161,14 +161,11 @@ sentry issue explain 123456789
 # By short ID with org prefix
 sentry issue explain my-org/MYPROJECT-ABC
 
+# Analyze multiple issues in one invocation
+sentry issue explain FRONT-ABC BACK-2
+
 # Force a fresh analysis
 sentry issue explain 123456789 --force
-
-# Generate a fix plan (automatically runs explain if needed)
-sentry issue plan 123456789
-
-# Force a fresh plan even if one already exists
-sentry issue plan 123456789 --force
 ```
 
 ### `sentry issue plan <issue>`
@@ -178,6 +175,16 @@ Generate a solution plan using Seer AI
 **Flags:**
 - `--force - Force new plan even if one exists`
 - `-f, --fresh - Bypass cache, re-detect projects, and fetch fresh data`
+
+**Examples:**
+
+```bash
+# Generate a fix plan (automatically runs explain if needed)
+sentry issue plan 123456789
+
+# Force a fresh plan even if one already exists
+sentry issue plan 123456789 --force
+```
 
 ### `sentry issue view <issue...>`
 
@@ -222,8 +229,14 @@ View details of one or more issues
 ```bash
 sentry issue view FRONT-ABC
 
-# Open in browser
-sentry issue view FRONT-ABC -w
+# Multiple issues in one invocation (space-separated, not commas)
+sentry issue view FRONT-ABC BACK-2
+
+# Open one or more issues in the browser (up to 5 tabs by default)
+sentry issue view FRONT-ABC BACK-2 -w
+
+# Explicitly allow more than 5 tabs
+sentry issue view FRONT-ABC BACK-2 API-3 WEB-4 IOS-5 OPS-6 -w --force
 
 # GitHub-style identifiers work too (the "#" replaces the final slash)
 sentry issue view my-org/my-project#FRONT-ABC
@@ -231,6 +244,9 @@ sentry issue view my-project#FRONT-ABC
 
 # Full JSON (issue fields + latest event + trace/replay context)
 sentry issue view FRONT-ABC --json
+
+# Multiple issues: JSON is an array of the same objects
+sentry issue view FRONT-ABC BACK-2 --json
 
 # Select specific top-level fields to keep output small
 sentry issue view FRONT-ABC --json --fields shortId,title,culprit,count,userCount,permalink

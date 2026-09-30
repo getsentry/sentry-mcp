@@ -184,10 +184,19 @@ sentry event send --raw ./crash.json
 sentry event send --raw ./captured.envelope
 
 # Explicit DSN
-sentry event send -m "Test" --dsn "https://key@o123.ingest.us.sentry.io/456"
+sentry event send "https://key@o123.ingest.us.sentry.io/456" -m "Test"
 
 # Via environment variable
 export SENTRY_DSN="https://key@o123.ingest.us.sentry.io/456"
+sentry event send -m "Test"
+
+# Project target (logged-in session; CLI fetches its sole active DSN)
+sentry event send cli -m "Test"
+
+# Org/project target
+sentry event send sentry/cli -m "Test"
+
+# Auto-detect from the current project
 sentry event send -m "Test"
 
 sentry send-event    # same as: sentry event send
