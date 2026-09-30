@@ -12,7 +12,7 @@ const docs = readFileSync(
 const shim = docs.match(/```bash\n(sentry-cli\(\) \{[\s\S]*?\n\})\n```/)?.[1];
 assert.ok(shim, "the migration guide must contain its runnable Bash shim");
 
-function runShim(args, extraEnv = {}, parentEnv = process.env) {
+function runShim(args, extraEnv = {}, parentEnv = process.env, shell = "bash") {
   const directory = mkdtempSync(join(tmpdir(), "sentry-migration-shim-"));
   try {
     writeFileSync(join(directory, "sentry"), `#!/bin/sh
@@ -22,7 +22,7 @@ if [ "\${SENTRY_TEST_SHIM_ENV:-}" = 1 ]; then
 fi
 exit "\${SENTRY_TEST_SHIM_EXIT:-0}"
 `, { mode: 0o700 });
-    return spawnSync("bash", ["-c", `${shim}\nsentry-cli "$@"`, "--", ...args], {
+    return spawnSync(shell, ["-c", `${shim}\nsentry-cli "$@"`, "--", ...args], {
       encoding: "utf8",
       env: {
         ...parentEnv,
@@ -110,6 +110,28 @@ test("deploys and nested release deploys map host URLs before the subcommand", (
       "release", "deploys", "auth=", "headers=", "host=https://sentry.example.com",
     ]);
   }
+});
+
+test("zsh inserts a group host before the sentry executable", {
+  skip: spawnSync("zsh", ["-c", "exit 0"]).error ? "zsh is unavailable" : false,
+}, () => {
+  const result = runShim(
+    ["releases", "--url", "https://sentry.example.com", "new", "1.0.0"],
+    { SENTRY_TEST_SHIM_ENV: "1" }, process.env, "zsh",
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.stdout.trim().split("\n"), [
+    "release", "new", "1.0.0", "auth=", "headers=", "host=https://sentry.example.com",
+  ]);
+
+  const groupFlag = runShim(
+    ["--org", "sentry", "releases", "--url", "https://sentry.example.com", "list"],
+    { SENTRY_TEST_SHIM_ENV: "1" }, process.env, "zsh",
+  );
+  assert.equal(groupFlag.status, 0, groupFlag.stderr);
+  assert.deepEqual(groupFlag.stdout.trim().split("\n"), [
+    "--org", "sentry", "release", "list", "auth=", "headers=", "host=https://sentry.example.com",
+  ]);
 });
 
 test("login retains the URL before or after the command", () => {

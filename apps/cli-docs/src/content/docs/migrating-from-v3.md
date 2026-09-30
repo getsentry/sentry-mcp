@@ -227,9 +227,15 @@ sentry-cli() {
   local run=(env "${envs[@]}" sentry "${lead[@]}")
 
   _scli_set_host() {
-    local index=1
-    while [ "${run[$index]}" != sentry ]; do index=$((index + 1)); done
-    run=("${run[@]:0:$index}" "SENTRY_HOST=$1" "SENTRY_URL=$1" "${run[@]:$index}")
+    local word inserted="" updated=()
+    for word in "${run[@]}"; do
+      if [ -z "$inserted" ] && [ "$word" = sentry ]; then
+        updated+=("SENTRY_HOST=$1" "SENTRY_URL=$1")
+        inserted=1
+      fi
+      updated+=("$word")
+    done
+    run=("${updated[@]}")
   }
 
   # `deploys` handling (top-level or nested under `releases`). Bare/`list` map to
