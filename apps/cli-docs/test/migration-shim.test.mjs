@@ -12,7 +12,7 @@ const docs = readFileSync(
 const shim = docs.match(/```bash\n(sentry-cli\(\) \{[\s\S]*?\n\})\n```/)?.[1];
 assert.ok(shim, "the migration guide must contain its runnable Bash shim");
 
-function runShim(args, extraEnv = {}) {
+function runShim(args, extraEnv = {}, parentEnv = process.env) {
   const directory = mkdtempSync(join(tmpdir(), "sentry-migration-shim-"));
   try {
     writeFileSync(join(directory, "sentry"), `#!/bin/sh
@@ -24,7 +24,17 @@ exit "\${SENTRY_TEST_SHIM_EXIT:-0}"
 `, { mode: 0o700 });
     return spawnSync("bash", ["-c", `${shim}\nsentry-cli "$@"`, "--", ...args], {
       encoding: "utf8",
-      env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, SENTRY_ALLOW_FAILURE: "", ...extraEnv },
+      env: {
+        ...parentEnv,
+        SENTRY_AUTH_TOKEN: "",
+        SENTRY_CUSTOM_HEADERS: "",
+        SENTRY_HOST: "",
+        SENTRY_URL: "",
+        SENTRY_FORCE_ENV_TOKEN: "",
+        PATH: `${directory}:${parentEnv.PATH}`,
+        SENTRY_ALLOW_FAILURE: "",
+        ...extraEnv,
+      },
     });
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -65,4 +75,43 @@ test("translates trailing host URL but preserves release URL", () => {
   const release = runShim(["releases", "new", "1.0.0", "--url", "https://release.example.com"], { SENTRY_TEST_SHIM_ENV: "1" });
   assert.equal(release.status, 0, release.stderr);
   assert.deepEqual(release.stdout.trim().split("\n"), ["release", "new", "1.0.0", "--url", "https://release.example.com", "auth=", "headers=", "host="]);
+});
+
+test("login retains the URL before or after the command", () => {
+  for (const args of [
+    ["--url", "https://sentry.example.com", "login"],
+    ["login", "--url", "https://sentry.example.com"],
+  ]) {
+    const result = runShim(args, { SENTRY_TEST_SHIM_ENV: "1" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(result.stdout.trim().split("\n"), [
+      "auth", "login", "--url", "https://sentry.example.com", "auth=", "headers=", "host=",
+    ]);
+  }
+});
+
+test("the stub never inherits credentials or host settings from the test process", () => {
+  const result = runShim(
+    ["login"],
+    { SENTRY_TEST_SHIM_ENV: "1" },
+    {
+      ...process.env,
+      SENTRY_AUTH_TOKEN: "inherited-token",
+      SENTRY_CUSTOM_HEADERS: "inherited-header",
+      SENTRY_HOST: "https://old.example.com",
+      SENTRY_URL: "https://old.example.com",
+      SENTRY_FORCE_ENV_TOKEN: "1",
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.stdout.trim().split("\n"), [
+    "auth", "login", "auth=", "headers=", "host=",
+  ]);
+});
+
+test("send-envelope never silently invokes a different command", () => {
+  const result = runShim(["send-envelope", "./envelope-file"]);
+  assert.equal(result.status, 64);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /event send <envelope-file> --raw/);
 });

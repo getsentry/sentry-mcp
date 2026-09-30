@@ -95,7 +95,6 @@ These are identical, or the old plural form still works as a shortcut:
 |----|----|
 | `sentry-cli info` | `sentry info` |
 | `sentry-cli send-event …` | `sentry send-event …` |
-| `sentry-cli send-envelope …` | `sentry send-envelope …` |
 | `sentry-cli bash-hook` | `sentry bash-hook` |
 | `sentry-cli sourcemaps …` | `sentry sourcemaps …` (or `sentry sourcemap …`) |
 | `sentry-cli debug-files …` | `sentry debug-files …` |
@@ -145,6 +144,10 @@ These live under a different group now:
 Most of these were already soft-deprecated in v3 (hidden from `--help` in favor
 of `debug-files` / `proguard`); v4 simply drops the legacy top-level spellings.
 
+`sentry-cli send-envelope` also has no direct v4 equivalent. To send an existing
+envelope file, use `sentry event send ./envelope-file --raw` and update any v3
+flags in the call. The shim below cannot translate `send-envelope` for you.
+
 ## Drop-in compatibility shim
 
 Paste this shell function into your `~/.bashrc` / `~/.zshrc` (or a CI step). It
@@ -160,13 +163,13 @@ sentry-cli() {
   # flags untouched (notably `--url`, which `release create`/`deploy` use for
   # the release/deploy URL, not the Sentry host). Other still-valid v4 globals
   # are collected into `lead` and re-applied before the command.
-  local envs=() lead=() headers="" allow_failure=""
+  local envs=() lead=() headers="" allow_failure="" login_url="" login_args=()
   while [ "$#" -gt 0 ]; do
     case "${1:-}" in
       --auth-token)   envs+=("SENTRY_AUTH_TOKEN=$2" "SENTRY_FORCE_ENV_TOKEN=1"); shift 2 2>/dev/null || shift ;;
       --auth-token=*) envs+=("SENTRY_AUTH_TOKEN=${1#*=}" "SENTRY_FORCE_ENV_TOKEN=1"); shift ;;
-      --url)          envs+=("SENTRY_HOST=$2" "SENTRY_URL=$2"); shift 2 2>/dev/null || shift ;;
-      --url=*)        envs+=("SENTRY_HOST=${1#*=}" "SENTRY_URL=${1#*=}"); shift ;;
+      --url)          login_url="$2"; shift 2 2>/dev/null || shift ;;
+      --url=*)        login_url="${1#*=}"; shift ;;
       # Multiple --header flags merge into one semicolon-separated var.
       --header)       headers="${headers:+$headers; }$2"; shift 2 2>/dev/null || shift ;;
       --header=*)     headers="${headers:+$headers; }${1#*=}"; shift ;;
@@ -184,6 +187,10 @@ sentry-cli() {
   # v3 accepts auth, headers and allow-failure after the command too. Keep
   # --url on releases/deploys: there it can name the release or deploy URL.
   local command="${1:-}" remaining=()
+  if [ -n "$login_url" ]; then
+    if [ "$command" = login ]; then login_args=(--url "$login_url")
+    else envs+=("SENTRY_HOST=$login_url" "SENTRY_URL=$login_url"); fi
+  fi
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --auth-token)
@@ -196,13 +203,13 @@ sentry-cli() {
       --header=*) headers="${headers:+$headers; }${1#*=}"; shift ;;
       --allow-failure) allow_failure=1; shift ;;
       --url)
-        if [ "$command" = releases ] || [ "$command" = deploys ] || [ "$#" -lt 2 ]; then
+        if [ "$command" = login ] || [ "$command" = releases ] || [ "$command" = deploys ] || [ "$#" -lt 2 ]; then
           remaining+=("$1"); shift
         else
           envs+=("SENTRY_HOST=$2" "SENTRY_URL=$2"); shift 2
         fi ;;
       --url=*)
-        if [ "$command" = releases ] || [ "$command" = deploys ]; then
+        if [ "$command" = login ] || [ "$command" = releases ] || [ "$command" = deploys ]; then
           remaining+=("$1")
         else
           envs+=("SENTRY_HOST=${1#*=}" "SENTRY_URL=${1#*=}")
@@ -278,7 +285,9 @@ sentry-cli() {
   _scli_dispatch() {
     case "${1:-}" in
     # Moved commands
-    login|logout)            local c=$1; shift; "${run[@]}" auth "$c" "$@" ;;
+    login)                   shift; "${run[@]}" auth login "${login_args[@]}" "$@" ;;
+    logout)                  shift; "${run[@]}" auth logout "$@" ;;
+    send-envelope)           printf 'sentry-cli: use sentry event send <envelope-file> --raw and update v3 flags\n' >&2; return 64 ;;
     update)                  shift; "${run[@]}" cli upgrade "$@" ;;
     uninstall)               shift; "${run[@]}" cli uninstall "$@" ;;
     deploys)                 shift; _scli_deploys "$@" ;;
