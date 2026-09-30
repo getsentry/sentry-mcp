@@ -243,7 +243,7 @@ sentry-cli() {
   # environment/name as positionals, not v3's `-e`/`-n` flags — so flag those.
   local deploy_msg='sentry-cli: `deploys new` changed in v4 — environment/name are positionals now:\n  sentry release deploy <version> <environment> [name] [--url … --started … --finished …]\n'
   _scli_deploys() {
-    local a release="" dargs=()
+    local release="" listed="" dargs=()
     while [ "$#" -gt 0 ]; do
       case "$1" in
         --url)
@@ -253,15 +253,17 @@ sentry-cli() {
         *) break ;;
       esac
     done
-    for a in "$@"; do [ "$a" = "new" ] && { printf '%b' "$deploy_msg" >&2; return 64; }; done
     while [ "$#" -gt 0 ]; do
       case "$1" in
-        list) shift ;;
+        list) listed=1; shift ;;
         -r|--release)
           release="${2:-}"
           shift 2 2>/dev/null || shift
           ;;
         --release=*) release="${1#*=}"; shift ;;
+        new)
+          if [ -z "$listed" ]; then printf '%b' "$deploy_msg" >&2; return 64; fi
+          dargs+=("$1"); shift ;;
         *) dargs+=("$1"); shift ;;
       esac
     done

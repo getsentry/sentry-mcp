@@ -112,6 +112,23 @@ test("deploys and nested release deploys map host URLs before the subcommand", (
   }
 });
 
+test("a release named new is a value, not the deploy-create subcommand", () => {
+  for (const [args, expected] of [
+    [["deploys", "list", "-r", "new"], ["release", "deploys", "new"]],
+    [["releases", "deploys", "--release=new"], ["release", "deploys", "new"]],
+  ]) {
+    const result = runShim(args);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(result.stdout.trim().split("\n"), expected);
+  }
+
+  for (const args of [["deploys", "new", "-r", "1.0.0"], ["deploys", "-r", "1.0.0", "new"]]) {
+    const result = runShim(args);
+    assert.equal(result.status, 64);
+    assert.match(result.stderr, /deploys new.*changed in v4/);
+  }
+});
+
 test("zsh inserts a group host before the sentry executable", {
   skip: spawnSync("zsh", ["-c", "exit 0"]).error ? "zsh is unavailable" : false,
 }, () => {
