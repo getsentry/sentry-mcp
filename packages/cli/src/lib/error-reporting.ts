@@ -45,6 +45,7 @@ import {
   ValidationError,
   WizardError,
 } from "./errors.js";
+import { isSaaS } from "./sentry-urls.js";
 
 // ---------------------------------------------------------------------------
 // Silencing
@@ -61,7 +62,8 @@ type SilenceReason =
   | "network_error"
   | "process_exit"
   | "user_validation"
-  | "user_input_error";
+  | "user_input_error"
+  | "seer_unavailable_self_hosted";
 
 /**
  * Classify whether an error should be silenced.
@@ -123,6 +125,12 @@ export function classifySilenced(error: unknown): SilenceReason | null {
   if (error instanceof ApiError && error.status > 400 && error.status < 500) {
     return "api_user_error";
   }
+  // On SaaS, SeerError stays captured: it feeds the marketing dashboard for
+  // Seer upsell/trial signal. Self-hosted instances cannot enable Seer or
+  // start a trial, so there it is pure feature-gate noise (CLI-1WP).
+  if (error instanceof SeerError && !isSaaS()) {
+    return "seer_unavailable_self_hosted";
+  }
   // A child process launched by `sentry local run` or `sentry monitor run`
   // that exits with a non-zero code throws `CliError("Process exited with
   // code N")`. These are expected user-script failures, not CLI bugs — no
@@ -152,6 +160,9 @@ function recordSilencedError(error: unknown, reason: SilenceReason): void {
   }
   if (error instanceof AuthError) {
     attributes.auth_reason = error.reason;
+  }
+  if (error instanceof SeerError) {
+    attributes.seer_reason = error.reason;
   }
 
   // biome-ignore lint/plugin: grandfathered silent catch — see #1531; drain by adding log.debug()/log.warn() or re-throwing.
