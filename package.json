@@ -31,8 +31,8 @@
     "check:generated": "pnpm --filter @sentry/mcp-core generate-definitions && git diff --exit-code -- packages/mcp-core/src/toolDefinitions.json packages/mcp-core/src/skillDefinitions.json plugins/sentry-mcp/agents/sentry-mcp.md plugins/sentry-mcp-experimental/agents/sentry-mcp.md",
     "deploy": "pnpm --filter '@sentry/mcp-cloudflare...' --if-present run build && pnpm --filter @sentry/mcp-cloudflare run deploy",
     "deploy:docs": "pnpm --filter sentry run generate:schema && pnpm --filter sentry run generate:docs && pnpm --filter sentry-cli-docs run build && pnpm --filter sentry-cli-docs run deploy",
-    "eval": "dotenv -e .env -e .env.local -- pnpm --filter @sentry/mcp-server-evals run eval",
-    "eval:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run eval:ci",
+    "eval": "pnpm --filter '@sentry/mcp-server-evals...' --if-present run build && dotenv -e .env -e .env.local -- pnpm --filter @sentry/mcp-server-evals run eval",
+    "eval:ci": "pnpm --filter '@sentry/mcp-server-evals...' --if-present run build && CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run eval:ci",
     "format": "biome format --write",
     "lint": "biome lint && pnpm run lint:ast-grep",
     "lint:ast-grep": "ast-grep scan && ast-grep test --skip-snapshot-tests",
@@ -44,10 +44,10 @@
     "prepare": "simple-git-hooks",
     "cli": "pnpm run --filter ./packages/mcp-test-client start",
     "start:stdio": "pnpm --stream run --filter ./packages/mcp-server start",
-    "test": "dotenv -e .env -e .env.local -- pnpm -r --filter '!@sentry/mcp-smoke-tests' --if-present run test",
-    "test:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci",
+    "test": "pnpm run build && dotenv -e .env -e .env.local -- pnpm -r --filter '!@sentry/mcp-smoke-tests' --if-present run test",
+    "test:ci": "pnpm run build && CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci",
     "test:watch": "dotenv -e .env -e .env.local -- pnpm -r --parallel --if-present run test:watch",
-    "tsc": "pnpm -r --if-present run tsc && pnpm -r --if-present run typecheck"
+    "tsc": "pnpm run build && pnpm -r --if-present run tsc && pnpm -r --if-present run typecheck"
   },
   "dependencies": {
     "@ast-grep/cli": "catalog:",

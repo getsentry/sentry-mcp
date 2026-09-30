@@ -203,6 +203,13 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate CLI docs
         run: pnpm --filter sentry run generate:schema && pnpm --filter sentry run generate:docs
+      - name: Set docs release
+        run: |
+          release=$(node -p 'require("./packages/cli/package.json").version')
+          {
+            echo "PUBLIC_SENTRY_RELEASE=$release"
+            echo "SENTRY_RELEASE=$release"
+          } >> "$GITHUB_ENV"
       - name: Build docs
         run: pnpm --filter sentry-cli-docs run build
       - name: Download Linux binary
@@ -220,7 +227,7 @@ jobs:
           ./dist-bin/sentry-linux-x64 sourcemap inject apps/cli-docs/dist/
           # shellcheck disable=SC2088
           ./dist-bin/sentry-linux-x64 sourcemap upload apps/cli-docs/dist/ \
-            --release "$(node -p 'require("./packages/cli/package.json").version')" \
+            --release "$PUBLIC_SENTRY_RELEASE" \
             --url-prefix "~/"
       - name: Remove sourcemaps
         run: find apps/cli-docs/dist -name '*.map' -delete

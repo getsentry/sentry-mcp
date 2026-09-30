@@ -209,6 +209,40 @@ sentry-cli() {
     "${run[@]}" release deploys "${dargs[@]}"
   }
 
+  _scli_group() {
+    local grp="$1"; shift
+    # v3 also accepts global flags between a plural group and its subcommand.
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --org|--project|--log-level|--fields)
+          [ "$#" -ge 2 ] || break
+          run+=("$1" "$2"); shift 2 ;;
+        --org=*|--project=*|--log-level=*|--fields=*|-v|--verbose|--json)
+          run+=("$1"); shift ;;
+        *) break ;;
+      esac
+    done
+
+    if [ "$grp" = releases ]; then
+      if [ "${1:-}" = deploys ]; then shift; _scli_deploys "$@"; return; fi
+      if [ "$#" -eq 0 ] || [ "${1#-}" != "$1" ]; then "${run[@]}" release list "$@";
+      else "${run[@]}" release "$@"; fi
+      return
+    fi
+
+    case "$grp" in
+      organizations) grp=org ;;
+      projects)       grp=project ;;
+      issues)         grp=issue ;;
+      monitors)       grp=monitor ;;
+      repos)          grp=repo ;;
+      events)         grp=event ;;
+    esac
+    # Some groups default to `view`, so an empty group must explicitly list.
+    if [ "$#" -eq 0 ] || [ "${1#-}" != "$1" ]; then "${run[@]}" "$grp" list "$@";
+    else "${run[@]}" "$grp" "$@"; fi
+  }
+
   _scli_dispatch() {
     case "${1:-}" in
     # Moved commands
@@ -220,31 +254,9 @@ sentry-cli() {
     upload-proguard)         shift; "${run[@]}" proguard upload "$@" ;;
     difutil)                 shift; "${run[@]}" debug-files "$@" ;;
 
-    # `releases` → `release` (bare lists). v3 nested deploys under `releases`.
-    releases)
-      shift
-      if [ "${1:-}" = "deploys" ]; then shift; _scli_deploys "$@"; return; fi
-      # v3 `releases` lists; insert `list` when there's no subcommand (only flags).
-      if [ "$#" -eq 0 ] || [ "${1#-}" != "$1" ]; then "${run[@]}" release list "$@";
-      else "${run[@]}" release "$@"; fi ;;
-
-    # Other renamed groups (plural → singular). Bare (or flags-only) form lists
-    # (matches v4's native aliases); a subcommand uses the singular group (v4
-    # aliases `new`→`create`, `ls`→`list`, so subcommands keep working).
-    organizations|projects|issues|monitors|repos|events)
-      local grp=$1; shift
-      case "$grp" in
-        organizations) grp=org ;;
-        projects)       grp=project ;;
-        issues)         grp=issue ;;
-        monitors)       grp=monitor ;;
-        repos)          grp=repo ;;
-        events)         grp=event ;;
-      esac
-      # No subcommand (empty or a leading flag like `--json`) → explicit `list`,
-      # since some groups (e.g. project) default to `view`, not `list`.
-      if [ "$#" -eq 0 ] || [ "${1#-}" != "$1" ]; then "${run[@]}" "$grp" list "$@";
-      else "${run[@]}" "$grp" "$@"; fi ;;
+    # Renamed groups accept v3 globals before the subcommand.
+    releases|organizations|projects|issues|monitors|repos|events)
+      _scli_group "$@" ;;
 
     # Everything else is unchanged
     *) "${run[@]}" "$@" ;;
