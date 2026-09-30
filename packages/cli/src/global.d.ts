@@ -40,3 +40,10 @@ declare class Worker {
 interface RegExpConstructor {
   escape?(s: string): string;
 }
+
+// Typechecking does not need the generated OpenAPI data; builds generate it.
+// This declaration also supports a fresh checkout without src/generated/.
+declare module "*/generated/api-schema.json" {
+  const endpoints: unknown;
+  export default endpoints;
+}
