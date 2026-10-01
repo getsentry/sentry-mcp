@@ -93,13 +93,13 @@ case "$url" in
     fi
     printf '%s\\n' "\${SENTRY_TEST_REGISTRY_RESPONSE:-}"
     ;;
-  *"/repos/getsentry/sentry-mcp/releases/tags/"*)
+  *"/repos/getsentry/toolkit/releases/tags/"*)
     printf '%s' "\${SENTRY_TEST_TOOLKIT_STATUS:-200}"
     ;;
   *"/repos/getsentry/cli/releases/tags/"*)
     printf '%s' "\${SENTRY_TEST_LEGACY_STATUS:-200}"
     ;;
-  *"/repos/getsentry/sentry-mcp/releases?per_page=100&page="*)
+  *"/repos/getsentry/toolkit/releases?per_page=100&page="*)
     page="\${url##*=}"
     case "$page" in
       1) if [[ -n "\${SENTRY_TEST_RELEASES_PAGE_1:-}" ]]; then cat "$SENTRY_TEST_RELEASES_PAGE_1"; else printf '[]'; fi ;;
@@ -462,7 +462,7 @@ process.exitCode = result.status ?? 1;
 
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(recorded("curl-urls")).toEqual([
-      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.42.2",
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.42.2",
       "https://api.github.com/repos/getsentry/cli/releases/tags/0.42.2",
       `https://github.com/getsentry/cli/releases/download/0.42.2/sentry-${process.platform === "darwin" ? "darwin" : "linux"}-${process.arch === "arm64" ? "arm64" : "x64"}.gz`,
     ]);
@@ -480,7 +480,7 @@ process.exitCode = result.status ?? 1;
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("Toolkit release check failed (HTTP 500)");
     expect(recorded("curl-urls")).toEqual([
-      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.42.2",
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.42.2",
     ]);
   });
 
@@ -507,14 +507,14 @@ process.exitCode = result.status ?? 1;
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(recorded("curl-urls").slice(0, 3)).toEqual([
       "https://release-registry.services.sentry.io/apps/sentry/latest",
-      "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=1",
-      "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=2",
+      "https://api.github.com/repos/getsentry/toolkit/releases?per_page=100&page=1",
+      "https://api.github.com/repos/getsentry/toolkit/releases?per_page=100&page=2",
     ]);
     expect(recorded("curl-urls")[3]).toBe(
-      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.46.0"
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.46.0"
     );
     expect(recorded("curl-urls")[4]).toContain(
-      "/getsentry/sentry-mcp/releases/download/cli@0.46.0/"
+      "/getsentry/toolkit/releases/download/cli@0.46.0/"
     );
   });
 
@@ -534,10 +534,10 @@ process.exitCode = result.status ?? 1;
 
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(recorded("curl-urls")[2]).toBe(
-      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.46.0"
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.46.0"
     );
     expect(recorded("curl-urls")[3]).toContain(
-      "/getsentry/sentry-mcp/releases/download/cli@0.46.0/"
+      "/getsentry/toolkit/releases/download/cli@0.46.0/"
     );
     expect(recorded("setup-args")).toContain("stable");
   });
@@ -573,10 +573,10 @@ process.exitCode = result.status ?? 1;
 
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(recorded("curl-urls")[2]).toBe(
-      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.46.0"
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.46.0"
     );
     expect(recorded("curl-urls")[3]).toContain(
-      "/getsentry/sentry-mcp/releases/download/cli@0.46.0/"
+      "/getsentry/toolkit/releases/download/cli@0.46.0/"
     );
   });
 
@@ -606,7 +606,7 @@ process.exitCode = result.status ?? 1;
 
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(recorded("curl-urls")).toContain(
-      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.46.0"
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.46.0"
     );
     expect(existsSync(join(installDir, "sentry"))).toBe(true);
   });
@@ -642,9 +642,9 @@ process.exitCode = result.status ?? 1;
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(recorded("curl-urls").slice(0, 4)).toEqual([
       "https://release-registry.services.sentry.io/apps/sentry/latest",
-      "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=1",
+      "https://api.github.com/repos/getsentry/toolkit/releases?per_page=100&page=1",
       "https://api.github.com/repos/getsentry/cli/releases/latest",
-      "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%400.42.2",
+      "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%400.42.2",
     ]);
     expect(recorded("curl-urls")[4]).toBe(
       "https://api.github.com/repos/getsentry/cli/releases/tags/0.42.2"

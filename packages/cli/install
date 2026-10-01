@@ -283,7 +283,7 @@ else
       release_tag=""
       # GitHub may have many pages of MCP releases before its newest CLI release.
       for page in {1..20}; do
-        if ! releases=$(curl -fsSL "https://api.github.com/repos/getsentry/sentry-mcp/releases?per_page=100&page=${page}"); then
+        if ! releases=$(curl -fsSL "https://api.github.com/repos/getsentry/toolkit/releases?per_page=100&page=${page}"); then
           die "Failed to list Toolkit releases" "gh-version"
         fi
         # Read the full page: exiting awk early can SIGPIPE printf under pipefail.
@@ -361,11 +361,11 @@ else
 
   # Fall back to legacy only when GitHub confirms the exact Toolkit tag is absent.
   if ! release_status=$(curl -sS -o /dev/null -w '%{http_code}' \
-    "https://api.github.com/repos/getsentry/sentry-mcp/releases/tags/cli%40${version}"); then
+    "https://api.github.com/repos/getsentry/toolkit/releases/tags/cli%40${version}"); then
     die "Failed to check Toolkit release" "gh-version"
   fi
   case "$release_status" in
-    200) release_repo="getsentry/sentry-mcp"; release_tag="cli@${version}" ;;
+    200) release_repo="getsentry/toolkit"; release_tag="cli@${version}" ;;
     404)
       if ! legacy_status=$(curl -sS -o /dev/null -w '%{http_code}' \
         "https://api.github.com/repos/getsentry/cli/releases/tags/${version}"); then

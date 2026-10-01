@@ -58,25 +58,9 @@ export const UNIT_SECONDS: Record<string, number> = {
 /** Valid unit suffixes for relative period strings, derived from UNIT_SECONDS */
 const PERIOD_UNITS = new Set(Object.keys(UNIT_SECONDS));
 
-/**
- * Example dates for --period help text, snapped to the 1st of the month so
- * they only change ~12×/year instead of daily. Keeps examples looking current
- * without causing constant regeneration churn in committed skill files.
- */
-const EXAMPLE_START = (() => {
-  const now = new Date();
-  const previousMonthStartUtc = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)
-  );
-  return previousMonthStartUtc.toISOString().slice(0, 10);
-})();
-const EXAMPLE_END = (() => {
-  const now = new Date();
-  const currentMonthStartUtc = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
-  );
-  return currentMonthStartUtc.toISOString().slice(0, 10);
-})();
+/** Stable example dates keep generated help and skill references reproducible. */
+const EXAMPLE_START = "2024-01-01";
+const EXAMPLE_END = "2024-02-01";
 
 /** Brief text for --period flag help, shared across commands */
 export const PERIOD_BRIEF = `Time range: "7d", "${EXAMPLE_START}..${EXAMPLE_END}", ">=${EXAMPLE_START}"`;

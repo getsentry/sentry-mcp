@@ -4,7 +4,7 @@
   "description": "Sentry CLI - A command-line interface for using Sentry built by robots and humans for robots and humans",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/getsentry/cli.git"
+    "url": "git+https://github.com/getsentry/toolkit.git"
   },
   "main": "./dist/index.cjs",
   "type": "module",
