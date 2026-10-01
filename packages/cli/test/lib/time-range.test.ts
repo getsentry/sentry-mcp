@@ -7,7 +7,7 @@
  * normalization behavior.
  */
 
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   parseDate,
   parsePeriod,
@@ -15,6 +15,24 @@ import {
   timeRangeToApiParams,
   timeRangeToSeconds,
 } from "../../src/lib/time-range.js";
+
+test("keeps generated period help stable across month boundaries", async () => {
+  try {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-30T23:59:59Z"));
+    vi.resetModules();
+    const before = (await import("../../src/lib/time-range.js")).PERIOD_BRIEF;
+
+    vi.setSystemTime(new Date("2026-10-01T00:00:01Z"));
+    vi.resetModules();
+    const after = (await import("../../src/lib/time-range.js")).PERIOD_BRIEF;
+
+    expect(after).toBe(before);
+  } finally {
+    vi.useRealTimers();
+    vi.resetModules();
+  }
+});
 
 // ---------------------------------------------------------------------------
 // parsePeriod — relative durations (backward compatibility)
