@@ -2,11 +2,8 @@
 
 CI/CD workflows for the Sentry MCP project.
 
-**Toolkit import landing:** The `Deploy to Cloudflare` job is disabled while
-the CLI and docs import lands. A passing `Test` run on `main` cannot change the
-production Worker. Restore deployments only through a separately reviewed
-workflow change. `pnpm build` builds the MCP workspace; `pnpm build:cli` builds
-the imported CLI and docs when `SENTRY_CLIENT_ID` is available.
+`pnpm build` builds the MCP workspace; `pnpm build:cli` builds the imported CLI
+and docs when `SENTRY_CLIENT_ID` is available.
 
 ## Workflows
 
@@ -22,8 +19,12 @@ Package-specific exceptions live in `package.json#sentryCi`; the standalone
 smoke-test suite remains in its own workflow.
 
 ### deploy.yml
-Currently disabled. Its old canary, production, and rollback steps must not
-run until a separately reviewed workflow replaces them.
+Runs after a successful `Test` push run on `main`. Checks out the tested commit,
+requires that it is still the tip of `main`, then deploys and tests canary.
+Records the active production version before changing traffic, deploys the
+tested commit, and verifies the run-owned candidate before production smoke
+tests. If those fail, restores the captured version only while this run's
+candidate remains active. External changes stop recovery.
 
 ### eval.yml
 Runs evaluation tests against the MCP server.
@@ -48,10 +49,13 @@ label creation.
 
 ## Required Secrets
 
-Repository secrets (no environment needed):
+The `production` environment is restricted to `main` and holds:
 
 - **`CLOUDFLARE_API_TOKEN`** - Cloudflare API token with Workers deployment permissions
-- **`CLOUDFLARE_ACCOUNT_ID`** - Your Cloudflare account ID  
+
+Other configuration:
+
+- **`CLOUDFLARE_ACCOUNT_ID`** - ID of the account owning the Workers
 - **`SENTRY_AUTH_TOKEN`** - For Sentry release tracking
 - **`SENTRY_CLIENT_SECRET`** - Sentry OAuth client secret
 - **`COOKIE_SECRET`** - Session cookie encryption secret
@@ -75,13 +79,15 @@ Canary and production use separate resources for complete isolation:
 
 ### Deployment Flow
 
-No production deployment runs while the import lands. The disabled workflow's
-old rollback step must not be used to recover production.
+The workflow never deploys an untested revision or a stale `main` commit.
+Failure to identify the prior active version, verify deployment ownership, or
+confirm the restored version fails the job rather than guessing a recovery.
 
 ## Manual Deployment
 
-The deployment job is also disabled for manual workflow dispatch. Do not use
-the old rollback path to deploy or recover the production Worker.
+Manual production dispatch is unavailable. Use a reviewed change and its
+passing `Test` run to deploy. Never run bare `wrangler rollback` against
+production; that command chooses from mutable history.
 
 ## Troubleshooting
 

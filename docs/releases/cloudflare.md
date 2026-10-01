@@ -136,32 +136,32 @@ pnpm dev
 
 ### Production Deployment
 
-#### Automated via GitHub Actions (Recommended)
+#### Automated via GitHub Actions
 
-Production deployments happen automatically when changes are pushed to the main branch:
+Production deployments run only from the trusted `Deploy to Cloudflare` workflow
+after the `Test` workflow succeeds for the current `main` commit:
 
-1. Push to main or merge a PR
-2. GitHub Actions runs tests
-3. If tests pass, deploys to Cloudflare
+1. Merge a PR into `main`; GitHub Actions tests that exact commit.
+2. The workflow builds and deploys `sentry-mcp-canary`, then runs canary smoke tests.
+3. After canary succeeds, it records the currently active production version
+   and deploys the tested commit to `sentry-mcp`.
+4. It verifies that this run owns the new deployment and runs production smoke
+   tests. On failure it restores the captured previous version **only if**
+   production still serves this run's exact candidate. External changes or
+   ambiguous traffic allocation stop recovery rather than overwrite them.
 
-Required secrets in GitHub repository settings:
-- `CLOUDFLARE_API_TOKEN` - API token with Workers deployment permissions
-- `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare account ID
+The `production` GitHub environment allows only `main`. Store
+`CLOUDFLARE_API_TOKEN` there with Workers deployment permissions. Configure
+`CLOUDFLARE_ACCOUNT_ID` for the account that owns both Workers. Keep credentials
+out of command arguments and logs. After a verified deployment, remove any
+repository-level copy of `CLOUDFLARE_API_TOKEN`.
 
 See `github-actions.md` for detailed setup instructions.
 
-#### Manual Deployment
-
-```bash
-# Build client assets
-pnpm build
-
-# Deploy to Cloudflare
-pnpm deploy
-
-# Or deploy specific environment
-pnpm deploy --env production
-```
+Production traffic changes must use the protected workflow. Do not use bare
+`wrangler rollback`: it selects from mutable deployment history and can undo
+someone else's deployment. If recovery declines because production changed,
+inspect the active version and use a new reviewed workflow run to fix forward.
 
 #### Version Uploads (Gradual Rollouts)
 
