@@ -133,9 +133,15 @@ describe("workspace CI selection", () => {
         sentryCi: { enabled: false },
       }),
     ]);
+    const rootFiles = execFileSync("git", ["ls-files", "-z"], {
+      cwd: root,
+      encoding: "utf8",
+    })
+      .split("\0")
+      .filter((file) => file !== "" && !file.includes("/"));
+    assert.ok(rootFiles.length > 0);
     for (const [files, event] of [
-      [["README.md"], "pull_request"],
-      [["pnpm-lock.yaml"], "pull_request"],
+      ...rootFiles.map((file) => [[file], "pull_request"]),
       [["packages/deleted/package.json"], "pull_request"],
       [[], "push"],
       [[], "merge_group"],
