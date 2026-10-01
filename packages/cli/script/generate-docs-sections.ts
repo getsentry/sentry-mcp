@@ -45,6 +45,7 @@ const { extractAllRoutes } = await import("../src/lib/introspect.js");
 const { OAUTH_SCOPES } = await import("../src/lib/oauth.js");
 const { ENV_VAR_REGISTRY } = await import("../src/lib/env-registry.js");
 const pkg = JSON.parse(await readFile("package.json", "utf-8"));
+const workspace = JSON.parse(await readFile("../../package.json", "utf-8"));
 
 const isCheck = process.argv.includes("--check");
 
@@ -157,12 +158,14 @@ function getSubcommandLabel(route: RouteInfo): string {
 function generateProjectStructure(allRoutes: RouteInfo[]): string {
   const lines: string[] = [];
   lines.push("```");
-  lines.push("cli/");
-  lines.push("├── src/");
-  lines.push("│   ├── bin.ts          # Entry point");
-  lines.push("│   ├── app.ts          # Stricli application setup");
-  lines.push("│   ├── context.ts      # Dependency injection context");
-  lines.push("│   ├── commands/       # CLI commands");
+  lines.push("toolkit/");
+  lines.push("├── packages/");
+  lines.push("│   └── cli/");
+  lines.push("│       ├── src/");
+  lines.push("│       │   ├── bin.ts          # Entry point");
+  lines.push("│       │   ├── app.ts          # Stricli application setup");
+  lines.push("│       │   ├── context.ts      # Dependency injection context");
+  lines.push("│       │   ├── commands/       # CLI commands");
 
   // Separate routes into groups (directories) and standalone (files)
   const groups: RouteInfo[] = [];
@@ -185,7 +188,9 @@ function generateProjectStructure(allRoutes: RouteInfo[]): string {
   // Render group directories (always use ├── since standalones follow)
   for (const route of groups) {
     const subcmds = getSubcommandLabel(route);
-    lines.push(`│   │   ├── ${`${route.name}/`.padEnd(13)}# ${subcmds}`);
+    lines.push(
+      `│       │   │   ├── ${`${route.name}/`.padEnd(13)}# ${subcmds}`
+    );
   }
 
   // Combine standalone commands with help.ts (which is in SKIP_ROUTES
@@ -202,17 +207,22 @@ function generateProjectStructure(allRoutes: RouteInfo[]): string {
     const isLast = i === allStandaloneEntries.length - 1;
     const prefix = isLast ? "└──" : "├──";
     lines.push(
-      `│   │   ${prefix} ${`${entry.name}.ts`.padEnd(13)}# ${entry.brief}`
+      `│       │   │   ${prefix} ${`${entry.name}.ts`.padEnd(13)}# ${entry.brief}`
     );
   }
 
-  lines.push("│   ├── lib/            # Shared utilities");
-  lines.push("│   └── types/          # TypeScript types and Valibot schemas");
-  lines.push("├── test/               # Test files (mirrors src/ structure)");
-  lines.push("├── script/             # Build and utility scripts");
-  lines.push("├── plugins/            # Agent skill files");
+  lines.push("│       │   ├── lib/            # Shared utilities");
   lines.push(
-    "└── docs/               # Documentation site (Astro + Starlight)"
+    "│       │   └── types/          # TypeScript types and Valibot schemas"
+  );
+  lines.push(
+    "│       ├── test/               # Test files (mirrors src/ structure)"
+  );
+  lines.push("│       ├── script/             # Build and utility scripts");
+  lines.push("│       └── plugins/            # Agent skill files");
+  lines.push("└── apps/");
+  lines.push(
+    "    └── cli-docs/             # Documentation site (Astro + Starlight)"
   );
   lines.push("```");
 
@@ -279,7 +289,7 @@ const SEMVER_RE = /(\d+\.\d+)/;
  * silent fallbacks caused stale Bun prerequisites after the Bun→Node migration.
  */
 function extractPnpmVersion(): string {
-  const pm: string = pkg.packageManager ?? "";
+  const pm: string = workspace.packageManager ?? "";
   const match = pm.match(PNPM_VERSION_RE);
   if (!match) {
     throw new Error(

@@ -25,7 +25,7 @@ jobs:
   build-binary:
     name: Build Binary (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
-    environment: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/cli/')) && 'production' || '' }}
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || startsWith(github.ref, 'refs/heads/release/cli/') && 'cli-release' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -126,7 +126,7 @@ jobs:
   build-npm:
     name: Build npm Package
     runs-on: ubuntu-latest
-    environment: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/cli/')) && 'production' || '' }}
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || startsWith(github.ref, 'refs/heads/release/cli/') && 'cli-release' || '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
@@ -188,7 +188,7 @@ jobs:
     name: Build Docs
     needs: build-binary
     runs-on: ubuntu-latest
-    environment: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/cli/')) && 'production' || '' }}
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || startsWith(github.ref, 'refs/heads/release/cli/') && 'cli-release' || '' }}
     env:
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       PUBLIC_SENTRY_ENVIRONMENT: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/cli/')) && 'production' || 'development' }}
