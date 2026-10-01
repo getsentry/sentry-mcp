@@ -90,6 +90,40 @@ describe("workspace CI selection", () => {
     );
   });
 
+  it("does not run CLI projects for MCP docs and core changes", () => {
+    const projects = buildProjects([
+      entry("@sentry/mcp-core", "packages/mcp-core", {
+        scripts: { test: "vitest run" },
+      }),
+      entry("@sentry/mcp-server", "packages/mcp-server", {
+        dependencies: { "@sentry/mcp-core": "workspace:*" },
+        scripts: { test: "vitest run" },
+      }),
+      entry("sentry", "packages/cli", { scripts: { test: "vitest run" } }),
+      entry("sentry-cli-docs", "apps/cli-docs", {
+        sentryCi: { dependencies: ["sentry"] },
+        scripts: { build: "astro build" },
+      }),
+    ]);
+
+    const names = (files) =>
+      buildMatrix(
+        selectAffectedProjects(projects, files, "pull_request"),
+      ).include.map(({ name }) => name);
+    assert.deepEqual(names(["docs/contributing/tool-responses.md"]), []);
+    assert.deepEqual(
+      names([
+        "docs/contributing/tool-responses.md",
+        "packages/mcp-core/src/api-client/schema.ts",
+      ]),
+      ["@sentry/mcp-core", "@sentry/mcp-server"],
+    );
+    assert.deepEqual(
+      names(["docs/contributing/tool-responses.md", "pnpm-lock.yaml"]),
+      ["sentry-cli-docs", "sentry", "@sentry/mcp-core", "@sentry/mcp-server"],
+    );
+  });
+
   it("runs all enabled projects for root changes and non-PR events", () => {
     const projects = buildProjects([
       entry("one", "packages/one", { scripts: { build: "tsc" } }),
@@ -100,6 +134,7 @@ describe("workspace CI selection", () => {
       }),
     ]);
     for (const [files, event] of [
+      [["README.md"], "pull_request"],
       [["pnpm-lock.yaml"], "pull_request"],
       [["packages/deleted/package.json"], "pull_request"],
       [[], "push"],
