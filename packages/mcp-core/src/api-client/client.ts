@@ -94,6 +94,8 @@ import {
   ReplayListResponseSchema,
   ReplayRecordingSegmentsSchema,
   RepositoryListSchema,
+  SearchAgentStartSchema,
+  SearchAgentStateSchema,
   SentryAppComponentListSchema,
   SentryAppExternalRequestOptionsSchema,
   SentryAppInstallationListSchema,
@@ -124,6 +126,8 @@ import type {
   AlertRuleUpdate,
   AutofixRun,
   AutofixRunState,
+  SearchAgentStart,
+  SearchAgentState,
   ClientKey,
   ClientKeyList,
   CommitList,
@@ -188,6 +192,16 @@ import type {
 // import { logger } from "@sentry/node";
 
 const SENTRY_MCP_SEARCH_EVENTS_REFERRER = "api.mcp.search-events";
+
+/**
+ * Filters on other events in the same trace, e.g. spans whose trace also has a
+ * matching log. Only the spans and logs datasets support them.
+ */
+export type CrossEventQueries = {
+  spanQuery?: string;
+  logQuery?: string;
+  metricQuery?: string;
+};
 
 type ExplorerAggregateParams = {
   fields?: string[];
@@ -1672,12 +1686,28 @@ export class SentryApiService {
    * Gets a single organization by slug.
    *
    * @param organizationSlug Organization identifier
+   * @param params Query parameters
+   * @param params.includeFeatureFlags Include `features` in the response (omitted by Sentry otherwise)
+   * @param params.detailed Include projects and teams (Sentry defaults to true)
    * @param opts Request options including host override
    * @returns Organization data
    */
-  async getOrganization(organizationSlug: string, opts?: RequestOptions) {
+  async getOrganization(
+    organizationSlug: string,
+    params?: { includeFeatureFlags?: boolean; detailed?: boolean },
+    opts?: RequestOptions,
+  ) {
+    const queryParams = new URLSearchParams();
+    if (params?.includeFeatureFlags) {
+      queryParams.set("include_feature_flags", "1");
+    }
+    if (params?.detailed === false) {
+      queryParams.set("detailed", "0");
+    }
+    const queryString = queryParams.toString();
+    const organizationPath = apiPath`/organizations/${organizationSlug}/`;
     const body = await this.requestJSON(
-      apiPath`/organizations/${organizationSlug}/`,
+      `${organizationPath}${queryString ? `?${queryString}` : ""}`,
       undefined,
       opts,
     );
@@ -4996,6 +5026,7 @@ export class SentryApiService {
     start?: string;
     end?: string;
     sort: string;
+    crossEventQueries?: CrossEventQueries;
   }): URLSearchParams {
     const queryParams = new URLSearchParams();
 
@@ -5019,6 +5050,11 @@ export class SentryApiService {
     if (params.dataset === "spans") {
       queryParams.set("sampling", "NORMAL");
     }
+
+    const { spanQuery, logQuery, metricQuery } = params.crossEventQueries ?? {};
+    if (spanQuery) queryParams.set("spanQuery", spanQuery);
+    if (logQuery) queryParams.set("logQuery", logQuery);
+    if (metricQuery) queryParams.set("metricQuery", metricQuery);
 
     queryParams.set("sort", params.sort);
 
@@ -5052,6 +5088,7 @@ export class SentryApiService {
       start,
       end,
       sort = "-timestamp",
+      crossEventQueries,
     }: {
       organizationSlug: string;
       query: string;
@@ -5063,6 +5100,7 @@ export class SentryApiService {
       start?: string;
       end?: string;
       sort?: string;
+      crossEventQueries?: CrossEventQueries;
     },
     opts?: RequestOptions,
   ) {
@@ -5098,6 +5136,7 @@ export class SentryApiService {
         start,
         end,
         sort,
+        crossEventQueries,
       });
     }
 
@@ -5208,6 +5247,55 @@ export class SentryApiService {
       opts,
     );
     return AutofixRunStateSchema.parse(body);
+  }
+
+  // POST https://us.sentry.io/api/0/organizations/my-org/search-agent/start/
+  async startSearchAgent(
+    {
+      organizationSlug,
+      projectIds,
+      naturalLanguageQuery,
+      strategy,
+    }: {
+      organizationSlug: string;
+      projectIds: number[];
+      naturalLanguageQuery: string;
+      strategy: "Traces" | "Issues" | "Logs" | "Errors" | "Metrics";
+    },
+    opts?: RequestOptions,
+  ): Promise<SearchAgentStart> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/search-agent/start/`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          project_ids: projectIds,
+          natural_language_query: naturalLanguageQuery,
+          strategy,
+        }),
+      },
+      opts,
+    );
+    return SearchAgentStartSchema.parse(body);
+  }
+
+  // GET https://us.sentry.io/api/0/organizations/my-org/search-agent/state/{runId}/
+  async getSearchAgentState(
+    {
+      organizationSlug,
+      runId,
+    }: {
+      organizationSlug: string;
+      runId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<SearchAgentState> {
+    const body = await this.requestJSON(
+      apiPath`/organizations/${organizationSlug}/search-agent/state/${runId}/`,
+      undefined,
+      opts,
+    );
+    return SearchAgentStateSchema.parse(body);
   }
 
   /**
