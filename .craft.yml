@@ -2,7 +2,9 @@ minVersion: '2.29.0'
 workspaces:
   packages/cli:
     changelog:
-      policy: auto
+      # CLI notes must cover CLI changes, not every MCP commit in the monorepo.
+      policy: simple
+      filePath: packages/cli/CHANGELOG.md
     versioning:
       policy: auto
     preReleaseCommand: bash -c 'cd packages/cli && node --experimental-strip-types script/bump-version.ts --pre'
