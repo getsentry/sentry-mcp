@@ -444,12 +444,12 @@ export function decodeCompoundCursor(raw: string): (string | null)[] {
  *
  * @param targets - Resolved org/project targets (sorted internally by key)
  * @param filters - Optional filter parameters for commands that have them
- *   (sort, query, period). When provided they are appended so cursors are
+ *   (sort, query, period, limit). When provided they are appended so cursors are
  *   isolated per unique query.
  */
 export function buildMultiTargetContextKey(
   targets: ResolvedTarget[],
-  filters?: { sort?: string; query?: string; period?: string }
+  filters?: { sort?: string; query?: string; period?: string; limit?: number }
 ): string {
   const host = getApiBaseUrl();
   const targetFingerprint = targets
@@ -471,7 +471,8 @@ export function buildMultiTargetContextKey(
     `${base}` +
     (escapedSort ? `|sort:${escapedSort}` : "") +
     `|period:${escapedPeriod}` +
-    (escapedQuery ? `|q:${escapedQuery}` : "")
+    (escapedQuery ? `|q:${escapedQuery}` : "") +
+    (filters.limit === undefined ? "" : `|limit:${filters.limit}`)
   );
 }
 

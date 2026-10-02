@@ -1,5 +1,7 @@
 /** DSN listing contracts through the real command, SDK, and cursor storage. */
 
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { buildApplication, run } from "@stricli/core";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { dsnRoute } from "../../../src/commands/dsn/index.js";
@@ -10,11 +12,22 @@ import {
   setDefaultOrganization,
   setDefaultProject,
 } from "../../../src/lib/db/defaults.js";
-import { setOrgRegions } from "../../../src/lib/db/regions.js";
+import { setCachedProject } from "../../../src/lib/db/project-cache.js";
+import { clearOrgRegions, setOrgRegions } from "../../../src/lib/db/regions.js";
 import { ApiError } from "../../../src/lib/errors.js";
-import { mockFetch, useTestConfigDir } from "../../helpers.js";
+import { mockFetch, useEnvSandbox, useTestConfigDir } from "../../helpers.js";
 
+useEnvSandbox([
+  "SENTRY_ORG",
+  "SENTRY_PROJECT",
+  "SENTRY_DSN",
+  "SENTRY_AUTH_TOKEN",
+  "SENTRY_TOKEN",
+  "SENTRY_URL",
+  "SENTRY_HOST",
+]);
 const configDir = useTestConfigDir("dsn-list-", { isolateProjectRoot: true });
+const PROJECT_API_PATH = /^\/api\/0\/projects\/([^/]+)\/([^/]+)\/(keys\/)?$/;
 const PUBLIC_DSN = `https://${"a".repeat(32)}@o1.ingest.us.sentry.io/42`;
 const KEY = {
   id: "internal-key-id",
@@ -88,6 +101,98 @@ function response(body: unknown, nextCursor?: string): Response {
   });
 }
 
+/** Project metadata served by the real SDK's HTTP boundary. */
+function project(org: string, orgId: string, slug: string, id: string) {
+  return { id, slug, name: slug, organization: { id: orgId, slug: org } };
+}
+
+type Project = ReturnType<typeof project>;
+const DEFAULT_PROJECTS = [
+  project("test-org", "1", "test-project", "42"),
+  project("test-org", "1", "other-project", "43"),
+];
+
+/** Serve organization discovery and project metadata before the key endpoint. */
+function mockProjectApi(
+  projects: Project[],
+  fetchKeys: (target: Project, url: URL) => Response
+) {
+  return mockFetch(async (input, init) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    if (request.method !== "GET") {
+      throw new Error(`Unexpected method: ${request.method}`);
+    }
+    const organizations = [
+      ...new Map(
+        projects.map((item) => [item.organization.slug, item.organization])
+      ).values(),
+    ].map((org) => ({
+      ...org,
+      name: org.slug,
+      links: { regionUrl: "https://us.sentry.io" },
+    }));
+    if (url.pathname === "/api/0/organizations/") {
+      return response(organizations);
+    }
+    for (const org of organizations) {
+      if (
+        [org.slug, org.id, `o${org.id}`].some(
+          (value) => url.pathname === `/api/0/organizations/${value}/`
+        )
+      ) {
+        return response(org);
+      }
+    }
+    const match = PROJECT_API_PATH.exec(url.pathname);
+    if (match) {
+      const target = projects.find(
+        (item) =>
+          [
+            item.organization.slug,
+            item.organization.id,
+            `o${item.organization.id}`,
+          ].includes(match[1] ?? "") &&
+          [item.slug, item.id].includes(match[2] ?? "")
+      );
+      if (target) {
+        return match[3] ? fetchKeys(target, url) : response(target);
+      }
+    }
+    throw new Error(`Unexpected request: ${url.pathname}`);
+  });
+}
+
+/** Deterministic API pages whose cursors advance by the requested item count. */
+function keyPage(target: Project, url: URL, count: number) {
+  const offset = Number(url.searchParams.get("cursor")?.split(":")[1] ?? 0);
+  const limit = Number(url.searchParams.get("per_page"));
+  const keys = Array.from({ length: count }, (_, index) => ({
+    ...KEY,
+    projectId: Number(target.id),
+    name: `${target.organization.slug}/${target.slug} ${index + 1}`,
+    dsn: {
+      public: `https://${"a".repeat(32)}@o${target.organization.id}.ingest.us.sentry.io/${target.id}`,
+    },
+  }));
+  const next = offset + limit;
+  return response(
+    keys.slice(offset, next),
+    next < count ? `0:${next}:0` : undefined
+  );
+}
+
+function cacheOrganizations(projects: Project[]) {
+  setOrgRegions(
+    projects.map(({ organization }) => ({
+      slug: organization.slug,
+      orgId: organization.id,
+      orgName: organization.slug,
+      regionUrl: "https://us.sentry.io",
+    }))
+  );
+}
+
 async function invoke(
   options: {
     target?: string;
@@ -112,16 +217,181 @@ async function invoke(
 }
 
 describe("dsn list", () => {
+  test("lists a bare project across organizations with a global limit and resumable exhausted targets", async () => {
+    const projects = [
+      project("org-one", "1", "frontend", "42"),
+      project("org-two", "2", "frontend", "43"),
+    ];
+    clearOrgRegions();
+    cacheOrganizations(projects);
+    globalThis.fetch = mockProjectApi(projects, (target, url) =>
+      keyPage(target, url, target.organization.slug === "org-one" ? 5 : 1)
+    );
+
+    const first = JSON.parse(
+      (await invoke({ target: "frontend", limit: 4 })).output()
+    );
+    expect(first.data).toHaveLength(4);
+    expect(first.data.map((item: { name: string }) => item.name)).toEqual(
+      expect.arrayContaining([
+        "org-one/frontend 1",
+        "org-one/frontend 2",
+        "org-one/frontend 3",
+        "org-two/frontend 1",
+      ])
+    );
+    expect(first).toMatchObject({ hasMore: true, hasPrev: false });
+
+    const next = JSON.parse(
+      (await invoke({ target: "frontend", limit: 4, cursor: "next" })).output()
+    );
+    expect(next.data.map((item: { name: string }) => item.name)).toEqual([
+      "org-one/frontend 4",
+      "org-one/frontend 5",
+    ]);
+    expect(next).toMatchObject({ hasMore: false, hasPrev: true });
+    expect(
+      JSON.parse(
+        (
+          await invoke({ target: "frontend", limit: 4, cursor: "prev" })
+        ).output()
+      )
+    ).toEqual(first);
+  });
+
+  test.each([
+    true,
+    false,
+  ])("detects all monorepo projects with public slugs from cold caches (json=%s)", async (json) => {
+    const projects = [
+      project("test-org", "1", "frontend", "42"),
+      project("test-org", "1", "backend", "43"),
+    ];
+    setDefaultOrganization(null);
+    setDefaultProject(null);
+    clearOrgRegions();
+    await writeFile(
+      join(configDir(), "package.json"),
+      JSON.stringify({ private: true, workspaces: ["apps/*"] })
+    );
+    for (const target of projects) {
+      const directory = join(configDir(), "apps", target.slug);
+      await mkdir(directory, { recursive: true });
+      await writeFile(
+        join(directory, ".env"),
+        `SENTRY_DSN=https://${"a".repeat(32)}@o1.ingest.us.sentry.io/${target.id}\n`
+      );
+    }
+    globalThis.fetch = mockProjectApi(projects, (target, url) =>
+      keyPage(target, url, 2)
+    );
+
+    const first = await invoke({ limit: 2, json });
+    if (json) {
+      const result = JSON.parse(first.output());
+      expect(result).toMatchObject({ hasMore: true, hasPrev: false });
+      expect(result.data).toHaveLength(2);
+      expect(result.data).toEqual(
+        expect.arrayContaining(
+          projects.map((target) => ({
+            org: "test-org",
+            project: target.slug,
+            name: `test-org/${target.slug} 1`,
+            isActive: true,
+            dateCreated: KEY.dateCreated,
+            dsn: `https://${"a".repeat(32)}@o1.ingest.us.sentry.io/${target.id}`,
+          }))
+        )
+      );
+    } else {
+      expect(first.output()).toContain("test-org/frontend");
+      expect(first.output()).toContain("test-org/backend");
+    }
+    expect(`${first.output()}\n${first.diagnostics()}`).not.toMatch(
+      /\b(?:test-org|1)\s*\/\s*(?:42|43)\b|\b1\s*\/\s*(?:frontend|backend)\b/
+    );
+
+    // Another command can warm these caches between list invocations.
+    for (const target of projects) {
+      setCachedProject("1", target.id, {
+        orgSlug: "test-org",
+        orgName: "Test Org",
+        projectSlug: target.slug,
+        projectName: target.name,
+        projectId: target.id,
+      });
+    }
+    const next = JSON.parse(
+      (await invoke({ limit: 2, cursor: "next" })).output()
+    );
+    expect(next).toMatchObject({ hasMore: false, hasPrev: true });
+    expect(next.data.map((item: { name: string }) => item.name)).toEqual(
+      expect.arrayContaining(["test-org/frontend 2", "test-org/backend 2"])
+    );
+    expect(next.data).toHaveLength(2);
+    const previous = JSON.parse(
+      (await invoke({ limit: 2, cursor: "prev" })).output()
+    );
+    expect(previous.data.map((item: { name: string }) => item.name)).toEqual(
+      expect.arrayContaining(["test-org/frontend 1", "test-org/backend 1"])
+    );
+    expect(previous).toMatchObject({ hasMore: true, hasPrev: false });
+  });
+
+  test("reports a failed project while returning the accessible project's DSNs", async () => {
+    const projects = [
+      project("org-one", "1", "frontend", "42"),
+      project("org-two", "2", "frontend", "43"),
+    ];
+    clearOrgRegions();
+    cacheOrganizations(projects);
+    globalThis.fetch = mockProjectApi(projects, (target, url) => {
+      if (target.organization.slug === "org-two") {
+        return new Response(JSON.stringify({ detail: "Permission denied" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return keyPage(target, url, 1);
+    });
+    const result = JSON.parse(
+      (await invoke({ target: "frontend", limit: 4 })).output()
+    );
+    expect(result.data).toMatchObject([
+      { org: "org-one", project: "frontend", name: "org-one/frontend 1" },
+    ]);
+    expect(result.errors).toMatchObject([
+      { project: "org-two/frontend", status: 403 },
+    ]);
+  });
+
+  test("does not advertise an unsafe cursor when the limit cannot include every target", async () => {
+    const projects = [
+      project("org-one", "1", "frontend", "42"),
+      project("org-two", "2", "frontend", "43"),
+    ];
+    clearOrgRegions();
+    cacheOrganizations(projects);
+    globalThis.fetch = mockProjectApi(projects, (target, url) =>
+      keyPage(target, url, 2)
+    );
+    const result = JSON.parse(
+      (await invoke({ target: "frontend", limit: 1 })).output()
+    );
+    expect(result.data).toHaveLength(1);
+    expect(result.hasMore).toBe(true);
+    expect(result.nextCursor).toBeUndefined();
+    await expect(
+      invoke({ target: "frontend", limit: 1, cursor: "next" })
+    ).rejects.toThrow("No next page");
+  });
+
   test.each([
     "list",
     "ls",
   ])("%s exposes only user-facing fields in JSON", async (command) => {
-    globalThis.fetch = mockFetch(async (input, init) => {
-      const request = new Request(input, init);
-      expect(request.method).toBe("GET");
-      expect(new URL(request.url).pathname).toBe(
-        "/api/0/projects/test-org/test-project/keys/"
-      );
+    globalThis.fetch = mockProjectApi(DEFAULT_PROJECTS, (_target, url) => {
+      expect(url.pathname).toBe("/api/0/projects/test-org/test-project/keys/");
       return response([KEY]);
     });
     const ctx = createContext();
@@ -147,7 +417,7 @@ describe("dsn list", () => {
   });
 
   test("shows public DSNs, enabled status, and missing creation dates in human output", async () => {
-    globalThis.fetch = mockFetch(async () =>
+    globalThis.fetch = mockProjectApi(DEFAULT_PROJECTS, () =>
       response([
         KEY,
         { ...KEY, name: "Old browser", isActive: false, dateCreated: null },
@@ -170,10 +440,8 @@ describe("dsn list", () => {
   });
 
   test("uses configured project when the target is omitted", async () => {
-    globalThis.fetch = mockFetch(async (input, init) => {
-      expect(new URL(new Request(input, init).url).pathname).toBe(
-        "/api/0/projects/test-org/test-project/keys/"
-      );
+    globalThis.fetch = mockProjectApi(DEFAULT_PROJECTS, (_target, url) => {
+      expect(url.pathname).toBe("/api/0/projects/test-org/test-project/keys/");
       return response([]);
     });
     const ctx = await invoke();
@@ -249,6 +517,9 @@ describe("dsn list", () => {
       if (url.pathname === "/api/0/projects/test-org/42/") {
         return response({ slug: "frontend" });
       }
+      if (url.pathname === "/api/0/projects/test-org/test-project/") {
+        return response(DEFAULT_PROJECTS[0]);
+      }
       expect(url.pathname).toBe("/api/0/organizations/test-org/project-keys/");
       expect(url.searchParams.get("per_page")).toBe("1");
       return url.searchParams.get("cursor") === "next:0:0"
@@ -293,10 +564,8 @@ describe("dsn list", () => {
   });
 
   test("explicit project wins over defaults and field selection stays inside the projection", async () => {
-    globalThis.fetch = mockFetch(async (input, init) => {
-      expect(new URL(new Request(input, init).url).pathname).toBe(
-        "/api/0/projects/test-org/other-project/keys/"
-      );
+    globalThis.fetch = mockProjectApi(DEFAULT_PROJECTS, (_target, url) => {
+      expect(url.pathname).toBe("/api/0/projects/test-org/other-project/keys/");
       return response([KEY]);
     });
     const ctx = createContext();
@@ -319,8 +588,7 @@ describe("dsn list", () => {
   });
 
   test("navigates forward and backward without losing keys", async () => {
-    globalThis.fetch = mockFetch(async (input, init) => {
-      const url = new URL(new Request(input, init).url);
+    globalThis.fetch = mockProjectApi(DEFAULT_PROJECTS, (_target, url) => {
       expect(url.searchParams.get("per_page")).toBe("1");
       return url.searchParams.get("cursor") === "next:0:0"
         ? response([{ ...KEY, name: "Second" }])
@@ -347,7 +615,9 @@ describe("dsn list", () => {
   });
 
   test("keeps pagination history scoped to project and page size", async () => {
-    globalThis.fetch = mockFetch(async () => response([KEY], "next:0:0"));
+    globalThis.fetch = mockProjectApi(DEFAULT_PROJECTS, () =>
+      response([KEY], "next:0:0")
+    );
     await invoke({ target: "test-org/test-project", limit: 1 });
     await expect(
       invoke({ target: "test-org/other-project", limit: 1, cursor: "next" })
@@ -358,8 +628,9 @@ describe("dsn list", () => {
   });
 
   test("surfaces denied access instead of presenting an empty list", async () => {
-    globalThis.fetch = mockFetch(
-      async () =>
+    globalThis.fetch = mockProjectApi(
+      DEFAULT_PROJECTS,
+      () =>
         new Response(JSON.stringify({ detail: "Permission denied" }), {
           status: 403,
           headers: { "Content-Type": "application/json" },

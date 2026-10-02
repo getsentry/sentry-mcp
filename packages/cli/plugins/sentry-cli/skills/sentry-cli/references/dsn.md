@@ -23,7 +23,7 @@ List DSNs
 **Examples:**
 
 ```bash
-# List client keys for the detected project
+# List client keys for detected projects, including monorepos
 sentry dsn list
 
 # List enabled and disabled DSNs for one project
