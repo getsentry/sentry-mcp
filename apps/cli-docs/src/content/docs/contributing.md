@@ -65,6 +65,7 @@ toolkit/
 │       │   │   ├── dashboard/   # add, create, delete, edit, list, restore, revisions, view
 │       │   │   ├── debug-files/ # bundle-jvm, bundle-sources, check, find, print-sources, upload
 │       │   │   ├── docs/        # list, query
+│       │   │   ├── dsn/         # list
 │       │   │   ├── event/       # list, send, view
 │       │   │   ├── feedback/    # list, view
 │       │   │   ├── issue/       # archive, events, explain, list, merge, plan, resolve, unresolve, view
