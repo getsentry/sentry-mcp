@@ -1,9 +1,8 @@
-minVersion: '2.32.0'
+minVersion: '2.33.0'
 workspaces:
   packages/cli:
     changelog:
       policy: auto
-      filePath: packages/cli/CHANGELOG.md
       # The CLI release also ships the documentation workspace.
       includePaths:
         - apps/cli-docs

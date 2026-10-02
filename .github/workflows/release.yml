@@ -90,11 +90,10 @@ jobs:
           echo "version=$NEW" >> "$GITHUB_OUTPUT"
 
       - name: Prepare release
-        uses: getsentry/craft@177c278ebf946da378659e3b5dfe7d5e4a4d383a # v2.32.0
+        uses: getsentry/craft@2.33.0
         env:
           GITHUB_TOKEN: ${{ steps.token.outputs.token }}
         with:
           workspace: ${{ steps.release.outputs.workspace }}
           version: ${{ steps.version.outputs.version }}
-          craft_version: '2.32.0'
           force: ${{ inputs.force && 'true' || '' }}
