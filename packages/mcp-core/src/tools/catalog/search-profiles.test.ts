@@ -9,9 +9,7 @@ vi.mock("../support/search-events/search", async (importOriginal) => ({
 }));
 
 it("search_profiles runs the shared handler locked to profiles", async () => {
-  expect(
-    await inspectDatasetSearchTool(searchProfiles),
-  ).toMatchInlineSnapshot(`
+  expect(await inspectDatasetSearchTool(searchProfiles)).toMatchInlineSnapshot(`
     {
       "dataset": "profiles",
       "inputParams": [

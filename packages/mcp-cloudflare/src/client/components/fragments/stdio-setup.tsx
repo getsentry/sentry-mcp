@@ -46,10 +46,9 @@ export default function StdioSetup() {
           scopes:
         </p>
         <p>
-          <strong>AI-powered search:</strong> If you want the
-          event search tools (<code>search_errors</code>,{" "}
-          <code>search_traces</code>, <code>search_logs</code>, and so on) and{" "}
-          <code>search_issues</code> to
+          <strong>AI-powered search:</strong> If you want the event search tools
+          (<code>search_errors</code>, <code>search_traces</code>,{" "}
+          <code>search_logs</code>, and so on) and <code>search_issues</code> to
           translate natural language queries, add an
           <code>OPENAI_API_KEY</code> next to your Sentry token. The rest of the
           MCP server works without it, so you can skip this step if you do not
