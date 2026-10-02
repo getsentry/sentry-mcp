@@ -79,7 +79,7 @@ export async function listRepositoriesPaginated(
     throw new ApiError(
       "Failed to list repositories: unexpected response format",
       0,
-      "Expected an array of repositories. This may indicate an incompatible self-hosted Sentry version or a proxy interfering with the response."
+      "Expected the repositories endpoint to return an array. Check the configured Sentry URL and the endpoint response."
     );
   }
   return paginated;

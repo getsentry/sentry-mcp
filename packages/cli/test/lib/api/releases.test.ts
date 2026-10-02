@@ -348,7 +348,7 @@ describe("setCommitsAuto", () => {
   });
 
   test.each([
-    {},
+    { ok: true },
     "unexpected response",
     null,
   ])("rejects a non-array repository response (%j) before updating the release", async (body) => {
