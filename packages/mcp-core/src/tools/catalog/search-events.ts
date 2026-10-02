@@ -12,7 +12,7 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import { logWarn } from "../../telem/logging";
-import { setTagAndAttribute } from "../../telem/scope";
+import { setTargetTagsAndAttributes } from "../../telem/scope";
 import { scrubSensitiveText } from "../../telem/sentry";
 import type { ServerContext } from "../../types";
 import {
@@ -499,9 +499,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setTagAndAttribute("organization.slug", organizationSlug);
-    if (params.projectSlug)
-      setTagAndAttribute("project.slug", params.projectSlug);
+    setTargetTagsAndAttributes(params);
 
     const inputDataset = params.dataset ?? "errors";
     const hasStructuredQuery = looksLikeSentrySearchSyntax(params.query);
