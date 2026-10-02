@@ -303,8 +303,8 @@ describe("get_issue_details", () => {
       - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
       - Issue event search: Use the Sentry tool \`search_issue_events\`
       - Full distributed trace and span tree: Use the Sentry tool \`get_sentry_resource\`
-      - Related span search: Use the Sentry tool \`search_events\`
-      - Related log search: Use the Sentry tool \`search_events\`
+      - Related span search: Use the Sentry tool \`search_traces\`
+      - Related log search: Use the Sentry tool \`search_logs\`
       "
     `);
   });
@@ -696,8 +696,8 @@ describe("get_issue_details", () => {
       - Use the Sentry tool \`execute_sentry_tool(name='get_agent_conversation_details', arguments={"organizationSlug":"sentry-mcp-evals","conversationId":"conv-123"})\` to fetch the full transcript.
       - Issue event search: Use the Sentry tool \`search_issue_events\`
       - Full distributed trace and span tree: Use the Sentry tool \`get_sentry_resource\`
-      - Related span search: Use the Sentry tool \`search_events\`
-      - Related log search: Use the Sentry tool \`search_events\`
+      - Related span search: Use the Sentry tool \`search_traces\`
+      - Related log search: Use the Sentry tool \`search_logs\`
       "
     `);
   });
@@ -1165,8 +1165,8 @@ describe("get_issue_details", () => {
       - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
       - Issue event search: Use the Sentry tool \`search_issue_events\`
       - Full distributed trace and span tree: Use the Sentry tool \`get_sentry_resource\`
-      - Related span search: Use the Sentry tool \`search_events\`
-      - Related log search: Use the Sentry tool \`search_events\`
+      - Related span search: Use the Sentry tool \`search_traces\`
+      - Related log search: Use the Sentry tool \`search_logs\`
       "
     `);
   });
@@ -1450,8 +1450,8 @@ describe("get_issue_details", () => {
       - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
       - Issue event search: Use the Sentry tool \`search_issue_events\`
       - Full distributed trace and span tree: Use the Sentry tool \`get_sentry_resource\`
-      - Related span search: Use the Sentry tool \`search_events\`
-      - Related log search: Use the Sentry tool \`search_events\`
+      - Related span search: Use the Sentry tool \`search_traces\`
+      - Related log search: Use the Sentry tool \`search_logs\`
       "
     `);
   });

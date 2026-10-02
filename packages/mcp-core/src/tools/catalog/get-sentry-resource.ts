@@ -196,7 +196,7 @@ function resolveFromParsedUrl(
   if (detectedType === "unknown") {
     if (parsed.transaction) {
       throw new UserInputError(
-        `Detected a performance summary URL for transaction "${parsed.transaction}". Use \`search_events\` to find traces and performance data for this transaction.`,
+        `Detected a performance summary URL for transaction "${parsed.transaction}". Use \`search_traces\` to find traces and performance data for this transaction.`,
       );
     }
     throw new UserInputError(

@@ -15,7 +15,7 @@ export default defineTool({
   description: [
     "Get the latest UI screenshots/images for an app from the preprod snapshot system.",
     "",
-    "This is the primary tool for retrieving app screenshots — not search_events or search_issues.",
+    "This is the primary tool for retrieving app screenshots.",
     "",
     "Use this tool when you need to:",
     "- Get screenshots, screens, golden images, or reference images for an app",
