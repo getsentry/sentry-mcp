@@ -2,7 +2,7 @@
 
 Entries through 0.45.0 come from the [original CLI changelog at its 0.45.0 tag](https://github.com/getsentry/cli/blob/0.45.0/CHANGELOG.md).
 
-<!-- Craft will auto-populate this file -->
+<!-- Add notes for the next CLI version before preparing its release. -->
 ## 0.46.0
 
 ### New Features ✨
