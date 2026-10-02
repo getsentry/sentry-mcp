@@ -1,6 +1,5 @@
-import { getActiveSpan, setTag } from "@sentry/core";
+import { getActiveSpan } from "@sentry/core";
 import { z } from "zod";
-import { setOrganizationContext } from "../../telem/organization";
 import { UserInputError } from "../../errors";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { withProviderFallback } from "../../internal/agents/provider-fallback";
@@ -13,6 +12,7 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import { logWarn } from "../../telem/logging";
+import { setTargetTagsAndAttributes } from "../../telem/scope";
 import { scrubSensitiveText } from "../../telem/sentry";
 import type { ServerContext } from "../../types";
 import {
@@ -503,8 +503,7 @@ export default defineTool({
     });
     const organizationSlug = params.organizationSlug;
 
-    setOrganizationContext(organizationSlug);
-    if (params.projectSlug) setTag("project.slug", params.projectSlug);
+    setTargetTagsAndAttributes(params);
 
     const inputDataset = params.dataset ?? "errors";
     const hasStructuredQuery = looksLikeSentrySearchSyntax(params.query);
