@@ -181,7 +181,7 @@ sentry feedback resolve my-org/FRONTEND-2SDJ --json --fields id,shortId,status
 
 ### `sentry feedback unresolve <feedback>`
 
-Reopen resolved User Feedback
+Return User Feedback to the inbox
 
 **JSON Fields** (use `--json --fields` to select specific fields):
 
@@ -229,6 +229,56 @@ sentry feedback unresolve my-org/FRONTEND-2SDJ
 
 # Return selected fields from the updated Feedback
 sentry feedback unresolve FRONTEND-2SDJ --json --fields id,shortId,status
+
+# Find spam and return a Feedback item to the unresolved inbox
+sentry feedback list --status spam
+sentry feedback unresolve FRONTEND-2SDJ
+```
+
+### `sentry feedback spam <feedback>`
+
+Mark User Feedback as spam
+
+**JSON Fields** (use `--json --fields` to select specific fields):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Numeric issue ID |
+| `shortId` | string | Human-readable short ID (e.g. PROJ-ABC) |
+| `title` | string | Issue title |
+| `culprit` | string \| null | Culprit string |
+| `count` | string | Total event count |
+| `userCount` | number | Number of affected users |
+| `firstSeen` | string \| null | First occurrence (ISO 8601) |
+| `lastSeen` | string \| null | Most recent occurrence (ISO 8601) |
+| `level` | string | Severity level |
+| `status` | string | Issue status |
+| `permalink` | string | URL to the issue in Sentry |
+| `project` | object | Project info |
+| `metadata` | object | Feedback metadata |
+| `assignedTo` | object \| null | Assigned user or team |
+| `priority` | string | Triage priority |
+| `platform` | string | Platform |
+| `substatus` | string \| null | Issue substatus |
+| `isUnhandled` | boolean | Whether the issue is unhandled |
+| `seerFixabilityScore` | number \| null | Seer AI fixability score (0-1) |
+| `issueCategory` | string | Issue category discriminator |
+| `issueType` | string | Issue type discriminator |
+| `hasSeen` | boolean | Whether the feedback has been read |
+| `latestEventHasAttachments` | boolean | Whether the latest event has attachments |
+
+**Examples:**
+
+```bash
+# Move a Feedback item to the spam mailbox
+sentry feedback spam FRONTEND-2SDJ
+sentry feedback spam 5146636313
+
+# Specify an organization explicitly when needed
+sentry feedback spam my-org/FRONTEND-2SDJ
+
+# Return selected fields from the updated Feedback
+sentry feedback spam FRONTEND-2SDJ --json --fields id,shortId,status
 ```
 
 All commands also support `--json`, `--fields`, `--help`, `--log-level`, and `--verbose` flags.

@@ -66,7 +66,7 @@ toolkit/
 │       │   │   ├── debug-files/ # bundle-jvm, bundle-sources, check, find, print-sources, upload
 │       │   │   ├── docs/        # list, query
 │       │   │   ├── event/       # list, send, view
-│       │   │   ├── feedback/    # list, resolve, unresolve, view
+│       │   │   ├── feedback/    # list, resolve, spam, unresolve, view
 │       │   │   ├── issue/       # archive, events, explain, list, merge, plan, resolve, unresolve, view
 │       │   │   ├── local/       # run, serve
 │       │   │   ├── log/         # list, view

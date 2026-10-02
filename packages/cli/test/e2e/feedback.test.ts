@@ -61,6 +61,7 @@ describe("sentry feedback routes", () => {
       const viewHelp = await ctx.run(["feedback", "view", "--help"]);
       const resolveHelp = await ctx.run(["feedback", "resolve", "--help"]);
       const unresolveHelp = await ctx.run(["feedback", "unresolve", "--help"]);
+      const spamHelp = await ctx.run(["feedback", "spam", "--help"]);
 
       expect(routeHelp.exitCode, routeHelp.stderr).toBe(0);
       expect(routeHelp.stdout).toContain("list");
@@ -68,6 +69,7 @@ describe("sentry feedback routes", () => {
       expect(routeHelp.stdout).toContain("resolve");
       expect(routeHelp.stdout).toContain("unresolve");
       expect(routeHelp.stdout).toContain("reopen");
+      expect(routeHelp.stdout).toContain("spam");
       expect(listHelp.exitCode, listHelp.stderr).toBe(0);
       expect(listHelp.stdout).toContain("--status");
       expect(listHelp.stdout).toContain("--period");
@@ -77,6 +79,8 @@ describe("sentry feedback routes", () => {
       expect(resolveHelp.stdout).toContain("--json");
       expect(unresolveHelp.exitCode, unresolveHelp.stderr).toBe(0);
       expect(unresolveHelp.stdout).toContain("--json");
+      expect(spamHelp.exitCode, spamHelp.stderr).toBe(0);
+      expect(spamHelp.stdout).toContain("--json");
     }
   );
 });
@@ -84,6 +88,7 @@ describe("sentry feedback routes", () => {
 describe.each([
   { command: "resolve", status: "resolved" },
   { command: "unresolve", status: "unresolved" },
+  { command: "spam", status: "ignored" },
 ])("sentry feedback $command", ({ command, status }) => {
   test("requires authentication", async () => {
     const result = await ctx.run([
