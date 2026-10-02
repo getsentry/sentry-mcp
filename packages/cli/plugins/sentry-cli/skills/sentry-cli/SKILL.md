@@ -620,10 +620,12 @@ Query aggregate event data (Explore)
 
 ### Feedback
 
-Search and inspect User Feedback
+Manage User Feedback
 
 - `sentry feedback list <org/project>` — List and search User Feedback
 - `sentry feedback view <feedback>` — View a User Feedback item
+- `sentry feedback resolve <feedback>` — Mark User Feedback as resolved
+- `sentry feedback unresolve <feedback>` — Reopen resolved User Feedback
 
 → Full flags and examples: `references/feedback.md`
 
