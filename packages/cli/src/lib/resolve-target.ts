@@ -198,7 +198,7 @@ export async function resolveTargetSlugs(
   };
 }
 
-/** Prefer a known slug before interpreting an all-digits identifier as an ID. */
+/** Look up project identity across numeric-key and discovery caches. */
 function getCachedTargetProject(
   target: ResolvedTarget,
   org: string
@@ -207,13 +207,10 @@ function getCachedTargetProject(
     target.projectData?.id ??
     target.projectId?.toString() ??
     (isAllDigits(target.project) ? target.project : undefined);
-  return (
-    getCachedProjectBySlug(org, target.projectData?.slug ?? target.project) ??
-    (projectId
-      ? (getCachedProject(target.org, projectId) ??
+  return projectId
+    ? (getCachedProject(target.org, projectId) ??
         getCachedProjectById(org, projectId))
-      : undefined)
-  );
+    : undefined;
 }
 
 /**

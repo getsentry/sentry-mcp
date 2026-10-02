@@ -2,25 +2,24 @@
 
 import { ApiError, ValidationError } from "../../lib/errors.js";
 import { LIST_MAX_LIMIT } from "../../lib/list-command.js";
-import { type FetchResult, fetchGroupsWithBudget } from "../../lib/org-list.js";
+import {
+  type FetchGroupsOptions,
+  type FetchResult,
+  fetchGroupsWithBudget,
+  type ListFetchPage,
+} from "../../lib/org-list.js";
 
-export type AlertRuleFetchPage<TRule> = {
+/** Alert rules with the cursor metadata used by shared list fetching. */
+export type AlertRuleFetchPage<TRule> = ListFetchPage & {
+  /** Rules returned for this group. */
   rules: TRule[];
-  hasMore?: boolean;
-  nextCursor?: string;
 };
 
-type FetchPageOptions = { limit: number; startCursor?: string };
-type BudgetOptions<TGroup, TRule, TPage extends AlertRuleFetchPage<TRule>> = {
-  limit: number;
-  startCursors?: Map<string, string>;
-  getGroupKey: (group: TGroup) => string;
-  fetchGroup: (
-    group: TGroup,
-    options: FetchPageOptions
-  ) => Promise<FetchResult<TPage>>;
-  onProgress: (fetched: number) => void;
-};
+type BudgetOptions<
+  TGroup,
+  TRule,
+  TPage extends AlertRuleFetchPage<TRule>,
+> = Omit<FetchGroupsOptions<TGroup, TRule, TPage>, "getItems">;
 
 export function assertAlertListLimit(limit: number): void {
   if (limit < 1) {

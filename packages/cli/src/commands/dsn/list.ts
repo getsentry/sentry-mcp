@@ -10,12 +10,12 @@ import {
   listOrganizationDsns,
   listProjectDsns,
 } from "../../lib/api/projects.js";
-import { parseOrgProjectArg } from "../../lib/arg-parsing.js";
+import { parseOrgProjectArg, validateLimit } from "../../lib/arg-parsing.js";
 import {
   advancePaginationState,
   buildMultiTargetContextKey,
   buildPaginationContextKey,
-  decodeCompoundCursor,
+  decodeTargetCursors,
   encodeCompoundCursor,
   hasPreviousPage,
   resolveCursor,
@@ -28,15 +28,18 @@ import {
   buildListCommand,
   buildListLimitFlag,
   LIST_MAX_LIMIT,
+  LIST_MIN_LIMIT,
   LIST_TARGET_POSITIONAL,
   paginationHint,
   targetPatternExplanation,
 } from "../../lib/list-command.js";
 import { logger } from "../../lib/logger.js";
 import {
+  type BaseListFlags,
   dispatchOrgScopedList,
   type FetchResult,
   fetchGroupsWithBudget,
+  type GroupFetchOptions,
   type HandlerContext,
   jsonTransformListResult,
   type ListCommandMeta,
@@ -59,18 +62,10 @@ const listConfig: ListCommandMeta = {
   commandPrefix: "sentry dsn list",
 };
 
-type ListFlags = {
-  readonly limit: number;
-  readonly cursor?: string;
-  readonly fresh: boolean;
-  readonly json: boolean;
-  readonly fields?: string[];
-};
-
 /** List an organization's keys directly, preserving its cursor history. */
 async function listForOrganization(
   org: string,
-  flags: HandlerContext["flags"]
+  flags: BaseListFlags
 ): Promise<ListResult<DsnListItem>> {
   const target = `${org}/`;
   const contextKey = buildPaginationContextKey("org", target, {
@@ -120,7 +115,7 @@ type DsnProjectPage = {
 /** Fetch a bounded project page, allowing callers to report partial failures. */
 async function fetchProjectPage(
   target: ResolvedTarget,
-  options: { limit: number; startCursor?: string }
+  options: GroupFetchOptions
 ): Promise<FetchResult<DsnProjectPage>> {
   const result = await withAuthGuard(async () => {
     const page = await listProjectDsns(target.org, target.project, {
@@ -149,8 +144,39 @@ async function fetchProjectPage(
       };
 }
 
+/** Stable identity for both resolved targets and displayed rows. */
+const targetKey = (target: Pick<ResolvedTarget, "org" | "project">) =>
+  `${target.org}/${target.project}`;
+
+/** Collect successful pages, reporting partial failures and throwing if all fail. */
+function collectProjectResults(
+  results: FetchResult<DsnProjectPage>[],
+  targets: ResolvedTarget[]
+) {
+  const pages = new Map<string, DsnProjectPage>();
+  const failures: { project: string; error: Error }[] = [];
+  for (const [index, result] of results.entries()) {
+    if (result.success) {
+      pages.set(targetKey(result.data.target), result.data);
+    } else {
+      const target = targets[index];
+      if (target) {
+        failures.push({ project: targetKey(target), error: result.error });
+      }
+    }
+  }
+  if (pages.size === 0 && failures[0]) {
+    throw failures[0].error;
+  }
+  if (failures.length > 0) {
+    logger.warn(
+      `Failed to fetch DSNs from ${failures.map((failure) => failure.project).join(", ")}. Showing results from ${pages.size} project(s).`
+    );
+  }
+  return { pages, failures };
+}
+
 /** Resolve list targets, then merge bounded pages using the shared cursor stack. */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-target cursor coordination and partial failures
 async function listForResolvedProjects<
   T extends "auto-detect" | "explicit" | "project-search",
 >(ctx: HandlerContext<T>): Promise<ListResult<DsnListItem>> {
@@ -185,23 +211,8 @@ async function listForResolvedProjects<
     PAGINATION_KEY,
     contextKey
   );
-  const targetKey = (target: ResolvedTarget) =>
-    `${target.org}/${target.project}`;
   const sortedKeys = targets.map(targetKey).sort();
-  const startCursors = new Map<string, string>();
-  const exhausted = new Set<string>();
-  if (cursor) {
-    for (const [index, value] of decodeCompoundCursor(cursor).entries()) {
-      const key = sortedKeys[index];
-      if (key !== undefined) {
-        if (value) {
-          startCursors.set(key, value);
-        } else {
-          exhausted.add(key);
-        }
-      }
-    }
-  }
+  const { startCursors, exhausted } = decodeTargetCursors(cursor, sortedKeys);
   const activeTargets = targets.filter(
     (target) => !exhausted.has(targetKey(target))
   );
@@ -221,32 +232,9 @@ async function listForResolvedProjects<
           ),
       })
   );
-  const pages = new Map<string, DsnProjectPage>();
-  const failures: { project: string; error: Error }[] = [];
-  for (const [index, result] of results.entries()) {
-    if (result.success) {
-      pages.set(targetKey(result.data.target), result.data);
-    } else {
-      const target = activeTargets[index];
-      if (target) {
-        failures.push({ project: targetKey(target), error: result.error });
-      }
-    }
-  }
-  if (pages.size === 0 && failures[0]) {
-    throw failures[0].error;
-  }
-  if (failures.length > 0) {
-    logger.warn(
-      `Failed to fetch DSNs from ${failures.map((failure) => failure.project).join(", ")}. Showing results from ${pages.size} project(s).`
-    );
-  }
+  const { pages, failures } = collectProjectResults(results, activeTargets);
   const allItems = [...pages.values()].flatMap((page) => page.items);
-  const items = trimWithGroupGuarantee(
-    allItems,
-    flags.limit,
-    (item) => `${item.org}/${item.project}`
-  );
+  const items = trimWithGroupGuarantee(allItems, flags.limit, targetKey);
   const trimmed = items.length < allItems.length;
   const cursors = sortedKeys.map((key) => {
     if (exhausted.has(key)) {
@@ -323,10 +311,16 @@ export const listCommand = buildListCommand("dsn", {
   },
   parameters: {
     positional: LIST_TARGET_POSITIONAL,
-    flags: { limit: buildListLimitFlag("DSNs") },
+    flags: {
+      limit: {
+        ...buildListLimitFlag("DSNs"),
+        parse: (value: string) =>
+          validateLimit(value, LIST_MIN_LIMIT, LIST_MAX_LIMIT),
+      },
+    },
     aliases: { n: "limit" },
   },
-  async *func(this: SentryContext, flags: ListFlags, target?: string) {
+  async *func(this: SentryContext, flags: BaseListFlags, target?: string) {
     const result: ListResult<DsnListItem> = await dispatchOrgScopedList({
       config: listConfig,
       parsed: parseOrgProjectArg(target),

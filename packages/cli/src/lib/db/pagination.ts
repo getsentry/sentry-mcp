@@ -439,6 +439,36 @@ export function decodeCompoundCursor(raw: string): (string | null)[] {
 }
 
 /**
+ * Associate a stored compound cursor with its targets.
+ *
+ * Missing entries start fresh; empty entries mark exhausted targets. Extra
+ * entries are ignored, and legacy JSON cursors start all targets fresh.
+ *
+ * @param raw - Stored cursor, or undefined for the first page
+ * @param sortedKeys - Target keys in the same sorted order used when encoding
+ * @returns Resume cursors and the keys of targets that should not be fetched
+ */
+export function decodeTargetCursors(
+  raw: string | undefined,
+  sortedKeys: readonly string[]
+): { startCursors: Map<string, string>; exhausted: Set<string> } {
+  const startCursors = new Map<string, string>();
+  const exhausted = new Set<string>();
+  for (const [index, cursor] of decodeCompoundCursor(raw ?? "").entries()) {
+    const key = sortedKeys[index];
+    if (key === undefined) {
+      break;
+    }
+    if (cursor) {
+      startCursors.set(key, cursor);
+    } else {
+      exhausted.add(key);
+    }
+  }
+  return { startCursors, exhausted };
+}
+
+/**
  * Build a compound cursor context key encoding the full target set and optional
  * query filters so a cursor from one search is never reused for a different search.
  *
