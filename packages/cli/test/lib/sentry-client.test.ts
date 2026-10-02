@@ -3,7 +3,7 @@
  * regression coverage.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { setAuthToken } from "../../src/lib/db/auth.js";
 import { TimeoutError } from "../../src/lib/errors.js";
 import {
@@ -36,6 +36,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   globalThis.fetch = originalFetch;
   resetAuthenticatedFetch();
 });
@@ -133,6 +134,10 @@ describe("per-request transport controls", () => {
     expect(
       await (await getCachedResponse("GET", url, headers))?.json()
     ).toEqual({ source: "cached" });
+    const cacheWrites = vi.spyOn(
+      await import("../../src/lib/response-cache.js"),
+      "storeCachedResponse"
+    );
     let callCount = 0;
     globalThis.fetch = mockFetch(async (_input, init) => {
       callCount += 1;
@@ -151,6 +156,9 @@ describe("per-request transport controls", () => {
     expect(await (await freshFetch(url)).json()).toEqual({ source: "fresh" });
     expect(await (await freshFetch(url)).json()).toEqual({ source: "fresh" });
     expect(callCount).toBe(2);
+    // Cache stores run in the background. Finish any started writes before
+    // checking that the pre-existing entry survived the fresh reads.
+    await Promise.all(cacheWrites.mock.results.map(({ value }) => value));
     expect(
       await (await getCachedResponse("GET", url, headers))?.json()
     ).toEqual({ source: "cached" });
