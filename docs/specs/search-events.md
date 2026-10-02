@@ -16,7 +16,7 @@ A unified search tool that accepts natural language queries and translates them 
 interface SearchEventsParams {
   organizationSlug: string;      // Required
   query: string;  // Natural language search description
-  dataset?: "spans" | "errors" | "logs" | "metrics"; // Dataset to search (default: "errors")
+  dataset: "spans" | "errors" | "logs" | "metrics" | "profiles" | "replays"; // Required; the agent may correct it
   projectSlug?: string;          // Optional - limit to specific project
   regionUrl?: string;           
   limit?: number;                // Default: 10, Max: 100
@@ -27,9 +27,10 @@ interface SearchEventsParams {
 ### Examples
 
 ```typescript
-// Find errors (errors dataset is default)
+// Find errors
 search_events({
   organizationSlug: "my-org",
+  dataset: "errors",
   query: "database timeouts in checkout flow from last hour"
 })
 
@@ -152,6 +153,7 @@ find_errors({
 // After
 search_events({
   organizationSlug: "sentry",
+  dataset: "errors",
   query: "unresolved errors in checkout.js"
 })
 ```

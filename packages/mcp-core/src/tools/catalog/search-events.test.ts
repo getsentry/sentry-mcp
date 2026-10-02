@@ -2,6 +2,7 @@ import { mswServer } from "@sentry/mcp-server-mocks";
 import { APICallError, generateText } from "ai";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { UserInputError } from "../../errors";
 import searchEvents from "./search-events";
 
@@ -124,6 +125,24 @@ describe("search_events", () => {
     process.env.OPENROUTER_API_KEY = "";
     mockGenerateText.mockResolvedValue(mockAIResponse("errors"));
     mockValidEventsValidation();
+  });
+
+  it("requires a dataset so callers pick one up front", () => {
+    const schema = z.object(searchEvents.inputSchema);
+
+    expect(
+      schema.safeParse({
+        organizationSlug: "test-org",
+        query: "slowest api calls in the last 24 hours",
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        organizationSlug: "test-org",
+        dataset: "spans",
+        query: "slowest api calls in the last 24 hours",
+      }).success,
+    ).toBe(true);
   });
 
   it("falls back to the original query when the AI provider is unavailable", async () => {
@@ -1183,6 +1202,7 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        dataset: "errors",
         regionUrl: null,
         projectSlug: null,
         query: "slow request duration metrics",
@@ -1283,6 +1303,7 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        dataset: "errors",
         regionUrl: null,
         projectSlug: null,
         query: "recent metrics",
@@ -1370,6 +1391,7 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        dataset: "errors",
         regionUrl: null,
         projectSlug: null,
         query: "recent profiles for /api/users",
@@ -1441,6 +1463,7 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        dataset: "errors",
         regionUrl: null,
         projectSlug: null,
         query: "recent profiles for /api/users",
@@ -1511,6 +1534,7 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        dataset: "errors",
         regionUrl: null,
         projectSlug: null,
         query: "recent profiles for /api/users",
@@ -1566,6 +1590,7 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        dataset: "errors",
         regionUrl: null,
         projectSlug: null,
         query: "count profiles by release",
@@ -1639,6 +1664,7 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        dataset: "errors",
         regionUrl: null,
         projectSlug: null,
         query: "recent profiles for /api/users",
@@ -1713,6 +1739,7 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        dataset: "errors",
         regionUrl: null,
         projectSlug: null,
         query: "production checkout replays with errors in the last day",
@@ -1770,6 +1797,7 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        dataset: "errors",
         regionUrl: null,
         projectSlug: null,
         query: "checkout replays yesterday",
@@ -2016,6 +2044,7 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        dataset: "errors",
         regionUrl: null,
         projectSlug: null,
         query: "recent errors with geo-only user data",
@@ -2072,6 +2101,7 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        dataset: "errors",
         regionUrl: null,
         projectSlug: null,
         query: "logs with user geo",
@@ -2131,6 +2161,7 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        dataset: "errors",
         regionUrl: null,
         projectSlug: null,
         query: "spans with user geo",

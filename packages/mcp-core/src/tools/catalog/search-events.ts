@@ -1,6 +1,5 @@
 import { getActiveSpan, setTag } from "@sentry/core";
 import { z } from "zod";
-import { setOrganizationContext } from "../../telem/organization";
 import { UserInputError } from "../../errors";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { withProviderFallback } from "../../internal/agents/provider-fallback";
@@ -13,6 +12,7 @@ import {
   ParamRegionUrl,
 } from "../../schema";
 import { logWarn } from "../../telem/logging";
+import { setOrganizationContext } from "../../telem/organization";
 import { scrubSensitiveText } from "../../telem/sentry";
 import type { ServerContext } from "../../types";
 import {
@@ -395,7 +395,7 @@ export default defineTool({
     "- metrics: Metric rows and aggregates: counters, gauges, distributions, values",
     "- profiles: Transaction/continuous profile results, profile IDs, profiled transactions",
     "- replays: Session replay results: rage clicks, dead clicks, visited pages, replay users",
-    "If the user says logs, log messages, error logs, or warning logs, choose logs instead of errors.",
+    "Pick logs for log messages (incl. error/warning logs); spans for API/HTTP calls, DB queries, latency.",
     "",
     "Replay searches return replay lists only; replay count()/avg()/sum() are not supported.",
     "",
@@ -419,9 +419,8 @@ export default defineTool({
     organizationSlug: ParamOrganizationSlug,
     dataset: z
       .enum(SEARCH_EVENTS_DATASETS)
-      .optional()
       .describe(
-        "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. Always pass it, including for natural language queries. The agent may correct it when configured.",
+        "Dataset to search: errors, logs, spans, metrics, profiles, or replays. Pick the one that matches the question, including for natural language queries. The agent may correct it when configured.",
       ),
     query: z
       .string()
@@ -506,7 +505,7 @@ export default defineTool({
     setOrganizationContext(organizationSlug);
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
-    const inputDataset = params.dataset ?? "errors";
+    const inputDataset = params.dataset;
     const hasStructuredQuery = looksLikeSentrySearchSyntax(params.query);
     const canApplyEnvironmentFilter =
       inputDataset !== "replays" &&
@@ -532,14 +531,11 @@ export default defineTool({
     let timeSeries: { yAxis: string; interval: string | null } | null = null;
 
     const explicitSort = params.sort?.trim() || undefined;
-    const hasExplicitDataset = params.dataset !== undefined;
     const hasExplicitFields = hasFields(params.fields);
     const hasExplicitSort = explicitSort !== undefined;
     const hasExplicitPeriod = params.period !== undefined;
-    const hasExplicitTraceItemDataset =
-      hasExplicitDataset && isTraceItemDataset(inputDataset);
     const shouldTrustStructuredTraceSearch =
-      hasStructuredQuery && hasExplicitTraceItemDataset;
+      hasStructuredQuery && isTraceItemDataset(inputDataset);
     const environmentFilter = formatEnvironmentFilter(params.environment);
     const explicitStructuredTraceQuery = shouldTrustStructuredTraceSearch
       ? appendSearchFilter(params.query ?? "", environmentFilter)
@@ -551,8 +547,8 @@ export default defineTool({
     // (below) and to flag any requested environment that doesn't exist. Skipped
     // only when nothing references an environment — including a structured query
     // that skips the agent but puts `environment:` in the query string.
-    // Seer only translates into the dataset it is given, so it runs only when
-    // one is explicit. It only sees the natural language query, so skip it for
+    // Seer only translates into the dataset it is given, so it runs only for
+    // the datasets it has a strategy for. It only sees the natural language query, so skip it for
     // structured queries and explicit fields or sort, which the embedded agent
     // preserves. Like the UI, an explicit environment is added to Seer's query
     // afterwards.

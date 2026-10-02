@@ -198,7 +198,7 @@ This opens the MCP Inspector at `http://localhost:6274`
 1. **List Tools** - Verify expected tools appear
 2. **Call a tool** - Start with `execute_sentry_tool` using `name="whoami"` and `arguments={}`
 3. **Test with parameters** - Try `find_organizations()`
-4. **Test complex operations** - Try `search_events(query="errors in the last hour")`
+4. **Test complex operations** - Try `search_events(dataset="errors", query="errors in the last hour")`
 
 **Example test sequence:**
 ```
@@ -207,6 +207,7 @@ This opens the MCP Inspector at `http://localhost:6274`
 3. find_projects(organizationSlug="your-org")
 4. search_events(
      organizationSlug="your-org",
+     dataset="errors",
      query="errors from yesterday"
    )
 ```
@@ -483,7 +484,7 @@ OPENAI_API_KEY=your-key pnpm start --access-token=TOKEN
 
 # Test search_events and search_issues work
 # In MCP Inspector:
-# - Call search_events(query="errors in production")
+# - Call search_events(dataset="errors", query="errors in production")
 # - Call search_issues(query="unresolved crashes")
 ```
 
