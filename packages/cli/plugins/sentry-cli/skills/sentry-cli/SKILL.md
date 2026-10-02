@@ -541,6 +541,14 @@ Search and query current Sentry documentation
 
 → Full flags and examples: `references/docs.md`
 
+### Dsn
+
+Find Sentry DSNs
+
+- `sentry dsn list <org/project>` — List DSNs
+
+→ Full flags and examples: `references/dsn.md`
+
 ### Platform
 
 List valid Sentry platform identifiers
