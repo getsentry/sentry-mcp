@@ -60,3 +60,20 @@ sentry feedback view my-org/FRONTEND-2SDJ --web
 The detail view includes the complete message and, when available, its latest
 event, linked error, Session Replays, and attachment metadata. If the supplied
 ID belongs to another issue category, use `sentry issue view` instead.
+
+### Resolve User Feedback
+
+```bash
+# Resolve a Feedback item immediately
+sentry feedback resolve my-org/FRONTEND-2SDJ
+
+# Resolve the most recently active unresolved Feedback
+sentry feedback resolve my-org/@latest
+
+# Return the updated Feedback, or select specific fields
+sentry feedback resolve my-org/FRONTEND-2SDJ --json --fields id,shortId,status
+```
+
+`resolve` accepts the same IDs and URLs as `view` and reads the current state
+before selecting a Feedback item. It rejects other issue categories before
+making changes. JSON output contains the updated Feedback issue from Sentry.
