@@ -78,7 +78,7 @@ toolkit/
 │       │   │   ├── project/     # create, delete, list, view
 │       │   │   ├── react-native/# gradle, xcode
 │       │   │   ├── release/     # archive, create, delete, deploy, deploys, finalize, list, propose-version, restore, set-commits, view
-│       │   │   ├── replay/      # list, view
+│       │   │   ├── replay/      # download, list, view
 │       │   │   ├── repo/        # list
 │       │   │   ├── snapshots/   # diff, download, upload
 │       │   │   ├── sourcemap/   # inject, resolve, upload

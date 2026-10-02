@@ -340,6 +340,10 @@ export async function getReplayRecordingSegments(
     cursor = nextCursor;
   }
 
+  log.warn(
+    `Pagination limit reached (${MAX_PAGINATION_PAGES} pages, ${segments.length} segments). ` +
+      "The recording may be incomplete."
+  );
   return segments;
 }
 

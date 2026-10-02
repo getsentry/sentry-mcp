@@ -581,6 +581,7 @@ Search and inspect Session Replays
 
 - `sentry replay list <org/project>` — List recent Session Replays
 - `sentry replay view <replay-id-or-url...>` — View a Session Replay
+- `sentry replay download <replay-id-or-url...>` — Download a Session Replay as rrweb JSON
 
 → Full flags and examples: `references/replay.md`
 
