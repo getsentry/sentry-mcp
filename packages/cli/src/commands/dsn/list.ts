@@ -186,7 +186,14 @@ async function listForResolvedProjects<
     projectSearchResolution: ctx.projectSearchResolution,
   });
   if (resolution.targets.length === 0) {
-    throw new ContextError("Organization and project", USAGE_HINT);
+    throw new ContextError(
+      "Organization and project",
+      USAGE_HINT,
+      undefined,
+      resolution.skippedSelfHosted
+        ? `Found ${resolution.skippedSelfHosted} DSN(s) that could not be resolved — you may not have access to these projects`
+        : undefined
+    );
   }
 
   const limitRequests = pLimit(ORG_FANOUT_CONCURRENCY);

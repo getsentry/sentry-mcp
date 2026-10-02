@@ -329,6 +329,31 @@ describe("dsn list", () => {
     expect(previous).toMatchObject({ hasMore: true, hasPrev: false });
   });
 
+  test("explains when detected DSNs cannot be resolved", async () => {
+    setDefaultOrganization(null);
+    setDefaultProject(null);
+    await writeFile(
+      join(configDir(), ".env"),
+      `SENTRY_DSN=https://${"a".repeat(32)}@sentry.example.com/42\n`
+    );
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const url = new URL(new Request(input, init).url);
+      if (url.pathname === "/api/0/users/me/regions/") {
+        return response({ regions: [] });
+      }
+      expect(url.pathname).toBe("/api/0/projects/");
+      expect(url.searchParams.get("query")).toBe(`dsn:${"a".repeat(32)}`);
+      return response([]);
+    });
+    await expect(invoke()).rejects.toMatchObject({
+      name: "ContextError",
+      command: "sentry dsn list <org>/<project>",
+      message: expect.stringContaining(
+        "Found 1 DSN(s) that could not be resolved — you may not have access to these projects"
+      ),
+    });
+  });
+
   test.each([
     false,
     true,
