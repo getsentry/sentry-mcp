@@ -52,6 +52,13 @@ export function formatReopenedFeedback(feedback: SentryIssue): string {
   );
 }
 
+/** Confirm spam using the updated Feedback's terminal-safe identifier. */
+export function formatSpamFeedback(feedback: SentryIssue): string {
+  return renderMarkdown(
+    `Marked feedback ${feedbackCodeSpan(feedback.shortId)} as spam.`
+  );
+}
+
 /** Remove terminal controls while preserving intentional message line breaks. */
 function sanitizeFeedbackText(value: string): string {
   return stripAnsi(value)

@@ -355,12 +355,14 @@ export const apiRoutes: MockRoute[] = [
       }
       const body = await req.json();
       if (
-        !["resolved", "unresolved"].includes(body.status) ||
+        !["resolved", "unresolved", "ignored"].includes(body.status) ||
         Object.keys(body).length !== 1
       ) {
         return {
           status: 400,
-          body: { detail: "Expected only a resolved or unresolved status" },
+          body: {
+            detail: "Expected only a resolved, unresolved, or ignored status",
+          },
         };
       }
       return { body: { ...feedbackFixture, status: body.status } };

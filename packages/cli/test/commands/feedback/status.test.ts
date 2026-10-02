@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { resolveCommand } from "../../../src/commands/feedback/resolve.js";
+import { spamCommand } from "../../../src/commands/feedback/spam.js";
 import { unresolveCommand } from "../../../src/commands/feedback/unresolve.js";
 import { ApiError } from "../../../src/lib/errors.js";
 import { resetCacheState } from "../../../src/lib/response-cache.js";
@@ -48,6 +49,11 @@ function createMockContext() {
   };
 }
 
+afterEach(() => {
+  vi.resetAllMocks();
+  resetCacheState();
+});
+
 describe.each([
   {
     name: "resolve",
@@ -61,6 +67,12 @@ describe.each([
     status: "unresolved",
     previousStatus: "resolved",
   },
+  {
+    name: "spam",
+    command: spamCommand,
+    status: "ignored",
+    previousStatus: "unresolved",
+  },
 ] as const)("feedback $name", ({ name, command, status, previousStatus }) => {
   beforeEach(() => {
     vi.mocked(resolveIssue).mockResolvedValue({
@@ -72,11 +84,6 @@ describe.each([
       status,
       metadata: { message: "Updated by the server" },
     });
-  });
-
-  afterEach(() => {
-    vi.resetAllMocks();
-    resetCacheState();
   });
 
   test("updates the checked Feedback and emits the server response as JSON", async () => {
@@ -129,4 +136,23 @@ describe.each([
     ).rejects.toBe(error);
     expect(output()).toBe("");
   });
+});
+
+test("feedback unresolve restores Feedback marked as spam", async () => {
+  vi.mocked(resolveIssue).mockResolvedValue({
+    org: "test-org",
+    issue: { ...feedback(), status: "ignored" },
+  });
+  vi.mocked(updateIssueStatus).mockResolvedValue(feedback());
+  const { context, output } = createMockContext();
+  const func = await unresolveCommand.loader();
+
+  await func.call(context, { json: true }, "TEST-PROJECT-1A");
+
+  expect(updateIssueStatus).toHaveBeenCalledExactlyOnceWith(
+    "123",
+    "unresolved",
+    { orgSlug: "test-org" }
+  );
+  expect(JSON.parse(output())).toEqual(feedback());
 });

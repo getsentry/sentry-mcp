@@ -1,30 +1,31 @@
 /**
- * Reopen modern User Feedback through the Issues API after checking its category.
+ * Move modern User Feedback to spam through the Issues API after checking its category.
  */
 
 import type { SentryContext } from "../../context.js";
 import { updateIssueStatus } from "../../lib/api-client.js";
 import { buildCommand } from "../../lib/command.js";
-import { formatReopenedFeedback } from "../../lib/formatters/feedback.js";
+import { formatSpamFeedback } from "../../lib/formatters/feedback.js";
 import { CommandOutput } from "../../lib/formatters/output.js";
 import { disableResponseCache } from "../../lib/response-cache.js";
 import { SentryFeedbackSchema } from "../../types/index.js";
 import { feedbackIdPositional, resolveFeedback } from "./utils.js";
 
-export const unresolveCommand = buildCommand({
+export const spamCommand = buildCommand({
   docs: {
-    brief: "Return User Feedback to the inbox",
+    brief: "Mark User Feedback as spam",
     fullDescription:
-      "Mark a User Feedback item as unresolved. Reopen resolved Feedback or restore it from spam.\n\n" +
+      "Move a User Feedback item to the spam mailbox.\n\n" +
       "Accepts the same IDs and URLs as sentry feedback view. Other issue categories are rejected before any changes are made.\n\n" +
-      "Use sentry feedback list --status resolved or --status spam to find Feedback to return to the inbox.\n\n" +
+      "Sentry stores spam Feedback with status ignored. Use sentry feedback unresolve <feedback> to return it to the unresolved inbox.\n\n" +
       "Examples:\n" +
-      "  sentry feedback unresolve FRONTEND-2SDJ\n" +
-      "  sentry feedback reopen FRONTEND-2SDJ\n" +
-      "  sentry feedback unresolve my-org/FRONTEND-2SDJ",
+      "  sentry feedback spam FRONTEND-2SDJ\n" +
+      "  sentry feedback spam my-org/FRONTEND-2SDJ\n" +
+      "  sentry feedback list --status spam\n" +
+      "  sentry feedback unresolve FRONTEND-2SDJ",
   },
   output: {
-    human: formatReopenedFeedback,
+    human: formatSpamFeedback,
     schema: SentryFeedbackSchema,
   },
   parameters: {
@@ -35,9 +36,9 @@ export const unresolveCommand = buildCommand({
     const { org, feedback } = await resolveFeedback(
       feedbackArg,
       this.cwd,
-      "unresolve"
+      "spam"
     );
-    const updated = await updateIssueStatus(feedback.id, "unresolved", {
+    const updated = await updateIssueStatus(feedback.id, "ignored", {
       orgSlug: org,
     });
 

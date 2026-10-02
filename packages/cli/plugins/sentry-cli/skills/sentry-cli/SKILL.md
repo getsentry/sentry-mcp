@@ -625,7 +625,8 @@ Manage User Feedback
 - `sentry feedback list <org/project>` — List and search User Feedback
 - `sentry feedback view <feedback>` — View a User Feedback item
 - `sentry feedback resolve <feedback>` — Mark User Feedback as resolved
-- `sentry feedback unresolve <feedback>` — Reopen resolved User Feedback
+- `sentry feedback unresolve <feedback>` — Return User Feedback to the inbox
+- `sentry feedback spam <feedback>` — Mark User Feedback as spam
 
 → Full flags and examples: `references/feedback.md`
 
