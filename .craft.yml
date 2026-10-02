@@ -1,10 +1,12 @@
-minVersion: '2.29.0'
+minVersion: '2.32.0'
 workspaces:
   packages/cli:
     changelog:
-      # CLI notes must cover CLI changes, not every MCP commit in the monorepo.
-      policy: simple
+      policy: auto
       filePath: packages/cli/CHANGELOG.md
+      # The CLI release also ships the documentation workspace.
+      includePaths:
+        - apps/cli-docs
     versioning:
       policy: auto
     preReleaseCommand: bash -c 'cd packages/cli && node --experimental-strip-types script/bump-version.ts --pre'
