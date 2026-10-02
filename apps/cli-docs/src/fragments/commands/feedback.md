@@ -77,3 +77,27 @@ sentry feedback resolve my-org/FRONTEND-2SDJ --json --fields id,shortId,status
 `resolve` accepts the same IDs and URLs as `view` and reads the current state
 before selecting a Feedback item. It rejects other issue categories before
 making changes. JSON output contains the updated Feedback issue from Sentry.
+
+### Reopen User Feedback
+
+```bash
+# Find resolved Feedback
+sentry feedback list --status resolved
+
+# Reopen a Feedback item using its short ID or numeric ID
+sentry feedback unresolve FRONTEND-2SDJ
+sentry feedback unresolve 5146636313
+
+# `reopen` is an alias for `unresolve`
+sentry feedback reopen FRONTEND-2SDJ
+
+# Specify an organization explicitly when needed
+sentry feedback unresolve my-org/FRONTEND-2SDJ
+
+# Return selected fields from the updated Feedback
+sentry feedback unresolve FRONTEND-2SDJ --json --fields id,shortId,status
+```
+
+`unresolve` marks Feedback as `unresolved`, using the same identifier resolution
+and category check as `resolve`. Other issue categories are rejected before
+making changes. JSON output contains the updated Feedback issue from Sentry.

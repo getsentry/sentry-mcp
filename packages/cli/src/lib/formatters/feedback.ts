@@ -45,6 +45,13 @@ export function formatResolvedFeedback(feedback: SentryIssue): string {
   );
 }
 
+/** Confirm reopening using the updated Feedback's terminal-safe identifier. */
+export function formatReopenedFeedback(feedback: SentryIssue): string {
+  return renderMarkdown(
+    `Reopened feedback ${feedbackCodeSpan(feedback.shortId)}.`
+  );
+}
+
 /** Remove terminal controls while preserving intentional message line breaks. */
 function sanitizeFeedbackText(value: string): string {
   return stripAnsi(value)

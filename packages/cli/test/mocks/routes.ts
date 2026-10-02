@@ -354,13 +354,16 @@ export const apiRoutes: MockRoute[] = [
         return { status: 404, body: notFoundFixture };
       }
       const body = await req.json();
-      if (body.status !== "resolved" || Object.keys(body).length !== 1) {
+      if (
+        !["resolved", "unresolved"].includes(body.status) ||
+        Object.keys(body).length !== 1
+      ) {
         return {
           status: 400,
-          body: { detail: "Expected only the resolved status" },
+          body: { detail: "Expected only a resolved or unresolved status" },
         };
       }
-      return { body: { ...feedbackFixture, status: "resolved" } };
+      return { body: { ...feedbackFixture, status: body.status } };
     },
   },
   {

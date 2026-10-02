@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import {
   formatFeedbackList,
   formatFeedbackView,
+  formatReopenedFeedback,
   formatResolvedFeedback,
 } from "../../../src/lib/formatters/feedback.js";
 import type { SentryFeedback } from "../../../src/types/index.js";
@@ -41,13 +42,16 @@ afterAll(() => {
   }
 });
 
-describe("formatResolvedFeedback", () => {
+describe.each([
+  { format: formatResolvedFeedback, action: "Resolved" },
+  { format: formatReopenedFeedback, action: "Reopened" },
+])("$action feedback", ({ format, action }) => {
   test("renders a terminal-safe confirmation", () => {
-    const output = formatResolvedFeedback(
+    const output = format(
       feedback({ shortId: "\x1b[31mWEB-1\x1b[0m\n\u202e" })
     );
 
-    expect(output).toContain("Resolved feedback");
+    expect(output).toContain(`${action} feedback`);
     expect(output).toContain("WEB-1");
     expect(output).not.toContain("\x1b");
     expect(output).not.toContain("\u202e");
