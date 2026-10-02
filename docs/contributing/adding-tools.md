@@ -318,7 +318,7 @@ pnpm eval your-tool
 
 ## Agent-in-Tool Pattern
 
-Some tools (`search_events`, `search_issue_events`, and `search_issues`) embed
+Some tools (the dataset search tools such as `search_errors`, plus `search_issue_events` and `search_issues`) embed
 AI agents to normalize search parameters before the handler calls Sentry. Treat
 the agent as a repair step for a structured request, not only as a natural
 language query translator. The agent may rewrite the query string, but it may

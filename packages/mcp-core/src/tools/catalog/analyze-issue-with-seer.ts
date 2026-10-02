@@ -70,7 +70,7 @@ export default defineTool({
     "",
     "<hints>",
     "- Only use when the user explicitly requests analysis or you cannot determine the root cause from issue details alone",
-    "- Seer Autofix does not support metric alert issues (issueCategory: metric); use get_issue_details and search_events instead",
+    "- Seer Autofix does not support metric alert issues (issueCategory: metric); use get_issue_details and search_metrics or search_traces instead",
     "- If the user provides an issueUrl, extract it and use that parameter alone",
     "- The analysis includes actual code snippets and fixes, not just error descriptions",
     "- Results are cached - subsequent calls return instantly",

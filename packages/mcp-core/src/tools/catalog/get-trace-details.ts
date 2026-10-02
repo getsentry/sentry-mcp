@@ -75,8 +75,8 @@ export default defineTool({
     "- Want an overview first, then a guided pivot into additional spans or events",
     "",
     "DO NOT USE for:",
-    "- General searching for traces (use search_events with trace queries)",
-    "- Complete span enumeration or branch-by-branch reconstruction (use search_events scoped to the trace)",
+    "- General searching for traces (use search_traces)",
+    "- Complete span enumeration or branch-by-branch reconstruction (use search_traces scoped to the trace)",
     "",
     "TRIGGER PATTERNS:",
     "- 'Show me trace abc123' → use get_trace_details",
@@ -99,7 +99,7 @@ export default defineTool({
     "- Trace IDs are 32-character hexadecimal strings",
     "- This returns a condensed trace overview, not a full span dump",
     "- Provide `spanId` to focus on a single span within the trace",
-    "- If the response says it shows a subset of spans, use search_events to inspect the rest of the trace",
+    "- If the response says it shows a subset of spans, use search_traces to inspect the rest of the trace",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -1248,15 +1248,17 @@ function buildTraceNextSteps({
 }): string[] {
   const formatSearchStep = ({
     label,
+    toolName,
     arguments: args,
     fallbackInstruction,
   }: {
     label: string;
+    toolName: "search_traces" | "search_errors" | "search_logs";
     arguments: Record<string, string>;
     fallbackInstruction: string;
   }) =>
     `- **${label}**: ${formatToolCallInstruction({
-      toolName: "search_events",
+      toolName,
       arguments: {
         organizationSlug,
         ...args,
@@ -1275,6 +1277,7 @@ function buildTraceNextSteps({
     return [
       formatSearchStep({
         label: "Search spans",
+        toolName: "search_traces",
         arguments: {
           query: spanQuery,
         },
@@ -1282,6 +1285,7 @@ function buildTraceNextSteps({
       }),
       formatSearchStep({
         label: "Search errors",
+        toolName: "search_errors",
         arguments: {
           query: `show error events from trace ${traceId}`,
         },
@@ -1289,6 +1293,7 @@ function buildTraceNextSteps({
       }),
       formatSearchStep({
         label: "Search logs",
+        toolName: "search_logs",
         arguments: {
           query: `show logs from trace ${traceId}`,
         },
@@ -1300,24 +1305,24 @@ function buildTraceNextSteps({
   return [
     formatSearchStep({
       label: "Search spans",
+      toolName: "search_traces",
       arguments: {
-        dataset: "spans",
         query: `trace:${traceId}`,
       },
       fallbackInstruction: "Span search is not available in this session",
     }),
     formatSearchStep({
       label: "Search errors",
+      toolName: "search_errors",
       arguments: {
-        dataset: "errors",
         query: `trace:${traceId}`,
       },
       fallbackInstruction: "Error search is not available in this session",
     }),
     formatSearchStep({
       label: "Search logs",
+      toolName: "search_logs",
       arguments: {
-        dataset: "logs",
         query: `trace:${traceId}`,
       },
       fallbackInstruction: "Log search is not available in this session",

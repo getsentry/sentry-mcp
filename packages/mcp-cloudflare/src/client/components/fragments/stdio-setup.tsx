@@ -47,7 +47,9 @@ export default function StdioSetup() {
         </p>
         <p>
           <strong>AI-powered search:</strong> If you want the
-          <code>search_events</code> and <code>search_issues</code> tools to
+          event search tools (<code>search_errors</code>,{" "}
+          <code>search_traces</code>, <code>search_logs</code>, and so on) and{" "}
+          <code>search_issues</code> to
           translate natural language queries, add an
           <code>OPENAI_API_KEY</code> next to your Sentry token. The rest of the
           MCP server works without it, so you can skip this step if you do not
@@ -113,7 +115,8 @@ export default function StdioSetup() {
               </dt>
               <dd className="text-slate-300">
                 Optional for the standard tools, but required for the AI-powered
-                search tools (<code>search_events</code> /{" "}
+                search tools (<code>search_errors</code>,{" "}
+                <code>search_traces</code>, <code>search_logs</code>, etc. and{" "}
                 <code>search_issues</code>). When unset, those tools stay hidden
                 but everything else works as usual.
               </dd>

@@ -282,7 +282,7 @@ export default defineTool({
           "- Profiling may not be enabled for this project",
           "",
           "**Suggestions:**",
-          "- Verify the exact transaction name using search_events",
+          "- Verify the exact transaction name using search_traces",
           "- Check if profiling is enabled for this project",
         ].join("\n");
       }
@@ -343,7 +343,7 @@ export default defineTool({
         "- Transaction may not have been executed recently",
         "",
         "**Suggestions:**",
-        "- Verify the exact transaction name using search_events",
+        "- Verify the exact transaction name using search_traces",
         "- Try a longer time period (e.g., '30d')",
         "- Check if profiling is enabled for this project",
       ].join("\n");

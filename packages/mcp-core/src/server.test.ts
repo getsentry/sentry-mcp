@@ -120,9 +120,14 @@ const DEFAULT_DIRECT_TOOL_NAMES = [
   "find_organizations",
   "find_projects",
   "get_sentry_resource",
-  "search_events",
+  "search_errors",
   "search_issues",
+  "search_logs",
+  "search_metrics",
+  "search_profiles",
+  "search_replays",
   "search_sentry_tools",
+  "search_traces",
   "update_issue",
 ].sort();
 
