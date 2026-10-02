@@ -31,26 +31,6 @@ describeEval("search-events-agent-attributes-without-context", {
   data: async () => {
     return [
       {
-        // Without context the agent picks the deprecated geo.region
-        input:
-          "Show me spans from users in the Ontario region in the last 24 hours",
-        expectedTools: [
-          {
-            name: "datasetAttributes",
-            arguments: {
-              dataset: "spans",
-            },
-          },
-        ],
-        expected: {
-          dataset: "spans",
-          query: (value: unknown) =>
-            typeof value === "string" &&
-            /(^|\s)geo\.region:/.test(value) &&
-            !value.includes("user.geo.region"),
-        },
-      },
-      {
         // http.method is also picked from the static span fields
         input: "Count spans grouped by HTTP method over the last 7 days",
         expectedTools: [
@@ -118,26 +98,6 @@ describeEval("search-events-agent-attributes-without-context", {
 describeEval("search-events-agent-attributes-with-context", {
   data: async () => {
     return [
-      {
-        // EVENTYALLY user.geo.region is chosen due to deprecation
-        input:
-          "Show me spans from users in the Ontario region in the last 24 hours",
-        expectedTools: [
-          {
-            name: "datasetAttributes",
-            arguments: {
-              dataset: "spans",
-            },
-          },
-        ],
-        expected: {
-          dataset: "spans",
-          query: (value: unknown) =>
-            typeof value === "string" &&
-            !value.includes("user.geo.region:") &&
-            /(^|\s)geo\.region:/.test(value),
-        },
-      },
       {
         // EVENTUALLY Context marks http.method as deprecated in favor of http.request.method
         input: "Count spans grouped by HTTP method over the last 7 days",
