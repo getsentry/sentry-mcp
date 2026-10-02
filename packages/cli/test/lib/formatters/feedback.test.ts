@@ -9,6 +9,7 @@ import {
   formatFeedbackView,
   formatReopenedFeedback,
   formatResolvedFeedback,
+  formatSpamFeedback,
 } from "../../../src/lib/formatters/feedback.js";
 import type { SentryFeedback } from "../../../src/types/index.js";
 
@@ -45,6 +46,7 @@ afterAll(() => {
 describe.each([
   { format: formatResolvedFeedback, action: "Resolved" },
   { format: formatReopenedFeedback, action: "Reopened" },
+  { format: formatSpamFeedback, action: "Marked" },
 ])("$action feedback", ({ format, action }) => {
   test("renders a terminal-safe confirmation", () => {
     const output = format(

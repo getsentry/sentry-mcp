@@ -7,6 +7,7 @@
 import { buildRouteMap } from "../../lib/route-map.js";
 import { listCommand } from "./list.js";
 import { resolveCommand } from "./resolve.js";
+import { spamCommand } from "./spam.js";
 import { unresolveCommand } from "./unresolve.js";
 import { viewCommand } from "./view.js";
 
@@ -16,6 +17,7 @@ export const feedbackRoute = buildRouteMap({
     view: viewCommand,
     resolve: resolveCommand,
     unresolve: unresolveCommand,
+    spam: spamCommand,
   },
   aliases: { reopen: "unresolve" },
   defaultCommand: "view",
@@ -27,7 +29,8 @@ export const feedbackRoute = buildRouteMap({
       "  list       List and search feedback\n" +
       "  view       View feedback with its latest event context\n" +
       "  resolve    Mark feedback as resolved\n" +
-      "  unresolve  Reopen resolved feedback (alias: reopen)",
+      "  unresolve  Return feedback to the inbox (alias: reopen)\n" +
+      "  spam       Mark feedback as spam",
     hideRoute: {},
   },
 });
