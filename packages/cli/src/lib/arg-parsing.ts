@@ -48,6 +48,64 @@ function looksLikeDisplayName(input: string): boolean {
   return input.includes(" ");
 }
 
+/**
+ * Split a project selector on commas.
+ *
+ * Sentry slugs cannot contain commas, so `org/web,api,worker` is unambiguous.
+ * Trims whitespace, drops empty tokens, and de-duplicates while preserving
+ * first-seen order.
+ *
+ * @param rawProject - Raw project selector, potentially containing commas
+ * @returns A non-empty list of unique project slugs in input order
+ * @throws {ValidationError} When every token is empty (`org/,,,`)
+ */
+function splitProjectSelector(rawProject: string): [string, ...string[]] {
+  const [first, ...rest] = [
+    ...new Set(rawProject.split(",").map((part) => part.trim())),
+  ].filter((slug) => slug !== "");
+  if (first === undefined) {
+    throw new ValidationError(
+      "Invalid project slug: comma-separated list is empty.",
+      "project"
+    );
+  }
+  return [first, ...rest];
+}
+
+/**
+ * Project slugs from an explicit `org/project` parse.
+ *
+ * A single slug stays on {@link ParsedOrgProject}'s `project` field. A
+ * comma-separated list also sets `projects` (including the first slug).
+ *
+ * @param parsed - Explicit project target returned by {@link parseOrgProjectArg}
+ * @returns A non-empty list containing the selected project slugs
+ */
+export function explicitProjectSlugs(
+  parsed: Extract<ParsedOrgProject, { type: "explicit" }>
+): [string, ...string[]] {
+  return parsed.projects ?? [parsed.project];
+}
+
+/**
+ * Format an explicit target back into its positional form.
+ *
+ * Used for titles, pagination hints, and cursor context keys so every
+ * surface renders `org/web,api` (or `org/` for org-wide) identically.
+ *
+ * @param org - Organization slug
+ * @param projects - Project slugs; omit or pass an empty list for `org/`
+ * @returns `org/a,b` for a project list, or `org/` without projects
+ */
+export function formatProjectTarget(
+  org: string,
+  projects?: readonly string[]
+): string {
+  return projects && projects.length > 0
+    ? `${org}/${projects.join(",")}`
+    : `${org}/`;
+}
+
 // ---------------------------------------------------------------------------
 // Issue short ID detection
 // ---------------------------------------------------------------------------
@@ -537,6 +595,13 @@ export type ParsedOrgProject =
       type: typeof ProjectSpecificationType.Explicit;
       org: string;
       project: string;
+      /**
+       * All project slugs when the user passed a comma-separated list
+       * (`org/web,api`). Includes {@link project} as the first element and
+       * always holds at least two slugs. Absent for a single slug so existing
+       * equality checks stay stable.
+       */
+      projects?: [string, string, ...string[]];
       /** True if any slug was normalized */
       normalized?: boolean;
     }
@@ -679,7 +744,10 @@ function rejectAtSelector(value: string, label: string): void {
  * Applies {@link normalizeSlug} to both components and validates against
  * URL injection characters.
  */
-function parseSlashOrgProject(input: string): ParsedOrgProject {
+function parseSlashOrgProject(
+  input: string,
+  allowProjectList: boolean
+): ParsedOrgProject {
   const slashIndex = input.indexOf("/");
   const rawOrg = input.slice(0, slashIndex);
   const rawProject = input.slice(slashIndex + 1);
@@ -722,7 +790,11 @@ function parseSlashOrgProject(input: string): ParsedOrgProject {
     };
   }
 
-  // "sentry/cli" → explicit org and project
+  // "sentry/web,api,worker" for list commands that explicitly opt in
+  if (allowProjectList && rawProject.includes(",")) {
+    return parseExplicitProjectList(no, rawProject);
+  }
+
   rejectAtSelector(rawProject, "project slug");
   if (looksLikeDisplayName(rawProject)) {
     // Spaces → display name, not a slug. Skip slug validation and let the
@@ -736,13 +808,65 @@ function parseSlashOrgProject(input: string): ParsedOrgProject {
       org: no.slug,
     };
   }
-  const np = normalizeSlug(rawProject);
-  validateResourceId(np.slug, "project slug");
+  const np = validateProjectSlugToken(rawProject);
   const normalized = no.normalized || np.normalized;
   return {
     type: "explicit",
     org: no.slug,
     project: np.slug,
+    ...(normalized && { normalized: true }),
+  };
+}
+
+/**
+ * Validate one project slug token: reject `@` selectors, normalize, and
+ * check for URL-injection characters. Shared by the single-slug and
+ * comma-list explicit paths.
+ */
+function validateProjectSlugToken(token: string): {
+  slug: string;
+  normalized: boolean;
+} {
+  rejectAtSelector(token, "project slug");
+  const np = normalizeSlug(token);
+  validateResourceId(np.slug, "project slug");
+  return np;
+}
+
+/**
+ * Parse `org/web,api,worker` into an explicit target with `projects` set.
+ *
+ * Display names are rejected here: a comma list is a slug selector, not a
+ * search. Each token is validated independently so a bad slug fails at parse
+ * time instead of as a 404 against the concatenated string.
+ */
+function parseExplicitProjectList(
+  org: { slug: string; normalized: boolean },
+  rawProject: string
+): ParsedOrgProject {
+  const [firstToken, ...restTokens] = splitProjectSelector(rawProject);
+  if ([firstToken, ...restTokens].some(looksLikeDisplayName)) {
+    throw new ValidationError(
+      "Comma-separated project targets must be slugs, not display names.",
+      "project"
+    );
+  }
+
+  const first = validateProjectSlugToken(firstToken);
+  const rest = restTokens.map(validateProjectSlugToken);
+  const normalized =
+    org.normalized ||
+    first.normalized ||
+    rest.some((token) => token.normalized);
+  const [second, ...others] = rest;
+
+  return {
+    type: "explicit",
+    org: org.slug,
+    project: first.slug,
+    ...(second !== undefined && {
+      projects: [first.slug, second.slug, ...others.map((t) => t.slug)],
+    }),
     ...(normalized && { normalized: true }),
   };
 }
@@ -754,21 +878,31 @@ function parseSlashOrgProject(input: string): ParsedOrgProject {
  * - `undefined` or empty → auto-detect from DSN/config
  * - `https://sentry.io/organizations/org/...` → extract from Sentry URL
  * - `sentry/cli` → explicit org and project
+ * - `sentry/web,api` → explicit org and multiple projects when
+ *   `options.allowProjectList` is true
  * - `sentry/` → org with all projects
  * - `/cli` → search for project across all orgs (leading slash)
  * - `cli` → search for project across all orgs
  *
  * @param arg - Input string from CLI positional argument
+ * @param options.allowProjectList - Parse comma-separated project slugs after
+ *   the org. Only commands that can query multiple projects together should
+ *   enable it.
  * @returns Parsed result with type discrimination
  *
  * @example
  * parseOrgProjectArg(undefined)     // { type: "auto-detect" }
  * parseOrgProjectArg("sentry/cli")  // { type: "explicit", org: "sentry", project: "cli" }
+ * parseOrgProjectArg("sentry/web,api", { allowProjectList: true })
+ * // { type: "explicit", ..., projects: ["web","api"] }
  * parseOrgProjectArg("sentry/")     // { type: "org-all", org: "sentry" }
  * parseOrgProjectArg("/cli")        // { type: "project-search", projectSlug: "cli" }
  * parseOrgProjectArg("cli")         // { type: "project-search", projectSlug: "cli" }
  */
-export function parseOrgProjectArg(arg: string | undefined): ParsedOrgProject {
+export function parseOrgProjectArg(
+  arg: string | undefined,
+  options: { allowProjectList?: boolean } = {}
+): ParsedOrgProject {
   if (!arg || arg.trim() === "") {
     return { type: "auto-detect" };
   }
@@ -784,7 +918,7 @@ export function parseOrgProjectArg(arg: string | undefined): ParsedOrgProject {
 
   let parsed: ParsedOrgProject;
   if (trimmed.includes("/")) {
-    parsed = parseSlashOrgProject(trimmed);
+    parsed = parseSlashOrgProject(trimmed, options.allowProjectList === true);
   } else {
     // No slash → search for project across all orgs
     rejectAtSelector(trimmed, "project slug");
