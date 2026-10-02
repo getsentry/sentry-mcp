@@ -46,6 +46,7 @@ const {
 
 import { setAuthToken } from "../../../src/lib/db/auth.js";
 import { setOrgRegion } from "../../../src/lib/db/regions.js";
+import { EXIT } from "../../../src/lib/errors.js";
 import type { SentryDeploy, SentryRelease } from "../../../src/types/index.js";
 import { mockFetch, useTestConfigDir } from "../../helpers.js";
 
@@ -344,6 +345,36 @@ describe("setCommitsAuto", () => {
     await expect(setCommitsAuto("test-org", "1.0.0", "/tmp")).rejects.toThrow(
       /No repository integrations/
     );
+  });
+
+  test.each([
+    {},
+    "unexpected response",
+    null,
+  ])("rejects a non-array repository response (%j) before updating the release", async (body) => {
+    const requests: { method: string; pathname: string }[] = [];
+    globalThis.fetch = mockFetch(async (input, init) => {
+      const request = new Request(input!, init);
+      requests.push({
+        method: request.method,
+        pathname: new URL(request.url).pathname,
+      });
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    await expect(
+      setCommitsAuto("test-org", "1.0.0", "/tmp")
+    ).rejects.toMatchObject({
+      name: "ApiError",
+      exitCode: EXIT.API,
+      message: "Failed to list repositories: unexpected response format",
+    });
+    expect(requests).toEqual([
+      { method: "GET", pathname: "/api/0/organizations/test-org/repos/" },
+    ]);
   });
 
   test("throws ValidationError when no repo matches local remote", async () => {
