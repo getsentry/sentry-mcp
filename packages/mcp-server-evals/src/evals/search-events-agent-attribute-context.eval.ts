@@ -134,8 +134,8 @@ describeEval("search-events-agent-attributes-with-context", {
           dataset: "spans",
           query: (value: unknown) =>
             typeof value === "string" &&
-            value.includes("user.geo.region:") &&
-            !/(^|\s)geo\.region:/.test(value),
+            !value.includes("user.geo.region:") &&
+            /(^|\s)geo\.region:/.test(value),
         },
       },
       {
