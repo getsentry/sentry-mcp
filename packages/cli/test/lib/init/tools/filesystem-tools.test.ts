@@ -49,6 +49,21 @@ describe("filesystem tools", () => {
     expect(result.error).toContain("outside project directory");
   });
 
+  test("returns a failed tool result when a directory cannot be read", async () => {
+    const result = await executeTool(
+      {
+        type: "tool",
+        operation: "list-dir",
+        cwd: testDir,
+        params: { path: "does-not-exist" },
+      },
+      makeContext(testDir)
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("ENOENT");
+  });
+
   test("lists and precomputes directory contents", async () => {
     fs.writeFileSync(path.join(testDir, "index.ts"), "export {};\n");
     fs.mkdirSync(path.join(testDir, "src"));
