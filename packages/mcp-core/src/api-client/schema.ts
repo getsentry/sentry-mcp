@@ -1076,6 +1076,7 @@ const EventTagsSchema = z.preprocess((value) => {
 
 const BaseEventSchema = z.object({
   id: z.string(),
+  packages: z.record(z.string(), z.string().nullable()).nullish(),
   groupID: z.string().nullable().optional(),
   title: z.string(),
   message: z.string().nullable(),
