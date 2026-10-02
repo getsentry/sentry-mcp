@@ -78,8 +78,9 @@ export async function listRepositoriesPaginated(
   if (!Array.isArray(paginated.data)) {
     throw new ApiError(
       "Failed to list repositories: unexpected response format",
-      0,
-      "Expected the repositories endpoint to return an array. Check the configured Sentry URL and the endpoint response."
+      result.response.status,
+      "Expected the repositories endpoint to return an array. Check the configured Sentry URL and the endpoint response.",
+      new URL(result.request.url).pathname
     );
   }
   return paginated;
