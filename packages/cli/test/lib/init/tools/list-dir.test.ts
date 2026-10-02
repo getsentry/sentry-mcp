@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { listDir } from "../../../../src/lib/init/tools/list-dir.js";
 import type {
   DirEntry,
+  DirectoryScanMetadata,
   ListDirPayload,
 } from "../../../../src/lib/init/types.js";
 
@@ -31,6 +32,15 @@ function entriesOf(result: Awaited<ReturnType<typeof listDir>>): DirEntry[] {
     throw new Error(`expected listDir to succeed, got: ${result.error}`);
   }
   return (result.data as { entries: DirEntry[] }).entries;
+}
+
+function metadataOf(
+  result: Awaited<ReturnType<typeof listDir>>
+): DirectoryScanMetadata {
+  if (!result.ok) {
+    throw new Error(`expected listDir to succeed, got: ${result.error}`);
+  }
+  return (result.data as { metadata: DirectoryScanMetadata }).metadata;
 }
 
 describe("listDir", () => {
@@ -241,10 +251,35 @@ describe("listDir", () => {
       writeFileSync(join(testDir, `f${i.toString().padStart(2, "0")}.ts`), "");
     }
 
-    const entries = entriesOf(
-      await listDir(makePayload(testDir, { path: ".", maxEntries: 5 }))
+    const result = await listDir(
+      makePayload(testDir, { path: ".", maxEntries: 5 })
     );
+    const entries = entriesOf(result);
     expect(entries).toHaveLength(5);
+    expect(metadataOf(result).truncated).toBe(true);
+  });
+
+  test("reports why directory contents were omitted", async () => {
+    mkdirSync(join(testDir, ".private"));
+    mkdirSync(join(testDir, "node_modules"));
+    mkdirSync(join(testDir, "src"));
+
+    const result = await listDir(
+      makePayload(testDir, {
+        path: ".",
+        recursive: true,
+        maxDepth: 0,
+      })
+    );
+
+    expect(metadataOf(result)).toEqual({
+      truncated: false,
+      omittedDirectories: expect.arrayContaining([
+        { path: ".private", reason: "hidden" },
+        { path: "node_modules", reason: "excluded" },
+        { path: "src", reason: "max-depth" },
+      ]),
+    });
   });
 
   test("throws on sandbox escape via `..`", async () => {

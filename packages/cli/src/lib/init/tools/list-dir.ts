@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DEFAULT_SKIP_DIRS, normalizePath } from "../../scan/index.js";
-import type { DirEntry, ListDirPayload, ToolResult } from "../types.js";
+import type {
+  DirEntry,
+  ListDirPayload,
+  OmittedDirectoryReason,
+  ToolResult,
+} from "../types.js";
 import { safePath } from "./shared.js";
 import type { InitToolDefinition } from "./types.js";
 
@@ -35,11 +40,22 @@ export async function listDir(payload: ListDirPayload): Promise<ToolResult> {
     entries: [],
     maxDepth,
     maxEntries,
+    omittedDirectories: [],
     recursive,
+    truncated: false,
   };
 
   await walkDirectory(targetPath, 0, state);
-  return { ok: true, data: { entries: state.entries } };
+  return {
+    ok: true,
+    data: {
+      entries: state.entries,
+      metadata: {
+        truncated: state.truncated,
+        omittedDirectories: state.omittedDirectories,
+      },
+    },
+  };
 }
 
 type WalkState = {
@@ -48,7 +64,12 @@ type WalkState = {
   entries: DirEntry[];
   maxDepth: number;
   maxEntries: number;
+  omittedDirectories: Array<{
+    path: string;
+    reason: OmittedDirectoryReason;
+  }>;
   recursive: boolean;
+  truncated: boolean;
 };
 
 async function readDirEntries(dir: string): Promise<fs.Dirent[]> {
@@ -59,14 +80,27 @@ async function readDirEntries(dir: string): Promise<fs.Dirent[]> {
   }
 }
 
-function shouldRecurseInto(entry: fs.Dirent, state: WalkState): boolean {
-  return (
-    state.recursive &&
-    entry.isDirectory() &&
-    !entry.isSymbolicLink() &&
-    !entry.name.startsWith(".") &&
-    !INIT_SKIP_DIRS.has(entry.name)
-  );
+function omissionReason(
+  entry: fs.Dirent,
+  state: WalkState,
+  depth: number
+): OmittedDirectoryReason | undefined {
+  if (!entry.isDirectory() || entry.isSymbolicLink()) {
+    return;
+  }
+  if (!state.recursive) {
+    return "non-recursive";
+  }
+  if (entry.name.startsWith(".")) {
+    return "hidden";
+  }
+  if (INIT_SKIP_DIRS.has(entry.name)) {
+    return "excluded";
+  }
+  if (depth >= state.maxDepth) {
+    return "max-depth";
+  }
+  return;
 }
 
 /**
@@ -105,12 +139,17 @@ async function walkDirectory(
   depth: number,
   state: WalkState
 ): Promise<void> {
-  if (depth > state.maxDepth || state.entries.length >= state.maxEntries) {
+  if (depth > state.maxDepth) {
+    return;
+  }
+  if (state.entries.length >= state.maxEntries) {
+    state.truncated = true;
     return;
   }
 
   for (const entry of await readDirEntries(dir)) {
     if (state.entries.length >= state.maxEntries) {
+      state.truncated = true;
       return;
     }
     const nextEntry = toDirEntry(state, dir, entry);
@@ -118,7 +157,13 @@ async function walkDirectory(
       continue;
     }
     state.entries.push(nextEntry);
-    if (shouldRecurseInto(entry, state)) {
+    const omittedBecause = omissionReason(entry, state, depth);
+    if (omittedBecause) {
+      state.omittedDirectories.push({
+        path: nextEntry.path,
+        reason: omittedBecause,
+      });
+    } else if (entry.isDirectory() && !entry.isSymbolicLink()) {
       await walkDirectory(dir + NATIVE_SEP + entry.name, depth + 1, state);
     }
   }
