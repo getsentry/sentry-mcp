@@ -26,6 +26,12 @@ tested commit, and verifies the run-owned candidate before production smoke
 tests. If those fail, restores the captured version only while this run's
 candidate remains active. External changes stop recovery.
 
+### migrate-cloudflare-token.yml
+Moves the Cloudflare API token from a repository secret into the protected
+`production` environment. Only `main` in the Toolkit repository can run it.
+Copy and removal are separate dispatches so a normal production deployment can
+prove that the environment copy works before the repository copy is deleted.
+
 ### eval.yml
 Runs evaluation tests against the MCP server.
 
@@ -52,6 +58,11 @@ label creation.
 The `production` environment is restricted to `main` and holds:
 
 - **`CLOUDFLARE_API_TOKEN`** - Cloudflare API token with Workers deployment permissions
+
+During migration, the same name also exists as a repository secret. A temporary
+`CLOUDFLARE_MIGRATION_PAT` environment secret gives the migration workflow
+permission to write environment secrets and delete the repository copy. The
+workflow deletes this PAT secret after successful cleanup.
 
 Other configuration:
 
@@ -88,6 +99,30 @@ confirm the restored version fails the job rather than guessing a recovery.
 Manual production dispatch is unavailable. Use a reviewed change and its
 passing `Test` run to deploy. Never run bare `wrangler rollback` against
 production; that command chooses from mutable history.
+
+## Cloudflare token migration
+
+1. Merge the reviewed migration workflow into `main`. Create a fine-grained PAT
+   for `getsentry/toolkit` with repository **Secrets: read/write** permission.
+   Store it as `CLOUDFLARE_MIGRATION_PAT` in the protected `production`
+   environment. Never pass the PAT in a workflow input or command argument.
+2. Dispatch `Move Cloudflare token to production environment` on `main` with
+   `operation=copy`. Confirm success and check that `CLOUDFLARE_API_TOKEN`
+   appears in both repository and `production` environment secret-name lists.
+3. Wait for a normal `Test` push on `main` to trigger `Deploy to Cloudflare`.
+   Confirm that the deployment passed canary and production smoke tests and
+   served the intended revision. Record its workflow run ID; its start time
+   must be after the environment secret was copied.
+4. Dispatch the migration workflow again on `main` with `operation=remove` and
+   that successful deployment run ID. The workflow checks the run's identity,
+   result, timing, and successful canary and production deployment and smoke-test
+   steps, then deletes the repository-scoped Cloudflare token.
+   Check that only the environment copy remains and the temporary PAT secret
+   has been removed. Revoke the PAT after use.
+
+If a step fails, keep the repository copy until a successful post-copy
+deployment has been verified. Never print either credential while diagnosing
+the failure.
 
 ## Troubleshooting
 
