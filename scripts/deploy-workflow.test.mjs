@@ -53,6 +53,22 @@ test("production deploy requires a successful Test run on this repository's main
   assert.match(workflow, /cloudflare-reconcile\.sh restore/);
 });
 
+test("production build retains Sentry DSN and source-map upload credentials", () => {
+  const buildStep = workflow
+    .split("- name: Build production artifact once")[1]
+    ?.split("- name:")[0];
+  assert.ok(buildStep, "production build step must exist");
+  assert.match(
+    buildStep,
+    /SENTRY_AUTH_TOKEN:\s*\$\{\{ secrets\.SENTRY_AUTH_TOKEN \}\}/,
+  );
+  assert.match(
+    buildStep,
+    /VITE_SENTRY_DSN:\s*\$\{\{ secrets\.VITE_SENTRY_DSN \}\}/,
+  );
+  assert.match(buildStep, /VITE_SENTRY_ENVIRONMENT:\s*production/);
+});
+
 test("deployment failures never invoke an unqualified rollback", () => {
   assert.doesNotMatch(
     workflow + recoveryWorkflow,

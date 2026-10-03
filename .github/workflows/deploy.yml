@@ -218,7 +218,9 @@ jobs:
         id: build
         env:
           CLOUDFLARE_PROJECT_PATH: ${{ steps.projects.outputs.cloudflare-path }}
-          SENTRY_CLIENT_ID: ${{ secrets.SENTRY_CLIENT_ID }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
         run: |
           set -euo pipefail
           pnpm --filter '${{ steps.projects.outputs.cloudflare-name }}' run build

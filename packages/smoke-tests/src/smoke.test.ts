@@ -158,11 +158,11 @@ describeIfPreviewUrl(
         `${PREVIEW_URL}/_health/version`,
       );
       expect(response.status).toBe(200);
-      if (IS_LOCAL_DEV) {
+      if (IS_LOCAL_DEV && data?.id === null && !EXPECTED_VERSION_ID) {
         expect(data).toEqual({ id: null });
       } else {
         expect(data).toEqual({ id: expect.any(String) });
-        expect(data.id).not.toBe("");
+        expect(data.id).toMatch(UUID_PATTERN);
         if (EXPECTED_VERSION_ID) {
           expect(data.id).toBe(EXPECTED_VERSION_ID);
         }
