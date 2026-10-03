@@ -115,7 +115,8 @@ production; that command chooses from mutable history.
    must be after the environment secret was copied.
 4. Dispatch the migration workflow again on `main` with `operation=remove` and
    that successful deployment run ID. The workflow checks the run's identity,
-   result, and timing, then deletes the repository-scoped Cloudflare token.
+   result, timing, and successful canary and production deployment and smoke-test
+   steps, then deletes the repository-scoped Cloudflare token.
    Check that only the environment copy remains and the temporary PAT secret
    has been removed. Revoke the PAT after use.
 

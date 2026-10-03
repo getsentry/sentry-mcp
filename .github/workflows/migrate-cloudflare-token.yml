@@ -70,9 +70,9 @@ jobs:
           copied_at="$(gh api "repos/$TARGET_REPOSITORY/environments/production/secrets/CLOUDFLARE_API_TOKEN" --jq .updated_at)"
           deploy_workflow_id="$(GH_TOKEN="$RUN_TOKEN" gh api "repos/$TARGET_REPOSITORY/actions/workflows/deploy.yml" --jq .id)"
           GH_TOKEN="$RUN_TOKEN" gh api "repos/$TARGET_REPOSITORY/actions/runs/$DEPLOYMENT_RUN_ID" --jq '
-            [.workflow_id, .event, .head_branch, .head_repository.id, .status, .conclusion, .created_at] | @tsv
+            [.workflow_id, .event, .head_branch, .head_repository.id, .status, .conclusion, .created_at, .run_attempt] | @tsv
           ' | {
-            IFS=$'\t' read -r workflow_id event branch repository_id status conclusion created_at
+            IFS=$'\t' read -r workflow_id event branch repository_id status conclusion created_at run_attempt
             test "$workflow_id" = "$deploy_workflow_id"
             test "$event" = workflow_run
             test "$branch" = main
@@ -80,6 +80,24 @@ jobs:
             test "$status" = completed
             test "$conclusion" = success
             [[ "$created_at" > "$copied_at" ]]
+            [[ "$run_attempt" =~ ^[1-9][0-9]*$ ]]
+            GH_TOKEN="$RUN_TOKEN" gh api "repos/$TARGET_REPOSITORY/actions/runs/$DEPLOYMENT_RUN_ID/attempts/$run_attempt/jobs?per_page=100" | jq -e --argjson attempt "$run_attempt" '
+              .total_count == 1 and
+              (.jobs | type == "array" and length == 1) and
+              (.jobs[0] |
+                .name == "Deploy to Cloudflare" and
+                .run_attempt == $attempt and
+                .status == "completed" and
+                .conclusion == "success" and
+                (. as $job | [
+                  "Deploy to Canary Worker",
+                  "Run Smoke Tests on Canary",
+                  "Deploy to Production Worker",
+                  "Verify production deployment ownership",
+                  "Run Smoke Tests on Production"
+                ] | all(.[]; . as $name | ($job.steps | map(select(.name == $name and .status == "completed" and .conclusion == "success")) | length) == 1))
+              )
+            ' > /dev/null
           }
 
       - name: Remove repository token and temporary migration credential
