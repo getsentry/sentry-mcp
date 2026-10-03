@@ -8,6 +8,7 @@ import {
 import { formatAssignedTo } from "../../internal/tool-helpers/formatting";
 import { logIssue } from "../../telem/logging";
 import { UserInputError } from "../../errors";
+import { ApiClientError } from "../../api-client";
 import type { Issue } from "../../api-client/types";
 import type { ServerContext } from "../../types";
 import {
@@ -599,7 +600,9 @@ async function tryPostReasonComment(
     });
     return { posted: true };
   } catch (error) {
-    logIssue(error);
+    if (!(error instanceof ApiClientError)) {
+      logIssue(error);
+    }
     return {
       posted: false,
       error: error instanceof Error ? error.message : String(error),
