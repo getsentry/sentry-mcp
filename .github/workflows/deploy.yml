@@ -223,7 +223,7 @@ jobs:
           VITE_SENTRY_ENVIRONMENT: production
         run: |
           set -euo pipefail
-          pnpm --filter '${{ steps.projects.outputs.cloudflare-name }}' run build
+          pnpm --filter '${{ steps.projects.outputs.cloudflare-name }}...' run build
           redirect="$CLOUDFLARE_PROJECT_PATH/.wrangler/deploy/config.json"
           jq -e '
             .configPath == "../../dist/sentry_mcp/wrangler.json" and

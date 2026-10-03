@@ -69,6 +69,17 @@ test("production build retains Sentry DSN and source-map upload credentials", ()
   assert.match(buildStep, /VITE_SENTRY_ENVIRONMENT:\s*production/);
 });
 
+test("production build includes Cloudflare workspace dependencies", () => {
+  const buildStep = workflow
+    .split("- name: Build production artifact once")[1]
+    ?.split("- name:")[0];
+  assert.ok(buildStep, "production build step must exist");
+  assert.match(
+    buildStep,
+    /pnpm --filter '\$\{\{ steps\.projects\.outputs\.cloudflare-name \}\}\.\.\.' run build/,
+  );
+});
+
 test("deployment failures never invoke an unqualified rollback", () => {
   assert.doesNotMatch(
     workflow + recoveryWorkflow,
