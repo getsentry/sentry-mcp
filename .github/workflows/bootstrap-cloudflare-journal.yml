@@ -1,0 +1,83 @@
+name: Bootstrap Cloudflare Deployment Journal
+
+on:
+  workflow_dispatch:
+    inputs:
+      failed-deploy-run-id:
+        description: Failed Deploy to Cloudflare workflow run ID at the trusted root
+        required: true
+        type: string
+      failed-deploy-run-attempt:
+        description: Failed workflow run attempt
+        required: true
+        default: "1"
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  NODE_VERSION: 22.23.1
+
+jobs:
+  bootstrap:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: deploy-cloudflare-production
+      cancel-in-progress: false
+    environment: production
+
+    steps:
+      - name: Check out trusted bootstrap implementation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # releases/v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.workflow_sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Create journal writer token
+        id: journal-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ secrets.CLOUDFLARE_JOURNAL_APP_ID }}
+          private-key: ${{ secrets.CLOUDFLARE_JOURNAL_APP_PRIVATE_KEY }}
+          permission-actions: read
+          permission-administration: read
+          permission-contents: write
+          permission-statuses: write
+
+      - name: Bootstrap append-only journal root
+        env:
+          CLOUDFLARE_JOURNAL_APP_ID: ${{ secrets.CLOUDFLARE_JOURNAL_APP_ID }}
+          CLOUDFLARE_JOURNAL_HMAC_KEY: ${{ secrets.CLOUDFLARE_JOURNAL_HMAC_KEY }}
+          CLOUDFLARE_JOURNAL_TRUSTED_SHA: ${{ vars.CLOUDFLARE_JOURNAL_TRUSTED_SHA }}
+          FAILED_DEPLOY_RUN_ATTEMPT: ${{ inputs.failed-deploy-run-attempt }}
+          FAILED_DEPLOY_RUN_ID: ${{ inputs.failed-deploy-run-id }}
+          GH_TOKEN: ${{ steps.journal-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$FAILED_DEPLOY_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$FAILED_DEPLOY_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          journal_hmac_key="$CLOUDFLARE_JOURNAL_HMAC_KEY"
+          journal_trusted_sha="$CLOUDFLARE_JOURNAL_TRUSTED_SHA"
+          unset CLOUDFLARE_JOURNAL_HMAC_KEY CLOUDFLARE_JOURNAL_TRUSTED_SHA
+          result="$RUNNER_TEMP/cloudflare-journal-bootstrap.json"
+          CLOUDFLARE_JOURNAL_HMAC_KEY="$journal_hmac_key" \
+            CLOUDFLARE_JOURNAL_TRUSTED_SHA="$journal_trusted_sha" \
+            node scripts/cloudflare-journal-store.mjs bootstrap \
+              "$FAILED_DEPLOY_RUN_ID" \
+              "$FAILED_DEPLOY_RUN_ATTEMPT" \
+              > "$result"
+          jq -e \
+            --arg trustedSha "$journal_trusted_sha" '
+              .state == "initialized" and
+              .bootstrap.trustedSha == $trustedSha
+            ' "$result" > /dev/null

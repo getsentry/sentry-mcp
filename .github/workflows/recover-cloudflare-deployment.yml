@@ -1,0 +1,191 @@
+name: Recover Cloudflare Deployment
+
+on:
+  workflow_run:
+    workflows: [Deploy to Cloudflare]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  NODE_VERSION: 22.23.1
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: deploy-cloudflare-production
+      cancel-in-progress: false
+    environment: production
+
+    steps:
+      - name: Validate trusted deployment run
+        id: run
+        env:
+          EVENT_RUN_JSON: ${{ toJSON(github.event.workflow_run) }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY_JSON: ${{ toJSON(github.event.repository) }}
+          TRUSTED_REVISION: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$EVENT_RUN_JSON" > "$RUNNER_TEMP/event-run.json"
+          printf '%s' "$REPOSITORY_JSON" > "$RUNNER_TEMP/repository.json"
+          gh api \
+            -H "Accept: application/vnd.github.raw+json" \
+            "/repos/$GITHUB_REPOSITORY/contents/scripts/validate-recovery-run.mjs?ref=$TRUSTED_REVISION" \
+            > "$RUNNER_TEMP/validate-recovery-run.mjs"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/${{ github.event.workflow_run.id }}" \
+            > "$RUNNER_TEMP/api-run.json"
+          deploy_workflow_id="$(
+            gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml" --jq '.id'
+          )"
+          recovery_workflow_id="$(
+            gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/recover-cloudflare-deployment.yml" --jq '.id'
+          )"
+          validated="$(
+            node "$RUNNER_TEMP/validate-recovery-run.mjs" \
+              "$RUNNER_TEMP/event-run.json" \
+              "$RUNNER_TEMP/api-run.json" \
+              "$RUNNER_TEMP/repository.json" \
+              "$deploy_workflow_id"
+          )"
+          {
+            echo "conclusion=$(jq -er '.conclusion' <<< "$validated")"
+            echo "deploy-workflow-id=$deploy_workflow_id"
+            echo "head-sha=$(jq -er '.headSha' <<< "$validated")"
+            echo "recovery-workflow-id=$recovery_workflow_id"
+            echo "run-attempt=$(jq -er '.runAttempt' <<< "$validated")"
+            echo "run-id=$(jq -er '.runId' <<< "$validated")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check out trusted recovery implementation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # releases/v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.workflow_sha }}
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          cache: pnpm
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create journal writer token
+        id: journal-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ secrets.CLOUDFLARE_JOURNAL_APP_ID }}
+          private-key: ${{ secrets.CLOUDFLARE_JOURNAL_APP_PRIVATE_KEY }}
+          permission-actions: read
+          permission-administration: read
+          permission-contents: write
+          permission-statuses: write
+
+      - name: Read newest durable deployment journal
+        id: journal
+        env:
+          GH_TOKEN: ${{ steps.journal-token.outputs.token }}
+          CLOUDFLARE_JOURNAL_APP_ID: ${{ secrets.CLOUDFLARE_JOURNAL_APP_ID }}
+          CLOUDFLARE_JOURNAL_HMAC_KEY: ${{ secrets.CLOUDFLARE_JOURNAL_HMAC_KEY }}
+          CLOUDFLARE_JOURNAL_TRUSTED_SHA: ${{ vars.CLOUDFLARE_JOURNAL_TRUSTED_SHA }}
+        run: |
+          set -euo pipefail
+          journal="$RUNNER_TEMP/cloudflare-deployment-journal.json"
+          state="$RUNNER_TEMP/cloudflare-journal-state.json"
+          node scripts/cloudflare-journal-store.mjs state "$journal" > "$state"
+          store_state="$(jq -er '.state' "$state")"
+          case "$store_state" in
+            absent|uninitialized)
+              echo "The durable Cloudflare journal branch is not initialized" >&2
+              exit 1
+              ;;
+            initialized)
+              echo "No durable journal exists, so this workflow has never changed traffic"
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            latest)
+              ;;
+            *)
+              echo "Unexpected durable journal state: $store_state" >&2
+              exit 1
+              ;;
+          esac
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+
+      - name: Validate newest journal provenance
+        if: steps.journal.outputs.exists == 'true'
+        id: journal-run
+        env:
+          DEPLOY_WORKFLOW_ID: ${{ steps.run.outputs.deploy-workflow-id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          journal="$RUNNER_TEMP/cloudflare-deployment-journal.json"
+          run_id="$(jq -er '.runId' "$journal")"
+          run_attempt="$(jq -er '.runAttempt' "$journal")"
+          expected_head_sha="$(jq -er '.headSha' "$journal")"
+          journal_run="$RUNNER_TEMP/cloudflare-journal-run.json"
+          gh api \
+            "/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/attempts/$run_attempt" \
+            > "$journal_run"
+          validated="$(
+            node "$RUNNER_TEMP/validate-recovery-run.mjs" \
+              "$journal_run" \
+              "$journal_run" \
+              "$RUNNER_TEMP/repository.json" \
+              "$DEPLOY_WORKFLOW_ID"
+          )"
+          validated_head_sha="$(jq -er '.headSha' <<< "$validated")"
+          if [[ "$validated_head_sha" != "$expected_head_sha" ]]; then
+            echo "Durable deployment journal head SHA does not match its workflow run" >&2
+            exit 1
+          fi
+          echo "conclusion=$(jq -er '.conclusion' <<< "$validated")" >> "$GITHUB_OUTPUT"
+
+      - name: Discover Cloudflare project
+        if: steps.journal.outputs.exists == 'true'
+        id: project
+        run: |
+          set -euo pipefail
+          project="$(node scripts/ci-projects.mjs --roles cloudflare)"
+          echo "path=$(jq -er '.cloudflare.path' <<< "$project")" >> "$GITHUB_OUTPUT"
+
+      - name: Verify or reconcile deployment
+        if: steps.journal.outputs.exists == 'true'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_PROJECT_PATH: ${{ steps.project.outputs.path }}
+          CONCLUSION: ${{ steps.journal-run.outputs.conclusion }}
+          GH_TOKEN: ${{ github.token }}
+          JOURNAL_GH_TOKEN: ${{ steps.journal-token.outputs.token }}
+          CLOUDFLARE_JOURNAL_APP_ID: ${{ secrets.CLOUDFLARE_JOURNAL_APP_ID }}
+          CLOUDFLARE_JOURNAL_HMAC_KEY: ${{ secrets.CLOUDFLARE_JOURNAL_HMAC_KEY }}
+          CLOUDFLARE_JOURNAL_TRUSTED_SHA: ${{ vars.CLOUDFLARE_JOURNAL_TRUSTED_SHA }}
+          RECOVERY_WORKFLOW_ID: ${{ steps.run.outputs.recovery-workflow-id }}
+        run: |
+          set -euo pipefail
+          journal="$RUNNER_TEMP/cloudflare-deployment-journal.json"
+          if [[ "$CONCLUSION" == "success" ]]; then
+            reconciliation_action="verify-promoted"
+          else
+            reconciliation_action="restore"
+          fi
+          bash scripts/cloudflare-reconcile.sh \
+            "$reconciliation_action" \
+            "$CLOUDFLARE_PROJECT_PATH" \
+            "$journal" \
+            "$RECOVERY_WORKFLOW_ID" \
+            '${{ github.sha }}' \
+            > "$RUNNER_TEMP/cloudflare-recovery-reconciliation.json"

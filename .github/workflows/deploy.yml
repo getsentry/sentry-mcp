@@ -1,192 +1,682 @@
 name: Deploy to Cloudflare
 
-permissions:
-  contents: read
-  deployments: write
-  checks: write
-
 on:
   workflow_run:
-    workflows: ["Test"]
-    types:
-      - completed
+    workflows: [Test]
+    types: [completed]
     branches: [main]
 
-concurrency:
-  group: mcp-production-deploy
-  cancel-in-progress: false
+permissions:
+  actions: read
+  checks: write
+  contents: read
+
+env:
+  NODE_VERSION: 22.23.1
 
 jobs:
-  deploy:
-    name: Deploy to Cloudflare
+  deploy-production:
+    name: Deploy production
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: deploy-cloudflare-production
+      cancel-in-progress: false
     environment: production
-    if: >-
-      ${{ github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push' &&
-          github.event.workflow_run.head_repository.id == github.event.repository.id &&
-          github.event.workflow_run.head_branch == 'main' }}
 
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          persist-credentials: false
-
-      - name: Require tested revision on main
+      - name: Validate trusted Test revision
+        id: validate
         env:
+          ARTIFACT_TOKEN: ${{ github.token }}
+          EVENT_RUN_JSON: ${{ toJSON(github.event.workflow_run) }}
+          EXPECTED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPOSITORY_JSON: ${{ toJSON(github.event.repository) }}
+          TRUSTED_REVISION: ${{ github.workflow_sha }}
         run: |
-          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
-          if [[ "$current_sha" != "$EXPECTED_SHA" ]]; then
-            echo 'The tested revision is no longer at main; refusing deployment.' >&2
+          set -euo pipefail
+          umask 077
+          printf '%s' "$EVENT_RUN_JSON" > "$RUNNER_TEMP/event-run.json"
+          printf '%s' "$REPOSITORY_JSON" > "$RUNNER_TEMP/repository.json"
+          gh api \
+            -H "Accept: application/vnd.github.raw+json" \
+            "/repos/$GITHUB_REPOSITORY/contents/scripts/validate-deployment.mjs?ref=$TRUSTED_REVISION" \
+            > "$RUNNER_TEMP/validate-deployment.mjs"
+          gh api \
+            -H "Accept: application/vnd.github.raw+json" \
+            "/repos/$GITHUB_REPOSITORY/contents/scripts/validate-recovery-run.mjs?ref=$TRUSTED_REVISION" \
+            > "$RUNNER_TEMP/validate-recovery-run.mjs"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/${{ github.event.workflow_run.id }}" \
+            > "$RUNNER_TEMP/api-run.json"
+          test_workflow_id="$(
+            gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/test.yml" --jq '.id'
+          )"
+          deploy_workflow_id="$(
+            gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml" --jq '.id'
+          )"
+          current_head_sha="$(
+            gh api "/repos/$GITHUB_REPOSITORY/commits/${{ github.event.repository.default_branch }}" --jq '.sha'
+          )"
+          validated="$(
+            node "$RUNNER_TEMP/validate-deployment.mjs" \
+              "$RUNNER_TEMP/event-run.json" \
+              "$RUNNER_TEMP/api-run.json" \
+              "$RUNNER_TEMP/repository.json" \
+              "$test_workflow_id" \
+              "$current_head_sha"
+          )"
+          head_sha="$(jq -er '.headSha' <<< "$validated")"
+          if [[ "$head_sha" != "$EXPECTED_HEAD_SHA" ]]; then
+            echo "Validated head SHA does not match the workflow event" >&2
             exit 1
           fi
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          {
+            echo "head-sha=$head_sha"
+            echo "deploy-workflow-id=$deploy_workflow_id"
+            echo "run-attempt=$GITHUB_RUN_ATTEMPT"
+            echo "test-workflow-id=$test_workflow_id"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check out tested revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # releases/v4
+        with:
+          persist-credentials: false
+          ref: ${{ steps.validate.outputs.head-sha }}
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "22"
-
-      # pnpm/action-setup@v4
-      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
-        name: Install pnpm
-        with:
-          run_install: false
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
-
-      - uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          cache: pnpm
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # === BUILD AND DEPLOY CANARY WORKER ===
-      - name: Build
-        run: pnpm --filter '@sentry/mcp-cloudflare...' run build
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-          VITE_SENTRY_ENVIRONMENT: production
-
-      - name: Deploy to Canary Worker
-        id: deploy_canary
-        working-directory: packages/mcp-cloudflare
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec wrangler deploy --config wrangler.canary.jsonc
-
-      - name: Wait for Canary to Propagate
-        if: success()
-        run: |
-          echo "Waiting 30 seconds for canary deployment to propagate..."
-          sleep 30
-
-      # === SMOKE TEST CANARY ===
-      - name: Run Smoke Tests on Canary
-        id: canary_smoke_tests
-        if: success()
-        env:
-          PREVIEW_URL: https://sentry-mcp-canary.getsentry.workers.dev
-        run: |
-          echo "Running smoke tests against canary worker..."
-          cd packages/smoke-tests
-          pnpm test:ci
-
-      - name: Publish Canary Smoke Test Report
-        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
-        if: always() && steps.canary_smoke_tests.outcome != 'skipped'
+      - name: Create journal writer token
+        id: journal-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
         with:
-          report_paths: "packages/smoke-tests/tests.junit.xml"
-          check_name: "Canary Smoke Test Results"
-          fail_on_failure: false
+          app-id: ${{ secrets.CLOUDFLARE_JOURNAL_APP_ID }}
+          private-key: ${{ secrets.CLOUDFLARE_JOURNAL_APP_PRIVATE_KEY }}
+          permission-actions: read
+          permission-administration: read
+          permission-contents: write
+          permission-statuses: write
 
-      # === DEPLOY PRODUCTION WORKER (only if canary tests pass) ===
-      - name: Require tested revision on main before production
-        if: steps.canary_smoke_tests.outcome == 'success'
+      - name: Discover deployment projects
+        id: projects
+        run: |
+          set -euo pipefail
+          projects="$(node scripts/ci-projects.mjs --roles cloudflare,smoke)"
+          cloudflare_name="$(jq -er '.cloudflare.name' <<< "$projects")"
+          cloudflare_path="$(jq -er '.cloudflare.path' <<< "$projects")"
+          smoke_name="$(jq -er '.smoke.name' <<< "$projects")"
+          smoke_path="$(jq -er '.smoke.path' <<< "$projects")"
+          {
+            echo "cloudflare-name=$cloudflare_name"
+            echo "cloudflare-path=$cloudflare_path"
+            echo "smoke-name=$smoke_name"
+            echo "smoke-path=$smoke_path"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Reconcile the newest durable deployment journal
+        id: reconcile
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_PROJECT_PATH: ${{ steps.projects.outputs.cloudflare-path }}
+          DEPLOY_WORKFLOW_ID: ${{ steps.validate.outputs.deploy-workflow-id }}
+          GH_TOKEN: ${{ github.token }}
+          JOURNAL_GH_TOKEN: ${{ steps.journal-token.outputs.token }}
+          CLOUDFLARE_JOURNAL_APP_ID: ${{ secrets.CLOUDFLARE_JOURNAL_APP_ID }}
+          CLOUDFLARE_JOURNAL_HMAC_KEY: ${{ secrets.CLOUDFLARE_JOURNAL_HMAC_KEY }}
+          CLOUDFLARE_JOURNAL_TRUSTED_SHA: ${{ vars.CLOUDFLARE_JOURNAL_TRUSTED_SHA }}
+        run: |
+          set -euo pipefail
+          umask 077
+          journal_hmac_key="$CLOUDFLARE_JOURNAL_HMAC_KEY"
+          journal_trusted_sha="$CLOUDFLARE_JOURNAL_TRUSTED_SHA"
+          unset CLOUDFLARE_JOURNAL_HMAC_KEY CLOUDFLARE_JOURNAL_TRUSTED_SHA
+          journal="$RUNNER_TEMP/cloudflare-previous-journal.json"
+          state="$RUNNER_TEMP/cloudflare-journal-state.json"
+          env \
+            -u CLOUDFLARE_ACCOUNT_ID \
+            -u CLOUDFLARE_API_TOKEN \
+            -u JOURNAL_GH_TOKEN \
+            CLOUDFLARE_JOURNAL_HMAC_KEY="$journal_hmac_key" \
+            CLOUDFLARE_JOURNAL_TRUSTED_SHA="$journal_trusted_sha" \
+            GH_TOKEN="$JOURNAL_GH_TOKEN" \
+            node scripts/cloudflare-journal-store.mjs state "$journal" > "$state"
+          store_state="$(jq -er '.state' "$state")"
+          case "$store_state" in
+            absent|uninitialized)
+              echo "The durable Cloudflare journal branch is not initialized" >&2
+              exit 1
+              ;;
+            initialized)
+              echo "No earlier durable Cloudflare deployment journal needs reconciliation"
+              echo "had-latest=false" >> "$GITHUB_OUTPUT"
+              ;;
+            latest)
+              previous_run_id="$(jq -er '.runId' "$journal")"
+              previous_run_attempt="$(jq -er '.runAttempt' "$journal")"
+              previous_head_sha="$(jq -er '.headSha' "$journal")"
+              previous_run="$RUNNER_TEMP/cloudflare-previous-run.json"
+              env \
+                -u CLOUDFLARE_ACCOUNT_ID \
+                -u CLOUDFLARE_API_TOKEN \
+                -u JOURNAL_GH_TOKEN \
+                gh api \
+                "/repos/$GITHUB_REPOSITORY/actions/runs/$previous_run_id/attempts/$previous_run_attempt" \
+                > "$previous_run"
+              validated_run="$(
+                node "$RUNNER_TEMP/validate-recovery-run.mjs" \
+                  "$previous_run" \
+                  "$previous_run" \
+                  "$RUNNER_TEMP/repository.json" \
+                  "$DEPLOY_WORKFLOW_ID"
+              )"
+              previous_conclusion="$(jq -er '.conclusion' <<< "$validated_run")"
+              validated_head_sha="$(jq -er '.headSha' <<< "$validated_run")"
+              if [[ "$validated_head_sha" != "$previous_head_sha" ]]; then
+                echo "Durable deployment journal head SHA does not match its workflow run" >&2
+                exit 1
+              fi
+
+              if [[ "$previous_conclusion" == "success" ]]; then
+                reconciliation_action="verify-promoted"
+              else
+                reconciliation_action="restore"
+              fi
+              reconciliation_result="$RUNNER_TEMP/cloudflare-reconciliation-result.json"
+              CLOUDFLARE_JOURNAL_HMAC_KEY="$journal_hmac_key" \
+                CLOUDFLARE_JOURNAL_TRUSTED_SHA="$journal_trusted_sha" \
+                bash scripts/cloudflare-reconcile.sh \
+                "$reconciliation_action" \
+                "$CLOUDFLARE_PROJECT_PATH" \
+                "$journal" \
+                "$DEPLOY_WORKFLOW_ID" \
+                '${{ github.sha }}' \
+                > "$reconciliation_result"
+              branch_head_sha="$(jq -er '.branchHeadSha' "$reconciliation_result")"
+              echo "had-latest=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unexpected durable journal state: $store_state" >&2
+              exit 1
+              ;;
+          esac
+          branch_head_sha="${branch_head_sha:-$(jq -er '.branchHeadSha' "$state")}"
+          echo "branch-head-sha=$branch_head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Build production artifact once
+        id: build
+        env:
+          CLOUDFLARE_PROJECT_PATH: ${{ steps.projects.outputs.cloudflare-path }}
+          SENTRY_CLIENT_ID: ${{ secrets.SENTRY_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          pnpm --filter '${{ steps.projects.outputs.cloudflare-name }}' run build
+          redirect="$CLOUDFLARE_PROJECT_PATH/.wrangler/deploy/config.json"
+          jq -e '
+            .configPath == "../../dist/sentry_mcp/wrangler.json" and
+            .auxiliaryWorkers == []
+          ' "$redirect" > /dev/null
+          staging_artifact="$RUNNER_TEMP/cloudflare-upload-staging-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          frozen_artifact="/opt/sentry-mcp-cloudflare-upload-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [[ -e "$staging_artifact" ]]; then
+            echo "Cloudflare upload staging directory already exists" >&2
+            exit 1
+          fi
+          if [[ -e "$frozen_artifact" ]]; then
+            echo "Frozen Cloudflare upload directory already exists" >&2
+            exit 1
+          fi
+          mkdir -- "$staging_artifact"
+          cp -a -- "$CLOUDFLARE_PROJECT_PATH/dist/." "$staging_artifact/"
+          sudo mkdir -- "$frozen_artifact"
+          sudo cp -a -- "$staging_artifact/." "$frozen_artifact/"
+          rm -rf -- "$staging_artifact"
+          upload_config="$frozen_artifact/sentry_mcp/wrangler.json"
+          jq -e '
+            .name == "sentry-mcp" and
+            .main == "index.js" and
+            .no_bundle == true and
+            .assets.directory == "../client" and
+            (has("base_dir") | not) and
+            (has("build") | not) and
+            (has("tsconfig") | not) and
+            (has("alias") | not) and
+            (has("site") | not) and
+            (has("wasm_modules") | not) and
+            (has("text_blobs") | not) and
+            (has("data_blobs") | not) and
+            all(.rules[]?.globs[]?;
+              (startswith("/") | not) and
+              ((split("/") | index("..")) | not)
+            ) and
+            ((.python_modules // []) | length) == 0 and
+            (has("build") | not) and
+            (has("site") | not) and
+            (has("wasm_modules") | not) and
+            (has("text_blobs") | not) and
+            (has("data_blobs") | not)
+          ' "$upload_config" > /dev/null
+          frozen_root="$(realpath -e -- "$frozen_artifact")"
+          resolved_main="$(realpath -e -- "$(dirname -- "$upload_config")/$(jq -er '.main' "$upload_config")")"
+          resolved_assets="$(realpath -e -- "$(dirname -- "$upload_config")/$(jq -er '.assets.directory' "$upload_config")")"
+          if [[ "$resolved_main" != "$frozen_root/"* ]] || \
+             [[ "$resolved_assets" != "$frozen_root/"* ]]; then
+            echo "Cloudflare upload config references files outside the frozen artifact" >&2
+            exit 1
+          fi
+          sudo chown -R root:root -- "$frozen_artifact"
+          sudo chmod -R a-w -- "$frozen_artifact"
+          artifact_digest="$(node scripts/hash-directory.mjs "$frozen_artifact")"
+          traffic_config="$RUNNER_TEMP/cloudflare-traffic-config.json"
+          jq -n '{name: "sentry-mcp", observability: null, tail_consumers: null, streaming_tail_consumers: null}' \
+            > "$traffic_config"
+          upload_config_digest="$(sha256sum "$traffic_config" | cut -d ' ' -f 1)"
+          {
+            echo "artifact-digest=$artifact_digest"
+            echo "artifact-path=$frozen_artifact"
+            echo "upload-config-digest=$upload_config_digest"
+            echo "upload-config=$upload_config"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Revalidate Test revision before version upload
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
-          if [[ "$current_sha" != "$EXPECTED_SHA" ]]; then
-            echo 'Main advanced during canary testing; refusing production deployment.' >&2
+          set -euo pipefail
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/${{ github.event.workflow_run.id }}" \
+            > "$RUNNER_TEMP/api-run.json"
+          current_head_sha="$(
+            gh api "/repos/$GITHUB_REPOSITORY/commits/${{ github.event.repository.default_branch }}" --jq '.sha'
+          )"
+          node "$RUNNER_TEMP/validate-deployment.mjs" \
+            "$RUNNER_TEMP/event-run.json" \
+            "$RUNNER_TEMP/api-run.json" \
+            "$RUNNER_TEMP/repository.json" \
+            '${{ steps.validate.outputs.test-workflow-id }}' \
+            "$current_head_sha" \
+            > /dev/null
+
+      - name: Upload production-scoped candidate and create journal
+        id: journal
+        env:
+          ARTIFACT_DIGEST: ${{ steps.build.outputs.artifact-digest }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_PROJECT_PATH: ${{ steps.projects.outputs.cloudflare-path }}
+          CLOUDFLARE_UPLOAD_CONFIG: ${{ steps.build.outputs.upload-config }}
+          UPLOAD_CONFIG_DIGEST: ${{ steps.build.outputs.upload-config-digest }}
+          HEAD_SHA: ${{ steps.validate.outputs.head-sha }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          umask 077
+          journal="$RUNNER_TEMP/cloudflare-deployment-journal.json"
+          original="$RUNNER_TEMP/cloudflare-original.json"
+          after_upload="$RUNNER_TEMP/cloudflare-after-upload.json"
+          output="$RUNNER_TEMP/cloudflare-version-upload.jsonl"
+          parsed="$RUNNER_TEMP/cloudflare-version-upload.json"
+          expectation="$RUNNER_TEMP/cloudflare-version-upload-expectation.json"
+          ownership_markers="$(node -e '
+            const { randomUUID } = require("node:crypto");
+            process.stdout.write(JSON.stringify(Array.from({ length: 3 }, () => randomUUID())));
+          ')"
+          candidate_marker="$(jq -er '.[0]' <<< "$ownership_markers")"
+          promoted_marker="$(jq -er '.[1]' <<< "$ownership_markers")"
+          restored_marker="$(jq -er '.[2]' <<< "$ownership_markers")"
+          upload_message="GitHub Actions run $RUN_ID attempt $RUN_ATTEMPT commit $HEAD_SHA candidate version"
+          candidate_message="GitHub Actions run $RUN_ID attempt $RUN_ATTEMPT commit $HEAD_SHA candidate 0% marker $candidate_marker"
+          promoted_message="GitHub Actions run $RUN_ID attempt $RUN_ATTEMPT commit $HEAD_SHA production 100% marker $promoted_marker"
+          restored_message="GitHub Actions run $RUN_ID attempt $RUN_ATTEMPT commit $HEAD_SHA restore previous marker $restored_marker"
+
+          bash scripts/cloudflare-deployment-live.sh snapshot \
+            "$CLOUDFLARE_PROJECT_PATH" "$CLOUDFLARE_UPLOAD_CONFIG" "$original"
+          jq -e '
+            .current.strategy == "percentage" and
+            (.current.versions | length) == 1 and
+            .current.versions[0].percentage == 100 and
+            (.history | length) >= 1 and
+            .history[-1].id == .current.id and
+            .history[-1].strategy == .current.strategy and
+            .history[-1].versions == .current.versions
+          ' "$original" > /dev/null
+          if [[ '${{ steps.reconcile.outputs.had-latest }}' == "true" ]]; then
+            node scripts/cloudflare-deployment-cli.mjs predecessor \
+              "$original" \
+              "$RUNNER_TEMP/cloudflare-previous-journal.json" \
+              "$RUNNER_TEMP/cloudflare-reconciliation-result.json" \
+              > /dev/null
+          fi
+          previous_deployment_id="$(jq -er '.current.id' "$original")"
+          previous_version_id="$(jq -er '.current.versions[0].versionId' "$original")"
+
+          arguments="$(jq -cn --args '$ARGS.positional' -- versions upload --experimental-auto-create=false --message "$upload_message" --config "$CLOUDFLARE_UPLOAD_CONFIG")"
+          jq -cn \
+            --arg type "version-upload" \
+            --argjson commandLineArgs "$arguments" \
+            '{type: $type, workerTag: null, commandLineArgs: $commandLineArgs}' \
+            > "$expectation"
+
+          rm -f -- "$output"
+          set +e
+          WRANGLER_OUTPUT_FILE_PATH="$output" \
+            bash scripts/run-wrangler-command.sh \
+              pnpm --dir "$CLOUDFLARE_PROJECT_PATH" exec wrangler \
+              versions upload --experimental-auto-create=false \
+                --message "$upload_message" \
+                --config "$CLOUDFLARE_UPLOAD_CONFIG"
+          upload_status="$?"
+          set -e
+          if [[ "$upload_status" -ne 0 ]]; then
+            bash scripts/cloudflare-deployment-live.sh snapshot \
+              "$CLOUDFLARE_PROJECT_PATH" "$CLOUDFLARE_UPLOAD_CONFIG" "$after_upload"
+            cmp --silent "$original" "$after_upload"
+            exit "$upload_status"
+          fi
+          if ! node scripts/cloudflare-deployment-cli.mjs wrangler \
+            "$output" "$expectation" > "$parsed"; then
+            bash scripts/cloudflare-deployment-live.sh snapshot \
+              "$CLOUDFLARE_PROJECT_PATH" "$CLOUDFLARE_UPLOAD_CONFIG" "$after_upload"
+            cmp --silent "$original" "$after_upload"
+            exit 1
+          fi
+          candidate_version_id="$(jq -er '.versionId' "$parsed")"
+          worker_name="$(jq -er '.workerName' "$parsed")"
+          worker_tag="$(jq -er '.workerTag' "$parsed")"
+          if [[ "$candidate_version_id" == "$previous_version_id" ]]; then
+            echo "Candidate version must differ from the active version" >&2
             exit 1
           fi
 
-      - name: Capture active production version
-        if: steps.canary_smoke_tests.outcome == 'success'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: node scripts/cloudflare-deployment.mjs capture
+          jq -cn \
+            --arg artifactDigest "$ARTIFACT_DIGEST" \
+            --arg uploadConfigDigest "$UPLOAD_CONFIG_DIGEST" \
+            --arg workerName "$worker_name" \
+            --arg workerTag "$worker_tag" \
+            --arg originalDeploymentId "$previous_deployment_id" \
+            --arg previousVersionId "$previous_version_id" \
+            --arg candidateVersionId "$candidate_version_id" \
+            --arg candidateMessage "$candidate_message" \
+            --arg promotedMessage "$promoted_message" \
+            --arg restoredMessage "$restored_message" \
+            --argjson githubRunId "$RUN_ID" \
+            --argjson runAttempt "$RUN_ATTEMPT" \
+            --arg headSha "$HEAD_SHA" \
+            '{
+              schemaVersion: 1,
+              artifactDigest: $artifactDigest,
+              uploadConfigDigest: $uploadConfigDigest,
+              workerName: $workerName,
+              workerTag: $workerTag,
+              originalDeploymentId: $originalDeploymentId,
+              previousVersionId: $previousVersionId,
+              candidateVersionId: $candidateVersionId,
+              messages: {
+                candidate: $candidateMessage,
+                promoted: $promotedMessage,
+                restored: $restoredMessage
+              },
+              runId: $githubRunId,
+              runAttempt: $runAttempt,
+              headSha: $headSha
+            }' \
+            > "$RUNNER_TEMP/cloudflare-deployment-journal.raw.json"
+          node scripts/cloudflare-deployment-cli.mjs journal \
+            "$RUNNER_TEMP/cloudflare-deployment-journal.raw.json" > "$journal"
+          {
+            echo "candidate-version-id=$candidate_version_id"
+            echo "ready=true"
+            echo "worker-name=$worker_name"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Deploy to Production Worker
-        id: deploy_production
-        if: steps.canary_smoke_tests.outcome == 'success'
-        working-directory: packages/mcp-cloudflare
+      - name: Persist deployment recovery journal
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: pnpm exec wrangler deploy --message "toolkit-mcp:$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:$TESTED_SHA"
-
-      - name: Verify production deployment ownership
-        id: verify_production
-        if: steps.deploy_production.outcome == 'success'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: node scripts/cloudflare-deployment.mjs verify
-
-      - name: Wait for Production to Propagate
-        if: steps.verify_production.outcome == 'success'
+          GH_TOKEN: ${{ steps.journal-token.outputs.token }}
+          CLOUDFLARE_JOURNAL_APP_ID: ${{ secrets.CLOUDFLARE_JOURNAL_APP_ID }}
+          CLOUDFLARE_JOURNAL_HMAC_KEY: ${{ secrets.CLOUDFLARE_JOURNAL_HMAC_KEY }}
+          CLOUDFLARE_JOURNAL_TRUSTED_SHA: ${{ vars.CLOUDFLARE_JOURNAL_TRUSTED_SHA }}
         run: |
-          echo "Waiting 30 seconds for production deployment to propagate..."
-          sleep 30
+          set -euo pipefail
+          journal_hmac_key="$CLOUDFLARE_JOURNAL_HMAC_KEY"
+          journal_trusted_sha="$CLOUDFLARE_JOURNAL_TRUSTED_SHA"
+          unset CLOUDFLARE_JOURNAL_HMAC_KEY CLOUDFLARE_JOURNAL_TRUSTED_SHA
+          result="$RUNNER_TEMP/cloudflare-journal-append.json"
+          CLOUDFLARE_JOURNAL_HMAC_KEY="$journal_hmac_key" \
+            CLOUDFLARE_JOURNAL_TRUSTED_SHA="$journal_trusted_sha" \
+            node scripts/cloudflare-journal-store.mjs append \
+            "$RUNNER_TEMP/cloudflare-deployment-journal.json" \
+            '${{ steps.reconcile.outputs.branch-head-sha }}' > "$result"
+          jq -e \
+            --argjson runId "$GITHUB_RUN_ID" \
+            --argjson runAttempt "$GITHUB_RUN_ATTEMPT" '
+              .state == "appended" and
+              .runId == $runId and
+              .runAttempt == $runAttempt
+            ' "$result" > /dev/null
 
-      # === SMOKE TEST PRODUCTION ===
-      - name: Run Smoke Tests on Production
-        id: production_smoke_tests
-        if: steps.verify_production.outcome == 'success'
+      - name: Revalidate Test revision before candidate activation
         env:
-          PREVIEW_URL: https://mcp.sentry.dev
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Running smoke tests on production..."
-          cd packages/smoke-tests
-          pnpm test:ci
+          set -euo pipefail
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/${{ github.event.workflow_run.id }}" \
+            > "$RUNNER_TEMP/api-run.json"
+          current_head_sha="$(
+            gh api "/repos/$GITHUB_REPOSITORY/commits/${{ github.event.repository.default_branch }}" --jq '.sha'
+          )"
+          node "$RUNNER_TEMP/validate-deployment.mjs" \
+            "$RUNNER_TEMP/event-run.json" \
+            "$RUNNER_TEMP/api-run.json" \
+            "$RUNNER_TEMP/repository.json" \
+            '${{ steps.validate.outputs.test-workflow-id }}' \
+            "$current_head_sha" \
+            > /dev/null
 
-      - name: Publish Production Smoke Test Report
-        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
-        if: always() && steps.production_smoke_tests.outcome != 'skipped'
-        with:
-          report_paths: "packages/smoke-tests/tests.junit.xml"
-          check_name: "Production Smoke Test Results"
-          fail_on_failure: false
-
-      - name: Recover captured previous version after smoke failure
-        if: failure() && steps.production_smoke_tests.outcome == 'failure' && steps.verify_production.outcome == 'success'
+      - name: Activate candidate at zero percent traffic
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: node scripts/cloudflare-deployment.mjs recover
-
-      - name: Fail Job if Production Smoke Tests Failed
-        if: failure() && steps.production_smoke_tests.outcome == 'failure'
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_PROJECT_PATH: ${{ steps.projects.outputs.cloudflare-path }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ steps.build.outputs.artifact-digest }}
+          FROZEN_ARTIFACT_PATH: ${{ steps.build.outputs.artifact-path }}
         run: |
-          echo 'Production smoke tests failed. Inspect the deployment before changing traffic.' >&2
+          set -euo pipefail
+          actual_digest="$(node scripts/hash-directory.mjs "$FROZEN_ARTIFACT_PATH")"
+          if [[ "$actual_digest" != "$EXPECTED_ARTIFACT_DIGEST" ]]; then
+            echo "Production artifact changed after its version was uploaded" >&2
+            exit 1
+          fi
+          bash scripts/cloudflare-deployment-live.sh transition candidate \
+            "$CLOUDFLARE_PROJECT_PATH" \
+            "$RUNNER_TEMP/cloudflare-deployment-journal.json"
+
+      - name: Wait for exact candidate version
+        env:
+          CANDIDATE_VERSION: ${{ steps.journal.outputs.candidate-version-id }}
+          CLOUDFLARE_WORKER_NAME: ${{ steps.journal.outputs.worker-name }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 24); do
+            if curl \
+              --fail \
+              --max-time 5 \
+              --show-error \
+              --silent \
+              -H "Cloudflare-Workers-Version-Overrides: $CLOUDFLARE_WORKER_NAME=\"$CANDIDATE_VERSION\"" \
+              https://mcp.sentry.dev/_health/version \
+              | jq -e --arg expected "$CANDIDATE_VERSION" '.id == $expected' >/dev/null; then
+              exit 0
+            fi
+            if [[ "$attempt" -lt 24 ]]; then
+              sleep 5
+            fi
+          done
+          echo "Candidate version did not become ready" >&2
           exit 1
+
+      - name: Smoke test exact candidate version
+        id: candidate-smoke-tests
+        env:
+          CLOUDFLARE_VERSION_OVERRIDE: ${{ steps.journal.outputs.candidate-version-id }}
+          CLOUDFLARE_WORKER_NAME: ${{ steps.journal.outputs.worker-name }}
+          EXPECTED_VERSION_ID: ${{ steps.journal.outputs.candidate-version-id }}
+          PREVIEW_URL: https://mcp.sentry.dev
+          SENTRY_HOST: ${{ vars.SENTRY_HOST }}
+        run: |
+          set -euo pipefail
+          report='${{ steps.projects.outputs.smoke-path }}/tests.junit.xml'
+          rm -f -- "$report"
+          pnpm --dir '${{ steps.projects.outputs.smoke-path }}' test:ci
+          test -s "$report"
+          python3 -c 'import sys; import xml.etree.ElementTree as ET; ET.parse(sys.argv[1])' "$report"
+
+      - name: Publish candidate smoke test results
+        if: always() && steps.candidate-smoke-tests.outcome != 'skipped'
+        continue-on-error: true
+        uses: mikepenz/action-junit-report@a83fd2b5d58d4fc702e690c1ea688d702d28d281 # v5.6.1
+        with:
+          annotate_only: true
+          check_name: Cloudflare candidate smoke tests
+          fail_on_failure: false
+          include_passed: true
+          report_paths: ${{ steps.projects.outputs.smoke-path }}/tests.junit.xml
+
+      - name: Revalidate Test revision before promotion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/${{ github.event.workflow_run.id }}" \
+            > "$RUNNER_TEMP/api-run.json"
+          current_head_sha="$(
+            gh api "/repos/$GITHUB_REPOSITORY/commits/${{ github.event.repository.default_branch }}" --jq '.sha'
+          )"
+          node "$RUNNER_TEMP/validate-deployment.mjs" \
+            "$RUNNER_TEMP/event-run.json" \
+            "$RUNNER_TEMP/api-run.json" \
+            "$RUNNER_TEMP/repository.json" \
+            '${{ steps.validate.outputs.test-workflow-id }}' \
+            "$current_head_sha" \
+            > /dev/null
+
+      - name: Promote tested candidate to production
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_PROJECT_PATH: ${{ steps.projects.outputs.cloudflare-path }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ steps.build.outputs.artifact-digest }}
+          FROZEN_ARTIFACT_PATH: ${{ steps.build.outputs.artifact-path }}
+        run: |
+          set -euo pipefail
+          actual_digest="$(node scripts/hash-directory.mjs "$FROZEN_ARTIFACT_PATH")"
+          if [[ "$actual_digest" != "$EXPECTED_ARTIFACT_DIGEST" ]]; then
+            echo "Production artifact changed after candidate smoke testing" >&2
+            exit 1
+          fi
+          bash scripts/cloudflare-deployment-live.sh transition promoted \
+            "$CLOUDFLARE_PROJECT_PATH" \
+            "$RUNNER_TEMP/cloudflare-deployment-journal.json"
+
+      - name: Wait for exact production version
+        env:
+          CANDIDATE_VERSION: ${{ steps.journal.outputs.candidate-version-id }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 24); do
+            if curl \
+              --fail \
+              --max-time 5 \
+              --show-error \
+              --silent \
+              https://mcp.sentry.dev/_health/version \
+              | jq -e --arg expected "$CANDIDATE_VERSION" '.id == $expected' >/dev/null; then
+              exit 0
+            fi
+            if [[ "$attempt" -lt 24 ]]; then
+              sleep 5
+            fi
+          done
+          echo "Production version did not become ready" >&2
+          exit 1
+
+      - name: Smoke test promoted production version
+        id: production-smoke-tests
+        env:
+          EXPECTED_VERSION_ID: ${{ steps.journal.outputs.candidate-version-id }}
+          PREVIEW_URL: https://mcp.sentry.dev
+          SENTRY_HOST: ${{ vars.SENTRY_HOST }}
+        run: |
+          set -euo pipefail
+          report='${{ steps.projects.outputs.smoke-path }}/tests.junit.xml'
+          rm -f -- "$report"
+          pnpm --dir '${{ steps.projects.outputs.smoke-path }}' test:ci
+          test -s "$report"
+          python3 -c 'import sys; import xml.etree.ElementTree as ET; ET.parse(sys.argv[1])' "$report"
+
+      - name: Publish production smoke test results
+        if: always() && steps.production-smoke-tests.outcome != 'skipped'
+        continue-on-error: true
+        uses: mikepenz/action-junit-report@a83fd2b5d58d4fc702e690c1ea688d702d28d281 # v5.6.1
+        with:
+          annotate_only: true
+          check_name: Cloudflare production smoke tests
+          fail_on_failure: false
+          include_passed: true
+          report_paths: ${{ steps.projects.outputs.smoke-path }}/tests.junit.xml
+
+      - name: Verify completed deployment ownership
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_PROJECT_PATH: ${{ steps.projects.outputs.cloudflare-path }}
+          DEPLOY_WORKFLOW_ID: ${{ steps.validate.outputs.deploy-workflow-id }}
+          GH_TOKEN: ${{ github.token }}
+          JOURNAL_GH_TOKEN: ${{ steps.journal-token.outputs.token }}
+          CLOUDFLARE_JOURNAL_APP_ID: ${{ secrets.CLOUDFLARE_JOURNAL_APP_ID }}
+          CLOUDFLARE_JOURNAL_HMAC_KEY: ${{ secrets.CLOUDFLARE_JOURNAL_HMAC_KEY }}
+          CLOUDFLARE_JOURNAL_TRUSTED_SHA: ${{ vars.CLOUDFLARE_JOURNAL_TRUSTED_SHA }}
+        run: |
+          set -euo pipefail
+          bash scripts/cloudflare-reconcile.sh verify-promoted \
+            "$CLOUDFLARE_PROJECT_PATH" \
+            "$RUNNER_TEMP/cloudflare-deployment-journal.json" \
+            "$DEPLOY_WORKFLOW_ID" \
+            '${{ github.sha }}' \
+            > "$RUNNER_TEMP/cloudflare-completed-reconciliation.json"
+          : > "$RUNNER_TEMP/cloudflare-deployment-complete"
+
+      - name: Reconcile Cloudflare state
+        if: always() && steps.journal.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_PROJECT_PATH: ${{ steps.projects.outputs.cloudflare-path }}
+          DEPLOY_WORKFLOW_ID: ${{ steps.validate.outputs.deploy-workflow-id }}
+          GH_TOKEN: ${{ github.token }}
+          JOURNAL_GH_TOKEN: ${{ steps.journal-token.outputs.token }}
+          CLOUDFLARE_JOURNAL_APP_ID: ${{ secrets.CLOUDFLARE_JOURNAL_APP_ID }}
+          CLOUDFLARE_JOURNAL_HMAC_KEY: ${{ secrets.CLOUDFLARE_JOURNAL_HMAC_KEY }}
+          CLOUDFLARE_JOURNAL_TRUSTED_SHA: ${{ vars.CLOUDFLARE_JOURNAL_TRUSTED_SHA }}
+        run: |
+          set -euo pipefail
+          if [[ -f "$RUNNER_TEMP/cloudflare-deployment-complete" ]]; then
+            echo "Cloudflare deployment reconciliation already completed"
+          else
+            bash scripts/cloudflare-reconcile.sh restore \
+              "$CLOUDFLARE_PROJECT_PATH" \
+              "$RUNNER_TEMP/cloudflare-deployment-journal.json" \
+              "$DEPLOY_WORKFLOW_ID" \
+              '${{ github.sha }}' \
+              > "$RUNNER_TEMP/cloudflare-restored-reconciliation.json"
+          fi
