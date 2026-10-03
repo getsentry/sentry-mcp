@@ -20,11 +20,24 @@ smoke-test suite remains in its own workflow.
 
 ### deploy.yml
 Runs after a successful `Test` push run on `main`. Checks out the tested commit,
-requires that it is still the tip of `main`, then deploys and tests canary.
-Records the active production version before changing traffic, deploys the
-tested commit, and verifies the run-owned candidate before production smoke
-tests. If those fail, restores the captured version only while this run's
-candidate remains active. External changes stop recovery.
+requires that it is still the tip of `main`, and reads the authenticated
+deployment journal before touching Cloudflare. It builds one frozen artifact,
+uploads a production-scoped version, records the previous active version, and
+appends the recovery journal. It activates the candidate at zero percent
+traffic and smoke-tests that exact version through a Worker version override.
+Only then does it promote the version to production and smoke-test live traffic.
+Failed deployments restore the captured version only after an exact ownership
+check. External or ambiguous state stops recovery.
+
+### recover-cloudflare-deployment.yml
+Runs after deployment to verify or reconcile the newest authenticated journal.
+It never selects a recovery version from mutable deployment history.
+
+### bootstrap-cloudflare-journal.yml
+Initializes the protected journal branch once, from a reviewed `main` revision
+and a verified deployment that failed before mutating Cloudflare. Follow the
+[journal bootstrap procedure](../cloudflare-deployment.md); never create the
+branch by hand or dispatch bootstrap after initialization.
 
 ### migrate-cloudflare-token.yml
 Moves the Cloudflare API token from a repository secret into the protected
@@ -75,24 +88,18 @@ Other configuration:
 
 ## Deployment Architecture
 
-### Workers
-- **`sentry-mcp`** - Production worker at `https://mcp.sentry.dev`
-- **`sentry-mcp-canary`** - Canary worker at `https://sentry-mcp-canary.getsentry.workers.dev`
-
-### Resource Isolation
-Canary and production use separate resources for complete isolation:
-
-| Resource | Production | Canary |
-|----------|------------|---------|
-| KV Namespace | `8dd5e9bafe1945298e2d5ca3b408a553` | `a3fe0d23b2d34416930e284362a88a3b` |
-| Rate Limiter IDs | `1001`, `1002`, `1003`, `1004` | `2001`, `2002`, `2003`, `2004` |
-| Wrangler Config | `wrangler.jsonc` | `wrangler.canary.jsonc` |
+### Worker
+**`sentry-mcp`** serves production at `https://mcp.sentry.dev`. The candidate
+is a version of this same Worker, tested through a version override while
+production traffic still uses the preceding version.
 
 ### Deployment Flow
 
 The workflow never deploys an untested revision or a stale `main` commit.
 Failure to identify the prior active version, verify deployment ownership, or
 confirm the restored version fails the job rather than guessing a recovery.
+The [durable journal](../cloudflare-deployment.md) binds deployment and recovery
+to reviewed code and authenticated Git history.
 
 ## Manual Deployment
 

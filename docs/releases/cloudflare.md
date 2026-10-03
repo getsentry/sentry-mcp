@@ -142,13 +142,15 @@ Production deployments run only from the trusted `Deploy to Cloudflare` workflow
 after the `Test` workflow succeeds for the current `main` commit:
 
 1. Merge a PR into `main`; GitHub Actions tests that exact commit.
-2. The workflow builds and deploys `sentry-mcp-canary`, then runs canary smoke tests.
-3. After canary succeeds, it records the currently active production version
-   and deploys the tested commit to `sentry-mcp`.
-4. It verifies that this run owns the new deployment and runs production smoke
-   tests. On failure it restores the captured previous version **only if**
-   production still serves this run's exact candidate. External changes or
-   ambiguous traffic allocation stop recovery rather than overwrite them.
+2. The workflow reads the authenticated deployment journal, builds one frozen
+   artifact, uploads a production-scoped Worker version, and records the prior
+   active version in the durable journal before changing traffic.
+3. It activates the candidate at zero percent traffic, then runs smoke tests
+   against that exact version through a Worker version override.
+4. After those tests pass, it promotes the candidate to 100 percent and tests
+   live production traffic. On failure it restores the captured previous
+   version **only if** the current deployment still belongs to this run.
+   External changes or ambiguous traffic allocation stop recovery.
 
 The `production` GitHub environment allows only `main`. Store
 `CLOUDFLARE_API_TOKEN` there with Workers deployment permissions. Configure
@@ -156,26 +158,13 @@ The `production` GitHub environment allows only `main`. Store
 out of command arguments and logs. After a verified deployment, remove any
 repository-level copy of `CLOUDFLARE_API_TOKEN`.
 
-See `github-actions.md` for detailed setup instructions.
+See [GitHub Actions](../operations/github-actions.md) and the
+[journal bootstrap procedure](../cloudflare-deployment.md) for setup.
 
 Production traffic changes must use the protected workflow. Do not use bare
 `wrangler rollback`: it selects from mutable deployment history and can undo
 someone else's deployment. If recovery declines because production changed,
 inspect the active version and use a new reviewed workflow run to fix forward.
-
-#### Version Uploads (Gradual Rollouts)
-
-For feature branches, GitHub Actions automatically uploads new versions without deploying:
-
-1. Push to any branch (except main)
-2. Tests run automatically
-3. If tests pass, version is uploaded to Cloudflare
-4. Use Cloudflare dashboard to gradually roll out the version
-
-Manual version upload:
-```bash
-pnpm cf:versions:upload
-```
 
 ### Creating Resources
 
